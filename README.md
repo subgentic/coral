@@ -1,216 +1,301 @@
 <p align="center">
-  <strong>Coral: the Inbox for your agents.</strong>
+  <h1 align="center">Coral: The Inbox for Your Coding Agents</h1>
+  <p align="center">
+    <strong>Your agents do the work. Anything that needs <em>you</em> — a permission prompt, a question, a plan or file to review — lands in one Inbox on your laptop or phone, and the agent carries on the moment you answer.</strong>
+  </p>
+  <p align="center">
+    <a href="https://github.com/subgentic/coral/releases/latest/download/Coral.dmg"><strong>macOS (<code>.dmg</code>)</strong></a> ·
+    <a href="https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi"><strong>Windows (<code>.msi</code>)</strong></a> ·
+    <a href="https://github.com/subgentic/coral/releases/latest/download/coral-linux-amd64.tar.gz"><strong>Linux x86-64</strong></a> ·
+    <a href="https://github.com/subgentic/coral/releases/latest/download/coral-linux-arm64.tar.gz"><strong>Linux ARM64</strong></a> ·
+    <a href="https://github.com/subgentic/coral/releases/latest"><strong>All releases</strong></a>
+  </p>
+  <p align="center">
+    <sub>Works with <strong>Claude Code</strong>, <strong>Codex</strong>, and <strong>Antigravity</strong> · <strong>Bring your own keys &amp; subscriptions</strong> · <strong>Apache-2.0</strong></sub>
+  </p>
+  <p align="center">
+    <a href="#quick-start">Quick Start</a> ·
+    <a href="#who-coral-is-for">Who It Is For</a> ·
+    <a href="#the-inbox-your-agents-report-to-you">The Inbox</a> ·
+    <a href="#long-running-teams--shared-memory">Teams &amp; Memory</a> ·
+    <a href="#why-coral">Why Coral</a> ·
+    <a href="#features">Features</a> ·
+    <a href="#contributing">Contributing</a> ·
+    <a href="https://subgentic.github.io/coral/">Docs</a> ·
+    <a href="https://discord.gg/qhfgY57AZn">Discord</a>
+  </p>
 </p>
 
-<p align="center">
-  Your coding agents do the work. Anything that needs <em>you</em> &mdash; a question, a permission, a file to review &mdash; lands in one Inbox, on your laptop or your phone, and the agent carries on the moment you answer.
-</p>
+```bash
+# Install on macOS or Linux with one command:
+curl -fsSL https://github.com/subgentic/coral/releases/latest/download/install.sh | bash
+```
 
 <p align="center">
-  <a href="https://github.com/subgentic/coral/releases/latest/download/Coral.dmg">macOS (.dmg)</a> &bull;
-  <a href="https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi">Windows (.msi)</a> &bull;
-  <a href="https://github.com/subgentic/coral/releases/latest/download/Coral-x64-portable.zip">Windows portable (.zip)</a> &bull;
-  <a href="https://github.com/subgentic/coral/releases/latest/download/coral-linux-amd64.tar.gz">Linux x86-64</a> &bull;
-  <a href="https://github.com/subgentic/coral/releases/latest/download/coral-linux-arm64.tar.gz">Linux ARM64</a> &middot; <a href="https://github.com/subgentic/coral/releases/latest">all releases</a><br>
-  Apache-2.0 &middot; no account, nothing to sign up for &middot; you keep your own keys and subscriptions &middot; works with Claude Code, Codex, Antigravity, Pi, OpenCode and Hermes (experimental)</sub>
-</p>
-
-<p align="center">
-  <a href="https://github.com/subgentic/coral"><img src="https://img.shields.io/github/stars/subgentic/coral?style=social" alt="GitHub Stars"></a>
-  <a href="https://github.com/subgentic/coral/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="Apache 2.0 License"></a>
-  <a href="https://subgentic.github.io/coral/"><img src="https://img.shields.io/badge/docs-live-blue" alt="Documentation"></a>
-  <a href="https://discord.gg/qhfgY57AZn"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
-</p>
-
-<p align="center">
-  <a href="#the-inbox">The Inbox</a> &bull;
-  <a href="#chief-your-front-agent">Chief</a> &bull;
-  <a href="#a-team-with-an-orchestrator">Teams</a> &bull;
-  <a href="#quick-start">Quick Start</a> &bull;
-  <a href="https://subgentic.github.io/coral/">Documentation</a> &bull;
-  <a href="https://discord.gg/qhfgY57AZn">Discord</a>
-</p>
-
-<p align="center">
-  <img width="100%" alt="A short demo: a team of agents launches, a document arrives in the Inbox, you comment on it and the agent updates it" src="assets/demo/coral-demo-inbox.gif" />
+  <img src="assets/demo/coral-demo-inbox.gif" alt="A short demo: a team of agents launches, a document arrives in the Inbox, you comment on a passage, and the agent answers and updates it" width="900">
   <br>
-  <sub>A document lands in the Inbox, you comment, the agent answers and updates it. (Sample data; staged with scripted agents.)</sub>
-</p>
-
-<p align="center">
-  <img alt="A file in Coral's review space: version 2 of 2 with Compare, and Approve and Request changes" src="assets/readme/review-approve.png" width="100%" />
-  <br>
-  <sub>A file an agent made, waiting for your review: read it, Approve or Request changes. (Sample data.)</sub>
-</p>
-
-<p align="center">
-  
-<img width="100%" alt="Needs You for review and questions" src="https://github.com/user-attachments/assets/2c995cf7-7a5b-4be0-94ad-ee5e3efd4552" />
-
-
-
-  <br>
-  <sub>A file an agent made, waiting for your review: read it, Approve or Request changes.</sub>
+  <sub>A document lands in the Inbox (<code>Needs you</code>), you comment on a passage, and the agent replies and uploads version 2 with an inline diff. <em>(Sample data; staged with scripted agents.)</em></sub>
 </p>
 
 ---
 
-<p align="center">
-  <strong>Install on macOS or Linux with one command:</strong>
-</p>
+## Who Coral Is For
 
-```bash
-curl -fsSL \
-  https://github.com/subgentic/coral/releases/latest/download/install.sh \
-  | bash
-```
+Running one coding agent for ten minutes in a terminal is easy. Running four, six, or ten agents across a multi-hour or multi-day project is where ad-hoc workflows break down:
+- A **permission prompt** sits unseen for an hour in a background terminal tab.
+- An **architectural question** or finished plan gets buried in scrollback.
+- **Context compaction, agent restarts, or handoffs** wipe out why a decision was made two hours ago.
+
+Coral turns ad-hoc agent sessions into a structured workflow where **your agents report to you**:
+
+1. **Developers running multiple agents in parallel** who want one **Inbox** (`Needs you`) for every permission, question, and deliverable across every running session — instead of babysitting terminal windows.
+2. **Builders mixing the best agent and model for each role** — for example, a **Claude Code** Orchestrator breaking down work, **Codex** workers writing code in isolated git worktrees, and an **Antigravity** reviewer checking the diff.
+3. **Long-running sessions where you stay in control.** Coral's **Goals** (each with a clear `Done when` check) and **Tasks** let you break long-horizon projects into structured steps with review checkpoints — so multi-hour or multi-day work is completed with a high level of control.
+4. **Sessions that keep their memory across agents and compactions.** Because the **Board**, **Tasks**, and **Goals** live in Coral — backed by **universal search** across boards and chats plus automatic **Knowledge distillation** — your team keeps its context across agents, restarts, and context compactions instead of starting from scratch.
+
+---
+
+## The Inbox: Your Agents Report to You
+
+Instead of checking ten terminal tabs to see who is stuck, you steer everything from one **Inbox**:
+
+- **`Needs you` — one queue for every human decision.** Every agent waiting on a tool permission, asking a question (`--ask`, including Approve/Deny `--yes-no` prompts), or submitting a plan or file tagged `for review` appears in one list. Answer in one tap and the agent immediately resumes its turn. The Inbox badge and background tab title show the live count, with optional desktop, Slack, or Discord alerts.
+- **Versioned file review with inline `Compare` and passage comments.** Open any plan, report, or file an agent uploaded, select a passage to leave an inline comment (or mark up an image with a pen, arrow, or box), and choose **Approve**, **Approve with a note**, or **Request changes**. When the agent uploads a revision (`--new-version-of`), **Compare** highlights the exact lines added and removed between versions.
 
 <p align="center">
-  <img alt="Compare: what changed between version 1 and version 2 of a file, the added line marked" src="assets/readme/review-compare.png" width="100%" />
+  <img src="assets/readme/review-approve.png" alt="A file in Coral's review space: version 2 of 2 with Compare, Approve, and Request changes" width="900">
   <br>
-  <sub>Compare with the earlier version: what changed, marked. (Sample data.)</sub>
+  <sub>A deliverable waiting in <code>Needs you</code>: read it, comment on a passage, or click <strong>Approve</strong> / <strong>Request changes</strong>. <em>(Sample data.)</em></sub>
 </p>
-
-Coral wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi and OpenCode, and Hermes, which is experimental). It calls no AI API itself: your keys, your subscriptions, your tools. It runs as one Go binary on your laptop or a remote box.
-
-## The Inbox
-
-Running agents is easy. *Knowing when one of them needs you* is the part that goes wrong: a permission prompt sits for an hour in a terminal you closed, a question waits behind a tab you forgot, a finished file never gets looked at. Coral puts all of that in one place.
-
-
-
-- **Needs you.** Every agent that is waiting for a permission, a question or a decision, and every file an agent asks you to review, in one list. One tap answers it; the agent carries on. The number on the Inbox tab is what is waiting, and you can turn on desktop alerts. While the tab is in the background its title carries the total too.
-
-<img width="100%" alt="Needs You for review and questions" src="https://github.com/user-attachments/assets/2c995cf7-7a5b-4be0-94ad-ee5e3efd4552" />
-
-- **A question to you is an item like a review.** It says who asked and about which goal and task, shows its words rendered, and takes your reply with pictures if you want them; a question whose wait ran out while you were away is kept, not lost.
-  
-- **Comments come back to you.** When an agent answers a comment on a file or a goal, the file is back in Needs you, and the goal page has its own Comments tab.
-
--  **Review that keeps its history.** Open a file the agent made, read it, **Approve** or **Request changes**. A new version of the same file arrives as the next version with **Compare**, so you see what changed. Comment on the whole document or a passage, and add a picture you have marked up (pen, arrow, box); the agent is told, and the original is kept. A file that is almost right can be **approved with a note**, and a row you do not want to act on can be **dismissed** (with Undo).
-
-<img width="100%" alt="Needs you review screen with comments" src="https://github.com/user-attachments/assets/94020b64-1850-4fd5-ad11-d06db742b398" />
-
-  
-- **Goals as high level direction.** Give a team a goal, watch its tasks and files, and **Close goal** when it is true. Coral tells you when files for a goal are still waiting for you before you close it, and an active goal whose tasks are all done shows up in Needs you as "looks done" for you to close.
-
-<img width="1580" height="916" alt="Screenshot 2026-11-02 at 11 01 03 PM" src="https://github.com/user-attachments/assets/e4fe5db5-25b5-4ab1-a28b-8e4bcb106d9f" />
-
-
-- **A compact file viewer.** The file first, with its controls on one header row (version chip and Compare, Approve, Request changes, a menu for the rest); on a phone, two thin rows.
-
-<img width="100%" alt="Coral Artifacts" src="https://github.com/user-attachments/assets/33d4c866-2577-4481-af31-7e4b4905fc0d" />
-
-
-- **A record of what you decided.** An Activity folder lists your decisions in Needs you, each row chained to the one before it.
-<img width="100%" alt="Activtity History of Decisions" src="https://github.com/user-attachments/assets/0330d913-4d14-4ef6-8bcf-cca513c7ca5e" />
-
-- **Versioned Artifacts** Artifacts are versioned so you can see what the agents have changed between turns
-
-<img width="100%" alt="What changed between versions" src="https://github.com/user-attachments/assets/895039f1-fc80-440b-bd2f-d758b24f49b9" />
-
-- **Every chat and every board, searchable.** The Inbox also holds the history of every agent CLI's conversations and each team's message board.
-
-- **Detailed Analytics** Analytics from token spend, cache read/writes broken down by provider, model thinking level, tasks, commits. etc. Coral is able to provide incredibly detailed data across your workloads to help you monitor for drift in your agentic system. Use it to figure out where the bottlenecks are in your agents. 
-
-<img width="100%" alt="Total time for a task by model" src="https://github.com/user-attachments/assets/0554a423-d03c-4a21-bc17-5964ed17ef9f" />
-
-
-
-### Use it from your phone
 
 <p align="center">
-<img width="100%" alt="Phone App" src="https://github.com/user-attachments/assets/72fd5d37-97ed-4975-98b0-ec6e9ed92ae6" />
+  <img src="assets/readme/review-compare.png" alt="Compare: what changed between version 1 and version 2 of a file, with added and removed lines highlighted" width="900">
   <br>
-  <sub>The same dashboard on a : the agent list, and one agent's chat. (Sample data.)</sub>
+  <sub>Click <strong>Compare</strong> on any revised artifact to inspect the exact diff since the previous version — inline or side by side. <em>(Sample data.)</em></sub>
 </p>
 
+- **Goals with checkable `Done when` criteria.** Give a team a **Goal** and a single verifiable **Done when** statement (e.g., *"the tests pass and the page loads in under two seconds"*). Coral groups every task and artifact under the goal, warns you if review files are still waiting before you close it, and surfaces active goals in `Needs you` as *"looks done"* once every task completes.
+- **An auditable decision history.** The **Activity** view in the Inbox records every approval, change request, and answer you gave, chained across versions. **All chats** and **Board history** make every conversation across every agent CLI searchable in one place.
 
-## A team of agents with different skills
+---
 
-Behind the Inbox is the part that does the work: a team of agents on one board. An **Orchestrator** plans and delegates; a **Lead Developer** writes the code; a **QA Engineer** checks it. They can be different vendors on the same team (a Claude orchestrator, Codex workers, an Antigravity reviewer), each in its own terminal session and, if you ask, its own git worktree. The team's board holds the messages and a task queue whose dependencies are conditioned on outcomes and artifacts, not just "done".
+## Long-Running Teams & Shared Memory
 
+Behind the Inbox is the coordination and memory layer that keeps multi-agent sessions on track over hours or days:
 
 <p align="center">
-  <img alt="The message board beside an agent's chat: posts from the Orchestrator and workers" src="https://github.com/user-attachments/assets/86c75256-e09d-459d-a517-73809be8bcf2" width="100%" />
+  <img src="assets/readme/dashboard.webp" alt="The Coral dashboard: a team of agents on the left, an Orchestrator's chat in the middle, and the team's message board on the right" width="900">
   <br>
-  <sub>The team's board beside one agent's chat: the Orchestrator and its workers at work. (Sample data.)</sub>
+  <sub>The dashboard with a team of agents at work: the agent list on the left, one agent's chat in the middle, and the team's message board on the right. <em>(Sample data.)</em></sub>
 </p>
 
-- **Mixed-vendor teams.** Permissions are written once and translated into each CLI's native format, so a read-only QA agent is read-only whether it is Claude or Codex.
+- **Memory that survives compaction, restarts, and handoffs.** Coral keeps your project's state outside any single agent's context window:
+  - **The Board, Tasks, and Goals stay in sync:** Every board agent receives the team's open **Goals** when it starts. Waking a sleeping agent resumes its conversation with the team's distilled **Knowledge** attached; restarting an agent briefs it on its board identity and its active or held **Tasks** so it picks up right where it left off.
+  - **Universal search across boards and chats:** When an agent's context compacts — or a teammate picks up a handoff — it can search past board decisions and conversation transcripts with `coral-board search` and `coral-agent history search`, while you can search every agent's conversations in **Inbox › All chats** and **Board history**.
+  - **Automatic Knowledge distillation:** Coral distills the team's transcripts in three passes — extracting per-agent learnings, cross-referencing how teammates work together, and formatting a shared **Knowledge** bundle (overview + per-agent guides on the team's **Knowledge** tab) that is automatically injected when agents start or wake.
+- **High-control task queue with review gates.** Break long-horizon goals into sequential or parallel tasks with dependencies and required deliverables. Authors submit finished work for review (`review_pending`), and designated reviewers inspect the diff and approve or request changes before dependent tasks unlock.
+- **Mixed-vendor teams with unified permissions.** Run **Claude Code**, **Codex**, and **Antigravity** on the same board. Define permissions once (`file_read`, `git_write`, `shell:<pattern>`, or read-only review roles) and Coral translates them into each CLI's native flags and sandboxes.
+- **Event-driven `wait`, never polling.** Workers run `coral-board wait` for a teammate, task, or commit and end their turn. Coral wakes the agent automatically the moment the reply or dependency lands — zero `sleep` loops and zero tokens burned waiting.
+- **Git worktree isolation & inline diffs.** Launch a team into an isolated git worktree (`~/.coral/worktrees/<team>`) or have agents work in per-task worktrees so your main checkout stays clean. Inspect each agent's uncommitted and committed changes file by file beside its chat.
 
-<img width="1580" height="916" alt="Screenshot 2026-11-02 at 11 12 33 PM" src="https://github.com/user-attachments/assets/f85e5e21-a49c-4b58-891b-6a89f151c156" />
+<p align="center">
+  <img src="assets/readme/changed-files.png" alt="An agent's changed-files panel: four files changed versus the previous commit, with an inline diff of cooldown.go alongside the agent's chat" width="900">
+  <br>
+  <sub>Inspect every file an agent touched against <code>main</code> or <code>HEAD~1</code>, with inline diffs right beside the conversation. <em>(Sample data.)</em></sub>
+</p>
 
-- **Idle agents sleep by themselves.** An agent that has been idle for a while is put to sleep to free memory and wakes when something is sent to it; an agent mid-work stays awake. On by default, with a switch in Settings.
-  
-- **A Skills Store (experimental).** Import a skill, review it, approve it; approved skills appear in New agent and New team, and agents can publish and search skills themselves.
-  
-- **Teams that survive closing the lid.** Sleep a whole team and wake it tomorrow, or after upgrading Coral: every agent resumes its own session.
-  
-- **Run it anywhere.** Put Coral on a build server or a spare Mac; open it from any browser, or scan a QR code for a phone client.
+- **Sleep, wake, and automatic idle parking.** Idle agents automatically go to sleep to free memory and wake the moment a message or task arrives for them. You can also sleep an entire team, close your laptop or upgrade Coral, and wake the team later with every session restored.
 
-Everything else is in the [feature list](#features).
+---
+
+## Operate from Your Phone
+
+Scan the QR code in the dashboard (or connect via **Coral Hub**) to open Coral's mobile web client — built for a phone screen and installable to your home screen with no app store download.
+
+<p align="center">
+  <img src="assets/readme/dashboard-on-a-phone.png" alt="The dashboard on a phone: the live sessions list on the left, and an agent's chat on the right" width="520">
+  <br>
+  <sub>The mobile client: monitor live sessions, read and post on the board, review artifacts, and approve permission prompts from your phone. <em>(Sample data.)</em></sub>
+</p>
+
+- **Two-tap approvals & reviews on the go.** Answer tool permission prompts, reply to agent questions, or approve versioned plans from anywhere so long-running sessions never stall while you are away from your desk.
+- **Coral Hub *(invite-only beta)*.** Reach your Coral servers from any browser at [app.coralhub.dev](https://coralhub.dev) without opening firewall ports. A fresh install never connects on its own — opt in anytime from **Settings › Coral Hub** or with `coral cloud connect`.
+
+---
+
+## Deep Cost & Activity Analytics
+
+When you run long-horizon sessions across multiple models and agent teams, you can see exactly where tokens and time are going:
+
+<p align="center">
+  <img src="assets/readme/analytics.png" alt="The Analytics view: token and cost totals, a cumulative spend chart, and cost tables by provider and model" width="900">
+  <br>
+  <sub>Live token and cost analytics: total spend, hourly burn rate, cache efficiency, and breakdowns by Provider, Model, Thinking Level, Team, Git Branch, and Task. <em>(Sample data.)</em></sub>
+</p>
+
+- **Granular cost attribution.** Track input, output, cache read/write tokens, and dollar cost broken down **By Provider**, **By Model**, **By Thinking Level** (`Low`, `Medium`, `High`, `Extra high`, `Max`), team, git branch, task, and commit.
+- **Live model & thinking-level controls.** Switch an agent's model or thinking effort from the chips beside the Send button.
+- **Tool-by-tool activity timeline.** Inspect how each agent spent its time across Bash, file edits, and board commands, with timestamps and durations for every tool call.
+
+<p align="center">
+  <img src="assets/readme/activity-timeline.png" alt="An agent's activity timeline: time split between Bash and Write, with every tool call and duration listed" width="900">
+  <br>
+  <sub>The per-agent Activity timeline: time split by tool category and every tool invocation with its duration. <em>(Sample data.)</em></sub>
+</p>
+
+---
+
+## Why Coral
+
+Coral is not another coding agent — it is the control and memory layer around the coding agents you already use.
+
+- **Versus single-vendor agent tools (*Claude Code / Desktop, Codex App, Cursor*):** Vendor tools work well when you run one provider in one window. Coral coordinates **Claude Code, Codex, and Antigravity** together on one shared board, unifies permissions across CLIs, keeps long-running sessions on track with **Goals** and **Tasks**, preserves memory across compactions and restarts (via the board, universal search, and Knowledge distillation), and puts every agent's questions, permissions, and review files into one **Inbox** reachable from your phone.
+- **Versus terminal multiplexers & local plan files:** Running agents in raw `tmux` panes or tracking work in static markdown files requires you to manually relay context and check terminals. Coral provides a live **Inbox (`Needs you`)** with versioned artifact diffs and passage comments, **event-driven `coral-board wait`**, shared memory and **Knowledge distillation**, a task queue with review gates, and real-time cost analytics.
+- **Versus code-first agent SDKs (*CrewAI, AutoGen, LangGraph*):** Code frameworks help you write custom Python/TypeScript bots against raw LLM APIs. Coral runs the coding CLIs you already subscribe to — zero glue code required.
+
+| Capability | **Coral** | **Single-Vendor Agent Apps** *(Claude / Codex / Cursor)* | **Raw `tmux` / Manual Plan Files** |
+|---|:---:|:---:|:---:|
+| **Supported coding agents** | **Claude Code, Codex, Antigravity** | Single vendor only | Any CLI (uncoordinated) |
+| **Unified Inbox (`Needs you`) for permissions, questions & file reviews** | **Yes (Web + Phone)** | In-app per session | No |
+| **Versioned artifact review with inline `Compare` diffs & passage comments** | **Yes** | No | No |
+| **Long-running session control** | **Goals (`Done when`) + task queue + review gates** | Same-vendor subagents / threads | Manual |
+| **Shared memory across compaction & restarts** | **Board, Tasks & Goals + universal search + Knowledge distillation** | Per-session resume | Manual file reading |
+| **Wait without polling (`coral-board wait`)** | **Yes (event-driven wakeup)** | Internal subagents only | No |
+| **Phone client & permission approvals on the go** | **Yes (QR pair + Coral Hub)** | Desktop / IDE only | No |
+| **Sleep & wake whole teams across restarts** | **Yes (plus automatic idle sleep)** | Per-session / thread resume | Manual |
+| **Cost tracking by provider, model, thinking level, team, branch & task** | **Yes** | Per session or request | None |
+| **Cron-scheduled jobs & multi-step OAuth workflows** | **Yes (isolated git worktree per run)** | Cloud-only or limited | No |
+| **Team health monitor (stuck/idle detection & escalation)** | **Yes** | No | No |
+| **License** | **Apache-2.0 (Open Source)** | Proprietary (Codex CLI open) | — |
 
 ---
 
 ## Quick Start
 
-### Download a release
+### 1. Prerequisite: Install at least one coding agent CLI
 
-Download the latest release from [GitHub Releases](https://github.com/subgentic/coral/releases/latest). These links always point to the newest version:
+Coral drives the agent CLIs installed on your machine; it does not install or authenticate them for you. Install and sign in to at least one:
+- [**Claude Code (`claude`)**](https://code.claude.com/docs/en/overview) — `npm install -g @anthropic-ai/claude-code`
+- [**Codex (`codex`)**](https://github.com/openai/codex) — `npm install -g @openai/codex`
+- [**Antigravity (`agy`)**](https://antigravity.google) — `curl -fsSL https://antigravity.google/cli/install.sh | bash`
 
-- **macOS**: [`Coral.dmg`](https://github.com/subgentic/coral/releases/latest/download/Coral.dmg) (universal binary)
-- **Linux**: [`coral-linux-amd64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-amd64.tar.gz) (x86-64) or [`coral-linux-arm64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-arm64.tar.gz) (ARM64, e.g. Graviton or Docker on Apple silicon)
-- **Windows**: [`Coral-x64.msi`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi) (installer) or [`Coral-x64-portable.zip`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64-portable.zip). These are currently **not code-signed**, so Windows SmartScreen warns that the publisher is unknown. Verify the file with the attestation check below before you run it.
+### 2. One-step install per platform
 
-### Install and start
+#### macOS (Apple Silicon & Intel, macOS 13+)
 
-First install and sign in to at least one agent CLI: [Claude Code](https://code.claude.com/docs/en/overview), [Codex](https://github.com/openai/codex), [Antigravity (`agy`)](https://antigravity.google), [Pi](https://pi.dev), [OpenCode](https://opencode.ai), or Hermes (experimental). Coral runs these tools; it does not install or authenticate them.
+Run the official installer script (installs `Coral.app` in `~/Applications` with bundled `tmux`, and links `coral`, `coral-board`, and `coral-agent` into `~/.local/bin` — never uses `sudo`):
 
-- **macOS:** Open the DMG, drag `Coral.app` to Applications, then open Coral. The app includes tmux. For terminal commands, run `/Applications/Coral.app/Contents/MacOS/install-cli.sh` and add `~/.local/bin` to your `PATH`.
-- **Windows:** Run the MSI, then open **Coral** from the Start menu. For the portable ZIP, extract it, open PowerShell in that folder, and run `.\coral.exe --no-browser`.
-- **Linux:** Download the archive for your architecture, then extract and start it (ARM64: replace `amd64` with `arm64`):
+```bash
+curl -fsSL https://github.com/subgentic/coral/releases/latest/download/install.sh | bash
+```
 
-  ```bash
-  mkdir -p "$HOME/.local/share/coral"
-  tar -xzf coral-linux-amd64.tar.gz -C "$HOME/.local/share/coral"
-  export PATH="$HOME/.local/share/coral:$PATH"
-  coral --no-browser
-  ```
+Or install via **Homebrew**:
 
-In the dashboard, choose **New agent** (then **New agent** again in the dialog: "One agent in a folder you choose"), choose the agent in step 1, enter an existing project folder on the computer running Coral (or use **Browse**), and choose **Launch**. In the agent's **Terminal**, answer any folder-trust or sign-in prompt, then send a task from **Chat** with Enter. Choose **New team** instead to start several agents together.
+```bash
+brew install --cask cdknorow/coral/coral
+```
 
-See [Getting started](https://subgentic.github.io/coral/getting-started/) for the full installation and first-agent walkthrough.
+*(Prefer a manual install? Download [`Coral.dmg`](https://github.com/subgentic/coral/releases/latest/download/Coral.dmg), drag `Coral.app` to Applications, and optionally run `/Applications/Coral.app/Contents/MacOS/install-cli.sh`.)*
 
+#### Linux (`x86-64` & `ARM64`)
 
-## Beta 
+Run the same one-line installer (detects `amd64` or `arm64` and installs `coral`, `coral-board`, and `coral-agent` into `~/.local/bin` without `sudo`):
 
-### Chief, your front agent
+```bash
+curl -fsSL https://github.com/subgentic/coral/releases/latest/download/install.sh | bash
+export PATH="$HOME/.local/bin:$PATH"
+coral --no-browser
+```
 
-**Chief** is one of your running agents that you make the front door. In Settings > Chief you pick which agent it is, give it a name and an avatar (one of eight colours and a letter), and choose the team it fronts: the team whose agents Chief takes your requests to. Chief has its own page on your phone, `/chief`, with its own chat (you turn the page on in Settings). You decide how much it may do on its own: **Ask first** (the default) asks before each action; **Act** edits without asking, and a shell command still asks; the level applies when Chief restarts. Chief has to be an agent that is already running (on a team of its own, a team of one), and Settings > Chief is on the computer itself, not through Coral Hub.
- Coral Hub and the Chief x 
+#### Windows (`x64`)
 
-### Coral Hub
+Download and run [`Coral-x64.msi`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi), or install from PowerShell in one step:
 
-Coral Hub (app.coralhub.dev, invite-only beta) lets you reach your Coral servers from any browser without opening a port. A fresh install never connects, or asks you to, on its own: connect a server from the home screen or **Settings › Coral Hub**, or run `coral cloud connect` on it. Coral offers it at first launch (the dashboard's Connect screen and a prompt in the terminal) only when you pass a hub URL (`--cloud-url https://app.coralhub.dev` or `CORAL_CLOUD_URL`) or start it with `--cloud-connect prompt` (`CORAL_CLOUD_CONNECT=prompt`); `--cloud-connect off` turns that off. See [Coral Hub](coral-go/agent_docs/hub.md#connecting-a-server-to-coral-hub).
+```powershell
+curl.exe -fSLo Coral-x64.msi https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi; Start-Process msiexec.exe -ArgumentList '/i Coral-x64.msi' -Wait
+```
 
+### 3. Launch your first agent or team
 
-## Documentation
+1. **Open Coral** from Applications / Start Menu (or run `coral --no-browser` and open `http://localhost:8420`, port `8450` on Windows).
+2. Click **New agent** to start one coding agent in a project folder, or **New team** to launch an Orchestrator and specialist workers on a shared board (using a built-in template or a plain-English description).
+3. Send your goal or task in **Chat**, then watch **Inbox › Needs you** — whenever an agent asks a question, needs a permission, or uploads a file for review, it lands there.
 
-Full documentation at **[subgentic.github.io/coral](https://subgentic.github.io/coral/)**.
+See the full **[Getting Started Guide](https://subgentic.github.io/coral/getting-started/)** for remote servers, Docker, and Tailscale setup.
+
+---
+
+## Features
+
+| Feature | What It Does |
+|---|---|
+| **The Inbox (`Needs you`)** | One queue for every agent waiting on a permission, a question (`--ask`), or a file review (`--tag "for review"`), plus completed goals and failed unopened automation runs |
+| **Versioned Artifact Review** | Read markdown, code, HTML, or images in the viewer; compare versions (`--new-version-of`) inline or side-by-side; comment on passages; mark up images; **Approve**, **Approve with a note**, or **Request changes** |
+| **Long-Horizon Goals & Tasks** | Goals with checkable `Done when` lines and structured tasks with dependencies, required deliverables, and review gates so long-running sessions stay under your control |
+| **Shared Memory & Universal Search** | The Board, Tasks, and Goals persist in Coral across restarts and compactions, with full-text search across boards and agent transcripts (`coral-board search`, `coral-agent history search`, and **Inbox › All chats**) |
+| **Knowledge Distillation** | Automatically distills agent transcripts into a shared team **Knowledge** bundle (overview + per-agent guides) injected when agents start or wake |
+| **Mixed-Vendor Agent Teams** | Run **Claude Code**, **Codex**, and **Antigravity** on one shared board with unified permission translation |
+| **Event-Driven `wait`** | Agents run `coral-board wait --from <agent>` (or `--task <id>`) and stop their turn; Coral wakes them when the event occurs |
+| **Sleep, Wake & Idle Parking** | Idle agents auto-sleep to save RAM and wake on new messages; sleep and wake entire teams across Coral restarts or upgrades |
+| **Git Worktrees & Diffs** | Opt-in team worktrees (`~/.coral/worktrees/<team>`), per-agent worktree modes, and live inline diffs per session |
+| **Phone Client** | QR-paired mobile web app for monitoring live sessions, reading the board, reviewing files, and approving permissions on the go |
+| **Skills Store *(experimental)*** | Import, review, and approve reusable `SKILL.md` folders; includes 5 built-in Coral skills (`using-coral`, `working-in-a-coral-team`, `orchestrator-team-builder`, and more) |
+| **Workflows & Scheduled Jobs** | Chain shell and agent steps with injected OAuth tokens (GitHub, Slack, Gmail, Calendar), or run cron jobs in fresh git worktrees |
+| **Cost & Activity Analytics** | Real-time token spend, cache read/write ratios, burn rate, and cost tables by Provider, Model, Thinking Level, Team, Branch, and Task |
+| **Agent-Published UI Panels** | Agents can publish sandboxed interactive HTML panels to the dashboard sidebar (`coral-agent ui publish`) |
+| **Coral Hub *(beta)*** | Reach all your Coral machines from any browser at [app.coralhub.dev](https://coralhub.dev) without opening ports (strictly opt-in) |
+
+---
 
 ## Contributing
 
-We welcome contributions in the form of feature requests or bug reports! 
+We welcome contributions — from bug reports and documentation fixes to new agent CLI integrations, skills, and dashboard improvements!
+
+### Build from source
+
+Requires **Git**, **Make**, **Go 1.26.10+**, and a C compiler (Xcode Command Line Tools on macOS, `build-essential` on Linux) for SQLite/SQLCipher:
+
+```bash
+git clone https://github.com/subgentic/coral.git
+cd coral/coral-go
+make build
+./bin/coral --backend pty --no-browser
+```
+
+The build outputs `coral`, `coral-board`, `coral-agent`, and the hook binaries into `coral-go/bin/`.
+
+### Repository layout
+
+| Path | Contents |
+|---|---|
+| `coral-go/cmd/` | Entrypoints for `coral` (server/dashboard), `coral-board`, `coral-agent`, `coral-tray`, and lifecycle hooks |
+| `coral-go/internal/` | Go packages: HTTP/WebSocket server, SQLite store, message board & task queue, agent CLI drivers (`internal/agent/`), scheduler, and cost poller |
+| `coral-go/pkg/frontend/static/` | Web and mobile dashboard UI (vanilla ES modules and CSS — no bundler step required) |
+| `coral-go/agent_docs/` & `site_docs/` | Built-in agent documentation (`coral-agent docs`) and public docs site ([subgentic.github.io/coral](https://subgentic.github.io/coral/)) |
+| `tests/frontend/` & `tests/release/` | Frontend static checks, browser E2E suites, and release/installer verification tests |
+
+### Running tests before opening a PR
+
+```bash
+# Run Go unit tests for packages you touched:
+cd coral-go && go test ./internal/...
+
+# Run frontend static checks (zero browser overhead):
+npm --prefix tests/frontend run test:cloud
+```
+
+- **UI & dashboard changes:** See [`tests/frontend/README.md`](tests/frontend/README.md) for frontend test suites and bundle-size checks.
+- **Commit attribution:** Include `Co-Authored-By: Coral <noreply@coral.com>` if you built your change with Coral.
+- **Questions or ideas?** Open a [GitHub Issue](https://github.com/subgentic/coral/issues) or join us on [Discord](https://discord.gg/qhfgY57AZn).
+
+---
+
+## Documentation & Community
+
+- **Documentation:** [subgentic.github.io/coral](https://subgentic.github.io/coral/)
+- **Discord:** [discord.gg/qhfgY57AZn](https://discord.gg/qhfgY57AZn)
+- **Coral Hub:** [coralhub.dev](https://coralhub.dev)
 
 ## License
 
 Apache 2.0 License. See [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  <a href="https://github.com/subgentic/coral">Star the repo</a> &bull;
-  <a href="https://discord.gg/qhfgY57AZn">Join Discord</a> &bull;
-  <a href="https://subgentic.github.io/coral/">Read the docs</a>
-</p>
