@@ -533,6 +533,7 @@
 1	team_working_mode.js	infoBox(infoId, explanation)
 1	team_working_mode.js	infoButton(infoId, `${label} prompts`)
 2	team_working_mode.js	label
+1	team_working_mode.js	note
 1	team_working_mode.js	options
 1	team_working_mode.js	title
 1	template_browser.js	active

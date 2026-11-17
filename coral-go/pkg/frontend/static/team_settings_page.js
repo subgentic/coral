@@ -2,7 +2,7 @@
 // shapes it saves, the presets editor, the Health check and Messaging parts (their own forms and Saves, held by the bar) and the read-only prompt preview.
 import { importOnce } from './import_once.js';
 import { escapeHtml, copyText, showToast } from './utils.js';
-import { splitKey, serverUrl, isCloud, boardFetch } from './server_base.js';
+import { splitKey, serverUrl, isCloud, boardFetch, boardLabel } from './server_base.js';
 import { rebaseChanges } from './settings_diff.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_settings_groups.css'); // the headings, the rail and the search box of this page: not in the start's stylesheet (#15058)
@@ -186,7 +186,7 @@ function loadSettings(st) {
         if (!orch.values) st.view.removeGroup('orchestrator');
         const guides = await st.gr.load().catch(() => ({ values: null })); // the owner's roster: not given to a page that may not read it (the group is then not drawn)
         if (!guides.values) st.view.removeGroup('guides');
-        st.q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), st.workingMode) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(st.team)))}</p>`;
+        st.q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), st.workingMode, { id: splitKey(st.team).name, name: boardLabel(st.team) }) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(st.team)))}</p>`;
         return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), max_open_goals: Number(boardSettings?.max_open_goals) || 0, goals_need_approval: Boolean(boardSettings?.goals_need_approval), tasks_need_approval: Boolean(boardSettings?.tasks_need_approval), planning_approval: presetOf({ goals_need_approval: boardSettings?.goals_need_approval, tasks_need_approval: boardSettings?.tasks_need_approval, require_goal: boardSettings?.require_goal }), ...(st.healthBase ? healthToValues(st.healthBase) : {}), ...(orch.values || {}), ...(guides.values || {}) };
     };
 }
