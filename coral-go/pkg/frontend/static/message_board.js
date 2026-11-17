@@ -26,12 +26,12 @@ const { confirmDeleteBoardMessage, copyMessageLink, loadPausedState, loadSleepSt
 const { clearNewPill, jumpToLatest } = await importOnce('./board_new_pill.js');
 const { focusMessageById, formatTime, isAtBottom, jumpToFirst, loadBoardMessages, loadEarlierMessages, openMessageActions, renderMessages } = await importOnce('./board_window.js');
 const { _pollNewMessages, startBoardPoll, stopBoardPoll } = await importOnce('./board_poll.js');
-const { replyToMessage, postBoardMessage } = await importOnce('./board_composer.js');
+const { replyToMessage, postBoardMessage, postEvent } = await importOnce('./board_composer.js');
 importOnce('./board_quick_reply.js');
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
 // the moved exports, still importable from here
 export const { showExportBoardModal, toggleSelectMode } = BX;
-export { jumpToLatest, doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, postBoardMessage, toggleBoardPause };
+export { postEvent, jumpToLatest, doExportBoard, toggleMessageSelect, selectAllMessages, selectNoneMessages, cancelSelectMode, exportSelectedAsMarkdown, postBoardMessage, toggleBoardPause };
 /* Message Board: project list, messages, subscribers, posting */
 
 // ── Sidebar rendering ────────────────────────────────────────────────────
