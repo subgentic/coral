@@ -4,7 +4,7 @@
  * was; text after a closing quote up to the delimiter is kept as it is; an unterminated quote runs to the end of the text; a short or long record is kept as it is (the table pads). It never throws and never
  * reads more than `maxChars` characters (a larger text is cut at its last whole line and `cut` says so), and it stores at most `maxRows` records while still counting the rest, and at most `maxCols` fields of a record while still counting its width. */
 
-export const MAX_CHARS = 2 * 1024 * 1024; // the preview's own cap on text (artifact_preview.js)
+export const MAX_CHARS = 2 * 1024 * 1024; // separate table parser budget; larger artifacts can still use Raw text
 export const MAX_ROWS = 5000;
 export const MAX_COLS = 200;
 

@@ -3,11 +3,10 @@
  * Trust is one exact version of the file (its digest), kept on the computer that holds it (GET/PUT/DELETE /api/artifacts/{digest}/trust-preview, owner only). The page that
  * runs is artifact_host.html in a frame with sandbox="allow-scripts" and nothing else: no same-origin access, no cookies, no popups, no forms, no device (allow=""); an in-memory storage shim stands in for localStorage/sessionStorage (lost when the frame is removed).
  * Its own policy (header and meta) blocks every request; the file's HTML is posted into it ONCE, after Coral has hashed the bytes it fetched and found them equal to the
- * digest that was trusted. Any other answer (a failed read of the trust, a different hash, a file over 2 MiB, no way to hash) leaves scripts OFF, with the plain preview. */
+ * digest that was trusted. Any other answer (a failed read of the trust, a different hash, a file over the preview budget, no way to hash) leaves scripts OFF, with the plain preview. */
 import { serverFetch } from './server_base.js';
 import { isPhoneLayout } from './phone_layout.js';
 
-export const MAX_SCRIPT_HTML_BYTES = 2 * 1024 * 1024;
 const HOST_URL = '/static/artifact_host.html';
 const MAX_HEIGHT = 20000;
 export const HEIGHT_GAP_MS = 250;

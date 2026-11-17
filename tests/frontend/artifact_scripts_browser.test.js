@@ -174,10 +174,11 @@ const OTHER = 'cd'.repeat(32);
             await waitFor(`/tried to leave this page/.test((document.querySelector('#artifact-viewer .artifact-scripts-line') || {}).textContent || '') && !document.querySelector('#artifact-viewer .artifact-linked-preview iframe')`, `${w}: a file that navigates itself is stopped and the frame removed`, 15000);
             await ev(`window.__body = ${JSON.stringify(HTML)}`);
 
+            await ev(`import(${S}+'state.js').then(m => { m.state.settings.artifact_preview_max_mb='2'; return true; })`);
             // 8. a file whose bytes decode to more than 2 MiB (the preview allows 2 MiB of bytes; invalid bytes become 3-byte characters): no offer, no frame (kills: the 2 MiB limit off)
             await ev(`window.__trust.clear(); window.__bodyBytes = new Uint8Array(1536 * 1024).fill(0xff)`);
             await open(HEX, false);
-            await waitFor(`/over 2 MiB/.test((document.querySelector('#artifact-viewer .artifact-scripts-line') || {}).textContent || '')`, `${w}: the over-limit line for bytes that decode past 2 MiB`, 15000);
+            await waitFor(`/Preview is limited to 2 MB/.test((document.querySelector('#artifact-viewer .artifact-scripts-line') || {}).textContent || '')`, `${w}: the over-limit line for bytes that decode past 2 MiB`, 15000);
             assert.ok(!(await q('.artifact-scripts-ask')) && !(await q('.artifact-scripts-bar')), `${w}: no offer and no scripts for a file past the limit`);
             await ev(`window.__bodyBytes = null`);
             // 8. over 2 MiB (the preview's own limit, the same number): no frame and no offer
@@ -185,6 +186,7 @@ const OTHER = 'cd'.repeat(32);
             await open(HEX, false); await sleep(800); // sleep-ok: a negative: the over-limit file is answered by the preview's own fallback, which never draws a frame or an offer
             const big = await ev(`({ line: (document.querySelector('#artifact-viewer .artifact-scripts-line') || {}).textContent || '', ask: !!document.querySelector('#artifact-viewer .artifact-scripts-ask'), frame: !!document.querySelector('#artifact-viewer .artifact-linked-preview iframe') })`);
             assert.ok(!big.ask, `${w}: a file over 2 MiB is not offered scripts: ` + JSON.stringify(big).slice(0, 200));
+            await ev(`import(${S}+'state.js').then(m => { m.state.settings.artifact_preview_max_mb='16'; return true; })`);
             await ev(`window.__body = ${JSON.stringify(HTML)}; document.querySelector('#artifact-viewer .artifact-viewer-close')?.click(); true`);
         }
     } finally { await client.close(); }

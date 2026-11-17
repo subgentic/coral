@@ -9,8 +9,9 @@ import { renderCaptureText, syncPaneWidth } from './capture.js';
 import { getTerminal } from './xterm_renderer.js';
 import { isCloud } from './server_base.js';
 import { NOTHING_TO_SAVE } from './settings_diff.js';
-import { savedWords, renderRemoteAccessStatus, renderDebugInputLogStatus, applyTheme, clearCustomThemeVars, applyCustomThemeByName, restoreSavedTheme } from './settings_core.js';
+import { renderRemoteAccessStatus, renderDebugInputLogStatus, applyTheme, clearCustomThemeVars, applyCustomThemeByName, restoreSavedTheme } from './settings_core.js';
 import { browserLocal } from './safe_storage.js';
+const { savedWords } = await importOnce('./settings_saved_words.js'); // Save words are needed only after Settings opens.
 const { _invalidateAgentModels, _invalidateDefaultModels } = await importOnce('./launch_models.js');
 const { databaseEncryptionChanged, saveDatabaseEncryptionSettings } = await importOnce('./settings_machine.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { readSettingsForm, payloadNow, changedSince } = await importOnce('./settings_form.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
