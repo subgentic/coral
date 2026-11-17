@@ -74,4 +74,34 @@ toggleRow(row, true); assert.equal(isRowOpen(7), true);
 const open = rowParts({ id: 7, content: 'hi' }, { agent: 'A', timeHtml: '', moreLabel: 'm' });
 assert.ok(/data-msg-id="7"/.test(open.actions) && /Reply/.test(open.actions) && /mb-open/.test(open.classes), 'an open row has its actions');
 const dock = rowParts({ id: 7, content: 'hi' }, { agent: 'A', timeHtml: '', moreLabel: '', more: false }); assert.ok(!/mb-row-more/.test(dock.actions) && dock.attrs === '', 'the dock has no More'); toggleRow(row, false); assert.equal(isRowOpen(7), false);
+// #19015: reply metadata is built as nodes, even when future fields contain markup.
+const html = Object.getOwnPropertyDescriptor(window.Element.prototype, 'innerHTML');
+Object.defineProperty(window.Element.prototype, 'innerHTML', { ...html, set(value) {
+    if (this.classList.contains('mb-row-reply') || this.classList.contains('mb-row-replies')) throw new Error('Reply metadata must be built as DOM nodes');
+    html.set.call(this, value);
+} });
+try {
+    for (const name of ['', '   ', null, '<img src=x onerror="boom">']) {
+        const parent = document.createElement('div'); parent.dataset.messageId = '41';
+        const actions = document.createElement('div'); actions.className = 'mb-row-actions';
+        const holder = document.createElement('div'); holder.className = 'mb-row-replies'; parent.append(actions, holder);
+        const child = document.createElement('div'); child.dataset.messageId = '42" autofocus onfocus="boom';
+        if (name !== null) { const who = document.createElement('span'); who.className = 'mb-row-who'; who.textContent = name; child.append(who); }
+        const head = document.createElement('div'); head.className = 'mb-row-toggle';
+        const time = document.createElement('time'); time.textContent = '<svg onload="boom">'; head.append(time); child.append(head);
+        const body = document.createElement('div'); body.className = 'mb-message-body';
+        const link = document.createElement('a'); link.href = 'https://example.com/reply'; link.id = 'reply-source'; link.textContent = 'Reply body'; body.append(link); child.append(body);
+        await toggleRow(parent, true, [child]);
+        const expected = name?.trim() || 'sender', button = holder.querySelector('.mb-row-reply-open');
+        assert.equal(button.getAttribute('aria-label'), 'Open reply by ' + expected, 'empty/missing sender has a useful accessible name');
+        assert.equal(button.dataset.msgId, child.dataset.messageId, 'reply id stays in one data attribute');
+        assert.equal(button.getAttribute('autofocus'), null);
+        assert.equal(holder.querySelector('b').textContent, expected);
+        assert.equal(holder.querySelector('.mb-row-reply-time').textContent, time.textContent);
+        assert.equal(holder.querySelector('img, svg, [onerror], [onload], [onfocus]'), null, 'metadata is text, never HTML');
+        assert.equal(holder.querySelector('.mb-row-reply-words a').href, link.href, 'reply links remain intact');
+        assert.equal(holder.querySelector('.mb-row-reply-words [id]'), null, 'body clones do not duplicate ids');
+        await toggleRow(parent, true, []); assert.equal(holder.childNodes.length, 0); assert.equal(holder.hidden, true);
+    }
+} finally { Object.defineProperty(window.Element.prototype, 'innerHTML', html); }
 console.log('board_table: ok');
