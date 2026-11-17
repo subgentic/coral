@@ -11,6 +11,7 @@ import (
 	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/internal/tracking"
 	"github.com/subgentic/coral/pkg/resourcequeue"
 	"html/template"
 	"io"
@@ -725,6 +726,7 @@ func dashboardCSPFor(host string) string {
 }
 
 func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
+	tracking.NoteDashboardPageServed() // in memory only: the stall watch (#19088) tells a page never requested from one that never reported ready
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", dashboardCSPFor(r.Host))
 	// Team, board and session names are in the page path now (#3532): a link out of the

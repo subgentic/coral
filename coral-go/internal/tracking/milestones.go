@@ -60,6 +60,9 @@ type milestoneState struct {
 	// Held are funnel steps that happened before consent (#7455, HoldFunnelStep): a closed-list value and a time each, sent once the Terms are accepted
 	// with analytics on, deleted when analytics is off then.
 	Held map[string]heldStep `json:"held,omitempty"`
+	// DashOpen is what the first start did about opening the dashboard (a closed-list value and a time), kept until the server's stall watch has looked at it
+	// (stall.go), so the server child of the Coral app can read what the app did. Deleted with the held steps when analytics is off.
+	DashOpen *heldStep `json:"dash_open,omitempty"`
 }
 
 // pendingMilestone is one frozen one-time event.
