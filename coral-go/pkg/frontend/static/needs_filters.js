@@ -1,4 +1,5 @@
 import { importOnce } from './import_once.js';
+export const { openQuestion } = await importOnce('./needs_open_text.js');
 import { serverUrl } from './server_base.js';
 const { artifactThumbnail, thumbnailPath } = await importOnce('./artifact_thumbnail.js');
 import { serverFilter } from './inbox_servers.js';
