@@ -77,6 +77,10 @@ func NewEvent(eventType, summary string, detailJSON *string) Event {
 	return e
 }
 
+// CompactingMaxSeconds is how long an agent may show Compacting with no event after it (#19151): a compaction that was aborted (Esc, a crash, the CLI killed) leaves only its PreCompact, and the row must not
+// say Compacting for ever. Ten minutes is well past any real compaction.
+const CompactingMaxSeconds = 600
+
 // maxWantsBytes bounds the stored Wants of an event read back (the server stores at most 200 characters; this is the read side's own bound).
 const maxWantsBytes = 2048
 
@@ -514,6 +518,10 @@ func (d *deriver) summarise(in Input) {
 	d.state.OwnRequest = d.state.NeedsInput && !IsHeldInputSummary(d.state.WaitingSummary)
 	d.state.Working = (d.latestType == "tool_use" || d.latestType == "prompt_submit") &&
 		in.StalenessSeconds < 120
+	// A compaction that was aborted sends no event after its PreCompact: past the longest a compaction takes, the row stops saying Compacting and is as quiet as any turn with no news (#19151).
+	if d.state.Compacting && in.StalenessSeconds >= CompactingMaxSeconds {
+		d.state.Compacting = false
+	}
 	// No authoritative stuck signal exists in the event schema yet. Keep the
 	// field explicit and false rather than inventing a timeout heuristic.
 	d.state.Stuck = false
