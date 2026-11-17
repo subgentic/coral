@@ -147,7 +147,7 @@ export function openImagePicker() {
 registerActions({
     'chat-team-files': async () => {
         const team = sessionTeamKey(state.currentSession);
-        if (team) await (await importOnce('./team_page.js')).openTeamPage(team, { tab: 'artifacts' });
+        if (team) { window.closeSendMenu(); await (await importOnce('./team_page.js')).openTeamPage(team, { tab: 'artifacts' }); }
     },
     'attach-image-picked': el => { const files = [...(el.files || [])]; el.value = ''; if (files.length) uploadPickedImages(files); },
 });
@@ -235,8 +235,7 @@ let lastDropNotice = 0;
 const imageName = (i, n) => (n > 1 ? `Image ${i + 1}` : 'Image');
 
 export function renderAttachments(session = state.currentSession) {
-    const otherFiles = document.getElementById('composer-other-files');
-    if (otherFiles) otherFiles.hidden = !sessionTeamKey(session);
+    for (const otherFiles of document.querySelectorAll('.composer-other-files')) otherFiles.hidden = !sessionTeamKey(session);
     const container = document.getElementById("image-attachments");
     if (!container) return;
 

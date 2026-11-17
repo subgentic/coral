@@ -476,6 +476,7 @@ export function renderQuickActions() {
                         <span class="send-menu-text">Send<span class="send-menu-note">Sends your message to the agent</span></span>
                         <span class="send-menu-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
                     </button>
+                    <button class="menu-item send-menu-item composer-other-files" role="menuitem" data-on-click="chat-team-files">Artifacts &gt; Add files</button>
                     <button class="menu-item send-menu-item" role="menuitem" data-on-click="send-menu-team">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M17 11a4 4 0 0 1 4 4v2"/></svg>
                         <span class="send-menu-text">Send and remind about team messages<span class="send-menu-note">Adds a reminder to use the team board, then sends</span></span>
