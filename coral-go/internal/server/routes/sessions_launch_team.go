@@ -203,7 +203,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		body.BoardName = key
 		boardCreated = created
 	}
-	if h.refuseAgentLaunchWhileAccessOff(w, r, body.BoardName) {
+	if h.refuseAgentLaunchWhileAccessOff(w, r, body.BoardName, body.BoardServer, boardCreated) {
 		h.rollBackTeamLaunch(context.WithoutCancel(r.Context()), body, 0, "", false, boardCreated)
 		return
 	}

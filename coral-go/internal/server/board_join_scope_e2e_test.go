@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -165,6 +166,8 @@ func TestAgentTokenCannotLaunchOntoAnotherBoard(t *testing.T) {
 	require.NoError(t, err)
 	_, err = bs.Subscribe(ctx, a.ID, "Dev", "Orchestrator", "claude-"+sid, nil, "all")
 	require.NoError(t, err)
+	// An agent starts agents only where the Operator switched Orchestrator access on for its team (#19138).
+	require.NoError(t, bs.SetOrchGrant(ctx, board.OrchGrant{Project: a.ID, Enabled: true, SeatSession: "claude-" + sid, MaxPerHour: 10, MaxLive: 10, IdleMin: 30}, "Operator"))
 	liveCount := func() int {
 		all, err := ss.GetAllLiveSessions(ctx)
 		require.NoError(t, err)

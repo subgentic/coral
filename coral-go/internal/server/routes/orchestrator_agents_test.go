@@ -488,23 +488,16 @@ func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 		b, _ := json.Marshal(map[string]any{"working_dir": work, "agent_type": "claude", "board_id": boardName, "display_name": "Helper"})
 		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok[who])
 	}
-	// the switch is off: a helper launch by any agent on its own board still goes, and is logged with its actor and target
+	// the switch is off (no grant row is off, #19138): an agent's launch is refused and nothing is started or logged
 	code, out := launch("Dev2", orchBoard)
-	require.Equal(t, http.StatusOK, code, out)
+	require.Equal(t, http.StatusForbidden, code, out)
+	assert.Equal(t, "orchestrator_access_off", out["code"])
 	log, err := r.h.bs.LifecycleLog(ctx, orchBoard, 10)
 	require.NoError(t, err)
-	require.Len(t, log, 1)
-	assert.Equal(t, board.LifecycleLaunch, log[0].Kind)
-	assert.Equal(t, "Dev2", log[0].Actor)
-	assert.Equal(t, "Helper", log[0].Target)
-	assert.Equal(t, "ok", log[0].Status)
-	msgs, _ := r.h.bs.ListMessages(ctx, orchBoard, 50, 0, 0)
-	for _, m := range msgs {
-		assert.NotContains(t, m.Content, "started Helper", "with the switch off no line is said on the board")
-	}
+	require.Len(t, log, 0)
 
-	// the switch on, a cap of two launches and wakes an hour: the log already holds one, one more passes, the next is refused with the cap named and nothing started
-	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 2, "max_live": 50})
+	// the switch on, a cap of one launch or wake an hour: the first passes, the next is refused with the cap named and nothing started
+	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 1, "max_live": 50})
 	require.Equal(t, http.StatusOK, code)
 	before, _ := r.ss.CountActiveLiveSessions(ctx)
 	code, out = launch("Dev2", orchBoard)
@@ -514,7 +507,7 @@ func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 	assert.Equal(t, "board_hourly_limit", out["code"])
 	after, _ := r.ss.CountActiveLiveSessions(ctx)
 	assert.Equal(t, before+1, after, "the refused launch started nothing")
-	msgs, _ = r.h.bs.ListMessages(ctx, orchBoard, 50, 0, 0)
+	msgs, _ := r.h.bs.ListMessages(ctx, orchBoard, 50, 0, 0)
 	said := false
 	for _, m := range msgs {
 		if strings.Contains(m.Content, "[Coral] Dev2 started Helper") {
@@ -568,19 +561,15 @@ func TestAnAgentsTeamLaunchIsLoggedAndCountedMemberByMember(t *testing.T) {
 		}
 		return ms
 	}
-	// the switch off: both members start and both are in the log
+	// the switch off (no grant row is off, #19138): nobody starts and nothing is logged
 	code, out := team("Dev2", "TeamA", "TeamB")
-	require.Equal(t, http.StatusOK, code, out)
+	require.Equal(t, http.StatusForbidden, code, out)
+	assert.Equal(t, "orchestrator_access_off", out["code"])
 	log, err := r.h.bs.LifecycleLog(ctx, orchBoard, 10)
 	require.NoError(t, err)
-	require.Len(t, log, 2)
-	for _, e := range log {
-		assert.Equal(t, board.LifecycleLaunch, e.Kind)
-		assert.Equal(t, "Dev2", e.Actor)
-		assert.Equal(t, "ok", e.Status)
-	}
-	// the switch on with room for one more this hour: the first member of the next team starts, the second is refused with the cap named
-	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 3, "max_live": 50})
+	require.Len(t, log, 0)
+	// the switch on with room for one this hour: the first member of the team starts and is logged, the second is refused with the cap named
+	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 1, "max_live": 50})
 	require.Equal(t, http.StatusOK, code)
 	before, _ := r.ss.CountActiveLiveSessions(ctx)
 	code, out = team("Orchestrator", "TeamC", "TeamD")
@@ -589,7 +578,7 @@ func TestAnAgentsTeamLaunchIsLoggedAndCountedMemberByMember(t *testing.T) {
 	require.Len(t, ms, 2)
 	assert.Nil(t, ms[0]["error"], "the first fits under the cap")
 	assert.Equal(t, "board_hourly_limit", ms[1]["code"])
-	assert.Contains(t, ms[1]["error"], "3 launches and wakes an hour")
+	assert.Contains(t, ms[1]["error"], "an hour")
 	after, _ := r.ss.CountActiveLiveSessions(ctx)
 	assert.Equal(t, before+1, after, "only the member under the cap started")
 	// a team whose every member is over the cap starts nobody

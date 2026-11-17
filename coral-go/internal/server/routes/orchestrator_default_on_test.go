@@ -100,7 +100,9 @@ func TestATeamWithoutAnOrchestratorGetsNoGrant(t *testing.T) {
 func TestATeamAnAgentLaunchesGetsNoGrant(t *testing.T) {
 	r := newOrchRig(t)
 	r.usualBoard()
-	code, out := r.do("POST", "/api/sessions/launch-team", defTeamBody("agentmade", r.work, "Orchestrator", "Dev3"), nil, r.tok["Dev2"])
+	code, out := r.operatorGrant("Orchestrator", nil) // the agent's own team has its switch on (#19138); the team it makes starts with none
+	require.Equal(t, http.StatusOK, code, out)
+	code, out = r.do("POST", "/api/sessions/launch-team", defTeamBody("agentmade", r.work, "Orchestrator", "Dev3"), nil, r.tok["Dev2"])
 	require.Equal(t, http.StatusOK, code, out)
 	g, err := r.h.bs.GetOrchGrant(context.Background(), out["board_id"].(string))
 	require.NoError(t, err)
@@ -203,7 +205,7 @@ func TestAnAgentsLaunchStaysInTheTeamsFolder(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code, "the Operator is not held to the team's folder: %v", out)
 }
 
-// The upgrade rule: a board with no grant row, or a grant that is off, keeps what it had. An agent starts agents in any folder there.
+// The folder rule applies only where the grant is on: with no grant row or an off grant an agent may not start agents at all (#17661, #19138), so there is no folder to hold it to.
 func TestTheFolderRuleDoesNotApplyWhereTheGrantIsOffOrAbsent(t *testing.T) {
 	r := newOrchRig(t)
 	r.usualBoard() // no grant row
@@ -213,7 +215,8 @@ func TestTheFolderRuleDoesNotApplyWhereTheGrantIsOffOrAbsent(t *testing.T) {
 		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok["Dev2"])
 	}
 	code, out := launch(t.TempDir())
-	assert.Equal(t, http.StatusOK, code, "no row: today's behaviour: %v", out)
+	assert.Equal(t, http.StatusForbidden, code, "no row: the switch is off, as wake reads it (#19138): %v", out)
+	assert.Equal(t, "orchestrator_access_off", out["code"])
 	code, _ = r.operatorGrant("Orchestrator", nil)
 	require.Equal(t, http.StatusOK, code)
 	code, out = launch(t.TempDir())
@@ -285,10 +288,10 @@ func TestAnAgentsLaunchWithNoBoardGoesOntoItsOwnTeamWhereTheGrantIsOn(t *testing
 		}
 		return *ls.BoardName
 	}
-	// no grant row: as it was, on no board
+	// no grant row: the switch is off, so an agent's launch is refused (#19138)
 	code, out := launch(nil)
-	require.Equal(t, http.StatusOK, code, out)
-	assert.Equal(t, "", boardOf(out), "grant absent: unchanged")
+	require.Equal(t, http.StatusForbidden, code, out)
+	assert.Equal(t, "orchestrator_access_off", out["code"])
 	// the grant on: the launch is on the team, logged, and under the cap
 	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_live": 2, "max_per_hour": 50})
 	require.Equal(t, http.StatusOK, code)
@@ -398,12 +401,13 @@ func TestEverySpellingOfSomewhereElseIsHeldToTheCallersTeam(t *testing.T) {
 	code, out = r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok["Dev2"])
 	assert.Equal(t, http.StatusForbidden, code, out)
 	assert.Equal(t, "outside_team_folder", out["code"])
-	// a board with no grant, and the Operator, are not held to any team
+	// a board with no grant is as off as one switched off (#19138): the agent's launch is refused; the Operator is not held to any team
 	other := r.seat("Loner", "Developer", "lonely-board", "claude", false, 9)
 	_ = other
 	bo, _ := json.Marshal(map[string]any{"working_dir": t.TempDir(), "agent_type": "claude", "display_name": "Free", "board_name": "free", "new_board": true})
 	code, out = r.do("POST", "/api/sessions/launch", string(bo), nil, r.tok["Loner"])
-	assert.Equal(t, http.StatusOK, code, "a team with no grant is as it was: %v", out)
+	assert.Equal(t, http.StatusForbidden, code, "a team with no grant: the switch is off: %v", out)
+	assert.Equal(t, "orchestrator_access_off", out["code"])
 	code, out = r.do("POST", "/api/sessions/launch", string(bo), operatorClient, "")
 	assert.Equal(t, http.StatusOK, code, "the Operator is never held: %v", out)
 }
