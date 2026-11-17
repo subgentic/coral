@@ -25,7 +25,7 @@ let agentsTableState = DT.tableState();
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
 // One word for a working agent (#15830, design guidelines 4.5): Working covers busy and an idle agent whose task is started; the task number is in Doing. The strip keeps four (All, Working, Has a task, Sleeping); the other states are in a More select beside it.
 const STRIP = ['working', 'has_task', 'sleeping'], MORE = ['available', 'queued', 'waiting', 'needs_input', 'offline', 'unavailable', 'unknown', 'archived'];
-const BUCKET_WORD = { working: 'Working', has_task: 'Has a task', available: 'Free', queued: 'Queued', waiting: 'Waiting for work', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Ended', archived: 'Archived', unavailable: 'Unavailable', unknown: 'Not reported' };
+const BUCKET_WORD = { working: 'Working', has_task: 'Has a task', available: 'Waiting for work', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Ended', archived: 'Archived', unavailable: 'Unavailable', unknown: 'Not reported' };
 const MARK = { working: 'working', needs_input: 'waiting', sleeping: 'sleeping', offline: 'done', unavailable: 'failed' }; // any other state is the grey hollow dot
 const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', needs_input: 'goal-state-blocked', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
 const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
@@ -39,7 +39,7 @@ const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type 
 
 // One status per agent (#10603, the Beta tester): an agent that is idle with a task already in progress is working on it, not "Task assigned, idle" beside "#1 in progress".
 const startedTask = (a) => (a.tasks || []).find(t => t.status === 'in_progress');
-const bucket = (a) => { const v = a.availability || 'unknown'; return v === 'busy' || (v === 'task_idle' && startedTask(a)) ? 'working' : v === 'task_idle' ? 'has_task' : v; }; // exclusive: every agent is in one, so the counts add up
+const bucket = (a) => { const v = a.availability === 'waiting' && !(a.tasks || []).length ? 'available' : a.availability || 'unknown'; return v === 'busy' || (v === 'task_idle' && startedTask(a)) ? 'working' : v === 'task_idle' ? 'has_task' : v; }; // exclusive: every agent is in one, so the counts add up
 const statusWord = (a) => BUCKET_WORD[bucket(a)] || 'Not reported';
 const statusNode = (a) => statusMark(MARK[bucket(a)] || 'idle', statusWord(a)); // the shared mark: a shape and a word, no blue
 // dropAt is one of the steps data_table.css has (62, 52, 36, 28, 20, 16): 32 and 33 had no rule, so those two columns never gave way and a phone's Status chip and row broke (#14903). Open tasks and Time on current task (#14861, the Operator): the tasks assigned to the agent that are pending, in progress or in review (a link to the Tasks tab filtered to the agent), and how long it has had its task in progress (since the claim; a dash with none).
