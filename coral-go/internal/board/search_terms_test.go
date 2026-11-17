@@ -128,3 +128,20 @@ func TestQueryMessagesAllWordsAndWithoutSystemPosts(t *testing.T) {
 	// a quoted phrase is one term
 	require.Equal(t, []int64{a}, ids(words(`"staging certificate" renewed`), true))
 }
+
+// The closest tasks are the ones holding the most words, wherever they sit in time (#19481): an older task with 3 of 4 words beats the newest ones with 1.
+func TestSearchWorkRelaxedRanksBeforeItCutsToTheLimit(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	best, err := s.CreateTask(ctx, "alpha", "Staging certificate renewal", "the tls certificate for staging", "low", "orch")
+	require.NoError(t, err)
+	for i := 0; i < 10; i++ {
+		_, err := s.CreateTask(ctx, "alpha", "Newer noise", "mentions renewal only", "low", "orch")
+		require.NoError(t, err)
+	}
+	hits, _, err := s.SearchWork(ctx, WorkQuery{Board: "alpha", Text: "staging certificate renewal billing", Sources: []string{"tasks"}, Relaxed: true, Limit: 3})
+	require.NoError(t, err)
+	require.NotEmpty(t, hits)
+	require.Equal(t, best.ID, hits[0].ID, "the task holding 3 of 4 words comes first though 10 newer ones hold 1")
+	require.Equal(t, 3, hits[0].Matched)
+}

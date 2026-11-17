@@ -64,6 +64,10 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 		want["tasks"], want["goals"] = true, true
 	}
 	terms := SearchTerms(text)
+	scanLimit := limit + 1
+	if q.Relaxed { // the closest are the ones holding most words, not the newest: read a bounded larger set, rank it, then cut
+		scanLimit = relaxedScanLimit
+	}
 	if want["tasks"] {
 		var rows []struct {
 			ID     int64   `db:"id"`
@@ -108,7 +112,7 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 		} else {
 			sqlText += " ORDER BY at DESC, id DESC LIMIT ?"
 		}
-		args = append(args, limit+1)
+		args = append(args, scanLimit)
 		if err = s.reader().SelectContext(ctx, &rows, sqlText, args...); err != nil {
 			return nil, false, err
 		}
@@ -163,7 +167,7 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 			} else {
 				sqlText += " ORDER BY updated_at DESC, id DESC LIMIT ?"
 			}
-			args = append(args, limit+1)
+			args = append(args, scanLimit)
 			if err = s.reader().SelectContext(ctx, &rows, sqlText, args...); err != nil {
 				return nil, false, err
 			}
@@ -191,6 +195,9 @@ func (s *Store) SearchWork(ctx context.Context, q WorkQuery) (hits []WorkHit, mo
 	}
 	return hits, more, nil
 }
+
+// relaxedScanLimit bounds the rows a near-match search reads from each table before it ranks them by words held (#19481).
+const relaxedScanLimit = 200
 
 // The states "open" stands for (#19476): a task still to do or being done, a goal not yet closed.
 var (
