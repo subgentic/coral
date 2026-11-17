@@ -48,7 +48,13 @@ let _returnFocus = null;
 let _comments = null;    // the comments panel of the viewer (#5182)
 function paintSnapshot(dialog, at) {
     let note = dialog.querySelector('.artifact-viewer-snapshot');
-    if (!note) { note = document.createElement('p'); note.className = 'artifact-viewer-snapshot'; note.setAttribute('role', 'note'); _details.add(note); }
+    if (!note) {
+        note = document.createElement('p'); note.className = 'artifact-viewer-snapshot'; note.setAttribute('role', 'note');
+        const quiet = _details.button.hidden;
+        _details.add(note);
+        // The menu still opens Details; a snapshot alone adds no header control.
+        if (quiet) _details.button.hidden = true;
+    }
     const date = at ? new Date(at) : null;
     note.hidden = false;
     note.textContent = `Uploaded snapshot${date && Number.isFinite(date.getTime()) ? ' · ' + date.toLocaleString() : ''}. Source-file changes are not copied here.`;

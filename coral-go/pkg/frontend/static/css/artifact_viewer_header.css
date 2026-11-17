@@ -171,3 +171,9 @@
 }
 
 @media (pointer: coarse) { .av-bar .btn, .av-icon { min-height: var(--control-touch-height, 44px); } } /* the version arrows and the viewer's icons on a tablet too (walk 80 item 10, #17694) */
+/* At 320 px the title needs its own row with the menu; Comments wraps below. */
+@media (max-width: 359px) {
+    .artifact-viewer-title { min-width: 120px; }
+    .artifact-viewer-header > .artifact-viewer-morewrap { order: 1; }
+    .artifact-viewer-header > .ac-toggle { order: 2; }
+}
