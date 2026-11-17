@@ -118,7 +118,7 @@ const HEX = crypto.createHash('sha256').update(TODO_HTML).digest('hex');
         await ev(`(() => { const n = document.querySelector('#artifact-viewer .artifact-linked-notice'); if (n) n.hidden = true; return true; })()`);
         await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
         const menuItem = await ev(`(() => { const item = document.querySelector('#artifact-viewer .artifact-viewer-scripts-item'); return item ? item.textContent.trim() : null; })()`);
-        assert.equal(menuItem, 'Run scripts…', 'the menu offers Run scripts while they are off');
+        assert.equal(menuItem, "Run this page's scripts", 'the menu offers Run scripts while they are off');
         await click('.artifact-viewer-scripts-item');
         assert.ok(await q('.artifact-scripts-sure'), 'the menu opens the confirmation even with the notice hidden');
 
