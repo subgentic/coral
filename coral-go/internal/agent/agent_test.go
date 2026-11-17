@@ -395,18 +395,33 @@ func TestDefaultPromptGuidanceKeepsCorrectionsAndHandoffsActionable(t *testing.T
 	}
 }
 
-func TestDefaultPromptsNameSearch(t *testing.T) {
-	for name, prompt := range map[string]string{
-		"orchestrator system": DefaultOrchestratorSystemPrompt,
-		"worker system":       DefaultWorkerSystemPrompt,
-		"orchestrator action": DefaultOrchestratorActionPrompt,
-		"worker action":       DefaultWorkerActionPrompt,
+// Every board agent is told how to look things up, once, in the shared intro: the default prompts, and a team's own default prompt too (#19422).
+func TestBoardSystemPromptNamesSearchOnceForEveryPrompt(t *testing.T) {
+	for name, c := range map[string]struct {
+		role      string
+		overrides map[string]string
+	}{
+		"worker":                {"dev", nil},
+		"orchestrator":          {"Orchestrator", nil},
+		"worker override":       {"dev", map[string]string{"default_prompt_worker": "Custom worker instructions"}},
+		"orchestrator override": {"Orchestrator", map[string]string{"default_prompt_orchestrator": "Custom orchestrator instructions"}},
 	} {
-		if !strings.Contains(prompt, `coral-board search "<words>" --sort newest`) {
-			t.Errorf("%s prompt missing coral-board search command", name)
+		prompt := BuildBoardSystemPrompt("board1", c.role, "", c.overrides, "")
+		if n := strings.Count(prompt, DefaultSearchGuidance); n != 1 {
+			t.Errorf("%s: the search line appears %d times, want once", name, n)
 		}
-		if !strings.Contains(prompt, "and your past chats in one list") { // #19236: the one command searches past chats too
-			t.Errorf("%s prompt does not say coral-board search covers past chats", name)
+	}
+	for _, want := range []string{`coral-board search "<words>"`, "past chats", "--source", "Do not grep logs or transcripts"} {
+		if !strings.Contains(DefaultSearchGuidance, want) {
+			t.Errorf("the search line is missing %q", want)
+		}
+	}
+	if strings.Contains(DefaultSearchGuidance, "--sort newest") {
+		t.Error("a named sort turns off best-match order: the line must not tell agents to use it")
+	}
+	for name, prompt := range map[string]string{"orchestrator system": DefaultOrchestratorSystemPrompt, "worker system": DefaultWorkerSystemPrompt, "orchestrator action": DefaultOrchestratorActionPrompt, "worker action": DefaultWorkerActionPrompt} {
+		if strings.Contains(prompt, "To find something said before") {
+			t.Errorf("%s still carries the old search sentence", name)
 		}
 	}
 }

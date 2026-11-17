@@ -416,7 +416,7 @@ Retrieve a sliding window of conversation turns surrounding a target turn so mat
 
 ## CLI Usage (`coral-agent`)
 
-Coral agents can execute history searches directly from their environment without leaving their terminal.
+Coral agents can execute history searches directly from their environment without leaving their terminal. `coral-board search "<words>" --source history` searches your own past chats too, together with the board's posts, tasks and goals.
 
 ```bash
 # Search conversation history for facts or instructions
