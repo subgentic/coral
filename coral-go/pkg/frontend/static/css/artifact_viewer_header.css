@@ -160,3 +160,12 @@
 /* The older-version banner (#18767): across the top of the viewer, above the content: the one notice (warning tone, full-width bar) with Open vN in it; only where it sits is here */
 .artifact-newer-banner { flex: none; margin: 0; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
 .artifact-newer-banner-text { flex: 1 1 14rem; min-width: 0; }
+@media (min-width: 768px) and (max-height: 600px) { /* a short laptop window (150% zoom on 1280 x 800 is 853 x 533, walk 60, #17300): the change request is a compact form (Add image shares the button row, the sharing line waits in its button's hover) so the document stays in view under it, and it scrolls if it still does not fit */
+    .artifact-review { flex: 0 0 auto; min-height: 0; max-height: 45dvh; overflow-y: auto; }
+    .artifact-review-form { padding-block: 4px; gap: 4px 6px; }
+    .artifact-review-form textarea { min-height: var(--control-height); height: calc(var(--control-height) + 12px); }
+    .artifact-review-form > .ac-images-hint { display: none; }
+    .artifact-review-form > label, .artifact-review-form > textarea { margin-block: 0; }
+    .artifact-review-form > .artifact-review-error:empty { display: none; } /* an empty message line is not a row of its own between the pictures and the buttons */
+    .artifact-review-form > :is(.ac-picker, .ac-pics, .ac-add-image) { flex: 0 0 auto; margin-inline-end: auto; }
+}

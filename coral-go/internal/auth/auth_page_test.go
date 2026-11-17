@@ -366,3 +366,11 @@ func TestPasswordRecoveryDocsLink(t *testing.T) {
 		assert.NotContains(t, page, `id="panel-forgot"`)
 	}
 }
+
+// Walk 60 (#17300): at 150% zoom on a 1280 x 800 laptop (853 x 533 CSS px) the create-password card is taller than the window; a centred body of a fixed
+// 100% height let it grow past the top edge, so the logo touched it and could not be scrolled to. The body grows with the card.
+func TestAuthPageBodyGrowsWithATallCard(t *testing.T) {
+	page := AuthPage(PageState{})
+	assert.NotContains(t, page, "html, body { height: 100%; }")
+	assert.Contains(t, page, "body { min-height: 100%; }")
+}
