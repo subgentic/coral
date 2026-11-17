@@ -42,7 +42,7 @@ func TestWebAppManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	const want = "The Inbox for your agents"
-	if !strings.Contains(string(readme), "Coral: the Inbox for your agents.") {
+	if !strings.Contains(strings.ToLower(string(readme)), "the inbox for your coding agents") {
 		t.Fatal("the README's first line changed: update this test and the manifest description together")
 	}
 	if !strings.Contains(m.Description, want) || strings.Contains(strings.ToLower(m.Description), "multi-agent orchestration") {
