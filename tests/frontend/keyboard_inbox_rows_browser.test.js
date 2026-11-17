@@ -22,9 +22,14 @@ const { coralReady, waitStable } = require('./helpers/wait');
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             for (const tab of ['tasks', 'saved']) {
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('${tab}')).then(() => true)`);
-                await waitFor(`document.querySelectorAll('.dt-table tbody tr .dt-primary').length >= 2`, `${tag} ${tab}: rows`, 8000); await waitFor(`!!document.querySelector('.dt-table tbody tr .dt-primary')`, 'row', 4000);
-                await ev(`document.querySelectorAll('.dt-table tbody tr .dt-primary')[1].focus(); true`); const before = await active();
-                await key('Enter'); await waitFor(`!document.querySelector('.dt-table tbody tr .dt-primary') || document.activeElement !== document.querySelector('.dt-table tbody tr .dt-primary')`, `${tag} ${tab}: the item opens`, 6000);
+                // The hidden Saved dock also has .dt-primary rows. Task paging can finish after that dock;
+                // a page-wide query used to focus its invisible Agent 12 and send Enter to BODY (#19488).
+                const rows = `[...document.querySelectorAll('#group-table-view[data-group="hub-inbox:${tab}"] .dt-table tbody tr .dt-primary')].filter(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== 'hidden'; })`;
+                await waitFor(`${rows}.length >= 2`, `${tag} ${tab}: visible folder rows`, 8000);
+                assert.equal(await ev(`(() => { const b = ${rows}[1]; b.focus(); return document.activeElement === b; })()`), true, `${tag} ${tab}: the second visible folder row takes focus`);
+                const before = await active();
+                assert.ok(before.visible && /dt-primary/.test(before.cls), `${tag} ${tab}: focus is on the row before Enter`);
+                await key('Enter');
                 // The item is open when its Back is shown and stays so: before that, Escape is not "one level back" to the list but the Inbox's own Escape, which leaves for Agents (saved_marks.js looks for the Back link). At 20x CPU slowdown the key landed first (#19449).
                 const backShown = `[...document.querySelectorAll('#inbox-page:not([hidden]) .goals-back, #inbox-page:not([hidden]) .back-link, #agentic-saved-detail-pane:not([hidden]) .back-link, .phone-title-row .back-link')].some(b => b.getClientRects().length > 0)`;
                 await waitFor(backShown, `${tag} ${tab}: the item's Back is shown`, 15000);
