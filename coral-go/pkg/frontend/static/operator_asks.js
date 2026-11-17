@@ -63,7 +63,7 @@ export const askWhole = a => markHidden(a && a.text, { strict: true });
 export const askIsLong = a => String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN;
 /** The question as an opened row says it (#14617): ALL the words the Operator's list carries (up to 4096 characters), white space collapsed as the preview's is; a question the server itself cut says so after it. */
 export function askOpened(a) {
-    const one = listsOf(withoutOperator(plainMarkdown(askWhole(a))).replace(/\s+/g, ' ')); // points and choices on lines of their own (#16680)
+    const one = listsOf(byLines(withoutOperator(plainMarkdown(askWhole(a))))); // the question's own lines kept; points and choices on lines of their own (#16680)
     return (a && a.cut ? `${one} \u2026 (cut: the board has the rest)` : one) + duplicateSources(a);
 }
 /** A stable id of one question among the rows. */
