@@ -580,11 +580,11 @@ function askActions(a) {
     box.append(reply);
     if (a.kind === 'ask' || a.kind === 'agent') { // a wait has no ask row to close: only a question is ignorable
         const failed = DT.el('span', 'inbox-review-error'); failed.setAttribute('role', 'alert');
-        const ignore = no => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
-            return importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who); sayLive(`Dismissed the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); };
+        const ignore = (no, answered) => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
+            return importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who, answered); sayLive(`${answered ? 'Marked answered in chat' : 'Dismissed'}: the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); };
         box._ignore = ignore;
-        if (isPhoneLayout()) box.append(moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }], `the question of ${who}`), failed); // a phone row has no Dismiss button: the menu, or a swipe (#11642)
-        else { const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button'; no.setAttribute('data-slot', 'ignore'); no.setAttribute('aria-label', `Dismiss the question of ${who}`); no.addEventListener('click', () => ignore(no)); box.append(no, failed); }
+        if (isPhoneLayout()) box.append(moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }, ...(a.kind === 'agent' ? [{ label: 'Answered in chat', title: 'Close it; the agent is not told it was dismissed', run: no => ignore(no, true) }] : [])], `the question of ${who}`), failed); // a phone row has no Dismiss button: the menu, or a swipe (#11642)
+        else { const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button'; no.setAttribute('data-slot', 'ignore'); no.setAttribute('aria-label', `Dismiss the question of ${who}`); no.addEventListener('click', () => ignore(no)); box.append(no, failed); if (a.kind === 'agent') { const chat = DT.el('button', 'btn btn-small btn-quiet', 'Answered in chat'); chat.type = 'button'; chat.setAttribute('data-slot', 'ignore'); chat.setAttribute('aria-label', `The question of ${who} was answered in its chat`); chat.title = 'Close it; the agent is not told it was dismissed'; chat.addEventListener('click', () => ignore(chat, true)); box.append(chat); } }
     }
     return box;
 }

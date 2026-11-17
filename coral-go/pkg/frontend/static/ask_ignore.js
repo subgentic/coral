@@ -10,25 +10,26 @@ const NOTE = 'Dismissed by the operator';
 
 async function close(a, body) {
     if (a.kind === 'agent') { // a single agent's question (#18668): its own route; the agent is told it was dismissed
-        const r = await serverFetch(a.server, `/api/agent-asks/${encodeURIComponent(a.id)}/dismiss`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body.undo ? { undo: true } : {}) });
+        const r = await serverFetch(a.server, `/api/agent-asks/${encodeURIComponent(a.id)}/dismiss`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body.undo ? { undo: true } : body.answered ? { answered_in_chat: true } : {}) });
         if (r.ok) return;
         let why = ''; try { const b = await r.json(); why = b.message || b.error || ''; } catch { /* not JSON */ }
         throw new Error(why || `Could not save (HTTP ${r.status}).`);
     }
-    const r = await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/asks/${encodeURIComponent(a.id)}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const { answered: _answeredInChat, ...teamBody } = body; // a team's question has no "answered in chat": its close body stays {note} / {undo}, as before #19355 (#19396)
+    const r = await serverFetch(a.server, `/api/board/${encodeURIComponent(a.board)}/asks/${encodeURIComponent(a.id)}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(teamBody) });
     if (r.ok) return;
     let why = '', code = ''; try { const b = await r.json(); why = b.message || b.error || ''; code = b.code || b.error || ''; } catch { /* not JSON */ }
     throw Object.assign(new Error(why || `Could not save (HTTP ${r.status}).`), { code });
 }
 
 /** Close the question quietly. `who` is the asker as it is drawn (hidden characters written out). Resolves when the route answered; rejects with its words. */
-export async function ignoreAsk(a, who) {
+export async function ignoreAsk(a, who, answered = false) { // answered: a single agent's question the Operator answered in its chat (#19355): closed, the agent told nothing
     const h = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: h })); // the table on screen when the Dismiss began: only it gets the one unheld redraw (#14373)
-    await close(a, { note: NOTE });
+    await close(a, { note: NOTE, answered });
     Promise.resolve(refreshOperatorAsks(true)).catch(() => {}).then(() => { document.dispatchEvent(new CustomEvent('coral:action-result', { detail: h })); }); // the list has been read again: its one redraw for this action is not held under a resting pointer (#14373)
     const flat = markHidden(String(a.text || ''), { strict: true }).replace(/\s+/g, ' ').trim(), what = flat ? `"${flat.length > 48 ? flat.slice(0, 47).trimEnd() + '\u2026' : flat}" from ${who}` : `the question of ${who}`; // which one, since nine ignores said the same line nine times (#12112)
-    showToast(`Dismissed ${what}`, false, undefined, { action: { label: 'Undo', onClick: () => close(a, { undo: true }).then(() => { refreshOperatorAsks(true); announceNotice(`The question of ${who} is back in Needs you.`); }).catch(e => showToast(e.message, true)) } });
-    announceNotice(`Dismissed ${what}. Undo is in the notice.`);
+    showToast(`${answered ? 'Marked answered in chat' : 'Dismissed'} ${what}`, false, undefined, { action: { label: 'Undo', onClick: () => close(a, { undo: true }).then(() => { refreshOperatorAsks(true); announceNotice(`The question of ${who} is back in Needs you.`); }).catch(e => showToast(e.message, true)) } });
+    announceNotice(`${answered ? 'Marked answered in chat' : 'Dismissed'} ${what}. Undo is in the notice.`);
 }
 
 /** The bulk Dismiss of a phone's selection (#11671): the same close route and Undo, with one toast for the whole selection (said by the caller). */
