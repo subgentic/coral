@@ -40,7 +40,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=guides]').click(); true`); await settle(150);
             const rows = await ev(`[...document.querySelectorAll('${P} .gr-guide')].map(r => [r.querySelector('.gr-label').textContent, r.querySelector('input').value, r.querySelector('input').placeholder])`);
             check(JSON.stringify(rows) === JSON.stringify([['Guide hub-user-3f2a9c1d', 'Priya (design)', 'Name agents see (not named yet)'], ['Guide hub-user-b81e07aa', '', 'Name agents see (not named yet)']]), `${tag}: a row per guide, by its Hub label: ` + JSON.stringify(rows));
-            check(await ev(`/remove them in Coral Hub/.test(document.querySelector('${P}').textContent) && /Until you name them, a guide shows as their Coral Hub label/.test(document.querySelector('${P}').textContent)`), `${tag}: the words say where access is stopped and what an unnamed guide shows as`);
+            check(await ev(`/remove them in Coral Hub/.test(document.querySelector('${P}').textContent) && /Until you name them, agents see the label/.test(document.querySelector('${P}').textContent)`), `${tag}: the words say where access is stopped and what an unnamed guide shows as`);
             if (mobile) check(await ev(`[...document.querySelectorAll('${P} button, ${P} input')].every(e => e.getClientRects().length === 0 || e.getBoundingClientRect().height >= 44)`), `${tag}: every control is 44 px`);
             // name the second guide and save: the whole roster, named guides only
             await ev(`(() => { const i = document.querySelectorAll('${P} .gr-guide input')[1]; i.value = 'Sam'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
