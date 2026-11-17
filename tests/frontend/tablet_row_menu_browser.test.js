@@ -17,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('.tablet-sidebar-toggle').click(); true`); await waitFor(`!!document.querySelector('.sidebar.tablet-open')`, 'the drawer opens', 4000);
         await waitFor(`!!document.querySelector('.session-group-item .sidebar-kebab-btn') && document.querySelector('.sidebar').getBoundingClientRect().left === 0`, 'the agent row is in view', 10000);
         await ev(`document.querySelector('.session-group-item .sidebar-kebab-btn').click(); true`);
-        await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none')`, 'the menu opens', 4000);
+        await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none' && getComputedStyle(m).visibility !== 'hidden')`, 'the menu opens', 4000);
         const m = await ev(`(() => { const menu = [...document.querySelectorAll('.sidebar-kebab-menu')].find(x => getComputedStyle(x).display !== 'none'); const mr = menu.getBoundingClientRect();
             const items = [...menu.querySelectorAll('.menu-item')].filter(e => !e.closest('[hidden]') && e.getClientRects().length).map(e => { const r = e.getBoundingClientRect(); return { t: e.textContent.replace(/\\s+/g, ' ').trim(), top: r.top, bottom: r.bottom, cut: e.scrollWidth > e.clientWidth + 1, right: r.right }; });
             const sb = document.querySelector('.sidebar'), sr = sb.getBoundingClientRect(), clips = getComputedStyle(sb).overflowX !== 'visible'; return { clips, sl: sr.left, sr: sr.right, st: sr.top, sb: sr.bottom, l: mr.left, r: mr.right, t: mr.top, b: mr.bottom, vw: innerWidth, vh: innerHeight, items }; })()`);

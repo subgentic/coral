@@ -33,7 +33,7 @@ export const labelOf = item => { const t = item.textContent.trim().replace(/\s+/
 /** Give every item of `menu` its line (once) and the menu its footer. */
 /** A half-asleep team's menu has both Sleep team and Wake team (#17536): the card draws the one its agents mostly say, and this adds the other, here so the start page does not carry it. */
 function bothSleepItems(menu) {
-    const it = menu.querySelector('[data-on-click="team-sleep"]:not([data-both])');
+    const it = menu.querySelector('[data-on-click="team-sleep"]:is([data-mode="sleep"], [data-mode="wake"]):not([data-both])');
     if (!it) return;
     it.dataset.both = '1';
     const wake = it.dataset.mode === 'wake', ss = (state.liveSessions || []).filter(x => inTeam(x, it.dataset.board));

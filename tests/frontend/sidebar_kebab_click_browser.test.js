@@ -4,14 +4,24 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { Input } = client;
+    const { Input, Fetch } = client;
+    let holdHelp = false, failHelp = false, heldHelp = null;
+    safePaused(client, async e => {
+        if (failHelp) await Fetch.failRequest({requestId:e.requestId,errorReason:'Failed'});
+        else if (holdHelp) { heldHelp = e; await ev('window.__helpPaused=true'); }
+        else await Fetch.continueRequest({requestId:e.requestId});
+    });
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
-        for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) for (const variant of ['at once', 'after 100 ms', 'after a redraw', 'after a redraw with new data', 'after another agent appears', 'after a status change']) {
+        await Fetch.enable({patterns:[{urlPattern:'*menu_help.js*'}]});
+        await client.Network.setCacheDisabled({cacheDisabled:true});
+        for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) for (const variant of ['help fails', 'while help arrives', 'cancel while help arrives', 'at once', 'after 100 ms', 'after a redraw', 'after a redraw with new data', 'after another agent appears', 'after a status change']) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            holdHelp = variant.includes('help arrives'); failHelp = variant === 'help fails'; heldHelp = null;
             await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const setList = n => ev(`window.__m.add('proj1', 'A', 2, { sleeping: false, session_id: 'w-sid', display_name: 'Writer', board_project: 'team-x' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`.replace("'Writer'", `'Writer${n}'`));
@@ -23,7 +33,23 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`document.querySelector('${BTN}').scrollIntoView({ block: 'center' }); true`);
             for (let j = 0, prev = ''; j < 40; j++) { const now = JSON.stringify(await centre(BTN)); if (now === prev) break; prev = now; await new Promise(r => setTimeout(r, 100)); } // sleep-ok: waits for the button to stop moving (the team's card draws after the list and shifts it)
             await click(await centre(BTN));
-            await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none')`, `${w} px, ${variant}: the menu opens`, 4000);
+            if (holdHelp) {
+                await waitFor('window.__helpPaused===true', 'help import is held');
+                const aimed = await ev(`(()=>{const m=[...document.querySelectorAll('.sidebar-kebab-menu')].find(m=>getComputedStyle(m).display!=='none'&&getComputedStyle(m).visibility!=='hidden');const it=m?.querySelector('[data-on-click="agent-rename"]');if(!it)return null;const r=it.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};})()`);
+                if (variant.startsWith('cancel')) await ev('document.body.click();true');
+                holdHelp = false; await Fetch.continueRequest({requestId:heldHelp.requestId}); heldHelp = null;
+                await waitFor('typeof window.menuHelp===\'function\'', 'help finished loading');
+                if (variant.startsWith('cancel')) {
+                    assert.equal(await ev(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m=>getComputedStyle(m).display!=='none')`),false,`${w}: outside click cancels the pending opening`);
+                    continue;
+                }
+                if (aimed) {
+                    const hit = await ev(`(()=>{const e=document.elementFromPoint(${aimed.x},${aimed.y});return{action:e?.closest('[data-on-click]')?.dataset.onClick,text:e?.textContent?.trim().slice(0,100)};})()`);
+                    console.log('late help target',w,JSON.stringify({aimed,hit}));
+                    assert.equal(hit.action,'agent-rename', `${w}: help arrival must not move Rename out from under an aimed pointer`);
+                }
+            }
+            await waitFor(`[...document.querySelectorAll('.sidebar-kebab-menu')].some(m => getComputedStyle(m).display !== 'none' && getComputedStyle(m).visibility !== 'hidden')`, `${w} px, ${variant}: the menu opens`, 4000);
             if (variant === 'after 100 ms') await ev(framesJs(6));
             if (variant === 'after another agent appears') { await ev(`window.__m.add('proj2', 'A', 2, { sleeping: false, session_id: 'x-sid', display_name: 'Other', board_project: 'team-x' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`); await ev(framesJs(4)); }
             if (variant === 'after a status change') { await ev(`window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => ({ ...window.__m.entry(a), status: { ...(window.__m.entry(a).status || {}), summary: 'busy now', status: 'working' } }))); true`); await ev(framesJs(4)); }
@@ -35,6 +61,6 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const dlg = await ev(`(() => { const d = [...document.querySelectorAll('dialog[open], .modal')].find(x => x.getClientRects().length && /Rename/i.test(x.textContent)); return !!d; })()`);
             assert.ok(dlg, `${w} px, ${variant}: the first click on Rename opens the Rename dialog`);
         }
-    } finally { await client.close(); }
+    } finally { if(heldHelp)await Fetch.continueRequest({requestId:heldHelp.requestId}).catch(()=>{}); await client.close(); }
     console.log('sidebar_kebab_click_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });
