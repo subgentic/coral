@@ -95,6 +95,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/dismiss-wait") {
 				continue
 			}
+			// The $ skills menu through the Hub (#19430) is new: the old list never had it.
+			if (m == http.MethodGet && p == "/api/skills/search") || (m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/skills")) {
+				continue
+			}
 			// The live list is an OwnerSees route since #12377 (the owner's rows carry waits_on_this): the old list never had it.
 			if m == http.MethodGet && p == "/api/sessions/live" {
 				continue

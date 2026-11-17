@@ -287,6 +287,10 @@ var routeTable = cat(
 		// A picture for a comment (#11650): the owner's alone, as the comment it goes in. The raw file is the body; the machine decides the type by its bytes.
 		"/api/artifacts/{hex64}/comment-images",
 	)),
+	// The $ skills menu through the Hub (#19430, the Operator's yes for 2.1.0): the computer OWNER's alone, the same two calls as at the dashboard. Searching reads names and descriptions (View); attaching types the
+	// skill's line into a running agent (Interact), so the machine's own mode still caps it. Approval of a skill stays the person's act on the computer.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/skills/search")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/skills")),
 	// A picture for a new goal's description (#11650): the owner's alone, like the goal it goes in.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goal-images")),
 	// The rest of the owner's artifact work through the Hub (#11354, the operator's rule: the owner gets everything): the version list and series reads (their handlers already refuse a non-owner), the edit and

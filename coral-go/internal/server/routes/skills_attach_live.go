@@ -11,15 +11,15 @@ import (
 )
 
 // The $skill menu of the message box (#12676): the Operator searches the approved skills and attaches one to an agent that is already running, and is given the one line to put in the message. Person only: an agent
-// token, a script and Coral Hub all get a 403, and skills never go through the Hub in v1 (Security on #12653).
+// token, a script and a Hub guest get a 403. Through Coral Hub the computer's owner alone has the menu (#19430; before it, skills never went through the Hub, Security on #12653).
 
 // maxMenuSkills is how many skills the menu shows.
 const maxMenuSkills = 20
 
-// personOnlySkills refuses everyone but the person at this computer's dashboard: the Hub (even a tunneled owner), an agent's token and a script's key.
+// personOnlySkills refuses everyone but the person: at this computer's dashboard, or the computer's OWNER through Coral Hub (#19430, the Operator's yes for 2.1.0). An agent's token, a script's key, a Hub guest and
+// a Hub request without the owner stamp get a 403. Through the Hub the owner stamp is the tunnel table's (owner-only routes, pkg/tunnel/routes.go): refuseNonOwner asks that one table, as the artifacts routes do.
 func personOnlySkills(w http.ResponseWriter, r *http.Request, what string) bool {
-	if cloud.Tunneled(r) {
-		writeError(w, http.StatusForbidden, "hub_refused", "skills are not offered through Coral Hub")
+	if cloud.Tunneled(r) && refuseNonOwner(w, r) {
 		return false
 	}
 	if !humanInputCaller(r) {
