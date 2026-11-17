@@ -97,7 +97,7 @@ const TEAM = `qa-docs-${Date.now() % 100000}`;
                 assert.match(await ev(`window.__na.text(${pane}.querySelector('.detail-foot'))`), /Could not save: disk full/, 'a refusal is said with its reason'); assert.ok(await ev(`!!${pane}.querySelector('textarea')`), 'the edit stays open');
                 await ev(`window.__putAnswer = 200; ${btnIn('/^Save$/')}.click(); true`); await settle(600);
                 const puts = await ev(`window.__puts`); assert.ok(puts.some(x => /Backend%20Dev|Backend Dev/.test(x.p) && /Changed notes\./.test(x.b)), `a PUT with the text (${JSON.stringify(puts.map(x => x.p))})`);
-                assert.match(await ev(`window.__na.text(${pane}.querySelector('.detail-foot'))`), /Saved\./); assert.match(await ev(`window.__na.text(${pane})`), /Changed notes\./, 'the pane shows the new text');
+                assert.match(await ev(`window.__na.text(${pane}.querySelector('.detail-foot'))`), /Saved\. It reaches .+ at its next start\./, 'a saved note says when the agent gets it (#19252)'); assert.match(await ev(`window.__na.text(${pane})`), /Changed notes\./, 'the pane shows the new text');
                 assert.equal(await ev(`document.activeElement && document.activeElement.textContent`), 'Edit', 'the focus is back on Edit after Save');
             });
         }
