@@ -36,7 +36,7 @@ try {
     assert.ok(calls.every(p => p.startsWith('/api/remote/')), `every read goes through the proxy of a linked computer: ${calls}`);
     assert.ok(!calls.includes('/api/sessions/history/counts'), 'nothing is asked of the Hub itself');
     const titles = CH.chatSections().map(s => s.title);
-    assert.deepEqual(titles, native ? ['Chats', 'By CLI'] : ['Chats', 'By CLI', 'Tags'], native ? 'no Tags folder (tags are per computer)' : 'Tags as before');
+    assert.deepEqual(titles, native ? ['Chats'] : ['Chats', 'Tags'], native ? 'no Tags folder (tags are per computer); empty By CLI stays hidden' : 'Tags as before; empty By CLI stays hidden');
 
     // nothing online: the folder says so
     state.servers = [{ id: 'local', status: 'online' }, { id: 'down', status: 'offline' }];
@@ -69,7 +69,7 @@ try {
     if (native) { // the real Inbox, drawn: the Hub's three pages and the chat folders, only the planned requests, a frame at its constant address
         state.servers = [{ id: 'box-2', status: 'online' }];
         calls.length = 0;
-        globalThis.fetch = window.fetch = async url => { calls.push(new URL(url, 'https://hub.example').pathname); return Response.json(String(url).includes('counts') ? { all: 2, group: 0, notes: 0, starred: 0, active: 0, archived: 0, by_agent_type: {} } : { sessions: [], total: 0 }); };
+        globalThis.fetch = window.fetch = async url => { calls.push(new URL(url, 'https://hub.example').pathname); return Response.json(String(url).includes('counts') ? { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 0, by_agent_type: {} } : { sessions: [], total: 0 }); };
         document.body.classList.add('cloud-mode', 'native-inbox'); document.body.setAttribute('data-nav-tab', 'hub-inbox');
         (await importUi('inbox_tab')).showInboxTabContent();
         const settle = async ms => { await new Promise(r => setTimeout(r, ms)); };
