@@ -147,9 +147,18 @@ export const agents = () => [...new Set(shown().map(AF.agentOf).filter(Boolean))
 export const goals = () => { const all = [...new Set(shown().map(AF.goalOf))]; return [...all.filter(g => g !== AF.NO_GOAL).sort((a, b) => a.localeCompare(b)), ...all.filter(g => g === AF.NO_GOAL)]; };
 export const teamOf = r => M(teamLabel(r.team));
 export const filtered = f => AF.ordered(shown().filter(r => AF.matches(r, f, teamOf)), f);
-export const total = () => shown().length;
+/** The rows the Important view keeps when `f` has it on (the same rule `matches` applies, so a count is what the list shows). */
+const visible = f => shown().filter(r => AF.passesImportant(r, f));
+export const total = f => visible(f).length;
 /** How many of the rows read are of a kind (the chips' counts); '' is all of them. */
-export const countKind = k => shown().filter(r => AF.inKind(r, k)).length;
+export const countKind = (k, f) => visible(f).filter(r => AF.inKind(r, k)).length;
+/** The counts the Show pills draw, as one string for the toolbar's signature. */
+export const countsKey = f => JSON.stringify([total(f), AF.KINDS.map(k => countKind(k, f))]);
+/** The Show pills (#16087, #19149): Important leaves out delivery bookkeeping and is on when nothing was chosen before; a kind chip toggles its kind; Everything clears Important and every kind, and the last kind off is Everything again. change(important, kinds) keeps the choice. */
+export const showPills = (f, change) => {
+    const picked = AF.kindsOf(f.kind), imp = f.important === true;
+    return { label: 'Show', panelLabel: 'Show', multi: true, current: [...(imp ? ['important'] : []), ...picked], items: [{ key: 'important', label: 'Important', count: total({ important: true }) }, { key: 'all', label: 'Everything', count: total() }, ...AF.KINDS.map(k => ({ key: k, label: AF.KIND_LABEL[k], count: countKind(k, f) }))], onPick: key => key === 'all' ? change(false, []) : key === 'important' ? change(!imp, picked) : change(imp, AF.kindsOf(picked.includes(key) ? picked.filter(k => k !== key) : [...picked, key])) };
+};
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
 export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {
@@ -161,9 +170,10 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
     const summary = r => { const p = parts(r); return [p.did, p.detail, p.about].filter(Boolean).join(' · '); };
     const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks, byTask) : null;
     const opens = r => (r.item_kind === 'job_run' && !!jobRunParts(r.item_id)) || (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message', 'workflow_run'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
+    const narrowed = AF.isFiltered(f), onlyNotes = !narrowed && f.important === true && shown().length > 0; // the view is Important (the default, not a filter the person set) and every row read is a delivery note (#19219)
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
-        empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : AF.isFiltered(f) ? 'No action matches the search and filters.' : 'Nothing yet.',
-            hint: loaded && !failed && !AF.isFiltered(f) ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
+        empty: { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : narrowed ? 'No action matches the search and filters.' : onlyNotes ? 'Nothing important yet.' : 'Nothing yet.',
+            hint: loaded && !failed && onlyNotes ? 'Delivery notes, like words sent to an agent, are under Everything.' : loaded && !failed && !narrowed ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
         signature: JSON.stringify([list.map(keyOf), check, loaded, failed, denied, more, missingComputers(), multipleServers(), grouped, grouped ? taskSignature : '']),
         node: () => {
             const wrap = DT.el('div', 'activity-folder');
