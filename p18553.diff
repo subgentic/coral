@@ -1,0 +1,33 @@
+diff --git a/coral-go/internal/server/routes/agent_asks.go b/coral-go/internal/server/routes/agent_asks.go
+index d4663590b2..c6bb7d2da6 100644
+--- a/coral-go/internal/server/routes/agent_asks.go
++++ b/coral-go/internal/server/routes/agent_asks.go
+@@ -24,7 +24,7 @@ import (
+ //
+ //	POST /api/agent-asks             the agent's own token: {text, options?: up to 3 labels} -> {id}
+ //	POST /api/agent-asks/{id}/answer the Operator: {answer} -> typed into the agent, the question closed
+-//	POST /api/agent-asks/{id}/dismiss the Operator: {} -> the question leaves Needs you and the agent is told it was dismissed; {undo:true} puts it back
++//	POST /api/agent-asks/{id}/dismiss the Operator: {} -> the question leaves Needs you and the agent is told it was dismissed; {answered_in_chat:true} closes it and tells the agent nothing (the Operator answered in its chat, #18553); {undo:true} puts it back
+ //	POST /api/agent-asks/{id}/images the Operator: one picture for the reply -> stored as that agent's artifact ({hex, uri, name, content_type, size}); the reply names it as coral://artifacts/<hex>
+ 
+ const agentAskOptionsMax = 3
+@@ -200,6 +200,8 @@ func (h *AgentAsksHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
+ 	}
+ 	var body struct {
+ 		Undo bool `json:"undo"`
++		// AnsweredInChat: the Operator answered in the agent's own chat (#18553), so the question closes with nothing typed into the agent: it has its answer, and "dismissed without answering" would be untrue.
++		AnsweredInChat bool `json:"answered_in_chat"`
+ 	}
+ 	if r.ContentLength != 0 {
+ 		if err := decodeJSONMax(w, r, &body, 1<<10); err != nil {
+@@ -233,6 +235,10 @@ func (h *AgentAsksHandler) Dismiss(w http.ResponseWriter, r *http.Request) {
+ 		writeJSON(w, http.StatusConflict, map[string]string{"error": "not_open", "message": "That question is already answered or was replaced."})
+ 		return
+ 	}
++	if body.AnsweredInChat {
++		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
++		return
++	}
+ 	agentType, sessionID := logparse.ParseSessionName(ask.SessionName)
+ 	text := typedAgentAskDismissed(ask.Text)
+ 	_ = h.deliver(r.Context(), h.term, ask.SessionName, agentType, sessionID, text, "operator dismissed") // best effort: the agent may be gone, and the question is closed either way
