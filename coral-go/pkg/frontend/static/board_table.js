@@ -223,7 +223,7 @@ function fillReplies(row, replies) {
         const item = document.createElement('div');
         item.className = 'mb-row-reply';
         const who = kid.querySelector('.mb-row-who')?.textContent, time = kid.querySelector('.mb-row-toggle time')?.textContent || '';
-        item.innerHTML = `<div class="mb-row-reply-header"><b>${escapeHtml(who || '')}</b><span class="mb-row-reply-time">${escapeHtml(time)}</span><button type="button" class="mb-row-reply-open" data-on-click="mb-jump-msg" data-msg-id="${escapeAttr(kid.dataset.messageId)}" aria-label="${escapeAttr(`Open reply by ${who ?? 'sender'}`)}">Open reply</button></div>`;
+        item.innerHTML = `<div class="mb-row-reply-header"><b>${escapeHtml(who || '')}</b><span class="mb-row-reply-time">${escapeHtml(time)}</span><button type="button" class="mb-row-reply-open" data-on-click="mb-jump-msg" data-msg-id="${escapeAttr(kid.dataset.messageId)}" aria-label="${escapeAttr('Open reply by ' + (who ?? 'sender'))}">Open reply</button></div>`;
         const words = document.createElement('div'); words.className = 'mb-row-reply-words';
         const sourceBody = kid.querySelector('.mb-message-body');
         if (sourceBody) {
