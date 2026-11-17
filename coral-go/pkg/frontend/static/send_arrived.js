@@ -51,3 +51,23 @@ async function refetchedTarget(sessionId, server, sentName, sentType) {
 export async function changedTarget(resp, sessionId, server, sentName, sentType) {
     return await isTargetMismatch(resp) ? refetchedTarget(sessionId, server, sentName, sentType) : null;
 }
+
+/**
+ * The words a refused composer send is shown with (#19173, the Operator's bug: "an error that gives no reason"). The server's own sentences for a refusal (agent_busy, not_confirmed, terminal_gone...) are
+ * already plain and pass through; the routes' short technical answers (a state of the agent's row, a bad id, a failed write into its terminal) get a sentence that says why the message was not sent and what to do.
+ * `code` is the body's code ('' when none), `text` what responseError made of it.
+ */
+export function plainSendReason(status, code, text) {
+    const t = String(text || '').trim();
+    if (code === 'session_target_mismatch') return 'This agent was restarted or renamed, so your message was not sent. Reload the page, then send it again.'; // the page holds an out-of-date name or type (#10813)
+    if (/^session is sleeping$/i.test(t)) return 'This agent is asleep, so your message was not sent. Wake it, then send it again.';
+    if (/^session is archived$/i.test(t)) return 'This agent is archived, so it cannot take messages and yours was not sent. Restore it to talk to it.';
+    if (/^live session not found$/i.test(t)) return 'Coral can no longer find this agent (it may have been removed), so your message was not sent.';
+    if (/^invalid session_id$/i.test(t) || /^session_id and agent_type are required$/i.test(t)) return "Coral couldn't tell which agent this message is for, so it was not sent. Reload the page, then send it again.";
+    if (/^no command provided$/i.test(t)) return 'There was no message to send.';
+    if (/^agent metadata is temporarily unavailable/i.test(t)) return "Coral couldn't read this agent's details just now, so your message was not sent. Try again in a moment.";
+    if (status === 413) return 'Your message is too long to send. Shorten it, or send it in parts.';
+    // a failed write into the terminal answers 500 with the raw error (the Hub's own 502-504 are already worded, server_status.js)
+    if (status === 500 && !code) return "Coral couldn't type your message into the agent's terminal, so it was not sent. Try again; if it keeps failing, check the agent's terminal.";
+    return t;
+}
