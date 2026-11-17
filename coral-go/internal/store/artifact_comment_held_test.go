@@ -25,7 +25,7 @@ func TestAHeldCommentSurvivesARestart(t *testing.T) {
 	now := time.Now()
 	_, _, err := s.CreateArtifactAsk(ctx, 1, artA, "team-a", "sess-1", "Dev", now)
 	require.NoError(t, err)
-	ok, err := s.HoldAskMessage(ctx, 1, "sess-1", "the held words", false, false, now)
+	ok, err := s.HoldAskMessage(ctx, 1, "sess-1", "the held words", false, now)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.NoError(t, db.Close()) // the server stops
@@ -45,7 +45,7 @@ func TestAHeldCommentIsNotDroppedWhenTheAsksDayPasses(t *testing.T) {
 	then := time.Now().Add(-AskTTL - time.Hour) // the agent was busy for more than a day
 	_, _, err := s.CreateArtifactAsk(ctx, 1, artA, "team-a", "sess-1", "Dev", then)
 	require.NoError(t, err)
-	ok, err := s.HoldAskMessage(ctx, 1, "sess-1", "the held words", false, false, then)
+	ok, err := s.HoldAskMessage(ctx, 1, "sess-1", "the held words", false, then)
 	require.NoError(t, err)
 	require.True(t, ok)
 
