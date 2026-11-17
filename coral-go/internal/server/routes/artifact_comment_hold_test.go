@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -213,4 +215,52 @@ func TestAGoalCommentForABusyDriverWaitsUntilItsTurnEnds(t *testing.T) {
 	msgs := rig.operatorMessages()
 	require.Len(t, msgs, 1, "delivered when the driver is free")
 	assert.Contains(t, msgs[0].Content, "Please also cover the retries.")
+}
+
+// #19085, the Operator: a comment stayed 'Queued ... delivers when it's free' while the agent sat in coral-board wait for that very review. The wait is a parked turn: the agent's turn and its task are both open,
+// so the hold never ended. An agent in a wait is free for a comment, whatever kind of agent it is.
+func TestACommentForAnAgentParkedInAWaitIsDeliveredAtOnce(t *testing.T) {
+	for _, agentType := range []string{"claude", "codex", "agy"} {
+		t.Run(agentType, func(t *testing.T) {
+			rig := newCmtRig(t)
+			ctx := context.Background()
+			require.NoError(t, rig.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sendSid(1), AgentType: agentType, AgentName: "Dev", WorkingDir: t.TempDir(), BoardName: ptr.NonEmpty("team-a")}))
+			sid := naming.SubscriberID("Dev", agentType)
+			_, err := rig.h.bs.Subscribe(ctx, "team-a", sid, "Dev", naming.SessionName(agentType, sendSid(1)), nil, "mentions")
+			require.NoError(t, err)
+			rig.turn(1, "Dev", "prompt_submit") // its turn is open: the wait command is running
+			_, err = rig.h.bs.CreateTask(ctx, "team-a", "review it", "", "medium", "Operator", "Dev")
+			require.NoError(t, err)
+			claimed, err := rig.h.bs.ClaimTask(ctx, "team-a", sid)
+			require.NoError(t, err)
+			require.NotNil(t, claimed, "the agent's task is in progress")
+			_, err = rig.h.bs.RegisterWait(ctx, "team-a", sid, naming.SessionName(agentType, sendSid(1)), board.WaitOperator, "", "Waiting for Operator review", time.Hour)
+			require.NoError(t, err)
+
+			cid := rig.ownerComment("Line 9: say more.")
+			code, out := rig.send(cid, "Dev")
+			require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+			assert.Equal(t, map[string]string{"Dev": "sent"}, states(out), "the agent is waiting for exactly this: it is not held")
+			assert.Len(t, rig.operatorMessages(), 1)
+			assert.False(t, rig.askQueued(cid, 1))
+		})
+	}
+}
+
+// A comment already held when the agent parks in a wait is delivered by the next pass.
+func TestAHeldCommentIsDeliveredOnceTheAgentParksInAWait(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.turn(1, "Dev", "prompt_submit")
+	cid := rig.ownerComment("Held first.")
+	_, out := rig.send(cid, "Dev")
+	require.Equal(t, map[string]string{"Dev": "queued"}, states(out))
+	rig.h.flushHeldComments(context.Background(), time.Now())
+	require.Empty(t, rig.operatorMessages(), "mid-turn: held")
+
+	_, err := rig.h.bs.RegisterWait(context.Background(), "team-a", naming.SubscriberID("Dev", "claude"), naming.SessionName("claude", sendSid(1)), board.WaitOperator, "", "Waiting for Operator review", time.Hour)
+	require.NoError(t, err)
+	rig.h.flushHeldComments(context.Background(), time.Now())
+	assert.Len(t, rig.operatorMessages(), 1, "delivered to the agent in its wait")
+	assert.False(t, rig.askQueued(cid, 1))
 }

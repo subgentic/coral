@@ -23,6 +23,9 @@ const (
 
 // commentHeld says whether a comment for this agent waits: it is mid-turn (always), or it has an active task and the comment is not marked "now". A check that fails does not hold (today's behaviour).
 func (h *SessionsHandler) commentHeld(ctx context.Context, ls *store.LiveSession, project string, sub *board.Subscriber, now bool) bool {
+	if h.waitingOnBoard(ctx, project, sub) {
+		return false // an agent parked in coral-board wait has given its turn up and has nothing to disturb: a comment is what it may be waiting for, and it would never leave the hold otherwise (#19085)
+	}
 	if st := h.deriveSingleSessionState(ctx, ls.SessionID, 0); st.InTurn || st.Working {
 		return true
 	}
@@ -35,6 +38,15 @@ func (h *SessionsHandler) commentHeld(ctx context.Context, ls *store.LiveSession
 		}
 	}
 	return false
+}
+
+// waitingOnBoard says whether the agent has an active coral-board wait (for a reply, a task, a commit or the Operator): its turn and its task are both open, but it is idle until something wakes it.
+func (h *SessionsHandler) waitingOnBoard(ctx context.Context, project string, sub *board.Subscriber) bool {
+	if h.bs == nil || project == "" || sub == nil {
+		return false
+	}
+	w, err := h.bs.GetActiveWait(ctx, project, sub.SubscriberID)
+	return err == nil && w != nil
 }
 
 // holdOrPost delivers the comment message to the agent now when it is free, or keeps it on the ask when it is busy (held true). posted is the board message when it went out.
@@ -132,9 +144,7 @@ func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) 
 		for _, a := range g.asks {
 			h.linkCommentMessage(ctx, first.Board, posted, a.CommentID, a.AgentSession)
 		}
-		if !system {
-			h.operatorPosted(first.Board, msg)
-		}
+		h.operatorPosted(first.Board, msg) // a delivery ends the waits it matches, an automatic one too: what is delivered overrides the wait (#19085)
 		if _, err := h.ss.ReleaseHeldAsks(ctx, ids, now); err != nil {
 			slog.Warn("[artifact comments] a held comment's hold was not cleared", "error", err)
 		}
