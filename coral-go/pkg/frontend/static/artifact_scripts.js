@@ -135,7 +135,7 @@ export function drawScripted(wrapper, { html, name, turnOff, line }) {
 export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFetch }) {
     const row = document.createElement('div');
     row.className = 'artifact-scripts-offer';
-    const ask = button('Run scripts…', 'btn-small artifact-scripts-ask', () => {
+    const ask = button("Run this page's scripts", 'btn-small artifact-scripts-ask', () => {
         ask.hidden = true;
         const notice = wrapper.querySelector('.artifact-linked-notice'); // while the question is open the banner no longer says scripts are disabled above it (#15324, walk 21 M2)
         if (notice && notice.firstChild && notice.firstChild.nodeType === 3) { notice.dataset.was = notice.firstChild.nodeValue; notice.firstChild.nodeValue = 'Scripts are off for this file.'; }
@@ -144,7 +144,7 @@ export function drawOffer(wrapper, { hex, server, onTrusted, fetchFn = serverFet
         const words = document.createElement('p');
         words.textContent = 'This file can run scripts. They can draw and animate. Coral limits what they can reach: no web requests, no cookies, no files, and nothing it stores is kept after the preview closes. Do not trust a file you would not open.';
         const msg = document.createElement('p'); msg.className = 'artifact-scripts-msg'; msg.setAttribute('role', 'status');
-        const go = button('Run scripts', 'btn-primary artifact-scripts-go', async () => {
+        const go = button('Allow scripts', 'btn-primary artifact-scripts-go', async () => {
             go.disabled = true;
             const on = await writeTrust(hex, server, true, fetchFn);
             if (on === true) onTrusted();

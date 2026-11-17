@@ -280,7 +280,7 @@ function syncScripts(d, body) {
     d.querySelector('.artifact-viewer-scriptson').hidden = !running;
     const item = d.querySelector('.artifact-viewer-scripts-item');
     item.hidden = !running && !offered;
-    item.textContent = running ? 'Turn off scripts' : 'Run scripts…';
+    item.textContent = running ? 'Turn off scripts' : "Run this page's scripts";
 }
 function syncSandbox(d, body) {
     const note = body.querySelector('.artifact-linked-notice'), chip = d.querySelector('.artifact-viewer-sandbox');
