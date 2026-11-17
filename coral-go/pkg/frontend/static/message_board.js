@@ -278,7 +278,7 @@ export async function deleteTeam(project) {
             }
             document.dispatchEvent(new CustomEvent('coral:team-removed', { detail: { team: project } })); // the Inbox drops the team's "Goal closed" rows now, not at its next read (#16895)
             showToast(`Removed team "${label}". Its agents' chats stay in History and its folder is untouched.`);
-            if (document.getElementById('team-page-view')?.getClientRects().length) { window.exitTeamPage?.({ force: true }); window.switchNavTab?.('agents'); } // removed from its team page: back to Agents, not the board list
+            if (document.getElementById('team-page-view')?.getClientRects().length) { await window.exitTeamPage?.({ force: true }); (await importOnce('./app_navigation.js')).showHome(); } // removed from its team page: Home, without opening another agent's chat (#17307)
             else if (document.getElementById('messageboard-view')?.getClientRects().length) showMessageBoardProjects();
             // removed from the sidebar's team menu: the page stays where it is; the live feed takes the group away
         } catch (e) {

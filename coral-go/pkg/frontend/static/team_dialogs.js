@@ -73,8 +73,11 @@ function _updateTeamAgentSummary(row) {
     const type = config.agentType || typeSelect?.value || 'claude';
     const parts = []; // [text, changed]
     parts.push([typeLabel(type), false]);
-    const modelId = config.model || '';
-    parts.push([modelId ? modelName(type, modelId, _effectiveServer(launch.server)) : 'default model', !!modelId && modelId !== _settingsFor(_effectiveServer(launch.server))['default_model_' + type]]);
+    const server = _effectiveServer(launch.server);
+    const modelId = config.model || _settingsFor(server)['default_model_' + type] || '';
+    const picker = acfId && document.getElementById(acfId)?.querySelector('.acf-model-select');
+    const defaultLabel = picker?.querySelector('option[value=""]')?.textContent || 'default model';
+    parts.push([modelId ? modelName(type, modelId, server) : defaultLabel, !!modelId && modelId !== _settingsFor(_effectiveServer(launch.server))['default_model_' + type]]);
     if (config.thinking) parts.push([`${levelName(config.thinking)} thinking`, true]);
     // What launches (#6425): the member's own Mode, else the team's, is applied; for Codex and Antigravity the capabilities may only narrow it, and with no Mode they decide.
     const acf = acfId ? document.getElementById(acfId) : null;
@@ -188,6 +191,7 @@ function _syncTeamGate() {
     put(false);
 }
 document.addEventListener('team-step-shown', _syncTeamGate);
+document.addEventListener('acf-synced', e => { const row = e.target.closest?.('#team-agents-list .team-agent-row'); if (row) _updateTeamAgentSummary(row); });
 document.addEventListener('cli-blocks-launch', e => { if (e.target.closest?.('#launch-step-team')) _syncTeamGate(); }); // a CLI check that answers while step 3 shows
 document.addEventListener('team-page-open', e => { const page = e.target.closest && e.target.closest('.team-page'); if (page && page.dataset.page) showTeamStep(page.dataset.page); });
 document.addEventListener('change', e => { if (e.target?.id === 'launch-team-dir') scheduleFolderTrust(e); });
