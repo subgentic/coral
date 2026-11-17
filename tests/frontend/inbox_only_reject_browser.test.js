@@ -88,7 +88,7 @@ const ALLOW_ONLY = ['Yes', 'Yes, proceed'];
             await waitFor(`/could not read this request in full/i.test(window.__cell.textContent)`, why, 5000);
             assert.deepEqual(await labels(), [], why + ': no answer button, not even No');
             assert.match(await note(), /answer it in the agent.s terminal/i, why + ': says where to answer it');
-            assert.deepEqual(await openBtn(), { text: 'Open agent', primary: true }, why + ': Open agent is the main button');
+            assert.deepEqual(await openBtn(), { text: 'Open agent', primary: false }, why + ': Open agent is the one Default button (no blue Primary, #17450)');
             assert.ok(!/can only be rejected/i.test(await ev(`window.__cell.textContent`)), why + ': the reject-only wording is gone');
         }
 
