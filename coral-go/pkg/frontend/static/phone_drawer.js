@@ -2,7 +2,7 @@
  * (Needs you, Tasks, Saved, Chats) and the teams; from every other screen Tasks and Chats (the bar has neither, #11535) and, from Agents, All agents and the teams; below a divider (nav_tabs.js adds them) are the less-used places: Docs, Computers, Settings, Themes, Check for updates (Automations and Analytics are bar tabs). It is the one
  * menu (#nav-more-menu) drawn as a panel: this file builds what is above the divider and the scrim behind it; css/mobile.css draws both. */
 import { state } from './state.js';
-import { importOnce } from './import_once.js';
+import { importOnce, loadedModule } from './import_once.js';
 import { inboxCountsNow } from './inbox_tab.js';
 import { identityKey, sessionServer, serverFetch } from './server_base.js';
 import { teamLabel } from './server_status.js';
@@ -55,10 +55,24 @@ function readTeamKeys() {
     return boards.reading;
 }
 const liveTeamKeys = () => [...new Set((state.liveSessions || []).filter(s => s && s.board_project).map(s => identityKey(sessionServer(s), s.board_project)))];
+const FEW_TEAMS = 4; // up to this many teams are all listed, as active_teams.js does: its module is not even loaded for them
+// The same rule as the agent list's (active_teams.js, #15744): active teams first, newest message first, the idle ones behind Show all teams (n idle), the open team always listed (#18744).
 function drawTeams(host) {
     const keys = boards.keys.length ? boards.keys : liveTeamKeys();
-    const n = k => (state.liveSessions || []).filter(s => s && s.board_project && identityKey(sessionServer(s), s.board_project) === k).length;
-    host.replaceChildren(...(keys.length ? [heading('nav-drawer-group', 'Teams'), ...keys.map(k => row('group', teamLabel(k), n(k), () => window.openTeamPage?.(k), false, { noun: 'agent' }))] : []));
+    const of = k => (state.liveSessions || []).filter(s => s && s.board_project && identityKey(sessionServer(s), s.board_project) === k);
+    let shown = keys.map(k => [k, of(k)]);
+    if (shown.length > FEW_TEAMS) {
+        const AT = loadedModule('./active_teams.js');
+        if (AT) shown = AT.pick(shown);
+        else importOnce('./active_teams.js').then(() => { if (host.isConnected) drawTeams(host); }).catch(() => {});
+    }
+    const rows = shown.map(([k, list]) => row('group', teamLabel(k), list.length, () => window.openTeamPage?.(k), false, { noun: 'agent' }));
+    if (shown.idle) { // the row under the teams: the choice is the list's own, remembered in this browser
+        const b = row('expand_more', shown.hide ? `Show all teams (${shown.idle} idle)` : 'Show active teams only', 0, e => { e.stopPropagation(); loadedModule('./active_teams.js')?.toggleShowAll(); drawTeams(host); host.querySelector('.nav-drawer-teams-all')?.focus(); }); // the drawer stays open for it (a choice closes it: nav_tabs.js)
+        b.classList.add('nav-drawer-teams-all'); b.setAttribute('aria-expanded', shown.hide ? 'false' : 'true');
+        rows.push(b);
+    }
+    host.replaceChildren(...(keys.length ? [heading('nav-drawer-group', 'Teams'), ...rows] : []));
 }
 
 /** The context the drawer opens from: the open tab's own options come first (the Inbox's folders; Agents' teams), the rest of the places are below the divider. */
