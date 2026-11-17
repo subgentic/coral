@@ -245,6 +245,7 @@ export function attachVersions(dialog, hooks) {
         const seg = el('div', 'av-seg btn-seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Compare view');
         const bChanges = btn('av-view-changes', 'Changes'), bSplit = btn('av-view-split', 'Side by side'), bPage = btn('av-view-page', 'Before / after');
         const isHtml = /\.html?$/i.test(row.name || '') || /^text\/html/i.test(row.media_type || ''); // an HTML file's lines are tags: its pages shown as drawn is the readable compare (#17818)
+        if (st.view === 'page' && !isHtml) st.view = 'changes'; // the Before / after view kept from an HTML file: a file with no pages falls back to the lines (#19072)
         for (const [b, v] of [[bChanges, 'changes'], [bSplit, 'split'], ...(isHtml ? [[bPage, 'page']] : [])]) { b.setAttribute('aria-pressed', String(st.view === v)); b.addEventListener('click', () => { st.view = v; drawCompare(body, row, before, lines, false); body.querySelector(`.av-view-${v === 'changes' ? 'changes' : v === 'split' ? 'split' : 'page'}`)?.focus(); }); }
         seg.append(bChanges, bSplit); if (isHtml) seg.append(bPage); top.append(status, seg);
         wrap.append(h, top);

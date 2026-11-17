@@ -26,6 +26,15 @@ const HTML = { [H2]: '<h1>Plan</h1><p id="p">Ship on Friday.</p>', [H3]: '<h1>Pl
         assert.match(frames[0].doc, /Ship on Friday/, 'the left page is the earlier version');
         assert.match(frames[1].doc, /Ship on Monday/, 'the right page is this version');
         assert.equal(await ev(`document.querySelector('#artifact-viewer .av-view-page').getAttribute('aria-pressed')`), 'true');
+        // the view is kept for the next compare: a Markdown file has no Before / after, so it falls back to Changes with that button pressed (#19072)
+        await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
+        await ev(`(() => { const inner = window.fetch; window.fetch = (u, o) => { const url = String(u); const m = /\\/api\\/artifacts\\/([0-9a-f]{64})\\/versions/.exec(url); return m ? inner(u, o).then(r => r.json()).then(rows => new Response(JSON.stringify(rows.map(x => ({ ...x, name: 'plan.md' }))), { headers: { 'Content-Type': 'application/json' } })) : inner(u, o); }; return true; })()`);
+        await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(H3)}, { filename: 'plan.md' }); return true; })()`);
+        await waitFor(`!!document.querySelector('#artifact-viewer .av-compare')`, 'Compare on the Markdown file');
+        await ev(`document.querySelector('#artifact-viewer .av-compare').click(); true`);
+        await waitFor(`!!document.querySelector('#artifact-viewer .av-view-changes')`, 'the compare views');
+        assert.equal(await ev(`!!document.querySelector('#artifact-viewer .av-view-page')`), false, 'no Before / after for a Markdown file');
+        assert.equal(await ev(`document.querySelector('#artifact-viewer .av-view-changes').getAttribute('aria-pressed')`), 'true', 'the kept page view falls back to Changes, pressed');
         console.log('artifact_versions_html: ok');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
