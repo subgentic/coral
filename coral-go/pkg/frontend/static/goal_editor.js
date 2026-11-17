@@ -247,8 +247,9 @@ export function openGoalEditor(opts = {}) {
             const r = await goalWrite(project, 'goal_create', 0, '/goals', 'POST', createBody({ title: t.value, description: desc.value, doneWhen: d.value, driver: dr.value, images: tray ? tray.hexes() : [], by: OPERATOR_ID }));
             if (!r.ok) throw await failure(r);
             dlg.close();
-            const made = await r.json().catch(() => null), told = !!(made && made.orchestrator_told_at); // the toast only when it was told (#11880)
-            if (told) showToast('Goal created. The Orchestrator was told.');
+            const made = await r.json().catch(() => null), told = !!(made && made.orchestrator_told_at && !made.orchestrator_waiting); // a board notice can wait for a stopped Orchestrator (#16372)
+            const toast = showToast(told ? 'Goal created. The Orchestrator was told.' : 'Goal created. The Orchestrator will see it when it starts.');
+            if (!told) toast.classList.add('expanded'); // keep the delivery timing visible on a phone (#16372)
             if (opts.onCreated) await opts.onCreated(project, told);
         } catch (ex) { err.textContent = `The goal was not created: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; sync(); }
     });
