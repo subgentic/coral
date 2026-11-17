@@ -22,8 +22,9 @@ const { coralReady } = require('./helpers/wait');
             await coralReady(ev, 'startup', 'liveList', 'settings');
             const open = async group => { await ev(`(async () => { await window.showSettingsModal(${JSON.stringify(group)}); return true; })()`); await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings'); };
 
-            // Windows exposes only pty; the backend-choice assertions apply where tmux is available.
-            if (process.platform !== 'win32') {
+            // The backend row is drawn only when the server offers a choice, which it does only where tmux is installed (a box without tmux, such as the Mac mini, has a fixed backend, #17583): the backend-choice assertions apply there.
+            const offersChoice = await ev(`fetch('/api/system/terminal-backend').then(r => r.json()).then(d => !!d.choice)`);
+            if (process.platform !== 'win32' && offersChoice) {
                 console.log(`1. (${w}) Terminal: one title each, the whole explanation under Learn more`);
                 await open('terminal');
                 await waitFor(`!document.getElementById('tb-choice').closest('.sv-row').hidden`, 'the backend row', 10000);
