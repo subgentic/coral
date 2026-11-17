@@ -1,5 +1,4 @@
 /* The board's composer: Reply and posting (moved out of message_board.js, #8399; no behaviour change). */
-import { registerActions } from './actions.js';
 import { importOnce } from './import_once.js';
 import { blockedReason } from './hub_access.js';
 import { splitKey, boardFetch } from './server_base.js';
@@ -9,9 +8,11 @@ import { bs } from './board_state.js';
 const { setReplyStrip } = await importOnce('./board_reply_strip.js'); // a part of the board page's group
 const { _pollNewMessages } = await importOnce('./board_poll.js'); // a part of the board page's group: loaded with it
 
-registerActions({
-    'mb-post-input': () => { const hint = document.getElementById('mb-post-hint'); if (hint) hint.textContent = ''; },
-});
+export function postEvent(event) {
+    if (event.type === 'input') {
+        const hint = document.getElementById('mb-post-hint'); if (hint) hint.textContent = '';
+    } else if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); postBoardMessage(); }
+}
 
 /** Reply: "@Sender " goes at the start of the composer's text and the focus to it; a "Replying to" strip shows the message, and the post carries reply_to while the strip is there. */
 export function replyToMessage(id, name) {
