@@ -1,4 +1,9 @@
 {
+  "analytics_cost_tasks.js": {
+    "tasks": {
+      "listRoute": 1
+    }
+  },
   "board_chat.js": {
     "board": {
       "row": 1,
