@@ -115,3 +115,46 @@ func TestGoalUsageHourlyAttribution(t *testing.T) {
 	require.Len(t, plain, 1)
 	assert.Equal(t, plain[0].TimeSeriesBucket, got[0].TimeSeriesBucket)
 }
+
+// #19246: rows of sessions with no work window are summed by the database (one row per minute, not one per request) and only the sessions that have windows are attributed row by row.
+// 3000 requests of sessions with no windows and 40 of one that has one: the result is what a row-by-row pass gives (the plain series' totals, the windowed session on its goal, the rest on "Not on a task").
+func TestGoalUsageSumsRowsOfSessionsWithoutWindowsInTheDatabase(t *testing.T) {
+	ts, _, _ := seriesRouter(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Truncate(time.Hour).Add(-3 * time.Hour)
+	board := "team-a"
+	for i := 0; i < 3000; i++ {
+		u := store.TokenUsage{SessionID: "plain-" + string(rune('a'+i%7)), AgentName: "x", AgentType: "claude", BoardName: &board, Model: "m", InputTokens: 10, OutputTokens: 1, TotalTokens: 11, CostUSD: 0.5, Source: "jsonl", RecordedAt: base.Add(time.Duration(i) * time.Second).Format("2006-01-02T15:04:05.000Z")}
+		require.NoError(t, ts.RecordUsage(ctx, &u))
+	}
+	for i := 0; i < 40; i++ {
+		u := store.TokenUsage{SessionID: "worker", AgentName: "w", AgentType: "claude", BoardName: &board, Model: "m", InputTokens: 10, OutputTokens: 1, TotalTokens: 11, CostUSD: 2, Source: "jsonl", RecordedAt: base.Add(time.Duration(i) * time.Minute).Format("2006-01-02T15:04:05.000Z")}
+		require.NoError(t, ts.RecordUsage(ctx, &u))
+	}
+	windows := []store.GoalUsageWindow{{TaskID: 9, Session: "worker", Board: board, Key: "team-a/1", Label: "Goal 1", Claimed: base, Ended: base.Add(20 * time.Minute)}}
+	q := store.TimeSeriesQuery{Since: base.Add(-time.Hour).Format(time.RFC3339), Interval: "1h"}
+	got, err := ts.GoalUsageSeries(ctx, q, windows)
+	require.NoError(t, err)
+	byKey := map[string]float64{}
+	reqs := map[string]int{}
+	for _, b := range got {
+		for _, s := range b.Series {
+			byKey[s.Key] += s.CostUSD
+			reqs[s.Key] += s.NumRequests
+		}
+	}
+	assert.InDelta(t, 40, byKey["team-a/1"], 0.001, "the worker's first 20 turns are on its goal")
+	assert.InDelta(t, 1500+40, byKey["untasked"], 0.001)
+	assert.Equal(t, 3000+20, reqs["untasked"])
+	assert.Equal(t, 20, reqs["team-a/1"])
+	plain, err := ts.GetUsageTimeSeriesGrouped(ctx, store.TimeSeriesQuery{Since: q.Since, Interval: "1h"})
+	require.NoError(t, err)
+	var plainCost, goalCost float64
+	for _, b := range plain {
+		plainCost += b.CostUSD
+	}
+	for _, b := range got {
+		goalCost += b.CostUSD
+	}
+	assert.InDelta(t, plainCost, goalCost, 0.001, "the goal view and the plain view add up to the same money")
+}
