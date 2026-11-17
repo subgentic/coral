@@ -46,6 +46,14 @@ let _gen = 0;
 let _openIntent = 0;
 let _returnFocus = null;
 let _comments = null;    // the comments panel of the viewer (#5182)
+function paintSnapshot(dialog, at) {
+    let note = dialog.querySelector('.artifact-viewer-snapshot');
+    if (!note) { note = document.createElement('p'); note.className = 'artifact-viewer-snapshot'; note.setAttribute('role', 'note'); _details.add(note); }
+    const date = at ? new Date(at) : null;
+    note.hidden = false;
+    note.textContent = `Uploaded snapshot${date && Number.isFinite(date.getTime()) ? ' · ' + date.toLocaleString() : ''}. Source-file changes are not copied here.`;
+}
+
 let _versions = null;    // the version bar of the viewer (#6472)
 let _fileNavigation = null;
 let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
@@ -251,14 +259,14 @@ function _build() {
     _versions = attachVersions(d, {
         version: n => { const t = d.querySelector('.artifact-viewer-title'); t.querySelector('.artifact-viewer-version')?.remove(); if (n > 1) t.append(Object.assign(document.createElement('span'), { className: 'artifact-viewer-version', textContent: ` · version ${n}` })); }, // Coral numbers the versions: the name is the agent's (#11865)
         body: () => d.querySelector('.artifact-viewer-body'),
-        show: (row) => openArtifactViewer(row.digest, { ..._lastOpts, filename: row.name || _lastOpts.filename, mediaType: row.media_type, switched: true }),
+        show: (row) => openArtifactViewer(row.digest, { ..._lastOpts, filename: row.name || _lastOpts.filename, mediaType: row.media_type, createdAt: row.at, switched: true }),
         reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: false }),
         wantLatest: () => { const w = !!_lastOpts.openLatest; if (w) _lastOpts = { ..._lastOpts, openLatest: false }; return w; }, // a Needs you row opens the NEWEST version of its file, once (#15197: a row opened v1 though v2 existed)
-        line: (row) => { _barLine = row && row.file_id && row.version_line ? { hex: row.digest, fileId: row.file_id, versionLine: row.version_line } : null; if (_dialog) paintLine(_dialog); },
+        line: (row) => { _barLine = row && row.file_id && row.version_line ? { hex: row.digest, fileId: row.file_id, versionLine: row.version_line } : null; if (_dialog) { paintLine(_dialog); paintSnapshot(_dialog, row?.at || _lastOpts.createdAt); } },
         sheetOpen: () => _comments.sheetOpen(),
         setSheet: (open) => _comments.setSheet(open),
     });
-    _review = attachReview(d, { reload: hex => openArtifactViewer(hex || _hex, { ..._lastOpts, switched: true }) });
+    _review = attachReview(d, { reload: hex => openArtifactViewer(hex || _hex, { ..._lastOpts, createdAt: hex && hex !== _hex ? '' : _lastOpts.createdAt, switched: true }) });
     // On a phone Approve and Request changes sit in the bottom bar with Close, and Comments sits by the ⋯ button (two thin rows above the file, #12226); on a computer they are on the header row
     const phone = matchMedia('(max-width: 768px)'), dock = () => {
         const q = x => d.querySelector(x), foot = q('.artifact-viewer-foot'), actions = q('.artifact-viewer-actions'), chips = q('.artifact-viewer-chips');
@@ -349,10 +357,10 @@ async function startMarkdownEdit(d) {
         const module = await importOnce('./artifact_markdown_editor.js');
         if (gen !== _gen || d.hidden) return;
         const commentsWereOpen = _comments.sheetOpen(); _comments.setSheet(false);
-        const restore = (base = granted.context.hex) => { stopMarkdownEdit(); if (gen === _gen && !d.hidden) { if (base !== granted.context.hex) openArtifactViewer(base, { ..._lastOpts, switched: false }); else { const preview = source.replace(/^\ufeff/, ''); renderArtifactText(d.querySelector('.artifact-viewer-body'), preview, 'artifact.md', granted.context.server); _comments.docRendered(preview, true); } _comments.setSheet(commentsWereOpen); } };
+        const restore = (base = granted.context.hex) => { stopMarkdownEdit(); if (gen === _gen && !d.hidden) { if (base !== granted.context.hex) openArtifactViewer(base, { ..._lastOpts, createdAt: '', switched: false }); else { const preview = source.replace(/^\ufeff/, ''); renderArtifactText(d.querySelector('.artifact-viewer-body'), preview, 'artifact.md', granted.context.server); _comments.docRendered(preview, true); } _comments.setSheet(commentsWereOpen); } };
         _editor = module.createMarkdownEditor({ body: d.querySelector('.artifact-viewer-body'), footer: d.querySelector('.artifact-viewer-foot'), dialog: d, context: granted.context, source,
             onExit: restore,
-            onSaved: saved => { if (gen !== _gen) return; importOnce('./artifacts_feed.js').then(m => m.invalidateArtifacts(granted.context.key, { previous: granted.context.hex, digest: saved.digest })).catch(() => {}); openArtifactViewer(saved.digest, { ..._lastOpts, filename: saved.name || _lastOpts.filename, switched: false, editSaved: true }); },
+            onSaved: saved => { if (gen !== _gen) return; importOnce('./artifacts_feed.js').then(m => m.invalidateArtifacts(granted.context.key, { previous: granted.context.hex, digest: saved.digest })).catch(() => {}); openArtifactViewer(saved.digest, { ..._lastOpts, filename: saved.name || _lastOpts.filename, createdAt: saved.created_at || saved.at || '', switched: false, editSaved: true }); },
         });
     } catch (error) {
         if (gen !== _gen || error.name === 'AbortError') return;
@@ -505,6 +513,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _review.open(hex, opts);
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
+    paintSnapshot(d, opts.createdAt);
     // The goal and the task the file serves, behind Details as chips in one wrapped row (#12725; #12025, #11751): the goal's chip is the link back to it (one click closes the viewer and opens the goal's page); the viewer's header is one line
     const chips = document.createElement('div'); chips.className = 'detail-chips';
     if (opts.goal && opts.goalId && opts.goalTeam) {
@@ -583,7 +592,7 @@ export async function openBundledDocument({ title, url, name, onOpened }) {
     _hex = ''; _lastOpts = {}; _line = null; _barLine = null; _layoutType = null;
     leaveTrail(); showTrail(d);
     _versions?.close(); _review?.close(); _comments?.close(); _details.clear();
-    for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-dropbox-share', '.artifact-viewer-source', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
+    for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-dropbox-share', '.artifact-viewer-source', '.artifact-viewer-snapshot', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
     d.querySelector('.artifact-edit-send-note').hidden = true;
     setContentPending(d, false);
     d.classList.remove('is-image');
