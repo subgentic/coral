@@ -387,6 +387,6 @@ export function inboxFolderPath(key) {
 }
 
 /** The views the Hub does not serve (#9368): Automations and the old Workflows and Jobs addresses that open it. */
-export const HIDDEN_IN_CLOUD = ['automations', 'workflows', 'jobs', 'skills', 'queue'];
+export const HIDDEN_IN_CLOUD = ['automations', 'workflows', 'jobs', 'skills'];
 /** Where an address goes when the dashboard is served by the Hub: a hidden view opens the Agents home, any other route is as it was. */
 export const cloudRedirect = (route, cloud) => (cloud && route && HIDDEN_IN_CLOUD.includes(route.view) ? { view: 'agents' } : route);

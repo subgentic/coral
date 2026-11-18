@@ -85,10 +85,15 @@ export async function refreshQueue() {
     return reading;
 }
 
-/** Start or stop the polling: on while the Queue folder is the one on screen. */
+/** Start or stop the polling: on while the Queue folder is the one on screen and the browser tab is shown (#19568, C7: a hidden tab sends nothing; showing it reads once at once and the timers start again). */
+let seeing = false;
+const onVisible = () => { if (!wanted) return; if (document.hidden) stopTimers(); else watchQueue(true); };
+function stopTimers() { clearInterval(timer); clearInterval(tickTimer); timer = 0; tickTimer = 0; }
 export function watchQueue(on) {
     wanted = !!on;
-    if (!wanted) { clearInterval(timer); clearInterval(tickTimer); timer = 0; tickTimer = 0; return; }
+    if (!wanted) { stopTimers(); if (seeing) { seeing = false; document.removeEventListener('visibilitychange', onVisible); } return; }
+    if (!seeing) { seeing = true; document.addEventListener('visibilitychange', onVisible); }
+    if (document.hidden) { stopTimers(); return; }
     refreshQueue();
     if (!timer) timer = pollEvery(() => { if (wanted) refreshQueue(); }, POLL_MS);
     if (!tickTimer) tickTimer = pollEvery(() => { if (wanted && !document.querySelector('.queue-sure')) emit(); }, TICK_MS); // not while a Kick is waiting for its second press: the table would be drawn again under it

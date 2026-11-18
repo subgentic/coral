@@ -464,3 +464,4 @@ node skills_beginner_counts_docs.test.js
 
 node inbox_task_pages.test.mjs
 node workflow_run_escape.test.mjs
+node queue_cloud.test.mjs
