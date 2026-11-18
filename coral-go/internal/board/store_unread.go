@@ -35,6 +35,19 @@ func reviewNoticeCond(col, subscriberID string) (string, []any) {
 	return cond, []any{n, prefix, n + 1, n + 1, n + 1}
 }
 
+// noticeReachFilter is the SQL condition, ANDed into a reader's unread selection, that Coral's notices about an agent (#19608: "[Coral] X put Y to sleep", "woke", "stopped", "restarted", "[Task #N claimed by Y]",
+// a task assigned) are mail only for the agent a line tags: a notice from Coral or the task queue reaches a reader only when its text tags that reader (its id or job title, @all or @notify-all). The actor and every
+// other agent, a receive-all orchestrator included, get nothing; the board view and read --all still list them. sender and col are the message's sender and content columns.
+func noticeReachFilter(sender, col, subscriberID, jobTitle string) (string, []any) {
+	cond := " AND (" + sender + " NOT IN ('" + CoralSender + "', 'Coral Task Queue') OR instr(lower(" + col + "), lower(?)) > 0 OR instr(lower(" + col + "), '@all') > 0 OR instr(lower(" + col + "), '@notify-all') > 0"
+	args := []any{"@" + subscriberID}
+	if jobTitle != "" && jobTitle != subscriberID {
+		cond += " OR instr(lower(" + col + "), lower(?)) > 0"
+		args = append(args, "@"+jobTitle)
+	}
+	return cond + ")", args
+}
+
 // orchestratorQueueFilter is the sender filter of an orchestrator's unread selection: every sender but Coral Task Queue, whose review notice naming the orchestrator is counted. col and sender are the
 // message's content and sender columns (m.content, m.subscriber_id in the latest-id query); it returns the filter and its arguments.
 func orchestratorQueueFilter(sender, col, subscriberID string) (string, []any) {
@@ -146,6 +159,9 @@ func (s *Store) LatestUnreadMessageID(ctx context.Context, project, subscriberID
 		filter, fargs := orchestratorQueueFilter("m.subscriber_id", "m.content", subscriberID)
 		where = "m.project=? AND m.id>? AND m.subscriber_id!=?" + filter
 		args = append(args, fargs...)
+		nf, nargs := noticeReachFilter("m.subscriber_id", "m.content", subscriberID, sub.JobTitle)
+		where += nf
+		args = append(args, nargs...)
 	}
 	if !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) { // the selection of a plain read: tagged messages, whatever the mode
 		args[1] = max(sub.LastReadID, s.unreadFloor(ctx, project)) // within the unread window (#3875)
@@ -423,9 +439,10 @@ func (s *Store) countProjectUnread(ctx context.Context, project string, projectS
 	for _, sub := range projectSubs {
 		if sub.ReceiveMode == "all" {
 			var n int
+			nf, nargs := noticeReachFilter("subscriber_id", "content", sub.SubscriberID, sub.JobTitle)
 			if err := s.reader().GetContext(ctx, &n,
-				"SELECT COUNT(*) FROM board_messages WHERE project = ? AND id > ? AND id <= ? AND subscriber_id != ? AND subscriber_id != 'Coral Task Queue'",
-				project, sub.start, hi, sub.SubscriberID); err != nil {
+				"SELECT COUNT(*) FROM board_messages WHERE project = ? AND id > ? AND id <= ? AND subscriber_id != ? AND subscriber_id != 'Coral Task Queue'"+nf,
+				append([]any{project, sub.start, hi, sub.SubscriberID}, nargs...)...); err != nil {
 				return 0, err
 			}
 			sub.count += n
@@ -576,7 +593,7 @@ func (s *Store) PeekCounted(ctx context.Context, project, subscriberID string, l
 		return nil, nil
 	}
 	everything := sub.ReceiveMode == "all" && isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek) // CheckUnread's first branch: every message from others
-	rule := &readRule{subscriberID: subscriberID, jobTitle: sub.JobTitle, lastReadID: sub.LastReadID, tagged: !everything}
+	rule := &readRule{subscriberID: subscriberID, jobTitle: sub.JobTitle, lastReadID: sub.LastReadID, tagged: !everything, hideNotices: true}
 	counted := func(m Message) bool {
 		if m.SubscriberID == "Coral Task Queue" {
 			return false

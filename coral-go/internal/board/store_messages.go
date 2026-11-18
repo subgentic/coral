@@ -142,6 +142,7 @@ type readRule struct {
 	lastReadID             int64
 	tagged                 bool // only the messages that explicitly tag the subscriber (or @all): every member but an orchestrator, and not read --all
 	none                   bool // receive mode "none": read delivers nothing
+	hideNotices            bool // a plain read (not --all): Coral's notices about an agent reach only the agent a line tags (#19608)
 }
 
 // subscriberReadRule reads the subscriber's cursor, role and receive mode; nil when it is not subscribed (read delivers nothing).
@@ -160,8 +161,9 @@ func (s *Store) subscriberReadRule(ctx context.Context, project, subscriberID st
 	}
 	return &readRule{
 		subscriberID: subscriberID, jobTitle: sub.JobTitle, lastReadID: sub.LastReadID,
-		tagged: !wantAll && !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek),
-		none:   !wantAll && sub.ReceiveMode == "none",
+		tagged:      !wantAll && !isOrchestrator(subscriberID, sub.JobTitle, sub.CanPeek),
+		none:        !wantAll && sub.ReceiveMode == "none",
+		hideNotices: !wantAll,
 	}
 }
 
@@ -203,14 +205,18 @@ func (s *Store) selectRead(ctx context.Context, project string, rule *readRule, 
 		}
 		return messages, scanned, more, nil
 	}
+	notices, nargs := "", []any{}
+	if rule.hideNotices {
+		notices, nargs = noticeReachFilter("m.subscriber_id", "m.content", rule.subscriberID, rule.jobTitle)
+	}
 	err = s.reader().SelectContext(ctx, &messages,
 		`SELECT m.id, m.project, m.subscriber_id, m.session_id, m.content, m.target_group_id, m.external_json, m.origin, m.hub_user, m.is_system, m.task_id, m.created_at,
 		        COALESCE(s.job_title, m.subscriber_id, 'Unknown') as job_title
 		 FROM board_messages m
 		 LEFT JOIN board_subscribers s ON m.project = s.project AND m.subscriber_id = s.subscriber_id
-		 WHERE m.project = ? AND m.id > ? AND m.subscriber_id != ?
+		 WHERE m.project = ? AND m.id > ? AND m.subscriber_id != ?`+notices+`
 		 ORDER BY m.id ASC LIMIT ?`,
-		project, afterID, rule.subscriberID, limit)
+		append(append([]any{project, afterID, rule.subscriberID}, nargs...), limit)...)
 	if n := len(messages); n > 0 {
 		scanned = messages[n-1].ID
 	}
@@ -265,7 +271,11 @@ type ForPage struct {
 // selectReadIDs is selectRead's ids: the same selection (the tagged rule reads a batch of candidates' text to apply it, and lets it go), kept as ids only.
 func (s *Store) selectReadIDs(ctx context.Context, project string, rule *readRule, afterID int64, limit int) (ids []int64, scanned int64, more bool, err error) {
 	if !rule.tagged { // every message from others: no text is needed to choose them
-		err = s.reader().SelectContext(ctx, &ids, "SELECT id FROM board_messages WHERE project = ? AND id > ? AND subscriber_id != ? ORDER BY id ASC LIMIT ?", project, afterID, rule.subscriberID, limit)
+		notices, nargs := "", []any{}
+		if rule.hideNotices {
+			notices, nargs = noticeReachFilter("subscriber_id", "content", rule.subscriberID, rule.jobTitle)
+		}
+		err = s.reader().SelectContext(ctx, &ids, "SELECT id FROM board_messages WHERE project = ? AND id > ? AND subscriber_id != ?"+notices+" ORDER BY id ASC LIMIT ?", append(append([]any{project, afterID, rule.subscriberID}, nargs...), limit)...)
 		if n := len(ids); n > 0 {
 			scanned = ids[n-1]
 		}
