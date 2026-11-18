@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -187,4 +188,35 @@ func TestOnlyThePairingPathCallsPromoteDeviceOrigin(t *testing.T) {
 	// and the verifier's own store interface cannot reach it
 	src, _ := os.ReadFile("verify.go")
 	assert.NotContains(t, string(src), "PromoteDeviceOrigin")
+}
+
+// Wire format section 9: the secret is single use, dead after 10 minutes, the first success or the third failed check (a bad pk counts as a failed MAC).
+func TestSecretHoldDiesOnTheThirdFailureTheFirstSuccessOrTenMinutes(t *testing.T) {
+	r := newRig(t)
+	secret, uc, label, s, good := pairingFixture(t)
+	bad := good
+	bad.MAC = b64.EncodeToString(make([]byte, 32))
+	complete := func(h *devicekey.SecretHold, a devicekey.PairingAnswer, now time.Time) error {
+		_, err := h.Complete(context.Background(), r.ss, uc, label, a, "launch", now)
+		return err
+	}
+	h := devicekey.NewSecretHold(secret, t0)
+	assert.ErrorIs(t, complete(h, bad, t0), devicekey.ErrPairingMAC)
+	badPK := good
+	badPK.PK = s.pk[:80] + "AAAAAAA"
+	assert.ErrorIs(t, complete(h, badPK, t0), devicekey.ErrPairingMAC, "a bad pk counts too")
+	noKey := good
+	noKey.PK = ""
+	assert.ErrorIs(t, complete(h, noKey, t0), devicekey.ErrPairingNoKey, "no pk is not a failed check")
+	assert.ErrorIs(t, complete(h, bad, t0), devicekey.ErrPairingMAC, "the third failure")
+	assert.ErrorIs(t, complete(h, good, t0), devicekey.ErrPairingNoSecret, "the secret is dead: even a good answer is refused")
+	_, ok := r.listed(s.kid)
+	assert.False(t, ok)
+
+	h = devicekey.NewSecretHold(secret, t0)
+	assert.ErrorIs(t, complete(h, good, t0.Add(10*time.Minute+time.Second)), devicekey.ErrPairingNoSecret, "dead after ten minutes")
+	h = devicekey.NewSecretHold(secret, t0)
+	require.NoError(t, complete(h, good, t0.Add(10*time.Minute)))
+	assert.ErrorIs(t, complete(h, good, t0), devicekey.ErrPairingNoSecret, "single use: the first success kills it")
+	assert.False(t, devicekey.NewSecretHold(nil, t0).Alive(t0))
 }

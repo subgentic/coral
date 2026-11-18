@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/hkdf"
@@ -134,4 +135,70 @@ func CompletePairing(ctx context.Context, st PairingStore, secret []byte, userCo
 		}
 	}
 	return a.KID, nil
+}
+
+const secretLife = 10 * time.Minute
+
+// SecretHold keeps one pairing secret in memory: single use, dead after ten minutes, at the first success or at the third failed check. A failed pk check counts like a failed MAC; an answer with no pk does not. The bytes are zeroed when it dies.
+type SecretHold struct {
+	mu      sync.Mutex
+	secret  []byte
+	expires time.Time
+	fails   int
+}
+
+// NewSecretHold holds secret (16 bytes; anything else is a hold that is already dead) from now.
+func NewSecretHold(secret []byte, now time.Time) *SecretHold {
+	h := &SecretHold{expires: now.Add(secretLife)}
+	if len(secret) == 16 {
+		h.secret = append([]byte(nil), secret...)
+	}
+	return h
+}
+
+func (h *SecretHold) die() {
+	for i := range h.secret {
+		h.secret[i] = 0
+	}
+	h.secret = nil
+}
+
+// Alive reports whether the secret can still be used at now.
+func (h *SecretHold) Alive(now time.Time) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.aliveLocked(now)
+}
+
+func (h *SecretHold) aliveLocked(now time.Time) bool {
+	if h.secret != nil && now.After(h.expires) {
+		h.die()
+	}
+	return h.secret != nil
+}
+
+// Wipe ends the hold at once (the enrollment was cancelled or finished).
+func (h *SecretHold) Wipe() {
+	h.mu.Lock()
+	h.die()
+	h.mu.Unlock()
+}
+
+// Complete is CompletePairing with this hold's secret and its life rules.
+func (h *SecretHold) Complete(ctx context.Context, st PairingStore, userCode, label string, a PairingAnswer, mode string, now time.Time) (string, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if !h.aliveLocked(now) {
+		return "", ErrPairingNoSecret
+	}
+	kid, err := CompletePairing(ctx, st, h.secret, userCode, label, a, mode, now)
+	switch {
+	case err == nil:
+		h.die()
+	case errors.Is(err, ErrPairingMAC):
+		if h.fails++; h.fails >= 3 {
+			h.die()
+		}
+	}
+	return kid, err
 }
