@@ -5,3 +5,5 @@
 .knowledge-note-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); color: var(--text-secondary); }
 
 .team-panel .team-knowledge-body .list-bar-search-row { flex-wrap: wrap; } /* at 200% text, search and both actions need two lines; keep the table page inside its gutter */
+.team-distill-who { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 8px; }
+.team-distill-who select { min-height: 44px; max-width: 100%; }
