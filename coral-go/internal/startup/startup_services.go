@@ -35,6 +35,7 @@ import (
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tmux"
+	"github.com/subgentic/coral/pkg/redact"
 )
 
 func selectBackend(backendType, logDir, coralDir string) (ptymanager.TerminalBackend, background.AgentRuntime, ptymanager.SessionTerminal) {
@@ -268,6 +269,8 @@ func startScheduler(ctx context.Context, cfg *config.Config, srv *server.Server,
 		got, err := taskStore.SessionsWithAnyEvent(ctx, []string{sessionID})
 		return err != nil || got[sessionID] // a read that fails never judges a run
 	})
+	resultReader := jsonl.NewSessionReader()
+	scheduler.SetResultReader(runResultReader(resultReader, secrets.Redactor()))
 	scheduler.SetAgentWaiting(background.AgentWaitingFromEvents(taskStore)) // a run that runs out of time at a prompt says so (#14772)
 	scheduler.SetSessionTurn(taskStore.SessionTurn)                         // a scheduled prompt run finishes on its agent's accepted turn end (#7090)
 	scheduler.SetRuntime(agentRT)
@@ -611,5 +614,28 @@ func historyScanners() []agent.HistoryScanner {
 		&agent.AgyAgent{},
 		&agent.CodexAgent{},
 		&agent.PiAgent{},
+	}
+}
+
+// runResultMaxRunes is how much of what a run's agent said last a run keeps.
+const runResultMaxRunes = 600
+
+// runResultReader reads what a run's agent said last for a run whose chat is not kept (#16958): the WHOLE message is redacted first and the text is cut after, so a secret that straddles the cut is
+// redacted whole and not left as a partial token (#18544). A text that cannot be checked is not kept.
+func runResultReader(r *jsonl.SessionReader, red redact.Redactor) func(sessionID, workingDir, agentType string) string {
+	return func(sessionID, workingDir, agentType string) string {
+		m, ok := r.LastMessageUncut(sessionID, workingDir, agentType)
+		if !ok || m.Role != "assistant" || m.Text == "" {
+			return ""
+		}
+		out, err := red.Text([]byte(m.Text))
+		if err != nil {
+			return ""
+		}
+		text := string(out)
+		if rs := []rune(text); len(rs) > runResultMaxRunes {
+			text = string(rs[:runResultMaxRunes])
+		}
+		return text
 	}
 }

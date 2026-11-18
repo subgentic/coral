@@ -403,7 +403,7 @@ registerActions({
         const opened = await window.selectHistorySession(sid);
         if (opened === false) { // the run has no saved chat to open (a run still going, or one whose chat was not kept): the chat page is already up and would say 'Loading chat…' for good (#16770, walk 32 F1), so go back to the job and say why
             window.switchNavTab?.('automations'); if (jobId) selectScheduledJob(jobId);
-            importOnce('./job_run_note.js', 'a note').then(m => showToast(m.noChatNote(job, runsPage, sid), true)).catch(() => {});
+            importOnce('./job_run_note.js', 'a note').then(m => m.noChat(job, runsPage, sid, el, showToast)).catch(() => {}); // a finished run with a kept result shows it, any other says why there is no chat (#16958, #16796)
             return;
         }
         const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)
