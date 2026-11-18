@@ -455,7 +455,6 @@ registerActions({
     'team-menu-more': (el, event) => { event.stopPropagation(); const more = document.getElementById(el.getAttribute('aria-controls')); if (!more) return; more.hidden = !more.hidden; el.setAttribute('aria-expanded', String(!more.hidden)); }, // the team menu's six first, the rest under More: the menu stays open (#10549)
     'held-why': menu(el => showToast(el.title)), // a touch screen has no hover: a tap says why the message is held (#17898)
     'agent-info': withAgent('showInfoDirect'),
-    'agent-distill': menu(el => W('distillTeamKnowledge')('', el.dataset.sessionId)),
     'agent-kill': withAgent('killSessionDirect'),
     'agent-restart': withAgent('restartDirect'),
     'agent-restart-same': withAgent('restartSameDirect'),

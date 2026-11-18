@@ -228,7 +228,7 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
                 ${SVGO.o1}<circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
                 Session Info
             </button>
-            ${s.board_project ? `<button class="menu-item overflow-menu-item" data-on-click="agent-distill" data-session-id="${escapeAttr(sid)}">Distill knowledge</button>` : ''}
+            ${s.board_project ? `<button class="menu-item overflow-menu-item" data-on-click="team-distill" data-board="${escapeAttr(s.board_project)}" data-session-id="${escapeAttr(sid)}">Distill knowledge</button>` : ''}
             </div>
             <hr class="overflow-menu-divider">
             <button class="menu-item overflow-menu-item" data-on-click="agent-move" data-session-id="${escapeAttr(sid)}" data-dir="up">
