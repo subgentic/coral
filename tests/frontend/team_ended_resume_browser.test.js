@@ -1,4 +1,4 @@
-// Bringing back an ended agent (walk 17 H2 and M5, #15294): the Agents tab's row of an ended agent has a Resume button (it was an empty Chat cell; the way back was All chats, a hover-only Continue),
+// Bringing back an ended agent (walk 17 H2 and M5, #15294): the Agents tab's row of an ended agent has a Start button (it was an empty Chat cell; the way back was All chats, a hover-only Continue),
 // named for the agent, that does what Continue this chat > Resume session does (the earlier chat's resume-info, then the launch with resume_session_id and the team); a kill from the sidebar makes the
 // open tab read its rows again at once (a killed agent still read Busy). The board's /status, the resume-info and the launch are stubbed. 1280 px, through the real team page.
 const assert = require('node:assert/strict');
@@ -25,22 +25,25 @@ const TEAM = `qa-resume-${Date.now() % 100000}`;
             return R(u, o); }; return true; })()`);
         await openTeam(ev, waitFor, TEAM); await settle(500);
         await ev(`(() => { const t = window.__tp.tabs().find(x => window.__tp.tabLabel(x) === 'Agents'); t.click(); return true; })()`);
-        await waitFor(`!![...document.querySelectorAll('tr.dt-row')].find(r => r.innerText.includes('Lead'))`, 'the ended agent is a row', 8000);
-        const row = await ev(`(() => { const rows = [...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length), of = n => rows.find(r => r.innerText.includes(n)); return { lead: [...of('Lead').querySelectorAll('button')].map(b => b.textContent.trim()), ghost: [...of('Ghost').querySelectorAll('button')].map(b => b.textContent.trim()), text: of('Lead').innerText }; })()`);
-        assert.ok(!row.lead.includes('Resume') && !row.lead.includes('Open chat'), 'the row itself has no Resume or Open chat button (the agent page has Resume, #15857): ' + JSON.stringify(row));
-        assert.ok(!row.ghost.includes('Resume'), 'a member with no session of its own has nothing to resume: ' + JSON.stringify(row));
+        await waitFor(`!![...document.querySelectorAll('tr.dt-row')].find(r => r.innerText.includes('Boss'))`, 'the agents are rows', 8000);
+        assert.ok(!(await ev(`[...document.querySelectorAll('tr.dt-row')].some(r => r.innerText.includes('Lead'))`)), 'an ended agent is Archived: not in the default list (#19674)');
+        await ev(`(() => { const s = document.querySelector('.team-tb-more'); const o = [...s.options].find(o => /^Archived/.test(o.textContent.trim())); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        await waitFor(`!![...document.querySelectorAll('tr.dt-row')].find(r => r.innerText.includes('Lead'))`, 'More > Archived lists the ended agent', 8000);
+        const row = await ev(`(() => { const rows = [...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length), of = n => rows.find(r => r.innerText.includes(n)); return { lead: [...of('Lead').querySelectorAll('button')].map(b => b.textContent.trim()), ghost: [], text: of('Lead').innerText }; })()`);
+        assert.ok(!row.lead.includes('Resume') && !row.lead.includes('Open chat'), 'the row itself has no Resume or Open chat button (the agent page has Start, #15857): ' + JSON.stringify(row));
+        
         assert.doesNotMatch(row.text, /registered local session/i, 'no jargon in the row: ' + row.text);
         const before = await ev('window.__calls.status');
         await ev(`window.dispatchEvent(new Event('kill')); true`);
         await waitFor(`window.__calls.status > ${before}`, 'a kill makes the open tab read its rows again', 5000);
         await ev(`[...document.querySelectorAll('tr.dt-row')].find(r => r.innerText.includes('Lead')).querySelector('.dt-primary').click(); true`); // an ended agent has no chat: its row opens its page
-        await waitFor(`!!document.querySelector('button[aria-label="Resume Lead"]')`, 'the ended agent\'s page has a Resume button', 8000);
-        await ev(`document.querySelector('button[aria-label="Resume Lead"]').click(); true`);
+        await waitFor(`!!document.querySelector('button[aria-label="Start Lead"]')`, 'the ended agent\'s page has a Start button', 8000);
+        await ev(`document.querySelector('button[aria-label="Start Lead"]').click(); true`);
         await waitFor(`window.__calls.launch.length === 1`, 'Resume starts the agent from its earlier chat', 8000);
         const l = await ev('window.__calls.launch[0]');
         assert.equal(l.resume_session_id, 'rs-lead', 'from its own chat: ' + JSON.stringify(l));
         assert.equal(l.display_name, 'Lead'); assert.equal(l.board_name, TEAM, 'back in the team: ' + JSON.stringify(l));
-        await waitFor(`!document.querySelector('button[aria-label="Resume Lead"]')`, 'the page reads again and the Resume button is gone', 8000);
-        console.log('PASS the ended agent\'s page has Resume, it resumes the earlier chat in the team, and a kill refreshes the tab');
+        await waitFor(`!document.querySelector('button[aria-label="Start Lead"]')`, 'the page reads again and the Start button is gone', 8000);
+        console.log('PASS the ended agent\'s page has Start, it resumes the earlier chat in the team, and a kill refreshes the tab');
     } finally { await removeBoards(ev, [TEAM]).catch(() => { }); await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });

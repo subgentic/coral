@@ -8,7 +8,7 @@ import { showToast, showView } from './utils.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { agentWords, whatStaysKill } from './agent_words.js';
-import { KILL_LOG_NOTE } from './agent_actions.js';
+import { KILL_LOG_NOTE, toggleAgentSleep, toggleAgentArchive } from './agent_actions.js';
 
 export function killSessionDirect(name, agentType, sessionId) {
     const server = serverForSession(name, sessionId);
@@ -34,4 +34,20 @@ export function killSessionDirect(name, agentType, sessionId) {
     } catch (e) {
         showToast("Failed to stop agent", true);
     } }, undefined, { label: idle ? 'Remove agent' : 'Stop agent', danger: true });
+}
+
+// Start and Sleep on an archived agent's page (#19674): Start is the sidebar's Wake (back awake), Sleep its Unarchive (stays asleep, back in the list). Here, a lazy module of agent actions.
+/** The two buttons, in order; done() runs after the server applied the change. */
+export function archivedButtons(agent, session, done) {
+    const make = (cls, word, act) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = word; b.setAttribute('aria-label', `${word} ${agent.name}`);
+        b.addEventListener('click', async () => {
+            if (await act()) done();
+        });
+        return b;
+    };
+    return [
+        make('btn btn-primary', 'Start', () => toggleAgentSleep(session.name, session.agent_type, session.session_id, 'wake')),
+        make('btn', 'Sleep', () => toggleAgentArchive(session.name, session.agent_type, session.session_id, 'unarchive')),
+    ];
 }
