@@ -45,15 +45,15 @@ func headSHAFromText(texts ...string) string {
 			if !hasLetterAndDigit(w) {
 				continue
 			}
-			prev := strings.Fields(strings.Trim(low[:loc[0]], " \t(["))
+			prev := strings.Fields(strings.Trim(low[:loc[0]], " \t([`'\""))
 			if len(prev) == 0 {
 				continue
 			}
-			word := strings.Trim(prev[len(prev)-1], ":,;.([")
+			word := strings.Trim(prev[len(prev)-1], ":,;.([`'\"")
 			if !headWords[word] {
 				continue
 			}
-			if word == "at" && len(prev) > 1 && baseVerbs[strings.Trim(prev[len(prev)-2], ":,;.([")] {
+			if word == "at" && len(prev) > 1 && baseVerbs[strings.Trim(prev[len(prev)-2], ":,;.([`'\"")] {
 				continue // "branched at <sha>" is where the work started, not where it is
 			}
 			return w
@@ -66,7 +66,7 @@ func headSHAFromText(texts ...string) string {
 var baseVerbs = map[string]bool{"branched": true, "based": true, "rebased": true, "forked": true, "cut": true, "stacked": true, "merged": true, "started": true, "built": true, "branch": true, "base": true}
 
 // headWords are the only words that put a commit's name in front of the work itself.
-var headWords = map[string]bool{"at": true, "commit": true, "sha": true}
+var headWords = map[string]bool{"at": true, "commit": true, "sha": true, "revision": true, "rev": true, "@": true, "pushed": true}
 
 func hasLetterAndDigit(s string) bool {
 	return strings.Trim(s, "0123456789") != "" && strings.Trim(s, "abcdef") != ""
@@ -95,6 +95,8 @@ type landedCheck struct {
 	Landed func(sha string) landedState
 	Picked func(sha string) bool
 	Named  func(id int64) bool
+	// Pushed says whether any remote branch holds the commit; nil, or a repository with no remote branches, says nothing (#19603).
+	Pushed func(sha string) bool
 }
 
 var approvedSHARe = regexp.MustCompile(`(?i)\bapproved\s+([0-9a-f]{7,40})\b`)
@@ -117,6 +119,25 @@ func approvedSHA(d map[string]any) string {
 				return strings.ToLower(m[1])
 			}
 		}
+	}
+	return ""
+}
+
+var fullSHARe = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
+
+// fieldHead is the head the board's own fields name when the submit text names none (#19603): the revision of an artifact the submit attached (an author's own word, so before the board's record), then the
+// head the board recorded at the submit (workflow.submitted_head, which is set by --head and can be the repository's head when it is not).
+func fieldHead(wf, cr map[string]any) string {
+	arts, _ := cr["artifacts"].([]any)
+	for _, a := range arts {
+		if m, _ := a.(map[string]any); m != nil {
+			if rev, _ := m["revision"].(string); fullSHARe.MatchString(rev) && hasLetterAndDigit(strings.ToLower(rev)) {
+				return strings.ToLower(rev)
+			}
+		}
+	}
+	if h, _ := wf["submitted_head"].(string); fullSHARe.MatchString(h) && hasLetterAndDigit(strings.ToLower(h)) {
+		return strings.ToLower(h)
 	}
 	return ""
 }
@@ -198,6 +219,9 @@ func findUnlandedCounted(tasks []map[string]any, since time.Time, ref string, de
 			sha = headSHAFromText(msg, reason)
 		}
 		if sha == "" {
+			sha = fieldHead(wf, cr) // the board's own fields, when the submit text names no commit (#19603)
+		}
+		if sha == "" {
 			out = append(out, unlandedTask{ID: id, Title: title, Why: "no head SHA recorded"})
 			continue
 		}
@@ -212,6 +236,10 @@ func findUnlandedCounted(tasks []map[string]any, since time.Time, ref string, de
 		}
 		switch state {
 		case stateNotLanded:
+			if check.Pushed != nil && !check.Pushed(sha) {
+				out = append(out, unlandedTask{ID: id, SHA: sha, Title: title, Why: "no remote branch holds it (never pushed)"})
+				continue
+			}
 			out = append(out, unlandedTask{ID: id, SHA: sha, Title: title, Why: "not on " + ref})
 		case stateUnknown:
 			out = append(out, unlandedTask{ID: id, SHA: sha, Title: title, Why: "commit not in this repository (git fetch it)"})
@@ -269,35 +297,62 @@ func gitChecks(dir, ref string) landedCheck {
 		out, err := cmd.Output()
 		return string(out), err == nil
 	}
-	patchIDs := func(logArgs ...string) (map[string]bool, bool) {
-		// git log -p is piped into patch-id: the patches are never held in memory, only the ids (#18191)
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		logCmd := gitutil.Command(ctx, dir, append([]string{"log", "--no-merges", "-p", "--format=%H", "--max-count=5000"}, logArgs...)...)
-		pipe, err := logCmd.StdoutPipe()
-		if err != nil {
-			return nil, false
-		}
-		idCmd := gitutil.Command(ctx, dir, "patch-id", "--stable")
-		idCmd.Stdin = pipe
-		if err := logCmd.Start(); err != nil {
-			return nil, false
-		}
-		outBytes, idErr := idCmd.Output()
-		logErr := logCmd.Wait()
-		out, ok := string(outBytes), idErr == nil && logErr == nil
-		ids := map[string]bool{}
-		for _, line := range strings.Split(out, "\n") {
-			if f := strings.Fields(line); len(f) >= 1 {
-				ids[f[0]] = true
+	var named map[int64]bool
+	// The sets are read once each (#19603): every head used to cost a process for "is it a commit here", one for ancestry and one for "is it on a remote branch", and a git process is most of what a head cost.
+	hashes := func(args ...string) map[string]bool {
+		set := map[string]bool{}
+		if out, ok := run(nil, append([]string{"rev-list"}, args...)...); ok {
+			for _, h := range strings.Fields(out) {
+				set[h] = true
 			}
 		}
-		return ids, ok
+		return set
 	}
-	var named map[int64]bool
-	onRef := map[string]map[string]bool{} // by merge-base
+	var onRef, onRemote map[string]bool
+	var byPrefix map[string][]string // every commit of every ref, by its first 7 digits
+	resolve := func(sha string) string {
+		if byPrefix == nil {
+			byPrefix = map[string][]string{}
+			for h := range hashes("--all") {
+				byPrefix[h[:7]] = append(byPrefix[h[:7]], h)
+			}
+		}
+		var found []string
+		for _, h := range byPrefix[strings.ToLower(sha)[:7]] {
+			if strings.HasPrefix(h, strings.ToLower(sha)) {
+				found = append(found, h)
+			}
+		}
+		if len(found) == 1 {
+			return found[0]
+		}
+		return "" // not on any ref here, or ambiguous: git decides
+	}
+	slowLanded := gitLanded(dir, ref)
 	return landedCheck{
-		Landed: gitLanded(dir, ref),
+		Landed: func(sha string) landedState {
+			full := resolve(sha)
+			if full == "" {
+				return slowLanded(sha) // a commit no ref holds, or a name that is ambiguous
+			}
+			if onRef == nil {
+				onRef = hashes(ref)
+			}
+			if onRef[full] {
+				return stateLanded
+			}
+			return stateNotLanded
+		},
+		Pushed: func(sha string) bool {
+			if onRemote == nil {
+				onRemote = hashes("--remotes")
+			}
+			if len(onRemote) == 0 {
+				return true // no remote branches here: this repository cannot say
+			}
+			full := resolve(sha)
+			return full == "" || onRemote[full]
+		},
 		Named: func(id int64) bool {
 			if named == nil {
 				named = map[int64]bool{}
@@ -312,28 +367,27 @@ func gitChecks(dir, ref string) landedCheck {
 			return named[id]
 		},
 		Picked: func(sha string) bool {
-			mb, ok := run(nil, "merge-base", sha, ref)
+			// One cheap count, then one git cherry (a single process: it marks each commit of ref..sha "-" when a commit of the ref holds the same patch, "+" when none does; merges are left out). A range with no
+			// patch at all prints nothing and is not a pick (#19603: the old patch-id pipeline took 0.3 s a head).
+			// An empty commit has the empty patch, which another empty commit of the ref "matches": a head with nothing but those carries no work (the pathspec drops the commits that change no file).
+			if n, ok := run(nil, "rev-list", "--count", "--no-merges", ref+".."+sha, "--", ":/"); !ok || strings.TrimSpace(n) == "0" {
+				return false
+			}
+			out, ok := run(nil, "cherry", ref, sha)
 			if !ok {
 				return false
 			}
-			mb = strings.TrimSpace(mb)
-			mine, ok := patchIDs(ref + ".." + sha)
-			if !ok || len(mine) == 0 {
-				return false
-			}
-			if onRef[mb] == nil {
-				ids, ok := patchIDs(mb + ".." + ref)
-				if !ok {
+			lines := 0
+			for _, line := range strings.Split(out, "\n") {
+				if line = strings.TrimSpace(line); line == "" {
+					continue
+				}
+				if !strings.HasPrefix(line, "- ") {
 					return false
 				}
-				onRef[mb] = ids
+				lines++
 			}
-			for id := range mine {
-				if !onRef[mb][id] {
-					return false
-				}
-			}
-			return true
+			return lines > 0
 		},
 	}
 }

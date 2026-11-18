@@ -291,3 +291,109 @@ func TestUnlandedNamesATaskOnlyByAnEndingNumberAndCountsWhatItSkips(t *testing.T
 	assert.Equal(t, int64(403), got[0].ID, "a revert does not land it")
 	assert.Equal(t, unlandCounts{Checked: 3, MarkedLanded: 1, Named: 1}, counts)
 }
+
+// A head named in the words people write (#19603): in backticks, after "revision" or "@", from the structured fields the board keeps when the text names none.
+func TestHeadSHAIsFoundInTheWordsSubmitsUse(t *testing.T) {
+	assert.Equal(t, "d5eec7c3d3", headSHAFromText("in review at `d5eec7c3d3`, stacked on `25fe1fd9eb`"), "backticks around the commit")
+	assert.Equal(t, "75d04da523", headSHAFromText("Ready for batch: correct author revision 75d04da523, all checks pass"))
+	assert.Equal(t, "abc1234def", headSHAFromText("fix-19570 @ abc1234def"))
+	assert.Equal(t, "abc1234def", headSHAFromText("pushed abc1234def"))
+	assert.Equal(t, "", headSHAFromText("stacked on `25fe1fd9eb`"), "a base in backticks is still no head")
+}
+
+func TestUnlandedTakesTheHeadFromTheBoardsFieldsWhenTheTextNamesNone(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "first")
+	gitIn(t, repo, "checkout", "-q", "-b", "topic")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "topic work")
+	off := gitIn(t, repo, "rev-parse", "HEAD")
+	gitIn(t, repo, "checkout", "-q", "main")
+	main := gitIn(t, repo, "rev-parse", "HEAD")
+	now := time.Now().UTC()
+	day := now.Add(-24 * time.Hour).Format(time.RFC3339)
+	mk := func(id float64, title string) map[string]any {
+		return map[string]any{"id": id, "status": "completed", "outcome": "success", "reviewers": []any{"QA"}, "completed_at": day, "title": title}
+	}
+	tasks := []map[string]any{mk(1, "head only in an artifact revision"), mk(2, "head only in submitted_head"), mk(3, "artifact revision beats submitted_head"), mk(4, "nothing anywhere")}
+	detail := func(id int64) (map[string]any, error) {
+		cr := map[string]any{"reason": "Ready for batch, all checks pass"}
+		wf := map[string]any{"completion_review": cr}
+		switch id {
+		case 1:
+			cr["artifacts"] = []any{map[string]any{"name": "patch", "revision": off}}
+		case 2:
+			wf["submitted_head"] = off
+		case 3:
+			cr["artifacts"] = []any{map[string]any{"name": "patch", "revision": off}}
+			wf["submitted_head"] = main // a landed commit must not hide the artifact's head
+		}
+		return map[string]any{"workflow": wf}, nil
+	}
+	got, err := findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitChecks(repo, "main"))
+	require.NoError(t, err)
+	var ids []string
+	for _, r := range got {
+		ids = append(ids, fmt.Sprintf("%d:%s", r.ID, r.Why))
+	}
+	assert.Equal(t, []string{"1:not on main", "2:not on main", "3:not on main", "4:no head SHA recorded"}, ids)
+	assert.Equal(t, off, got[0].SHA)
+}
+
+// A head no remote branch holds was never pushed (#19603): 7 approved heads had no remote branch. The check only speaks when the repository has remote branches at all.
+func TestUnlandedFlagsAHeadNoRemoteBranchContains(t *testing.T) {
+	bare := t.TempDir()
+	gitIn(t, bare, "init", "-q", "--bare", "-b", "main")
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	gitIn(t, repo, "remote", "add", "origin", bare)
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "first")
+	gitIn(t, repo, "push", "-q", "origin", "main")
+	gitIn(t, repo, "checkout", "-q", "-b", "pushed")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "pushed work")
+	pushed := gitIn(t, repo, "rev-parse", "HEAD")
+	gitIn(t, repo, "push", "-q", "origin", "pushed")
+	gitIn(t, repo, "checkout", "-q", "-b", "local")
+	gitIn(t, repo, "commit", "-q", "--allow-empty", "-m", "local work")
+	local := gitIn(t, repo, "rev-parse", "HEAD")
+	gitIn(t, repo, "checkout", "-q", "main")
+	now := time.Now().UTC()
+	day := now.Add(-24 * time.Hour).Format(time.RFC3339)
+	tasks := []map[string]any{
+		{"id": 1.0, "status": "completed", "outcome": "success", "reviewers": []any{"QA"}, "completed_at": day, "title": "on a remote branch"},
+		{"id": 2.0, "status": "completed", "outcome": "success", "reviewers": []any{"QA"}, "completed_at": day, "title": "only on this computer"},
+	}
+	heads := map[int64]string{1: pushed, 2: local}
+	detail := func(id int64) (map[string]any, error) {
+		return map[string]any{"workflow": map[string]any{"completion_review": map[string]any{"message": "Head " + heads[id]}}}, nil
+	}
+	got, err := findUnlanded(tasks, now.Add(-7*24*time.Hour), "main", detail, gitChecks(repo, "main"))
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, "not on main", got[0].Why)
+	assert.Contains(t, got[1].Why, "no remote branch", "the head that was never pushed says so")
+}
+
+// A head is a pick only when every one of its commits has its patch on the ref (#19603): one commit that is not there keeps the whole head unlanded, and a head with no patch is no pick.
+func TestUnlandedPickNeedsEveryPatchOnTheRef(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	write := func(name string) {
+		require.NoError(t, os.WriteFile(repo+"/"+name, []byte(name+"\n"), 0o644))
+		gitIn(t, repo, "add", "-A")
+		gitIn(t, repo, "commit", "-q", "-m", name)
+	}
+	write("base.txt")
+	gitIn(t, repo, "checkout", "-q", "-b", "two", "main")
+	write("a.txt")
+	write("b.txt")
+	two := gitIn(t, repo, "rev-parse", "HEAD")
+	gitIn(t, repo, "checkout", "-q", "main")
+	write("moved.txt")
+	gitIn(t, repo, "cherry-pick", "two~1") // only a.txt's commit comes over
+	c := gitChecks(repo, "main")
+	assert.False(t, c.Picked(two), "b.txt's patch is not on main")
+	gitIn(t, repo, "cherry-pick", "two")
+	assert.True(t, c.Picked(two), "both patches are on main under other SHAs")
+	assert.False(t, c.Picked(gitIn(t, repo, "rev-parse", "main")), "a head that is the ref has no patch to pick")
+}
