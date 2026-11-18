@@ -382,6 +382,8 @@ func TestSleepRefusesAnAgentThatWaitsOnThePersonOrIsWorking(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, code)
 	assert.Equal(t, "working", out["code"])
 	assert.Contains(t, out["message"], "5 minutes")
+	assert.Contains(t, out["message"], "in a turn: yes", "the refusal says which signal held it, so a refusal that reads wrong can be traced (#19529)")
+	assert.Regexp(t, `last event \d+s ago`, out["message"])
 	assert.False(t, r.asleep("Dev5"))
 }
 
