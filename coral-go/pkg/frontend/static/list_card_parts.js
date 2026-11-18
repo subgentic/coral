@@ -42,8 +42,8 @@ export function deleteTeamItem(boardName) {
 }
 
 // The team's health check (#4962, quieter in #5119): an accent icon beside the team view button while the check is ON, that opens the setting; while it is off there is no icon
-// (it is turned on in Team settings, Health check, and in the Agent Team dialog).
-// The state is "team_health_on" on the team's rows in the live list; Hub's web shell: a plain icon, a remote team: this button (#19509).
+// (turned on in Team settings, Health check, and in the Agent Team dialog).
+// The state is "team_health_on" on the team's rows in the live list; Hub's web shell: plain icon.
 // The icon must not blink: a feed message that leaves the field out or nulls it (a field-level diff says null for a field a row no longer has) is not the team turning
 // the check off, so the last state seen for the team stands until a row says otherwise.
 const _healthSeen = new Map(); // team (board) name -> the last team_health_on a row of it carried
@@ -51,7 +51,7 @@ export function teamHealthBtn(boardName, boardSessions) {
     const row = boardSessions.find(s => typeof s.team_health_on === 'boolean');
     if (row) _healthSeen.set(boardName, row.team_health_on);
     if (!_healthSeen.get(boardName)) return '';
-    if (isCloud()) return `<span class="team-health-btn is-on" role="img" aria-label="Health check is on" title="Health check is on">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></span>`;
+    if (isCloud()) return `<span class="team-health-btn is-on" role="img" aria-label="Health check is on">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></span>`;
     const label = `Health check settings for ${keyLabel(boardName)}`;
     return `<button type="button" class="btn btn-quiet btn-icon btn-xs folder-copy-btn team-health-btn is-on" data-on-click="team-health" data-board="${escapeAttr(boardName)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></button>`;
 }
