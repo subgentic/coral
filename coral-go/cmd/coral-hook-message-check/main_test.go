@@ -4,6 +4,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"strings"
 	"testing"
+	"time"
 )
 
 // #11198 (QA's MUST): a paused board's check answers the real count with paused: true, and read delivers none of it. The hook that runs after every tool call says nothing then; before, it printed
@@ -35,5 +36,26 @@ func TestTheHooksNoticeIsTheNudgeText(t *testing.T) {
 	}
 	if strings.ContainsAny(board.NudgeText(), "0123456789") {
 		t.Fatalf("the nudge states a number: %q", board.NudgeText())
+	}
+}
+
+// #19622: the line was printed after every tool call while anything was unread. It is said once per batch: at once when messages first wait, then not again until they are read (and more come) or five minutes pass.
+func TestTheUnreadLineIsSaidOncePerBatch(t *testing.T) {
+	path := t.TempDir() + "/said"
+	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	if saidRecently(path, now) {
+		t.Fatal("the first call of a batch says the line")
+	}
+	for i := 1; i <= 5; i++ {
+		if !saidRecently(path, now.Add(time.Duration(i)*20*time.Second)) {
+			t.Fatalf("call %d inside the window is quiet", i)
+		}
+	}
+	if saidRecently(path, now.Add(5*time.Minute+time.Second)) {
+		t.Fatal("after five minutes it is said again")
+	}
+	forgetSaid(path) // everything was read
+	if saidRecently(path, now.Add(5*time.Minute+2*time.Second)) {
+		t.Fatal("a new batch after a read is said at once")
 	}
 }

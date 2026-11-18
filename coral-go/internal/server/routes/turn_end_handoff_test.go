@@ -432,3 +432,48 @@ func TestTurnEndHandoffWaitsWhileTheBoardIsPaused(t *testing.T) {
 	bh.SetPaused(board, false)
 	assert.Equal(t, true, ask()["handoff"], "resumed: the messages that waited are handed over")
 }
+
+// #19622: one channel per message. A routine message a typed nudge already announced is not announced again by the Stop-hook block; a mention of the agent, or the Operator's message, still goes at once.
+func TestTurnEndHandoffDoesNotRepeatWhatANudgeAnnounced(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-1962-2200-0000-000000000001"
+	name := "claude-" + sid
+	board := "team-1962a"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "foxtrot", WorkingDir: "/w", BoardName: &board}))
+	tok := agentToken(t, h, sid, name)
+	_, err := h.bs.Subscribe(ctx, board, "Orch", "Orchestrator", name, nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, board, "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	t.Cleanup(func() { ptymanager.ForgetSession(name) })
+	ask := func() bool {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/foxtrot/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return out["handoff"] == true
+	}
+	post := func(who, text string) {
+		_, err := h.bs.PostMessage(ctx, board, who, text, nil)
+		require.NoError(t, err)
+	}
+	latest := func() int64 {
+		id, err := h.bs.LatestUnreadMessageID(ctx, board, "Orch")
+		require.NoError(t, err)
+		return id
+	}
+	post("Lead", "fyi the build is green")
+	ptymanager.NoteBoardAnnounced(sid, latest()) // the nudge for it was typed
+	assert.False(t, ask(), "a routine message the nudge announced is not announced again by the Stop hook")
+	post("Lead", "fyi another thing")
+	assert.True(t, ask(), "a newer routine message the nudge did not cover is handed over")
+	ptymanager.NoteBoardAnnounced(sid, latest())
+	post("Lead", "@Orch please look now")
+	ptymanager.NoteBoardAnnounced(sid, latest())
+	assert.True(t, ask(), "a mention goes at once even when a nudge covered it")
+}

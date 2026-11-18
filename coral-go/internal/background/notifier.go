@@ -509,7 +509,11 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 	delete(n.heldNudge, sessName)
 	last, notified := n.notified[sessName]
 	n.notifiedMu.Unlock()
-	if !nudgeDue(last, notified, sub, unread, latestID, n.now(), ptymanager.JitterAround(n.remindAfter, sessName)) {
+	urgent := true // a nudge held to the all-messages floor (#19622) goes at once for a mention of the agent or the Operator's message; decided only when the floor would hold it
+	if sub.ReceiveMode == "all" && notified && n.now().Sub(last.at) < allModeNudgeFloor {
+		urgent = n.nudgeUrgent(ctx, sub.Project, subscriberID)
+	}
+	if !nudgeDue(last, notified, sub, unread, latestID, n.now(), ptymanager.JitterAround(n.remindAfter, sessName), urgent) {
 		n.logger.Debug("already notified", "subscriber_id", subscriberID, "session", sessName, "unread", unread, "notified_unread", last.count)
 		return
 	}
@@ -597,6 +601,7 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 	n.notifiedMu.Lock()
 	n.notified[sessName] = notifyState{count: unread, latestID: latestID, at: n.now()}
 	n.notifiedMu.Unlock()
+	ptymanager.NoteBoardAnnounced(a.SessionID, latestID) // the turn-end hand-off does not announce these again (#19622)
 }
 
 // modelRefused says whether a is a Codex agent whose model is refused (#13480), and which; and forgets the log of one whose refusal is gone.
@@ -638,6 +643,19 @@ func (n *BoardNotifier) nudgeDeliverer() nudgeDeliverFn {
 	return deliverNudgeFn
 }
 
+// allModeNudgeFloor is the least time between two typed nudges to an all-messages subscriber (the Orchestrator, #19622): every new message was a new batch, so a busy board nudged it about 900 times a day for what one
+// nudge a few minutes covers. A message that @mentions it, or the Operator's, is not held by it.
+const allModeNudgeFloor = 5 * time.Minute
+
+// nudgeUrgent says whether the subscriber's unread messages include a same-board mention of it or an Operator message. A check that fails counts as urgent (today's behaviour).
+func (n *BoardNotifier) nudgeUrgent(ctx context.Context, project, subscriberID string) bool {
+	if local, err := n.boardStore.HasUnreadLocalMention(ctx, project, subscriberID); err != nil || local {
+		return true
+	}
+	op, err := n.boardStore.HasUnreadOperatorMessage(ctx, project, subscriberID)
+	return err != nil || op
+}
+
 // nudgeDue reports whether an agent with unread messages (latestID the newest) is nudged now: one nudge until the
 // agent reads, which covers more messages arriving meanwhile (the agent reads them all at once), with a reminder once
 // window (remindAfter, spread per agent: #3613) has passed. A new batch is nudged at once:
@@ -647,7 +665,10 @@ func (n *BoardNotifier) nudgeDeliverer() nudgeDeliverFn {
 //   - in any mode, an agent that has read past the batch it was nudged for has only newer messages unread. Without
 //     this a new mention that arrived before a pass saw unread == 0 waited for the reminder (#3480);
 //   - an all-messages subscriber's larger unread count is new activity too.
-func nudgeDue(last notifyState, notified bool, sub *board.Subscriber, unread int, latestID int64, now time.Time, window time.Duration) bool {
+func nudgeDue(last notifyState, notified bool, sub *board.Subscriber, unread int, latestID int64, now time.Time, window time.Duration, urgent bool) bool {
+	if notified && sub.ReceiveMode == "all" && !urgent && now.Sub(last.at) < allModeNudgeFloor {
+		return false // #19622: a subscriber that reads every message is nudged at most once per floor, whatever arrives; a mention or the Operator's message is urgent and goes at once
+	}
 	newBatch := sub.ReceiveMode == "all" && last.latestID > 0 && latestID > last.latestID
 	if last.latestID > 0 && sub.LastReadID >= last.latestID && latestID > last.latestID {
 		newBatch = true

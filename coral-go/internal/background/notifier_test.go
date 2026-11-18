@@ -437,8 +437,9 @@ func TestBoardNotifier_OrchestratorGetsNudgeForNewUnreadBatch(t *testing.T) {
 	require.Len(t, rt.sent, 1)
 	_, err = bs.PostMessage(ctx, "proj", "Worker", "second", nil)
 	require.NoError(t, err)
+	pastTheAllModeFloor(notifier)
 	require.NoError(t, notifier.RunOnce(ctx))
-	require.Len(t, rt.sent, 2, "new messages should immediately nudge the orchestrator")
+	require.Len(t, rt.sent, 2, "new messages nudge the orchestrator once the floor is past (#19622)")
 }
 
 func TestBoardNotifier_NewMessageAfterReadWithSameUnreadCount(t *testing.T) {
@@ -464,6 +465,7 @@ func TestBoardNotifier_NewMessageAfterReadWithSameUnreadCount(t *testing.T) {
 	require.NoError(t, err)
 	_, err = bs.PostMessage(ctx, "proj", "Worker", "second", nil)
 	require.NoError(t, err)
+	pastTheAllModeFloor(notifier)
 	require.NoError(t, notifier.RunOnce(ctx))
 	require.Len(t, rt.sent, 2, "new message ID must re-notify after the prior batch was read")
 }
@@ -701,4 +703,10 @@ func TestBoardNotifier_ReminderWindowIsJittered(t *testing.T) {
 	assert.Len(t, rt.sent, 2, "a reminder by 1.2 x remindAfter")
 	w := ptymanager.JitterAround(defaultRemindAfter, "claude-eeee-0001")
 	assert.True(t, w >= defaultRemindAfter*8/10 && w <= defaultRemindAfter*12/10, "%v", w)
+}
+
+// pastTheAllModeFloor moves the notifier's clock past the floor between two nudges to an all-messages subscriber (#19622), so a test of the new-batch watermark is not held by it.
+func pastTheAllModeFloor(n *BoardNotifier) {
+	at := time.Now().Add(allModeNudgeFloor + time.Second)
+	n.now = func() time.Time { return at }
 }

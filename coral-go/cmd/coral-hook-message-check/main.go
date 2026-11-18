@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/subgentic/coral/internal/hooks"
 )
@@ -75,10 +76,32 @@ func main() {
 	count, _ := result["unread"].(float64)
 	hooks.DebugLog(fmt.Sprintf("message_check: project=%s unread=%d paused=%v", hooks.LogID(project), int(count), result["paused"] == true))
 
-	if text := unreadNotice(result); text != "" {
+	text := unreadNotice(result)
+	if text != "" && !saidRecently(filepath.Join(hooks.CoralDir(), "message-check-said-"+hooks.BoardStateFileName(os.Getenv("CORAL_SESSION_NAME"))), time.Now()) {
 		fmt.Print(text)
 	}
+	if text == "" { // read, or a paused board: the next batch is said when it arrives
+		forgetSaid(filepath.Join(hooks.CoralDir(), "message-check-said-"+hooks.BoardStateFileName(os.Getenv("CORAL_SESSION_NAME"))))
+	}
 }
+
+// sayAgainAfter is how long the unread line stays quiet after it was said (#19622): it was printed after EVERY tool call while anything was unread, the same line the typed nudge and the Stop-hook block already
+// gave. Once per batch: it is said when messages first wait, not again until they are read and more come, or this long passes.
+const sayAgainAfter = 5 * time.Minute
+
+// saidRecently reports whether the line was said within sayAgainAfter, and records now as the time it was said when it was not. A state file that cannot be read or written says it (the old behaviour).
+func saidRecently(path string, now time.Time) bool {
+	if data, err := os.ReadFile(path); err == nil {
+		if at, perr := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(data))); perr == nil && now.Sub(at) < sayAgainAfter && !at.After(now) {
+			return true
+		}
+	}
+	_ = os.WriteFile(path, []byte(now.UTC().Format(time.RFC3339Nano)), 0o600)
+	return false
+}
+
+// forgetSaid clears the record when nothing is unread, so the next batch is said at once.
+func forgetSaid(path string) { _ = os.Remove(path) }
 
 // unreadNotice is what the hook prints after a tool call: the unread count and how to read them, or "" when there is nothing to say. A paused board says nothing: its check answers the real count with
 // paused: true (#11198), and read delivers none of it until the board is resumed, so a line after every tool call would be a dead end repeated (QA's #11198 MUST).
