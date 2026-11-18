@@ -183,9 +183,11 @@ func HubFields(shape hubShape) func(http.Handler) http.Handler {
 				errInternalServer(w, "Not shown through Coral Hub")
 				return
 			}
-			out := shape(decoded)
+			var out map[string]any
 			if hw.code >= 300 {
 				out = hubErrorBody(hw.code, decoded)
+			} else {
+				out = shape(decoded)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			if v := hw.h.Get("Cache-Control"); v != "" {
