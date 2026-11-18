@@ -314,7 +314,7 @@ function fill(s, cell, withDismiss = true) {
             note.className = unreadable ? 'inbox-only-reject inbox-unread' : 'inbox-only-reject';
             const t = autoBlockAt ? new Date(autoBlockAt) : null, at = t && !Number.isNaN(t.getTime()) ? t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
             note.textContent = unreadable ? UNREAD_ROW : `It can only be rejected here. Open the agent to read it${at ? `; Claude Code blocks it on its own at ${at}` : ''}.`;
-            const o = document.createElement('button'); o.type = 'button'; o.className = 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
+            const o = document.createElement('button'); o.type = 'button'; o.className = unreadable ? 'btn btn-primary btn-small inbox-open-agent' : 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
             o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to ${unreadable ? 'answer' : 'read the request'}`);
             o.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
             o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });

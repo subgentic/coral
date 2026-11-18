@@ -2,7 +2,7 @@
  * refresh depth and stale replies; its `artifacts` array carries task rows here. */
 import { importOnce } from './import_once.js';
 import { inboxSources } from './inbox_servers.js';
-import { isCloud, nativeTasks, personalInboxSources, personalInboxAllowed, splitKey, identityKey, noteBoardLabels, keyLabel } from './server_base.js';
+import { isCloud, nativeTasks, personalInboxSources, personalInboxAllowed, dropBody, splitKey, identityKey, noteBoardLabels, keyLabel } from './server_base.js';
 import { clean } from './task_filters.js';
 import { onAccountForgotten } from './local_store.js';
 const { createReviewPages } = await importOnce('./review_pages.js');
@@ -16,7 +16,7 @@ export function createTaskQueries(readTaskQuery) {
         if (isCloud() && !personalInboxAllowed(server)) throw new Error('This computer’s tasks are not available.');
         const q = new URLSearchParams(query); q.set('limit', String(limit)); if (cursor) q.set('cursor', cursor);
         const r = await readTaskQuery(server, q, { signal });
-        if (!r.ok) throw new Error(`Tasks could not be read (HTTP ${r.status}).`);
+        if (!r.ok) { dropBody(r); throw new Error(`Tasks could not be read (HTTP ${r.status}).`); }
         const data = await r.json();
         if (!Array.isArray(data.tasks)) throw new Error('The task list was not usable.');
         if (isCloud() && !personalInboxAllowed(server)) throw new Error('This computer’s tasks are no longer available.');
