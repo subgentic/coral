@@ -899,6 +899,18 @@ export function _renderBurnRate(buckets, periodHours) {
     const el = document.getElementById('cost-burn-rate');
     if (!el || buckets.length === 0) return;
     const totalCost = buckets[buckets.length - 1].cumulative_cost || 0;
+    if (totalCost === 0 || periodHours === 0) {
+        el.textContent = '$0.00/hr';
+        return;
+    }
+    const firstTime = new Date(buckets[0].bucket).getTime();
+    const lastTime = new Date(buckets[buckets.length - 1].bucket).getTime();
+    const rawHours = (lastTime - firstTime) / 3600000;
+    if (rawHours < 1) { // retain main's short-data-span rule (walk 80 #17)
+        el.textContent = formatCost(totalCost, { zeroAsTwo: true }) + ' so far';
+        el.title = 'Less than an hour of data in this range, so there is no hourly rate yet';
+        return;
+    }
     const hours = Math.max(periodHours, 1); // the hours of the range chosen: five minutes of work in a day is a small rate, not the cost of the day read as one hour (#19191: $1.13/hr on a 24 h range)
     el.title = `${formatCost(totalCost, { zeroAsTwo: true })} over the ${hours === 1 ? 'hour' : `${hours} hours`} of this range`;
     el.textContent = totalCost === 0 ? '$0.00/hr' : formatCost(totalCost / hours, { zeroAsTwo: true }) + '/hr';
