@@ -4,7 +4,7 @@
  * entry (./orchestrator.md) opens that entry in the same pane. When a distillation ends, the entry it wrote opens there. The sidebar is the documents pane with its resize handle (detail_pane.js, the goal page's column).
  * Everything is built with the DOM and textContent. Lazy: team_page.js imports it. */
 import { importOnce } from './import_once.js';
-import { teamFetch, sessionTeamKey } from './server_base.js';
+import { teamFetch, sessionTeamKey, isCloud } from './server_base.js';
 import { state } from './state.js';
 import { refusedTooLarge } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
@@ -105,7 +105,7 @@ function openEntry(entry, opener, { focus = true } = {}) {
     let more = null;
     const showFacts = () => { if (!more) return; more.clear(); const b = entryFacts(entry); if (b) more.add(b); };
     const when = model.data && model.data.created_at;
-    const editable = entry.key !== 'index'; // the team's index is written by the distillation; an agent's notes can be changed by hand
+    const editable = entry.key !== 'index' && !isCloud(); // the team's index is written by the distillation; an agent's notes can be changed by hand
     let bodyHost = null, editButton = null, status = null;
     const foot = () => document.querySelector('#detail-pane .detail-foot');
     const say = (t) => { if (status) { status.textContent = ''; status.textContent = t; } };
@@ -198,7 +198,7 @@ function draw() {
     if (running) d.setAttribute('aria-label', 'Distill knowledge, running');
     // The one toolbar line (#7717): the search field and Distill knowledge at the right (no count line: the table is the count).
     const bar = Toolbar.build({ id: 'team-knowledge-search', label: 'Search knowledge', placeholder: 'Search knowledge', value: model.search, onSearch: text => { model.search = text; draw(); }, action: d });
-    const add = btn('btn btn-small team-add-note', 'Add note', () => addNote(add)); add.classList.add('team-tb-action'); d.before(add); // Add note first, Distill knowledge at the far right (#17485)
+    const add = btn('btn btn-small team-add-note', 'Add note', () => addNote(add)); add.classList.add('team-tb-action'); d.before(add); add.hidden = isCloud(); // through the Hub a note is not written (the route is never in the tunnel, #19630); Add note first, Distill knowledge at the far right (#17485)
     body.append(bar);
     // Which agents (#19560): all of them, or one member; the choice is the team's own, so it stays while the page is open.
     const who = members(model.team);

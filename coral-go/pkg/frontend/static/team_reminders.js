@@ -1,7 +1,7 @@
 // A team's agent reminders in Settings (#19288): each member's count of reminders still to come (the next time on hover) and a switch that turns that agent's
 // reminders off and back on without deleting them. The server's GET /api/reminders/agents?board= and POST /api/reminders/agents/<session>/switch are the person's
 // only and not served through Coral Hub (then there is no group). Each switch saves on its own, not with the page's Save bar.
-import { serverUrl, splitKey } from './server_base.js';
+import { serverUrl, splitKey, isCloud } from './server_base.js';
 
 const countWords = n => (n === 1 ? '1 reminder' : `${n} reminders`);
 
@@ -77,6 +77,7 @@ export function createTeamReminders(team) {
         fields: () => [{ key: 'agent_reminders', type: 'custom', label: 'Reminders for each agent', wide: true, help: 'A reminder wakes the agent it is for. Off keeps them, says nothing, and brings back a one-time reminder that came due while it was off.', render: s => { slot = s; draw(); return { get: () => undefined, set: () => {}, disable: on => { viewOff = !!on; queueMicrotask(reapply); } }; } }],
         /** Reads the counts. Resolves to false when the server does not give them to this page (the group is then removed). */
         async load() {
+            if (isCloud()) return false; // not served through the Hub (#19630)
             const got = await read();
             if (!got) return false;
             rows = got;
