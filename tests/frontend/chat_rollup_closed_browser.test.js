@@ -25,6 +25,9 @@ const pages = [turn(1, 'first-label'), turn(2, 'second-label unique-xyzzy'), tur
         await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('ru-bot', 'claude', 'ru-bot-id', 'local'); true`);
         await waitFor(`(() => { const c = document.getElementById('live-history-messages'); return !!c && c.offsetParent !== null; })()`, 'the live chat', 10000);
+        // The chat's own first load draws into this box after the page is up ("Loading conversation…", then the transcript, which replaces what is there). Waiting for the box only meant the loading line;
+        // a suite that drew its pages before the real load landed had them wiped, and its first step found no bar (#19650). Wait until the real transcript is on screen, and then it stays (a poll of an unchanged chat adds nothing).
+        await waitFor(`(() => { const c = document.getElementById('live-history-messages'); return !!c && !c.querySelector('.loading-indicator, .chat-load-error') && !!c.querySelector(':scope > :not(.chat-earlier)'); })()`, 'the real first load of the chat to land', 10000);
         await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => { window.__lc = m; window.__run = async (c, n) => { c.innerHTML = ''; m.renderTranscript([{ type: 'user', content: 'Watch' }], c, 'claude'); const cc = await import((window.__coralStatic || '/static/') + 'chat_content.js'); for (const page of window.__pages.slice(0, n)) { const tmp = document.createElement('div'); m.renderTranscript(page, tmp, 'claude'); while (tmp.firstChild) c.appendChild(tmp.firstChild); } cc.rollUpGroups(c); return true; }; const c = document.getElementById('live-history-messages'); window.__pages = ${JSON.stringify(pages)}; return window.__run(c, 3); })`);
         const C = '#live-history-messages';
 
