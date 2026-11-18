@@ -1021,4 +1021,11 @@ CREATE INDEX IF NOT EXISTS idx_agent_events_edited_files ON agent_events(session
 	WHERE event_type = 'tool_use' AND tool_name IN ('Write', 'Edit') AND detail_json IS NOT NULL AND json_valid(detail_json);
 CREATE INDEX IF NOT EXISTS idx_git_snap_session_time ON git_snapshots(session_id, recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_git_snap_agent_time ON git_snapshots(agent_name, recorded_at DESC);
+CREATE TABLE IF NOT EXISTS device_keys (
+ kid TEXT PRIMARY KEY, pk BLOB NOT NULL CHECK (length(pk) = 65), label TEXT NOT NULL CHECK (length(CAST(label AS BLOB)) <= 64),
+ mode TEXT NOT NULL, origin TEXT NOT NULL CHECK (origin IN ('pairing','bootstrap','noproof')), kind TEXT NOT NULL CHECK (kind IN ('device','passkey')),
+ created_at INTEGER NOT NULL, last_used_at INTEGER, removed_at INTEGER, removed_reason TEXT CHECK (removed_reason IS NULL OR removed_reason IN ('removed','expired'))
+);
+CREATE TABLE IF NOT EXISTS device_nonces (nonce TEXT PRIMARY KEY, kid TEXT NOT NULL, accepted_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS device_meta (k TEXT PRIMARY KEY, v INTEGER NOT NULL);
 `
