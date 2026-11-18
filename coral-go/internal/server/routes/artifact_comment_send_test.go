@@ -282,7 +282,10 @@ func TestSendWithASeriesNamesTheVersionAndThatANewerOneExists(t *testing.T) {
 	code, out := rig.send(cid, "Dev")
 	require.Equal(t, 200, code, fmt.Sprint(out))
 	m := rig.operatorMessages()[0].Content
-	assert.Contains(t, m, "coral://artifacts/"+cmtDoc+" (v1 of 2; the newest is v2: the text may have changed)")
+	assert.Contains(t, m, "coral://artifacts/"+cmtDoc+" (v1 of 2; the newest is v2, coral://artifacts/"+cmtPic2+": the text may have changed)")
+	// #19563: the upload must name the NEWEST version as its base; the commented one is refused as stale (409)
+	assert.Contains(t, m, "--new-version-of coral://artifacts/"+cmtPic2+" ")
+	assert.NotContains(t, m, "--new-version-of coral://artifacts/"+cmtDoc)
 }
 
 // stampTestRecord writes an upload record of an artifact for a session, in a series.

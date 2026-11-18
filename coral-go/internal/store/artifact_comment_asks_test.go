@@ -122,3 +122,26 @@ func TestANewVersionClosesTheTeamsOpenAsksOnTheOlderVersions(t *testing.T) {
 	b, _, _ := s.GetArtifactAsk(ctx, 3, "sess-3")
 	assert.True(t, b.OpenAt(later), "another team's ask stays open")
 }
+
+// #19563: a comment held for a busy agent is not answered by an upload of the next version made during that turn: the ask stays open so the agent gets it when its turn ends, and a delivered ask still closes.
+func TestANewVersionLeavesAHeldAskOpen(t *testing.T) {
+	ctx := context.Background()
+	s := newCommentStore(t)
+	now := time.Now()
+	for _, c := range []struct {
+		id    int64
+		agent string
+	}{{1, "sess-held"}, {2, "sess-sent"}} {
+		_, _, err := s.CreateArtifactAsk(ctx, c.id, artA, "team-a", c.agent, "x", now)
+		require.NoError(t, err)
+	}
+	ok, err := s.HoldAskMessage(ctx, 1, "sess-held", "the Operator commented", false, now)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.NoError(t, s.CloseOpenAsksOfVersions(ctx, []string{artA}, "team-a", now.Add(time.Minute)))
+	later := now.Add(2 * time.Minute)
+	held, _, _ := s.GetArtifactAsk(ctx, 1, "sess-held")
+	assert.True(t, held.OpenAt(later), "the held comment is still waiting for its agent: it stays open")
+	sent, _, _ := s.GetArtifactAsk(ctx, 2, "sess-sent")
+	assert.False(t, sent.OpenAt(later), "an ask already delivered is answered by the new version")
+}
