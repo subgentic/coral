@@ -51,6 +51,7 @@ const INBOX_FIELDS = [
 ];
 
 const FILES_FIELDS = [
+    { key: 'artifact_preview_max_mb', type: 'select', id: 'settings-artifact-preview-max-mb', label: 'Largest artifact to preview', help: 'Larger files stay available to download. Reopen a preview after changing this limit.', default: '16', options: [2, 16, 32, 64].map(mb => ({ value: String(mb), label: `${mb} MB` })) },
     { key: 'file_search_mode', type: 'select', id: 'settings-file-search-mode', label: 'File search mode', help: 'How @ mentions and the file browser find files', options: [{ value: 'directory', label: 'Browse folders' }, { value: 'fuzzy', label: 'Match any part of a name' }] },
     { key: 'file_search_limit', type: 'select', id: 'settings-file-search-limit', label: 'File search limit', help: 'Max number of files returned in search results', default: '500',
         options: [{ value: '50', label: '50' }, { value: '100', label: '100' }, { value: '200', label: '200' }, { value: '500', label: '500' }, { value: '1000', label: '1,000' }] },

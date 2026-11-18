@@ -88,7 +88,7 @@ const HEX = c => c.repeat(64);
             ['audio', URI, {}, { type: 'audio/mpeg', body: 'x' }],
             ['video', URI, {}, { type: 'video/mp4', body: 'x' }],
             ['a binary file (not rendered inline)', URI, { filename: 'tool.bin' }, { type: 'application/octet-stream', body: 'x', length: 4096 }],
-            ['text too large to preview', URI, { filename: 'big.log' }, { type: 'text/plain', body: 'x', length: 5 * 1024 * 1024 }],
+            ['text too large to preview', URI, { filename: 'big.log' }, { type: 'text/plain', body: 'x', length: 65 * 1024 * 1024 }],
             ['an inline artifact of a board', URI, { contentURL: `/api/board/${TEAM}/artifacts/inline-1/content`, mediaType: 'text/markdown', filename: 'inline.md' }, { type: 'text/plain', body: 'inline body' }],
         ];
         for (const [name, uri, options, answer] of ART) {

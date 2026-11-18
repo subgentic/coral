@@ -103,6 +103,7 @@ export function readSettingsForm(all = false) {
         default_model_pi: defaultModelPi,
         file_search_mode: fileSearchMode,
         file_search_limit: fileSearchLimit,
+        artifact_preview_max_mb: pick('settings-artifact-preview-max-mb'),
         git_diff_mode: gitDiffMode,
         git_poll_interval_s: gitPollIntervalS,
         agent_priority: agentPriority,
