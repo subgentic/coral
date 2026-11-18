@@ -31,6 +31,7 @@ var settingRows = map[string]struct{ good, bad string }{
 	"terminal_scrollback":         {`20000`, `-1`},
 	"terminal_replay_bytes":       {`262144`, `"lots"`},
 	"file_search_mode":            {`"fuzzy"`, `"grep"`},
+	"artifact_preview_max_mb":     {`"32"`, `"3"`},
 	"file_search_limit":           {`500`, `0`},
 	"git_diff_mode":               {`"main_head"`, `"HEAD~2"`},
 	"git_poll_interval_s":         {`"60"`, `"abc"`},

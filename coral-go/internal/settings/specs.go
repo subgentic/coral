@@ -23,6 +23,7 @@ const (
 	CallMetricsRetentionDay  = "call_metrics_retention_days"
 	UploadsRetentionDays     = "uploads_retention_days"
 	UploadsMaxMB             = "uploads_max_mb"
+	ArtifactPreviewMaxMB     = "artifact_preview_max_mb"
 	FileSearchLimit          = "file_search_limit"
 	GitDiffMode              = "git_diff_mode"
 	DefaultAgentType         = "default_agent_type"
@@ -139,6 +140,7 @@ func init() {
 	s.WriteClamp = true
 	register(s)
 	register(Spec{Key: "file_search_mode", Kind: KindEnum, Values: []string{"directory", "fuzzy"}, Apply: ApplyClient, Doc: "How the file search matches."})
+	register(Spec{Key: ArtifactPreviewMaxMB, Kind: KindEnum, Values: []string{"2", "16", "32", "64"}, Default: "16", Apply: ApplyClient, Doc: "Largest artifact preview in MiB."})
 	s = whole(FileSearchLimit, "500", 1, 100_000, ReadDefault, ApplyLive, "Most results a file search returns.")
 	s.ReadBounded, s.ReadMin, s.ReadMax = true, 1, math.MaxInt64
 	register(s)

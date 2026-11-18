@@ -103,3 +103,20 @@ func TestSpecsAreSane(t *testing.T) {
 		}
 	}
 }
+
+// Artifact previews have a bounded preset budget; unknown stored values default safely.
+func TestArtifactPreviewBudget(t *testing.T) {
+	if got := Enum(nil, ArtifactPreviewMaxMB); got != "16" {
+		t.Fatalf("default = %q", got)
+	}
+	for _, value := range []string{"2", "16", "32", "64"} {
+		if got := Enum(map[string]string{ArtifactPreviewMaxMB: value}, ArtifactPreviewMaxMB); got != value {
+			t.Errorf("saved %s reads %s", value, got)
+		}
+	}
+	for _, value := range []string{"0", "3", "128", "garbage"} {
+		if got := Enum(map[string]string{ArtifactPreviewMaxMB: value}, ArtifactPreviewMaxMB); got != "16" {
+			t.Errorf("invalid %s reads %s", value, got)
+		}
+	}
+}
