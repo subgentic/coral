@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
+	"io"
 	"regexp"
 	"strings"
 	"testing"
@@ -58,10 +61,13 @@ func TestCloudConnectPrintsTheLinkWithTheSecretAndSendsItOnlyInTheBody(t *testin
 	fastPoll(t)
 	f := newFakeCoral(t, ready, enrolled)
 	f.statuses = []string{idle, enrolling, enrolling, connected}
+	c, _ := newCloudClient(f.srv.URL, "", "connect", io.Discard)
+	require.NotNil(t, c)
 	var out, errb bytes.Buffer
 	args := []string{"connect", "--url", f.srv.URL}
-	require.Equal(t, 0, runCloud(args, strings.NewReader(""), &out, &errb), errb.String())
-	m := regexp.MustCompile(`open (\S+)#p=([A-Za-z0-9_-]{22}) and enter code ABCD-EFGH\n`).FindStringSubmatch(out.String())
+	ui := connectUI{out: &out, in: bufio.NewReader(strings.NewReader("\n3\ny\n")), ask: true, how: "coral cloud connect"}
+	require.Equal(t, 0, c.connectFlow(context.Background(), ui), out.String())
+	m := regexp.MustCompile(`Open (\S+)#p=([A-Za-z0-9_-]{22})\n`).FindStringSubmatch(out.String())
 	require.NotNil(t, m, out.String())
 	assert.Equal(t, "https://app.coralhub.dev/enroll?code=ABCD-EFGH", m[1])
 	secret := m[2]
@@ -78,4 +84,18 @@ func TestCloudConnectPrintsTheLinkWithTheSecretAndSendsItOnlyInTheBody(t *testin
 	assert.Empty(t, other, "no other request carries the secret")
 	assert.NotContains(t, strings.Join(args, " "), secret, "not in the arguments")
 	assert.NotContains(t, errb.String(), secret)
+}
+
+// Security's MUST on #19689: with no terminal (a script, a pipe, the startup log) no secret is made, none is sent and no `#p=` is printed.
+func TestCloudConnectWithoutATerminalMakesNoSecretAndPrintsNoFragment(t *testing.T) {
+	fastPoll(t)
+	f := newFakeCoral(t, ready, enrolled)
+	f.statuses = []string{idle, enrolling, enrolling, connected}
+	var out, errb bytes.Buffer
+	require.Equal(t, 0, runCloud([]string{"connect", "--url", f.srv.URL}, strings.NewReader(""), &out, &errb), errb.String())
+	assert.Contains(t, out.String(), "open https://app.coralhub.dev/enroll?code=ABCD-EFGH and enter code ABCD-EFGH")
+	assert.NotContains(t, out.String(), "#p=")
+	for _, c := range f.callList() {
+		assert.NotContains(t, c, "pairing_secret")
+	}
 }

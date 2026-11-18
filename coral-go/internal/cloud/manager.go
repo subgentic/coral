@@ -285,13 +285,21 @@ func (m *Manager) Bootstrap(ctx context.Context, settings *store.SessionStore, h
 	m.redeemMu.Lock()
 	defer m.redeemMu.Unlock()
 	res := m.bootstrapOnce(ctx, settings, hostname, src)
-	if res.Status == BootstrapEnrolled && src.DevicePK != "" {
+	m.afterBootstrap(ctx, res, src)
+	return res
+}
+
+// afterBootstrap: every bootstrap enrollment is a new account's list, so the keys are cleared whether or not a device key came with it (a credential without one must not leave the old account's devices trusted); the redeemed key, if any, is then written as a bootstrap row.
+func (m *Manager) afterBootstrap(ctx context.Context, res BootstrapResult, src CredentialSource) {
+	if res.Status != BootstrapEnrolled {
+		return
+	}
+	m.clearDeviceKeys(ctx)
+	if src.DevicePK != "" {
 		pk := src.DevicePK
 		m.devicePK.Store(&pk)
-		m.clearDeviceKeys(ctx)
 		m.recordBootstrapDevice(ctx, pk)
 	}
-	return res
 }
 
 func (m *Manager) bootstrapOnce(ctx context.Context, settings *store.SessionStore, hostname string, src CredentialSource) BootstrapResult {

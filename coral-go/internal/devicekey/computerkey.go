@@ -13,6 +13,8 @@ import (
 // ComputerKeyFile is the name of the one stored per-computer X25519 key inside the data folder. Only this package names it (a source scan test holds that): the key is identity only, never in status, logs, backups or Hub messages. Only its public half, computer_pub, leaves.
 const ComputerKeyFile = "device-computer.key"
 
+// On Windows there are no file modes: the data folder's ACL is what guards the key file.
+
 // ErrComputerKeyFile is a key file Coral will not use: a link, others' access, a wrong size or content. It is never repaired by making a new key, because a new key is a new computer identity. The error text never holds file content.
 var ErrComputerKeyFile = errors.New("the computer key file is not usable")
 

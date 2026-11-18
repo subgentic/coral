@@ -170,3 +170,20 @@ func TestTheRedeemedDevicePKIsWrittenAsABootstrapRow(t *testing.T) {
 	assert.Equal(t, "view", l[0].Mode)
 	assert.Equal(t, store.DeviceKindDevice, l[0].Kind)
 }
+
+// Security's SHOULD 3 on #19689: a bootstrap enrollment clears the old keys whether or not a device key came with it; a refused one clears nothing.
+func TestABootstrapEnrollmentClearsTheKeysEvenWithoutADevicePK(t *testing.T) {
+	r := pairingSetup(t, true)
+	ctx := context.Background()
+	r.m.recordBootstrapDevice(ctx, newDevicePK(t))
+	require.Len(t, r.listed(t), 1)
+
+	r.m.afterBootstrap(ctx, BootstrapResult{Status: BootstrapRefused}, CredentialSource{})
+	require.Len(t, r.listed(t), 1, "a refused enrollment changes nothing")
+
+	r.m.afterBootstrap(ctx, BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{})
+	assert.Empty(t, r.listed(t), "enrolled with no device key: the old list is cleared")
+
+	r.m.afterBootstrap(ctx, BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{DevicePK: newDevicePK(t)})
+	assert.Len(t, r.listed(t), 1, "with a key: cleared, then the new bootstrap row")
+}

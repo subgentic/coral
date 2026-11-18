@@ -183,7 +183,7 @@ func runCloudStartupStep(ctx context.Context, cfg *config.Config, mode string, i
 	if mode == "log" {
 		go func() {
 			defer safego.Recover("coral/cloud_startup:163")
-			ui := connectUI{out: logLines{}, in: bufio.NewReader(strings.NewReader("")), how: "coral cloud connect", noSecret: true}
+			ui := connectUI{out: logLines{}, in: bufio.NewReader(strings.NewReader("")), how: "coral cloud connect"}
 			end := time.Now().Add(cloudLogWindow)
 			for ctx.Err() == nil {
 				if c.connectFlow(ctx, ui) != 4 || !time.Now().Before(end) {

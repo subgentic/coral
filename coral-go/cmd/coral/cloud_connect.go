@@ -251,8 +251,6 @@ type connectUI struct {
 	ask   bool   // a person is at a terminal: offer a retry, ask for the access mode
 	how   string // how to do it later, for the messages
 	force bool   // --force: forget an existing enrollment here, then enroll again
-	// noSecret: the output goes to a log (the startup step), where the pairing secret must never be. No secret is made, so no `#p=` link; a browser pairing from that code is refused, with a message.
-	noSecret bool
 }
 
 func (u connectUI) prompt(q string) (string, bool) {
@@ -307,8 +305,9 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 	}
 	for {
 		// The pairing secret (wire format section 3): made here, put in the link's fragment (which a browser never sends to the Hub) and handed to this Coral in this one local call. Not in an argument, a file or the status.
+		// Only for a person at a terminal: any other output (the startup step's log, a script's captured output) is kept, so it gets no secret and no `#p=` link; a browser pairing from that code is refused, with a message.
 		body, frag := map[string]any{}, ""
-		if !ui.noSecret {
+		if ui.ask {
 			secret := devicekey.NewPairingSecret()
 			body["pairing_secret"], frag = secret, "#p="+secret
 		}
