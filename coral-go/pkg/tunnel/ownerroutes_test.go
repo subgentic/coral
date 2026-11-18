@@ -234,6 +234,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodGet && p == "/api/resources" {
 				continue
 			}
+			// The Automations reads (#19570, coral-hub's design §7.3.5) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodGet && (strings.HasPrefix(p, "/api/scheduled/jobs") || p == "/api/scheduled/runs/recent" || p == "/api/automations/runs" || strings.HasPrefix(p, "/api/workflows")) {
+				continue
+			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).
 			if strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/artifact-content") && m == http.MethodGet {
 				continue

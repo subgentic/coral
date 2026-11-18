@@ -149,8 +149,10 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
 		"/api/board/{project}/artifacts/{digest}/edit": true, "/api/board/{project}/artifacts/{digest}/edit/send": true, // what the Markdown editor may do with a file is the owner's alone (#13757)
 		"/api/custom-modes": true, "/api/custom-models": true, // the custom models are the owner's alone through the hub (#5996)
-		"/api/skills/search": true, // the skills menu is the owner's alone through the hub (#19430)
-		"/api/resources":     true} // the resource queue's list is the owner's alone through the hub, notes redacted (#16140)
+		"/api/skills/search":  true,                                                                                                                                                   // the skills menu is the owner's alone through the hub (#19430)
+		"/api/scheduled/jobs": true, "/api/scheduled/jobs/{jobID}": true, "/api/scheduled/jobs/{jobID}/runs": true, "/api/scheduled/runs/recent": true, "/api/automations/runs": true, // the automations reads are the owner's alone, with a field list (#19570)
+		"/api/workflows": true, "/api/workflows/runs/recent": true, "/api/workflows/by-name/{name}": true, "/api/workflows/{workflowID}": true, "/api/workflows/{workflowID}/runs": true, "/api/workflows/runs/{runID}": true,
+		"/api/resources": true} // the resource queue's list is the owner's alone through the hub, notes redacted (#16140)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
 	require.NoError(t, err)
