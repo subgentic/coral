@@ -147,6 +147,17 @@ func TestReviewFlowApproval(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return boardMessagesContain(t, board, fmt.Sprintf("[Task #%d completed by lead (approved by Security Reviewer, QA Engineer)]", task.ID))
 	}, 2*time.Second, 50*time.Millisecond, "the completion notice names the approvers")
+	// #19619: the final-approval line tags the Orchestrator, so #19608's rule (an untagged Coral line is board-only) still delivers it
+	require.Eventually(t, func() bool {
+		return boardMessagesContain(t, board, fmt.Sprintf("@lead [Task #%d approved by QA Engineer] every reviewer approved", task.ID))
+	}, 2*time.Second, 50*time.Millisecond, "the final approval tags the orchestrator")
+	msgs, err := h.bs.PeekMessages(ctx, "team", "lead", 100)
+	require.NoError(t, err)
+	var seen bool
+	for _, m := range msgs {
+		seen = seen || strings.Contains(m.Content, "every reviewer approved")
+	}
+	assert.True(t, seen, "the orchestrator's plain read includes the final approval")
 }
 
 // (3) #3787 (operator): a rejection sends the task back to its author and the reviewers stay on
