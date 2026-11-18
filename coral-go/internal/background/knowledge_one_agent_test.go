@@ -1,6 +1,7 @@
 package background
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,4 +81,31 @@ func newKnowledgeTeamFixtureOn(t *testing.T, f *knowledgeTeamFixture, board stri
 	require.NoError(t, err)
 	g.team = team
 	return g
+}
+
+// An agent name is text a person typed: writeAgentKnowledge writes only inside the team's folder, however the name is spelled (#19607).
+func TestWriteAgentKnowledgeContainsHostileNames(t *testing.T) {
+	for _, name := range []string{"../evil", "../../evil", "a/b", `a\b`, "con", "nul.txt", "x\x00y"} {
+		coral := t.TempDir()
+		bundle := &KnowledgeBundle{TeamName: "t", Agents: map[string]*AgentConcept{name: {FinalMD: "# note"}}}
+		require.NoError(t, writeAgentKnowledge(coral, bundle), name)
+		var found []string
+		require.NoError(t, filepath.WalkDir(coral, func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				rel, _ := filepath.Rel(coral, p)
+				found = append(found, rel)
+			}
+			return err
+		}))
+		require.Len(t, found, 1, name)
+		assert.Equal(t, filepath.Join("agent_knowledge", "t"), filepath.Dir(found[0]), "%q must stay in the team's folder", name)
+	}
+	// A name with nothing a file name can hold is refused rather than written as ".md".
+	for _, name := range []string{"", "///", "..", "日本"} {
+		coral := t.TempDir()
+		bundle := &KnowledgeBundle{TeamName: "t", Agents: map[string]*AgentConcept{name: {FinalMD: "# note"}}}
+		assert.Error(t, writeAgentKnowledge(coral, bundle), "%q", name)
+		_, err := os.Stat(filepath.Join(coral, "agent_knowledge", "t", ".md"))
+		assert.True(t, os.IsNotExist(err), "%q: no .md file", name)
+	}
 }

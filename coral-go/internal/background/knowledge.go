@@ -857,8 +857,13 @@ func writeAgentKnowledge(coralDir string, bundle *KnowledgeBundle) error {
 		}
 		finals[name], concept.FinalMD = md, md
 	}
+	// An agent name is a person's text: only its slug (letters, digits, '-' and '_', no separator, no dot, no device name) reaches a path, and a name with none is refused.
 	for name, md := range finals {
-		if err := secfile.WriteFileNoFollow(filepath.Join(dir, slugify(name)+".md"), []byte(md), 0o600); err != nil {
+		slug := slugify(name)
+		if slug == "" {
+			return fmt.Errorf("knowledge not written: agent name %q has no letters or digits to name a file", name)
+		}
+		if err := secfile.WriteFileNoFollow(filepath.Join(dir, slug+".md"), []byte(md), 0o600); err != nil {
 			return err
 		}
 	}
