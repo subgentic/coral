@@ -262,24 +262,31 @@ func TestSetDeviceMode(t *testing.T) {
 
 const win5 = 5 * time.Minute
 
+// nn makes a well-formed nonce (22 base64url characters of 16 bytes) from a name.
+func nn(name string) string {
+	b := make([]byte, 16)
+	copy(b, name)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
 func TestNonceRepeatRefusedWithinWindow(t *testing.T) {
 	ss, ctx := dkStore(t), context.Background()
-	require.NoError(t, ss.RecordNonce(ctx, "n1", "kid", dkT0, win5))
-	assert.ErrorIs(t, ss.RecordNonce(ctx, "n1", "kid", dkT0.Add(4*time.Minute), win5), store.ErrNonceRepeat)
+	require.NoError(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0, win5))
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(4*time.Minute), win5), store.ErrNonceRepeat)
 	// kept for the window plus the 5 minute skew: still refused at 9 min 59 s, free at 10 min
-	assert.ErrorIs(t, ss.RecordNonce(ctx, "n1", "kid", dkT0.Add(10*time.Minute-time.Second), win5), store.ErrNonceRepeat)
-	assert.NoError(t, ss.RecordNonce(ctx, "n1", "kid", dkT0.Add(10*time.Minute), win5))
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(10*time.Minute-time.Second), win5), store.ErrNonceRepeat)
+	assert.NoError(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(10*time.Minute), win5))
 }
 
 func TestNonceSurvivesReopen(t *testing.T) {
 	path := t.TempDir() + "/s.db"
 	db, err := storetest.Open(t, path)
 	require.NoError(t, err)
-	require.NoError(t, store.NewSessionStore(db).RecordNonce(context.Background(), "n1", "kid", dkT0, win5))
+	require.NoError(t, store.NewSessionStore(db).RecordNonce(context.Background(), nn("n1"), "kid", dkT0, win5))
 	require.NoError(t, db.Close())
 	db2, err := storetest.Open(t, path)
 	require.NoError(t, err)
-	assert.ErrorIs(t, store.NewSessionStore(db2).RecordNonce(context.Background(), "n1", "kid", dkT0.Add(time.Minute), win5), store.ErrNonceRepeat, "a restart does not reopen a replay")
+	assert.ErrorIs(t, store.NewSessionStore(db2).RecordNonce(context.Background(), nn("n1"), "kid", dkT0.Add(time.Minute), win5), store.ErrNonceRepeat, "a restart does not reopen a replay")
 }
 
 // The count cap refuses a new message before it drops a nonce.
@@ -287,31 +294,72 @@ func TestNonceStoreFullRefusesBeforeDropping(t *testing.T) {
 	ss, ctx := dkStore(t), context.Background()
 	store.SetNonceCapForTest(t, 3)
 	for i := 0; i < 3; i++ {
-		require.NoError(t, ss.RecordNonce(ctx, fmt.Sprintf("n%d", i), "kid", dkT0, win5))
+		require.NoError(t, ss.RecordNonce(ctx, nn(fmt.Sprintf("n%d", i)), "kid", dkT0, win5))
 	}
-	assert.ErrorIs(t, ss.RecordNonce(ctx, "n3", "kid", dkT0.Add(time.Second), win5), store.ErrNonceStoreFull)
-	assert.ErrorIs(t, ss.RecordNonce(ctx, "n0", "kid", dkT0.Add(time.Second), win5), store.ErrNonceRepeat, "the oldest was not dropped to make room")
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n3"), "kid", dkT0.Add(time.Second), win5), store.ErrNonceStoreFull)
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n0"), "kid", dkT0.Add(time.Second), win5), store.ErrNonceRepeat, "the oldest was not dropped to make room")
 	// when the earliest expires, room appears
-	assert.NoError(t, ss.RecordNonce(ctx, "n3", "kid", dkT0.Add(10*time.Minute), win5))
+	assert.NoError(t, ss.RecordNonce(ctx, nn("n3"), "kid", dkT0.Add(10*time.Minute), win5))
 }
 
 func TestClockSetBackIsRefused(t *testing.T) {
 	ss, ctx := dkStore(t), context.Background()
-	require.NoError(t, ss.RecordNonce(ctx, "n1", "kid", dkT0.Add(time.Hour), win5))
-	err := ss.RecordNonce(ctx, "n2", "kid", dkT0, win5)
+	require.NoError(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(time.Hour), win5))
+	err := ss.RecordNonce(ctx, nn("n2"), "kid", dkT0, win5)
 	assert.ErrorIs(t, err, store.ErrClockBack, "the clock is behind the latest accepted time")
 	assert.ErrorIs(t, ss.CheckClock(ctx, dkT0), store.ErrClockBack)
 	assert.NoError(t, ss.CheckClock(ctx, dkT0.Add(time.Hour)))
 	// nothing was recorded by the refused call
-	assert.NoError(t, ss.RecordNonce(ctx, "n2", "kid", dkT0.Add(2*time.Hour), win5))
+	assert.NoError(t, ss.RecordNonce(ctx, nn("n2"), "kid", dkT0.Add(2*time.Hour), win5))
 }
 
 func TestPruneNoncesDropsOnlyExpired(t *testing.T) {
 	ss, ctx := dkStore(t), context.Background()
-	require.NoError(t, ss.RecordNonce(ctx, "short", "k", dkT0, win5))
-	require.NoError(t, ss.RecordNonce(ctx, "long", "k", dkT0, 24*time.Hour))
+	require.NoError(t, ss.RecordNonce(ctx, nn("short"), "k", dkT0, win5))
+	require.NoError(t, ss.RecordNonce(ctx, nn("long"), "k", dkT0, 24*time.Hour))
 	n, err := ss.PruneNonces(ctx, dkT0.Add(11*time.Minute))
 	require.NoError(t, err)
 	assert.Equal(t, 1, n)
-	assert.ErrorIs(t, ss.RecordNonce(ctx, "long", "k", dkT0.Add(11*time.Minute), 24*time.Hour), store.ErrNonceRepeat)
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("long"), "k", dkT0.Add(11*time.Minute), 24*time.Hour), store.ErrNonceRepeat)
+}
+
+// The nonce must be the 22-character base64url form of 16 bytes (coral-hub Lead's note B): anything else is refused before the store is touched.
+func TestRecordNonceRefusesABadForm(t *testing.T) {
+	ss, ctx := dkStore(t), context.Background()
+	for _, bad := range []string{"", "n1", nn("x") + "A", nn("x")[:21], nn("x")[:21] + "+", nn("x")[:21] + "B", base64.RawURLEncoding.EncodeToString(make([]byte, 24))} {
+		assert.ErrorIs(t, ss.RecordNonce(ctx, bad, "kid", dkT0, win5), store.ErrNonceForm, bad)
+	}
+	assert.NoError(t, ss.CheckClock(ctx, dkT0))
+	m, _ := ss.ClockMark(ctx)
+	assert.True(t, m.IsZero(), "a refused nonce moves nothing")
+}
+
+// A computer re-linked to another Hub account must not honour account A's keys for account B (Q1): the re-link removes every active key; the removed ones stay listed and the entries cannot sign.
+func TestRemoveAllDeviceKeysOnRelink(t *testing.T) {
+	ss, ctx := dkStore(t), context.Background()
+	a, b := dkKey(1, store.DeviceKindDevice, store.DeviceOriginPairing), dkKey(2, store.DeviceKindPasskey, store.DeviceOriginPairing)
+	_, _ = ss.AddDeviceKey(ctx, a, dkT0)
+	_, _ = ss.AddDeviceKey(ctx, b, dkT0)
+	n, err := ss.RemoveAllDeviceKeys(ctx, dkT0.Add(time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+	for _, k := range []store.DeviceKey{a, b} {
+		_, err := ss.ActiveDeviceKey(ctx, k.KID, dkT0.Add(2*time.Hour))
+		assert.ErrorIs(t, err, store.ErrSignerRemoved)
+	}
+	n, _ = ss.RemoveAllDeviceKeys(ctx, dkT0.Add(2*time.Hour))
+	assert.Zero(t, n, "a second re-link removes nothing more and keeps the first time")
+}
+
+// After a clock jump the owner clears the mark at the computer (note A): the refusal ends, and a nonce already accepted is still refused.
+func TestOwnerClearsTheClockMark(t *testing.T) {
+	ss, ctx := dkStore(t), context.Background()
+	require.NoError(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(time.Hour), win5))
+	assert.ErrorIs(t, ss.CheckClock(ctx, dkT0), store.ErrClockBack)
+	m, err := ss.ClockMark(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, dkT0.Add(time.Hour).Unix(), m.Unix())
+	require.NoError(t, ss.ClearClockMark(ctx, dkT0))
+	assert.NoError(t, ss.CheckClock(ctx, dkT0))
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(time.Minute), win5), store.ErrNonceRepeat, "clearing the mark does not forget a nonce")
 }

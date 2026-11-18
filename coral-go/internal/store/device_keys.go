@@ -33,6 +33,7 @@ const (
 	deviceNonceSkew      = 5 * time.Minute
 	deviceLabelMax       = 64
 	deviceHighWaterKey   = "high_water"
+	deviceNonceLen       = 22 // 16 random bytes as base64url without padding
 )
 
 var (
@@ -41,6 +42,7 @@ var (
 	ErrSignerRemoved  = errors.New("device key is removed or expired")
 	ErrKeyLimit       = errors.New("device key limit reached")
 	ErrNonceRepeat    = errors.New("nonce already accepted")
+	ErrNonceForm      = errors.New("nonce is not 22 base64url characters of 16 bytes")
 	ErrNonceStoreFull = errors.New("nonce store is full")
 	ErrClockBack      = errors.New("the computer's clock is behind the latest accepted time")
 	deviceNonceCap    = 10000 // a count cap: a new message is refused before a live nonce is dropped
@@ -277,6 +279,9 @@ func checkClock(ctx context.Context, q deviceQuerier, now time.Time) error {
 
 // RecordNonce accepts a message's nonce in one transaction: the clock check, the repeat check, the count cap, then the insert and the high-water mark. It is kept for the message's window plus the 5 minute skew. A refused call writes nothing.
 func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now time.Time, window time.Duration) error {
+	if b, err := base64.RawURLEncoding.Strict().DecodeString(nonce); err != nil || len(nonce) != deviceNonceLen || len(b) != 16 {
+		return ErrNonceForm
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -319,4 +324,32 @@ func (s *SessionStore) PruneNonces(ctx context.Context, now time.Time) (int, err
 	}
 	n, _ := res.RowsAffected()
 	return int(n), nil
+}
+
+// RemoveAllDeviceKeys removes every active key with reason removed. It is what a re-link of this computer to another Hub account does (#19669, coral-hub Lead's Q1): the list has no account column, so a key trusted for
+// account A must never verify for account B, and the person pairs again. Removed entries are kept as always.
+func (s *SessionStore) RemoveAllDeviceKeys(ctx context.Context, now time.Time) (int, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE device_keys SET removed_at = ?, removed_reason = 'removed' WHERE removed_at IS NULL`, now.Unix())
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}
+
+// ClearClockMark is the owner's reset after a clock jump (CheckClock fails closed): the mark becomes now. It is safe because the nonces keep their own expiry times, which a clock set back only lengthens. Only the
+// computer's owner may call it (a local command), never a device or the Hub.
+func (s *SessionStore) ClearClockMark(ctx context.Context, now time.Time) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO device_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`, deviceHighWaterKey, now.Unix())
+	return err
+}
+
+// ClockMark is the latest time a signed action was accepted (0 when none), for the notice that says what the clock was compared with.
+func (s *SessionStore) ClockMark(ctx context.Context) (time.Time, error) {
+	var v int64
+	err := s.db.QueryRowContext(ctx, `SELECT v FROM device_meta WHERE k = ?`, deviceHighWaterKey).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, nil
+	}
+	return time.Unix(v, 0), err
 }
