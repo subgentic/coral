@@ -11,6 +11,7 @@ export const machineChoices = () => state.hub ? [...(isCloud() ? [] : ['local'])
 export const machineLabel = id => !id || id === 'local' ? 'This computer' : (state.servers || []).find(s => s.id === id)?.label || (state.servers || []).find(s => s.id === id)?.name || id;
 export const machineOnline = id => !id || id === 'local' || (state.servers || []).some(s => s.id === id && s.status === 'online');
 /** The computer being read: the choice if it is still on the list, else the first one on it (or this computer when there is no list). */
+// 'local' (the fallback when nothing is linked) is the same origin: in cloud every caller must read through readNow, or stop on noComputerInCloud(), never use this id with fetch (#19591).
 export const machineNow = () => { const c = machineChoices(); return c.includes(chosen) ? chosen : (c[0] || 'local'); };
 export function pickMachine(id) { chosen = id || 'local'; document.dispatchEvent(new CustomEvent(MACHINE_EVENT, { detail: chosen })); }
 
