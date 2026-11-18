@@ -35,7 +35,7 @@ export const VIEWS = [
 export const GROUPS = [['all', 'All'], ['provider', 'Provider'], ['model', 'Model'], ['thinking', 'Thinking level'], ['team', 'Team'], ['agent', 'Agent'], ['branch', 'Branch'], ['task', 'Task'], ['goal', 'Goal']];
 
 // Coral Hub's page (cloud) does not show Tasks, Tokens per commit, Task time or Inbox vs chat: their routes are closed on the Hub (#19569, Security). Their addresses open Overview.
-const CLOUD_CLOSED = new Set(['tasks', 'per-commit', 'task-time', 'inbox-' + 'chat']);
+const CLOUD_CLOSED = new Set(['tasks', 'per-commit', 'task-time', 'inbox-' + 'chat', 'resource-queue', 'comm']);
 const closed = v => isCloud() && CLOUD_CLOSED.has(v.key);
 let current = 'overview';
 let query = '';
