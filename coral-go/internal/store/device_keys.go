@@ -325,6 +325,19 @@ func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now t
 	return tx.Commit()
 }
 
+// NonceSeen reports ErrNonceRepeat when the nonce is still kept, and writes nothing.
+func (s *SessionStore) NonceSeen(ctx context.Context, nonce string, now time.Time) error {
+	var one int
+	switch err := s.db.QueryRowContext(ctx, `SELECT 1 FROM device_nonces WHERE nonce = ? AND expires_at >= ?`, nonce, now.Unix()).Scan(&one); {
+	case err == nil:
+		return ErrNonceRepeat
+	case errors.Is(err, sql.ErrNoRows):
+		return nil
+	default:
+		return err
+	}
+}
+
 // PruneNonces drops the nonces whose keep time is over.
 func (s *SessionStore) PruneNonces(ctx context.Context, now time.Time) (int, error) {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM device_nonces WHERE expires_at < ?`, now.Unix())

@@ -531,3 +531,108 @@ func TestNonceKeptForWindowPlusTwiceTheSkewEdge(t *testing.T) {
 	assert.ErrorIs(t, r.ss.RecordNonce(context.Background(), m.Nonce, r.signer.kid, t0.Add(keep), 5*time.Minute), store.ErrNonceRepeat, "still kept at exactly the end")
 	assert.NoError(t, r.ss.RecordNonce(context.Background(), m.Nonce, r.signer.kid, t0.Add(keep+time.Second), 5*time.Minute), "gone one second later")
 }
+
+// Second MUST on slice 3 (Security + QA): who may remove whom.
+func TestRemoveDeviceAuthority(t *testing.T) {
+	r := newRig(t)
+	mk := func(mode, origin string) signer {
+		s := newSigner(t)
+		r.add(s, mode, origin, store.DeviceKindDevice)
+		return s
+	}
+	boot, np := mk("interact", store.DeviceOriginBootstrap), mk("interact", store.DeviceOriginNoProof)
+	view := mk("view", store.DeviceOriginPairing)
+	inter := mk("interact", store.DeviceOriginPairing)
+	victim := mk("view", store.DeviceOriginPairing)
+
+	r.refused(devicekey.ErrSignerBootstrap, r.remove(boot, victim.kid), boot, t0)
+	r.refused(devicekey.ErrSignerNoProof, r.remove(np, victim.kid), np, t0)
+	r.refused(devicekey.ErrAboveSigner, r.remove(view, inter.kid), view, t0)
+	_, ok := r.listed(inter.kid)
+	assert.True(t, ok)
+	// allowed: a bootstrap or no-proof device removes itself, a pairing device removes one at or below its mode
+	_, err := r.handle(r.remove(boot, boot.kid), boot, t0)
+	assert.NoError(t, err)
+	_, err = r.handle(r.remove(np, np.kid), np, t0)
+	assert.NoError(t, err)
+	_, err = r.handle(r.remove(view, victim.kid), view, t0)
+	assert.NoError(t, err, "same mode")
+	_, err = r.handle(r.remove(r.signer, inter.kid), r.signer, t0)
+	assert.NoError(t, err, "a launch pairing device removes a lower one")
+}
+
+func TestApproveOfAListedKidIsRefused(t *testing.T) {
+	r := newRig(t)
+	target := newSigner(t)
+	r.add(target, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+	m := r.approve(r.signer, target, "interact")
+	r.refused(devicekey.ErrBadForm, m, r.signer, t0)
+	k, _ := r.listed(target.kid)
+	assert.Equal(t, "view", k.Mode)
+}
+
+// Ruling (a): removing a launch-mode device needs a pairing-origin launch-mode signer.
+func TestRemovingALaunchDeviceNeedsALaunchPairingSigner(t *testing.T) {
+	r := newRig(t)
+	inter, launch := newSigner(t), newSigner(t)
+	r.add(inter, "interact", store.DeviceOriginPairing, store.DeviceKindDevice)
+	r.add(launch, "launch", store.DeviceOriginPairing, store.DeviceKindDevice)
+	r.refused(devicekey.ErrAboveSigner, r.remove(inter, launch.kid), inter, t0)
+	_, err := r.handle(r.remove(r.signer, launch.kid), r.signer, t0)
+	assert.NoError(t, err)
+}
+
+// Ruling (c): a removal is never refused for the list ceiling.
+func TestRemovalIsNeverRefusedForTheCeiling(t *testing.T) {
+	r := newRig(t)
+	ctx := context.Background()
+	victim := newSigner(t)
+	r.add(victim, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+	full := false
+	for i := 0; i < 1000 && !full; i++ {
+		s := newSigner(t)
+		raw, _ := b64.DecodeString(s.pk)
+		if _, err := r.ss.AddDeviceKey(ctx, store.DeviceKey{KID: s.kid, PK: raw, Label: "d", Mode: "view", Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, t0); err != nil {
+			require.ErrorIs(t, err, store.ErrKeyLimit)
+			full = true
+			break
+		}
+		require.NoError(t, r.ss.RemoveDeviceKey(ctx, s.kid, store.DeviceRemoved, t0))
+	}
+	require.True(t, full, "the removed list reached its ceiling")
+	_, err := r.handle(r.remove(r.signer, victim.kid), r.signer, t0)
+	assert.NoError(t, err)
+}
+
+// Ruling (d): every removal is audited with the signer's kid.
+func TestRemovalIsAuditedWithTheSignersKid(t *testing.T) {
+	r := newRig(t)
+	victim := newSigner(t)
+	r.add(victim, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+	var got []string
+	r.v.Audit = func(a devicekey.Action, signerKID, targetKID string) {
+		got = append(got, string(a)+" "+signerKID+" "+targetKID)
+	}
+	_, err := r.handle(r.remove(r.signer, victim.kid), r.signer, t0)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"remove-device " + r.signer.kid + " " + victim.kid}, got)
+	r.refused(devicekey.ErrUnknownTarget, r.remove(r.signer, victim.kid), r.signer, t0)
+	assert.Len(t, got, 1, "a refused removal is not audited as a removal")
+}
+
+// Ruling (f): bad_mode and unknown_target come only after the signature and the nonce-repeat check, so a replay is nonce_repeat and the refusal says nothing about the list.
+func TestBadModeAndUnknownTargetComeAfterTheNonceCheck(t *testing.T) {
+	r := newRig(t)
+	m := r.raise(r.signer, "A"+newSigner(t).kid[1:], "interact") // unknown target
+	require.NoError(t, r.ss.RecordNonce(context.Background(), m.Nonce, r.signer.kid, t0, 5*time.Minute))
+	_, err := r.handle(m, r.signer, t0)
+	assert.ErrorIs(t, err, devicekey.ErrNonceRepeat)
+	b := r.raise(r.signer, r.signer.kid, "nonsense") // bad mode
+	require.NoError(t, r.ss.RecordNonce(context.Background(), b.Nonce, r.signer.kid, t0, 5*time.Minute))
+	_, err = r.handle(b, r.signer, t0)
+	assert.ErrorIs(t, err, devicekey.ErrNonceRepeat)
+	// a forged signature still never gets that far
+	body, _ := m.Canonical()
+	_, err = r.v.Handle(context.Background(), m.Action, body, "x", t0)
+	assert.ErrorIs(t, err, devicekey.ErrBadSignature)
+}

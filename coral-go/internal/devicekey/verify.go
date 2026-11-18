@@ -51,6 +51,7 @@ type Store interface {
 	SetDeviceMode(ctx context.Context, kid, mode string, now time.Time) error
 	TouchDeviceKey(ctx context.Context, kid string, now time.Time) error
 	RecordNonce(ctx context.Context, nonce, kid string, now time.Time, window time.Duration) error
+	NonceSeen(ctx context.Context, nonce string, now time.Time) error
 	CheckClock(ctx context.Context, now time.Time) error
 }
 
@@ -60,6 +61,9 @@ type Verifier struct {
 	Computer string // this computer's fingerprint: a body for any other is refused
 	// RefuseBefore, when set, refuses every message whose ts is earlier. Coral sets it to its start time plus the window when the nonce store could not be read at start (design page v4 section 4, `before_start`).
 	RefuseBefore time.Time
+
+	// Audit, when set, is called after each applied removal with the signer's kid and the target's.
+	Audit func(a Action, signerKID, targetKID string)
 
 	mu sync.Mutex // one message at a time: the nonce check and the apply are not racing each other
 }
@@ -103,7 +107,11 @@ func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string
 	if !verifyP1363(signer.PK, SigningInput(a, body), sig) {
 		return Message{}, ErrBadSignature
 	}
-	// The signature is good: from here the signer is who it says. Authority next, read from Coral's own list.
+	// The signature is good: from here the signer is who it says. A replay is answered nonce_repeat before anything about the list or the mode is said.
+	if err := v.Store.NonceSeen(ctx, m.Nonce, now); err != nil {
+		return Message{}, mapStoreErr(err)
+	}
+	// Authority next, read from Coral's own list.
 	target, targetMode, err := v.authorize(ctx, m, signer, now)
 	if err != nil {
 		return Message{}, err
@@ -114,7 +122,13 @@ func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string
 	if err := v.Store.TouchDeviceKey(ctx, m.KID, now); err != nil {
 		return Message{}, err
 	}
-	return m, v.apply(ctx, m, target, targetMode, now)
+	if err := v.apply(ctx, m, target, targetMode, now); err != nil {
+		return m, err
+	}
+	if m.Action == RemoveDevice && v.Audit != nil {
+		v.Audit(m.Action, m.KID, m.TargetKID)
+	}
+	return m, nil
 }
 
 func mapStoreErr(err error) error {
@@ -167,6 +181,13 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 			return none, 0, ErrAboveSigner
 		}
 	}
+	if m.Action == ApproveDevice { // a kid already listed is refused, not spent as a no-op; a removed or expired one may be paired again
+		if _, err := v.Store.ActiveDeviceKey(ctx, m.TargetKID, now); err == nil {
+			return none, 0, ErrBadForm
+		} else if !errors.Is(err, store.ErrUnknownSigner) && !errors.Is(err, store.ErrSignerRemoved) {
+			return none, 0, err
+		}
+	}
 	var target store.DeviceKey
 	if m.Action == RaiseMode || m.Action == RemoveDevice {
 		var err error
@@ -175,6 +196,19 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 				return none, 0, ErrUnknownTarget
 			}
 			return none, 0, err
+		}
+		if m.Action == RemoveDevice && m.TargetKID != m.KID { // anyone may remove itself; another device only by a pairing signer at or above its mode
+			switch signer.Origin {
+			case store.DeviceOriginBootstrap:
+				return none, 0, ErrSignerBootstrap
+			case store.DeviceOriginNoProof:
+				return none, 0, ErrSignerNoProof
+			}
+			sm, ok := tunnel.ParseMode(signer.Mode)
+			tm, tok := tunnel.ParseMode(target.Mode)
+			if !ok || !tok || tm > sm {
+				return none, 0, ErrAboveSigner
+			}
 		}
 		if m.Action == RaiseMode && target.Origin == store.DeviceOriginBootstrap { // stays capped until a real pairing
 			return none, 0, ErrSelfTarget
