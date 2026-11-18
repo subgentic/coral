@@ -18,8 +18,8 @@ const interruptUsageText = `Usage: coral-board interrupt <member> [--board <proj
   Interrupt an agent's current turn (the same as the red Stop in its composer: the agent reads "Interrupted" and waits with its conversation; it is not put to sleep or archived: that is coral-board stop).
   An agent that is idle or asleep gets a plain sentence, not an error.
 
-  Only the board's Orchestrator, and only while BOTH the main orchestrator switch AND the separate "interrupt" setting are on in the board's orchestrator grant: any other caller, either switch off, is refused
-  with the server's reason.`
+  Only the board's Orchestrator, and only while BOTH the main orchestrator switch AND the grant's Stop setting (stop_enabled, "may archive agents (Stop)" in Team settings) are on: any other caller, either switch off, is refused
+  with the server's reason. Interrupt has no setting of its own; it follows Stop.`
 
 func cmdInterrupt() {
 	if len(os.Args) < 3 {

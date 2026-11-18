@@ -32,7 +32,7 @@ type teamAbilities struct {
 }
 
 // orchestratorAbilities is every setting that contributes a line, in the order the section lists them. A line is "" when the setting adds nothing.
-var orchestratorAbilities = []func(teamAbilities) string{launchAbility, stopAbility, poolAbility}
+var orchestratorAbilities = []func(teamAbilities) string{launchAbility, stopAbility, restAbility, poolAbility}
 
 // stopAbility is the line for coral-board stop (#17348), which needs the main switch AND its own: with the main switch off the launch line already sends the Orchestrator to the Operator, so this adds nothing; with it
 // on, the command when stop is on and ask the Operator when it is off.
@@ -41,9 +41,17 @@ func stopAbility(a teamAbilities) string {
 		return ""
 	}
 	if !a.MayStop {
-		return "Stopping a member: the Operator has not allowed you to stop an agent's turn, so when one must be stopped, ask the Operator."
+		return "Stopping a member: the Operator has not allowed you to stop (archive) an agent, so you cannot stop or archive one; when one must be stopped, ask the Operator."
 	}
-	return "Stopping a member: to interrupt one member's current turn (it waits with its conversation and is not put to sleep), run coral-board stop <member>. An agent at a permission prompt or a dialog is refused, and an idle or sleeping one gets a plain sentence."
+	return "Stopping a member: coral-board stop <member> archives it: its session ends, it stays on the team (out of the Agents list, its history and tasks kept), and coral-board wake <member> starts it again. To end only a member's current turn, with its session and conversation kept, run coral-board interrupt <member>. An agent at a permission prompt or a dialog, or waiting on a person, is refused; you cannot stop yourself or the team's last Orchestrator."
+}
+
+// restAbility is the line for sleep and start (#19673), which need only the main switch: the three states are Awake, Asleep and Archived, and a name stays taken by an archived member.
+func restAbility(a teamAbilities) string {
+	if !a.MayLaunch {
+		return ""
+	}
+	return "Sleeping and starting a member: coral-board sleep <member> puts a running member to sleep (an archived one becomes asleep, history kept; one already asleep is left as it is); coral-board wake <member> starts a sleeping or an archived member. A name on this team stays taken by an archived member, so to bring that role back start the member instead of launching a new one."
 }
 
 // poolAbility is the line for the team's reviewer pool (#17612): the Orchestrator need not pick between the pool's members, and a member takes review tasks on a bare claim. No pool, no line.
@@ -150,9 +158,12 @@ func BoardAbilitiesSection(bs *board.Store, ss *store.SessionStore) func(p agent
 		}
 		ctx := context.Background()
 		a := teamAbilities{MayLaunch: grantIsOn(ctx, bs, p.BoardName), BoardID: p.BoardName, Dir: p.WorkingDir, AgentType: agentType, Model: model}
-		if bs != nil && p.BoardName != "" { // the stop switch and the reviewer pool, as they are now (#17710); a team being started has no grant row yet, so stop is off
+		if bs != nil && p.BoardName != "" { // the stop switch and the reviewer pool, as they are now (#17710); a team being started has no row yet: stop is what the seed will write, on
 			if g, err := bs.GetOrchGrant(ctx, p.BoardName); err == nil {
 				a.MayStop = g.StopEnabled
+				if _, starting := grantStarting.Load(p.BoardName); starting && g.SetAt == "" {
+					a.MayStop = true // a team the Operator is starting: no row yet, and the seed (SeedOrchGrant) writes stop ON right after the seat starts, so the first prompt says what the grant will be
+				}
 			}
 			a.Pool = bs.GetHealthSettings(ctx, p.BoardName).ReviewerPool
 		}
