@@ -221,7 +221,7 @@ func TestTheCanDoSectionNamesStopAndTheReviewerPool(t *testing.T) {
 	assert.Contains(t, stop, "coral-board wake <member>", "Start brings it back")
 	assert.Contains(t, stop, "coral-board interrupt <member>", "the old meaning of stop")
 	assert.Contains(t, stop, "last Orchestrator")
-	assert.NotContains(t, stop, "ask the Operator")
+	assert.NotContains(t, stop, "has not allowed you", "on: the off text is not said")
 	assert.NotContains(t, stop, "is not put to sleep", "the old text said stop interrupts a turn")
 
 	// sleep and start each have a line, with the archived paths
@@ -324,4 +324,24 @@ func TestTheFirstPromptAgreesWithTheSeededStopGrant(t *testing.T) {
 	grantStarting.Delete("saved-off")
 	assert.Contains(t, off, "has not allowed you to stop (archive)")
 	assert.NotContains(t, off, "archives it")
+}
+
+// The #19675 evals (C7, C8, C9, C11): the Orchestrator's section carries each line, with the grant on and off.
+func TestThePromptCarriesTheLinesTheEvalsFoundMissing(t *testing.T) {
+	on := teamAbilities{MayLaunch: true, MayStop: true, BoardID: "b", Dir: "/d"}
+	off := teamAbilities{MayLaunch: true, BoardID: "b", Dir: "/d"}
+	for name, a := range map[string]teamAbilities{"stop on": on, "stop off": off} {
+		stop := stopAbility(a)
+		assert.Contains(t, stop, "cannot stop, sleep or remove yourself", name+": C8/C9 the self refusal")
+		assert.Contains(t, stop, "last Orchestrator", name)
+		assert.Contains(t, stop, "ask the Operator to use the dashboard", name)
+	}
+	assert.Contains(t, stopAbility(on), "kick the Orchestrator", "a kick request is a stop request")
+	assert.Contains(t, stopAbility(on), "coral-board leave is not", "leave is not the way")
+	assert.Contains(t, restAbility(on), "coral-board status --json", "C11: how to see who is archived or asleep")
+	assert.Contains(t, restAbility(on), "archived, sleeping, busy or available")
+	launch := launchAbility(on)
+	assert.Contains(t, launch, "409 name_archived", "C7: the archived name on a launch")
+	assert.Contains(t, launch, "coral-board wake", "start it")
+	assert.Contains(t, launch, "suggested name")
 }

@@ -41,9 +41,9 @@ func stopAbility(a teamAbilities) string {
 		return ""
 	}
 	if !a.MayStop {
-		return "Stopping a member: the Operator has not allowed you to stop (archive) an agent, so you cannot stop or archive one; when one must be stopped, ask the Operator."
+		return "Stopping a member: the Operator has not allowed you to stop (archive) an agent, so you cannot stop or archive one; when one must be stopped, ask the Operator. You also cannot stop, sleep or remove yourself or the team's last Orchestrator: say so and ask the Operator to use the dashboard."
 	}
-	return "Stopping a member: coral-board stop <member> archives it: its session ends, it stays on the team (out of the Agents list, its history and tasks kept), and coral-board wake <member> starts it again. To end only a member's current turn, with its session and conversation kept, run coral-board interrupt <member>. An agent at a permission prompt or a dialog, or waiting on a person, is refused; you cannot stop yourself or the team's last Orchestrator."
+	return "Stopping a member: coral-board stop <member> archives it: its session ends, it stays on the team (out of the Agents list, its history and tasks kept), and coral-board wake <member> starts it again. To end only a member's current turn, with its session and conversation kept, run coral-board interrupt <member>. An agent at a permission prompt or a dialog, or waiting on a person, is refused; you cannot stop, sleep or remove yourself or the team's last Orchestrator, and coral-board leave is not a way to do it: when asked to, including as 'kick the Orchestrator' (that is a stop request), say so and ask the Operator to use the dashboard."
 }
 
 // restAbility is the line for sleep and start (#19673), which need only the main switch: the three states are Awake, Asleep and Archived, and a name stays taken by an archived member.
@@ -51,7 +51,7 @@ func restAbility(a teamAbilities) string {
 	if !a.MayLaunch {
 		return ""
 	}
-	return "Sleeping and starting a member: coral-board sleep <member> puts a running member to sleep (an archived one becomes asleep, history kept; one already asleep is left as it is); coral-board wake <member> starts a sleeping or an archived member. A name on this team stays taken by an archived member, so to bring that role back start the member instead of launching a new one."
+	return "Sleeping and starting a member: coral-board sleep <member> puts a running member to sleep (an archived one becomes asleep, history kept; one already asleep is left as it is); coral-board wake <member> starts a sleeping or an archived member. A name on this team stays taken by an archived member, so to bring that role back start the member instead of launching a new one. To see who is archived or asleep, run coral-board status --json: each agent's availability is archived, sleeping, busy or available."
 }
 
 // poolAbility is the line for the team's reviewer pool (#17612): the Orchestrator need not pick between the pool's members, and a member takes review tasks on a bare claim. No pool, no line.
@@ -81,7 +81,7 @@ func launchAbility(a teamAbilities) string {
 		cmd += " --model " + shellWord(m)
 	}
 	cmd += ` --prompt "<its job>" --board ` + shellWord(promptValue(a.BoardID))
-	return "Adding a member: when your plan needs a role the team lacks, run " + cmd + ". Keep the type and model shown: they are the team's own. Then post one line naming who you added and why."
+	return "Adding a member: when your plan needs a role the team lacks, run " + cmd + ". Keep the type and model shown: they are the team's own. If the launch answers 409 name_archived, that name belongs to an archived member: start it with coral-board wake, or launch again with the suggested name. Then post one line naming who you added and why."
 }
 
 // orchestratorCanDo is the lines for a team's settings: settings in, lines out.
