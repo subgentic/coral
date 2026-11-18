@@ -4,6 +4,7 @@
  * the way to change it where every agent's is changed (its own page); a launch is not made here. Every name that comes from an agent or a team is set as text, never as HTML. Machine-only: nothing of it exists through Coral Hub. */
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
+import { isCloud } from './server_base.js';
 import { showConfirmModal } from './confirm_dialog.js';
 const { mountSettingsView } = await importOnce('./settings_view.js');
 const { COLORS, avatarNode, lookOf } = await importOnce('./chief_look.js');
@@ -43,7 +44,7 @@ export async function mountChiefSetup(host) {
     const form = el('div', 'chief-setup-form'); section.append(intro, preview, form); host.append(section);
     const checks = el('button', 'btn', 'Manage checks and sources'); checks.type = 'button';
     checks.addEventListener('click', () => importOnce('./chief_checks.js').then(m => m.showChiefChecks()).catch(() => showToast('Checks could not be opened. Try again.', true)));
-    section.insertBefore(checks, form);
+    if (!isCloud()) section.insertBefore(checks, form); // a check runs a command on the computer: not in the Hub's tunnel (#19630)
     const modelRow = el('p', 'chief-model');
 
     let view = null;
