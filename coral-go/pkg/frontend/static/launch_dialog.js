@@ -628,7 +628,7 @@ export async function launchSession() {
 
     try {
         const dirInput = document.getElementById(launch.mode === "terminal" ? "launch-terminal-dir" : "launch-dir");
-        const result = await _launchOn(server, "/api/sessions/launch", payload, type, { dirInput, retry: launchSession }); // the Not Found dialog's Check again launches again, from this dialog's own fields
+        const result = await _launchOn(server, "/api/sessions/launch", payload, type, { dirInput, retry: launchSession, nameInput: document.getElementById('launch-agent-name-input') }); // the Not Found dialog's Check again launches again, from this dialog's own fields
         if (result) {
             recordRecentDir(dir, server);
             // The agent as the list names it (its name, else its folder or CLI, or "Terminal"), not the session's raw id (#5895)
