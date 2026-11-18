@@ -4,7 +4,8 @@
  * entry (./orchestrator.md) opens that entry in the same pane. When a distillation ends, the entry it wrote opens there. The sidebar is the documents pane with its resize handle (detail_pane.js, the goal page's column).
  * Everything is built with the DOM and textContent. Lazy: team_page.js imports it. */
 import { importOnce } from './import_once.js';
-import { teamFetch } from './server_base.js';
+import { teamFetch, sessionTeamKey } from './server_base.js';
+import { state } from './state.js';
 import { refusedTooLarge } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
 import { whenText } from './when_text.js';
@@ -16,10 +17,11 @@ const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the
 const { rowFocusTarget, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 const { openDetailPane, closeDetailPane, detailKey } = await importOnce('./detail_pane.js');
 
+await loadStyles('knowledge_note.css'); // the Distill-for row's rules, and the note form's (#19560)
 const DT = await importOnce('./data_table.js');
 let knowledgeTableState = DT.tableState();
 
-const model = { team: '', data: null, refused: false, failed: '', loading: false, search: '' };
+const model = { team: '', data: null, refused: false, failed: '', loading: false, search: '', agent: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-knowledge-status'); if (s) { s.textContent = ''; s.textContent = t; } };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
@@ -161,9 +163,23 @@ async function addNote(opener) {
     } catch (e) { say(`Could not open the note form: ${e && e.message ? e.message : 'it did not load'}`); }
 }
 
+/** The agents on this team that can be distilled alone: name and session (#19560). */
+function members(team) {
+    return (state.liveSessions || []).filter(s => s.session_id && s.board_project && sessionTeamKey(s) === team)
+        .map(s => ({ id: s.session_id, name: s.display_name || s.agent_name || s.name })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+/** The team's menu, or an agent's own (sessionId, with no team named): the Knowledge tab opens and a run starts, or joins the one already running (#3325). A run of ONE agent writes only its notes (#19560). */
+export async function distillTeam(team, sessionId) {
+    const { showToast } = await importOnce('./notifications.js');
+    if (sessionId) { const s = (state.liveSessions || []).find(x => x.session_id === sessionId && x.board_project); team = s && sessionTeamKey(s); if (!team) return; }
+    if (window.openTeamPage) await window.openTeamPage(team, { tab: 'knowledge' });
+    try { await startDistill(team, sessionId); if (sessionId) showToast('Distilling this agent’s knowledge…'); } catch (err) { showToast(`Could not start: ${err && err.message ? err.message : 'no answer'}`, true); }
+}
+
 async function distill() {
-    const team = model.team;
-    try { await startDistill(team); say('Distilling the team’s knowledge…'); } catch (e) { say(`Could not start: ${e && e.message ? e.message : 'no answer'}`); }
+    const team = model.team, one = members(team).some(m => m.id === model.agent) ? model.agent : '';
+    try { await startDistill(team, one || undefined); say(one ? 'Distilling this agent’s knowledge…' : 'Distilling the team’s knowledge…'); } catch (e) { say(`Could not start: ${e && e.message ? e.message : 'no answer'}`); }
     draw();
 }
 
@@ -184,8 +200,17 @@ function draw() {
     const bar = Toolbar.build({ id: 'team-knowledge-search', label: 'Search knowledge', placeholder: 'Search knowledge', value: model.search, onSearch: text => { model.search = text; draw(); }, action: d });
     const add = btn('btn btn-small team-add-note', 'Add note', () => addNote(add)); add.classList.add('team-tb-action'); d.before(add); // Add note first, Distill knowledge at the far right (#17485)
     body.append(bar);
+    // Which agents (#19560): all of them, or one member; the choice is the team's own, so it stays while the page is open.
+    const who = members(model.team);
+    if (who.length > 1 && !running) {
+        const row = el('div', 'team-distill-who'), id = 'team-distill-who-select', lab = el('label', null, 'Distill for'); lab.htmlFor = id;
+        const sel = el('select'); sel.id = id; sel.append(Object.assign(el('option', null, 'All agents'), { value: '' }), ...who.map(m => Object.assign(el('option', null, m.name), { value: m.id })));
+        sel.value = who.some(m => m.id === model.agent) ? model.agent : ''; sel.addEventListener('change', () => { model.agent = sel.value; draw(); });
+        row.append(lab, sel); body.append(row);
+    }
     // What Distill does and costs, before it is pressed (#17485): it is the one button here that spends model usage and rewrites files.
-    if (!running) body.append(el('p', 'goals-note team-distill-hint', 'Distill knowledge reads every agent’s conversations and asks Claude to write their notes: two model calls per agent and one for the team, a few minutes, on your Claude plan. It rewrites each agent’s notes, edits included. Notes you add are kept.'));
+    if (!running && who.some(m => m.id === model.agent)) body.append(el('p', 'goals-note team-distill-hint', 'Distill knowledge reads this agent’s conversations and asks Claude to write its notes: two model calls, a few minutes, on your Claude plan. It rewrites this agent’s notes, edits included; the other agents’ notes and the team’s index stay as they are.'));
+    else if (!running) body.append(el('p', 'goals-note team-distill-hint', 'Distill knowledge reads every agent’s conversations and asks Claude to write their notes: two model calls per agent and one for the team, a few minutes, on your Claude plan. It rewrites each agent’s notes, edits included. Notes you add are kept.'));
     // A run in progress says how long it has gone and what it is doing; a failed one keeps its error here (#15272).
     const job = distillJob(model.team), pr = job.progress || {};
     if (running) {
@@ -233,7 +258,7 @@ document.addEventListener('coral:distill-status', (e) => {
 
 /** Show the team's knowledge in `host`. hooks: onCount(n). */
 export function showKnowledge(host, team, h = {}) {
-    if (team !== model.team) { knowledgeTableState = DT.tableState(); Object.assign(model, { team, data: null, refused: false, failed: '', loading: false, search: '' }); }
+    if (team !== model.team) { knowledgeTableState = DT.tableState(); Object.assign(model, { team, data: null, refused: false, failed: '', loading: false, search: '', agent: '' }); }
     hooks = h;
     if (!host.dataset.built) {
         host.dataset.built = '1';

@@ -57,6 +57,7 @@ type AgentConcept struct {
 
 // agentMeta holds agent info during distillation.
 type agentMeta struct {
+	sessionID  string
 	name       string
 	role       string
 	transcript string
@@ -233,6 +234,42 @@ func cleanKnowledgeDoc(s string) string {
 
 // DistillTeamKnowledge runs the three-pass knowledge distillation pipeline for a team.
 func DistillTeamKnowledge(ctx context.Context, ss *store.SessionStore, ts *store.TeamStore, teamName, coralDir string, progressFn func(DistillProgress)) (*KnowledgeBundle, error) {
+	return distillTeam(ctx, ss, ts, teamName, "", coralDir, progressFn)
+}
+
+// ErrKnowledgeAgentNotOnTeam: the session asked for is not an agent of this team (unknown, or on another team or none): the same answer for each, so a caller learns nothing about other sessions (#19560).
+var ErrKnowledgeAgentNotOnTeam = errors.New("that agent is not on this team")
+
+// DistillAgentKnowledge distills ONE agent of a team into the team's knowledge (#19560, the Operator): its own transcript through the same redaction, limits and passes, writing only its
+// own document; the team's index and the other agents' documents stay as they are, and the collaboration pass (it needs more than one agent) is not repeated.
+func DistillAgentKnowledge(ctx context.Context, ss *store.SessionStore, ts *store.TeamStore, teamName, sessionID, coralDir string, progressFn func(DistillProgress)) (*KnowledgeBundle, error) {
+	if strings.TrimSpace(sessionID) == "" {
+		return nil, ErrKnowledgeAgentNotOnTeam
+	}
+	return distillTeam(ctx, ss, ts, teamName, sessionID, coralDir, progressFn)
+}
+
+// OnlyKnowledgeAgent is the one agent of agents whose session is sessionID, or ErrKnowledgeAgentNotOnTeam.
+func onlyKnowledgeAgent(agents []agentMeta, sessionID string) ([]agentMeta, error) {
+	for _, a := range agents {
+		if a.sessionID == sessionID {
+			return []agentMeta{a}, nil
+		}
+	}
+	return nil, ErrKnowledgeAgentNotOnTeam
+}
+
+// KnowledgeAgentOnTeam says whether sessionID is one of the agents a distillation of the team covers; the route asks before it starts a run (no job for a foreign agent).
+func KnowledgeAgentOnTeam(ctx context.Context, ss *store.SessionStore, ts *store.TeamStore, teamName, sessionID string) bool {
+	agents, err := teamKnowledgeAgentsMeta(ctx, ss, ts, teamName, false)
+	if err != nil {
+		return false
+	}
+	_, err = onlyKnowledgeAgent(agents, sessionID)
+	return err == nil
+}
+
+func distillTeam(ctx context.Context, ss *store.SessionStore, ts *store.TeamStore, teamName, onlySession, coralDir string, progressFn func(DistillProgress)) (*KnowledgeBundle, error) {
 	if !ValidKnowledgeTeam(teamName) {
 		return nil, ErrBadKnowledgeTeam
 	}
@@ -256,15 +293,27 @@ func DistillTeamKnowledge(ctx context.Context, ss *store.SessionStore, ts *store
 		Agents:    make(map[string]*AgentConcept),
 	}
 
-	agents, err := teamKnowledgeAgents(ctx, ss, ts, teamName)
+	agents, err := teamKnowledgeAgentsMeta(ctx, ss, ts, teamName, onlySession == "")
 	if err != nil {
 		return nil, err
+	}
+	if onlySession != "" {
+		if agents, err = onlyKnowledgeAgent(agents, onlySession); err != nil {
+			return nil, err
+		}
+		agents[0].transcript = redactedTranscript(agentTranscript(ctx, ss, onlySession))
+		if agents[0].transcript == "" { // nothing to learn from: its earlier document stays, not replaced by one that says there was nothing
+			return nil, errors.New("this agent has no session transcript to distill yet")
+		}
 	}
 	call := func(prompt, content string) (string, error) {
 		if ctx.Err() != nil {
 			return "", fmt.Errorf("distilling took longer than %d minutes and was stopped: %w", int(knowledgeRunLimit/time.Minute), ErrKnowledgeTimeout)
 		}
 		return callClaudeForKnowledge(ctx, claudePath, callTimeout, prompt, content)
+	}
+	if onlySession != "" {
+		return distillAgentsOpts(bundle, agents, call, coralDir, writeAgentKnowledge, progressFn, true)
 	}
 	return distillAgents(bundle, agents, call, coralDir, progressFn)
 }
@@ -274,6 +323,11 @@ func DistillTeamKnowledge(ctx context.Context, ss *store.SessionStore, ts *store
 // (they have no roster row), and, for a stopped team, the roster members that stopped with it.
 // A member stopped on its own has left the team and is not distilled.
 func teamKnowledgeAgents(ctx context.Context, ss *store.SessionStore, ts *store.TeamStore, teamName string) ([]agentMeta, error) {
+	return teamKnowledgeAgentsMeta(ctx, ss, ts, teamName, true)
+}
+
+// teamKnowledgeAgentsMeta is teamKnowledgeAgents, with the transcripts read only when withTranscripts (a run of one agent reads just its own).
+func teamKnowledgeAgentsMeta(ctx context.Context, ss *store.SessionStore, ts *store.TeamStore, teamName string, withTranscripts bool) ([]agentMeta, error) {
 	live, err := ss.GetBoardSessions(ctx, teamName)
 	if err != nil {
 		return nil, err
@@ -293,7 +347,11 @@ func teamKnowledgeAgents(ctx context.Context, ss *store.SessionStore, ts *store.
 		if n := names[name]; n > 1 {
 			name = fmt.Sprintf("%s (%d)", name, n)
 		}
-		agents = append(agents, agentMeta{name: name, role: inferRole(prompt), transcript: redactedTranscript(agentTranscript(ctx, ss, sessionID))})
+		transcript := ""
+		if withTranscripts {
+			transcript = redactedTranscript(agentTranscript(ctx, ss, sessionID))
+		}
+		agents = append(agents, agentMeta{sessionID: sessionID, name: name, role: inferRole(prompt), transcript: transcript})
 	}
 	for _, ls := range live {
 		name := ls.AgentName
@@ -382,6 +440,11 @@ func distillAgents(bundle *KnowledgeBundle, agents []agentMeta, call func(prompt
 
 // distillAgentsWith is distillAgents with the place the finished bundle goes: the team's live knowledge for a person's run, a candidate beside it for an automatic one (#13928).
 func distillAgentsWith(bundle *KnowledgeBundle, agents []agentMeta, call func(prompt, content string) (string, error), coralDir string, write func(coralDir string, bundle *KnowledgeBundle) error, progressFn func(DistillProgress)) (*KnowledgeBundle, error) {
+	return distillAgentsOpts(bundle, agents, call, coralDir, write, progressFn, false)
+}
+
+// distillAgentsOpts is distillAgentsWith; single is a run of one agent (#19560): the collaboration pass, which compares agents, is not made.
+func distillAgentsOpts(bundle *KnowledgeBundle, agents []agentMeta, call func(prompt, content string) (string, error), coralDir string, write func(coralDir string, bundle *KnowledgeBundle) error, progressFn func(DistillProgress), single bool) (*KnowledgeBundle, error) {
 	teamName := bundle.TeamName
 	shown := bundle.TeamTitle
 	if shown == "" {
@@ -449,11 +512,15 @@ func distillAgentsWith(bundle *KnowledgeBundle, agents []agentMeta, call func(pr
 		fmt.Fprintf(&agentSummaries, "### Agent: %s (Role: %s)\n\n%s\n\n---\n\n", a.name, a.role, concept.Pass1Raw)
 	}
 
-	collabPrompt := fmt.Sprintf(pass2Prompt, teamName, agentSummaries.String())
-	collabResult, err := call(collabPrompt, "")
-	if err != nil {
-		bundle.CollaborationError = err.Error()
-		collabResult = "No collaboration analysis is available for this run."
+	collabResult := "No collaboration analysis is available for this run."
+	if !single {
+		collabPrompt := fmt.Sprintf(pass2Prompt, teamName, agentSummaries.String())
+		res, err := call(collabPrompt, "")
+		if err != nil {
+			bundle.CollaborationError = err.Error()
+		} else {
+			collabResult = res
+		}
 	}
 
 	// Store pass2 on all agents
@@ -769,6 +836,32 @@ func writeKnowledgeBundle(coralDir string, bundle *KnowledgeBundle) error {
 		}
 	}
 
+	return nil
+}
+
+// writeAgentKnowledge writes the documents of the agents in the bundle and nothing else: a run of one agent leaves the team's index and the other documents as they are (#19560). Every document is
+// redacted before any is written, as writeKnowledgeBundle does.
+func writeAgentKnowledge(coralDir string, bundle *KnowledgeBundle) error {
+	dir, err := knowledgeTeamDir(coralDir, bundle.TeamName)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	finals := make(map[string]string, len(bundle.Agents))
+	for name, concept := range bundle.Agents {
+		md, err := redactKnowledge(concept.FinalMD)
+		if err != nil {
+			return fmt.Errorf("knowledge not written: it could not be checked for secrets: %w", err)
+		}
+		finals[name], concept.FinalMD = md, md
+	}
+	for name, md := range finals {
+		if err := secfile.WriteFileNoFollow(filepath.Join(dir, slugify(name)+".md"), []byte(md), 0o600); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

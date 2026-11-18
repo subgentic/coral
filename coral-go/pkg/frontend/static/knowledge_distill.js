@@ -90,8 +90,8 @@ export async function refreshDistill(team) {
 }
 
 /** Start a run for `team`, or join the one already running (the server never starts two). */
-export async function startDistill(team) {
-    const r = await teamFetch(team, path, { method: 'POST' });
+export async function startDistill(team, sid) {
+    const r = await teamFetch(team, path, { method: 'POST', body: sid && JSON.stringify({ session_id: sid }) });
     let job = null;
     try { job = await r.json(); } catch { /* none */ }
     if (!r.ok) throw new Error((job && job.error) || 'Failed to start distillation');
