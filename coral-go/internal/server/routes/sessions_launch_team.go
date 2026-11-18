@@ -290,6 +290,11 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	// A team the Operator launches starts with its Orchestrator holding the grant, on (#13891). Only when the Operator made the call and the team is new: an agent's launch-team, a relaunch of a team
 	// that has a board, and a board that already has a grant row never get one.
 	seedGrant := h.bs != nil && body.BoardName != "" && boardCreated && !fromAgent && launchedByOperator(r)
+	if h.bs != nil && body.BoardName != "" && boardCreated && !seedGrant { // a new team the Operator did not launch starts with the grant OFF: the default for a board's one Orchestrator is the Operator's own teams' (#19507)
+		if err := h.bs.SeedOrchGrantOff(ctx, body.BoardName); err != nil {
+			log.Printf("the new team's Orchestrator grant was not written (%s): %v", body.BoardName, err)
+		}
+	}
 	var launched []map[string]any
 	var categories []string // the analytics category of each member that failed
 	firstFailure := ""
