@@ -51,8 +51,7 @@ func TestDeviceListIsLocalOnlyAndTheOwnerCanLowerAndRemove(t *testing.T) {
 	active, _ := ss.ActiveDeviceKey(context.Background(), kid, time.Now())
 	assert.Equal(t, "launch", active.Mode)
 
-	// The generic settings route is refused for the web mode from the hub, too.
-	assert.Equal(t, 403, call(h, "PUT", "/api/settings", `{"settings":{"device_web_mode":"launch"}}`, hub).Code)
+	// The generic PUT /api/settings refuses the key for every caller (TestPutSettingsRefusesHubTrustSettings holds it).
 
 	rec := call(h, "GET", "/api/cloud/devices", "", js)
 	require.Equal(t, 200, rec.Code, rec.Body.String())

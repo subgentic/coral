@@ -264,6 +264,8 @@ func TestALinkLostWhoseClearFailsStillWipesTheSecretAndFailsClosedAfter(t *testi
 	assert.False(t, r.m.PairingSecretHeld(), "the secret is wiped whatever the store did")
 	assert.Len(t, r.listed(t), 1, "the stale key could not be removed")
 	assert.True(t, r.m.deviceClearPending(), "and the manager knows: a pairing refuses until a clear works")
+}
+
 // coral-hub condition (c): the mode comes from the computer's own setting at the moment of pairing, read each time: changing the setting before the next pairing changes what it grants, and nothing in the request or the Hub's answer does.
 func TestThePairedModeIsReadFromTheComputersSettingAtPairingTime(t *testing.T) {
 	r := pairingSetup(t, true)
