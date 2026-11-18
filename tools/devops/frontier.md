@@ -55,7 +55,12 @@ git archive --format=tar.gz -o <run>.tgz <sha>
 ssh frontier "mkdir D:\coral-link-runs\<run>"
 scp <run>.tgz frontier:D:/coral-link-runs/<run>/src.tgz
 ssh frontier "cd /d D:\coral-link-runs\<run> && mkdir src && tar -xzf src.tgz -C src"
+ssh frontier "cd /d D:\coral-link-runs\<run>\src && (dir /s /b ._* 2>nul && (echo AppleDouble files reached the box: delete them and re-copy with COPYFILE_DISABLE=1 & exit /b 1) || echo copy clean)"
 ```
+
+Copying a working tree (uncommitted files) instead of a commit: make the tarball with `COPYFILE_DISABLE=1 tar --no-mac-metadata -czf <run>.tgz ...`
+(a plain macOS `tar` adds a `._name` AppleDouble file beside every file, and those broke runs three times on 2026-11-18: the static checks, a pin and
+`run_cdp_suites`). `git archive` never adds them. The `dir /s /b ._*` line above fails the copy if any reached the box, so there is no manual cleanup.
 
 ## Run
 
