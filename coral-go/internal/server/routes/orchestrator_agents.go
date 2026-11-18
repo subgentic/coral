@@ -460,10 +460,28 @@ func (h *SessionsHandler) refuseSleepNow(ctx context.Context, project string, ta
 	if st.InTurn || st.Working {
 		idle := time.Duration(g.IdleMin) * time.Minute
 		if st.LastEvent.IsZero() || time.Since(st.LastEvent) < idle {
-			return "working", fmt.Sprintf("that agent is working: it may be put to sleep after %d minutes without activity", g.IdleMin)
+			slog.Info("sleep refused: the agent reads as working", "session", target.SessionID, "in_turn", st.InTurn, "working", st.Working, "last_event", st.LastEvent, "last_stop", st.LastStop)
+			return "working", fmt.Sprintf("that agent is working: it may be put to sleep after %d minutes without activity (%s)", g.IdleMin, sleepRefusalEvidence(st)) // the evidence: a refusal for an agent that looks idle can be traced (#19529)
 		}
 	}
 	return "", ""
+}
+
+// sleepRefusalEvidence says which signals held a sleep: whether the agent reads as in a turn and as working, and how long ago its last event and its last stop were.
+func sleepRefusalEvidence(st SessionState) string {
+	ago := func(t time.Time) string {
+		if t.IsZero() {
+			return "none"
+		}
+		return fmt.Sprintf("%ds ago", int(time.Since(t).Seconds()))
+	}
+	yn := func(b bool) string {
+		if b {
+			return "yes"
+		}
+		return "no"
+	}
+	return fmt.Sprintf("in a turn: %s, working: %s, last event %s, last stop %s", yn(st.InTurn), yn(st.Working), ago(st.LastEvent), ago(st.LastStop))
 }
 
 // sleeper is an awake agent that may be put to sleep to make room: who, its session, and how long it has been without activity.
