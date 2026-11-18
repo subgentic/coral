@@ -1,6 +1,7 @@
 // Loading a saved theme in Customize theme puts it in use (#13760, the Operator: "loading a theme, I can't use it without saving it as a new theme"): Load applies the theme to the page now, keeps it as the saved
 // theme (a Cancel does not take it back, a reload keeps it) and creates no copy; the list shows the theme in use when the editor opens; an edit that is only previewed is dropped by Cancel; the line above the buttons
-// says whether Save and apply updates the theme or makes a new one; Light from the built-ins is kept the same way. 1280 px, isolated dev server; the two themes it makes are deleted and the settings put back.
+// says whether Save and apply updates the theme or makes a new one; Light from the built-ins is kept the same way. The settings save is slowed by 400 ms on purpose (#19657): the colour is on the page before the save lands, so every step
+// that reads what Load kept (the hint, Cancel, the saved theme) waits for the save first; a busy runner that answers late used to fail Cancel with the old colour. 1280 px, isolated dev server; the two themes it makes are deleted and the settings put back.
 'use strict';
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -15,10 +16,11 @@ const fs = require('node:fs');
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const count = async () => ((await api('GET', '/api/themes')).body.themes || []).length;
-    const load = async () => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); };
+    const load = async () => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(`(() => { if (window.__slowPut) return true; window.__slowPut = true; const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const p = R(u, o); return (String(u) === '/api/settings' && String((o && o.method) || 'GET').toUpperCase() === 'PUT') ? p.then(r => new Promise(res => setTimeout(() => res(r), 400))) : p; }; return true; })()`); };
     const colour = v => ev(`getComputedStyle(document.documentElement).getPropertyValue(${JSON.stringify(v)}).trim().toLowerCase()`);
     const open = async () => { await ev(`window.showThemeConfigurator(); true`); await waitFor(`document.getElementById('theme-configurator-modal').style.display === 'flex' && !!document.querySelector('#theme-configurator-modal .theme-color-text')`, 'the editor', 8000); };
     const pick = async name => { await ev(`(() => { const s = document.getElementById('theme-load-select'); s.value = ${JSON.stringify(name)}; document.querySelector('[data-on-click="theme-load"]').click(); return true; })()`); };
+    const landed = (name, what) => waitFor(`((window.T.state.settings || {}).custom_theme === ${JSON.stringify(name)})`, what + ': the settings save has landed', 8000);
     const close = async () => { await ev(`document.querySelector('[data-on-click="theme-close"]').click(); true`); await waitFor(`document.getElementById('theme-configurator-modal').style.display === 'none'`, 'it closes', 4000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -35,6 +37,7 @@ const fs = require('node:fs');
         check(/^(base:dark|dark)$/i.test(shown0), 'with no saved theme the list shows the page base (Dark): ' + shown0);
         await pick(A);
         await waitFor(`getComputedStyle(document.documentElement).getPropertyValue(${JSON.stringify(VAR)}).trim().toLowerCase() === '#ff00aa'`, 'Load applies the theme to the page now', 6000).catch(() => {});
+        await landed(A, 'Load A');
         check(await colour(VAR) === '#ff00aa', 'Load puts the theme on the page now: ' + await colour(VAR));
         check(await ev(`document.getElementById('theme-load-select').value`) === A, 'the list keeps showing the loaded theme');
         const hint = await ev(`(document.getElementById('theme-save-hint') || {}).textContent || ''`);
@@ -64,6 +67,7 @@ const fs = require('node:fs');
         await ev(`(() => { window.__gets = []; window.__failPut = false; const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const url = String(u), m = String((o && o.method) || 'GET').toUpperCase(); if (m === 'GET' && url.startsWith('/api/themes/') && !url.includes('variables')) window.__gets.push(decodeURIComponent(url)); if (m === 'PUT' && url === '/api/settings' && window.__failPut) return Promise.resolve(new Response('{"error":"no"}', { status: 500, headers: { 'Content-Type': 'application/json' } })); return R(u, o); }; return true; })()`);
         await open(); await pick(A);
         await waitFor(`getComputedStyle(document.documentElement).getPropertyValue(${JSON.stringify(VAR)}).trim().toLowerCase() === '#ff00aa'`, 'A again', 6000).catch(() => {});
+        await landed(A, 'A again');
         check((await ev(`window.__gets.filter(g => g.endsWith('/' + ${JSON.stringify(A)}))`)).length === 1, 'Load reads the theme once: ' + JSON.stringify(await ev(`window.__gets`)));
         const prefBefore = await ev(`localStorage.getItem('coral-theme')`);
         await ev(`(() => { const t = document.querySelector('#theme-configurator-modal .theme-color-text[data-var="${VAR}"]'); t.value = '#777777'; t.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('theme-save-desc'); d.value = 'my draft'; return true; })()`);
@@ -93,6 +97,7 @@ const fs = require('node:fs');
         const editor = v => ev(`(document.querySelector('#theme-configurator-modal .theme-color-text[data-var="${v}"]') || {}).value.trim().toLowerCase()`);
         const darkV2 = await colour(V2);
         await pick(P); await waitFor(`document.documentElement.getAttribute('data-theme') === 'light'`, 'the partial light theme is applied', 6000).catch(() => {});
+        await landed(P, 'the partial theme');
         const lightV2 = await colour(V2);
         check(lightV2 !== darkV2, 'the other colour changed with the base: ' + darkV2 + ' -> ' + lightV2);
         check(await editor(V2) === lightV2 && await editor(VAR) === '#112233', 'the editor shows what the page shows (the base\'s colour and the theme\'s own), not the dark edits: ' + await editor(V2) + ' vs ' + lightV2);
@@ -117,6 +122,7 @@ const fs = require('node:fs');
         const n2 = await count();
         await ev(`document.querySelector('[data-on-click="theme-import"]').click(); true`);
         await waitFor(`getComputedStyle(document.documentElement).getPropertyValue(${JSON.stringify(VAR)}).trim().toLowerCase() === '#fa8072'`, 'the imported theme is applied', 8000).catch(() => {});
+        await landed(I, 'the import');
         check(await colour(VAR) === '#fa8072', 'an imported theme is put in use: ' + await colour(VAR));
         check(await count() === n2 + 1, 'stored once');
         check(await ev(`document.getElementById('theme-load-select').value`) === I, 'and the list shows it');
@@ -142,6 +148,7 @@ const fs = require('node:fs');
         // Light from the built-ins is kept as well
         await open(); await pick('base:light');
         await waitFor(`document.documentElement.getAttribute('data-theme') === 'light'`, 'Light is applied', 6000).catch(() => {});
+        await landed('', 'Light');
         await close(); await load();
         check(await ev(`document.documentElement.getAttribute('data-theme')`) === 'light', 'Load Light is still Light after a reload');
         check(await count() === n0, 'and the themes made here are all gone again');
