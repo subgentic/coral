@@ -131,7 +131,7 @@ function openEntry(entry, opener, { focus = true } = {}) {
                 if (!r.ok || !b.ok) { say(`Could not save: ${(b && b.error) || `HTTP ${r.status}`}`); save.disabled = false; cancel.disabled = false; return; }
                 entry.text = box.value;
                 const a = model.data && model.data.agents.find(x => x.name === (entry.file || entry.name)); if (a) a.content = box.value;
-                toView(); say(b.redacted ? 'Saved. A secret in the text was replaced before it was saved.' : 'Saved.');
+                toView(); say(`Saved. It reaches ${entry.name} at its next start.${b.redacted ? ' A secret in the text was replaced before it was saved.' : ''}`); // a running agent is not sent it (#19252)
                 load(); // Updated and the table are read again
             } catch (e) { say(`Could not save: ${e && e.message ? e.message : 'no answer'}`); save.disabled = false; cancel.disabled = false; }
         });
