@@ -211,7 +211,32 @@ func TestATunnelErrorReplyKeepsItsStatusAndMessageOnly(t *testing.T) {
 	g := newHubFieldsRig(t)
 	code, body := g.get(t, "/api/scheduled/jobs/99999", true)
 	assert.Equal(t, http.StatusNotFound, code)
-	assert.Contains(t, body, "job not found")
+	assert.Contains(t, body, "Not found")
+	assert.NotContains(t, body, "job not found")
+}
+
+// An error through the tunnel holds no path, prompt or stored text (#19583): the handlers' err.Error() text and a name from the request are replaced by a fixed sentence, a code is kept only as a plain word.
+func TestATunnelErrorReplyHoldsNoStoredOrPathText(t *testing.T) {
+	leak := hubSentinel + "/Users/someone/.coral/sessions.db: disk I/O error"
+	for _, status := range []int{400, 404, 500} {
+		for _, code := range []string{"", "bad code with " + hubSentinel, "not_signed_in"} {
+			body := hubErrorBody(status, map[string]any{"error": leak, "code": code, "detail": leak, "path": leak})
+			raw, err := json.Marshal(body)
+			require.NoError(t, err)
+			assert.NotContains(t, string(raw), "PRIVATE", "status %d code %q: %s", status, code, raw)
+			assert.NotContains(t, string(raw), "/Users")
+			for k := range body {
+				assert.Contains(t, []string{"error", "code"}, k)
+			}
+		}
+	}
+	// Through each of the 11 routes: a name, an id or a query value the caller sent is not echoed back.
+	g := newHubFieldsRig(t)
+	for _, path := range []string{"/api/workflows/by-name/" + hubSentinel + "name", "/api/workflows/" + hubSentinel + "id", "/api/scheduled/jobs/" + hubSentinel + "id", "/api/workflows/runs/" + hubSentinel + "id", "/api/scheduled/jobs/" + hubSentinel + "id/runs", "/api/workflows/" + hubSentinel + "id/runs"} {
+		code, body := g.get(t, path, true)
+		assert.GreaterOrEqual(t, code, 400, path)
+		assert.NotContains(t, body, "PRIVATE", path)
+	}
 }
 
 // router.go registers each Automations read with its cut: dropping one would send the full reply through the Hub.
