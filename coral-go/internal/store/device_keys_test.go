@@ -250,10 +250,10 @@ func TestSetDeviceMode(t *testing.T) {
 	ss, ctx := dkStore(t), context.Background()
 	k := dkKey(1, store.DeviceKindDevice, store.DeviceOriginPairing)
 	_, _ = ss.AddDeviceKey(ctx, k, dkT0)
-	require.NoError(t, ss.SetDeviceMode(ctx, k.KID, "write", dkT0.Add(time.Minute)))
+	require.NoError(t, ss.SetDeviceMode(ctx, k.KID, "interact", dkT0.Add(time.Minute)))
 	got, _ := ss.ActiveDeviceKey(ctx, k.KID, dkT0.Add(time.Minute))
-	assert.Equal(t, "write", got.Mode)
-	assert.ErrorIs(t, ss.SetDeviceMode(ctx, "nope", "write", dkT0), store.ErrUnknownSigner)
+	assert.Equal(t, "interact", got.Mode)
+	assert.ErrorIs(t, ss.SetDeviceMode(ctx, "nope", "interact", dkT0), store.ErrUnknownSigner)
 	require.NoError(t, ss.RemoveDeviceKey(ctx, k.KID, store.DeviceRemoved, dkT0.Add(time.Hour)))
 	assert.ErrorIs(t, ss.SetDeviceMode(ctx, k.KID, "launch", dkT0.Add(2*time.Hour)), store.ErrSignerRemoved, "a removed entry's mode is not changed")
 }
@@ -387,4 +387,24 @@ func TestNonceCapHasAPerKidShare(t *testing.T) {
 	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("a4"), "kidA", dkT0, win5), store.ErrNonceStoreFull, "kid A is at its share")
 	assert.NoError(t, ss.RecordNonce(ctx, nn("b0"), "kidB", dkT0, win5), "kid B is not blocked by kid A")
 	assert.NoError(t, ss.RecordNonce(ctx, nn("a4"), "kidA", dkT0.Add(16*time.Minute), win5), "A's earlier nonces expired: room again")
+}
+
+// coral-hub draft 8 has only view, interact and launch: a stored mode is one of those.
+func TestStoredModeIsOneOfThreeModes(t *testing.T) {
+	ss, ctx := dkStore(t), context.Background()
+	k := dkKey(2, store.DeviceKindDevice, store.DeviceOriginPairing)
+	for _, bad := range []string{"write", "admin", "VIEW", ""} {
+		bk := k
+		bk.Mode = bad
+		_, err := ss.AddDeviceKey(ctx, bk, dkT0)
+		assert.ErrorIs(t, err, store.ErrDeviceKeyForm, "add %q", bad)
+	}
+	_, err := ss.AddDeviceKey(ctx, k, dkT0)
+	require.NoError(t, err)
+	for _, bad := range []string{"write", "admin", "VIEW", ""} {
+		assert.ErrorIs(t, ss.SetDeviceMode(ctx, k.KID, bad, dkT0), store.ErrDeviceKeyForm, "set %q", bad)
+	}
+	for _, ok := range []string{"view", "interact", "launch"} {
+		assert.NoError(t, ss.SetDeviceMode(ctx, k.KID, ok, dkT0), ok)
+	}
 }

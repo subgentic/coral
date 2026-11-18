@@ -64,7 +64,7 @@ type DeviceKey struct {
 }
 
 func (k DeviceKey) formOK() bool {
-	if len(k.PK) != 65 || k.PK[0] != 0x04 || len(k.Label) > deviceLabelMax || k.Mode == "" || len(k.Mode) > 32 {
+	if len(k.PK) != 65 || k.PK[0] != 0x04 || len(k.Label) > deviceLabelMax || !validDeviceMode(k.Mode) {
 		return false
 	}
 	sum := sha256.Sum256(k.PK)
@@ -206,9 +206,12 @@ func (s *SessionStore) RemoveDeviceKey(ctx context.Context, kid, reason string, 
 	return nil
 }
 
+// validDeviceMode: coral-hub's wire format has exactly these three modes.
+func validDeviceMode(m string) bool { return m == "view" || m == "interact" || m == "launch" }
+
 // SetDeviceMode changes the stored mode of an active key. Who may ask is the verifier's rule, not this method's.
 func (s *SessionStore) SetDeviceMode(ctx context.Context, kid, mode string, now time.Time) error {
-	if mode == "" || len(mode) > 32 {
+	if !validDeviceMode(mode) {
 		return ErrDeviceKeyForm
 	}
 	if _, err := s.ActiveDeviceKey(ctx, kid, now); err != nil {
