@@ -52,6 +52,7 @@ var pinnedSites = map[string]string{
 	"workflow_runner.go WorkflowRunner.KillRun":                person + ": the workflow run's kill handler",
 	"workflow_steps.go WorkflowRunner.executeAgentInteractive": background + ": the workflow agent step, reached from the workflow runner",
 	"chief_checks.go ChiefChecksHandler.wake":                  background + ": only from Chief check delivery (the person-only Run now handler, scheduled delivery or Poll); delivery requires the Operator-saved trigger snapshot AND current wake consent, pinned live board membership, non-paused board and receive mode; wake also reserves ordinary live/hourly grant caps, paces, and uses the existing wake permissions",
+	"reminders.go ChiefChecksHandler.deliverSolo":              background + ": a reminder for an agent with no team, from its schedule or the person-only Run now handler; it wakes a sleeping target only when the Operator-saved trigger AND the current check both have wake consent, and paces the wake (#19531)",
 	// the reconciler
 	"reconciler.go SessionReconciler.killOrphans": background + ": the reconciler kills the orphan sessions of agents the database lists as stopped",
 	// what the handlers launch with
