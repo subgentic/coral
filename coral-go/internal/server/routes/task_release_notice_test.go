@@ -17,6 +17,20 @@ import (
 // #19623: releasing a task to the queue is not a broadcast. The line stays on the board, tagged to the Orchestrator alone: no @notify-all
 // (that woke every agent), and a receive-all bystander reads nothing of it.
 func TestAReleasedTaskIsNotBroadcastToEveryAgent(t *testing.T) {
+	line := releaseLine(t, "Dev")
+	assert.NotContains(t, line, "@notify-all")
+	assert.Contains(t, line, "@Orchestrator")
+}
+
+// #19633: when the Orchestrator releases a task itself, its own news does not tag it.
+func TestTheOrchestratorsOwnReleaseDoesNotTagIt(t *testing.T) {
+	line := releaseLine(t, "Orchestrator")
+	assert.NotContains(t, line, "@notify-all")
+	assert.False(t, strings.HasPrefix(line, "@"), line)
+}
+
+func releaseLine(t *testing.T, releaser string) string {
+	t.Helper()
 	_, h := setupBoardTestServer(t)
 	ctx := context.Background()
 	for _, s := range []struct{ id, title string }{{"Orchestrator", "Orchestrator"}, {"Dev", "Developer"}, {"Other", "Developer"}} {
@@ -26,7 +40,7 @@ func TestAReleasedTaskIsNotBroadcastToEveryAgent(t *testing.T) {
 	task, err := h.bs.CreateTask(ctx, "team", "T1", "", "medium", "Orchestrator", "Dev")
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/board/team/tasks/%d/release", task.ID), bytes.NewReader([]byte(`{"subscriber_id":"Orchestrator"}`)))
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/board/team/tasks/%d/release", task.ID), bytes.NewReader([]byte(`{"subscriber_id":"`+releaser+`"}`)))
 	req.Header.Set("Content-Type", "application/json")
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("project", "team")
@@ -46,8 +60,6 @@ func TestAReleasedTaskIsNotBroadcastToEveryAgent(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, line, "the board still has the line")
-	assert.NotContains(t, line, "@notify-all")
-	assert.Contains(t, line, "@Orchestrator")
 	for _, who := range []string{"Dev", "Other"} {
 		peek, err := h.bs.PeekMessages(ctx, "team", who, 50)
 		require.NoError(t, err)
@@ -55,4 +67,5 @@ func TestAReleasedTaskIsNotBroadcastToEveryAgent(t *testing.T) {
 			assert.NotContains(t, m.Content, "released by", "%s is not told", who)
 		}
 	}
+	return line
 }

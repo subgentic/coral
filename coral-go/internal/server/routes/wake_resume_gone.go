@@ -61,8 +61,8 @@ func (h *SessionsHandler) noteFreshStart(ctx context.Context, ls *store.LiveSess
 	}
 	text := name + " could not resume its conversation, so it started fresh."
 	// It needs a decision (restart or not), and an untagged Coral line is board-only for an orchestrator (#19608): tag it (#19615).
-	if orch, err := h.bs.TeamOrchestrator(ctx, bn); err == nil && !board.SameIdentity(orch, name) {
-		text = "@" + orch + " " + text
+	if orch, err := h.bs.TeamOrchestrator(ctx, bn); err == nil {
+		text = orchestratorTag(orch, name) + text
 	}
 	if _, err := h.bs.PostSystemMessage(ctx, bn, board.CoralSender, text, nil); err != nil {
 		log.Printf("[wake] session=%s: the fresh-start note was not posted: %v", naming.SessionName(ls.AgentType, ls.SessionID), err)

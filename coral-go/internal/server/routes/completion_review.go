@@ -258,7 +258,7 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 		h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d rejected by %s] back to you%s. Fix it and submit-review again: the same reviewers review the new revision", v.Author, task.ID, h.noticeText(ctx, project, body.SubscriberID), note))
 		h.postNotice(ctx, project, h.buildAssignmentNotification(ctx, project, task, v.Author, true))
 	case v.Complete:
-		h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d approved by %s] every reviewer approved: completing it%s", v.Orchestrator, task.ID, h.noticeText(ctx, project, body.SubscriberID), note)) // tagged: an untagged Coral line is board-only for an orchestrator (#19608, #19619)
+		h.postNotice(ctx, project, fmt.Sprintf("%s[Task #%d approved by %s] every reviewer approved: completing it%s", orchestratorTag(v.Orchestrator), task.ID, h.noticeText(ctx, project, body.SubscriberID), note)) // tagged: an untagged Coral line is board-only for an orchestrator (#19608, #19619)
 		msg := ""
 		var done *board.Task
 		var cerr error
