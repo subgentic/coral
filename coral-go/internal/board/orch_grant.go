@@ -8,8 +8,6 @@ import (
 	"log"
 	"strings"
 	"time"
-
-	"github.com/subgentic/coral/internal/naming"
 )
 
 // The Operator's grant to a board's Orchestrator (#11432): a switch, off by default, that lets ONE session, the one the Operator names as the board's orchestrator seat, wake and sleep the agents seated on its own
@@ -21,8 +19,8 @@ const (
 	DefaultOrchMaxPerHour = 10 // launches and wakes per hour on the board
 	DefaultOrchMaxLive    = 8  // live agents on the board
 	DefaultOrchIdleMin    = 5  // minutes an agent must have been idle before it may be put to sleep
-	// TeamLaunchOrchMaxLive is the live cap of the grant a team launch seeds (#13891): five helpers besides the seat. The default of a board that has no row stays DefaultOrchMaxLive; a board with no row
-	// is ON for its one Orchestrator (#19507) and OFF when it has none or more than one.
+	// TeamLaunchOrchMaxLive is the live cap of the grant a team launch seeds (#13891): five helpers besides the seat. The default of a board that has no row stays DefaultOrchMaxLive, and a
+	// board with no row stays OFF: only a row written at creation turns the grant on by itself.
 	TeamLaunchOrchMaxLive = 5
 	// TeamLaunchSetBy is what the row of a seeded grant says wrote it.
 	TeamLaunchSetBy   = "team launch"
@@ -112,12 +110,8 @@ func (s *Store) ensureOrchSchema(ctx context.Context) error {
 	return nil
 }
 
-// DefaultSetBy is what the grant of a board with no saved row says wrote it: the default for a board with exactly one Orchestrator seat (#19507).
-const DefaultSetBy = "default"
-
-// GetOrchGrant is the board's grant. A board with no saved row has the Orchestrator's default (#19507, the Operator's decision of 2026-11-18: an orchestrator may launch, wake, sleep, restart and stop in its own
-// team): ON, with every switch on and the usual caps, for the board's one member titled Orchestrator on this computer; with none, or more than one (a second claimant makes it ambiguous), the switch is off. A row
-// the Operator saved (off included) is never replaced by the default, and the default writes nothing: saving settings makes it the Operator's own.
+// GetOrchGrant is the board's grant; a board that has none has the switch off with the default caps. There is no default ON for an existing team: only a new team's launch seeds a grant (SeedOrchGrant, #13891;
+// #19507, narrowed 2026-11-18 by the Operator: current teams' permissions do not change).
 func (s *Store) GetOrchGrant(ctx context.Context, project string) (OrchGrant, error) {
 	g := defaultOrchGrant(project)
 	var row struct {
@@ -132,27 +126,13 @@ func (s *Store) GetOrchGrant(ctx context.Context, project string) (OrchGrant, er
 	}
 	err := s.reader().GetContext(ctx, &row, `SELECT enabled, stop_enabled, seat_session, max_per_hour, max_live, idle_min, set_by, set_at FROM board_orch_grant WHERE project = ?`, project)
 	if errors.Is(err, sql.ErrNoRows) {
-		return s.defaultOrchGrant(ctx, g), nil
+		return g, nil
 	}
 	if err != nil {
 		return g, err
 	}
 	g.Enabled, g.StopEnabled, g.SeatSession, g.MaxPerHour, g.MaxLive, g.IdleMin, g.SetBy, g.SetAt = row.Enabled != 0, row.StopEnabled != 0, row.SeatSession, row.MaxPerHour, row.MaxLive, row.IdleMin, row.SetBy, row.SetAt
 	return g, nil
-}
-
-// defaultOrchGrant is the grant of a board with no saved row: on for its one local member the launch made Orchestrator (can_peek, set only by a launch; a title a member joined with is not a seat), else g as it is (off).
-func (s *Store) defaultOrchGrant(ctx context.Context, g OrchGrant) OrchGrant {
-	var seats []string
-	if err := s.reader().SelectContext(ctx, &seats, `SELECT COALESCE(session_name, '') FROM board_subscribers WHERE project = ? AND is_active = 1 AND can_peek = 1 AND COALESCE(session_name, '') <> '' AND LOWER(TRIM(job_title)) = 'orchestrator' AND COALESCE(origin_server, '') = ''`, g.Project); err != nil || len(seats) != 1 {
-		return g
-	}
-	id := naming.SessionIDFromName(seats[0])
-	if id == "" {
-		return g
-	}
-	g.Enabled, g.StopEnabled, g.SeatSession, g.SetBy = true, true, id, DefaultSetBy
-	return g
 }
 
 // SetOrchGrant writes the grant. The caller (the route) has decided the writer is the verified Operator; by is who is recorded. Turning it on needs a seat; values outside their bounds are refused.

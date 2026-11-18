@@ -160,8 +160,9 @@ func TestEnsureOrchSchemaLogsNonDuplicateAlterError(t *testing.T) {
 	}
 }
 
-// #19507: an orchestrator gets every agent-management permission in its own team by default, stop included.
-func TestABoardWithOneOrchestratorDefaultsToOnForItAndSavedGrantsAreNeverChanged(t *testing.T) {
+// #19530 (the Operator, 2026-11-18, narrowing #19507): a team that exists keeps the permissions it has. A board with no saved grant is OFF whoever sits on it, the launched Orchestrator included; only a new team's
+// launch writes a grant.
+func TestABoardWithNoSavedGrantIsOffEvenWithOneLaunchedOrchestrator(t *testing.T) {
 	s := orchStore(t)
 	ctx := context.Background()
 	const sid = "dc6d10f4-2f20-4a64-9d0e-111111111111"
@@ -172,37 +173,23 @@ func TestABoardWithOneOrchestratorDefaultsToOnForItAndSavedGrantsAreNeverChanged
 
 	g, err := s.GetOrchGrant(ctx, "team")
 	require.NoError(t, err)
-	assert.True(t, g.Enabled, "no saved grant and one Orchestrator seat: on for it")
-	assert.True(t, g.StopEnabled, "stop is on with the rest")
-	assert.Equal(t, sid, g.SeatSession)
-	assert.Equal(t, DefaultOrchMaxLive, g.MaxLive, "the caps stay")
-	assert.Equal(t, DefaultSetBy, g.SetBy)
+	assert.False(t, g.Enabled, "no saved grant: off, one Orchestrator or not")
+	assert.False(t, g.StopEnabled)
+	assert.Empty(t, g.SeatSession)
+	assert.Empty(t, g.SetBy)
+	assert.Equal(t, DefaultOrchMaxLive, g.MaxLive, "the default caps")
 
-	// the Operator's saved grant, off included, is never changed by the default
-	require.NoError(t, s.SetOrchGrant(ctx, OrchGrant{Project: "team", Enabled: false, MaxPerHour: 3, MaxLive: 4, IdleMin: 7}, "Operator"))
+	// reading writes nothing: the team still has no row
+	var n int
+	require.NoError(t, s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_orch_grant WHERE project = ?`, "team"))
+	assert.Zero(t, n)
+
+	// the Operator's saved grant is read as saved
+	require.NoError(t, s.SetOrchGrant(ctx, OrchGrant{Project: "team", Enabled: true, SeatSession: sid, MaxPerHour: 3, MaxLive: 4, IdleMin: 7}, "Operator"))
 	g, err = s.GetOrchGrant(ctx, "team")
 	require.NoError(t, err)
-	assert.False(t, g.Enabled, "off, saved by the Operator, stays off")
-	assert.False(t, g.StopEnabled)
+	assert.True(t, g.Enabled)
 	assert.Equal(t, 3, g.MaxPerHour)
-
-	// two claimants of the title: ambiguous, so off
-	_, err = s.Subscribe(ctx, "two", "Orchestrator", "Orchestrator", "claude-"+sid, nil, "all", true)
-	require.NoError(t, err)
-	_, err = s.Subscribe(ctx, "two", "Boss", " orchestrator ", "claude-dc6d10f4-2f20-4a64-9d0e-333333333333", nil, "all", true)
-	require.NoError(t, err)
-	g, _ = s.GetOrchGrant(ctx, "two")
-	assert.False(t, g.Enabled, "two Orchestrators: no default")
-	// none: off; a remote one is not a seat on this computer
-	_, err = s.Subscribe(ctx, "none", "Dev", "Developer", "claude-"+sid, nil, "all")
-	require.NoError(t, err)
-	g, _ = s.GetOrchGrant(ctx, "none")
-	assert.False(t, g.Enabled)
-	remote := "other-computer"
-	_, err = s.Subscribe(ctx, "remote", "Orchestrator", "Orchestrator", "claude-"+sid, &remote, "all", true)
-	require.NoError(t, err)
-	g, _ = s.GetOrchGrant(ctx, "remote")
-	assert.False(t, g.Enabled, "a member on another computer is not the seat")
 }
 
 func TestTheTeamLaunchGrantSeedsStopOn(t *testing.T) {
@@ -216,29 +203,4 @@ func TestTheTeamLaunchGrantSeedsStopOn(t *testing.T) {
 	assert.True(t, g.Enabled)
 	assert.True(t, g.StopEnabled, "stop is seeded on with the launch grant")
 	assert.Equal(t, TeamLaunchOrchMaxLive, g.MaxLive)
-}
-
-// #19516 (Security SHOULD on #19507): the default goes only to the member the launch made Orchestrator (its subscription carries can_peek, which only a launch sets), never to one that joined with the title.
-func TestTheDefaultGrantGoesOnlyToTheLaunchedOrchestratorNotAMemberWhoJoinedWithTheTitle(t *testing.T) {
-	s := orchStore(t)
-	ctx := context.Background()
-	// a self-titled join, no launch record: no default
-	_, err := s.Subscribe(ctx, "joined", "Boss", "Orchestrator", "claude-dc6d10f4-2f20-4a64-9d0e-444444444444", nil, "all")
-	require.NoError(t, err)
-	g, err := s.GetOrchGrant(ctx, "joined")
-	require.NoError(t, err)
-	assert.False(t, g.Enabled, "a member that joined with the title is not the seat")
-	assert.False(t, g.StopEnabled)
-	assert.Empty(t, g.SeatSession)
-
-	// the launched one, with a later self-titled join beside it: the default is for the launched one alone
-	const sid = "dc6d10f4-2f20-4a64-9d0e-555555555555"
-	_, err = s.Subscribe(ctx, "launched", "Orchestrator", "Orchestrator", "claude-"+sid, nil, "all", true)
-	require.NoError(t, err)
-	_, err = s.Subscribe(ctx, "launched", "Boss", "Orchestrator", "claude-dc6d10f4-2f20-4a64-9d0e-666666666666", nil, "all")
-	require.NoError(t, err)
-	g, err = s.GetOrchGrant(ctx, "launched")
-	require.NoError(t, err)
-	assert.True(t, g.Enabled, "the launched Orchestrator keeps the default")
-	assert.Equal(t, sid, g.SeatSession, "the seat is the launched member, not the one that joined later")
 }
