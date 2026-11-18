@@ -560,7 +560,7 @@ export async function killSession() {
 
     const cur = state.currentSession;
     if (cur.board_project && cur.agent_type !== 'terminal' && !cur.archived) return (await importOnce('./kill_session.js')).killSessionDirect(cur.name, cur.agent_type, cur.session_id);
-    const who = agentWords(cur, resolveSessionIdentity(cur)).label; // the agent by its role and team, not the folder it works in (#10139)
+    const who = agentWords(cur, resolveSessionIdentity(cur)).label;
     window.showConfirmModal('Stop agent', `Stop ${who}? This ends the agent's process. ${whatStaysKill([cur])} ${cur.git_state && cur.git_state.is_worktree ? worktreeConfirmWords(cur.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => {
         try {
             const killed = state.currentSession;
@@ -574,8 +574,7 @@ export async function killSession() {
                 } else {
                     showToast(agentWords(killed, resolveSessionIdentity(killed)).label + ' ended');
                 }
-                showWorktreeNotice(result.worktree, 'agent'); // what became of its worktree, if it had one (#6707); a kept one stays on screen with its path (#6818)
-                // The row goes at once; the agent's chat stays in History.
+                showWorktreeNotice(result.worktree, 'agent');
                 dropKilledRows([{ session_id: killed.session_id, server: currentServer() }]);
                 state.currentSession = null;
                 showView("welcome-screen");
