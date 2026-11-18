@@ -71,6 +71,7 @@ type restartPlan struct {
 	startMode                                                 string // the mode the stored agent's transcript says its chat started in, read when it had none recorded (#12718)
 	modeFromTranscript                                        bool   // the stored agent had no mode and no permission flag: its transcript's start mode is the one it restarts in and records (#12718)
 	pickedMode                                                bool   // the dialog named the mode: it replaces the stored one and the stored permission flags
+	liveModel                                                 string // the model the agent's transcript says it runs now (#19506); used when the request names none
 	liveMode                                                  string // the mode a Claude agent is in now when Shift+Tab changed it (liveClaudeMode, #16536); used when the dialog named none
 	liveSet                                                   bool   // liveMode is the mode it restarts in and records
 	modeNotRecorded                                           bool   // the stored agent had no mode: it restarts in Default and the answer says so
@@ -176,6 +177,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 			}
 			p.stored = ls
 			p.startMode = h.transcriptStartMode(ctx, ls, store.UnmarshalFlags(ls.Flags))
+			p.liveModel = h.transcriptModel(ls.SessionID)
 			p.liveMode = h.liveClaudeMode(*ls, ptr.Value(ls.PermissionMode), store.UnmarshalFlags(ls.Flags))
 			if ls.Capabilities != nil && *ls.Capabilities != "" {
 				p.caps = &agent.Capabilities{}
@@ -360,6 +362,10 @@ func (p *restartPlan) restartSettings() {
 		p.model = modelOfFlags(storedFlags) // an agent started with its model on the command line (no model column) keeps it (#15114)
 		p.contextWindow = max(p.contextWindow, proxy.LookupContextWindow(p.model))
 	}
+	if live := p.liveModelToKeep(); live != "" { // the model it runs now, after a chip switch that was never stored or a /model typed in the terminal (#19506)
+		p.model = live
+		p.contextWindow = proxy.LookupContextWindow(live)
+	}
 	// Request body overrides stored values (user edited in modal)
 	if p.req.Prompt != "" {
 		p.prompt = p.req.Prompt
@@ -418,6 +424,26 @@ func (p *restartPlan) restartSettings() {
 		cleanFlags = append(cleanFlags, agent.PermissionFlagsForAgent(p.agentType, p.permMode)...)
 	}
 	p.flags = append(cleanFlags, agentmodels.ThinkingArgs(p.agentType, p.thinking)...)
+}
+
+// liveModelToKeep is the model the transcript says the agent runs now when the restart should start it on that one and not the stored one: the request named no model, the value is one that can go on the
+// command line, belongs to the agent's provider and differs from the stored one (a dated id of the same family, or an alias, is the same model: the stored word stays). "" means the stored model stands (#19506).
+func (p *restartPlan) liveModelToKeep() string {
+	live := strings.TrimSpace(p.liveModel)
+	if p.req.Model != nil || p.stored == nil || live == "" || !agentmodels.ValidModelValue(live) || validateAgentModel(p.agentType, live) != nil {
+		return ""
+	}
+	if !sameProvider(p.stored.AgentType, p.agentType) { // a switch to another provider: the model belongs to the CLI it ran on
+		return ""
+	}
+	have := strings.ToLower(p.model)
+	if have == "" {
+		have = strings.ToLower(modelOfFlags(store.UnmarshalFlags(p.stored.Flags)))
+	}
+	if have != "" && (strings.Contains(strings.ToLower(live), have) || strings.Contains(have, strings.ToLower(live))) {
+		return ""
+	}
+	return live
 }
 
 // restartFlags is a restarted agent's CLI flags: the stored ones without permission flags (its capabilities are
