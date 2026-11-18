@@ -328,3 +328,32 @@ func TestDeviceClearPendingFollowsTheClear(t *testing.T) {
 	r.m.afterBootstrap(context.Background(), BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{})
 	assert.False(t, r.m.DeviceClearPending())
 }
+
+// coral-hub Security (#19717, the Orchestrator's ruling): "pending" is written before the clear and ended only when a clear works, so a restart does not end it; the restarted process refuses, and its start tries the clear again.
+func TestAPendingClearSurvivesARestart(t *testing.T) {
+	r := pairingSetup(t, true)
+	cf := &clearFails{SessionStore: r.ss, fail: true}
+	r.m.o.Devices = cf
+	r.m.afterBootstrap(context.Background(), BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{})
+	require.True(t, r.m.DeviceClearPending())
+	assert.True(t, r.ss.DeviceClearPending(context.Background()), "the mark is in the store")
+
+	// A new process over the same store: no memory of the failure, but the store remembers.
+	m2 := r.e.manager(r.e.hub.srv.URL)
+	m2.o.Devices = r.ss
+	assert.True(t, m2.DeviceClearPending(), "after a restart: still pending")
+	assert.False(t, m2.deviceClearPending(), "(this process saw nothing: it is the store that says so)")
+
+	// The start's retry: a clear that works ends it.
+	start(t, m2)
+	require.Eventually(t, func() bool { return !m2.DeviceClearPending() }, 5*time.Second, 10*time.Millisecond)
+	assert.False(t, r.ss.DeviceClearPending(context.Background()))
+}
+
+// A store that cannot say whether a clear is pending says yes: fail closed.
+func TestAnUnreadableClearMarkIsPending(t *testing.T) {
+	r := pairingSetup(t, true)
+	assert.False(t, r.m.DeviceClearPending())
+	require.NoError(t, r.e.db.Close())
+	assert.True(t, r.m.DeviceClearPending())
+}

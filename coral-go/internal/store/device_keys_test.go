@@ -463,3 +463,14 @@ func TestDeviceWebModeDefaultsToLaunchAndTakesOnlyTheThreeModes(t *testing.T) {
 	require.NoError(t, ss.SetSetting(ctx, store.DeviceWebModeSetting, "admin")) // a hand-edited row
 	assert.Equal(t, "launch", ss.DeviceWebMode(ctx), "a bad stored value reads as the default, never as a mode")
 }
+
+func TestDeviceClearPendingIsKeptUntilAClearWorks(t *testing.T) {
+	ss := dkStore(t)
+	ctx := context.Background()
+	assert.False(t, ss.DeviceClearPending(ctx))
+	require.NoError(t, ss.SetDeviceClearPending(ctx, true))
+	assert.True(t, ss.DeviceClearPending(ctx))
+	require.NoError(t, ss.SetDeviceClearPending(ctx, true), "setting twice is fine")
+	require.NoError(t, ss.SetDeviceClearPending(ctx, false))
+	assert.False(t, ss.DeviceClearPending(ctx))
+}

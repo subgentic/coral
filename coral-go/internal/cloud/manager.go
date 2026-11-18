@@ -250,6 +250,11 @@ func (m *Manager) Run(ctx context.Context) {
 	m.root = ctx
 	m.mu.Unlock()
 
+	// A clear that failed before this start left its mark in the store: try it again now (every key still listed is an earlier account's: pairings were refused while it was pending).
+	if m.o.Devices != nil && m.o.Devices.DeviceClearPending(ctx) {
+		m.clearDeviceKeys(ctx)
+	}
+
 	conn, err := m.o.Store.Get(ctx)
 	switch {
 	case errors.Is(err, store.ErrNoCloudConnection):

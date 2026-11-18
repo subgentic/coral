@@ -414,3 +414,25 @@ func (s *SessionStore) SetDeviceWebMode(ctx context.Context, mode string) error 
 	}
 	return s.SetSetting(ctx, DeviceWebModeSetting, mode)
 }
+
+const deviceClearPendingKey = "clear_pending"
+
+// SetDeviceClearPending records (true) or ends (false) "a clear of the device list is under way or failed": written before the clear and ended only when a clear worked, so a failed clear, a crash or a restart cannot end it (coral-hub Security, #19717). It lives in the device tables, not in user settings: no settings route can write it.
+func (s *SessionStore) SetDeviceClearPending(ctx context.Context, pending bool) error {
+	if pending {
+		_, err := s.db.ExecContext(ctx, `INSERT INTO device_meta (k, v) VALUES (?, 1) ON CONFLICT(k) DO UPDATE SET v = 1`, deviceClearPendingKey)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM device_meta WHERE k = ?`, deviceClearPendingKey)
+	return err
+}
+
+// DeviceClearPending is whether a clear is pending. Fail closed: a read that errors says true.
+func (s *SessionStore) DeviceClearPending(ctx context.Context) bool {
+	var v int64
+	err := s.db.QueryRowContext(ctx, `SELECT v FROM device_meta WHERE k = ?`, deviceClearPendingKey).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false
+	}
+	return err != nil || v != 0
+}

@@ -17,6 +17,9 @@ var b64u = base64.RawURLEncoding
 type DeviceKeys interface {
 	devicekey.PairingStore
 	RemoveAllDeviceKeys(ctx context.Context, now time.Time) (int, error)
+	// SetDeviceClearPending and DeviceClearPending keep "a clear is pending" in the store, so a restart cannot end it.
+	SetDeviceClearPending(ctx context.Context, pending bool) error
+	DeviceClearPending(ctx context.Context) bool
 }
 
 // pairingState is what the manager keeps between the link and the poll: the secret, in memory only, and what the last pairing said.
@@ -84,23 +87,41 @@ func (m *Manager) clearDeviceKeys(ctx context.Context) bool {
 	if m.o.Devices == nil {
 		return true
 	}
-	if _, err := m.o.Devices.RemoveAllDeviceKeys(ctx, m.o.Now()); err != nil {
-		m.o.Logger.Warn("cloud: could not clear the device keys")
-		m.pair.mu.Lock()
-		m.pair.clearPending = true
-		m.pair.mu.Unlock()
+	// Written BEFORE the clear and ended only when a clear worked: a failure, a crash or a restart in between leaves it set.
+	if err := m.o.Devices.SetDeviceClearPending(ctx, true); err != nil {
+		m.o.Logger.Warn("cloud: could not record that the device keys are being cleared")
+		m.setClearPending(true)
 		return false
 	}
-	m.pair.mu.Lock()
-	m.pair.clearPending = false
-	m.pair.mu.Unlock()
+	if _, err := m.o.Devices.RemoveAllDeviceKeys(ctx, m.o.Now()); err != nil {
+		m.o.Logger.Warn("cloud: could not clear the device keys")
+		m.setClearPending(true)
+		return false
+	}
+	if err := m.o.Devices.SetDeviceClearPending(ctx, false); err != nil {
+		m.o.Logger.Warn("cloud: the device keys were cleared but the pending mark could not be ended")
+		m.setClearPending(true)
+		return false
+	}
+	m.setClearPending(false)
 	return true
 }
 
-// DeviceClearPending is the Verifier.Refuse of this computer: true while the last clear of the device list failed and none has worked since. (In memory: a restart starts with no flag, and the next enrollment, disconnect or lost link clears again.)
-func (m *Manager) DeviceClearPending() bool { return m.deviceClearPending() }
+func (m *Manager) setClearPending(v bool) {
+	m.pair.mu.Lock()
+	m.pair.clearPending = v
+	m.pair.mu.Unlock()
+}
 
-// deviceClearPending is whether the last clear failed and has not worked since.
+// DeviceClearPending is the Verifier.Refuse of this computer: true while a clear of the device list is pending: the last one failed (this process) or the store says so (any earlier process: it survives a restart). A store that cannot be read says true.
+func (m *Manager) DeviceClearPending() bool {
+	if m.deviceClearPending() {
+		return true
+	}
+	return m.o.Devices != nil && m.o.Devices.DeviceClearPending(context.Background())
+}
+
+// deviceClearPending is whether this process saw a clear fail and none has worked since.
 func (m *Manager) deviceClearPending() bool {
 	m.pair.mu.Lock()
 	defer m.pair.mu.Unlock()
