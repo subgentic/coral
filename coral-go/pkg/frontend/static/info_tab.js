@@ -26,6 +26,7 @@ const getJson = async (server, path) => { try { const r = await serverFetch(serv
 const FIELD_IDS = ['info-agent-name', 'info-agent-type', 'info-tmux-session', 'info-tmux-command', 'info-working-dir', 'info-log-path', 'info-pane-title', 'info-git-branch', 'info-git-commit', 'info-prompt'];
 /** Nothing of an earlier agent stays on screen while the next one is read: every field emptied and the whole grid hidden (UI Reviewer, #13917). */
 function clearFields() {
+    $('info-reminders')?.replaceChildren(); // the reminders of the agent before
     for (const id of FIELD_IDS) { const el = $(id); if (el) el.textContent = ''; }
     $('info-board')?.replaceChildren();
     for (const id of ['info-prompt-label', 'info-prompt', 'info-board-label', 'info-board', 'info-attach-note', 'info-keep-label', 'info-keep', 'info-keep-off']) setHidden($(id), true);
@@ -111,6 +112,11 @@ export async function showInfoTab() {
     if (!sid || isCloud() || !isLocalServer(server)) return; // the three sections are this computer's own agents' only
     const { loadAgentSections } = await importOnce('./agent_info_sections.js'); // a lazy module loads the others through importOnce, so a failed load is retried
     if (!current()) return;
+    if (!s.board_project && s.agent_type !== 'terminal') importOnce('./agent_reminders.js').then(async m => { // an agent on no team has no team page, so its Reminders are here (#19531)
+        const host = $('info-reminders'); if (!host || !current()) return;
+        const box = document.createElement('div'); await m.mountAgentReminders(box, '', s).catch(() => null);
+        if (current() && box.firstChild) host.replaceChildren(box.firstChild);
+    }).catch(() => {});
     await Promise.all([loadMcp(name, sid, server, current), loadAgentSections({ name, sid, server, current, fetchJson: getJson, rows: { skills: ROWS.skills, memory: ROWS.memory } })]);
 }
 

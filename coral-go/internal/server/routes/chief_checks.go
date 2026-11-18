@@ -144,6 +144,31 @@ func (h *ChiefChecksHandler) target(ctx context.Context, b, sid string) (*store.
 	}
 	return nil, nil, errors.New("target_not_on_board")
 }
+
+// soloTarget is target for a live agent on no team (#19531): there is no board and no subscription, so its own live session is the whole check, and its name stands for the board's job title. A terminal agent's shell and an archived one are not targets.
+func (h *ChiefChecksHandler) soloTarget(ctx context.Context, sid string) (*store.LiveSession, *board.Subscriber, error) {
+	if h.sessions == nil || h.sessions.ss == nil {
+		return nil, nil, errors.New("unavailable")
+	}
+	ls, err := h.sessions.ss.GetLiveSession(ctx, sid)
+	if err != nil || ls == nil || ls.IsArchived != 0 || ls.AgentType == "terminal" {
+		return nil, nil, errors.New("target_gone")
+	}
+	name := ls.AgentName
+	if ls.DisplayName != nil && strings.TrimSpace(*ls.DisplayName) != "" {
+		name = *ls.DisplayName
+	}
+	return ls, &board.Subscriber{JobTitle: name, ReceiveMode: "mentions"}, nil
+}
+
+// targetOrSolo is target, or soloTarget when the reminder names no board.
+func (h *ChiefChecksHandler) targetOrSolo(ctx context.Context, b, sid string) (*store.LiveSession, *board.Subscriber, error) {
+	if b == "" {
+		return h.soloTarget(ctx, sid)
+	}
+	return h.target(ctx, b, sid)
+}
+
 func (h *ChiefChecksHandler) save(w http.ResponseWriter, r *http.Request) {
 	if !chiefPerson(w, r) {
 		return
@@ -312,7 +337,7 @@ func (h *ChiefChecksHandler) state(w http.ResponseWriter, r *http.Request) {
 		commentRefuse(w, 403, "wrong_session", "this trigger belongs to another session")
 		return
 	}
-	_, sub, err := h.target(r.Context(), t.TargetBoard, t.TargetSession)
+	_, sub, err := h.targetOrSolo(r.Context(), t.TargetBoard, t.TargetSession)
 	if agent && err != nil {
 		commentRefuse(w, 403, "target_gone", "the receiving session is no longer a member of this board")
 		return
@@ -492,9 +517,12 @@ func (h *ChiefChecksHandler) deliverTrigger(ctx context.Context, id int64, kind 
 	if err != nil {
 		return finish("failed", "trigger_gone", 0)
 	}
-	ls, sub, err := h.target(ctx, t.TargetBoard, t.TargetSession)
+	ls, sub, err := h.targetOrSolo(ctx, t.TargetBoard, t.TargetSession)
 	if err != nil {
 		return finish("failed", "target_gone", 0)
+	}
+	if t.TargetBoard == "" {
+		return h.deliverSolo(ctx, t, ls, sub, kind, finish)
 	}
 	if cur, e := h.sched.ChiefCheck(ctx, t.CheckID); e == nil && cur.Paused {
 		return finish("held", "reminders_off", 0) // the Operator switched this agent's reminders off (#19288); it is told once they are on again

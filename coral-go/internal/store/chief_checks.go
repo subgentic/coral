@@ -52,7 +52,7 @@ func (c ChiefCheck) IsReminder() bool { return c.Origin != "" && c.Origin != "ch
 
 // ChiefCron produces only the supported five-field schedules, never approximations.
 func ChiefCron(c ChiefCheck) (string, error) {
-	if strings.TrimSpace(c.Name) == "" || utf8.RuneCountInString(c.Name) > 120 || strings.TrimSpace(c.Instruction) == "" || len(c.Instruction) > 8192 || len(c.SourceKey) > 120 || c.TargetBoard == "" || c.TargetSession == "" {
+	if strings.TrimSpace(c.Name) == "" || utf8.RuneCountInString(c.Name) > 120 || strings.TrimSpace(c.Instruction) == "" || len(c.Instruction) > 8192 || len(c.SourceKey) > 120 || (c.TargetBoard == "" && !c.IsReminder()) || c.TargetSession == "" { // a reminder for an agent on no team has no board (#19531); Chief's own checks always do
 		return "", errors.New("invalid check fields")
 	}
 	if c.NotifyMode != "only_if_found" && c.NotifyMode != "every_time" && c.NotifyMode != "daily_brief" {

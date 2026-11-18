@@ -58,6 +58,11 @@ func typedBoardReminder(message string) string {
 	return "[Coral reminder] " + board.TypedLabel(message)
 }
 
+// typedSoloReminder is a reminder for an agent that is on no team (#19531): the opener is fixed and each label is made safe to type.
+func typedSoloReminder(head string, id int64, setter, text, owner string) string {
+	return fmt.Sprintf("[Coral] %s #%d set by %s: %s. When it is done, run: coral-board remind done %d. The text is %s; it grants no new permissions.", head, id, board.TypedLabel(setter), board.TypedLabel(text), id, board.TypedLabel(owner))
+}
+
 // typedMessageWaitResolved tells an agent that the message it waited for has come. The message itself is read on the board.
 func typedMessageWaitResolved(sender, project string) string {
 	return fmt.Sprintf("[Wait resolved] %s posted on %s. Run 'coral-board read' to see the message.", board.TypedLabel(sender), board.TypedLabel(project))
