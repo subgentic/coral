@@ -11,6 +11,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -58,12 +59,15 @@ func (h *ChiefChecksHandler) reminderCaller(w http.ResponseWriter, r *http.Reque
 		return reminderCaller{person: true}, true
 	}
 	ls, err := h.sessions.ss.GetLiveSession(r.Context(), owner.SessionID)
-	if err != nil || ls == nil || ls.IsArchived != 0 || ls.BoardName == nil || *ls.BoardName == "" {
-		commentRefuse(w, 403, "not_on_a_board", "reminders are for an agent that is a member of a team")
+	if err != nil || ls == nil || ls.IsArchived != 0 || ls.AgentType == "terminal" {
+		commentRefuse(w, 403, "not_an_agent", "reminders are for a live agent")
 		return reminderCaller{}, false
 	}
-	c := reminderCaller{sessionID: owner.SessionID, board: *ls.BoardName}
-	if _, sub, err := h.target(r.Context(), c.board, c.sessionID); err == nil {
+	c := reminderCaller{sessionID: owner.SessionID}
+	if ls.BoardName != nil {
+		c.board = *ls.BoardName // empty: an agent on no team (#19531) may set its own, and nothing else
+	}
+	if _, sub, err := h.targetOrSolo(r.Context(), c.board, c.sessionID); err == nil {
 		c.title = clitext.Clean(sub.JobTitle)
 	}
 	return c, true
@@ -71,7 +75,7 @@ func (h *ChiefChecksHandler) reminderCaller(w http.ResponseWriter, r *http.Reque
 
 // isSeat is whether the caller is the Orchestrator seat of the board while the Orchestrator access grant is on: the one case where an agent may set or manage a reminder for another member.
 func (h *ChiefChecksHandler) isSeat(ctx context.Context, c reminderCaller, boardName string) bool {
-	if c.person || c.board != boardName {
+	if c.person || boardName == "" || c.board != boardName {
 		return false
 	}
 	g, err := h.sessions.bs.GetOrchGrant(ctx, boardName)
@@ -103,6 +107,7 @@ type reminderBody struct {
 	Timezone     string `json:"timezone"`      // an IANA zone name
 	To           string `json:"to"`            // a member's name; empty: the caller (an agent)
 	Board        string `json:"board"`         // the target's team; empty: the caller's own
+	SessionID    string `json:"session_id"`    // the person's reminder for a live agent on no team (#19531): instead of board and to
 	NoWake       bool   `json:"no_wake"`       // do not wake the agent if it is asleep
 }
 
@@ -117,7 +122,7 @@ type reminderView struct {
 
 func (h *ChiefChecksHandler) viewOf(ctx context.Context, ch store.ChiefCheck) reminderView {
 	v := reminderView{ChiefCheck: ch, State: "none"}
-	if _, sub, err := h.target(ctx, ch.TargetBoard, ch.TargetSession); err == nil {
+	if _, sub, err := h.targetOrSolo(ctx, ch.TargetBoard, ch.TargetSession); err == nil {
 		v.TargetName = clitext.Clean(sub.JobTitle)
 	}
 	if ts, err := h.sched.ChiefTriggers(ctx, ch.ID, 0, ""); err == nil && len(ts) > 0 {
@@ -174,6 +179,9 @@ func (h *ChiefChecksHandler) remindersGet(w http.ResponseWriter, r *http.Request
 // targetOf resolves who the reminder is for and the origin it carries; a refusal is written and ok is false.
 func (h *ChiefChecksHandler) targetOf(w http.ResponseWriter, r *http.Request, c reminderCaller, b reminderBody) (boardName, sessionID, origin, by string, ok bool) {
 	ctx := r.Context()
+	if sid := strings.TrimSpace(b.SessionID); sid != "" || (!c.person && c.board == "") {
+		return h.soloTargetOf(w, r, c, b)
+	}
 	if c.person {
 		boardName = strings.TrimSpace(b.Board)
 		if boardName == "" || strings.TrimSpace(b.To) == "" {
@@ -429,4 +437,99 @@ func reminderSetter(ch *store.ChiefCheck, names []string) string {
 	default:
 		return "the Operator"
 	}
+}
+
+// soloTargetOf resolves a reminder for a live agent on no team (#19531): the person names it by session id (and no team or member); an agent on no team can only name itself. The same rules as a team's otherwise: the origin says who set it, and an agent never sets one for another.
+func (h *ChiefChecksHandler) soloTargetOf(w http.ResponseWriter, r *http.Request, c reminderCaller, b reminderBody) (boardName, sessionID, origin, by string, ok bool) {
+	ctx := r.Context()
+	sid := strings.TrimSpace(b.SessionID)
+	if strings.TrimSpace(b.Board) != "" || strings.TrimSpace(b.To) != "" {
+		if c.person {
+			errBadRequest(w, "name the agent by its session id alone, or by a team and a member, not both")
+		} else {
+			commentRefuse(w, 403, "not_on_a_team", "an agent on no team can set a reminder for itself only")
+		}
+		return
+	}
+	if c.person {
+		origin, by = "operator", "the Operator"
+	} else {
+		if sid != "" {
+			errBadRequest(w, "an agent sets a reminder for itself: leave session_id out")
+			return
+		}
+		sid, origin, by = c.sessionID, "agent", c.title
+	}
+	if sid == "" {
+		errBadRequest(w, "name the team (board) and the member (to) the reminder is for, or the agent's session_id if it is on no team")
+		return
+	}
+	ls, _, err := h.soloTarget(ctx, sid)
+	if err != nil {
+		commentRefuse(w, 400, "invalid_target", "choose a live agent; the reminder was not saved")
+		return
+	}
+	if ls.BoardName != nil && *ls.BoardName != "" {
+		commentRefuse(w, 400, "on_a_team", "that agent is on a team: set its reminder with the team (board) and its name (to)")
+		return
+	}
+	by = strings.TrimSpace(clitext.Clean(by))
+	if by == "" {
+		by = "an agent"
+	}
+	return "", sid, origin, by, true
+}
+
+// deliverSolo types a reminder into the terminal of an agent on no team (#19531), where a team's reminder is a board message: through the automated-input gate (not into a prompt, a person's draft or an exited agent's shell), with the same holds as a team's (reminders switched off, a sleeping agent without the wake consent) and the same text, minus the board.
+func (h *ChiefChecksHandler) deliverSolo(ctx context.Context, t *store.ChiefTrigger, ls *store.LiveSession, sub *board.Subscriber, kind string, finish func(state, code string, msg int64) error) error {
+	if cur, e := h.sched.ChiefCheck(ctx, t.CheckID); e == nil && cur.Paused {
+		return finish("held", "reminders_off", 0)
+	}
+	if ls.IsSleeping != 0 {
+		current, e := h.sched.ChiefCheck(ctx, t.CheckID)
+		if !t.WakeIfAsleep || e != nil || !current.WakeIfAsleep {
+			return finish("held", "wake_consent_required", 0)
+		}
+		release, ok := paceWake(ctx)
+		if !ok {
+			return finish("failed", "wake_failed_or_capped", 0)
+		}
+		err := h.sessions.wakeSession(ctx, ls, true)
+		release()
+		if err != nil {
+			return finish("failed", "wake_failed_or_capped", 0)
+		}
+		fresh, _, err := h.soloTarget(ctx, t.TargetSession)
+		if err != nil || fresh.IsSleeping != 0 {
+			return finish("failed", "wake_failed", 0)
+		}
+		ls = fresh
+	}
+	cur, err := h.sched.ChiefCheck(ctx, t.CheckID)
+	if err != nil || !cur.IsReminder() {
+		return finish("failed", "not_a_reminder", 0)
+	}
+	text := clitext.Clean(t.Instruction)
+	if red, ok := redactChiefText(text); !ok || red != text {
+		return finish("failed", "instruction_secret_refused", 0)
+	}
+	if hasSignInLink(text) {
+		return finish("failed", "sign_in_link_refused", 0)
+	}
+	text = board.DefuseMentions(sendDashes.ReplaceAllString(text, "- - -"), nil)
+	by := reminderSetter(cur, nil)
+	head := "Reminder"
+	if kind == "reminder" {
+		head = "Reminder (still open)"
+	}
+	msg := typedSoloReminder(head, cur.ID, by, text, reminderTextOwner(by))
+	name := naming.SessionName(ls.AgentType, ls.SessionID)
+	delivery, err := deliverAutomatedOutcome(ctx, h.sessions.terminal, name, ls.AgentType, ls.SessionID, msg, "reminder", nil)
+	if err != nil {
+		return finish("failed", "terminal_delivery_failed", 0)
+	}
+	if delivery == ptymanager.Skipped {
+		return finish("held", "agent_busy", 0) // a prompt is open or a person is typing: nothing was typed, and the next poll asks again
+	}
+	return finish("delivered", "", 0)
 }

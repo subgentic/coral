@@ -1,4 +1,4 @@
-// The Operator's reminders for one agent, on its page (#19350): the ones it has, each with Cancel, and an editor that adds a one-time reminder or a
+// The Operator's reminders for one agent, on its page (#19350; an agent on no team has them in its Info tab, #19531: no team, so no board and no member name, the request names its session): the ones it has, each with Cancel, and an editor that adds a one-time reminder or a
 // repeating one (every day, Monday to Friday, or every few minutes), built on Chief's checks screen: the same cards, schedule words, editor and buttons (#19528, the Operator). It uses the person's /api/reminders routes, which the Hub does not serve:
 // then the section is not drawn. A reminder wakes the agent and stays open until it marks it done.
 import { serverUrl, splitKey } from './server_base.js';
@@ -66,7 +66,7 @@ export async function mountAgentReminders(host, team, agent) {
         const field = (label, input) => { const wrap = el('label', 'chief-check-field', label); wrap.append(input); form.append(wrap); return input; };
         const text = el('textarea'); text.rows = 4; text.maxLength = 1000; text.required = true; field('Instruction', text);
         const kind = el('select'); for (const [v, t] of KINDS) kind.append(Object.assign(el('option', '', t), { value: v })); field('Schedule', kind);
-        const every = el('select'); for (const [v, t] of INTERVALS) every.append(Object.assign(el('option', '', t), { value: String(v) })); field('Check every', every);
+        const every = el('select'); for (const [v, t] of INTERVALS) every.append(Object.assign(el('option', '', t), { value: String(v) })); field('Repeat every', every);
         const when = el('input'); field('Time', when);
         form.append(el('p', 'chief-check-hint', `The reminder wakes ${who} and stays open until it marks it done.`));
         const error = el('p', 'chief-check-error'); error.setAttribute('role', 'alert'); error.hidden = true;
@@ -89,7 +89,7 @@ export async function mountAgentReminders(host, team, agent) {
         form.addEventListener('input', () => { dirty = true; }); form.addEventListener('change', () => { dirty = true; });
         form.addEventListener('submit', async ev => {
             ev.preventDefault(); if (busy || !form.reportValidity()) return;
-            const body = { text: text.value.trim(), board, to: agent.subscriber_id || agent.name, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
+            const body = { text: text.value.trim(), ...(board ? { board, to: agent.subscriber_id || agent.name } : { session_id: agent.session_id }), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
             if (!body.text) { error.hidden = false; error.textContent = 'Say what to remind it of.'; return; }
             if (kind.value === 'every') { body.kind = 'every'; body.every_minutes = Number(every.value); body.timezone = 'UTC'; }
             else { if (!when.value) { error.hidden = false; error.textContent = 'Choose when.'; return; } body.kind = kind.value; body.at = when.value.slice(0, 16); }
