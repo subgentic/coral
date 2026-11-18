@@ -37,15 +37,16 @@ const { coralReady } = require('./helpers/wait');
             // 7.2.3: the four closed views are not listed, and their addresses open Overview
             const names = () => ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].map(b => b.textContent.trim())`);
             const list = await names();
-            for (const gone of ['Tasks', 'Tokens per commit', 'Task time', 'Inbox vs chat']) assert.ok(!list.includes(gone), `${tag}: no ${gone} in cloud: ${JSON.stringify(list)}`);
+            for (const gone of ['Tasks', 'Tokens per commit', 'Task time', 'Inbox vs chat', 'Resource queue', 'Team communication']) assert.ok(!list.includes(gone), `${tag}: no ${gone} in cloud: ${JSON.stringify(list)}`);
             for (const kept of ['Overview', 'Usage']) assert.ok(list.includes(kept), `${tag}: ${kept} stays: ${JSON.stringify(list)}`);
-            for (const closed of ['tasks', 'per-commit', 'task-time', 'inbox-chat']) assert.equal(await select(closed), 'overview', `${tag}: ${closed} opens Overview`);
+            for (const closed of ['tasks', 'per-commit', 'task-time', 'inbox-chat', 'resource-queue', 'comm']) assert.equal(await select(closed), 'overview', `${tag}: ${closed} opens Overview`);
             // 7.2.1: opening every remaining view sends nothing to this origin; every read starts with /api/remote/<id>/
             await ev(`window.__seen.length = 0; true`);
-            for (const key of ['overview', 'usage', 'operator', 'comm', 'resource-queue', 'calls', 'provider', 'model', 'team', 'agent', 'branch', 'task', 'goal', 'thinking']) {
+            for (const key of ['overview', 'usage', 'operator', 'calls', 'provider', 'model', 'team', 'agent', 'branch', 'task', 'goal', 'thinking']) {
                 assert.equal(await select(key), key, `${tag}: ${key} opens`);
                 await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             }
+            assert.deepEqual(await ev(`['coral-activity-team', 'coral-spend-team', 'coral-by-computer'].filter(k => localStorage.getItem(k) !== null)`), [], `${tag}: no saved team or computer choice on the Hub origin`);
             await new Promise(r => setTimeout(r, 800)); // sleep-ok: the open views' reads settle; there is no event to wait for
             assert.deepEqual(await ev(own), [], `${tag}: no same-origin /api/token-usage, /api/call-metrics, /api/analytics or /api/board request`);
             const remote = await ev(`window.__seen.filter(p => p.startsWith('/api/remote/'))`);
