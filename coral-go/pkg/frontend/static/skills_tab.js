@@ -7,10 +7,11 @@ import { requestJson } from './api.js';
 import { note, currentRoute } from './nav.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { state } from './state.js';
-import { keyLabel, sessionServer } from './server_base.js';
+import { keyLabel, sessionServer, serverFetch, isCloud } from './server_base.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { SKILL_FOLDERS } from './routes.js';
 const { latestSkillRows, skillVersions } = await importOnce('./skill_versions.js');
+const { machineChoices, machineLabel, machineOnline } = await importOnce('./analytics_machine.js'); // the Computer picker, as the Queue has it (#19627)
 const DT = await importOnce('./data_table.js');
 const PH = await importOnce('./page_header.js'); // the shared page header: title and count, the Primary at the far right (#15838, guidelines 4.2)
 const VL = await importOnce('./view_list.js'); // the folders in the sidebar (and a phone's strip), as Automations and the Inbox have them (#12997)
@@ -23,15 +24,32 @@ const tableState = DT.tableState();
 let rows = [], everyRow = [], folder = '', query = '', showStatus = '', loadError = '', open = null /* { id, data, error, busy, acked, fileShown, opened: Set of the files shown } */;
 
 const host = () => document.getElementById('skills-view');
-const publisher = r => (r.publisher_kind === 'operator' ? 'Operator' : r.publisher_kind === 'coral' ? 'Coral (example)' : `${r.publisher_agent}${r.publisher_team ? ' · ' + r.publisher_team : ''}`);
+const publisher = r => (cloud() ? '' : r.publisher_kind === 'operator' ? 'Operator' : r.publisher_kind === 'coral' ? 'Coral (example)' : `${r.publisher_agent}${r.publisher_team ? ' · ' + r.publisher_team : ''}`);
 const kb = n => (n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`);
 const short = h => String(h || '').slice(0, 12);
+// ── through a Coral Hub (#19627): the page READS one linked computer's skills, owner only, through the Hub. The Hub sends a list of rows without who published them or which teams use them, and a skill's page with its
+// SKILL.md text alone (scripts, other files and scanner lines stay on the computer). Import, approve, reject, remove and Use in a team are the person's act on the computer, so they are not drawn here. ──
+const cloud = () => isCloud();
+let chosenComputer = '';
+const computers = () => machineChoices();
+const computer = () => (computers().includes(chosenComputer) ? chosenComputer : (computers()[0] || ''));
+/** One GET: on a computer's own page the dashboard's request; on a Hub's page the chosen computer's, with the status and message an error carries. */
+async function readJson(path) {
+    if (!cloud()) return requestJson('GET', path);
+    const id = computer();
+    if (!id) { const e = new Error('No computer is linked to read skills from.'); e.status = 0; throw e; }
+    const r = await serverFetch(id, path);
+    const data = await r.json().catch(() => null);
+    if (!r.ok) { const e = new Error((data && (data.error || data.message)) || (r.status === 403 ? 'Only the account this computer is linked to can read its skills through the Hub.' : 'The skills could not be read')); e.status = r.status; e.data = data; throw e; }
+    return data;
+}
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', onClick); return b; };
 
 /** Pending skills wait on the Operator: the nav badge says how many (the tab loads it at start too). */
 export async function loadSkillsBadge() {
     const badge = document.getElementById('nav-tab-skills-badge');
     if (!badge) return;
+    if (cloud()) { badge.hidden = true; return; } // a Hub's page has no badge: what waits for approval is approved at the computer
     try {
         const d = await requestJson('GET', '/api/skills?status=pending');
         const n = (d.skills || []).length;
@@ -42,7 +60,7 @@ export async function loadSkillsBadge() {
 
 async function loadList() {
     try {
-        everyRow = (await requestJson('GET', '/api/skills')).skills || []; // the whole store: the folders' counts do not move with the status filter
+        everyRow = (await readJson('/api/skills')).skills || []; // the whole store: the folders' counts do not move with the status filter
         rows = latestSkillRows(everyRow, showStatus);
         loadError = '';
     } catch (e) { rows = []; everyRow = []; loadError = e.message || 'The skills could not be read'; }
@@ -55,8 +73,8 @@ function usedBy(r) { return Array.isArray(r.used_by) ? r.used_by.map(team => { c
 const KIND_OF = { imported: 'operator', 'agent-created': 'agent', 'coral-skills': 'coral' };
 const FOLDER_LABEL = { '': 'All skills', imported: 'Imported', 'agent-created': 'Agent created', 'coral-skills': 'Coral skills' };
 const FOLDER_ICON = { '': 'dataset', imported: 'download', 'agent-created': 'smart_toy', 'coral-skills': 'auto_awesome' }; // a skill folder's glyph, as the Inbox's folders have theirs (#15820)
-const inFolder = (r, f) => !f || r.publisher_kind === KIND_OF[f];
-const sections = () => [{ title: 'Skills', items: ['', ...SKILL_FOLDERS].map(key => {
+const inFolder = (r, f) => !f || cloud() || r.publisher_kind === KIND_OF[f];
+const sections = () => [{ title: 'Skills', items: (cloud() ? [''] : ['', ...SKILL_FOLDERS]).map(key => {
     const mine = latestSkillRows(everyRow).filter(r => inFolder(r, key)), waiting = key === 'agent-created' ? mine.filter(r => r.pendingVersion).length : 0;
     return { key: key || 'all', label: FOLDER_LABEL[key], icon: FOLDER_ICON[key], count: waiting ? `${waiting} of ${mine.length}` : mine.length, alert: waiting > 0 }; // what waits on the Operator is said on Agent created, red, as Needs you says its unread
 }) }];
@@ -77,7 +95,7 @@ async function loadOne(id) {
     open = { id, data: null, error: '', busy: false, acked: false, fileShown: null, opened: new Set() };
     const view = open;
     draw();
-    try { const data = await requestJson('GET', `/api/skills/${encodeURIComponent(id)}`); if (open !== view) return; view.data = data; }
+    try { const data = await readJson(`/api/skills/${encodeURIComponent(id)}`); if (open !== view) return; view.data = data; }
     catch (e) { if (open !== view) return; view.error = e.status === 404 ? 'This skill no longer exists.' : (e.message || 'The skill could not be read'); }
     draw();
 }
@@ -113,23 +131,31 @@ function drawList() {
     for (const [v, label] of FILTERS) { const o = el('option', '', label); o.value = v; sel.append(o); }
     sel.value = showStatus;
     sel.addEventListener('change', async () => { showStatus = sel.value; await loadList(); draw(); });
+    const picker = cloud() && computers().length > 1 ? el('select', 'field field-dense team-tb-select') : null; // which linked computer's skills
+    if (picker) {
+        picker.setAttribute('aria-label', 'Computer');
+        for (const id of computers()) { const o = el('option', '', machineLabel(id) + (machineOnline(id) ? '' : ' (offline)')); o.value = id; picker.append(o); }
+        picker.value = computer();
+        picker.addEventListener('change', async () => { chosenComputer = picker.value; open = null; await loadList(); draw(); });
+    }
     const input = el('input'); input.type = 'file'; input.accept = '.zip,.md,.markdown,application/zip,text/markdown'; input.hidden = true;
     input.addEventListener('change', () => { const f = input.files && input.files[0]; input.value = ''; if (f) importFile(f, false, false); });
     const importBtn = button('btn btn-primary team-tb-action', 'Import', () => input.click());
     importBtn.title = 'Import a skill: a .zip or a SKILL.md file'; importBtn.setAttribute('aria-label', 'Import a skill (a .zip or a SKILL.md file)');
     const folderHead = el('div', 'inbox-folder-head'); folderHead.append(title, count);
-    head.append(folderHead, sel, importBtn, input);
+    head.append(folderHead, ...(picker ? [picker] : []), sel, ...(cloud() ? [] : [importBtn, input]));
     PH.pageHeader(head, { idp: 'skills' });
     page.append(head);
     const approval = 'Skills are reusable instructions that help an agent do a particular job, such as reviewing code or writing release notes. A skill an agent publishes waits here until you approve it; one you import is approved at once.';
-    if (!loadError) page.append(el('p', 'skills-note', approval)); // the description is for an empty list; the approval rule stays under the header with skills listed (#16211)
-    page.append(el('p', 'skills-note skills-get-started', 'Ask an agent to write a skill for a task you repeat, or download one from a source you trust. Import its .zip or SKILL.md file here, read it, then choose Use in a team.'));
+    if (cloud()) page.append(el('p', 'skills-note', `This is ${machineLabel(computer())}'s list, read only. Import, approve and remove a skill in that computer's own Coral.`));
+    else if (!loadError) page.append(el('p', 'skills-note', approval)); // the description is for an empty list; the approval rule stays under the header with skills listed (#16211)
+    if (!cloud()) page.append(el('p', 'skills-note skills-get-started', 'Ask an agent to write a skill for a task you repeat, or download one from a source you trust. Import its .zip or SKILL.md file here, read it, then choose Use in a team.'));
     if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }
     const columns = [
         { key: 'name', label: 'Name', primary: true, width: 'grow', min: 32, sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
         { key: 'description', label: 'Description', share: 3, min: 24, line: 2, cell: r => r.description, narrowHide: true },
-        { key: 'by', label: 'Published by', width: '10rem', sort: true, sortValue: publisher, cell: publisher },
-        { key: 'usedBy', label: 'Used by', width: '9rem', sort: true, sortValue: usedBy, cell: r => usedBy(r) || '-', narrowHide: true }, // the teams whose agents have it attached or loaded (#15383)
+        ...(cloud() ? [] : [{ key: 'by', label: 'Published by', width: '10rem', sort: true, sortValue: publisher, cell: publisher },
+        { key: 'usedBy', label: 'Used by', width: '9rem', sort: true, sortValue: usedBy, cell: r => usedBy(r) || '-', narrowHide: true }]), // the teams whose agents have it attached or loaded (#15383)
         { key: 'version', label: 'Version', width: '6rem', align: 'end', sort: 'number', sortValue: r => r.version, cell: r => {
             const cell = el('span', '', `v${r.version}`), pending = r.pendingVersion;
             if (pending && pending.id !== r.id) {
@@ -179,14 +205,14 @@ function drawDetail() {
     const top = el('div', 'skills-head'); top.append(back); page.append(top);
     if (open.error) { const p = el('p', 'skills-error', open.error); p.setAttribute('role', 'alert'); page.append(p); return page; }
     if (!open.data) { page.append(el('p', 'skills-note', 'Loading…')); return page; }
-    const d = open.data, s = d.skill, files = d.files || [], contents = d.contents || {};
+    const d = open.data, s = d.skill, files = d.files || [], contents = cloud() ? (d.skill_md != null ? { 'SKILL.md': d.skill_md } : {}) : (d.contents || {}); // through a Hub the one text is SKILL.md's
     const [statusWord] = STATUS[s.status] || [s.status];
     const title = el('div', 'skills-head'); title.append(el('h2', '', `${s.name} · version ${s.version}`), DT.chip(statusWord, (STATUS[s.status] || [])[1]));
     page.append(title);
     const meta = el('div', 'skills-meta');
-    meta.append(el('span', '', `Published by ${publisher(s)}`), el('span', 'skills-used-by', usedBy(s) ? `Used by ${usedBy(s)}` : 'Not used by a team yet'), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
+    meta.append(...(cloud() ? [] : [el('span', '', `Published by ${publisher(s)}`), el('span', 'skills-used-by', usedBy(s) ? `Used by ${usedBy(s)}` : 'Not used by a team yet')]), el('span', '', `${files.length} file${files.length === 1 ? '' : 's'}`));
     page.append(meta, el('p', 'skills-note', s.description));
-    if (s.status === 'approved') {
+    if (s.status === 'approved' && !cloud()) {
         const use = el('div', 'skills-section');
         use.append(button('btn btn-primary', 'Use in a team', async () => {
             try { const { showSkillUse } = await importOnce('./skill_use.js'); showSkillUse(use, s, teams => { s.used_by = [...new Set([...(s.used_by || []), ...teams])]; meta.querySelector('.skills-used-by').textContent = usedBy(s) ? `Used by ${usedBy(s)}` : 'Not used by a team yet'; }); }
@@ -201,7 +227,7 @@ function drawDetail() {
     }
     if (s.status === 'removed') { page.append(el('p', 'skills-note', 'This skill was removed.')); return page; }
     let unopenedEl = null;
-    if (s.status === 'pending') {
+    if (s.status === 'pending' && !cloud()) {
         const b = el('div', 'notice notice-warn skills-banner'); b.append(el('strong', '', 'Read it before you approve it.'));
         b.append(el('span', '', `This skill was published by ${publisher(s)}. Its text is instructions an agent will follow, and approving it puts its description into the instructions of every agent that has it attached. Nothing here is searchable or attachable until you approve.`));
         unopenedEl = el('p', 'skills-unopened'); b.append(unopenedEl);
@@ -222,6 +248,11 @@ function drawDetail() {
     if (shown) { const pre = el('pre', 'skills-file-text'); pre.textContent = contents[shown]; pre.setAttribute('aria-label', `Text of ${shown}`); fileSec.append(el('p', 'skills-note', `Showing ${shown}`), pre); }
     if (contents['SKILL.md']) { const instructions = el('div', 'skills-instructions prose prose-doc'); instructions.innerHTML = renderMarkdownStrict(contents['SKILL.md']); page.append(instructions); }
     page.append(fileSec);
+    if (cloud()) {
+        const why = d.skill_md_withheld ? 'The instructions could not be checked for secrets, so they are not shown here.' : d.skill_md_truncated ? 'The instructions are cut at 64 KB here.' : '';
+        page.append(el('p', 'skills-note', `${why ? why + ' ' : ''}Scripts and other files stay on ${machineLabel(computer())}: open them in that computer's own Coral.`));
+        return page; // no scanner lines, no approve, no remove: those are that computer's
+    }
     // what the scanner found in the scripts
     const warnings = d.warnings || [], hosts = d.hosts || [];
     if (warnings.length || hosts.length) {

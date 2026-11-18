@@ -45,7 +45,7 @@ func TestEveryOwnerOnlyRouteOfTheTableRefusesANonOwnerOnTheRealRouter(t *testing
 		if !route.Mode.Refuses() {
 			continue
 		}
-		segs := strings.Split(strings.ReplaceAll(route.Pattern, "{hex64}", strings.Repeat("a", 64)), "/")
+		segs := strings.Split(strings.ReplaceAll(strings.ReplaceAll(route.Pattern, "{hex64}", strings.Repeat("a", 64)), "{hex32}", strings.Repeat("a", 32)), "/")
 		for i, seg := range segs {
 			if strings.HasPrefix(seg, "{") {
 				segs[i] = "x"
@@ -111,6 +111,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/custom-models":                       "owner-only", "PUT /api/custom-models": "owner-only", // #5996
 		"GET /api/custom-modes": "owner-only", "PUT /api/custom-modes": "owner-only", // #15950
 		"GET /api/skills/search": "owner-only", "POST /api/sessions/live/{name}/skills": "owner-only", // the $ menu through the Hub (#19430)
+		"GET /api/skills": "owner-only", "GET /api/skills/{hex32}": "owner-only", // the Skills page's two reads through the Hub (#19627)
 		"GET /api/saved":                                "owner-only",
 		"GET /api/saved/{id}/message":                   "owner-only",
 		"POST /api/saved":                               "owner-only",

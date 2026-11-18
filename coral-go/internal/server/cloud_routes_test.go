@@ -24,6 +24,9 @@ func concrete(route string) string {
 	if route == "/api/artifacts/{id}" {
 		return "/api/artifacts/" + strings.Repeat("a", 64) // the table only admits a full content digest
 	}
+	if route == "/api/skills/{id}" {
+		return "/api/skills/" + strings.Repeat("a", 32) // a skill id is exactly 32 lowercase hex digits (the {hex32} segment, #19627)
+	}
 	if strings.HasPrefix(route, "/api/artifacts/{id}/comments") || route == "/api/artifacts/{id}/comment-images" || route == "/api/artifacts/{id}/thumbnail" || route == "/api/artifacts/{id}/trust-preview" || route == "/api/artifacts/{id}/meta" || route == "/api/artifacts/{id}/readers" || route == "/api/artifacts/{id}/versions" || route == "/api/artifacts/{id}/private" || route == "/api/artifacts/{id}/star" || route == "/api/artifacts/{id}/opened" { // the comments (#5176), the metadata (#5465) and the readers (#5577) of an artifact are under the same digest
 		route = strings.Replace(route, "{id}", strings.Repeat("a", 64), 1)
 	}
