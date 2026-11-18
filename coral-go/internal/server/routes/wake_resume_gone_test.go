@@ -330,3 +330,32 @@ func TestAFreshStartWithNoModeRecordedStartsInDefaultNotTheSavedDefault(t *testi
 	assert.NotContains(t, cmds, "bypassPermissions", "never the saved default")
 	assert.NotContains(t, cmds, "--dangerously-skip-permissions")
 }
+
+// #19615: "could not resume" needs a decision (restart or not), and an untagged Coral line is board-only for an orchestrator (#19608),
+// so the line names the Orchestrator when the team has one.
+func TestTheFreshStartLineTagsTheOrchestrator(t *testing.T) {
+	g := newGoneRig(t)
+	g.sawConversation(t)
+	_, err := g.h.bs.Subscribe(context.Background(), "team", "Orchestrator", "Orchestrator", naming.SessionName("claude", "99999999-0000-0000-0000-000000000000"), nil, "all")
+	require.NoError(t, err)
+
+	g.wake(t)
+
+	msgs, err := g.h.bs.ListMessages(context.Background(), "team", 100, 0, 0)
+	require.NoError(t, err)
+	var line string
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "could not resume its conversation") {
+			line = m.Content
+		}
+	}
+	require.NotEmpty(t, line)
+	assert.Contains(t, line, "@Orchestrator")
+	unread, err := g.h.bs.PeekCounted(context.Background(), "team", "Orchestrator", 50)
+	require.NoError(t, err)
+	var seen bool
+	for _, m := range unread {
+		seen = seen || strings.Contains(m.Content, "could not resume")
+	}
+	assert.True(t, seen, "a receive-all Orchestrator still reads it")
+}

@@ -25,7 +25,7 @@ var systemPostAllowed = map[string]struct {
 }{
 	"routes/agent_exit.go postExitNotice":               {1, "the stopped agents' cleaned names, a fixed label and a fixed plan"},
 	"routes/agent_exit.go autoResume":                   {1, "a live @title and a constant sentence"},
-	"routes/wake_resume_gone.go noteFreshStart":         {1, "the agent's cleaned name (noticeName: no @) and one fixed sentence (#12714)"},
+	"routes/wake_resume_gone.go noteFreshStart":         {1, "the agent's cleaned name (noticeName: no @), one fixed sentence, and the Orchestrator's own name as a leading @tag (#12714, #19615)"},
 	"routes/agent_server_lost.go ServerLost":            {1, "the lost agents' cleaned names (noticeName: no @), a time, a count and fixed words (#12592)"},
 	"routes/agent_server_lost.go recoverAgent":          {1, "a live @title and a constant sentence (#12592)"},
 	"routes/auto_recommend.go pick":                     {1, "the agent's cleaned display name (noticeName: capped, no @) and a fixed sentence: no label or screen text"},

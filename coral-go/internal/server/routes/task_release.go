@@ -56,7 +56,12 @@ func (h *BoardHandler) ReleaseTaskByID(w http.ResponseWriter, r *http.Request) {
 	if !body.KeepAssigned {
 		h.goBG(func() {
 			ctx := context.Background()
-			h.postNotice(ctx, project, fmt.Sprintf("@notify-all [Task #%d released by %s; now unassigned] %s — run 'coral-board task claim' to pick it up", task.ID, h.noticeText(ctx, project, who), h.noticeText(ctx, project, task.Title)))
+			// Not a broadcast (#19623): the Orchestrator is told, the board keeps the line, nobody else is woken. Untagged when the team has none.
+			tag := ""
+			if orch, err := h.bs.TeamOrchestrator(ctx, project); err == nil {
+				tag = orchestratorTag(orch, who) // not when the orchestrator released it itself (#19633)
+			}
+			h.postNotice(ctx, project, fmt.Sprintf("%s[Task #%d released by %s; now unassigned] %s — run 'coral-board task claim' to pick it up", tag, task.ID, h.noticeText(ctx, project, who), h.noticeText(ctx, project, task.Title)))
 		})
 	}
 	writeJSON(w, http.StatusOK, task)
