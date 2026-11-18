@@ -6,7 +6,7 @@ import { clearOpenSubagent } from './subagents.js';
 const { _taskDetailHtml } = await importOnce('./task_detail_html.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 import { _agentTaskStatus } from './task_format.js';
 import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
-import { pathId, serverFetch, currentServer } from './server_base.js';
+import { pathId, serverFetch, currentServer, isCloud } from './server_base.js';
 import { _taskRequiredOutputs } from './task_reminders.js';
 import { loadAgentTasks } from './task_list.js';
 
@@ -38,7 +38,7 @@ export function showAgentTaskDetailModal(taskId) {
 
     const footer = document.getElementById('task-detail-modal-footer');
     if (footer) {
-        const open = task.status === 'pending' || task.status === 'in_progress';
+        const open = (task.status === 'pending' || task.status === 'in_progress') && !isCloud(); // Complete is the agent-token API: never in the Hub's tunnel (#19630)
         footer.innerHTML = `
             <span style="flex:1"></span>
             <button class="btn" data-on-click="task-close">Close</button>
