@@ -293,6 +293,16 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/skills")),
 	// A picture for a new goal's description (#11650): the owner's alone, like the goal it goes in.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goal-images")),
+	// A question from an agent that is on no team, in the Hub's own Needs you (#19628, the Hub's beta): answering types the answer into that agent, dismissing tells it, and a picture for the answer is kept as the agent's
+	// file. The OWNER's alone through the Hub, as an ask's Ignore is (#13446): the machine refuses anyone else (403 owner_only) before the handler runs, and each handler checks the owner again. They type into an agent
+	// or write a file, so Interact, and the machine's own mode still caps them. The picture is the raw file as the body: the machine decides its type by its bytes and cuts it at the upload route's size.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract,
+		"/api/agent-asks/{id}/answer",
+		"/api/agent-asks/{id}/dismiss",
+		"/api/agent-asks/{id}/images",
+	)),
+	// What happened while the person was away, as counts (#19628): the OWNER's alone and read-only; it names no task, team or agent.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/away")),
 	// The rest of the owner's artifact work through the Hub (#11354, the operator's rule: the owner gets everything): the version list and series reads (their handlers already refuse a non-owner), the edit and
 	// delete of a comment and the lock (the comment policy still decides: the owner edits and deletes what they wrote, the lock is the owner's), and the change-request send, which hands the owner's own words (redacted,
 	// cut, quoted as untrusted data) to an agent: agent input, so Launch, as the other routes that type into an agent. A series DELETE stays unlisted (it removes every version) and so does an agent's reply (POST
