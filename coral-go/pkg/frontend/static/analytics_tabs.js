@@ -58,7 +58,7 @@ export async function showTab(key, host, force = false) {
     if (key === IVC) await readBoards(); // every team unless one is chosen
     else if (key !== 'usage' && key !== RQ) {
         await readBoards();
-        const list = teams(), saved = browserLocal.get(TEAM_KEY) || '';
+        const list = teams(), saved = isCloud() ? '' : browserLocal.get(TEAM_KEY) || '';
         m.team = list.includes(m.team) ? m.team : (list.includes(saved) ? saved : (list[0] || ''));
     }
     draw(key);
@@ -133,7 +133,7 @@ function filterBar(key) {
     } else {
         const list = teams();
         if (key === IVC) bar.append(V.selectField('Team', [['', 'All teams'], ...list.map(k => [k, teamLabel(k)])], m.team, v => { m.team = v; reload(key); }));
-        else bar.append(V.selectField('Team', list.length ? list.map(k => [k, teamLabel(k)]) : [['', 'No team yet']], m.team, v => { m.team = v; browserLocal.set(TEAM_KEY, v); reload(key); }));
+        else bar.append(V.selectField('Team', list.length ? list.map(k => [k, teamLabel(k)]) : [['', 'No team yet']], m.team, v => { m.team = v; if (!isCloud()) browserLocal.set(TEAM_KEY, v); reload(key); }));
     }
     return bar;
 }

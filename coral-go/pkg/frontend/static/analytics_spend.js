@@ -279,7 +279,7 @@ const rangeOf = (period) => (period === 'week' || period === 'month' ? '7d' : '2
 export function showSpend(host, period, timeHost, force = false) {
     const range = rangeOf(period);
     const list = teams();
-    const saved = browserLocal.get(TEAM_KEY) || '';
+    const saved = isCloud() ? '' : browserLocal.get(TEAM_KEY) || '';
     const team = list.includes(model.team) ? model.team : (list.includes(saved) ? saved : (list[0] || ''));
     const changed = team !== model.team || range !== model.range;
     model.team = team; model.range = range;
@@ -288,7 +288,7 @@ export function showSpend(host, period, timeHost, force = false) {
         const head = el('div', 'spend-head');
         const label = el('label', 'spend-team'); label.append(el('span', null, 'Team '));
         const sel = el('select', 'field field-dense cost-time-select spend-team-select'); sel.setAttribute('aria-label', 'Team for tokens per commit and task time');
-        sel.addEventListener('change', () => { model.team = sel.value; try { browserLocal.set(TEAM_KEY, sel.value); } catch { /* the choice lasts until the page closes */ } model.data = null; loadSpend(); });
+        sel.addEventListener('change', () => { model.team = sel.value; try { if (!isCloud()) browserLocal.set(TEAM_KEY, sel.value); } catch { /* the choice lasts until the page closes */ } model.data = null; loadSpend(); });
         label.append(sel); head.append(label);
         host.replaceChildren(head, el('div', 'spend-body'));
     }
