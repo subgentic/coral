@@ -91,9 +91,8 @@ An agent that is not on a team asks with `coral-agent ask "<question>" --option 
 
 - **Sleep a whole team:** open the **⋯** menu beside the team's name and choose **Sleep Team**. Its agents stop running; their chats stay. **Wake Team** (the same place) starts them again.
 - **Pause one agent:** open the **⋯** menu on its row and choose **Sleep**. It stops running and its chat stays; **Wake** (the same place) starts it again.
-- **Put one away:** choose **Archive**. It leaves the list and its chat is kept; **Unarchive** brings it back.
-- **Stop one for good:** choose **Stop agent**. The agent ends now and its running work is lost.
-- **Take a sleeping or archived one off the list:** choose **Remove Agent** in its menu. Nothing is running, so nothing is lost; its chat stays in History.
+- **Stop one:** choose **Stop agent**. A team's agent ends now (its running work is lost) and is archived: it leaves the list and its chat is kept. Open **More** > **Archived** on the team's Agents tab to find it; **Start** brings it back awake and **Sleep** brings it back asleep.
+- **Take an archived one off the list for good:** choose **Remove Agent** in its menu. Nothing is running, so nothing is lost; its chat stays in History.
 - **Stop a reply that is still running:** while the agent is working and the message box is empty, the **Esc** button beside the box turns red and says **Stop**: press it, or press **Escape** in the empty message box. On a phone the round Send button becomes a red square named **Stop the agent**. The agent stops what it is doing and its chat stays.
 
 ## Next
