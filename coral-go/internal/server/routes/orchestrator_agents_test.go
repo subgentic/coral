@@ -140,9 +140,16 @@ func (r *orchRig) usualBoard() {
 	r.seat("Dev2", "Developer", orchBoard, "claude", false, 3)
 }
 
-func TestTheSwitchIsOffByDefaultAndOffMeansRefusedForTheSeat(t *testing.T) {
-	r := newOrchRig(t)
+// usualBoardOff is the usual board with the Operator's saved OFF grant: with no row an Orchestrator seat defaults to ON (#19507), so a test of the refusals saves the switch off first.
+func (r *orchRig) usualBoardOff() {
+	r.t.Helper()
 	r.usualBoard()
+	require.NoError(r.t, r.h.bs.SetOrchGrant(context.Background(), board.OrchGrant{Project: orchBoard, Enabled: false, MaxPerHour: board.DefaultOrchMaxPerHour, MaxLive: board.DefaultOrchMaxLive, IdleMin: board.DefaultOrchIdleMin}, "Operator"))
+}
+
+func TestTheSwitchIsOffWhenTheOperatorSavedItOffAndOffMeansRefusedForTheSeat(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoardOff()
 	code, out := r.agentPost("Orchestrator", "wake", "Dev", "")
 	assert.Equal(t, http.StatusForbidden, code)
 	assert.Equal(t, "orchestrator_switch_off", out["code"])
@@ -164,7 +171,7 @@ func TestTheSwitchIsOffByDefaultAndOffMeansRefusedForTheSeat(t *testing.T) {
 // Security 3: the switch, the seat and the caps are written only by the verified Operator, never from a claimed subscriber_id.
 func TestTheGrantIsWrittenOnlyByTheVerifiedOperator(t *testing.T) {
 	r := newOrchRig(t)
-	r.usualBoard()
+	r.usualBoardOff()
 	body := func(extra string) string {
 		return `{"enabled": true, "seat_session": "` + r.sid["Orchestrator"] + `", "subscriber_id": "Operator", "created_by": "Operator", "as": "Operator"` + extra + `}`
 	}
@@ -482,7 +489,7 @@ func TestSleepRefusesAnAgentAtADialog(t *testing.T) {
 func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
-	r.usualBoard()
+	r.usualBoardOff()
 	work := r.work
 	launch := func(who, boardName string) (int, map[string]any) {
 		b, _ := json.Marshal(map[string]any{"working_dir": work, "agent_type": "claude", "board_id": boardName, "display_name": "Helper"})
@@ -544,7 +551,7 @@ func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 func TestAnAgentsTeamLaunchIsLoggedAndCountedMemberByMember(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
-	r.usualBoard()
+	r.usualBoardOff()
 	work := r.work
 	team := func(who string, names ...string) (int, map[string]any) {
 		agents := make([]map[string]any, len(names))
@@ -688,7 +695,7 @@ func TestAPausedBoardRefusesEveryLifecycleAction(t *testing.T) {
 // QA's SHOULD: through Coral Hub the grant and the log are the owner's alone: a tunneled request that is not the owner is refused (the Operator's cookie on it included), and nothing changes.
 func TestThroughTheHubOnlyTheOwnerReadsOrWritesTheGrant(t *testing.T) {
 	r := newOrchRig(t)
-	r.usualBoard()
+	r.usualBoardOff()
 	viaHub := func(method, path, body string) int {
 		req, _ := http.NewRequest(method, r.server+path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -880,7 +887,7 @@ func TestStopSendsCtrlCToAWorkingHermesAgent(t *testing.T) {
 
 func TestStopIsRefusedWithTheSwitchOff(t *testing.T) {
 	r := newOrchRig(t)
-	r.usualBoard()
+	r.usualBoardOff()
 	// no grant: the switch is off
 	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
 	assert.Equal(t, http.StatusForbidden, code)

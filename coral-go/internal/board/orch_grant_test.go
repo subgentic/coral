@@ -159,3 +159,61 @@ func TestEnsureOrchSchemaLogsNonDuplicateAlterError(t *testing.T) {
 		t.Fatalf("a non-duplicate ALTER error must be logged; got: %q", buf.String())
 	}
 }
+
+// #19507: an orchestrator gets every agent-management permission in its own team by default, stop included.
+func TestABoardWithOneOrchestratorDefaultsToOnForItAndSavedGrantsAreNeverChanged(t *testing.T) {
+	s := orchStore(t)
+	ctx := context.Background()
+	const sid = "dc6d10f4-2f20-4a64-9d0e-111111111111"
+	_, err := s.Subscribe(ctx, "team", "Orchestrator", "Orchestrator", "claude-"+sid, nil, "all")
+	require.NoError(t, err)
+	_, err = s.Subscribe(ctx, "team", "Dev", "Developer", "claude-dc6d10f4-2f20-4a64-9d0e-222222222222", nil, "all")
+	require.NoError(t, err)
+
+	g, err := s.GetOrchGrant(ctx, "team")
+	require.NoError(t, err)
+	assert.True(t, g.Enabled, "no saved grant and one Orchestrator seat: on for it")
+	assert.True(t, g.StopEnabled, "stop is on with the rest")
+	assert.Equal(t, sid, g.SeatSession)
+	assert.Equal(t, DefaultOrchMaxLive, g.MaxLive, "the caps stay")
+	assert.Equal(t, DefaultSetBy, g.SetBy)
+
+	// the Operator's saved grant, off included, is never changed by the default
+	require.NoError(t, s.SetOrchGrant(ctx, OrchGrant{Project: "team", Enabled: false, MaxPerHour: 3, MaxLive: 4, IdleMin: 7}, "Operator"))
+	g, err = s.GetOrchGrant(ctx, "team")
+	require.NoError(t, err)
+	assert.False(t, g.Enabled, "off, saved by the Operator, stays off")
+	assert.False(t, g.StopEnabled)
+	assert.Equal(t, 3, g.MaxPerHour)
+
+	// two claimants of the title: ambiguous, so off
+	_, err = s.Subscribe(ctx, "two", "Orchestrator", "Orchestrator", "claude-"+sid, nil, "all")
+	require.NoError(t, err)
+	_, err = s.Subscribe(ctx, "two", "Boss", " orchestrator ", "claude-dc6d10f4-2f20-4a64-9d0e-333333333333", nil, "all")
+	require.NoError(t, err)
+	g, _ = s.GetOrchGrant(ctx, "two")
+	assert.False(t, g.Enabled, "two Orchestrators: no default")
+	// none: off; a remote one is not a seat on this computer
+	_, err = s.Subscribe(ctx, "none", "Dev", "Developer", "claude-"+sid, nil, "all")
+	require.NoError(t, err)
+	g, _ = s.GetOrchGrant(ctx, "none")
+	assert.False(t, g.Enabled)
+	remote := "other-computer"
+	_, err = s.Subscribe(ctx, "remote", "Orchestrator", "Orchestrator", "claude-"+sid, &remote, "all")
+	require.NoError(t, err)
+	g, _ = s.GetOrchGrant(ctx, "remote")
+	assert.False(t, g.Enabled, "a member on another computer is not the seat")
+}
+
+func TestTheTeamLaunchGrantSeedsStopOn(t *testing.T) {
+	s := orchStore(t)
+	ctx := context.Background()
+	wrote, err := s.SeedOrchGrant(ctx, "team", "sess-1")
+	require.NoError(t, err)
+	require.True(t, wrote)
+	g, err := s.GetOrchGrant(ctx, "team")
+	require.NoError(t, err)
+	assert.True(t, g.Enabled)
+	assert.True(t, g.StopEnabled, "stop is seeded on with the launch grant")
+	assert.Equal(t, TeamLaunchOrchMaxLive, g.MaxLive)
+}

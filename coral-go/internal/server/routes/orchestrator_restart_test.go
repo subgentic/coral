@@ -57,7 +57,7 @@ func TestTheOrchestratorRestartsAnIdleAgentUnderTheGrant(t *testing.T) {
 
 func TestARestartIsRefusedWithoutTheGrantForANonOrchestratorAndForAnotherBoardsMember(t *testing.T) {
 	r := newOrchRig(t)
-	r.usualBoard()
+	r.usualBoardOff()
 	other := r.seat("Elsewhere", "Developer", "other-board", "claude", false, 4)
 	old := r.sid["Dev2"]
 
