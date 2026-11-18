@@ -1,0 +1,207 @@
+[
+ {
+  "note": "plain ascii",
+  "label_hex": "4d79206c6170746f70",
+  "ok": true
+ },
+ {
+  "note": "plain unicode",
+  "label_hex": "42c3bc726f2d526563686e657220e7ac94e8aeb0e69cac",
+  "ok": true
+ },
+ {
+  "note": "64 bytes",
+  "label_hex": "61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+  "ok": true
+ },
+ {
+  "note": "65 bytes",
+  "label_hex": "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+  "ok": false
+ },
+ {
+  "note": "32 two-byte runes",
+  "label_hex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+  "ok": true
+ },
+ {
+  "note": "33 two-byte runes",
+  "label_hex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+  "ok": false
+ },
+ {
+  "note": "single character",
+  "label_hex": "78",
+  "ok": true
+ },
+ {
+  "note": "quote and backslash",
+  "label_hex": "6122625c63",
+  "ok": true
+ },
+ {
+  "note": "inner single space",
+  "label_hex": "612062",
+  "ok": true
+ },
+ {
+  "note": "Cc tab",
+  "label_hex": "610962",
+  "ok": false
+ },
+ {
+  "note": "Cc newline",
+  "label_hex": "610a62",
+  "ok": false
+ },
+ {
+  "note": "Cc carriage return",
+  "label_hex": "610d62",
+  "ok": false
+ },
+ {
+  "note": "Cc NUL",
+  "label_hex": "610062",
+  "ok": false
+ },
+ {
+  "note": "Cc DEL",
+  "label_hex": "617f62",
+  "ok": false
+ },
+ {
+  "note": "Cc U+0085",
+  "label_hex": "61c28562",
+  "ok": false
+ },
+ {
+  "note": "Cc U+0085 at end",
+  "label_hex": "6162c285",
+  "ok": false
+ },
+ {
+  "note": "Cf zero width space",
+  "label_hex": "61e2808b62",
+  "ok": false
+ },
+ {
+  "note": "Cf U+FEFF",
+  "label_hex": "efbbbf6162",
+  "ok": false
+ },
+ {
+  "note": "Cf U+202E",
+  "label_hex": "61e280ae62",
+  "ok": false
+ },
+ {
+  "note": "Cf soft hyphen",
+  "label_hex": "61c2ad62",
+  "ok": false
+ },
+ {
+  "note": "Zl U+2028",
+  "label_hex": "61e280a862",
+  "ok": false
+ },
+ {
+  "note": "Zp U+2029",
+  "label_hex": "61e280a962",
+  "ok": false
+ },
+ {
+  "note": "Co U+E000",
+  "label_hex": "61ee808062",
+  "ok": false
+ },
+ {
+  "note": "U+FFFD",
+  "label_hex": "61efbfbd62",
+  "ok": false
+ },
+ {
+  "note": "NBSP inside",
+  "label_hex": "61c2a062",
+  "ok": false
+ },
+ {
+  "note": "NBSP at start",
+  "label_hex": "c2a06162",
+  "ok": false
+ },
+ {
+  "note": "NBSP at end",
+  "label_hex": "6162c2a0",
+  "ok": false
+ },
+ {
+  "note": "ideographic space inside",
+  "label_hex": "61e3808062",
+  "ok": false
+ },
+ {
+  "note": "ideographic space at end",
+  "label_hex": "6162e38080",
+  "ok": false
+ },
+ {
+  "note": "leading space",
+  "label_hex": "206162",
+  "ok": false
+ },
+ {
+  "note": "trailing space",
+  "label_hex": "616220",
+  "ok": false
+ },
+ {
+  "note": "only a space",
+  "label_hex": "20",
+  "ok": false
+ },
+ {
+  "note": "NFKC ligature fi",
+  "label_hex": "efac816c65",
+  "ok": false
+ },
+ {
+  "note": "NFKC fullwidth A",
+  "label_hex": "efbca16263",
+  "ok": false
+ },
+ {
+  "note": "NFKC superscript two",
+  "label_hex": "6dc2b2",
+  "ok": false
+ },
+ {
+  "note": "NFKC combining acute",
+  "label_hex": "65cc81",
+  "ok": false
+ },
+ {
+  "note": "precomposed e acute",
+  "label_hex": "c3a9",
+  "ok": true
+ },
+ {
+  "note": "Cs surrogate bytes",
+  "label_hex": "eda080",
+  "ok": false
+ },
+ {
+  "note": "invalid UTF-8",
+  "label_hex": "ff61",
+  "ok": false
+ },
+ {
+  "note": "truncated UTF-8",
+  "label_hex": "c3",
+  "ok": false
+ },
+ {
+  "note": "empty",
+  "label_hex": "",
+  "ok": false
+ }
+]
