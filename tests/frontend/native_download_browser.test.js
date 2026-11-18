@@ -54,7 +54,8 @@ assert.ok(/coral:native-download/.test(SCRIPT), "the app's script was read from 
             window.fetch = (url, opts) => {
                 if (preview && String(url).includes('${digest}')) {
                     preview = false;
-                    return Promise.resolve(new Response('', { headers: { 'Content-Type': 'text/html', 'Content-Length': String(3 * 1024 * 1024) } }));
+                    // Exceed the 16 MB default without allocating a large download payload.
+                    return Promise.resolve(new Response('', { headers: { 'Content-Type': 'text/html', 'Content-Length': String(17 * 1024 * 1024) } }));
                 }
                 return fetchOriginal(url, opts);
             };
@@ -65,7 +66,7 @@ assert.ok(/coral:native-download/.test(SCRIPT), "the app's script was read from 
             finally { window.fetch = fetchOriginal; }
             return true;
         })()`);
-        assert.match(await ev(`document.getElementById('oversized-report').textContent`), /Preview is limited/);
+        assert.match(await ev(`document.getElementById('oversized-report').textContent`), /Preview is limited to 16 MB \(Settings > Files and Git > Largest artifact to preview\)/, 'the oversized fallback explains where to raise the preview limit');
         const point = await ev(`(() => { const a = document.querySelector('#oversized-report a[download]'); const r = a.getBoundingClientRect(); return { x:r.x+r.width/2, y:r.y+r.height/2, target:a.target }; })()`);
         assert.equal(point.target, '_blank');
         await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 });

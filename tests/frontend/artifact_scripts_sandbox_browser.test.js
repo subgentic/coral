@@ -150,7 +150,7 @@ const base = require('./test_base').BASE;
             assert.equal(await inHost(`document.querySelectorAll('iframe').length`), 1, 'a second coral-artifact-load did not start a second file frame');
             await ev(`window.clearRuns()`);
             // an HTML larger than the host's limit is not run at all (kills: no size limit on the HTML in the host)
-            await ev(`window.runFile('huge', '<p>' + 'x'.repeat(2 * 1024 * 1024 + 20000) + '</p>', '', '')`);
+            await ev(`window.runFile('huge', '<p>' + 'x'.repeat(64 * 1024 * 1024 + 20000) + '</p>', '', '')`);
             await until(() => inHost(`document.body ? 'up' : ''`), 'the host for the huge file');
             await sleep(800); // sleep-ok: a negative: a frame for the huge file would have been added by now
             assert.equal(await inHost(`document.querySelectorAll('iframe').length`), 0, 'a file over the host\'s limit gets no frame');
