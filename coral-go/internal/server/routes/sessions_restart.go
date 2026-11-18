@@ -178,7 +178,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 			p.stored = ls
 			p.startMode = h.transcriptStartMode(ctx, ls, store.UnmarshalFlags(ls.Flags))
 			p.liveModel = h.transcriptModel(ls.SessionID)
-			p.liveMode = h.liveClaudeMode(*ls, ptr.Value(ls.PermissionMode), store.UnmarshalFlags(ls.Flags))
+			p.liveMode = h.keptLiveMode(*ls, ptr.Value(ls.PermissionMode), store.UnmarshalFlags(ls.Flags))
 			if ls.Capabilities != nil && *ls.Capabilities != "" {
 				p.caps = &agent.Capabilities{}
 				if err := json.Unmarshal([]byte(*ls.Capabilities), p.caps); err != nil {
