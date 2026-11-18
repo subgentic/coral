@@ -19,6 +19,7 @@ GET /api/artifacts/{id}/readers view owner-only
 GET /api/artifacts/{id}/thumbnail view owner-only
 GET /api/artifacts/{id}/trust-preview view owner-only
 GET /api/artifacts/{id}/versions view owner-only
+GET /api/automations/runs view owner-only
 GET /api/board/{project}/artifacts view owner-only
 GET /api/board/{project}/artifacts/{digest}/edit view owner-only
 GET /api/board/{project}/artifacts/{digest}/edit/send view owner-only
@@ -42,6 +43,10 @@ GET /api/proposals view owner-only
 GET /api/resources view owner-only
 GET /api/saved view owner-only
 GET /api/saved/{id}/message view owner-only
+GET /api/scheduled/jobs view owner-only
+GET /api/scheduled/jobs/{jobID} view owner-only
+GET /api/scheduled/jobs/{jobID}/runs view owner-only
+GET /api/scheduled/runs/recent view owner-only
 GET /api/session-artifacts view owner-only
 GET /api/sessions/live view owner-sees
 GET /api/settings/prompt-inspection launch owner-only
@@ -50,6 +55,12 @@ GET /api/system/update view owner-update
 GET /api/team-artifacts view owner-only
 GET /api/thread view owner-only
 GET /api/threads view owner-only
+GET /api/workflows interact owner-only
+GET /api/workflows/by-name/{name} interact owner-only
+GET /api/workflows/runs/recent interact owner-only
+GET /api/workflows/runs/{runID} interact owner-only
+GET /api/workflows/{workflowID} interact owner-only
+GET /api/workflows/{workflowID}/runs interact owner-only
 PATCH /api/artifacts/{id}/comments/{cid} interact owner-sees
 PATCH /api/saved/{id} interact owner-only
 POST /api/artifacts/{id}/comment-images interact owner-only
