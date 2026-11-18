@@ -374,3 +374,22 @@ func TestAFullHealthPassLeavesAWaitEscalationAlone(t *testing.T) {
 	assert.Equal(t, ruleWaitEscalation, esc[0].Rule)
 	assert.Equal(t, "7", esc[0].Subject)
 }
+
+// #19614: a task whose agent waits on the Operator (coral-board wait --operator) is not stalled; no "no activity" nudge.
+func TestNoStatusNudgeWhileTheAgentWaitsOnTheOperator(t *testing.T) {
+	n := newNudgeHarness(t, "")
+	ctx := context.Background()
+	sid := "77777777-7777-7777-7777-777777777777"
+	n.agent("Dev", sid)
+	task, err := n.bs.CreateTask(ctx, "team", "work", "", "high", "Operator", "Dev")
+	require.NoError(t, err)
+	_, err = n.bs.ClaimTask(ctx, "team", "Dev", task.ID)
+	require.NoError(t, err)
+	n.sig[sid] = agentSignal{Since: n.now, LastEvent: n.now}
+	_, err = n.bs.RegisterWait(ctx, "team", "Dev", naming.SessionName("claude", sid), board.WaitOperator, "", "", 3*time.Hour)
+	require.NoError(t, err)
+	n.run(40 * time.Minute)
+	assert.Empty(t, n.sentTo("Dev"), "waiting on the Operator: not a stall")
+	_, err = n.bs.GetActiveWait(ctx, "team", "Dev")
+	require.NoError(t, err)
+}

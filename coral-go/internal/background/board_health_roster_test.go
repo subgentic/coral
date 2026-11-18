@@ -352,3 +352,33 @@ func TestRosterAWaitEscalationEndsWithItsWait(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, esc, "the wait ended: its escalation ended with it")
 }
+
+// #19614: an agent that was answered and went to sleep still has its wait open; nobody is waited on by a sleeper, so no line
+// "X has waited N min on you" goes out for it. When it wakes and is still waiting, the line is due again.
+func TestRosterDoesNotEscalateASleepersWait(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Security Reviewer", "Security", 2, 0)
+	h.member("Lead Developer", "Developer", 3, 0)
+	h.wait(3, "Lead Developer", "message", "Security Reviewer")
+	h.sleeping(3)
+	posted := func() int {
+		msgs, err := h.s.ListMessages(ctx, "team", 100, 0, 0)
+		require.NoError(t, err)
+		n := 0
+		for _, m := range msgs {
+			if m.SubscriberID == "Coral Health Monitor" && strings.Contains(m.Content, "has waited") {
+				n++
+			}
+		}
+		return n
+	}
+	h.now = h.now.Add(20 * time.Minute)
+	h.m.scan(ctx)
+	assert.Zero(t, posted(), "the waiter is asleep: nobody is waiting on anyone")
+	_, err := h.sessions.Exec(`UPDATE live_sessions SET is_sleeping = 0`)
+	require.NoError(t, err)
+	h.m.scan(ctx)
+	assert.Equal(t, 1, posted(), "awake and still waiting: it is told")
+}

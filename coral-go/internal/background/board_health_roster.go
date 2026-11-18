@@ -254,10 +254,14 @@ func (m *BoardHealthMonitor) escalateWaits(ctx context.Context, project string) 
 		}
 	}
 	now := m.now()
+	sleeping, _ := m.store.SleepingSubscribers(ctx, project)
 	for _, w := range waits {
 		at, err := time.Parse(time.RFC3339, w.CreatedAt)
 		if err != nil || now.Sub(at) <= waitEscalateAfter {
 			continue
+		}
+		if sleeping[w.SubscriberID] {
+			continue // answered and asleep with the wait still open: nobody is waiting on anyone (#19614); due again on waking
 		}
 		target := resolveWait(w, subs, tasks)
 		if target.sub == nil || board.SameIdentity(target.sub.SubscriberID, w.SubscriberID) {

@@ -193,9 +193,12 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 		return
 	}
 	waits, _ := h.store.ListActiveWaits(ctx, project)
-	waiting := map[string]bool{}
+	waiting, onOperator := map[string]bool{}, map[string]bool{}
 	for _, w := range waits {
 		waiting[w.SubscriberID] = true
+		if w.WaitType == board.WaitOperator {
+			onOperator[w.SubscriberID] = true
+		}
 	}
 	r := &healthRun{h: h, project: project, hs: hs, now: h.now()}
 	for _, sub := range subs {
@@ -206,7 +209,9 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 		mine, pending := agentTasks(tasks, sub.SubscriberID, r.now)
 		sig, known := h.signal(ctx, a.SessionID)
 		r.claimNudge(ctx, sub, a, mine, pending, sig, known, waiting[sub.SubscriberID])
-		r.statusNudges(ctx, sub, a, mine, sig, known)
+		if !onOperator[sub.SubscriberID] { // its task waits on the Operator, not on the agent: silence is not a stall (#19614)
+			r.statusNudges(ctx, sub, a, mine, sig, known)
+		}
 	}
 
 	// Re-nudge the orchestrator, once, for agents' @-mentions it has not acted on (#4176 rule 9):
