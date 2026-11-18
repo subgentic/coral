@@ -481,3 +481,53 @@ func TestAPasskeyRowIsNotASignerOfTheseMessages(t *testing.T) {
 	r.add(pk, "view", store.DeviceOriginPairing, store.DeviceKindPasskey)
 	r.refused(devicekey.ErrUnknownSigner, r.remove(pk, r.signer.kid), pk, t0)
 }
+
+// Security's MUST on slice 3: a bootstrap-origin signer cannot add a passkey (threat table).
+func TestSignerBootstrapCannotTrustAPasskey(t *testing.T) {
+	r := newRig(t)
+	boot := newSigner(t)
+	r.add(boot, "interact", store.DeviceOriginBootstrap, store.DeviceKindDevice)
+	m := r.msg(devicekey.TrustPasskey, boot)
+	m.PasskeyPK, m.Label = newSigner(t).pk, "p"
+	r.refused(devicekey.ErrSignerBootstrap, m, boot, t0)
+}
+
+// Security's SHOULD 5: two Handle calls with the same message at once accept exactly one.
+func TestHandleIsSerialized(t *testing.T) {
+	r := newRig(t)
+	target := newSigner(t)
+	r.add(target, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+	m := r.raise(r.signer, target.kid, "interact")
+	body, _ := m.Canonical()
+	sig := r.signer.sign(t, m.Action, body)
+	const n = 8
+	errs := make(chan error, n)
+	for i := 0; i < n; i++ {
+		go func() {
+			_, err := r.v.Handle(context.Background(), m.Action, body, sig, t0)
+			errs <- err
+		}()
+	}
+	ok := 0
+	for i := 0; i < n; i++ {
+		if err := <-errs; err == nil {
+			ok++
+		} else {
+			assert.ErrorIs(t, err, devicekey.ErrNonceRepeat)
+		}
+	}
+	assert.Equal(t, 1, ok)
+}
+
+// Security's SHOULD 3: a nonce lives for the window plus twice the skew, and is dropped only once strictly past that.
+func TestNonceKeptForWindowPlusTwiceTheSkewEdge(t *testing.T) {
+	r := newRig(t)
+	target := newSigner(t)
+	r.add(target, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+	m := r.raise(r.signer, target.kid, "interact") // short window: 5 min
+	_, err := r.handle(m, r.signer, t0)
+	require.NoError(t, err)
+	keep := 5*time.Minute + 2*5*time.Minute
+	assert.ErrorIs(t, r.ss.RecordNonce(context.Background(), m.Nonce, r.signer.kid, t0.Add(keep), 5*time.Minute), store.ErrNonceRepeat, "still kept at exactly the end")
+	assert.NoError(t, r.ss.RecordNonce(context.Background(), m.Nonce, r.signer.kid, t0.Add(keep+time.Second), 5*time.Minute), "gone one second later")
+}

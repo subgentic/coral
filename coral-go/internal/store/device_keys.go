@@ -279,7 +279,7 @@ func checkClock(ctx context.Context, q deviceQuerier, now time.Time) error {
 	return nil
 }
 
-// RecordNonce accepts a message's nonce in one transaction: the clock check, the repeat check, the count cap, then the insert and the high-water mark. It is kept for the message's window plus the 5 minute skew. A refused call writes nothing.
+// RecordNonce accepts a message's nonce in one transaction: the clock check, the repeat check, the count cap, then the insert and the high-water mark. It is kept for the message's window plus twice the 5 minute skew. A refused call writes nothing.
 func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now time.Time, window time.Duration) error {
 	if b, err := base64.RawURLEncoding.Strict().DecodeString(nonce); err != nil || len(nonce) != deviceNonceLen || len(b) != 16 {
 		return ErrNonceForm
@@ -292,7 +292,7 @@ func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now t
 	if err := checkClock(ctx, tx, now); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM device_nonces WHERE nonce = ? AND expires_at <= ?`, nonce, now.Unix()); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM device_nonces WHERE nonce = ? AND expires_at < ?`, nonce, now.Unix()); err != nil {
 		return err
 	}
 	var one int
@@ -303,20 +303,20 @@ func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now t
 		return err
 	}
 	var live int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM device_nonces WHERE expires_at > ?`, now.Unix()).Scan(&live); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM device_nonces WHERE expires_at >= ?`, now.Unix()).Scan(&live); err != nil {
 		return err
 	}
 	if live >= deviceNonceCap {
 		return ErrNonceStoreFull
 	}
 	var mine int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM device_nonces WHERE kid = ? AND expires_at > ?`, kid, now.Unix()).Scan(&mine); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM device_nonces WHERE kid = ? AND expires_at >= ?`, kid, now.Unix()).Scan(&mine); err != nil {
 		return err
 	}
 	if mine >= deviceNonceKidShare {
 		return ErrNonceStoreFull
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO device_nonces (nonce, kid, accepted_at, expires_at) VALUES (?, ?, ?, ?)`, nonce, kid, now.Unix(), now.Add(window+deviceNonceSkew).Unix()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO device_nonces (nonce, kid, accepted_at, expires_at) VALUES (?, ?, ?, ?)`, nonce, kid, now.Unix(), now.Add(window+2*deviceNonceSkew).Unix()); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO device_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = MAX(v, excluded.v)`, deviceHighWaterKey, now.Unix()); err != nil {
@@ -327,7 +327,7 @@ func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now t
 
 // PruneNonces drops the nonces whose keep time is over.
 func (s *SessionStore) PruneNonces(ctx context.Context, now time.Time) (int, error) {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM device_nonces WHERE expires_at <= ?`, now.Unix())
+	res, err := s.db.ExecContext(ctx, `DELETE FROM device_nonces WHERE expires_at < ?`, now.Unix())
 	if err != nil {
 		return 0, err
 	}

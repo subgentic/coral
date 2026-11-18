@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/subgentic/coral/internal/store"
@@ -59,6 +60,8 @@ type Verifier struct {
 	Computer string // this computer's fingerprint: a body for any other is refused
 	// RefuseBefore, when set, refuses every message whose ts is earlier. Coral sets it to its start time plus the window when the nonce store could not be read at start (design page v4 section 4, `before_start`).
 	RefuseBefore time.Time
+
+	mu sync.Mutex // one message at a time: the nonce check and the apply are not racing each other
 }
 
 func window(a Action) time.Duration {
@@ -71,6 +74,8 @@ func window(a Action) time.Duration {
 // Handle verifies one message and, only when every check has passed, records its nonce, touches the signer and applies it. The order is the cheap, secret-free checks first, the signature, then authority; a refusal at any step
 // changes nothing. sig is the P1363 signature, base64url without padding.
 func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string, now time.Time) (Message, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	m, err := Parse(a, body)
 	if err != nil {
 		return Message{}, err
@@ -134,7 +139,7 @@ func mapStoreErr(err error) error {
 func (v *Verifier) authorize(ctx context.Context, m Message, signer store.DeviceKey, now time.Time) (store.DeviceKey, tunnel.Mode, error) {
 	var none store.DeviceKey
 	switch m.Action {
-	case ApproveDevice, RaiseMode:
+	case ApproveDevice, RaiseMode, TrustPasskey:
 		if signer.Origin == store.DeviceOriginBootstrap {
 			return none, 0, ErrSignerBootstrap
 		}

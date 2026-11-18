@@ -274,8 +274,8 @@ func TestNonceRepeatRefusedWithinWindow(t *testing.T) {
 	require.NoError(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0, win5))
 	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(4*time.Minute), win5), store.ErrNonceRepeat)
 	// kept for the window plus the 5 minute skew: still refused at 9 min 59 s, free at 10 min
-	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(10*time.Minute-time.Second), win5), store.ErrNonceRepeat)
-	assert.NoError(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(10*time.Minute), win5))
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(15*time.Minute), win5), store.ErrNonceRepeat)
+	assert.NoError(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(15*time.Minute+time.Second), win5))
 }
 
 func TestNonceSurvivesReopen(t *testing.T) {
@@ -299,7 +299,7 @@ func TestNonceStoreFullRefusesBeforeDropping(t *testing.T) {
 	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n3"), "kid", dkT0.Add(time.Second), win5), store.ErrNonceStoreFull)
 	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n0"), "kid", dkT0.Add(time.Second), win5), store.ErrNonceRepeat, "the oldest was not dropped to make room")
 	// when the earliest expires, room appears
-	assert.NoError(t, ss.RecordNonce(ctx, nn("n3"), "kid", dkT0.Add(10*time.Minute), win5))
+	assert.NoError(t, ss.RecordNonce(ctx, nn("n3"), "kid", dkT0.Add(16*time.Minute), win5))
 }
 
 func TestClockSetBackIsRefused(t *testing.T) {
@@ -317,10 +317,10 @@ func TestPruneNoncesDropsOnlyExpired(t *testing.T) {
 	ss, ctx := dkStore(t), context.Background()
 	require.NoError(t, ss.RecordNonce(ctx, nn("short"), "k", dkT0, win5))
 	require.NoError(t, ss.RecordNonce(ctx, nn("long"), "k", dkT0, 24*time.Hour))
-	n, err := ss.PruneNonces(ctx, dkT0.Add(11*time.Minute))
+	n, err := ss.PruneNonces(ctx, dkT0.Add(16*time.Minute))
 	require.NoError(t, err)
 	assert.Equal(t, 1, n)
-	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("long"), "k", dkT0.Add(11*time.Minute), 24*time.Hour), store.ErrNonceRepeat)
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("long"), "k", dkT0.Add(16*time.Minute), 24*time.Hour), store.ErrNonceRepeat)
 }
 
 // The nonce must be the 22-character base64url form of 16 bytes (coral-hub Lead's note B): anything else is refused before the store is touched.
@@ -386,5 +386,5 @@ func TestNonceCapHasAPerKidShare(t *testing.T) {
 	}
 	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("a4"), "kidA", dkT0, win5), store.ErrNonceStoreFull, "kid A is at its share")
 	assert.NoError(t, ss.RecordNonce(ctx, nn("b0"), "kidB", dkT0, win5), "kid B is not blocked by kid A")
-	assert.NoError(t, ss.RecordNonce(ctx, nn("a4"), "kidA", dkT0.Add(10*time.Minute), win5), "A's earlier nonces expired: room again")
+	assert.NoError(t, ss.RecordNonce(ctx, nn("a4"), "kidA", dkT0.Add(16*time.Minute), win5), "A's earlier nonces expired: room again")
 }
