@@ -78,6 +78,7 @@ async function load(key) {
             if (!r.ok) throw new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
         } else if (key === 'tasks') {
+            if (isCloud()) throw new Error('closed on Coral Hub'); // this computer's own route: never asked of Coral Hub's origin (#19591)
             const r = await serverFetch('local', `/api/analytics/tasks?range=${encodeURIComponent(m.range)}&group_by=${encodeURIComponent(m.group)}${m.reviews ? '&reviews=1' : ''}`);
             if (seq !== m.seq) return;
             if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = 'guest'; m.data = null; draw(key); return; }

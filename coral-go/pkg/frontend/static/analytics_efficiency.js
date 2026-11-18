@@ -5,7 +5,7 @@
  * are written by agents. Lazy: cost_dashboard.js imports it. */
 import { importOnce } from './import_once.js';
 import { browserLocal } from './safe_storage.js';
-import { serverFetch } from './server_base.js';
+import { serverFetch, isCloud } from './server_base.js';
 
 const { dataTable, el } = await importOnce('./data_table.js'); // the shared table
 const { fmtTokens, fmtDur } = await importOnce('./analytics_spend.js'); // a figure as a person reads it
@@ -76,6 +76,7 @@ function sync(key) {
 async function read(cfg, group, signal) {
     const server = machineNow(); // the computer picked on a Hub-served dashboard (this one otherwise, #15730)
     if (!machineOnline(server)) throw new Error(`${machineLabel(server)} is offline, so its comparison cannot be read.`);
+    if (isCloud() && server === 'local') throw new Error('Coral Hub has no computer of its own to read'); // never a same-origin read in cloud (#19591)
     const r = server === 'local' ? await fetch(`/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}`, { signal }) : await serverFetch(server, `/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}`, { signal });
     if (!r.ok) throw new Error(server === 'local' ? `Could not load the comparison (${r.status}).` : `${machineLabel(server)} would not give its comparison (${r.status}): it may be an older Coral that needs an update.`);
     const d = await r.json();
