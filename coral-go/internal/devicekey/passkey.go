@@ -17,9 +17,6 @@ import (
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// ErrBadAssertion: the WebAuthn assertion is not the one a passkey would make for this certificate on this computer (type, origin, rp id hash, flags, challenge or shape). One fixed code for all of them: it says nothing of which.
-var ErrBadAssertion = errors.New("bad_assertion")
-
 const (
 	maxCertField      = 2048 // each text field of a certificate, before it is decoded
 	maxClientData     = 1024 // clientDataJSON, raw bytes (draft 10)
@@ -88,7 +85,7 @@ func (v *Verifier) HandleCertificate(ctx context.Context, c Certificate, now tim
 	}
 	want := Challenge(v.Computer, c.Label, devRaw, c.Ts)
 	if !v.assertionOK(ad, cd, want) {
-		return none, ErrBadAssertion
+		return none, ErrBadSignature
 	}
 	// No credential id is trusted: each active passkey (at most 5) is tried, and the one fixed code is bad_signature however it failed.
 	msg := append(append([]byte{}, ad...), sum(cd)...)

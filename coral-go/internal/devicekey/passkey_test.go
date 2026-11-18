@@ -44,6 +44,7 @@ type assertion struct {
 	signWith          *ecdsa.PrivateKey
 	extraClient       map[string]any // more clientDataJSON keys
 	rawClient         string         // clientDataJSON as given, when set
+	dupType           bool           // the valid clientDataJSON with its type key repeated
 	adExtra           []byte         // bytes after the 37
 	computer          string         // the fingerprint the challenge was made for
 }
@@ -85,6 +86,9 @@ func (r *pkRig) cert(dev signer, a *assertion) devicekey.Certificate {
 	}
 	cd, err := json.Marshal(km)
 	require.NoError(r.t, err)
+	if a.dupType {
+		cd = append([]byte(`{"type":"webauthn.get",`), cd[1:]...) // everything else valid: only the repeated key is wrong
+	}
 	if a.rawClient != "" {
 		cd = []byte(a.rawClient)
 	}
@@ -128,7 +132,7 @@ func TestACertificateWithoutAHubOriginConfiguredIsRefused(t *testing.T) {
 	r := newPkRig(t)
 	r.v.HubOrigin = ""
 	dev := newSigner(t)
-	r.refused(devicekey.ErrBadAssertion, r.cert(dev, nil), dev, t0)
+	r.refused(devicekey.ErrBadSignature, r.cert(dev, nil), dev, t0)
 }
 
 func TestACertificateNamesNoPasskeyAndAnyOfTheActiveOnesMaySign(t *testing.T) {
@@ -165,12 +169,13 @@ func TestACertificateIsRefusedForEachWrongAssertionField(t *testing.T) {
 		"top origin":     {extraClient: map[string]any{"topOrigin": hubOrigin}},
 		"attested data":  {flags: 0x45, adExtra: []byte{1}},
 		"38 bytes":       {adExtra: []byte{0}},
-		"dup key":        {rawClient: `{"type":"webauthn.get","type":"webauthn.get","origin":"` + hubOrigin + `","challenge":"x"}`},
+		"dup type key":   {dupType: true},
+		"dup key raw":    {rawClient: `{"type":"webauthn.get","type":"webauthn.get","origin":"` + hubOrigin + `","challenge":"x"}`},
 		"trailing":       {rawClient: `{"type":"webauthn.get"} {}`},
 	} {
 		dev := newSigner(t)
 		c := r.cert(dev, a)
-		assert.ErrorIs(t, r.handle(c, t0), devicekey.ErrBadAssertion, name)
+		assert.ErrorIs(t, r.handle(c, t0), devicekey.ErrBadSignature, name)
 		_, ok := r.listed(dev.kid)
 		assert.False(t, ok, name)
 	}
@@ -181,14 +186,14 @@ func TestACertificateChallengeBindsLabelDeviceKeyAndTime(t *testing.T) {
 	dev := newSigner(t)
 	c := r.cert(dev, nil)
 	c.Label = "Other name" // the label changed after the passkey signed
-	r.refused(devicekey.ErrBadAssertion, c, dev, t0)
+	r.refused(devicekey.ErrBadSignature, c, dev, t0)
 	other := newSigner(t)
 	c = r.cert(dev, nil)
 	c.DevicePK = other.pk // a different device key under the same signature
-	r.refused(devicekey.ErrBadAssertion, c, other, t0)
+	r.refused(devicekey.ErrBadSignature, c, other, t0)
 	c = r.cert(dev, nil)
 	c.Ts++
-	r.refused(devicekey.ErrBadAssertion, c, dev, t0)
+	r.refused(devicekey.ErrBadSignature, c, dev, t0)
 }
 
 func TestACertificateSignedByAnotherKeyIsRefused(t *testing.T) {
@@ -308,6 +313,6 @@ func TestACertificateWithAnOriginWithAPortOrPathHubRecordIsRefused(t *testing.T)
 	for _, o := range []string{"http://app.coralhub.dev", hubOrigin + "/", hubOrigin + ":8443", "app.coralhub.dev"} {
 		r.v.HubOrigin = o
 		dev := newSigner(t)
-		r.refused(devicekey.ErrBadAssertion, r.cert(dev, &assertion{origin: o}), dev, t0)
+		r.refused(devicekey.ErrBadSignature, r.cert(dev, &assertion{origin: o}), dev, t0)
 	}
 }
