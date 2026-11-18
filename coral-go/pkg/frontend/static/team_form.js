@@ -126,7 +126,7 @@ function mountMembers(modal) {
     const fields = [
         { key: 'template', type: 'custom', label: 'Choose a team template', help: 'Default team has coding roles. For other work, choose a template or Describe your team.', wide: true, render: slot => slot.append(take('.team-template-row')) },
         { key: 'describe', type: 'custom', label: ' ', wide: true, render: slot => slot.append(take('#team-wizard-panel')) }, // "Describe your team" opens here, under the template, not in a second dialog
-        { key: 'workers', type: 'custom', label: 'Everyone runs as', help: 'Every worker takes these unless you set it by hand. The built-in Orchestrator takes the Mode too; one you set by hand keeps its own.', render: slot => slot.append(take('#team-allworkers')) },
+        { key: 'workers', type: 'custom', label: 'Everyone runs as', help: 'Workers take these unless set by hand. The built-in Orchestrator takes Model and Mode too; one you set by hand keeps its own.', render: slot => slot.append(take('#team-allworkers')) },
         { key: 'members', type: 'custom', label: 'Members', wide: true, render: slot => { slot.append(take('#team-agents-count'), take('.team-agents-container')); } },
     ];
     _members = mountSettingsView(host, { mode: 'form', fields });
