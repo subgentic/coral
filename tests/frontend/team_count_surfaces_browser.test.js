@@ -36,10 +36,7 @@ const BASE = require('./test_base').BASE;
             await ev(`window.openTeamPage('${team}', { tab: 'tasks' }).then(() => true)`);
             await waitFor(`!!document.querySelector('#team-panel-tasks [data-filter="open"]') && !/Loading tasks/.test(document.getElementById('team-panel-tasks').textContent)`, 'team tasks loaded');
             const tasks = await ev(`({ pill: document.querySelector('#team-panel-tasks [data-filter="open"]').textContent.trim(), rows: document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length })`);
-            // #16686 is held out of rc4; enable this pin when its Open semantics land.
-            const openExcludesDone = process.env.CORAL_TEST_16686 === '1';
-            if (openExcludesDone) check(/Open\s*0/.test(tasks.pill) && tasks.rows === 0, `${width} item1 Open excludes completed tasks`, tasks);
-            else console.log(`${width} item1 SKIP: waits for held #16686 (set CORAL_TEST_16686=1 when landed)`);
+            check(/Open\s*0/.test(tasks.pill) && tasks.rows === 0, `${width} item1 Open excludes completed tasks (#17130)`, tasks);
             await shot(`tasks-${width}`);
             await ev(`window.openTeamPage('${team}', { tab: 'goals' }).then(() => true)`);
             await waitFor(`!/Loading goals/.test(document.getElementById('team-panel-goals').textContent) && /Active/.test(document.getElementById('team-panel-goals').textContent)`, 'goal filters loaded');
