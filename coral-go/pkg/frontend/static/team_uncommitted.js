@@ -1,5 +1,5 @@
 /* The team page's line about work an agent left uncommitted (#17203): "Files changed in <folder>, not committed: N changed, M new" with Review changes (the list) and Commit (one local commit, never pushed). Lazy, loaded by the team page. */
-import { teamFetch, boardFetch, splitKey } from './server_base.js';
+import { teamFetch, boardFetch, splitKey, isCloud } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_uncommitted.css'); // the line's layout: not at start
 
@@ -15,6 +15,7 @@ async function readRepos(team) {
 
 /** Reads the team's folders and draws one line per folder with work not committed; none draws nothing. Into the team page's slot, or into the box given (the goal page, #17284). */
 export async function refreshUncommitted(team, into) {
+    if (isCloud()) return; // the read and Commit run git on the computer: neither is in the Hub's tunnel (#19630)
     const box = into || $('team-page-uncommitted'); if (!box) return;
     const mine = (box._uncSeq = (box._uncSeq || 0) + 1);
     box.dataset.uncommittedHost = '1';
@@ -97,6 +98,7 @@ const notes = new Map(), asked = new Map(); // team -> words, team -> when last 
 export const noteFor = (team) => notes.get(team) || '';
 /** Reads the team's folder (at most every 30 s) and calls changed() when the words differ (#17284). */
 export async function loadNote(team, changed) {
+    if (isCloud()) return;
     const now = Date.now();
     if (now - (asked.get(team) || 0) < 30000) return;
     asked.set(team, now);

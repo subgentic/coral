@@ -24,6 +24,8 @@ func concretePath(pattern string) string {
 		switch {
 		case s == "{hex64}":
 			segs[i] = strings.Repeat("ab", 32)
+		case s == "{hex32}":
+			segs[i] = strings.Repeat("ab", 16)
 		case s == "{uiid}":
 			segs[i] = "panel-1"
 		case strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}"):

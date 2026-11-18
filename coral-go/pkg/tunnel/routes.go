@@ -68,7 +68,7 @@ func Lower(a, b Mode) Mode {
 }
 
 // route is "METHOD /path/{param}/more": a {param} matches exactly one non-empty
-// segment, except {hex64}, which matches exactly 64 lowercase hex digits (a content digest). There are no prefix or wildcard rules, so a rule can never swallow a
+// segment, except {hex64}, which matches exactly 64 lowercase hex digits (a content digest), and {hex32}, exactly 32 (a skill's id). There are no prefix or wildcard rules, so a rule can never swallow a
 // sibling route.
 type route struct {
 	method  string // "*" matches every method (used for explicit TierNever rules)
@@ -225,7 +225,6 @@ var routeTable = cat(
 		"/api/goals/metrics", "/api/call-metrics/summary",
 		"/api/tags", "/api/folder-tags", "/api/folder-tags/{name}", "/api/pinned-folders",
 		// The Operator's saved messages (#4510): his own bookmarks, snippets redacted when saved.
-		"/api/scheduled/jobs", "/api/scheduled/jobs/{id}", "/api/scheduled/jobs/{id}/runs", "/api/scheduled/runs/recent", "/api/automations/runs", // Recent runs as pages (#13183): the same View-tier read as /api/scheduled/runs/recent, a page at a time (the connector redacts its reply like the old one: View routes are redacted by default)
 		"/api/themes", "/api/themes/variables", "/api/themes/{name}",
 		"/api/templates/agents", "/api/templates/agents/{category}", "/api/templates/agents/{category}/{name}",
 		"/api/templates/commands", "/api/templates/commands/{category}", "/api/templates/commands/{category}/{name}",
@@ -277,6 +276,14 @@ var routeTable = cat(
 		// Every team's artifacts in one list (Goal #62, the Inbox's Artifacts folder): the team route's query plus team, one cursor, the owner's alone like the per-team read.
 		"/api/team-artifacts",
 	)),
+	// A pasted image of a chat and a done task's changes.diff, through the Hub (#19629, coral-hub's point 7 of the #19626 audit): the pages ask for both and the table had neither, so a Hub chat showed
+	// no thumbnail and a done task no diff. Reads, and the OWNER's alone like the artifact reads above: an image in a transcript and a diff can hold anything the agents saw. The image is named by a
+	// 32-hex reference the handler validates (400 otherwise) and found again in the session's own transcript; its query is session_id and agent_type (the page leaves working_directory off through a
+	// hub, and an absolute path is refused here as it is for the chat). The diff reaches the Hub through the handler's own filter (cloud.Tunneled: sensitive and binary files left out, capped).
+	owner(OwnerRefuse, rules(http.MethodGet, TierView,
+		"/api/sessions/live/{name}/attachment/{ref}",
+		"/api/board/{project}/tasks/{id}/changes.diff",
+	)),
 	// A comment, a reply (the same route with a parent_id) and a resolve or reopen, through the Hub (#7052, the Hub's #7039 request): the OWNER's alone, as the artifact reads are (#5575). A comment changes state on this
 	// computer and runs nothing, so Interact; the machine's own mode still caps it. Edit and delete (PATCH, DELETE), send (hands a thread to an agent), the lock and an agent's reply (POST .../{id}/reply, which is never a person's
 	// and refuses anything tunnelled) stay unlisted.
@@ -291,8 +298,22 @@ var routeTable = cat(
 	// skill's line into a running agent (Interact), so the machine's own mode still caps it. Approval of a skill stays the person's act on the computer.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/skills/search")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/skills")),
+	// The Skills page's two reads through the Hub (#19627, coral-hub's Operator yes, #19626 section 4): the list (with its one status filter) and one skill's page, the computer OWNER's alone. The server cuts
+	// both replies to an allow-list (its SKILL.md text alone, redacted and capped, never another file, a scanner line or a host). A skill's id is exactly 32 lowercase hex digits ({hex32}). Import, approve, reject and
+	// remove stay unlisted: they are the person's act on the computer.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/skills", "/api/skills/{hex32}")),
 	// A picture for a new goal's description (#11650): the owner's alone, like the goal it goes in.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goal-images")),
+	// A question from an agent that is on no team, in the Hub's own Needs you (#19628, the Hub's beta): answering types the answer into that agent, dismissing tells it, and a picture for the answer is kept as the agent's
+	// file. The OWNER's alone through the Hub, as an ask's Ignore is (#13446): the machine refuses anyone else (403 owner_only) before the handler runs, and each handler checks the owner again. They type into an agent
+	// or write a file, so Interact, and the machine's own mode still caps them. The picture is the raw file as the body: the machine decides its type by its bytes and cuts it at the upload route's size.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract,
+		"/api/agent-asks/{id}/answer",
+		"/api/agent-asks/{id}/dismiss",
+		"/api/agent-asks/{id}/images",
+	)),
+	// What happened while the person was away, as counts (#19628): the OWNER's alone and read-only; it names no task, team or agent.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/away")),
 	// The rest of the owner's artifact work through the Hub (#11354, the operator's rule: the owner gets everything): the version list and series reads (their handlers already refuse a non-owner), the edit and
 	// delete of a comment and the lock (the comment policy still decides: the owner edits and deletes what they wrote, the lock is the owner's), and the change-request send, which hands the owner's own words (redacted,
 	// cut, quoted as untrusted data) to an agent: agent input, so Launch, as the other routes that type into an agent. A series DELETE stays unlisted (it removes every version) and so does an agent's reply (POST
@@ -402,10 +423,15 @@ var routeTable = cat(
 	// ── interact: typing into running agents, and changing running work ──
 	// Workflows are not for a view-only Hub viewer (the operator, 2026-10-23 16:20Z): their definitions are commands that run later and a run's detail carries command output, so reading them
 	// needs Interact like starting one (Launch) or stopping one. A viewer at View sees no workflow at all: not the list, not a run, not its failure reason.
-	rules(http.MethodGet, TierInteract,
+	// The Automations reads are the owner's alone (#19570, coral-hub's design §7.3.5): the machine refuses anyone else (403 owner_only) before a handler runs, and what the owner is sent is cut to coral-hub's
+	// accepted list of fields (routes.HubFields). Jobs and runs were View, workflows Interact: each keeps its tier.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView,
+		"/api/scheduled/jobs", "/api/scheduled/jobs/{id}", "/api/scheduled/jobs/{id}/runs", "/api/scheduled/runs/recent", "/api/automations/runs",
+	)),
+	owner(OwnerRefuse, rules(http.MethodGet, TierInteract,
 		"/api/workflows", "/api/workflows/runs/recent", "/api/workflows/by-name/{name}", "/api/workflows/{id}",
 		"/api/workflows/{id}/runs", "/api/workflows/runs/{id}",
-	),
+	)),
 	rules(http.MethodPost, TierInteract,
 		// A panel interaction and a request to the agent put user text in front of an agent, like send.
 		"/api/agent/ui/{uiid}/events",
@@ -877,6 +903,12 @@ func matchSegments(pattern string, segs []string) bool {
 			}
 			continue
 		}
+		if ps == "{hex32}" {
+			if !isHex32(segs[i]) {
+				return false
+			}
+			continue
+		}
 		if ps == "{uiid}" {
 			if !isUIID(segs[i]) {
 				return false
@@ -915,8 +947,13 @@ func FrameTier(decodedPath string, data []byte) Tier {
 }
 
 // isHex64 reports whether s is exactly 64 lowercase hexadecimal digits.
-func isHex64(s string) bool {
-	if len(s) != 64 {
+func isHex64(s string) bool { return isLowerHex(s, 64) }
+
+// isHex32 reports whether s is exactly 32 lowercase hex digits (a skill's id).
+func isHex32(s string) bool { return isLowerHex(s, 32) }
+
+func isLowerHex(s string, n int) bool {
+	if len(s) != n {
 		return false
 	}
 	for i := 0; i < len(s); i++ {

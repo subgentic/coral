@@ -11,6 +11,8 @@ import { registerGroupSource, openGroupTable, refreshGroupTable } from './sideba
 import { setHidden } from './dom_write.js';
 import { announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
+import { isCloud } from './server_base.js';
+const CLOUD = isCloud() ? await importOnce('./automations_cloud.js') : null;
 const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot at the toolbar's end (#15063)
 const PH = await importOnce('./page_header.js'); // the shared page header: title, More and the Primary, then the search row (#15814)
 import { jobList, onJobsChanged, refreshJobs, selectScheduledJob, openJobId, scheduleOf, nextOf, offWord } from './scheduler.js';
@@ -20,10 +22,10 @@ const DT = await importOnce('./data_table.js'); // a lazy module imports only wh
 const VL = await importOnce('./view_list.js');
 const IT = await importOnce('./inbox_toolbar.js');
 const AF = await importOnce('./automation_filters.js');
-const W = await importOnce('./workflows.js');
-const AR = await importOnce('./automation_runs.js');
+const W = CLOUD ? null : await importOnce('./workflows.js');
+const AR = CLOUD ? null : await importOnce('./automation_runs.js');
 const SM = await importOnce('./status_mark.js'); // the one status mark: shape and word (#15813)
-const AQ = await importOnce('./automations_queue.js'); // the Queue folder: this computer's resource queue (#13651)
+const AQ = CLOUD ? null : await importOnce('./automations_queue.js'); // the Queue folder: this computer's resource queue (#13651)
 
 const $ = id => document.getElementById(id);
 const FOLDERS = [
@@ -315,7 +317,7 @@ function folderTable(key) {
         }).el };
 }
 
-registerGroupSource('automations', {
+if (!CLOUD) registerGroupSource('automations', {
     signature: () => JSON.stringify([folder]),
     toolbar: key => (folderOf(key) ? toolbarOf(key) : null),
     keys: () => FOLDERS.map(f => f.key),
@@ -342,6 +344,7 @@ function mount() {
 
 /** Called by switchNavTab('automations'): the folders are drawn and the folder that was on screen opens, unless an item's page is the address (the route handler opens that). */
 export function showAutomationsTab() {
+    if (CLOUD) return CLOUD.showAutomationsTab();
     mount();
     renderNav(true);
     refreshJobs();
@@ -361,6 +364,7 @@ export function showAutomationsTab() {
 
 /** The route handler's call (app_routes.js): the folder, or the job, workflow or run, the address names. false when the item is not there. */
 export async function openAutomationsRoute(r) {
+    if (CLOUD) return CLOUD.openAutomationsRoute(r);
     mount();
     renderNav(true);
     const key = folderOf(r.folder) ? r.folder : folder;
@@ -393,6 +397,7 @@ export async function openAutomationsRoute(r) {
 
 /** An item's page (or a deleted item's) goes back to its folder: one step back when the entry before is the folder, else the folder's address. */
 export function backToFolder(key) {
+    if (CLOUD) return CLOUD.backToFolder(key);
     const open = key === 'workflows' ? W.openWorkflowId() : openJobId();
     if (!opener && open) opener = { key: open, scroll: 0 }; // the item that was open gets the keyboard back, however it was opened
     const route = routeOf(folderOf(key) ? key : 'jobs'), prev = history.state && history.state.prev;
@@ -400,7 +405,7 @@ export function backToFolder(key) {
 }
 
 /** The sidebar's search box was typed in (app_actions.js): it narrows the folder on screen, and the page's box shows the same words. */
-export function filterAutomations(value) { setFilters(folder, { ...filtersOf(folder), q: String(value || '').trim() }); renderNav(true); }
+export function filterAutomations(value) { if (CLOUD) return CLOUD.filterAutomations(value); setFilters(folder, { ...filtersOf(folder), q: String(value || '').trim() }); renderNav(true); }
 
 registerActions({
     'automations-back': el => backToFolder(textOf(el.dataset.folder)),

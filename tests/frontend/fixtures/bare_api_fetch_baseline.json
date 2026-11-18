@@ -21,17 +21,9 @@
       "count": 1,
       "reason": "this computer's own board list: the remote computers' lists are read next to it with serverFetch"
     },
-    "cost_dashboard.js": {
-      "count": 8,
-      "reason": "the Analytics page is this computer's: every one of its cost routes is a bare path, and the page has no computer switch"
-    },
     "dropbox_connected.js": {
       "count": 1,
       "reason": "Share via Dropbox (#14944): the Dropbox status, read only for this computer's own file or board outside Coral Hub, to show the share entries; Dropbox is this computer's alone"
-    },
-    "inbox_away.js": {
-      "count": 1,
-      "reason": "the While you were away line counts what finished on this computer; it is the person's own, and the Inbox's Needs you list it sits in has no computer switch"
     },
     "job_form.js": {
       "count": 6,

@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/skills"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tracking"
@@ -54,6 +55,9 @@ func validSkillID(id string) bool { return len(id) == 32 && strings.Trim(id, "01
 
 // ListSkillsOperator: GET /api/skills[?status=pending|approved|rejected]. Every skill but the removed ones, newest first.
 func (h *SkillsHandler) ListSkillsOperator(w http.ResponseWriter, r *http.Request) {
+	if refuseSkillReadUnlessOwner(w, r) { // through the Hub the owner's alone, before anything is read (#19627)
+		return
+	}
 	if refuseUnlessOperator(w, r, "read the skills") {
 		return
 	}
@@ -77,12 +81,19 @@ func (h *SkillsHandler) ListSkillsOperator(w http.ResponseWriter, r *http.Reques
 		out = append(out, v)
 	}
 	w.Header().Set("Cache-Control", "no-store")
+	if cloud.Tunneled(r) {
+		writeJSON(w, http.StatusOK, hubSkillList(out)) // the allow-listed fields only (#19627)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"skills": out})
 }
 
 // GetSkillOperator: GET /api/skills/{id}. The approval view's data: the row, every file with its size, kind and SHA-256, the text of every file that can be shown as text, and what the scanner
 // found in the scripts. A removed skill has only its tombstone.
 func (h *SkillsHandler) GetSkillOperator(w http.ResponseWriter, r *http.Request) {
+	if refuseSkillReadUnlessOwner(w, r) { // through the Hub the owner's alone, before anything is read (#19627)
+		return
+	}
 	if refuseUnlessOperator(w, r, "read a skill") {
 		return
 	}
@@ -103,6 +114,10 @@ func (h *SkillsHandler) GetSkillOperator(w http.ResponseWriter, r *http.Request)
 	out := map[string]any{"skill": sv}
 	w.Header().Set("Cache-Control", "no-store")
 	if row.Status == store.SkillRemoved {
+		if cloud.Tunneled(r) {
+			writeJSON(w, http.StatusOK, hubSkillPage(sv, nil))
+			return
+		}
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
@@ -119,6 +134,10 @@ func (h *SkillsHandler) GetSkillOperator(w http.ResponseWriter, r *http.Request)
 	contents := make(map[string]string, len(sk.Content))
 	for p, b := range sk.Content {
 		contents[p] = string(b)
+	}
+	if cloud.Tunneled(r) {
+		writeJSON(w, http.StatusOK, hubSkillPage(sv, sk)) // the allow-listed fields only: no other file's text, no scanner line (#19627)
+		return
 	}
 	scan := skills.Scan(sk)
 	out["files"], out["contents"], out["warnings"], out["hosts"] = sk.Files, contents, scan.Warnings, scan.Hosts

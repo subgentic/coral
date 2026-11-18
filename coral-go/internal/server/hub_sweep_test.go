@@ -143,14 +143,19 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/artifacts/{id}/versions": true, "/api/artifacts/series/{series_id}": true, "/api/artifacts/series/{series_id}/versions": true, // the owner's version list and series reads (#11354)
 		"/api/board/{project}/proposals": true, "/api/proposals": true, // what agents asked to add is the owner's alone through the hub (#11389)
 		"/api/operator-asks": true, // the questions agents asked the Operator are the owner's alone (#11417)
+		"/api/away":          true, // the away counts are the owner's alone (#19628)
 		"/api/needs-you":     true, // what is waiting for the Operator is the owner's alone (#11596)
 		"/api/activity":      true, // the record of what the Operator did in Needs you, read only, the owner's alone (#12070)
 		"/api/chief":         true, // which agent the Operator recorded as Chief is the owner's alone through the hub (#11470)
 		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
 		"/api/board/{project}/artifacts/{digest}/edit": true, "/api/board/{project}/artifacts/{digest}/edit/send": true, // what the Markdown editor may do with a file is the owner's alone (#13757)
 		"/api/custom-modes": true, "/api/custom-models": true, // the custom models are the owner's alone through the hub (#5996)
-		"/api/skills/search": true, // the skills menu is the owner's alone through the hub (#19430)
-		"/api/resources":     true} // the resource queue's list is the owner's alone through the hub, notes redacted (#16140)
+		"/api/skills/search":  true,                                                                                                                                                   // the skills menu is the owner's alone through the hub (#19430)
+		"/api/scheduled/jobs": true, "/api/scheduled/jobs/{jobID}": true, "/api/scheduled/jobs/{jobID}/runs": true, "/api/scheduled/runs/recent": true, "/api/automations/runs": true, // the automations reads are the owner's alone, with a field list (#19570)
+		"/api/workflows": true, "/api/workflows/runs/recent": true, "/api/workflows/by-name/{name}": true, "/api/workflows/{workflowID}": true, "/api/workflows/{workflowID}/runs": true, "/api/workflows/runs/{runID}": true,
+		"/api/board/{project}/tasks/{taskID}/changes.diff": true, "/api/sessions/live/{name}/attachment/{ref}": true, // a task's diff and a chat's pasted image are the owner's alone through the hub (#19629)
+		"/api/skills": true, "/api/skills/{id}": true, // the Skills page's two reads are the owner's alone through the hub (#19627)
+		"/api/resources": true} // the resource queue's list is the owner's alone through the hub, notes redacted (#16140)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
 	require.NoError(t, err)
@@ -172,6 +177,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		}
 		if f[1] == "/api/artifacts/{id}" {
 			path = "/api/artifacts/" + artifactHex
+		}
+		if f[1] == "/api/skills/{id}" { // a skill id is 32 lowercase hex digits (#19627); the rig has none, so the owner's answer is the route's own 404 (the plain hub caller was refused above)
+			path = "/api/skills/" + strings.Repeat("c", 32)
 		}
 		if f[1] == "/api/artifacts/resolve" { // which artifact a shortened link means (#9841): it needs a link to answer 200 (none matches in the rig)
 			path = "/api/artifacts/resolve?link=" + artifactHex[:8]
@@ -196,6 +204,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		}
 		if f[1] == "/api/artifacts/{id}/comments" { // the comments of that artifact (#5176)
 			path = "/api/artifacts/" + artifactHex + "/comments"
+		}
+		if f[1] == "/api/sessions/live/{name}/attachment/{ref}" { // a chat's pasted image (#19629): a reference is 32 hex characters
+			path = "/api/sessions/live/" + name + "/attachment/" + strings.Repeat("ab", 16)
 		}
 		q := hubSweepQuery(f[1], sid)
 		rec := call(h, "GET", path+q, "", hub)
@@ -229,10 +240,13 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		versionsAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/versions") || strings.HasPrefix(f[1], "/api/artifacts/series/")) && (rec.Code == 404 || rec.Code == 400)
 		// The editor's capability read (#13757) names a file of the board; the rig's artifact is on no team, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
 		editAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/edit") || strings.HasSuffix(f[1], "/edit/send")) && (rec.Code == 404 || rec.Code == 409) // 409 not_an_edit: the rig's artifact is no saved edit
+		// The chat's pasted image (#19629) names an image in the session's transcript; the rig's has none, so the owner's answer is the route's own 404 "no such attachment" (the plain hub caller was refused above).
+		attachmentAbsent := f[1] == "/api/sessions/live/{name}/attachment/{ref}" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no such attachment")
+		skillAbsent := f[1] == "/api/skills/{id}" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no such skill")
 		thumbnailAbsent := f[1] == "/api/artifacts/{id}/thumbnail" && rec.Code == 404 && strings.Contains(rec.Body.String(), "thumbnail unavailable")
 		// The thread reads (#14440) need a team and a goal or task of it: the rig sends neither, so the owner's answer is the route's own 400 or 404 (the plain hub caller was refused above).
 		threadAbsent := (f[1] == "/api/thread" || f[1] == "/api/threads") && (rec.Code == 400 || rec.Code == 404)
-		if rec.Code == 200 || thumbnailAbsent || threadAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
+		if rec.Code == 200 || skillAbsent || attachmentAbsent || thumbnailAbsent || threadAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
 			answered++
 		}
 		for _, home := range homes {
@@ -268,7 +282,8 @@ func hubSweepQuery(route, sid string) string {
 		return ""
 	}
 	vals := map[string]string{"target": "Dev", "session_id": sid, "filepath": "README.md", "agent_type": "terminal", "q": "hi", "query": "hi",
-		"dir": ".", "message_index": "0", "window": "5", "pids": "1", "page": "1", "limit": "5", "subscriber_id": "x", "timeout": "1"}
+		"dir": ".", "message_index": "0", "window": "5", "pids": "1", "page": "1", "limit": "5", "subscriber_id": "x", "timeout": "1",
+		"since": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)} // since: GET /api/away (#19628)
 	var parts []string
 	for _, k := range strings.Split(allowed, ",") {
 		k = strings.TrimSuffix(k, "*")

@@ -203,10 +203,24 @@ func TestTunneledDiffsAreFiltered(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Get("/api/board/{project}/tasks/{taskID}/changes.diff", h.TaskChangesDiff)
+	// Through the Hub a task's diff is the computer owner's alone (#19629): a grantee is refused, the owner reads it (filtered).
+	oldLabel := hubOwnerLabel
+	hubOwnerLabel = func(context.Context) (string, error) { return "hub-user-0000beef", nil }
+	t.Cleanup(func() { hubOwnerLabel = oldLabel })
+	grantee := httptest.NewRequest("GET", "/api/board/team/tasks/"+strconv.FormatInt(task.ID, 10)+"/changes.diff", nil)
+	for k, v := range granteeHeaders() {
+		grantee.Header.Set(k, v)
+	}
+	gr := httptest.NewRecorder()
+	r.ServeHTTP(gr, grantee)
+	require.Equal(t, http.StatusForbidden, gr.Code)
+	require.Contains(t, gr.Body.String(), "owner_only")
 	get := func(tunneled bool) string {
 		req := httptest.NewRequest("GET", "/api/board/team/tasks/"+strconv.FormatInt(task.ID, 10)+"/changes.diff", nil)
 		if tunneled {
-			req = stamp(req)
+			for k, v := range ownerHeaders("hub-user-0000beef") {
+				req.Header.Set(k, v)
+			}
 		}
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)

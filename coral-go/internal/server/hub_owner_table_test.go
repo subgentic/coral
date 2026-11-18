@@ -45,7 +45,7 @@ func TestEveryOwnerOnlyRouteOfTheTableRefusesANonOwnerOnTheRealRouter(t *testing
 		if !route.Mode.Refuses() {
 			continue
 		}
-		segs := strings.Split(strings.ReplaceAll(route.Pattern, "{hex64}", strings.Repeat("a", 64)), "/")
+		segs := strings.Split(strings.ReplaceAll(strings.ReplaceAll(route.Pattern, "{hex64}", strings.Repeat("a", 64)), "{hex32}", strings.Repeat("a", 32)), "/")
 		for i, seg := range segs {
 			if strings.HasPrefix(seg, "{") {
 				segs[i] = "x"
@@ -103,7 +103,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/proposals/{id}/approve": "owner-only", "POST /api/board/{project}/goals/{id}/driver": "owner-only", "POST /api/board/{project}/goals/{id}/done-state": "owner-only", "POST /api/sessions/record-agents": "owner-only", "POST /api/board/{project}/goals/{id}/move": "owner-only", // #13517
 		"POST /api/board/{project}/proposals/{id}/reject": "owner-only",
 		"PUT /api/teams/detail/{name}/daily-knowledge":    "owner-only", "PUT /api/teams/detail/{name}/daily-knowledge/auto-apply": "owner-only", "POST /api/teams/detail/{name}/daily-knowledge/accept": "owner-only", "POST /api/teams/detail/{name}/daily-knowledge/revert": "owner-only", // #13928
-		"GET /api/board/{project}/artifacts": "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
+		"GET /api/board/{project}/artifacts": "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only", "GET /api/board/{project}/tasks/{id}/changes.diff": "owner-only", "GET /api/sessions/live/{name}/attachment/{ref}": "owner-only",
 		"GET /api/session-artifacts": "owner-only", "GET /api/team-artifacts": "owner-only", "GET /api/settings/prompt-inspection": "owner-only", "PUT /api/board/{project}/settings": "owner-only",
 		"POST /api/board/{project}/cross-team/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/disable": "owner-only-hub",
 		"POST /api/board/{project}/cross-team/files/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/files/disable": "owner-only-hub",
@@ -111,6 +111,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/custom-models":                       "owner-only", "PUT /api/custom-models": "owner-only", // #5996
 		"GET /api/custom-modes": "owner-only", "PUT /api/custom-modes": "owner-only", // #15950
 		"GET /api/skills/search": "owner-only", "POST /api/sessions/live/{name}/skills": "owner-only", // the $ menu through the Hub (#19430)
+		"GET /api/skills": "owner-only", "GET /api/skills/{hex32}": "owner-only", // the Skills page's two reads through the Hub (#19627)
 		"GET /api/saved":                                "owner-only",
 		"GET /api/saved/{id}/message":                   "owner-only",
 		"POST /api/saved":                               "owner-only",
@@ -132,6 +133,17 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/board/{project}/lifecycle-log":      "owner-only",
 		"GET /api/chief":                              "owner-only", // the recorded Chief, for the Hub's own Chief page (#11470)
 		"GET /api/resources":                          "owner-only", // #16140
+		"GET /api/scheduled/jobs":                     "owner-only",
+		"GET /api/scheduled/jobs/{id}":                "owner-only",
+		"GET /api/scheduled/jobs/{id}/runs":           "owner-only",
+		"GET /api/scheduled/runs/recent":              "owner-only",
+		"GET /api/automations/runs":                   "owner-only",
+		"GET /api/workflows":                          "owner-only",
+		"GET /api/workflows/runs/recent":              "owner-only",
+		"GET /api/workflows/{id}":                     "owner-only",
+		"GET /api/workflows/{id}/runs":                "owner-only",
+		"GET /api/workflows/runs/{id}":                "owner-only",
+		"GET /api/workflows/by-name/{name}":           "owner-only",
 		"GET /api/artifacts/{hex64}/private":          "owner-only", // the manager's private mark (#11457)
 		"PUT /api/artifacts/{hex64}/private":          "owner-only",
 		"GET /api/board/{project}/guide-roster":       "owner-only", // which name goes with which guide (#11457)
@@ -153,6 +165,10 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "owner-only",
 		"POST /api/board/{project}/asks/{messageID}/close":                     "owner-only", // Ignore and Undo in the owner's Needs you table on the Hub (#13446)
 		"POST /api/sessions/live/{name}/dismiss-wait":                          "owner-only",
+		"POST /api/agent-asks/{id}/answer":                                     "owner-only", // an agent's own question, answered in the Hub's Needs you (#19628)
+		"POST /api/agent-asks/{id}/dismiss":                                    "owner-only",
+		"POST /api/agent-asks/{id}/images":                                     "owner-only",
+		"GET /api/away":                                                        "owner-only", // the away counts (#19628)
 		"POST /api/sessions/live/{name}/auto-sleep":                            "owner-only", // an agent's auto-sleep switch (#12111)
 		"POST /api/sessions/live/{name}/keep-full-access":                      "owner-only", // a Codex agent's Full access across restarts (#14061)
 		"GET /api/board/{project}/artifacts/{digest}/edit":                     "owner-only",

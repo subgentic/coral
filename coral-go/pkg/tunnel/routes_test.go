@@ -712,7 +712,7 @@ func TestHubTierChanges4274(t *testing.T) {
 		{"GET", "/api/tasks/runs", TierNever},
 		{"GET", "/api/tasks/runs/7", TierNever},
 		{"POST", "/api/tasks/runs/7/kill", TierNever},
-		{"GET", "/api/board/team/tasks/9/changes.diff", TierNever},
+		{"GET", "/api/board/team/tasks/9/changes.diff", TierView}, // was never (#4274); the owner's read since #19629 (the handler filters it for the Hub)
 
 		// What coral-hub relies on stays as it was.
 		{"GET", "/api/sessions/live/agent-1/changes.diff", TierView},
@@ -864,4 +864,34 @@ func TestArtifactCommentRoutesThroughTheHub(t *testing.T) {
 	for _, bad := range []string{"/api/artifacts/" + hex[:63] + "/comments", "/api/artifacts/" + strings.ToUpper(hex) + "/comments"} {
 		assert.Equal(t, TierNever, Classify("POST", bad, ""), "POST "+bad+" is not a comments route")
 	}
+}
+
+// Chat thumbnails and a task's changes.diff through the Hub (#19629, coral-hub's point 7 of the #19626 audit): the pages' own requests were never in the table, so the Hub showed no
+// pasted image in a chat and no diff on a done task. Both are reads (view) and the OWNER's alone: a pasted image and a diff can hold anything the owner's agents saw.
+func TestChatAttachmentAndTaskDiffReachTheHubForTheOwnerOnly(t *testing.T) {
+	ref := strings.Repeat("ab", 16)
+	for _, c := range []struct{ path, query string }{
+		// chat_thumbs.js: session_id and agent_type; working_directory is left off through a hub (the table refuses an absolute path)
+		{"/api/sessions/live/001/attachment/" + ref, "session_id=abc&agent_type=claude"},
+		{"/api/sessions/live/001/attachment/" + ref, "session_id=abc"},
+		{"/api/sessions/live/001/attachment/" + ref, ""},
+		{"/api/board/proj/tasks/12/changes.diff", ""},
+	} {
+		assert.Equal(t, TierView, Classify("GET", c.path, c.query), c.path+"?"+c.query)
+		assert.Equal(t, TierView, Classify("HEAD", c.path, c.query), "HEAD "+c.path)
+		_, m := OwnerRoute("GET", c.path)
+		assert.Equal(t, OwnerRefuse, m, c.path+" is the owner's alone")
+		assert.True(t, AllowRequest(func() Mode { return TierView })("GET", c.path, c.query), c.path+" at view")
+		for _, method := range []string{"POST", "PUT", "PATCH", "DELETE"} {
+			assert.Equal(t, TierNever, Classify(method, c.path, c.query), method+" "+c.path)
+		}
+	}
+	// Only the queries the handlers read; an absolute path is refused as the chat request's is
+	assert.Equal(t, TierNever, Classify("GET", "/api/sessions/live/001/attachment/"+ref, "session_id=abc&evil=1"))
+	assert.Equal(t, TierNever, Classify("GET", "/api/sessions/live/001/attachment/"+ref, "working_directory=/etc"))
+	assert.Equal(t, TierNever, Classify("GET", "/api/board/proj/tasks/12/changes.diff", "path=/etc/passwd"))
+	// Not these routes: a longer path, a missing segment
+	assert.Equal(t, TierNever, Classify("GET", "/api/sessions/live/001/attachment", ""))
+	assert.Equal(t, TierNever, Classify("GET", "/api/sessions/live/001/attachment/"+ref+"/x", ""))
+	assert.Equal(t, TierNever, Classify("GET", "/api/board/proj/tasks/12/changes.diff/x", ""))
 }

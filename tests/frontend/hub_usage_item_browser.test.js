@@ -40,10 +40,11 @@ const BASE = require('./test_base').BASE;
             await new Promise(r => setTimeout(r, 700)); // sleep-ok: the account answer lands after the page starts
         };
         const usage = () => ev(`(() => { const a = document.getElementById('cloud-account-usage'); document.querySelector('.cloud-account-btn') && document.querySelector('.cloud-account-btn').click(); return a ? { shown: !a.hidden && a.getClientRects().length > 0, href: a.getAttribute('href'), tag: a.tagName, text: a.textContent.trim(), role: a.getAttribute('role'), after: a.previousElementSibling && a.previousElementSibling.textContent.trim() } : null; })()`);
-        console.log('1. analytics_tab: true: a plain link to /usage, after Saved for later');
+        console.log('1. analytics_tab: true: still no Usage item (#19569: Analytics reads the linked computers, the Hub retires /usage)');
         await open();
-        const t = await usage();
-        assert.deepEqual(t, { shown: true, href: '/usage', tag: 'A', text: 'Usage', role: 'menuitem', after: 'Saved for later' });
+        assert.equal(await usage(), null, 'analytics_tab true: no Usage item');
+        account = { status: 200, body: { analytics_tab: true, nav: [{ key: 'usage' }, { key: 'account' }] } }; await open();
+        assert.equal(await usage(), null, 'a nav naming usage: no Usage item');
         console.log('2. false, a missing field, a 404, unreadable, a string, a number: hidden');
         for (const [what, a] of [['false', { status: 200, body: { analytics_tab: false } }], ['missing', { status: 200, body: { artifacts_tab: true } }], ['404', { status: 404, body: { error: 'x' } }], ['unreadable', { status: 200, body: 'not json' }], ['string true', { status: 200, body: { analytics_tab: 'true' } }], ['number 1', { status: 200, body: { analytics_tab: 1 } }]]) {
             account = a; await open();

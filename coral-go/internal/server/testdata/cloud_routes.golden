@@ -82,7 +82,7 @@ GET /api/auth/sessions never
 GET /api/auth/setup-code never
 GET /api/auth/setup-code/show never
 GET /api/automations/runs view
-GET /api/away never
+GET /api/away view
 GET /api/board-seats/foreign never
 GET /api/board/projects view
 GET /api/board/remotes never
@@ -129,7 +129,7 @@ GET /api/board/{project}/subscribers view
 GET /api/board/{project}/tasks view
 GET /api/board/{project}/tasks/{taskID} view
 GET /api/board/{project}/tasks/{taskID}/artifact-content view
-GET /api/board/{project}/tasks/{taskID}/changes.diff never
+GET /api/board/{project}/tasks/{taskID}/changes.diff view
 GET /api/board/{project}/tasks/{taskID}/cost view
 GET /api/board/{project}/tasks/{taskID}/history view
 GET /api/board/{project}/waits never
@@ -194,7 +194,7 @@ GET /api/sessions/history/{sessionID}/tasks view
 GET /api/sessions/live view
 GET /api/sessions/live/team/{boardName}/sleep-status view
 GET /api/sessions/live/{name} view
-GET /api/sessions/live/{name}/attachment/{ref} never
+GET /api/sessions/live/{name}/attachment/{ref} view
 GET /api/sessions/live/{name}/branches view
 GET /api/sessions/live/{name}/branches/detail view
 GET /api/sessions/live/{name}/capture view
@@ -231,9 +231,9 @@ GET /api/sessions/{sessionID}/status view
 GET /api/settings never
 GET /api/settings/default-prompts view
 GET /api/settings/prompt-inspection launch
-GET /api/skills never
+GET /api/skills view
 GET /api/skills/search view
-GET /api/skills/{id} never
+GET /api/skills/{id} view
 GET /api/spec.json never
 GET /api/system/api-key never
 GET /api/system/artifact-store never
@@ -315,9 +315,9 @@ PATCH /api/sessions/history/{sessionID}/flags never
 PATCH /api/sessions/live/{name}/notes/{noteID} interact
 PATCH /api/sessions/live/{name}/tasks/{taskID} interact
 POST /api/agent-asks never
-POST /api/agent-asks/{id}/answer never
-POST /api/agent-asks/{id}/dismiss never
-POST /api/agent-asks/{id}/images never
+POST /api/agent-asks/{id}/answer interact
+POST /api/agent-asks/{id}/dismiss interact
+POST /api/agent-asks/{id}/images interact
 POST /api/agent/artifacts never
 POST /api/agent/skills never
 POST /api/agent/tasks never

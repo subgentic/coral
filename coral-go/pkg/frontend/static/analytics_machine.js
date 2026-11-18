@@ -2,7 +2,7 @@
  * itself) or a linked one, chosen with the Computer picker. A dashboard of one computer has no picker and reads that computer, as it always did. No DOM and no request at load: the choice is a variable, and
  * a change is announced with one event so the open views read again. */
 import { state } from './state.js';
-import { isCloud } from './server_base.js';
+import { isCloud, serverFetch } from './server_base.js';
 
 let chosen = 'local';
 export const MACHINE_EVENT = 'analytics-machine-change';
@@ -11,5 +11,12 @@ export const machineChoices = () => state.hub ? [...(isCloud() ? [] : ['local'])
 export const machineLabel = id => !id || id === 'local' ? 'This computer' : (state.servers || []).find(s => s.id === id)?.label || (state.servers || []).find(s => s.id === id)?.name || id;
 export const machineOnline = id => !id || id === 'local' || (state.servers || []).some(s => s.id === id && s.status === 'online');
 /** The computer being read: the choice if it is still on the list, else the first one on it (or this computer when there is no list). */
+// 'local' (the fallback when nothing is linked) is the same origin: in cloud every caller must read through readNow, or stop on noComputerInCloud(), never use this id with fetch (#19591).
 export const machineNow = () => { const c = machineChoices(); return c.includes(chosen) ? chosen : (c[0] || 'local'); };
 export function pickMachine(id) { chosen = id || 'local'; document.dispatchEvent(new CustomEvent(MACHINE_EVENT, { detail: chosen })); }
+
+/** Coral Hub's own page (cloud) has no computer of its own: with none linked there is nothing to read, and nothing is asked of this origin (coral-hub §7.2). */
+export const noComputerInCloud = () => isCloud() && machineChoices().length === 0;
+export const LINK_A_COMPUTER = 'Link a computer to see usage';
+/** One Analytics read: this computer's own route off a Hub's page, the chosen computer's through /api/remote/<id>/ in cloud, never the same origin there and never with no computer chosen (the read is refused, not sent). */
+export const readNow = (path, init) => !isCloud() ? fetch(path, init) : noComputerInCloud() ? Promise.reject(new Error(LINK_A_COMPUTER)) : serverFetch(machineNow(), path, init);

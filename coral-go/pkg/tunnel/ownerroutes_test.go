@@ -44,7 +44,7 @@ func instances(pattern string) []string {
 	hex := strings.Repeat("a", 64)
 	var out []string
 	for _, id := range []string{"12", "x"} {
-		p := strings.NewReplacer("{hex64}", hex).Replace(pattern)
+		p := strings.NewReplacer("{hex64}", hex, "{hex32}", hex[:32]).Replace(pattern)
 		segs := strings.Split(p, "/")
 		for i, s := range segs {
 			if strings.HasPrefix(s, "{") {
@@ -97,6 +97,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// The $ skills menu through the Hub (#19430) is new: the old list never had it.
 			if (m == http.MethodGet && p == "/api/skills/search") || (m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/skills")) {
+				continue
+			}
+			// The Skills page's two reads through the Hub (#19627) are new: the old list never had them.
+			if m == http.MethodGet && (p == "/api/skills" || strings.HasPrefix(p, "/api/skills/")) {
 				continue
 			}
 			// The live list is an OwnerSees route since #12377 (the owner's rows carry waits_on_this): the old list never had it.
@@ -232,6 +236,18 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// The resource queue's list (#16140, Security on #16030) is read through the hub by the owner alone: the old list never had it.
 			if m == http.MethodGet && p == "/api/resources" {
+				continue
+			}
+			// The Automations reads (#19570, coral-hub's design §7.3.5) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodGet && (strings.HasPrefix(p, "/api/scheduled/jobs") || p == "/api/scheduled/runs/recent" || p == "/api/automations/runs" || strings.HasPrefix(p, "/api/workflows")) {
+				continue
+			}
+			// An agent's own question answered, dismissed or given a picture from the Hub's Needs you, and the away counts (#19628): the owner's alone, and the old list never had them.
+			if (m == http.MethodPost && strings.HasPrefix(p, "/api/agent-asks/")) || (m == http.MethodGet && p == "/api/away") {
+				continue
+			}
+			// A chat's pasted image and a done task's changes.diff (#19629) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodGet && (strings.Contains(p, "/attachment/") || strings.HasSuffix(p, "/changes.diff") && strings.HasPrefix(p, "/api/board/")) {
 				continue
 			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).

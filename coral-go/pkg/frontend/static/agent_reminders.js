@@ -1,7 +1,7 @@
 // The Operator's reminders for one agent, on its page (#19350; an agent on no team has them in its Info tab, #19531: no team, so no board and no member name, the request names its session): the ones it has, each with Cancel, and an editor that adds a one-time reminder or a
 // repeating one (every day, Monday to Friday, or every few minutes), built on Chief's checks screen: the same cards, schedule words, editor and buttons (#19528, the Operator). It uses the person's /api/reminders routes, which the Hub does not serve:
 // then the section is not drawn. A reminder wakes the agent and stays open until it marks it done.
-import { serverUrl, splitKey } from './server_base.js';
+import { serverUrl, splitKey, isCloud } from './server_base.js';
 import { el } from './dom_el.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
@@ -20,6 +20,7 @@ const button = (text, fn, cls = 'btn') => { const b = el('button', cls, text); b
 
 /** Mounts the section on host for the agent (its team key, session id and the name the board knows it by). Resolves when the first read is done. */
 export async function mountAgentReminders(host, team, agent) {
+    if (isCloud()) return; // reminders are the person's own, on the computer: the Hub does not serve them (#19630)
     const { server, name: board } = splitKey(team);
     const list = serverUrl('/api/reminders', server);
     const read = async () => {

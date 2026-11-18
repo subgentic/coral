@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { formatLastSeen } from './server_status.js';
 import { loadStyles } from './lazy_styles.js';
+import { isCloud } from './server_base.js';
 import { isPhoneLayout } from './phone_layout.js';
 const VL = await importOnce('./view_list.js'); // the left navbar: the same list Automations, Skills and the Inbox draw (#18719)
 const AQ = await importOnce('./automations_queue.js');
@@ -16,8 +17,8 @@ const { el } = V;
 
 let chosen = 'local', active = false, wired = false, drawn = '', query = '', sideNav = null;
 const body = () => document.getElementById('queue-tab-body');
-const choices = () => ['local', ...machineChoices().filter(id => id !== 'local')];
-const current = () => (choices().includes(chosen) ? chosen : 'local');
+const choices = () => (isCloud() ? machineChoices().filter(id => id !== 'local') : ['local', ...machineChoices().filter(id => id !== 'local')]); // in the Hub there is no "This computer": only the linked ones (#19568)
+const current = () => (choices().includes(chosen) ? chosen : (choices()[0] || 'local'));
 const ageWords = at => { const s = Math.max(0, Math.round((Date.now() - at) / 1000)); return s < 60 ? 'just now' : formatLastSeen(new Date(at).toISOString()); };
 
 /** The line under the picker for a linked computer: read-only, and what is known when it does not answer. */

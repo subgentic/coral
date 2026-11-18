@@ -14,7 +14,7 @@ import { importOnce } from './import_once.js';
 await loadStyles('analytics_tabs.css');
 const V = await importOnce('./analytics_viz.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const D = await importOnce('./analytics_tabs_data.js');
-const { machineChoices, machineLabel, machineNow, machineOnline, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer these tabs read (#15730)
+const { machineChoices, machineLabel, machineNow, machineOnline, pickMachine, noComputerInCloud, LINK_A_COMPUTER, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer these tabs read (#15730)
 const T = await importOnce('./analytics_tasks.js'); // the Tasks view (#17206)
 const Q = await importOnce('./analytics_queue.js'); // the Resource queue view (#13671) // not in the start's stylesheet: it arrives before the page is drawn (#10706)
 const { el } = V;
@@ -40,7 +40,7 @@ async function readBoards() {
     if (Date.now() - boards.at < 30000) return;
     boards.at = Date.now();
     try {
-        const servers = ['local', ...(state.hub ? (state.servers || []).filter(s => s && s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
+        const servers = [...(isCloud() ? [] : ['local']), ...(state.hub ? (state.servers || []).filter(s => s && s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
         const lists = await Promise.all(servers.map(async server => {
             try { const r = await serverFetch(server, '/api/board/projects'); const rows = r.ok ? await r.json() : []; if (!Array.isArray(rows)) return []; noteBoardLabels(rows, 'board_id', server); return rows.filter(x => x && x.board_id).map(x => identityKey(server, x.board_id)); } catch { return []; }
         }));
@@ -58,7 +58,7 @@ export async function showTab(key, host, force = false) {
     if (key === IVC) await readBoards(); // every team unless one is chosen
     else if (key !== 'usage' && key !== RQ) {
         await readBoards();
-        const list = teams(), saved = browserLocal.get(TEAM_KEY) || '';
+        const list = teams(), saved = isCloud() ? '' : browserLocal.get(TEAM_KEY) || '';
         m.team = list.includes(m.team) ? m.team : (list.includes(saved) ? saved : (list[0] || ''));
     }
     draw(key);
@@ -67,6 +67,7 @@ export async function showTab(key, host, force = false) {
 
 async function load(key) {
     const m = tabs[key], seq = ++m.seq, server = machineNow(); // the computer picked on a Hub-served dashboard (this one otherwise, #15730)
+    if (noComputerInCloud()) { m.status = 'nocomputer'; m.data = null; draw(key); return; } // Coral Hub's page with no computer linked: nothing is read (#19569)
     m.status = m.data ? 'ok' : 'loading'; m.stale = false;
     try {
         if (key === 'usage') {
@@ -77,6 +78,7 @@ async function load(key) {
             if (!r.ok) throw new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
         } else if (key === 'tasks') {
+            if (isCloud()) throw new Error('closed on Coral Hub'); // this computer's own route: never asked of Coral Hub's origin (#19591)
             const r = await serverFetch('local', `/api/analytics/tasks?range=${encodeURIComponent(m.range)}&group_by=${encodeURIComponent(m.group)}${m.reviews ? '&reviews=1' : ''}`);
             if (seq !== m.seq) return;
             if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = 'guest'; m.data = null; draw(key); return; }
@@ -115,7 +117,7 @@ const reload = (key) => { const m = tabs[key]; m.data = null; m.status = 'loadin
 
 function filterBar(key) {
     const m = tabs[key], bar = el('div', 'atab-filters');
-    if (MACHINE_TABS.has(key) && machineChoices().length > 1) bar.append(V.selectField('Computer', machineChoices().map(id => [id, machineLabel(id) + (machineOnline(id) ? '' : ' (offline)')]), machineNow(), v => pickMachine(v)));
+    if (MACHINE_TABS.has(key) && !isCloud() && machineChoices().length > 1) bar.append(V.selectField('Computer', machineChoices().map(id => [id, machineLabel(id) + (machineOnline(id) ? '' : ' (offline)')]), machineNow(), v => pickMachine(v)));
     bar.append(V.selectField('Period', D.RANGES, m.range, v => { m.range = v; reload(key); }));
     if (key === 'tasks') {
         bar.append(V.selectField('Group by', T.GROUPS, m.group, v => { m.group = v; reload(key); }));
@@ -131,7 +133,7 @@ function filterBar(key) {
     } else {
         const list = teams();
         if (key === IVC) bar.append(V.selectField('Team', [['', 'All teams'], ...list.map(k => [k, teamLabel(k)])], m.team, v => { m.team = v; reload(key); }));
-        else bar.append(V.selectField('Team', list.length ? list.map(k => [k, teamLabel(k)]) : [['', 'No team yet']], m.team, v => { m.team = v; browserLocal.set(TEAM_KEY, v); reload(key); }));
+        else bar.append(V.selectField('Team', list.length ? list.map(k => [k, teamLabel(k)]) : [['', 'No team yet']], m.team, v => { m.team = v; if (!isCloud()) browserLocal.set(TEAM_KEY, v); reload(key); }));
     }
     return bar;
 }
@@ -142,7 +144,8 @@ function draw(key) {
     const host = hosts[key]; if (!host || !host.isConnected) return;
     const m = tabs[key], root = el('div', 'atab' + (phone() ? ' atab-phone' : ''));
     root.append(filterBar(key));
-    if (m.status === 'offline') root.append(say(`${machineLabel(machineNow())} is offline, so its numbers cannot be read.`));
+    if (m.status === 'nocomputer') root.append(say(LINK_A_COMPUTER));
+    else if (m.status === 'offline') root.append(say(`${machineLabel(machineNow())} is offline, so its numbers cannot be read.`));
     else if (m.status === 'refused') root.append(say(`${machineLabel(machineNow())} would not give these numbers. It may be an older Coral that needs an update, or you may only be a guest there.`));
     else if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : key === 'tasks' ? 'Tasks completed are visible to the owner of this Coral only.' : GUEST_LINE));
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
