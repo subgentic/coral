@@ -89,7 +89,7 @@ function stepOutputWords(tail) {
 /** One step of the timeline: its mark, name, type, exit code, agent link, timing, output, error tail and files. `count` is how many steps the run has. */
 export function runStepHtml(run, s, i, count) {
         const icon = statusIconChar(s.status);
-        const iconClass = s.status || 'pending';
+        const iconClass = escAttr(String(s.status || 'pending')); // a class name from the record: escaped, it cannot close the attribute (#19557)
         const isLast = i === count - 1;
 
         let timingHtml = '';
@@ -107,7 +107,7 @@ export function runStepHtml(run, s, i, count) {
         let exitCodeHtml = '';
         if (s.type === 'shell' && s.exit_code != null) {
             const ecClass = s.exit_code === 0 ? 'wf-exit-ok' : 'wf-exit-err';
-            exitCodeHtml = `<span class="wf-exit-code ${ecClass}">exit ${s.exit_code}</span>`;
+            exitCodeHtml = `<span class="wf-exit-code ${ecClass}">exit ${esc(String(s.exit_code))}</span>`;
         }
 
         // Output section — auto-expanded for failed steps

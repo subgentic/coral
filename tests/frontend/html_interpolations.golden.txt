@@ -584,7 +584,6 @@
 1	workflow_run_html.js	progressPct
 1	workflow_run_html.js	run.finished_at ? ` title="${escAttr('Finished ' + formatTime(run.finished_at))}"` : ''
 1	workflow_run_html.js	run.started_at ? `<span${run.finished_at ? ` title="${escAttr('Finished ' + formatTime(run.finished_at))}"` : 
-1	workflow_run_html.js	s.exit_code
 1	workflow_run_html.js	signInFailure
 1	workflow_run_html.js	signInFailure ? `<span class="wf-run-error" style="color:var(--error-text)"><span class="material-icons" aria-
 1	workflow_run_html.js	timingHtml
