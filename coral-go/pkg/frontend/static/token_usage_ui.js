@@ -132,9 +132,4 @@ export async function showTeamTokenUsage(boardName) {
     ] }).el);
 }
 
-export async function distillTeamKnowledge(boardName) {
-    if (window.openTeamPage) await window.openTeamPage(boardName, { tab: 'knowledge' });
-    // Starts a run, or joins the one already running (#3325); the team page's Knowledge tab shows the progress and the result follows from knowledge_distill.js.
-    const { startDistill } = await importOnce('./knowledge_distill.js');
-    try { await startDistill(boardName); } catch (err) { const { showToast } = await importOnce('./notifications.js'); showToast(`Could not start: ${err && err.message ? err.message : 'no answer'}`, true); }
-}
+export const distillTeamKnowledge = (b, s) => importOnce('./team_knowledge_page.js').then(m => m.distillTeam(b, s));

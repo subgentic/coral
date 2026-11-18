@@ -21,7 +21,7 @@ export const withAgent = (fn, modes) => menu(el => {
     if (modes) { if (modes.includes(el.dataset.mode)) W(fn)(...a, el.dataset.mode); } else W(fn)(...a);
 });
 
-export const withBoard = fn => menu(el => { const b = textOf(el.dataset.board); if (b) W(fn)(b); });
+export const withBoard = fn => menu(el => { const b = textOf(el.dataset.board); if (b) { const s = tokenOf(el.dataset.sessionId); W(fn)(...(s ? [b, s] : [b])); } });
 
 export const dirOf = el => textOf(el.dataset.dir, 4096);
 

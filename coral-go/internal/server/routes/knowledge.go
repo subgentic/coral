@@ -3,6 +3,7 @@ package routes
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -158,10 +159,24 @@ func (h *SessionsHandler) DistillKnowledge(w http.ResponseWriter, r *http.Reques
 		errBadRequest(w, "invalid team name")
 		return
 	}
-	// No body and no query (#3518): the run is decided by the path alone.
-	if b, _ := io.ReadAll(io.LimitReader(r.Body, 1024)); len(bytes.TrimSpace(b)) > 0 || r.URL.RawQuery != "" {
-		errBadRequest(w, "this request takes no body or query")
+	// No query (#3518), and a body only to name ONE agent (#19560): {"session_id": "<an agent of the team>"}, nothing else.
+	agent := ""
+	b, _ := io.ReadAll(io.LimitReader(r.Body, 1024))
+	if r.URL.RawQuery != "" {
+		errBadRequest(w, "this request takes no query")
 		return
+	}
+	if len(bytes.TrimSpace(b)) > 0 {
+		var body struct {
+			SessionID string `json:"session_id"`
+		}
+		dec := json.NewDecoder(bytes.NewReader(b))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&body); err != nil || dec.More() || len(body.SessionID) == 0 || len(body.SessionID) > 64 || strings.ContainsAny(body.SessionID, " \t\r\n/\\") {
+			errBadRequest(w, "this request takes no body, or only {\"session_id\": \"an agent of the team\"}")
+			return
+		}
+		agent = body.SessionID
 	}
 	if h.teamStore == nil {
 		errBadRequest(w, "team persistence not available")
@@ -169,6 +184,10 @@ func (h *SessionsHandler) DistillKnowledge(w http.ResponseWriter, r *http.Reques
 	}
 	if !h.teamExists(r.Context(), teamName) {
 		errNotFound(w, "team not found")
+		return
+	}
+	if agent != "" && !background.KnowledgeAgentOnTeam(r.Context(), h.ss, h.teamStore, teamName, agent) {
+		errNotFound(w, "that agent is not on this team") // unknown, or on another team: the same answer, and no job is made
 		return
 	}
 
@@ -213,7 +232,13 @@ func (h *SessionsHandler) DistillKnowledge(w http.ResponseWriter, r *http.Reques
 
 		coralDir := h.cfg.CoralDir()
 		ctx := context.Background()
-		bundle, err := background.DistillTeamKnowledge(ctx, h.ss, h.teamStore, teamName, coralDir, progressFn)
+		var bundle *background.KnowledgeBundle
+		var err error
+		if agent != "" {
+			bundle, err = background.DistillAgentKnowledge(ctx, h.ss, h.teamStore, teamName, agent, coralDir, progressFn)
+		} else {
+			bundle, err = background.DistillTeamKnowledge(ctx, h.ss, h.teamStore, teamName, coralDir, progressFn)
+		}
 
 		knowledgeJobsMu.Lock()
 		job.FinishedAt = time.Now().UTC().Format(time.RFC3339)
@@ -226,7 +251,9 @@ func (h *SessionsHandler) DistillKnowledge(w http.ResponseWriter, r *http.Reques
 			log.Printf("[knowledge] distillation failed for team %s: %v", teamName, err)
 		} else {
 			job.Status = "complete"
-			background.ClearKnowledgeEdits(coralDir, teamName) // a person's own run took every agent again (#13928)
+			if agent == "" {
+				background.ClearKnowledgeEdits(coralDir, teamName) // a person's own run took every agent again (#13928); a run of one agent did not
+			}
 			log.Printf("[knowledge] distillation complete for team %s (%d agents failed)", teamName, len(job.FailedAgents))
 		}
 		knowledgeJobsMu.Unlock()
