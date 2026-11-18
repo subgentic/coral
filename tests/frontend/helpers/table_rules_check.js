@@ -50,6 +50,8 @@ const SPECS = `(() => {
       rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, name: mix === 'long' && i === 1 ? long : 'skill-' + i, by: ['Backend Dev · alpha', 'the Operator', 'Hermes · beta'][i % 3], version: i, status: ['Waiting', 'Approved', 'Rejected'][i % 3], at: when(i * 11) })) }),
     'skill files': (m, mix) => ({ label: 'Files, 3', columns: [ { key: 'path', label: 'File', primary: true, width: 'grow', sort: true, field: 'path' }, { key: 'size', label: 'Size', sort: 'number', align: 'end', field: 'size' }, { key: 'kind', label: 'Kind', sort: true, field: 'kind' }, { key: 'sha', label: 'SHA-256', field: 'sha' } ],
       rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, path: mix === 'long' && i === 1 ? long : ['SKILL.md', 'scripts/check.sh', 'references/pg.md'][i % 3], size: i * 4, kind: ['Instructions', 'Script', 'Text'][i % 3], sha: 'abcdef12' })) }),
+    automations: (m, mix) => ({ label: 'Cloud automations, 3', fold: 'labeled', columns: [ { key: 'name', label: 'Run', primary: true, width: 'grow', field: 'name' }, { key: 'status', label: 'Status', width: '8rem', field: 'status' }, { key: 'started', label: 'Started', width: '14rem', field: 'started', dropAt: 28 } ],
+      rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, name: mix === 'long' && i === 1 ? long : 'Run ' + i + ' · build', status: 'completed', started: when(i * 4) })) }),
     settings: (m, mix) => ({ label: 'Settings keys, 3', columns: [ { key: 'name', label: 'Setting', primary: true, width: 'grow', sort: true, field: 'name' }, { key: 'value', label: 'Value', field: 'value' } ],
       rows: mix === 'empty' ? [] : [1, 2, 3].map(i => ({ id: i, name: mix === 'long' && i === 1 ? long : 'setting_' + i, value: 'value ' + i })) }),
   };
