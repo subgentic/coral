@@ -68,22 +68,25 @@ func TestAnAgentsLaunchIsRefusedWhileTheTeamsOrchestratorAccessIsOff(t *testing.
 		status, out := launch(r, r.tok["Orchestrator"], nil)
 		assert.Equal(t, http.StatusOK, status, "%v", out)
 	})
-	// #19507 (the Operator, 2026-11-18; it replaces #19138's "no row is off"): a team whose switch was never touched has it ON for its one Orchestrator seat, and OFF where no member is titled Orchestrator.
-	t.Run("never decided, one Orchestrator seat: an agent's launch works", func(t *testing.T) {
+	// #19138 (the Operator): an Orchestrator started agents on a team whose switch they had never touched, while wake refused. No grant row is off, the way wake and restart read it.
+	t.Run("never decided: an agent's launch is refused, with where to turn it on", func(t *testing.T) {
 		r := setup(t, nil)
-		status, out := launch(r, r.tok["Orchestrator"], nil)
-		assert.Equal(t, http.StatusOK, status, "%v", out)
-	})
-	t.Run("never decided, no member titled Orchestrator: an agent's launch is refused, with where to turn it on", func(t *testing.T) {
-		r := newOrchRig(t)
-		r.seat("Orchestrator", "Lead", orchBoard, "claude", false, 1)
-		r.seat("Dev2", "Developer", orchBoard, "claude", false, 3)
 		before := len(r.term.sentCommands())
 		status, out := launch(r, r.tok["Orchestrator"], nil)
 		assert.Equal(t, http.StatusForbidden, status, "%v", out)
 		assert.Equal(t, "orchestrator_access_off", out["code"])
 		assert.Contains(t, out["error"], "Orchestrator access")
+		assert.Contains(t, out["error"], orchBoard, "it names the team")
 		assert.Len(t, r.term.sentCommands(), before)
+		status, out = launch(r, r.tok["Orchestrator"], map[string]any{"board_id": ""})
+		assert.Equal(t, http.StatusForbidden, status, "a launch naming no board, from an agent seated on the team: %v", out)
+	})
+	t.Run("never decided: a team launch by an agent is refused", func(t *testing.T) {
+		r := setup(t, nil)
+		b, _ := json.Marshal(map[string]any{"board_id": orchBoard, "working_dir": r.work, "agents": []map[string]any{{"name": "Reviewer", "agent_type": "claude", "prompt": "Review."}}})
+		status, out := r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok["Orchestrator"])
+		assert.Equal(t, http.StatusForbidden, status, "%v", out)
+		assert.Equal(t, "orchestrator_access_off", out["code"])
 	})
 	t.Run("never decided: the Operator's launch is unchanged", func(t *testing.T) {
 		r := setup(t, nil)
