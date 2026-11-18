@@ -202,7 +202,7 @@ export function installCloudFetch() {
 
 const signOut = signOutThisBrowser; // drafts, pending messages, recent folders, stars and panel requests go before the session does (#3681, #4164)
 
-const navLink = ([text, href]) => h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href, text, ...(href === '/usage' ? { id: 'cloud-account-usage' } : {}) });
+const navLink = ([text, href]) => h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href, text });
 
 function buildAccountMenu(email) {
     // The desktop account menu is the phone drawer's list (#14764, #14718): Settings, Account, Docs, Computers, GitHub, Sign out, in that order, and nothing else. Account is the Hub's own page on this origin (a plain link, same tab); the Hub's other pages
@@ -239,12 +239,11 @@ function buildAccountMenu(email) {
     });
     btn.addEventListener('keydown', e => { if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && menu.hidden) { e.preventDefault(); setOpen(true); } });
     // What the Hub says this account may use: one read of /api/account for the page (account_info.js). The six above are always there; the Hub's `nav` entries it still sends (other than Account, which is one of the six) go between GitHub and Sign out (#14764).
-    // A Hub that sends no `nav` (an older one, or a failed read) keeps Saved for later, and with analytics_tab Usage after it, as before.
+    // A Hub that sends no `nav` (an older one, or a failed read) keeps Saved for later. There is no Usage link: Analytics is the sidebar's page and reads the linked computers (#19569).
     const saved = navLink(ACCOUNT_NAV.saved); signOutBtn.before(saved);
     readAccount().then(d => {
         const entries = accountNavEntries(d && d.nav);
         if (entries) { saved.remove(); signOutBtn.before(...entries.filter(e => e !== ACCOUNT_NAV.account).map(navLink)); return; }
-        if (d && d.analytics_tab === true) saved.after(navLink(ACCOUNT_NAV.usage));
     });
     return h('div', { className: 'cloud-account-wrapper' }, btn, menu);
 }

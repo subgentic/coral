@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { nameSpan } from './agent_live.js';
 import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
-import { keyLabel, noteBoardLabels } from './server_base.js';
+import { keyLabel, noteBoardLabels, isCloud } from './server_base.js';
 import { compactFigure, compactDuration, formatCost, noDataWords, costDigits } from './format.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
@@ -18,6 +18,7 @@ const agentDetail = await importOnce('./analytics_agent.js'); // one agent over 
 const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
 const { syncEfficiency } = await importOnce('./analytics_efficiency.js'); // the Group by switch and the comparison of Tokens per commit and Task time (Goal #77)
 const { readCostTasks } = await importOnce('./analytics_cost_tasks.js');
+const { readNow, noComputerInCloud, LINK_A_COMPUTER, machineChoices, machineLabel, machineOnline, machineNow, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // in cloud every read goes to the chosen computer, none with no computer linked (#19569)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
@@ -250,7 +251,7 @@ async function _refreshCallMetrics(period, hours) {
     if (!el) return;
     const label = (document.querySelector(`#cost-time-range option[value="${period}"]`)?.textContent || 'Last 24 hours').toLowerCase();
     try {
-        const response = await fetch(`/api/call-metrics/summary?hours=${hours}`, { cache: 'no-store' });
+        const response = await readNow(`/api/call-metrics/summary?hours=${hours}`, { cache: 'no-store' });
         if (!response.ok) throw new Error('metrics unavailable');
         const data = await response.json();
         const rows = shownCallMetrics(data.rows || []);
@@ -320,7 +321,7 @@ async function _refreshCalendarCost() {
     const { calendarSince } = await importOnce('./cost_data.js');
     const since = calendarSince(Date.now());
     try {
-        const [day, month] = await Promise.all([since.today, since.month].map(s => fetch(`/api/token-usage/summary?since=${encodeURIComponent(s)}`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))));
+        const [day, month] = await Promise.all([since.today, since.month].map(s => readNow(`/api/token-usage/summary?since=${encodeURIComponent(s)}`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))));
         const cost = d => formatCost((d && d.totals && d.totals.cost_usd) || 0, { zeroAsTwo: true });
         el.replaceChildren(...(day && month ? [`Today ${cost(day)}`, `This month ${cost(month)}`] : []).map(t => Object.assign(document.createElement('span'), { textContent: t })));
     } catch { el.replaceChildren(); }
@@ -337,7 +338,7 @@ export async function _recheckTotals(view) {
         await _refreshDone;
         const { costRange, providerRows, modelRows, agentRows } = await importOnce('./cost_data.js');
         const { sinceParam } = costRange(_period(), Date.now());
-        const r = await fetch(`/api/token-usage/${view === 'team' ? 'by-team' : 'summary'}${sinceParam}`, { cache: 'no-store' }), d = r.ok ? await r.json() : null;
+        const r = await readNow(`/api/token-usage/${view === 'team' ? 'by-team' : 'summary'}${sinceParam}`, { cache: 'no-store' }), d = r.ok ? await r.json() : null;
         if (d && view === 'team') _renderTeamTable(d.teams || []);
         else if (d && view === 'provider') _renderProviderTable(providerRows(d.by_agent_type));
         else if (d && view === 'model') _renderModelTable(modelRows(d.by_model));
@@ -346,8 +347,29 @@ export async function _recheckTotals(view) {
     } catch (e) { console.error('[cost-dashboard] totals re-check:', e); } finally { _rechecking = false; }
 }
 
+/** Coral Hub's own page (cloud, #19569): every number is one computer's, so the header has the Computer picker, and with no computer linked the page says so and reads nothing. True when there is nothing to read. */
+function _syncComputerBar() {
+    const cloud = isCloud(), choices = cloud ? machineChoices() : [];
+    let pick = document.getElementById('cost-computer-pick'), line = document.getElementById('cost-no-computer');
+    if (cloud && choices.length > 1) {
+        if (!pick) {
+            pick = document.createElement('select'); pick.id = 'cost-computer-pick'; pick.className = 'field cost-time-select'; pick.setAttribute('aria-label', 'Computer');
+            pick.addEventListener('change', () => pickMachine(pick.value));
+            document.getElementById('cost-time-range')?.before(pick);
+        }
+        pick.replaceChildren(...choices.map(id => new Option(machineLabel(id) + (machineOnline(id) ? '' : ' (offline)'), id)));
+        pick.value = machineNow(); pick.hidden = false;
+    } else if (pick) pick.hidden = true;
+    const none = noComputerInCloud();
+    if (none && !line) { line = document.createElement('p'); line.id = 'cost-no-computer'; line.className = 'cost-note'; line.setAttribute('role', 'status'); line.textContent = LINK_A_COMPUTER; document.querySelector('#cost-page .cost-header')?.after(line); }
+    if (line) line.hidden = !none;
+    return none;
+}
+document.addEventListener(MACHINE_EVENT, () => { if (isCloud() && document.getElementById('cost-dashboard-view')?.offsetParent) _refreshCostDashboard(); }); // another computer picked: the page reads that one
+
 async function _readCostDashboard({ force = false } = {}) {
     _watchCostTables();
+    if (_syncComputerBar()) return; // cloud with no computer linked: nothing is asked of any origin
     if (force && TAB_VIEWS.has(state.analyticsView)) openTab(state.analyticsView, true); // Refresh on one of the three tabs reads it again (#11222)
     const { costRange, providerRows, modelRows, thinkingRows, agentRows } = await importOnce('./cost_data.js'); // the range and the rows, pure (#8359); loaded when the page first refreshes, as the page's other lazy parts are
     const period = document.getElementById('cost-time-range')?.value || 'day';
@@ -357,17 +379,17 @@ async function _readCostDashboard({ force = false } = {}) {
     _refreshOverview(); // the change against the period before, and cost by team (#7930)
     _refreshCalendarCost(); // Today and This month beside Total cost (#10521)
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
-    syncEfficiency(period);
+    if (!isCloud()) syncEfficiency(period); // Tokens per commit, Task time, Tasks and Inbox vs chat are not shown on Coral Hub's page (#19569)
     importOnce('./analytics_servers.js').then(m => m.showByComputer(document.getElementById('cost-by-computer'), sinceParam, period)).catch(e => console.error('[cost-dashboard] by computer:', e)); // this computer and each linked one (#16017): its own read, its own errors
-    showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time'), force); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
+    if (!isCloud()) showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time'), force); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([
-            fetch(`/api/token-usage/summary${sinceParam}`).catch(() => null),
+            readNow(`/api/token-usage/summary${sinceParam}`).catch(() => null),
             readCostTasks({full: force}).catch(() => null), // all projected pages, including zero-cost tasks (#17251)
-            fetch(`/api/token-usage/timeseries${tsParams}`).catch(() => null),
-            fetch(`/api/token-usage/by-team${sinceParam}`).catch(() => null),
-            fetch(`/api/token-usage/by-branch${sinceParam}`).catch(() => null),
+            readNow(`/api/token-usage/timeseries${tsParams}`).catch(() => null),
+            readNow(`/api/token-usage/by-team${sinceParam}`).catch(() => null),
+            readNow(`/api/token-usage/by-branch${sinceParam}`).catch(() => null),
         ]);
 
         if (summaryResp && summaryResp.ok) {
@@ -494,7 +516,7 @@ async function _refreshSeries(view = _currentView()) {
     if (!host) return;
     const untilMs = Date.now(), sinceMs = untilMs - _periodHours() * 3600000, interval = _periodInterval();
     try {
-        const resp = await fetch(`/api/token-usage/timeseries?since=${encodeURIComponent(new Date(sinceMs).toISOString())}&interval=${interval}&group_by=${v.group}`, { cache: 'no-store' });
+        const resp = await readNow(`/api/token-usage/timeseries?since=${encodeURIComponent(new Date(sinceMs).toISOString())}&interval=${interval}&group_by=${v.group}`, { cache: 'no-store' });
         if (!resp.ok) throw new Error('unavailable');
         const data = await resp.json();
         series.setData(view, { buckets: data.buckets || [], interval, sinceMs, untilMs });
@@ -546,7 +568,7 @@ async function _refreshOverview() {
     const host = document.getElementById('cost-series-overview');
     if (!host) return;
     const hours = _periodHours(), untilMs = Date.now(), sinceMs = untilMs - hours * 3600000, interval = _periodInterval(), iso = ms => encodeURIComponent(new Date(ms).toISOString());
-    const read = async url => { const resp = await fetch(url, { cache: 'no-store' }); if (!resp.ok) throw new Error('unavailable'); return (await resp.json()).buckets || []; };
+    const read = async url => { const resp = await readNow(url, { cache: 'no-store' }); if (!resp.ok) throw new Error('unavailable'); return (await resp.json()).buckets || []; };
     try {
         const [now, byTeam, prior] = await Promise.all([
             read(`/api/token-usage/timeseries?since=${iso(sinceMs)}&interval=1d`),

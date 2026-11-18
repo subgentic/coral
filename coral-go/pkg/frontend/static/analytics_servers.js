@@ -3,7 +3,7 @@
  * never a zero; one never read has no figures and says so. The total is the sum of the rows shown: every figure is a whole number or a cost rounded the way it is shown, so what is added is what is read. The Overview's
  * own cards stay this computer's. Lazy: cost_dashboard.js imports it. Everything is built with the DOM and textContent: a computer's name is written by its owner. */
 import { state } from './state.js';
-import { serverFetch } from './server_base.js';
+import { serverFetch, isCloud } from './server_base.js';
 import { formatLastSeen } from './server_status.js';
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
@@ -51,10 +51,12 @@ export function breakdown(computers, known, fresh, now = Date.now()) {
 const memory = new Map(); // `${id}|${period}` -> { figs, at }
 const keyOf = (id, period) => `${id}|${period}`;
 function loadStored() {
+    if (isCloud()) return {}; // Coral Hub's page keeps the figures in memory only: nothing about a person's computers is stored in the browser (#19569)
     try { const o = JSON.parse(browserLocal.get(STORE_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
 }
 function remember(id, period, figs, at) {
     memory.set(keyOf(id, period), { figs, at });
+    if (isCloud()) return;
     try { const o = loadStored(); o[keyOf(id, period)] = { figs, at }; const keys = Object.keys(o); if (keys.length > 60) for (const k of keys.slice(0, keys.length - 60)) delete o[k]; browserLocal.set(STORE_KEY, JSON.stringify(o)); } catch { /* this browser keeps nothing: the figures last until the page is closed */ }
 }
 function recall(id, period) {
