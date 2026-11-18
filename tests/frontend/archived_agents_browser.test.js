@@ -115,14 +115,14 @@ const SLEEPING_PLACEHOLDER = '';
         const rowWake = await ev(`[...document.querySelectorAll('#live-sessions-list li')].filter(l => l.textContent.includes('arch-a')).flatMap(l => [...l.querySelectorAll('button')].map(b => (b.getAttribute('aria-label') || b.textContent).trim())).filter(t => /^Wake/i.test(t))`);
         assert.deepEqual(rowWake, [], 'an archived row shows no Wake: Unarchive is the way back (#17420)');
         const archivedMenu = await menuItems('t1-arch-a-id');
-        assert.ok(archivedMenu.some(t => /^Unarchive$/.test(t)) && !archivedMenu.some(t => /^Wake/.test(t)), `archived menu has Unarchive and no Wake (#17420) (${JSON.stringify(archivedMenu)})`);
+        assert.ok(archivedMenu.some(t => /^Sleep$/.test(t)) && !archivedMenu.some(t => /^Wake/.test(t)), `archived menu has Sleep (the unarchive call) and no Wake (#17420, #19674) (${JSON.stringify(archivedMenu)})`);
         assert.ok(!archivedMenu.some(t => /Restart|Rename|Move|^Archive$/.test(t)), `archived menu has no Restart/Rename/Move/Archive (${JSON.stringify(archivedMenu)})`);
         await ev(`(() => { const e = document.querySelector('#live-sessions-list .sleeping-summary-row:not(.archived-summary-row)'); if (e) e.click(); })()`);
         for (const sid of ['t1-lead-id', 't1-sleeper-id']) {
             const items = await menuItems(sid);
-            assert.ok(items && items.some(t => /^Archive$/.test(t)), `${sid} menu offers Archive (${JSON.stringify(items)})`);
+            assert.ok(items && items.some(t => /^Stop agent$/.test(t)) && !items.some(t => /^Archive$/.test(t)), `${sid} menu offers Stop agent (the archive, #19674) and no Archive item (${JSON.stringify(items)})`);
         }
-        console.log(`   ✓ archived: ${archivedMenu.join(', ')}; awake + sleeping offer Archive`);
+        console.log(`   ✓ archived: ${archivedMenu.join(', ')}; awake + sleeping offer Stop agent (archives)`);
 
         console.log('3. Archive asks first; Cancel settles false and sends nothing');
         await clearReqs();

@@ -24,6 +24,7 @@ import { setChecked, setHidden } from './dom_write.js';
 import { SVGO } from './svg_open.js';
 import { wasStopped } from './stopped_agents.js';
 const _mk0 = "<path d=\"M3 3h10M3 6.5h10M3 10h6\"/><path d=\"M11.5 11.5l2 2\"/></svg>\n                Edit instructions\n            </button>";
+const _mk2 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                Stop agent\n            </button>";
 const _mk1 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                Remove Agent\n            </button>";
 
 // ── Archived section (#3030) ─────────────────────────────────────────────
@@ -123,12 +124,6 @@ function splitLabel(name) {
 /** What the phone's row shows besides the name (the sidebar hides these): the state chip, the unread count, and the banner for an agent that needs the person. */
 /** The items of an agent row's action menu (drawn when it opens): the archived, sleeping or awake set. */
 function _rowMenuContent(s, sid) {
-    const _archiveItem = `
-            <button class="menu-item overflow-menu-item" data-on-click="agent-archive" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="archive">
-                ${SVGO.o0}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M6.5 9h3"/></svg>
-                Archive
-            </button>
-`;
     const _why = isGoneAsleep(s) || isExitedAsleep(s);
     const _sleepingMenu = `${_why ? `<div class="overflow-menu-note" role="note">Its ${isExitedAsleep(s) ? 'program exited' : 'terminal is gone'}.</div>` : ''}
             ${_why ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
@@ -143,7 +138,7 @@ function _rowMenuContent(s, sid) {
                 ${SVGO.o0}<path d="M12 3a6 6 0 1 0 0 10 5 5 0 0 1 0-10z"/></svg>
                 Wake
             </button>
-${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-click="agent-restart-same" title="Starts a fresh conversation; the instructions are sent again" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
+            <button class="menu-item overflow-menu-item" data-on-click="agent-restart-same" title="Starts a fresh conversation; the instructions are sent again" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart, same settings
             </button>
@@ -177,7 +172,7 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
             </button>
             <hr class="overflow-menu-divider overflow-menu-divider-danger">
             <button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-click="agent-kill" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
-                ${SVGO.o1}${_mk1}`;
+                ${SVGO.o1}${_mk2}`;
     const _awakeMenu = `
             ${wasStopped(s) ? `<button class="menu-item overflow-menu-item" data-on-click="agent-continue" data-session-id="${escapeAttr(sid)}" data-server="${escapeAttr(sessionServer(s))}" title="Send continue to resume this conversation">Continue</button>` : ''}
             <button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="sleep">
@@ -192,7 +187,7 @@ ${_archiveItem}            <button class="menu-item overflow-menu-item" data-on-
                 ${SVGO.o1}<path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
                 Rename
             </button>
-${_archiveItem}            <hr class="overflow-menu-divider">
+            <hr class="overflow-menu-divider">
             <button class="menu-item overflow-menu-item" data-on-click="agent-restart-same" title="Starts a fresh conversation; the instructions are sent again" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o0}<path d="M3.5 2v4h4"/><path d="M3.5 6A5.5 5.5 0 1 1 2.5 8"/></svg>
                 Restart, same settings
@@ -252,7 +247,7 @@ ${['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access
             </a>
             <button class="menu-item overflow-menu-item" data-on-click="agent-archive" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}" data-mode="unarchive">
                 ${SVGO.o0}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M8 12V8M6 10l2-2 2 2"/></svg>
-                Unarchive
+                Sleep
             </button>
             <button class="menu-item overflow-menu-item" data-on-click="agent-info" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(sid)}">
                 ${SVGO.o1}<circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>

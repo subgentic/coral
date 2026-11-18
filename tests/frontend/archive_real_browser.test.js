@@ -31,11 +31,8 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         const base = { counts: (await api('GET', '/api/sessions/history/counts')).data || {}, archivedInSidebar: Number(/Archived \((\d+)\)/.exec((await sidebar()).summary || '')?.[1] || 0) };
 
         // Archive from the row's menu, then the confirmation
-        await ev(`${row(qa.session_id)}.querySelector('[data-on-click="kebab-toggle"]').click(); true`);
-        await until(`!!document.querySelector('#live-sessions-list [data-on-click="agent-archive"][data-session-id="${qa.session_id}"]')`, 'the Archive item');
-        await ev(`document.querySelector('#live-sessions-list [data-on-click="agent-archive"][data-session-id="${qa.session_id}"]').click(); true`);
-        await until(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirmation');
-        await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+        // (a team agent's Stop is the archive, #19674: team_stop_archives_browser drives the menu; these agents are terminals, which Stop still kills, so the archive is the route's own call)
+        assert.ok((await api('POST', `/api/sessions/live/${qa.session_id}/archive`)).data.ok, 'the archive call is accepted');
         await until(`(() => { let inA = false; for (const li of document.querySelectorAll('#live-sessions-list li')) { if (li.classList.contains('archived-summary-row')) { inA = true; continue; } if (!inA && li.dataset.sessionId === ${JSON.stringify(qa.session_id)}) return false; } return true; })()`, 'QA Engineer to leave the main list');
         const after = await sidebar();
         assert.ok(!after.main.includes(qa.session_id), 'QA Engineer left the main list: ' + JSON.stringify(after));

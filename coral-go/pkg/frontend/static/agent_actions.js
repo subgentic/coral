@@ -216,7 +216,7 @@ export async function sleepTerminalGone(ids) {
  * sleeping. Resolves true when the server applied it, false on failure or
  * when the archive confirmation is cancelled.
  */
-export function toggleAgentArchive(name, agentType, sessionId, action) {
+export function toggleAgentArchive(name, agentType, sessionId, action, quiet) {
     const server = serverForSession(name, sessionId);
     const doIt = async () => {
         try {
@@ -243,7 +243,7 @@ export function toggleAgentArchive(name, agentType, sessionId, action) {
             return false;
         }
     };
-    if (action === 'archive') {
+    if (action === 'archive' && !quiet) {
         const s = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === server);
         const stops = s && !s.sleeping ? ' It stops now.' : ''; // a whole sentence for each state, never "It Archived agents..." (#10369)
         return new Promise(resolve => showConfirmModal('Archive agent',

@@ -14,6 +14,7 @@ export function killSessionDirect(name, agentType, sessionId) {
     const server = serverForSession(name, sessionId);
     const row = (state.liveSessions || []).find(s => s.session_id === sessionId);
     const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent by its role and team, not the folder it works in (#10139)
+    if (row && row.board_project && row.agent_type !== 'terminal' && !row.archived) return stopTeamAgent(row, who, name, sessionId); // a team agent: Stop archives it (#19674)
     const idle = row && (row.sleeping || row.archived), word = idle ? 'Remove' : 'Stop'; // nothing runs on such a row: it is only taken off the list, as its menu item says (#15585)
     showConfirmModal(idle ? 'Remove agent' : 'Stop agent', `${word} ${who}? ${idle ? 'It is not running.' : "This ends the agent's process."} ${whatStaysKill([row || { agent_type: agentType }])} ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
         const result = await killLiveSession({ name, agent_type: agentType, session_id: sessionId }, server);
@@ -50,4 +51,10 @@ export function archivedButtons(agent, session, done) {
         make('btn btn-primary', 'Start', () => toggleAgentSleep(session.name, session.agent_type, session.session_id, 'wake')),
         make('btn', 'Sleep', () => toggleAgentArchive(session.name, session.agent_type, session.session_id, 'unarchive')),
     ];
+}
+
+/** Stop on a team agent, awake or asleep (#19674): ends its session and archives it. It leaves the Agents list, stays on the team, and Start brings it back. */
+function stopTeamAgent(row, who, name, sessionId) {
+    showConfirmModal('Stop agent', `Stop ${who}? It ends the agent's session and archives it: it leaves the Agents list and can be started again from More > Archived. Its chat stays in History.`,
+        () => toggleAgentArchive(name, row.agent_type, sessionId, 'archive', true), undefined, { label: 'Stop agent', danger: true });
 }
