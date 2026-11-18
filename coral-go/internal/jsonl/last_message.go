@@ -304,6 +304,9 @@ func lastMessageFromEntriesMax(msgs []map[string]any, max int) (LastMessage, boo
 		if text == "" {
 			text, _ = m["content"].(string)
 		}
+		if role == "user" {
+			text = agent.PersonText(text)
+		}
 		text = plainLineMax(text, max)
 		if text == "" || (role == "user" && agent.IsCoralDelivery(text)) {
 			continue

@@ -19,6 +19,10 @@ func TestIsCoralDeliveryKnowsWhatCoralTypesIntoAnAgent(t *testing.T) {
 	var cases struct {
 		Notices    []string `json:"notices"`
 		NotNotices []string `json:"not_notices"`
+		Mixed      []struct {
+			Text  string `json:"text"`
+			Typed string `json:"typed"`
+		} `json:"mixed"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &cases))
 	require.NotEmpty(t, cases.Notices)
@@ -28,5 +32,31 @@ func TestIsCoralDeliveryKnowsWhatCoralTypesIntoAnAgent(t *testing.T) {
 	}
 	for _, text := range cases.NotNotices {
 		assert.False(t, IsCoralDelivery(text), text)
+	}
+	require.NotEmpty(t, cases.Mixed)
+	for _, c := range cases.Mixed { // a nudge with a person's lines after it (#19534): theirs, and the dashboard reads it the same way
+		assert.False(t, IsCoralDelivery(c.Text), c.Text)
+		assert.Equal(t, c.Typed, PersonText(c.Text))
+	}
+}
+
+// #19534: the board nudge and a person's typed lines are one user turn when the agent was busy; the turn is the person's, with the nudge line left off. A lone nudge, and a nudge with nothing after it, are
+// still Coral's.
+func TestANudgeWithTypedLinesAfterItIsThePersonsTurn(t *testing.T) {
+	nudge := "You have unread messages on the message board. Run 'coral-board read' to see them."
+	mixed := nudge + "\n1. lets just finish the work in progress there is no rush\n2. close"
+	assert.False(t, IsCoralDelivery(mixed))
+	n, typed := SplitNudge(mixed)
+	assert.Equal(t, nudge, n)
+	assert.Equal(t, "1. lets just finish the work in progress there is no rush\n2. close", typed)
+	assert.Equal(t, typed, PersonText(mixed))
+	assert.Equal(t, typed, PersonText("<pasted_content id=\"1\">"+mixed+"</pasted_content id=\"1\">"))
+	text, ok := typedText(mixed)
+	assert.True(t, ok)
+	assert.Equal(t, typed, text, "the first message a history search lists")
+
+	for _, alone := range []string{nudge, nudge + "\n", "You have 2 unread messages on the message board.", "[Task #7 (high) available] build it\nmore"} {
+		assert.True(t, IsCoralDelivery(alone), alone)
+		assert.Equal(t, alone, PersonText(alone))
 	}
 }

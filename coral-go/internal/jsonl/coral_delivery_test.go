@@ -31,3 +31,16 @@ func TestFirstUserPromptSkipsWhatCoralTypedIntoTheAgent(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(projectDir, only+".jsonl"), []byte(`{"type":"user","message":{"content":"You have 1 unread message on the message board."}}`+"\n"), 0o644))
 	assert.Equal(t, "", NewSessionReader().FirstUserPrompt(only, "", "claude"), "a session nobody has asked anything has no first prompt")
 }
+
+// #19534: a turn that is the nudge and the person's lines is the person's first prompt, without the nudge line.
+func TestFirstUserPromptTakesThePersonsLinesAfterANudge(t *testing.T) {
+	dir := t.TempDir()
+	sessionID := "00000000-0000-4000-8000-000000019534"
+	projectDir := filepath.Join(dir, "project")
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
+	entries := `{"type":"user","message":{"content":"You have unread messages on the message board. Run 'coral-board read' to see them.\n1. finish the work in progress\n2. close"}}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, sessionID+".jsonl"), []byte(entries), 0o644))
+	assert.Equal(t, "1. finish the work in progress\n2. close", NewSessionReader().FirstUserPrompt(sessionID, "", "claude"))
+}

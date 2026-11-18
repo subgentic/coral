@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 installDom({ mode: 'local' });
 const { isCoralNudge } = await importUi('pending_messages');
+const { NUDGE_THEN_TYPED } = await importUi('chat_team_instructions');
 const { unwrapPastedContent } = await importUi('pasted_content');
 const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../coral-go/internal/agent/testdata/coral_deliveries.json');
 const cases = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -15,4 +16,6 @@ assert.ok(cases.notices.length > 10 && cases.not_notices.length > 5, 'the fixtur
 const nudge = text => isCoralNudge(unwrapPastedContent(text));
 for (const text of cases.notices) assert.equal(nudge(text), true, `a notice: ${JSON.stringify(text)}`);
 for (const text of cases.not_notices) assert.equal(nudge(text), false, `not a notice: ${JSON.stringify(text)}`);
+// a nudge with the person's own lines after it is theirs (#19534): not a notice, and the split gives their lines
+for (const c of cases.mixed) { const m = NUDGE_THEN_TYPED.exec(unwrapPastedContent(c.text).trim()); assert.ok(m, `split: ${JSON.stringify(c.text)}`); assert.equal(m[2].trim(), c.typed); }
 console.log(`coral_notice_fixture: ok (${cases.notices.length} notices, ${cases.not_notices.length} not)`);

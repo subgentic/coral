@@ -74,6 +74,7 @@ func typedText(text string) (string, bool) {
 		}
 		text = t[:start]
 	}
+	text = PersonText(text)
 	if injectedUserText(text) || IsCoralDelivery(text) { // what Coral typed into the agent (a nudge, a task notice) is not what the person asked (#10163)
 		return "", false
 	}
