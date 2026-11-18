@@ -36,6 +36,8 @@ const ROWS=[row(5,'rejected'),row(4,'pending'),row(3,'approved'),row(2,'approved
   await ev(`document.querySelector('#skills-view .dt-sort[data-key=version]').click();true`);
   assert.match((await list())[0],/Designer description v3/,'version descending works');
   assert.equal(await ev(`[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting').getAttribute('aria-label')`),'v4 waiting: review version 4 of testing-on-the-mac-mini');
+  // the viewport went back from 390 to 1280 above: the table is laid out unfolded on its next resize pass, and until then the pending button's cell is display:none (Tab skips it, to the next row's link: 1 in 20 on a loaded machine, #19525)
+  await waitFor(`[...document.querySelectorAll('#skills-view button')].some(b=>b.textContent==='v4 waiting'&&b.getClientRects().length>0)`,'the table is unfolded again at 1280: the pending button is shown');
   await ev(`(()=>{const b=[...document.querySelectorAll('#skills-view button')].find(b=>b.textContent==='v4 waiting');b.closest('tr').querySelector('.dt-primary').focus();window.__detailGets=[];return true;})()`);
   await client.Input.dispatchKeyEvent({type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
   await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
