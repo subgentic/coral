@@ -97,6 +97,9 @@ func (m *Manager) clearDeviceKeys(ctx context.Context) bool {
 	return true
 }
 
+// DeviceClearPending is the Verifier.Refuse of this computer: true while the last clear of the device list failed and none has worked since. (In memory: a restart starts with no flag, and the next enrollment, disconnect or lost link clears again.)
+func (m *Manager) DeviceClearPending() bool { return m.deviceClearPending() }
+
 // deviceClearPending is whether the last clear failed and has not worked since.
 func (m *Manager) deviceClearPending() bool {
 	m.pair.mu.Lock()

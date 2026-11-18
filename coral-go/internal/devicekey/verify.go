@@ -32,6 +32,8 @@ var (
 	ErrAboveSigner     = errors.New("above_signer")
 	ErrSelfTarget      = errors.New("self_target")
 	ErrTargetBootstrap = errors.New("target_bootstrap")
+	// ErrListUnavailable: the device list could not be cleared on a new enrollment, so the old account's keys may still be in it: every signed message is refused, nothing is applied and no nonce is spent, until a clear works (coral-hub Security, #19717). A fixed code: it says nothing of the list.
+	ErrListUnavailable = errors.New("list_unavailable")
 	ErrUnknownTarget   = errors.New("unknown_target")
 	ErrNonceRepeat     = errors.New("nonce_repeat")
 	ErrNonceStoreFull  = errors.New("nonce_store_full")
@@ -64,6 +66,9 @@ type Verifier struct {
 	// RefuseBefore, when set, refuses every message whose ts is earlier. Coral sets it to its start time plus the window when the nonce store could not be read at start (design page v4 section 4, `before_start`).
 	RefuseBefore time.Time
 
+	// Refuse, when set, is asked first of all: while it returns true (a device-key clear is pending) every message is refused with ErrListUnavailable before anything of it is read.
+	Refuse func() bool
+
 	// Audit, when set, is called after each applied removal with the signer's kid, the target's, and the mode the target had.
 	Audit func(a Action, signerKID, targetKID, targetMode string)
 
@@ -82,6 +87,9 @@ func window(a Action) time.Duration {
 func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string, now time.Time) (Message, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	if v.Refuse != nil && v.Refuse() {
+		return Message{}, ErrListUnavailable
+	}
 	m, err := Parse(a, body)
 	if err != nil {
 		return Message{}, err

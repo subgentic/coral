@@ -315,3 +315,16 @@ func TestAnOldOrUsedSecretPairsNothing(t *testing.T) {
 	assert.Empty(t, r2.listed(t), "an enrollment clears the list, and the used secret pairs nothing again")
 	assert.Contains(t, r2.m.Status().DevicePairing, "not added")
 }
+
+// DeviceClearPending is the verifier's switch: true after a failed clear, false after one works.
+func TestDeviceClearPendingFollowsTheClear(t *testing.T) {
+	r := pairingSetup(t, true)
+	cf := &clearFails{SessionStore: r.ss, fail: true}
+	r.m.o.Devices = cf
+	assert.False(t, r.m.DeviceClearPending())
+	r.m.afterBootstrap(context.Background(), BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{})
+	assert.True(t, r.m.DeviceClearPending(), "a failed clear: refuse every signed message")
+	cf.fail = false
+	r.m.afterBootstrap(context.Background(), BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{})
+	assert.False(t, r.m.DeviceClearPending())
+}

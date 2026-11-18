@@ -685,3 +685,27 @@ func TestAuditLineNamesTheKidsAndTheMode(t *testing.T) {
 	assert.Contains(t, b.String(), "kid=TARGET")
 	assert.Contains(t, b.String(), "mode=interact")
 }
+
+// coral-hub Security (#248970): while a device-key clear is pending the old account's keys may still be in the list, so a valid message from one is refused with a fixed code, nothing applied, no nonce spent; when a clear works, the same message is refused as a removed key.
+func TestAPendingClearRefusesEverySignedMessage(t *testing.T) {
+	r := newRig(t)
+	pending := true
+	r.v.Refuse = func() bool { return pending }
+	victim := newSigner(t)
+	r.add(victim, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+	m := r.remove(r.signer, victim.kid) // valid, from a launch device
+	r.refused(devicekey.ErrListUnavailable, m, r.signer, t0)
+	k, _ := r.listed(victim.kid)
+	assert.Zero(t, k.RemovedAt, "nothing was applied")
+
+	// Even a garbled body gets the same fixed code: nothing of the message is read first.
+	_, err := r.v.Handle(context.Background(), devicekey.RemoveDevice, []byte("not json"), "x", t0)
+	assert.ErrorIs(t, err, devicekey.ErrListUnavailable)
+
+	// The clear works: the old key is gone, and the very same message is refused as a removed key (its nonce was never spent).
+	pending = false
+	_, err = r.ss.RemoveAllDeviceKeys(context.Background(), t0)
+	require.NoError(t, err)
+	_, err = r.handle(m, r.signer, t0)
+	assert.ErrorIs(t, err, devicekey.ErrSignerRemoved)
+}
