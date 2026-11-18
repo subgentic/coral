@@ -591,6 +591,12 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Put("/api/cloud/allow-auto-accept", s.cloudHandler.SetAllowHubAutoAccept)
 	r.Post("/api/hub-auto-accept", s.cloudHandler.HubOwnerSetAutoAccept) // #5840: Coral Hub's owner, through the tunnel only
 	r.Put("/api/cloud/redact-tokens", s.cloudHandler.SetRedactTokens)
+	// Device keys, slice 5 (#19669): this computer's person lists, lowers and removes the devices Coral Hub's owner trusts. Local only, never through the tunnel.
+	r.Get("/api/cloud/devices", s.cloudHandler.Devices)
+	r.Put("/api/cloud/device-web-mode", s.cloudHandler.SetDeviceWebMode)
+	r.Post("/api/cloud/devices/clear-clock", s.cloudHandler.ClearDevicesClock)
+	r.Put("/api/cloud/devices/{kid}/mode", s.cloudHandler.SetDeviceMode)
+	r.Delete("/api/cloud/devices/{kid}", s.cloudHandler.RemoveDevice)
 	r.Put("/api/cloud/hub-relaunch", s.cloudHandler.SetHubRelaunch)        // #5280
 	r.Put("/api/cloud/hub-cross-team", s.cloudHandler.SetHubCrossTeam)     // #5572
 	r.Get("/api/system/codex-trust-hooks", s.cloudHandler.CodexTrustHooks) // #153

@@ -388,3 +388,29 @@ func (s *SessionStore) ClockMark(ctx context.Context) (time.Time, error) {
 	}
 	return time.Unix(v, 0), err
 }
+
+// DeviceWebModeSetting is the computer's own setting for the mode a browser paired through the `#p=` link starts at. Beta default launch (a dated decision, 2026-11-18: coral-hub's Part G item 6; first reviewed at the start of the closed beta's second week, or sooner if a device signs something unexpected). Only this computer's person changes it (the dashboard here and `coral cloud devices`); never a paired browser or the Hub.
+const DeviceWebModeSetting = "device_web_mode"
+
+// DeviceWebModeDefault is the beta default.
+const DeviceWebModeDefault = "launch"
+
+// DeviceWebMode is the mode a newly paired browser gets. A missing, empty or unknown stored value is the default: a stored word is never taken for a mode it is not.
+func (s *SessionStore) DeviceWebMode(ctx context.Context) string {
+	all, err := s.GetSettings(ctx)
+	if err != nil {
+		return DeviceWebModeDefault
+	}
+	if m := all[DeviceWebModeSetting]; validDeviceMode(m) {
+		return m
+	}
+	return DeviceWebModeDefault
+}
+
+// SetDeviceWebMode saves the web mode: only view, interact or launch.
+func (s *SessionStore) SetDeviceWebMode(ctx context.Context, mode string) error {
+	if !validDeviceMode(mode) {
+		return ErrDeviceKeyForm
+	}
+	return s.SetSetting(ctx, DeviceWebModeSetting, mode)
+}

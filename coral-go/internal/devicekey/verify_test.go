@@ -7,6 +7,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -617,12 +619,12 @@ func TestRemovalIsAuditedWithTheSignersKid(t *testing.T) {
 	victim := newSigner(t)
 	r.add(victim, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
 	var got []string
-	r.v.Audit = func(a devicekey.Action, signerKID, targetKID string) {
-		got = append(got, string(a)+" "+signerKID+" "+targetKID)
+	r.v.Audit = func(a devicekey.Action, signerKID, targetKID, targetMode string) {
+		got = append(got, string(a)+" "+signerKID+" "+targetKID+" "+targetMode)
 	}
 	_, err := r.handle(r.remove(r.signer, victim.kid), r.signer, t0)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"remove-device " + r.signer.kid + " " + victim.kid}, got)
+	assert.Equal(t, []string{"remove-device " + r.signer.kid + " " + victim.kid + " view"}, got, "with the kid and the mode the removed device had")
 	r.refused(devicekey.ErrUnknownTarget, r.remove(r.signer, victim.kid), r.signer, t0)
 	assert.Len(t, got, 1, "a refused removal is not audited as a removal")
 }
@@ -671,4 +673,15 @@ func TestRaiseOfABootstrapTargetSaysTargetBootstrap(t *testing.T) {
 	boot := newSigner(t)
 	r.add(boot, "view", store.DeviceOriginBootstrap, store.DeviceKindDevice)
 	r.refused(devicekey.ErrTargetBootstrap, r.raise(r.signer, boot.kid, "interact"), r.signer, t0)
+}
+
+// Condition (d): the audit line for a removal names the kids and the mode, and nothing from the message beyond them.
+func TestAuditLineNamesTheKidsAndTheMode(t *testing.T) {
+	var b strings.Builder
+	lg := slog.New(slog.NewTextHandler(&b, nil))
+	devicekey.AuditLine(lg)(devicekey.RemoveDevice, "SIGNER", "TARGET", "interact")
+	assert.Contains(t, b.String(), "device removed")
+	assert.Contains(t, b.String(), "signer=SIGNER")
+	assert.Contains(t, b.String(), "kid=TARGET")
+	assert.Contains(t, b.String(), "mode=interact")
 }

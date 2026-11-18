@@ -264,4 +264,52 @@ func TestALinkLostWhoseClearFailsStillWipesTheSecretAndFailsClosedAfter(t *testi
 	assert.False(t, r.m.PairingSecretHeld(), "the secret is wiped whatever the store did")
 	assert.Len(t, r.listed(t), 1, "the stale key could not be removed")
 	assert.True(t, r.m.deviceClearPending(), "and the manager knows: a pairing refuses until a clear works")
+// coral-hub condition (c): the mode comes from the computer's own setting at the moment of pairing, read each time: changing the setting before the next pairing changes what it grants, and nothing in the request or the Hub's answer does.
+func TestThePairedModeIsReadFromTheComputersSettingAtPairingTime(t *testing.T) {
+	r := pairingSetup(t, true)
+	r.m.o.PairedDeviceMode = func() string { return r.ss.DeviceWebMode(context.Background()) }
+	require.NoError(t, r.ss.SetDeviceWebMode(context.Background(), "view"))
+	r.connect(t)
+	l := r.listed(t)
+	require.Len(t, l, 1)
+	assert.Equal(t, "view", l[0].Mode, "the setting at pairing time")
+}
+
+// coral-hub condition (d): each pairing is audited with the kid and the mode it was given; nothing else of the key (no secret, no MAC) is in the line.
+func TestAPairingIsAuditedWithTheKidAndTheMode(t *testing.T) {
+	r := pairingSetup(t, true)
+	r.connect(t)
+	logs := r.e.logs.String()
+	line := ""
+	for _, l := range strings.Split(logs, "\n") {
+		if strings.Contains(l, "device paired") {
+			line = l
+		}
+	}
+	require.NotEmpty(t, line, logs)
+	assert.Contains(t, line, "kid="+r.kid)
+	assert.Contains(t, line, "mode=launch")
+	assert.NotContains(t, logs, r.secret)
+}
+
+// coral-hub condition (a), at the manager: a secret older than ten minutes adds nothing, and a secret already used once cannot pair a second browser.
+func TestAnOldOrUsedSecretPairsNothing(t *testing.T) {
+	r := pairingSetup(t, true)
+	base := time.Now()
+	r.m.o.Now = func() time.Time { return base }
+	r.m.SetPairingSecret(r.secret)
+	r.m.o.Now = func() time.Time { return base.Add(10*time.Minute + time.Second) }
+	require.NoError(t, r.m.Connect(context.Background()))
+	waitState(t, r.m, StateConnected)
+	assert.Empty(t, r.listed(t), "ten minutes passed")
+	assert.Contains(t, r.m.Status().DevicePairing, "not added")
+
+	r2 := pairingSetup(t, true)
+	r2.connect(t)
+	require.Len(t, r2.listed(t), 1)
+	require.NoError(t, r2.m.Disconnect(context.Background()))
+	require.NoError(t, r2.m.Connect(context.Background())) // no new secret: the first was used up
+	waitState(t, r2.m, StateConnected)
+	assert.Empty(t, r2.listed(t), "an enrollment clears the list, and the used secret pairs nothing again")
+	assert.Contains(t, r2.m.Status().DevicePairing, "not added")
 }

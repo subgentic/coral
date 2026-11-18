@@ -513,10 +513,10 @@ func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, 
 		HubLimits:    routes.HubLimitsFromSettings(ss),
 		CoralVersion: config.ReportedVersion(),
 		Logger:       slog.Default(),
-		// Device keys, slice 4: the list the pairing writes, this computer's key, and the mode a browser-paired device starts at (Launch in the beta; slice 5 makes it a setting).
+		// Device keys: the list the pairing writes, this computer's key, and the mode a browser-paired device starts at: this computer's own setting, read at each pairing (Launch in the beta).
 		Devices:          ss,
 		ComputerKey:      loadComputerKey(cfg.CoralDir()),
-		PairedDeviceMode: func() string { return "launch" },
+		PairedDeviceMode: func() string { return ss.DeviceWebMode(context.Background()) },
 		// Sign in with Coral Hub (#3966): the return origins, the owner-pin events, and the
 		// sessions a lost link ends.
 		SigninOrigins: srv.HubSigninOrigins,

@@ -533,6 +533,11 @@ b PUT /api/cloud/hub-relaunch
 b PUT /api/system/update/settings
 b PUT /api/cloud/max-mode
 b PUT /api/cloud/redact-tokens
+b GET /api/cloud/devices
+b PUT /api/cloud/device-web-mode
+b PUT /api/cloud/devices/{kid}/mode
+b DELETE /api/cloud/devices/{kid}
+b POST /api/cloud/devices/clear-clock
 b PUT /api/custom-models
 b PUT /api/custom-modes
 b PUT /api/system/identity-actor

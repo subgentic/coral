@@ -45,6 +45,8 @@ type fakeCoral struct {
 	connectRetryAfter string
 	connects          int
 	onStatus          func() // test hook, called on every status read
+	connectReply      string // if set, what /api/cloud/connect answers (default: enrolling)
+	deviceReply       string // if set, what the /api/cloud/device* routes answer
 }
 
 type fakeRedeem struct {
@@ -123,10 +125,18 @@ func (f *fakeCoral) serve(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.WriteString(w, `{"error":"Could not start enrollment: Coral Hub could not be reached or had an error; try again in a minute"}`)
 			return
 		}
+		if f.connectReply != "" {
+			_, _ = io.WriteString(w, f.connectReply)
+			return
+		}
 		_, _ = io.WriteString(w, enrolling)
 	case "/api/cloud/connect/cancel":
 		_, _ = io.WriteString(w, idle)
 	default:
+		if f.deviceReply != "" && strings.HasPrefix(r.URL.Path, "/api/cloud/device") {
+			_, _ = io.WriteString(w, f.deviceReply)
+			return
+		}
 		_, _ = io.WriteString(w, `{}`)
 	}
 }

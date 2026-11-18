@@ -167,7 +167,7 @@ func (m *Manager) finishDevicePairing(ctx context.Context, dc *DeviceCode, en *E
 	if m.o.PairedDeviceMode != nil {
 		mode = m.o.PairedDeviceMode()
 	}
-	_, mac, err := hold.Complete(ctx, m.o.Devices, dc.UserCode, en.Label, *en.Pairing, mode, m.o.ComputerKey.Pub(), m.o.Now())
+	kid, mac, err := hold.Complete(ctx, m.o.Devices, dc.UserCode, en.Label, *en.Pairing, mode, m.o.ComputerKey.Pub(), m.o.Now())
 	if err != nil {
 		why := pairWhyOther
 		switch {
@@ -183,6 +183,8 @@ func (m *Manager) finishDevicePairing(ctx context.Context, dc *DeviceCode, en *E
 		return
 	}
 	m.setPairNote(pairNoteAdded)
+	// The audit line (coral-hub condition d): who was added and what it may do. The kid is a public hash; the label is a stranger's text and stays out.
+	m.o.Logger.Info("cloud: device paired", "kid", kid, "mode", mode, "origin", store.DeviceOriginPairing)
 	// Once, no retry, nothing logged of it. A failure leaves the device listed: the browser can pair again.
 	if err := SendEnrollReply(ctx, m.hc, m.o.HubURL, dc.DeviceCode, b64u.EncodeToString(m.o.ComputerKey.Pub()), b64u.EncodeToString(mac)); err != nil {
 		m.o.Logger.Info("cloud: the pairing reply was not delivered")

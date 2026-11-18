@@ -446,3 +446,20 @@ func TestPromoteDeviceOriginIsUpgradeOnly(t *testing.T) {
 	assert.False(t, ok)
 	assert.Equal(t, store.DeviceOriginBootstrap, origin(b2.KID))
 }
+
+// Slice 5 (coral-hub condition c/e): the mode a browser-paired device starts at is the computer's own setting. Beta default: launch (decided 2026-11-18, first reviewed at the start of the closed beta's second week). An unknown or empty value is never trusted: it reads as the default, and a set accepts only the three modes.
+func TestDeviceWebModeDefaultsToLaunchAndTakesOnlyTheThreeModes(t *testing.T) {
+	ss := dkStore(t)
+	ctx := context.Background()
+	assert.Equal(t, "launch", ss.DeviceWebMode(ctx), "the beta default")
+	for _, m := range []string{"view", "interact", "launch"} {
+		require.NoError(t, ss.SetDeviceWebMode(ctx, m))
+		assert.Equal(t, m, ss.DeviceWebMode(ctx))
+	}
+	for _, bad := range []string{"", "admin", "LAUNCH", "launch ", "root"} {
+		require.Error(t, ss.SetDeviceWebMode(ctx, bad), bad)
+	}
+	require.NoError(t, ss.SetDeviceWebMode(ctx, "view"))
+	require.NoError(t, ss.SetSetting(ctx, store.DeviceWebModeSetting, "admin")) // a hand-edited row
+	assert.Equal(t, "launch", ss.DeviceWebMode(ctx), "a bad stored value reads as the default, never as a mode")
+}

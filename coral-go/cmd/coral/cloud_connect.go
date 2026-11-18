@@ -51,13 +51,14 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: coral cloud connect [--force] [--ticket-file <path|-> [--proof-file <path>]] [--url "+defaultCoralURL()+"] [--home DIR]")
 		fmt.Fprintln(stderr, "       coral cloud status [--url ...] [--home DIR]")
 		fmt.Fprintln(stderr, "       coral cloud disconnect [--url ...] [--home DIR]")
+		fmt.Fprintln(stderr, "       coral cloud devices [list | remove <kid> | mode <kid> <view|interact|launch> | web-mode <view|interact|launch> | clear-clock]")
 		return 2
 	}
 	if len(args) == 0 {
 		return usage()
 	}
 	cmd := args[0]
-	if cmd != "connect" && cmd != "status" && cmd != "disconnect" {
+	if cmd != "connect" && cmd != "status" && cmd != "disconnect" && cmd != "devices" {
 		return usage()
 	}
 	fs := flag.NewFlagSet("cloud "+cmd, flag.ContinueOnError)
@@ -72,8 +73,17 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	base := fs.String("url", hooks.CoralBase(), "the running Coral server, on this computer")
 	home := fs.String("home", "", "Coral's data folder, if the server was started with --home (default: CORAL_DATA_DIR or ~/.coral)")
-	if err := fs.Parse(args[1:]); err != nil {
-		return usage()
+	var words []string // `coral cloud devices` takes words; flags may come before, between or after them
+	rest := args[1:]
+	for {
+		if err := fs.Parse(rest); err != nil {
+			return usage()
+		}
+		if cmd != "devices" || fs.NArg() == 0 {
+			break
+		}
+		words = append(words, fs.Arg(0))
+		rest = fs.Args()[1:]
 	}
 	*base = runningServerURL(fs, *base, *home)
 	if fs.NArg() > 0 {
@@ -91,6 +101,8 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return c.printStatus(ctx, stdout)
 	case "disconnect":
 		return c.disconnect(ctx, stdout)
+	case "devices":
+		return c.devices(ctx, words, stdout, stderr)
 	}
 	if *ticket != "" {
 		return c.redeemTicket(ctx, *ticket, *proof, *devKey, stdin, stdout)
@@ -205,6 +217,8 @@ func (c *cloudClient) call(ctx context.Context, method, path string, body any, h
 type cloudStatusReply struct {
 	cloud.Status
 	AllowHubAutoAccept bool `json:"allow_hub_auto_accept"`
+	// DeviceWebMode is the mode a browser paired from the link starts at, this computer's own setting.
+	DeviceWebMode string `json:"device_web_mode"`
 }
 
 func (c *cloudClient) status(ctx context.Context) (cloudStatusReply, int) {
@@ -322,6 +336,7 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 			return 4
 		}
 		if ui.ask {
+			fmt.Fprint(ui.out, pairingPrompt(st.DeviceWebMode))
 			fmt.Fprintf(ui.out, "\nOpen %s\nYour code %s should already be filled in. Approve it there (from any computer).\n", st.VerificationURL+frag, st.UserCode)
 			fmt.Fprintln(ui.out, "\nWaiting for you to approve… (Ctrl-C to cancel)")
 		} else {

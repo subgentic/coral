@@ -1,0 +1,172 @@
+package routes
+
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/subgentic/coral/internal/store"
+)
+
+// The device list at this computer (#19669 slice 5, coral-hub condition e): the person here sees the browsers and passkeys Coral Hub's owner trusts, lowers or removes any one, and lowers the mode new browsers start at. Every route here is local only: the dashboard on this computer and the signed command line, never the tunnel (never at any mode), never a paired browser, never a Hub sign-in.
+
+type deviceRow struct {
+	KID        string `json:"kid"`
+	Label      string `json:"label"`
+	Mode       string `json:"mode"`
+	Origin     string `json:"origin"`
+	Kind       string `json:"kind"`
+	CreatedAt  int64  `json:"created_at"`
+	LastUsedAt int64  `json:"last_used_at,omitempty"`
+}
+
+type deviceList struct {
+	WebMode     string      `json:"web_mode"`
+	Devices     []deviceRow `json:"devices"`
+	ClockNotice string      `json:"clock_notice,omitempty"`
+}
+
+func (h *CloudHandler) deviceList(r *http.Request) (deviceList, error) {
+	ctx := r.Context()
+	out := deviceList{WebMode: h.ss.DeviceWebMode(ctx), Devices: []deviceRow{}}
+	keys, err := h.ss.ListDeviceKeys(ctx)
+	if err != nil {
+		return out, err
+	}
+	for _, k := range keys {
+		if k.RemovedAt != 0 {
+			continue
+		}
+		out.Devices = append(out.Devices, deviceRow{KID: k.KID, Label: k.Label, Mode: k.Mode, Origin: k.Origin, Kind: k.Kind, CreatedAt: k.CreatedAt, LastUsedAt: k.LastUsedAt})
+	}
+	if mark, err := h.ss.ClockMark(ctx); err == nil && !mark.IsZero() && time.Now().Before(mark) {
+		out.ClockNotice = sprintfClock(mark)
+	}
+	return out, nil
+}
+
+// sprintfClock is the notice for a clock behind the last accepted device message: it says what the clock was compared with and how to fix it.
+func sprintfClock(mark time.Time) string {
+	return "This computer's clock is behind the last time it accepted a device message (" + mark.Local().Format("2006-01-02 15:04") + "). Set the clock right. If the clock is right and the old time was wrong, run: coral cloud devices clear-clock"
+}
+
+// Devices: GET /api/cloud/devices
+func (h *CloudHandler) Devices(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) {
+		return
+	}
+	out, err := h.deviceList(r)
+	if err != nil {
+		errInternalServer(w, "Could not read the device list")
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// SetDeviceWebMode: PUT /api/cloud/device-web-mode {"mode": "view"|"interact"|"launch"}: what the next browser paired from the link gets. A device already paired keeps its mode (lower it by itself).
+func (h *CloudHandler) SetDeviceWebMode(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || !requireJSON(w, r) {
+		return
+	}
+	var body struct {
+		Mode string `json:"mode"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		errBadRequest(w, "mode is required")
+		return
+	}
+	if err := h.ss.SetDeviceWebMode(r.Context(), body.Mode); err != nil {
+		errBadRequest(w, "mode must be view, interact or launch")
+		return
+	}
+	slog.Info("cloud: the mode for newly paired browsers was set here", "mode", body.Mode)
+	out, err := h.deviceList(r)
+	if err != nil {
+		errInternalServer(w, "Could not read the device list")
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// SetDeviceMode: PUT /api/cloud/devices/{kid}/mode {"mode": ...}: one device's mode, set here.
+func (h *CloudHandler) SetDeviceMode(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || !requireJSON(w, r) {
+		return
+	}
+	var body struct {
+		Mode string `json:"mode"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		errBadRequest(w, "mode is required")
+		return
+	}
+	kid := chi.URLParam(r, "kid")
+	switch body.Mode {
+	case "view", "interact", "launch":
+	default:
+		errBadRequest(w, "mode must be view, interact or launch")
+		return
+	}
+	ctx := r.Context()
+	if _, err := h.ss.ActiveDeviceKey(ctx, kid, time.Now()); err != nil {
+		errNotFound(w, "No such device")
+		return
+	}
+	if err := h.ss.SetDeviceMode(ctx, kid, body.Mode, time.Now()); err != nil {
+		errInternalServer(w, "Could not change the device")
+		return
+	}
+	slog.Info("cloud: a device's mode was set here", "kid", kid, "mode", body.Mode)
+	out, err := h.deviceList(r)
+	if err != nil {
+		errInternalServer(w, "Could not read the device list")
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// RemoveDevice: DELETE /api/cloud/devices/{kid}
+func (h *CloudHandler) RemoveDevice(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) {
+		return
+	}
+	kid := chi.URLParam(r, "kid")
+	ctx := r.Context()
+	k, err := h.ss.ActiveDeviceKey(ctx, kid, time.Now())
+	if err != nil {
+		errNotFound(w, "No such device")
+		return
+	}
+	if err := h.ss.RemoveDeviceKey(ctx, kid, "removed", time.Now()); err != nil && !errors.Is(err, store.ErrUnknownSigner) {
+		errInternalServer(w, "Could not remove the device")
+		return
+	}
+	slog.Info("cloud: device removed", "action", "removed-here", "kid", kid, "mode", k.Mode)
+	out, lerr := h.deviceList(r)
+	if lerr != nil {
+		errInternalServer(w, "Could not read the device list")
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// ClearDevicesClock: POST /api/cloud/devices/clear-clock: the owner's reset after a clock jump (the mark becomes now).
+func (h *CloudHandler) ClearDevicesClock(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) {
+		return
+	}
+	if err := h.ss.ClearClockMark(r.Context(), time.Now()); err != nil {
+		errInternalServer(w, "Could not reset the clock mark")
+		return
+	}
+	slog.Info("cloud: the device clock mark was reset here")
+	out, err := h.deviceList(r)
+	if err != nil {
+		errInternalServer(w, "Could not read the device list")
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}

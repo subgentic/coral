@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"math/big"
 	"sync"
 	"time"
@@ -63,8 +64,8 @@ type Verifier struct {
 	// RefuseBefore, when set, refuses every message whose ts is earlier. Coral sets it to its start time plus the window when the nonce store could not be read at start (design page v4 section 4, `before_start`).
 	RefuseBefore time.Time
 
-	// Audit, when set, is called after each applied removal with the signer's kid and the target's.
-	Audit func(a Action, signerKID, targetKID string)
+	// Audit, when set, is called after each applied removal with the signer's kid, the target's, and the mode the target had.
+	Audit func(a Action, signerKID, targetKID, targetMode string)
 
 	mu sync.Mutex // one message at a time: the nonce check and the apply are not racing each other
 }
@@ -127,7 +128,7 @@ func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string
 		return m, err
 	}
 	if m.Action == RemoveDevice && v.Audit != nil {
-		v.Audit(m.Action, m.KID, m.TargetKID)
+		v.Audit(m.Action, m.KID, m.TargetKID, target.Mode)
 	}
 	return m, nil
 }
@@ -260,4 +261,11 @@ func verifyP1363(pk []byte, msg []byte, sig string) bool {
 	}
 	h := sha256.Sum256(msg)
 	return ecdsa.Verify(&ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}, h[:], new(big.Int).SetBytes(raw[:32]), new(big.Int).SetBytes(raw[32:]))
+}
+
+// AuditLine is the Verifier.Audit that writes the removal to the log: the kids (public hashes) and the mode, never a label or a message.
+func AuditLine(lg *slog.Logger) func(a Action, signerKID, targetKID, targetMode string) {
+	return func(a Action, signerKID, targetKID, targetMode string) {
+		lg.Info("cloud: device removed", "action", string(a), "signer", signerKID, "kid", targetKID, "mode", targetMode)
+	}
 }
