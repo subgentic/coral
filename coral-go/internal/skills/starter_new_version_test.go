@@ -17,3 +17,12 @@ func TestTheGettingStartedSkillsUploadAChangedFileAsANewVersion(t *testing.T) {
 		assert.Contains(t, string(b), "never as a separate file", name)
 	}
 }
+
+// An orchestrator that wants a fresh agent restarts the one on the board; it never launches a second one for the same job (#19508).
+func TestOrchestratorSkillTeachesManagingAgentsAlreadyOnTheBoard(t *testing.T) {
+	md := StarterText("orchestrator-team-builder")
+	require.NotEmpty(t, md)
+	for _, want := range []string{"## 7. Managing agents already on the board", "`coral-board restart \"<agent>\"`", "`coral-board sleep \"<agent>\"`", "`coral-board wake \"<agent>\"`", "never replaced by a new launch", "the server's words"} {
+		require.Contains(t, md, want)
+	}
+}

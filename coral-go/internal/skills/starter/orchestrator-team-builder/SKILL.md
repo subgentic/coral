@@ -82,4 +82,13 @@ On Windows an agent CLI installed as a `.cmd` file cannot take a board launch ye
 
 Wait for the agents to come online, then post the first assignments as tasks (`coral-board task add`), one per agent, and tell the person where to watch: the Agents tab shows each agent, Needs you shows what waits on them. Every launch is logged and said on the board.
 
+## 7. Managing agents already on the board
+
+An agent that is already on the board is never replaced by a new launch: a second agent with the same job gets a new name and personality, and the person's agent, its seat and its history are left behind. Use the agent's own commands:
+
+- A fresh session for an agent that is stuck or has too much context: `coral-board restart "<agent>"`. It keeps the agent's CLI, model, prompt, folder and board seat and starts a new conversation. An agent in the middle of a turn is refused; `coral-board restart "<agent>" --when-idle` queues it for its next idle.
+- To pause one: `coral-board sleep "<agent>"`; to bring it back with its conversation: `coral-board wake "<agent>"`.
+- Check who is running first with `coral-board status --json`. Launch (section 5) only an agent that is not on the board.
+- If a restart, wake or sleep is refused, tell the person the server's words, not your own; do not launch a replacement or retry another way. The usual cause is that the Operator has not switched on "the orchestrator may wake, sleep, stop and start agents" for the board.
+
 The person can also build a team without you: Agents, New team, describe it.
