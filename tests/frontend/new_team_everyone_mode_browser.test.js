@@ -22,7 +22,7 @@ const BASE = require('./test_base').BASE;
         await t.type('input', N.teamName, 'alpha'); await t.type('input', N.folder, '/work/payments-app');
         await t.click('button', N.next); await t.step(2); await settle(500);
         const help = await ev(`document.querySelector('#team-allworkers').closest('.sv-row')?.textContent || ''`);
-        check(/built-in Orchestrator takes the Mode too; one you set by hand keeps its own/.test(help), `the help says who follows the Mode: ${help.slice(0, 200)}`);
+        check(/built-in Orchestrator takes Model and Mode too; one you set by hand keeps its own/.test(help), `the help says who follows the Mode: ${help.slice(0, 200)}`);
         let line = await orchLine();
         check(/^Orchestrator \(follows the team's Mode\)/.test(line), `a built-in Orchestrator's line says it follows the team's Mode: ${line}`);
         check(!/its own/.test(line), `and not that it is its own: ${line}`);
