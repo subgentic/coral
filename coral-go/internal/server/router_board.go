@@ -183,6 +183,7 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/sleep", sessHandler.OrchestratorSleep)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/restart", sessHandler.OrchestratorRestart)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/stop", sessHandler.OrchestratorStop)
+		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/interrupt", sessHandler.OrchestratorInterrupt)
 	})
 
 	// These work without an open board, so they stay outside the board group (#4924): team

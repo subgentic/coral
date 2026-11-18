@@ -216,6 +216,11 @@ func (h *SessionsHandler) orchSeat(w http.ResponseWriter, r *http.Request, proje
 
 // orchTarget resolves the agent to act on from the BOARD'S OWN seats, by member, never from a session name the caller supplies, and refuses what is not a plain agent of this board.
 func (h *SessionsHandler) orchTarget(w http.ResponseWriter, r *http.Request, project string, seat *store.LiveSession) (*store.LiveSession, string, bool) {
+	return h.orchTargetFor(w, r, project, seat, false)
+}
+
+// orchTargetFor is orchTarget; allowArchived lets an archived member through (wake and sleep bring it back, #19673).
+func (h *SessionsHandler) orchTargetFor(w http.ResponseWriter, r *http.Request, project string, seat *store.LiveSession, allowArchived bool) (*store.LiveSession, string, bool) {
 	member := chi.URLParam(r, "subscriber")
 	if un, err := url.PathUnescape(member); err == nil { // chi routes on the escaped path, so a name with a slash or a space (UX%2FUX%20Engineer) arrives escaped (#13415)
 		member = un
@@ -236,10 +241,10 @@ func (h *SessionsHandler) orchTarget(w http.ResponseWriter, r *http.Request, pro
 	case err != nil || target == nil || ptr.Value(target.BoardName) != project:
 		orchRefusal(w, http.StatusNotFound, "no_such_agent", "that agent is not seated on this board")
 	case target.SessionID == seat.SessionID:
-		orchRefusal(w, http.StatusForbidden, "not_itself", "the orchestrator seat cannot wake, sleep or stop itself")
+		orchRefusal(w, http.StatusForbidden, "not_itself", "the orchestrator seat cannot wake, sleep, stop or interrupt itself")
 	case target.AgentType == at.Terminal:
 		orchRefusal(w, http.StatusForbidden, "not_an_agent", "a terminal is not an agent")
-	case target.IsArchived == 1:
+	case target.IsArchived == 1 && !allowArchived:
 		orchRefusal(w, http.StatusConflict, "archived", "that agent is archived")
 	default:
 		return target, sub.SubscriberID, true
@@ -263,7 +268,7 @@ func (h *SessionsHandler) OrchestratorWake(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	target, member, ok := h.orchTarget(w, r, project, seat)
+	target, member, ok := h.orchTargetFor(w, r, project, seat, true)
 	if !ok {
 		return
 	}
@@ -344,8 +349,19 @@ func (h *SessionsHandler) OrchestratorSleep(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
-	target, member, ok := h.orchTarget(w, r, project, seat)
+	target, member, ok := h.orchTargetFor(w, r, project, seat, true)
 	if !ok {
+		return
+	}
+	if target.IsArchived == 1 { // Archived -> Sleep -> Sleeping (#19673): its session is already ended, only the flag goes
+		if err := h.ss.SetSessionArchived(r.Context(), target.SessionID, false); err != nil {
+			errInternalServer(w, "could not move the agent to sleeping")
+			return
+		}
+		actor, who := h.orchActor(seat), orchName(member)
+		h.sayLifecycle(r.Context(), project, actor+" moved "+who+" from archived to asleep")
+		h.kickWS()
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "slept": who})
 		return
 	}
 	if target.IsSleeping == 1 {
@@ -369,9 +385,9 @@ func (h *SessionsHandler) OrchestratorSleep(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "slept": who})
 }
 
-// OrchestratorStop: POST /api/board/{project}/agents/{subscriber}/stop. Stop the agent's current turn (the same as the composer's Stop button: Escape for Claude/Codex, Ctrl-C for Hermes). An agent that is
+// OrchestratorInterrupt: POST /api/board/{project}/agents/{subscriber}/interrupt (#19673: it was /stop). Interrupt the agent's current turn (the same as the composer's Stop button: Escape for Claude/Codex, Ctrl-C for Hermes). An agent that is
 // idle or asleep gets a plain sentence, not an error; one at a prompt or a dialog is refused (a stop there can answer it by accident). No body is read.
-func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Request) {
+func (h *SessionsHandler) OrchestratorInterrupt(w http.ResponseWriter, r *http.Request) {
 	project := chi.URLParam(r, "project")
 	g, seat, ok := h.orchSeat(w, r, project)
 	if !ok {
@@ -433,9 +449,56 @@ func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": true, "name": who})
 }
 
-// refuseSleepNow says why an agent must not be put to sleep now: it waits on the person (a permission prompt, a question, an ask to the Operator: that is theirs to answer), or it is working and has not been
-// idle for the grant's minutes. "" when it may be.
-func (h *SessionsHandler) refuseSleepNow(ctx context.Context, project string, target *store.LiveSession, member string, g board.OrchGrant) (code, why string) {
+// OrchestratorStop: POST /api/board/{project}/agents/{subscriber}/stop. Stop archives (#19673): the agent's session ends (a working agent is cut off with it), the seat stays with the team, and the agent shows as
+// Archived until it is started again. Behind the grant's stop switch. The Orchestrator seat and the team's last Orchestrator are refused; an agent that waits for the person's answer or sits at a dialog is refused
+// too (archiving it would hide the question). An agent already archived gets a plain sentence. No body is read.
+func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Request) {
+	project := chi.URLParam(r, "project")
+	g, seat, ok := h.orchSeat(w, r, project)
+	if !ok {
+		return
+	}
+	if !g.StopEnabled {
+		orchRefusal(w, http.StatusForbidden, "stop_not_enabled", "the Operator has not enabled the stop setting for this board's orchestrator (orchestrator-grant stop_enabled)")
+		return
+	}
+	target, member, ok := h.orchTargetFor(w, r, project, seat, true)
+	if !ok {
+		return
+	}
+	actor, who := h.orchActor(seat), orchName(member)
+	if target.IsArchived == 1 {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": false, "name": who, "note": who + " is already archived"})
+		return
+	}
+	if code, why := h.refuseSleepNowPrompt(r.Context(), project, target, member); code != "" {
+		orchRefusal(w, http.StatusConflict, code, why)
+		return
+	}
+	if h.refuseArchive(w, r.Context(), target) {
+		return
+	}
+	id, err := h.reserveForBoard(r.Context(), project, board.LifecycleStop, actor, who, g)
+	if err != nil {
+		h.refuseCap(w, err, g)
+		return
+	}
+	if target.IsSleeping != 1 {
+		h.sleepNow(r.Context(), target)
+	}
+	if err := h.ss.SetSessionArchived(r.Context(), target.SessionID, true); err != nil {
+		_ = h.bs.FinishLifecycle(r.Context(), id, "failed", "the archive failed")
+		errInternalServer(w, "could not archive the agent")
+		return
+	}
+	_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
+	h.sayLifecycle(r.Context(), project, actor+" stopped and archived "+who)
+	h.kickWS()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": true, "archived": true, "name": who})
+}
+
+// refuseSleepNowPrompt is the part of that refusal about the person: the agent waits on a permission prompt, a question, a dialog or an answer from the Operator (hiding it, by sleep or archive, would lose it).
+func (h *SessionsHandler) refuseSleepNowPrompt(ctx context.Context, project string, target *store.LiveSession, member string) (code, why string) {
 	st := h.deriveSingleSessionState(ctx, target.SessionID, 0)
 	if st.NeedsInput {
 		return "waiting_for_the_person", "that agent waits for the person's answer (a permission prompt or a question): leave it"
@@ -457,6 +520,16 @@ func (h *SessionsHandler) refuseSleepNow(ctx context.Context, project string, ta
 			}
 		}
 	}
+	return "", ""
+}
+
+// refuseSleepNow says why an agent must not be put to sleep now: it waits on the person (a permission prompt, a question, an ask to the Operator: that is theirs to answer), or it is working and has not been
+// idle for the grant's minutes. "" when it may be.
+func (h *SessionsHandler) refuseSleepNow(ctx context.Context, project string, target *store.LiveSession, member string, g board.OrchGrant) (code, why string) {
+	if code, why := h.refuseSleepNowPrompt(ctx, project, target, member); code != "" {
+		return code, why
+	}
+	st := h.deriveSingleSessionState(ctx, target.SessionID, 0)
 	if st.InTurn || st.Working {
 		idle := time.Duration(g.IdleMin) * time.Minute
 		if st.LastEvent.IsZero() || time.Since(st.LastEvent) < idle {
