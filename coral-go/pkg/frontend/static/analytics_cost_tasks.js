@@ -1,7 +1,7 @@
 // Read the complete projected task list once. Automatic refreshes read only the
 // first page; the user's Refresh action can request a complete snapshot again.
-import { serverFetch } from './server_base.js';
-export function createCostTaskReader(fetchPage = path => serverFetch('local', path)) {
+import { importOnce } from './import_once.js';
+export function createCostTaskReader(fetchPage = path => importOnce('./analytics_machine.js').then(m => m.readNow(path))) {
     const fields = 'id,board_id,title,status,priority,assigned_to,claimed_at,completed_at,created_at,cost_usd,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,goal_id,goal_title';
     let snapshot = null, pending = null;
     const key = task => `${task.board_id || ''}/${task.id}`;
