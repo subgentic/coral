@@ -1,6 +1,6 @@
-/* The Reminders section of an agent's page (#19389): moved out of inline styles; loaded with agent_reminders.js, not at start. */
-.agent-rem-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.agent-rem-list li { display: flex; gap: 10px; align-items: center; }
-.agent-rem-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
-.agent-rem-field { display: flex; flex-direction: column; gap: 2px; }
-.agent-rem-form input[type=text] { min-width: 16em; }
+/* The Reminders section of an agent's page (#19389, #19528): the cards and the editor are Chief's (chief-checks.css); this only lays the section out. Loaded with agent_reminders.js, not at start. */
+.agent-rem { display: grid; gap: 12px; margin-block: 16px; }
+.agent-rem h3 { margin: 0; font-size: var(--fs-lg); }
+.agent-rem p { margin: 0; }
+.agent-rem-list { display: grid; gap: 12px; }
+.agent-rem .chief-check-actions button { min-height: 44px; }

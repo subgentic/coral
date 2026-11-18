@@ -31,12 +31,13 @@ const BASE = require('./test_base').BASE;
             window.__sec = await m.mountAgentReminders(h, 'agent-rem', { session_id: '${SID}', subscriber_id: 'Dev', name: 'Dev' }); })(); true`);
         await settle(250);
     };
-    const rowTexts = () => ev(`Array.from(document.querySelectorAll('#ar-host .agent-rem-list li')).map(li => li.textContent)`);
+    const rowTexts = () => ev(`Array.from(document.querySelectorAll('#ar-host .agent-rem-list .chief-check-card')).map(li => li.textContent)`);
     const say = () => ev(`document.querySelector('#ar-host .agent-rem-say')?.textContent || ''`);
-    const fill = (text, kind, when, every) => ev(`(() => { const f = document.querySelector('#ar-host form'); const set = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
-        set(f.querySelector('input[type=text]'), ${JSON.stringify(text)}); const sel = f.querySelectorAll('select'); set(sel[0], ${JSON.stringify(kind)});
+    const formSay = () => ev(`document.querySelector('dialog.chief-check-editor .chief-check-error')?.textContent || ''`);
+    const fill = (text, kind, when, every) => ev(`(() => { if (!document.querySelector('dialog.chief-check-editor')) document.querySelector('#ar-host .agent-rem-new').click(); const f = document.querySelector('dialog.chief-check-editor form'); const set = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+        set(f.querySelector('textarea'), ${JSON.stringify(text)}); const sel = f.querySelectorAll('select'); set(sel[0], ${JSON.stringify(kind)});
         if (${JSON.stringify(when)}) set(f.querySelector('input[type=datetime-local],input[type=time]'), ${JSON.stringify(when)}); if (${JSON.stringify(every)}) set(sel[1], ${JSON.stringify(every)}); return true; })()`);
-    const submit = async () => { await ev(`document.querySelector('#ar-host form button[type=submit]').click(); true`); await settle(300); };
+    const submit = async () => { await ev(`document.querySelector('dialog.chief-check-editor form button[type=submit]').click(); true`); await settle(300); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const theme of ['dark', 'light']) {
@@ -47,16 +48,16 @@ const BASE = require('./test_base').BASE;
             await require('./helpers/wait').coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
             await layer(); await mount();
             const rows = await rowTexts();
-            check(`${theme}: only this agent's two reminders are listed, with their schedule and "off" for a paused one`, rows.length === 2 && /Check CI \(every 15 min\)/.test(rows[0]) && /once, 2026-11-18 09:00 UTC, off/.test(rows[1]), JSON.stringify(rows));
+            check(`${theme}: only this agent's two reminders are listed, with their schedule and "off" for a paused one`, rows.length === 2 && /Check CI/.test(rows[0]) && /Every 15 minutes/.test(rows[0]) && /Once, 2026-11-18 09:00 · UTC · Off/.test(rows[1]), JSON.stringify(rows));
             check(`${theme}: a name with markup stays text and nothing ran`, !(await ev(`!!document.querySelector('#ar-host img') || !!window.__pwn`)));
-            const au = await auditRegion(ev, ['#ar-host'], { focus: ['#ar-host input[type=text]'] });
+            const au = await auditRegion(ev, ['#ar-host'], { focus: ['#ar-host .agent-rem-new'] });
             check(`${theme}: readable (4.5:1) with a focus ring (${au.checked} checked)`, au.fails.length === 0, JSON.stringify(au.fails.slice(0, 2)));
 
             await fill('Look at the soak', 'once', '2030-01-02T09:30');
             await submit();
             let p = await ev(`window.__rem.posts`);
             check(`${theme}: a one-time reminder sends text, board, to, kind once, at and the zone`, p.length === 1 && p[0].text === 'Look at the soak' && p[0].board === 'agent-rem' && p[0].to === 'Dev' && p[0].kind === 'once' && p[0].at === '2030-01-02T09:30' && !!p[0].timezone, JSON.stringify(p));
-            check(`${theme}: it is listed and the box is empty again`, (await rowTexts()).length === 3 && (await say()) === 'Reminder added.' && (await ev(`document.querySelector('#ar-host input[type=text]').value`)) === '', JSON.stringify([await rowTexts(), await ev(`JSON.stringify(window.__rem.rows.map(x=>x.id))`), await say(), await ev(`document.querySelector('#ar-host input[type=text]').value`)]));
+            check(`${theme}: it is listed and the editor closed`, (await rowTexts()).length === 3 && (await say()) === 'Reminder added.' && !(await ev(`!!document.querySelector('dialog.chief-check-editor')`)), JSON.stringify([await rowTexts(), await ev(`JSON.stringify(window.__rem.rows.map(x=>x.id))`), await say()]));
 
             await fill('Check mail', 'every', '', '30');
             await submit();
@@ -70,10 +71,16 @@ const BASE = require('./test_base').BASE;
             await ev(`window.__rem.addStatus = 400; true`);
             await fill('Too late', 'daily', '07:00');
             await submit();
-            check(`${theme}: a refusal is said and the text stays`, /Could not add it: that time has passed/.test(await say()) && (await ev(`document.querySelector('#ar-host input[type=text]').value`)) === 'Too late');
+            check(`${theme}: a refusal is said in the editor and the text stays`, /Could not add it: that time has passed/.test(await formSay()) && (await ev(`document.querySelector('dialog.chief-check-editor textarea').value`)) === 'Too late');
+            await ev(`window.__rem.addStatus = 201; document.querySelector('dialog.chief-check-editor button:not([type=submit])').click(); true`); await settle(200);
+            check(`${theme}: Cancel with unsaved text asks first`, /unsaved changes/.test(await formSay()));
+            await ev(`[...document.querySelectorAll('dialog.chief-check-editor button')].find(b => b.textContent === 'Discard changes').click(); true`); await settle(200);
+            check(`${theme}: after Discard changes the editor is gone`, !(await ev(`!!document.querySelector('dialog.chief-check-editor')`)));
 
-            await ev(`document.querySelector('#ar-host .agent-rem-list li button').click(); true`); await settle(300);
-            check(`${theme}: Cancel removes that reminder only`, (await ev(`window.__rem.deletes`)).join() === '1' && (await say()) === 'Reminder cancelled.' && !(await rowTexts()).some(t => /Check CI/.test(t)));
+            await ev(`document.querySelector('#ar-host .agent-rem-list .chief-check-card button').click(); true`); await settle(150);
+            check(`${theme}: the first Delete asks to confirm and removes nothing`, (await ev(`window.__rem.deletes`)).length === 0 && (await ev(`document.querySelector('#ar-host .agent-rem-list .chief-check-card button').textContent`)) === 'Confirm delete');
+            await ev(`document.querySelector('#ar-host .agent-rem-list .chief-check-card button').click(); true`); await settle(300);
+            check(`${theme}: Confirm delete removes that reminder only`, (await ev(`window.__rem.deletes`)).join() === '1' && (await say()) === 'Reminder deleted.' && !(await rowTexts()).some(t => /Check CI/.test(t)));
 
             await ev(`window.__rem.status = 404; true`);
             await mount();
