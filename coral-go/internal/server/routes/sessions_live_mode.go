@@ -48,3 +48,23 @@ func (h *SessionsHandler) liveClaudeMode(ls store.LiveSession, storedMode string
 	}
 	return mode
 }
+
+// keptLiveMode is the mode a relaunch (a wake, a restart) keeps for a Claude agent that left its stored mode with Shift+Tab (#19543, the Operator's: coral-hub's agents ran in Auto, were woken in Default and asked for
+// every permission): what its hooks last reported (liveModes, the newest signal and the one that needs no message to have been sent), else what its transcript says (liveClaudeMode). "" when the stored mode
+// stands. Same rules as liveClaudeMode: Claude only, never a custom mode, only a mode Coral can launch, and never above what the Operator chose (bypassPermissions only where the stored launch allowed it).
+func (h *SessionsHandler) keptLiveMode(ls store.LiveSession, storedMode string, flags []string) string {
+	if ls.AgentType != at.Claude {
+		return ""
+	}
+	if _, custom := custommodes.IDOf(storedMode); custom {
+		return ""
+	}
+	if v, ok := h.liveModes.Load(ls.SessionID); ok {
+		if mode, _ := v.(string); mode != "" && mode != storedMode && agent.ValidPermissionMode(mode) &&
+			(mode != "bypassPermissions" || storedMode == "bypassPermissions" ||
+				slices.Contains(flags, "--allow-dangerously-skip-permissions") || slices.Contains(flags, "--dangerously-skip-permissions")) {
+			return mode
+		}
+	}
+	return h.liveClaudeMode(ls, storedMode, flags)
+}

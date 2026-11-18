@@ -175,6 +175,15 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 			}
 		}
 	}
+	// An agent that left its saved mode with Shift+Tab wakes in the mode it was in (#19543); Coral records it, so the wake after this one keeps it too. Not for a launch with capabilities, whose flags are its own.
+	if live := h.keptLiveMode(*ls, permMode, flags); live != "" && caps.IsEmpty() {
+		_, flags = agent.SplitPermissionFlags(flags) // the saved mode's own flag would win over it
+		permMode = live
+		if err := h.ss.SetLivePermissionMode(ctx, ls.SessionID, live); err != nil {
+			slog.Warn("[wake] the mode the agent was in was not recorded", "session_id", ls.SessionID, "err", err)
+		}
+		slog.Info("[wake] the agent wakes in the mode it was in, not its saved one", "session_id", ls.SessionID, "mode", live)
+	}
 	// The mode's flags are added only when the stored flags carry no permission flag at all, in any spelling (#6423): a Plan agent started with its own sandbox flags
 	// woke with Auto's after them, and Codex takes the last.
 	if carried, _ := agent.SplitPermissionFlags(flags); caps.IsEmpty() && permMode != "" && permMode != "default" && len(carried) == 0 {

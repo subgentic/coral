@@ -823,6 +823,12 @@ func (s *SessionStore) SetSessionThinking(ctx context.Context, sessionID, level 
 	return err
 }
 
+// SetLivePermissionMode records the mode a Claude agent was in when it was relaunched (a wake keeps what Shift+Tab set, #19543), replacing the saved one.
+func (s *SessionStore) SetLivePermissionMode(ctx context.Context, sessionID, mode string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET permission_mode = ? WHERE session_id = ?", mode, sessionID)
+	return err
+}
+
 // SetLivePermissionModeIfEmpty records the mode a row started in when it recorded none (#12718); a mode already recorded is never replaced.
 func (s *SessionStore) SetLivePermissionModeIfEmpty(ctx context.Context, sessionID, mode string) error {
 	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET permission_mode = ? WHERE session_id = ? AND (permission_mode IS NULL OR permission_mode = '')", mode, sessionID)
