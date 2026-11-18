@@ -147,8 +147,13 @@ const { safePaused } = require('./helpers/paused');
         await waitFor(`document.querySelectorAll('#team-panel-artifacts [data-artifact-id]').length >= 1`, 'the files at 390', 15000);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip-host')`, 'the ghost at 390', 8000);
         const rowTop390 = () => ev(`Math.round(document.querySelector('#team-panel-artifacts [data-artifact-id]').getBoundingClientRect().top)`);
+        // Every .btn animates its size for 150 ms when a media query changes it (`transition: all`), and the toolbar's Add files button is one of them: the viewport was just switched to 390 px, so a measure taken mid-transition sees the toolbar
+        // 3 px short (412, then 415 a few frames later) and blames the strip for it (#19670). Wait until no animation is running and two frames agree, before each of the two measures.
+        const settled = () => waitFor(`(async () => { const top = () => Math.round(document.querySelector('#team-panel-artifacts [data-artifact-id]').getBoundingClientRect().top); const a = top(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return document.getAnimations().length === 0 && top() === a; })()`, 'the layout has settled (no running transition)', 8000);
+        await settled();
         const before390 = await rowTop390();
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the real strip at 390', 15000);
+        await settled();
         const after390 = await rowTop390();
         assert.ok(Math.abs(after390 - before390) <= 1, `the first row does not move at 390 px when the strip arrives (${before390} -> ${after390})`);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
