@@ -143,6 +143,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/artifacts/{id}/versions": true, "/api/artifacts/series/{series_id}": true, "/api/artifacts/series/{series_id}/versions": true, // the owner's version list and series reads (#11354)
 		"/api/board/{project}/proposals": true, "/api/proposals": true, // what agents asked to add is the owner's alone through the hub (#11389)
 		"/api/operator-asks": true, // the questions agents asked the Operator are the owner's alone (#11417)
+		"/api/away":          true, // the away counts are the owner's alone (#19628)
 		"/api/needs-you":     true, // what is waiting for the Operator is the owner's alone (#11596)
 		"/api/activity":      true, // the record of what the Operator did in Needs you, read only, the owner's alone (#12070)
 		"/api/chief":         true, // which agent the Operator recorded as Chief is the owner's alone through the hub (#11470)
@@ -270,7 +271,8 @@ func hubSweepQuery(route, sid string) string {
 		return ""
 	}
 	vals := map[string]string{"target": "Dev", "session_id": sid, "filepath": "README.md", "agent_type": "terminal", "q": "hi", "query": "hi",
-		"dir": ".", "message_index": "0", "window": "5", "pids": "1", "page": "1", "limit": "5", "subscriber_id": "x", "timeout": "1"}
+		"dir": ".", "message_index": "0", "window": "5", "pids": "1", "page": "1", "limit": "5", "subscriber_id": "x", "timeout": "1",
+		"since": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)} // since: GET /api/away (#19628)
 	var parts []string
 	for _, k := range strings.Split(allowed, ",") {
 		k = strings.TrimSuffix(k, "*")
