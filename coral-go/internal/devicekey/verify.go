@@ -30,6 +30,7 @@ var (
 	ErrTopMode         = errors.New("top_mode")
 	ErrAboveSigner     = errors.New("above_signer")
 	ErrSelfTarget      = errors.New("self_target")
+	ErrTargetBootstrap = errors.New("target_bootstrap")
 	ErrUnknownTarget   = errors.New("unknown_target")
 	ErrNonceRepeat     = errors.New("nonce_repeat")
 	ErrNonceStoreFull  = errors.New("nonce_store_full")
@@ -210,8 +211,19 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 				return none, 0, ErrAboveSigner
 			}
 		}
-		if m.Action == RaiseMode && target.Origin == store.DeviceOriginBootstrap { // stays capped until a real pairing
-			return none, 0, ErrSelfTarget
+		if m.Action == RaiseMode {
+			if target.Origin == store.DeviceOriginBootstrap { // stays capped until a real pairing
+				return none, 0, ErrTargetBootstrap
+			}
+			// The target's current mode, read from the list: never above the signer's, and a raise goes strictly up (lowering is removing and pairing again, or the owner at the computer).
+			tm, ok := tunnel.ParseMode(target.Mode)
+			sm, sok := tunnel.ParseMode(signer.Mode)
+			if !ok || !sok || tm > sm {
+				return none, 0, ErrAboveSigner
+			}
+			if mode <= tm {
+				return none, 0, ErrBadMode
+			}
 		}
 	}
 	return target, mode, nil

@@ -219,7 +219,13 @@ func TestTsWindowFiveMinutesEitherSideForApproveAndRaise(t *testing.T) {
 	target := newSigner(t)
 	r.add(target, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
 	for _, a := range []func(int64) devicekey.Message{
-		func(ts int64) devicekey.Message { m := r.raise(r.signer, target.kid, "interact"); m.Ts = ts; return m },
+		func(ts int64) devicekey.Message { // a raise goes strictly up, so each one has its own view target
+			t2 := newSigner(t)
+			r.add(t2, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+			m := r.raise(r.signer, t2.kid, "interact")
+			m.Ts = ts
+			return m
+		},
 		func(ts int64) devicekey.Message { m := r.approve(r.signer, newSigner(t), "view"); m.Ts = ts; return m },
 	} {
 		now := t0.Add(time.Hour)
@@ -378,7 +384,7 @@ func TestSelfTarget(t *testing.T) {
 	r.refused(devicekey.ErrSelfTarget, r.approve(r.signer, r.signer, "view"), r.signer, t0)
 	boot := newSigner(t)
 	r.add(boot, "view", store.DeviceOriginBootstrap, store.DeviceKindDevice)
-	r.refused(devicekey.ErrSelfTarget, r.raise(r.signer, boot.kid, "interact"), r.signer, t0) // a bootstrap device stays capped until a real pairing
+	r.refused(devicekey.ErrTargetBootstrap, r.raise(r.signer, boot.kid, "interact"), r.signer, t0) // a bootstrap device stays capped until a real pairing
 }
 
 func TestUnknownTarget(t *testing.T) {
@@ -412,13 +418,14 @@ func TestNonceRepeatSurvivesARestart(t *testing.T) {
 	require.NoError(t, err)
 	ss := store.NewSessionStore(db)
 	s, target := newSigner(t), newSigner(t)
-	for _, k := range []signer{s, target} {
+	for i, k := range []signer{s, target} {
 		raw, _ := b64.DecodeString(k.pk)
-		_, err = ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: k.kid, PK: raw, Label: "d", Mode: "interact", Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, t0.Add(-time.Hour))
+		mode := []string{"interact", "view"}[i]
+		_, err = ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: k.kid, PK: raw, Label: "d", Mode: mode, Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, t0.Add(-time.Hour))
 		require.NoError(t, err)
 	}
 	comp := devicekey.ComputerFingerprint([]byte("0123456789abcdef0123456789abcdef"))
-	m := devicekey.Message{Action: devicekey.RaiseMode, KID: s.kid, Computer: comp, Ts: t0.Unix(), Nonce: b64.EncodeToString(make([]byte, 16)), TargetKID: target.kid, Mode: "view"}
+	m := devicekey.Message{Action: devicekey.RaiseMode, KID: s.kid, Computer: comp, Ts: t0.Unix(), Nonce: b64.EncodeToString(make([]byte, 16)), TargetKID: target.kid, Mode: "interact"}
 	body, _ := m.Canonical()
 	sig := s.sign(t, m.Action, body)
 	_, err = (&devicekey.Verifier{Store: ss, Computer: comp}).Handle(context.Background(), m.Action, body, sig, t0)
@@ -635,4 +642,33 @@ func TestBadModeAndUnknownTargetComeAfterTheNonceCheck(t *testing.T) {
 	body, _ := m.Canonical()
 	_, err = r.v.Handle(context.Background(), m.Action, body, "x", t0)
 	assert.ErrorIs(t, err, devicekey.ErrBadSignature)
+}
+
+// coral-hub Security (#19690): a raise looks at the target's current mode too, and never lowers.
+func TestRaiseRefusesATargetAboveTheSigner(t *testing.T) {
+	r := newRig(t)
+	inter, launch := newSigner(t), newSigner(t)
+	r.add(inter, "interact", store.DeviceOriginPairing, store.DeviceKindDevice)
+	r.add(launch, "launch", store.DeviceOriginPairing, store.DeviceKindDevice)
+	r.refused(devicekey.ErrAboveSigner, r.raise(inter, launch.kid, "interact"), inter, t0)
+	k, _ := r.listed(launch.kid)
+	assert.Equal(t, "launch", k.Mode, "a lowering by an interact signer did not happen")
+}
+
+func TestRaiseMustBeStrictlyAboveTheTargetsCurrentMode(t *testing.T) {
+	r := newRig(t)
+	target := newSigner(t)
+	r.add(target, "interact", store.DeviceOriginPairing, store.DeviceKindDevice)
+	r.refused(devicekey.ErrBadMode, r.raise(r.signer, target.kid, "interact"), r.signer, t0) // same
+	r.refused(devicekey.ErrBadMode, r.raise(r.signer, target.kid, "view"), r.signer, t0)     // lower
+	_, err := r.handle(r.raise(r.signer, target.kid, "launch"), r.signer, t0)
+	assert.Error(t, err) // launch is the top mode: refused as top_mode, never set by a message
+	assert.ErrorIs(t, err, devicekey.ErrTopMode)
+}
+
+func TestRaiseOfABootstrapTargetSaysTargetBootstrap(t *testing.T) {
+	r := newRig(t)
+	boot := newSigner(t)
+	r.add(boot, "view", store.DeviceOriginBootstrap, store.DeviceKindDevice)
+	r.refused(devicekey.ErrTargetBootstrap, r.raise(r.signer, boot.kid, "interact"), r.signer, t0)
 }
