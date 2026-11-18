@@ -16,6 +16,10 @@ func IsCoralDelivery(content string) bool {
 	if _, typed := SplitNudge(content); typed != "" {
 		return false // the nudge and a person's lines in one turn: the turn is the person's (#19534)
 	}
+	return matchesDelivery(text)
+}
+
+func matchesDelivery(text string) bool {
 	for _, re := range coralDeliveryRes {
 		if re.MatchString(text) {
 			return true
@@ -69,7 +73,11 @@ func SplitNudge(content string) (nudge, typed string) {
 		text = strings.TrimSpace(m[1])
 	}
 	if m := nudgeLeadRe.FindStringSubmatch(text); m != nil {
-		return m[1], strings.TrimSpace(m[2])
+		typed := strings.TrimSpace(m[2])
+		if matchesDelivery(normalizeDelivery(typed)) {
+			return "", "" // a nudge followed by another Coral delivery is still all Coral's, not the person's
+		}
+		return m[1], typed
 	}
 	return "", ""
 }

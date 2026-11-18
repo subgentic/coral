@@ -87,6 +87,12 @@ const interleave = texts => texts.flatMap(t => [{ type: 'user', content: OPERATO
             assert.ok(c.bubbles[0].startsWith('lets just finish'), `${label}: the bubble holds what they typed: ${JSON.stringify(c.bubbles)}`);
         }
         console.log('   ✓ a nudge with typed lines after it shows the lines');
+        // 6. #19548: a nudge followed by another Coral delivery is all Coral's: no bubble
+        await fresh();
+        await render([{ type: 'user', content: "You have unread messages on the message board. Run 'coral-board read' to see them.\n[Task #19548 available] Run 'coral-board task claim 19548' to claim it when your current task is done." }]);
+        c = await count();
+        assert.equal(c.bubbles.length, 0, `a nudge plus a task notice is no bubble: ${JSON.stringify(c.bubbles)}`);
+        console.log('   ✓ a nudge plus a task notice stays a notice');
         console.log('\nPASS Coral notices are never the operator\'s bubbles');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
