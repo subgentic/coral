@@ -38,7 +38,7 @@ const TEAM = `qa-strip15830-${Date.now() % 100000}`;
                     return { rows: vis.map(row), pills: pills.map(c => ({ key: c.dataset.filter, text: c.textContent.replace(/\\s+/g, ' ').trim(), on: c.getAttribute('aria-pressed') })), more: sel ? [...sel.options].map(o => ({ key: o.value, text: o.textContent.trim() })) : [], moreOn: sel ? sel.dataset.on : null, sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
                 const d = await read();
                 const words = d.rows.map(r => r.word).sort();
-                ok(JSON.stringify(words) === JSON.stringify(['Ended', 'Has a task', 'Needs input', 'Not reported', 'Sleeping', 'Waiting for work', 'Working', 'Working']), 'one word per state, Working for busy and for a started task', words);
+                ok(JSON.stringify(words) === JSON.stringify(['Has a task', 'Needs input', 'Not reported', 'Not running', 'Sleeping', 'Waiting for work', 'Working', 'Working']), 'one word per state, Working for busy and for a started task', words);
                 ok(d.rows.every(r => r.state && !r.chip && !r.blue), 'every status is the shared mark, no chip and no blue state', d.rows);
                 ok(d.rows.filter(r => r.word === 'Working').every(r => r.state === 'working') && d.rows.find(r => r.word === 'Sleeping').state === 'sleeping' && d.rows.find(r => r.word === 'Needs input').state === 'waiting', 'the marks: working, sleeping, waiting', d.rows);
                 ok(JSON.stringify(d.pills.map(p => p.key)) === JSON.stringify(['all', 'working', 'has_task', 'sleeping']), 'the strip is All, Working, Has a task, Sleeping', d.pills);

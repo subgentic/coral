@@ -15,8 +15,8 @@ export function killSessionDirect(name, agentType, sessionId) {
     const row = (state.liveSessions || []).find(s => s.session_id === sessionId);
     const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent by its role and team, not the folder it works in (#10139)
     if (row && row.board_project && row.agent_type !== 'terminal' && !row.archived) return stopTeamAgent(row, who, name, sessionId); // a team agent: Stop archives it (#19674)
-    const idle = row && (row.sleeping || row.archived), word = idle ? 'Remove' : 'Stop'; // nothing runs on such a row: it is only taken off the list, as its menu item says (#15585)
-    showConfirmModal(idle ? 'Remove agent' : 'Stop agent', `${word} ${who}? ${idle ? 'It is not running.' : "This ends the agent's process."} ${whatStaysKill([row || { agent_type: agentType }])} ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
+    const idle = row && (row.sleeping || row.archived), gone = row && row.archived, word = gone ? 'Remove' : 'Stop'; // nothing runs on such a row: an archived one is only taken off the list, as its menu item says (#15585); a sleeping one's menu says Stop agent (#19674)
+    showConfirmModal(gone ? 'Remove agent' : 'Stop agent', `${word} ${who}? ${idle ? 'It is not running.' : "This ends the agent's process."} ${whatStaysKill([row || { agent_type: agentType }])} ${row && row.git_state && row.git_state.is_worktree ? worktreeConfirmWords(row.branch) + ' ' : ''}${KILL_LOG_NOTE}`, async () => { try {
         const result = await killLiveSession({ name, agent_type: agentType, session_id: sessionId }, server);
         if (!result) throw new Error('the kill answer was not JSON');
         if (result.error) { showToast(result.error, true); return; }
@@ -34,7 +34,7 @@ export function killSessionDirect(name, agentType, sessionId) {
         }
     } catch (e) {
         showToast("Failed to stop agent", true);
-    } }, undefined, { label: idle ? 'Remove agent' : 'Stop agent', danger: true });
+    } }, undefined, { label: gone ? 'Remove agent' : 'Stop agent', danger: true });
 }
 
 // Start and Sleep on an archived agent's page (#19674): Start is the sidebar's Wake (back awake), Sleep its Unarchive (stays asleep, back in the list). Here, a lazy module of agent actions.
