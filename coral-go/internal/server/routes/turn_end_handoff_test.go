@@ -479,7 +479,7 @@ func TestTurnEndHandoffDoesNotRepeatWhatANudgeAnnounced(t *testing.T) {
 
 	// #19640: a restart (or sleep and wake, or /clear) keeps the session id but is a conversation that never saw those nudges: the mark is cleared.
 	h.handoffs.setEvery(time.Millisecond)
-	time.Sleep(5 * time.Millisecond) // sleep-ok: the window is wall-clock time
+	time.Sleep(5 * time.Millisecond)                    // sleep-ok: the window is wall-clock time
 	_, err = h.bs.ReadMessages(ctx, board, "Orch", 100) // the mention above is read: only routine messages wait
 	require.NoError(t, err)
 	post("Lead", "fyi after a restart")
