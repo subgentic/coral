@@ -9,7 +9,7 @@ const { execFileSync } = require('./helpers/child_process');
 const { connect } = require('./agent_view_harness');
 const { removeBoards, killSessions } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 const { safePaused } = require('./helpers/paused');
 
 (async () => {
@@ -149,7 +149,7 @@ const { safePaused } = require('./helpers/paused');
         const rowTop390 = () => ev(`Math.round(document.querySelector('#team-panel-artifacts [data-artifact-id]').getBoundingClientRect().top)`);
         // Every .btn animates its size for 150 ms when a media query changes it (`transition: all`), and the toolbar's Add files button is one of them: the viewport was just switched to 390 px, so a measure taken mid-transition sees the toolbar
         // 3 px short (412, then 415 a few frames later) and blames the strip for it (#19670). Wait until no animation is running and two frames agree, before each of the two measures.
-        const settled = () => waitFor(`(async () => { const top = () => Math.round(document.querySelector('#team-panel-artifacts [data-artifact-id]').getBoundingClientRect().top); const a = top(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return document.getAnimations().length === 0 && top() === a; })()`, 'the layout has settled (no running transition)', 8000);
+        const settled = () => waitFor(`(async () => { const top = () => Math.round(document.querySelector('#team-panel-artifacts [data-artifact-id]').getBoundingClientRect().top); const a = top(); await ${framesJs(2)}; return document.getAnimations().length === 0 && top() === a; })()`, 'the layout has settled (no running transition)', 8000);
         await settled();
         const before390 = await rowTop390();
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-files-strip')`, 'the real strip at 390', 15000);
