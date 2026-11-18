@@ -54,6 +54,14 @@ type fakeHub struct {
 	onMode    atomic.Value // func(tunnel.Mode): takes the local mode message (#5918); unset: local_mode/1 is not advertised
 	routeMu   sync.Mutex
 	routeSeen []string // the X-Coral-Route header of each /tunnel dial
+	replyMu   sync.Mutex
+	replies   []map[string]string // each POST /api/enroll/reply body (slice 4)
+}
+
+func (h *fakeHub) replyBodies() []map[string]string {
+	h.replyMu.Lock()
+	defer h.replyMu.Unlock()
+	return append([]map[string]string(nil), h.replies...)
 }
 
 type signinFunc func(tunnel.SigninRequest) tunnel.SigninResponse
@@ -85,6 +93,14 @@ func newFakeHub(t *testing.T) *fakeHub {
 			"device_code": strings.Repeat("d", 43), "user_code": "ABCD-EFGH",
 			"verification_url": h.srv.URL + "/enroll?code=ABCD-EFGH" + func() string { e, _ := h.verifyEnd.Load().(string); return e }(), "interval": 2, "expires_in": 600,
 		})
+	})
+	mux.HandleFunc("POST /api/enroll/reply", func(w http.ResponseWriter, r *http.Request) {
+		var b map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		h.replyMu.Lock()
+		h.replies = append(h.replies, b)
+		h.replyMu.Unlock()
+		w.Write([]byte(`{"status":"ok"}`))
 	})
 	mux.HandleFunc("POST /api/enroll/poll", func(w http.ResponseWriter, r *http.Request) {
 		if n := h.expireAfter.Load(); n > 0 && h.polls.Load()+1 >= n {

@@ -22,6 +22,7 @@ import (
 
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/devicekey"
 )
 
 // Enrollment errors. They carry no hub-supplied text.
@@ -155,6 +156,8 @@ type Enrolled struct {
 	// TeamOrg is the Coral Hub organisation's id (a canonical lower-case UUID) when the hub enrolled this machine as a team's (#7061), and "" for a machine enrolled to a person. A team's machine has no
 	// Account and no OwnerUser: the person who pressed Confirm is not its owner.
 	TeamOrg string
+	// Pairing is the poll answer's pairing object when it has the shape (slice 4): what Coral checks against its pairing secret. It prints as its kid only.
+	Pairing *devicekey.PairingAnswer
 }
 
 func hubPost(ctx context.Context, hc *http.Client, hubURL, path string, in, out any) (int, error) {
@@ -282,6 +285,8 @@ func PollEnrollment(ctx context.Context, hc *http.Client, hubURL, deviceCode str
 		Kind     string `json:"owner_kind"`
 		Org      string `json:"owner_org"`
 		Error    string `json:"error"`
+		// Pairing is read apart from the rest: anything that is not the object is no pairing, and never an error.
+		Pairing json.RawMessage `json:"pairing"`
 	}
 	status, err := hubPost(ctx, hc, hubURL, "/api/enroll/poll", map[string]string{"device_code": deviceCode}, &r)
 	if err != nil {
@@ -304,7 +309,7 @@ func PollEnrollment(ctx context.Context, hc *http.Client, hubURL, deviceCode str
 				return nil, ErrHubResponse
 			}
 			// A team's machine has no person owner: neither the account nor the label is kept (the sign-in is refused there, and the owner check is the organisation's).
-			return &Enrolled{Token: r.Token, ServerID: r.ServerID, Label: cleanLabel(r.Label), TeamOrg: r.Org}, nil
+			return &Enrolled{Token: r.Token, ServerID: r.ServerID, Label: cleanLabel(r.Label), TeamOrg: r.Org}, nil // a team machine has no person to pair a device for: its pairing is not read
 		default:
 			return nil, ErrHubResponse
 		}
@@ -317,7 +322,7 @@ func PollEnrollment(ctx context.Context, hc *http.Client, hubURL, deviceCode str
 		if !tunnel.ValidHubUser(owner) {
 			owner = ""
 		}
-		return &Enrolled{Token: r.Token, ServerID: r.ServerID, Label: cleanLabel(r.Label), Account: acct, OwnerUser: owner}, nil
+		return &Enrolled{Token: r.Token, ServerID: r.ServerID, Label: cleanLabel(r.Label), Account: acct, OwnerUser: owner, Pairing: parsePairing(r.Pairing)}, nil
 	case http.StatusBadRequest, http.StatusForbidden:
 		switch r.Error {
 		case "authorization_pending":
@@ -333,6 +338,39 @@ func PollEnrollment(ctx context.Context, hc *http.Client, hubURL, deviceCode str
 		return nil, ErrSlowDown
 	}
 	return nil, ErrHubResponse
+}
+
+// parsePairing reads the poll answer's pairing object: v a number, kid, mac, user_code and pk strings. Any other shape is no pairing.
+func parsePairing(raw json.RawMessage) *devicekey.PairingAnswer {
+	if len(raw) == 0 {
+		return nil
+	}
+	var p struct {
+		V        *int   `json:"v"`
+		KID      string `json:"kid"`
+		MAC      string `json:"mac"`
+		UserCode string `json:"user_code"`
+		PK       string `json:"pk"`
+	}
+	if json.Unmarshal(raw, &p) != nil || p.V == nil {
+		return nil
+	}
+	return &devicekey.PairingAnswer{V: *p.V, KID: p.KID, MAC: p.MAC, UserCode: p.UserCode, PK: p.PK}
+}
+
+// SendEnrollReply sends Coral's reply to the browser's pairing (wire format section 13): `POST /api/enroll/reply` with exactly device_code, computer_pub and reply_mac (43 characters each for the last two), the device code in the body only. It is sent once and never retried, its answer is not read, and nothing about it is logged or put in an error.
+func SendEnrollReply(ctx context.Context, hc *http.Client, hubURL, deviceCode, computerPub, replyMAC string) error {
+	if len(computerPub) != 43 || len(replyMAC) != 43 || deviceCode == "" {
+		return errors.New("the reply is not in the form the hub takes")
+	}
+	status, err := hubPost(ctx, hc, hubURL, "/api/enroll/reply", map[string]string{"device_code": deviceCode, "computer_pub": computerPub, "reply_mac": replyMAC}, nil)
+	if err != nil {
+		return errors.New("the reply could not be sent to the hub")
+	}
+	if status != http.StatusOK {
+		return errors.New("the hub did not take the reply")
+	}
+	return nil
 }
 
 // ValidHubAccount reports whether s is a Coral Hub account id.

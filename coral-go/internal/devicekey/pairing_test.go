@@ -197,7 +197,7 @@ func TestSecretHoldDiesOnTheThirdFailureTheFirstSuccessOrTenMinutes(t *testing.T
 	bad := good
 	bad.MAC = b64.EncodeToString(make([]byte, 32))
 	complete := func(h *devicekey.SecretHold, a devicekey.PairingAnswer, now time.Time) error {
-		_, err := h.Complete(context.Background(), r.ss, uc, label, a, "launch", now)
+		_, _, err := h.Complete(context.Background(), r.ss, uc, label, a, "launch", make([]byte, 32), now)
 		return err
 	}
 	h := devicekey.NewSecretHold(secret, t0)

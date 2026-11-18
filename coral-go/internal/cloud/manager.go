@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/redact"
@@ -63,6 +64,10 @@ type Options struct {
 	Backoff      tunnel.Backoff
 	Logger       *slog.Logger
 	Now          func() time.Time
+	// Devices, ComputerKey and PairedDeviceMode are the device-key pairing (slice 4): the list the pairing writes, this computer's own key (nil until it has one), and the mode a browser-paired device starts at (the web setting; default launch in the beta).
+	Devices          DeviceKeys
+	ComputerKey      *devicekey.ComputerKey
+	PairedDeviceMode func() string
 	// PollInterval overrides the hub's suggested enrollment poll interval (tests).
 	PollInterval time.Duration
 	// OnLinkLost runs when this server stops being linked to the hub: the user
@@ -108,6 +113,8 @@ type Status struct {
 	// moved, #3546). It stays set through any failed attempt to enroll again (their errors show
 	// in LastError and LastErrorCode) until an enrollment succeeds or the operator disconnects.
 	HubMoved bool `json:"hub_moved,omitempty"`
+	// DevicePairing is what the last browser pairing came to ("added", or why a device was not added): a sentence, never a key, a proof or the secret.
+	DevicePairing string `json:"device_pairing,omitempty"`
 }
 
 // applyTunnelState records a tunnel state change: ConnectedAt is set when the tunnel comes
@@ -152,6 +159,8 @@ func pollGap(interval time.Duration) time.Duration { return 2*interval + 30*time
 type Manager struct {
 	o  Options
 	hc *http.Client
+
+	pair pairingState
 
 	devicePK atomic.Pointer[string] // the device public key this Coral redeemed with (#16726); memory only, public
 
@@ -279,6 +288,8 @@ func (m *Manager) Bootstrap(ctx context.Context, settings *store.SessionStore, h
 	if res.Status == BootstrapEnrolled && src.DevicePK != "" {
 		pk := src.DevicePK
 		m.devicePK.Store(&pk)
+		m.clearDeviceKeys(ctx)
+		m.recordBootstrapDevice(ctx, pk)
 	}
 	return res
 }
@@ -322,6 +333,7 @@ func (m *Manager) Status() Status {
 	defer m.mu.Unlock()
 	s := m.st
 	s.HubMoved = m.hubMoved
+	s.DevicePairing = m.pairNote()
 	s.MaxMode = m.currentMode().String()
 	s.Loading = !m.isLoaded()
 	if s.State == StateIdle && (s.LastErrorCode == ErrCodeRateLimited || s.LastErrorCode == ErrCodeHubUnreachable) {
@@ -503,6 +515,7 @@ func (m *Manager) CancelEnrollment(ctx context.Context) {
 	}
 	m.stopLocked()
 	m.st = Status{Configured: true, HubURL: m.o.HubURL, State: StateIdle, LastError: "enrollment cancelled"}
+	m.wipePairing()
 	running := m.root != nil
 	m.mu.Unlock()
 	if conn, err := m.o.Store.Get(ctx); err == nil && running && conn.HubURL == m.o.HubURL {
@@ -577,6 +590,7 @@ func (m *Manager) pollEnrollment(ctx context.Context, gen int, dc *DeviceCode, r
 				return
 			}
 			m.mu.Unlock()
+			m.finishDevicePairing(ctx, dc, en)
 			m.startTunnel(conn)
 			return
 		case errors.Is(err, ErrAuthorizationPending):
@@ -717,6 +731,8 @@ func (m *Manager) Disconnect(ctx context.Context) error {
 }
 
 func (m *Manager) linkLost(ctx context.Context) {
+	m.wipePairing()
+	m.clearDeviceKeys(ctx)
 	if m.o.OnLinkLost != nil {
 		m.o.OnLinkLost(ctx)
 	}

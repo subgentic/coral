@@ -33,6 +33,12 @@ type PairingAnswer struct {
 	PK       string
 }
 
+// String prints the kid only: the mac and the key never reach a log or a failing test's output through a stray %v.
+func (a PairingAnswer) String() string { return "pairing{kid:" + a.KID + "}" }
+
+// GoString is the same, for %#v.
+func (a PairingAnswer) GoString() string { return a.String() }
+
 // NewPairingSecret is 16 random bytes, base64url, 22 characters: what the `#p=` link carries and the Hub never sees.
 func NewPairingSecret() string {
 	b := make([]byte, 16)
@@ -184,21 +190,29 @@ func (h *SecretHold) Wipe() {
 	h.mu.Unlock()
 }
 
-// Complete is CompletePairing with this hold's secret and its life rules.
-func (h *SecretHold) Complete(ctx context.Context, st PairingStore, userCode, label string, a PairingAnswer, mode string, now time.Time) (string, error) {
+// Complete is CompletePairing with this hold's secret and its life rules. On success it also returns Coral's reply MAC for computerPub (the 32 raw bytes of the computer key), made before the secret is zeroed.
+func (h *SecretHold) Complete(ctx context.Context, st PairingStore, userCode, label string, a PairingAnswer, mode string, computerPub []byte, now time.Time) (kid string, replyMAC []byte, err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if !h.aliveLocked(now) {
-		return "", ErrPairingNoSecret
+		return "", nil, ErrPairingNoSecret
 	}
-	kid, err := CompletePairing(ctx, st, h.secret, userCode, label, a, mode, now)
+	kid, err = CompletePairing(ctx, st, h.secret, userCode, label, a, mode, now)
 	switch {
 	case err == nil:
+		pk, _ := b64.DecodeString(a.PK)
+		replyMAC = ReplyMAC(h.secret, userCode, pk, computerPub)
 		h.die()
 	case errors.Is(err, ErrPairingMAC):
 		if h.fails++; h.fails >= 3 {
 			h.die()
 		}
 	}
-	return kid, err
+	return kid, replyMAC, err
+}
+
+// KIDOf is a device key's id: the base64url SHA-256 of its 65 raw bytes.
+func KIDOf(pk []byte) string {
+	s := sha256.Sum256(pk)
+	return b64.EncodeToString(s[:])
 }
