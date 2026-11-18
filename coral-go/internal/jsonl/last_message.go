@@ -201,7 +201,7 @@ func readAppendedMessage(path, agentType string, from, size int64, anchor []byte
 		return LastMessage{}, false, start, anchor, true // only a line still being written
 	}
 	complete := buf[:nl+1]
-	m, ok = lastMessageIn(complete, agentType)
+	m, ok = lastMessageIn(complete, agentType, lastMessageMaxRunes)
 	lineEnd = start + int64(nl) + 1
 	// the new anchor: the last bytes before lineEnd, from what was read (the old anchor's bytes too when little was added)
 	whole := append(append([]byte{}, anchor...), complete...)
@@ -216,6 +216,11 @@ func readAppendedMessage(path, agentType string, from, size int64, anchor []byte
 
 // readLastMessage reads the end of the file, widening it while the last message is not in what was read.
 func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int64, []byte) {
+	return readLastMessageMax(path, agentType, size, lastMessageMaxRunes)
+}
+
+// readLastMessageMax is readLastMessage with the text cut at max characters (0: not cut).
+func readLastMessageMax(path, agentType string, size int64, max int) (LastMessage, bool, int64, []byte) {
 	f, err := openTranscript(path, agentType)
 	if err != nil {
 		return LastMessage{}, false, 0, nil
@@ -254,7 +259,7 @@ func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int
 				buf = nil
 			}
 		}
-		if m, ok := lastMessageIn(buf, agentType); ok {
+		if m, ok := lastMessageIn(buf, agentType, max); ok {
 			return m, true, lineEnd, anchor
 		}
 		if n >= size || n >= lastMessageTailMax {
@@ -264,7 +269,7 @@ func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int
 }
 
 // lastMessageIn is the newest message with text among complete lines, newest first.
-func lastMessageIn(buf []byte, agentType string) (LastMessage, bool) {
+func lastMessageIn(buf []byte, agentType string, max int) (LastMessage, bool) {
 	lines := bytes.Split(buf, []byte("\n"))
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := bytes.TrimSpace(lines[i])
@@ -275,7 +280,7 @@ func lastMessageIn(buf []byte, agentType string) (LastMessage, bool) {
 		if json.Unmarshal(line, &entry) != nil {
 			continue
 		}
-		if m, ok := LastMessageFromEntries(parseTranscriptEntry(entry, map[string]string{}, agentType)); ok {
+		if m, ok := lastMessageFromEntriesMax(parseTranscriptEntry(entry, map[string]string{}, agentType), max); ok {
 			return m, true
 		}
 	}
@@ -285,6 +290,10 @@ func lastMessageIn(buf []byte, agentType string) (LastMessage, bool) {
 // LastMessageFromEntries is the newest message with text among chat entries already parsed (oldest first), by the rules of a transcript's tail: a tool call alone, a tool result and what Coral typed into the
 // agent are not a message. A Hermes agent's rows come from its state.db, not a file, and are read this way (#11936).
 func LastMessageFromEntries(msgs []map[string]any) (LastMessage, bool) {
+	return lastMessageFromEntriesMax(msgs, lastMessageMaxRunes)
+}
+
+func lastMessageFromEntriesMax(msgs []map[string]any, max int) (LastMessage, bool) {
 	for j := len(msgs) - 1; j >= 0; j-- {
 		m := msgs[j]
 		role, _ := m["type"].(string)
@@ -295,7 +304,7 @@ func LastMessageFromEntries(msgs []map[string]any) (LastMessage, bool) {
 		if text == "" {
 			text, _ = m["content"].(string)
 		}
-		text = plainLine(text)
+		text = plainLineMax(text, max)
 		if text == "" || (role == "user" && agent.IsCoralDelivery(text)) {
 			continue
 		}
@@ -306,7 +315,10 @@ func LastMessageFromEntries(msgs []map[string]any) (LastMessage, bool) {
 }
 
 // plainLine is text as one line of plain words: whitespace runs are one space, control and format characters are dropped, and it is cut at lastMessageMaxRunes characters.
-func plainLine(s string) string {
+func plainLine(s string) string { return plainLineMax(s, lastMessageMaxRunes) }
+
+// plainLineMax is plainLine cut at max characters (0: not cut).
+func plainLineMax(s string, max int) string {
 	s = strings.ToValidUTF8(s, "")
 	s = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) && !unicode.IsSpace(r) || unicode.Is(unicode.Cf, r) {
@@ -315,8 +327,8 @@ func plainLine(s string) string {
 		return r
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
-	if utf8.RuneCountInString(s) > lastMessageMaxRunes {
-		s = string([]rune(s)[:lastMessageMaxRunes])
+	if max > 0 && utf8.RuneCountInString(s) > max {
+		s = string([]rune(s)[:max])
 	}
 	return s
 }
@@ -332,4 +344,22 @@ func (r *SessionReader) CachedLastMessage(sessionID string) (LastMessage, bool) 
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.msg, e.read && e.ok
+}
+
+// LastMessageUncut is the newest message with text of a session's transcript with its whole text (still one plain line), read fresh and not cached: for a caller that redacts the text before it cuts it,
+// so a cut cannot leave part of a secret (#18544). The text is bounded only by the tail read (lastMessageTailMax); the caller cuts it after redacting.
+func (r *SessionReader) LastMessageUncut(sessionID, workingDir, agentType string) (LastMessage, bool) {
+	if !transcriptlink.IsSessionID(sessionID) {
+		return LastMessage{}, false
+	}
+	path := resolveTranscriptPathMode(sessionID, workingDir, agentType, true)
+	if path == "" {
+		return LastMessage{}, false
+	}
+	fi, err := os.Stat(path)
+	if err != nil || !fi.Mode().IsRegular() {
+		return LastMessage{}, false
+	}
+	m, ok, _, _ := readLastMessageMax(path, agentType, fi.Size(), 0)
+	return m, ok
 }
