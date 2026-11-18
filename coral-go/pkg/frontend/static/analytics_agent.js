@@ -28,7 +28,8 @@ export async function openAgent(row, period) {
     await load();
 }
 
-async function read(url) { const resp = await fetch(url, { cache: 'no-store' }); if (!resp.ok) throw new Error('unavailable'); return resp.json(); }
+async function read(url) { const { readNow } = await importOnce('./analytics_machine.js'); const resp = await readNow(url, // the computer being read: in cloud every read goes to one computer (#19569)
+    { cache: 'no-store' }); if (!resp.ok) throw new Error('unavailable'); return resp.json(); }
 
 async function load() {
     const my = ++st.seq, r = RANGES[st.period], row = st.row, untilMs = st.untilMs, sinceMs = untilMs - r.hours * 3600000, since = encodeURIComponent(new Date(sinceMs).toISOString());

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { accountNavEntries, ACCOUNT_NAV } from '../../coral-go/pkg/frontend/static/account_info.js';
 
-assert.deepEqual(accountNavEntries([{ key: 'goals' }, { key: 'nope' }, { key: 'usage' }]), [['Goals', '/goals'], ['Usage', '/usage']], 'Goals then Usage, nothing for an unknown key');
+assert.deepEqual(accountNavEntries([{ key: 'goals' }, { key: 'nope' }, { key: 'usage' }]), [['Goals', '/goals']], 'Goals, nothing for an unknown key and nothing for usage (the Hub retires /usage, #19569)');
 assert.equal(accountNavEntries(undefined), null, 'no nav: null (today\'s links stay)');
 assert.equal(accountNavEntries('goals'), null, 'nav that is not a list: null');
 assert.deepEqual(accountNavEntries([]), [], 'an empty list: no entries');
