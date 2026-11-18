@@ -114,8 +114,13 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     });
     dlg.showModal(); box.focus({ preventScroll: true });
     try {
-        const { messages } = await fetchMessages(team, 200, { after_id: Math.max(0, askId - 1) });
-        thread = threadOf(messages, askId);
+        // The answer can sit far down a busy board: read on from the last message seen until a page comes back short (a page is the next 200 after it), so a reply 300 messages later is in the thread (#19535).
+        const all = []; let after = Math.max(0, askId - 1);
+        for (let page = 0; page < 25; page++) {
+            const { messages } = await fetchMessages(team, 200, { after_id: after }); all.push(...messages);
+            const last = Math.max(after, ...messages.map(m => Number(m.id) || 0)); if (messages.length < 200 || last === after) break; after = last;
+        }
+        thread = threadOf(all, askId);
     } catch { thread = []; }
     if (!thread.length) { kept = true; // the board no longer has it: the record's own words say what was asked and answered
         thread = [{ id: askId, subscriber_id: asker, content: row.title || '', created_at: row.at }, ...(row.note ? [{ id: askId + 1, subscriber_id: OPERATOR_ID, content: String(row.note).replace(/^Your answer: /, ''), created_at: row.at }] : [])];
