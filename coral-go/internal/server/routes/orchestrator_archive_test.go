@@ -163,6 +163,24 @@ func TestALaunchWithATeamMembersNameIsRefusedWithTheChoices(t *testing.T) {
 	assert.Equal(t, "name_archived", out["code"])
 }
 
+// launch-team keeps numbering a repeated name (Backend Dev 2); the number must count archived members too, so a team launch never reuses an archived member's name (#19684).
+func TestATeamLaunchNeverReusesAnArchivedMembersName(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	require.NoError(t, r.ss.SetSessionArchived(ctx, r.sid["Dev"], true))
+	b, _ := json.Marshal(map[string]any{"board_id": orchBoard, "working_dir": r.work, "agent_type": "claude", "agents": []map[string]any{{"name": "Dev", "prompt": "work"}}})
+	code, out := r.do("POST", "/api/sessions/launch-team", string(b), operatorClient, "")
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	agents, _ := out["agents"].([]any)
+	require.Len(t, agents, 1)
+	assert.Equal(t, "Dev 2", agents[0].(map[string]any)["name"], "the archived Dev keeps its name; the new member is numbered")
+	ls, err := r.ss.GetLiveSession(ctx, r.sid["Dev"])
+	require.NoError(t, err)
+	require.NotNil(t, ls)
+	assert.Equal(t, 1, ls.IsArchived, "the archived member is untouched")
+}
+
 var helperSeq atomic.Int64
 
 // nextHelperName gives each launch in a test a name of its own: a team's names are unique, archived members included (#19673).
