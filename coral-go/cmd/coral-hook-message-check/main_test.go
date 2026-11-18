@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/hooks"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -57,5 +59,20 @@ func TestTheUnreadLineIsSaidOncePerBatch(t *testing.T) {
 	forgetSaid(path) // everything was read
 	if saidRecently(path, now.Add(5*time.Minute+2*time.Second)) {
 		t.Fatal("a new batch after a read is said at once")
+	}
+}
+
+// #19622 (the join census): the said-state file is in the data folder whatever the session name says.
+func TestTheSaidStateFileStaysInTheDataFolder(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CORAL_DATA_DIR", dir)
+	for _, name := range []string{"../../etc/x", "a/b", `a\b`, "..", "../", "/abs/path", ""} {
+		got := saidStatePath(name)
+		if filepath.Dir(got) != filepath.Clean(hooks.CoralDir()) {
+			t.Errorf("name %q: %q is not directly in %q", name, got, hooks.CoralDir())
+		}
+		if strings.Contains(filepath.Base(got), "/") || strings.Contains(filepath.Base(got), `\`) {
+			t.Errorf("name %q: base %q holds a separator", name, filepath.Base(got))
+		}
 	}
 }

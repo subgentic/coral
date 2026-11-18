@@ -77,12 +77,18 @@ func main() {
 	hooks.DebugLog(fmt.Sprintf("message_check: project=%s unread=%d paused=%v", hooks.LogID(project), int(count), result["paused"] == true))
 
 	text := unreadNotice(result)
-	if text != "" && !saidRecently(filepath.Join(hooks.CoralDir(), "message-check-said-"+hooks.BoardStateFileName(os.Getenv("CORAL_SESSION_NAME"))), time.Now()) {
+	said := saidStatePath(os.Getenv("CORAL_SESSION_NAME"))
+	if text == "" { // read, or a paused board: the next batch is said when it arrives
+		forgetSaid(said)
+	} else if !saidRecently(said, time.Now()) {
 		fmt.Print(text)
 	}
-	if text == "" { // read, or a paused board: the next batch is said when it arrives
-		forgetSaid(filepath.Join(hooks.CoralDir(), "message-check-said-"+hooks.BoardStateFileName(os.Getenv("CORAL_SESSION_NAME"))))
-	}
+}
+
+// saidStatePath is the file that records when the unread line was last said, in the data folder: the session name goes through hooks.BoardStateFileName, which makes every path separator "_", so no name, whatever
+// the environment says, leaves the folder (the same rule as the board state file this hook reads).
+func saidStatePath(sessionName string) string {
+	return filepath.Join(hooks.CoralDir(), "message-check-said-"+hooks.BoardStateFileName(sessionName))
 }
 
 // sayAgainAfter is how long the unread line stays quiet after it was said (#19622): it was printed after EVERY tool call while anything was unread, the same line the typed nudge and the Stop-hook block already
