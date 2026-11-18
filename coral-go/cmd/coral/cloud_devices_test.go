@@ -36,12 +36,13 @@ func TestConnectPromptSaysWhatThePairedBrowserCanDoBeforeTheLink(t *testing.T) {
 		o := out.String()
 		assert.Contains(t, o, phrase, mode)
 		assert.Contains(t, o, "(access: "+mode+")")
+		assert.Contains(t, o, "read again when the browser pairs", "QA INFO: the mode is read at pairing time, not now")
 		assert.Contains(t, o, "coral cloud devices web-mode view", "how to lower it here")
 		assert.Less(t, strings.Index(o, phrase), strings.Index(o, "Open https://"), "before the link: the person reads it before confirming")
 	}
 }
 
-// A log or a script gets no prompt (it asks nobody), and an unknown mode word says nothing rather than something false.
+// A log or a script gets no prompt (it asks nobody), and a mode that could not be read is never silence: the prompt says so and names launch, the most it could be.
 func TestConnectPromptIsOnlyForAPersonAndFailsSafeForAnUnknownMode(t *testing.T) {
 	// Security's SHOULD on slice 5: a mode that could not be read (an older server, a bad word) is never silence: the prompt says so and names the most it could be.
 	for _, bad := range []string{"", "root", "LAUNCH"} {

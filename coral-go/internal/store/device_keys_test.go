@@ -447,11 +447,11 @@ func TestPromoteDeviceOriginIsUpgradeOnly(t *testing.T) {
 	assert.Equal(t, store.DeviceOriginBootstrap, origin(b2.KID))
 }
 
-// Slice 5 (coral-hub condition c/e): the mode a browser-paired device starts at is the computer's own setting. Beta default: launch (decided 2026-11-18, first reviewed at the start of the closed beta's second week). An unknown or empty value is never trusted: it reads as the default, and a set accepts only the three modes.
-func TestDeviceWebModeDefaultsToLaunchAndTakesOnlyTheThreeModes(t *testing.T) {
+// Slice 5 (coral-hub condition c/e): the mode a browser-paired device starts at is the computer's own setting. Beta default: launch (decided 2026-11-18, first reviewed at the start of the closed beta's second week), only when nothing was ever set. A set that is not one of the three modes is refused; a stored value that is not a mode, or a settings read that fails, reads as view (QA on slice 5: never more than the person set).
+func TestDeviceWebModeDefaultsToLaunchWhenUnsetAndTakesOnlyTheThreeModes(t *testing.T) {
 	ss := dkStore(t)
 	ctx := context.Background()
-	assert.Equal(t, "launch", ss.DeviceWebMode(ctx), "the beta default")
+	assert.Equal(t, "launch", ss.DeviceWebMode(ctx), "unset: the beta default")
 	for _, m := range []string{"view", "interact", "launch"} {
 		require.NoError(t, ss.SetDeviceWebMode(ctx, m))
 		assert.Equal(t, m, ss.DeviceWebMode(ctx))
@@ -459,9 +459,24 @@ func TestDeviceWebModeDefaultsToLaunchAndTakesOnlyTheThreeModes(t *testing.T) {
 	for _, bad := range []string{"", "admin", "LAUNCH", "launch ", "root"} {
 		require.Error(t, ss.SetDeviceWebMode(ctx, bad), bad)
 	}
-	require.NoError(t, ss.SetDeviceWebMode(ctx, "view"))
-	require.NoError(t, ss.SetSetting(ctx, store.DeviceWebModeSetting, "admin")) // a hand-edited row
-	assert.Equal(t, "launch", ss.DeviceWebMode(ctx), "a bad stored value reads as the default, never as a mode")
+}
+
+func TestDeviceWebModeFailsToViewOnABadStoredWord(t *testing.T) {
+	ss := dkStore(t)
+	ctx := context.Background()
+	for _, bogus := range []string{"bogus", "admin", "", " launch"} {
+		require.NoError(t, ss.SetSetting(ctx, store.DeviceWebModeSetting, bogus)) // a hand-edited row
+		assert.Equal(t, "view", ss.DeviceWebMode(ctx), "a stored %q is not a mode: view, never the default", bogus)
+	}
+}
+
+func TestDeviceWebModeFailsToViewWhenTheSettingsReadFails(t *testing.T) {
+	db, err := storetest.Open(t, t.TempDir()+"/s.db")
+	require.NoError(t, err)
+	ss := store.NewSessionStore(db)
+	require.NoError(t, ss.SetDeviceWebMode(context.Background(), "view"))
+	require.NoError(t, db.Close())
+	assert.Equal(t, "view", ss.DeviceWebMode(context.Background()), "a read that errors: the lowest mode, not launch")
 }
 
 func TestDeviceClearPendingIsKeptUntilAClearWorks(t *testing.T) {

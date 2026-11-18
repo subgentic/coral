@@ -395,16 +395,20 @@ const DeviceWebModeSetting = "device_web_mode"
 // DeviceWebModeDefault is the beta default.
 const DeviceWebModeDefault = "launch"
 
-// DeviceWebMode is the mode a newly paired browser gets. A missing, empty or unknown stored value is the default: a stored word is never taken for a mode it is not.
+// DeviceWebMode is the mode a newly paired browser gets. Fail safe (QA on slice 5): no row at all is the dated beta default (launch); but a read error, or a stored word that is not view, interact or launch, is view, the lowest. A person who lowered the setting never gets more than they set because a read failed.
 func (s *SessionStore) DeviceWebMode(ctx context.Context) string {
 	all, err := s.GetSettings(ctx)
 	if err != nil {
+		return "view"
+	}
+	m, set := all[DeviceWebModeSetting]
+	if !set {
 		return DeviceWebModeDefault
 	}
-	if m := all[DeviceWebModeSetting]; validDeviceMode(m) {
+	if validDeviceMode(m) {
 		return m
 	}
-	return DeviceWebModeDefault
+	return "view"
 }
 
 // SetDeviceWebMode saves the web mode: only view, interact or launch.
