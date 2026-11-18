@@ -734,7 +734,7 @@ coral-board goal close <id> --reason "why" [--state done|dropped]    # its open 
 coral-board task add "title" --goal <id>             # a task joins a goal when it is added...
 coral-board task goal <task-id> <goal-id|none>       # ...or later; none takes it off
 coral-board task list --goal <id>                    # one goal's tasks
-coral-board task unlanded [--ref main] [--since 7d]   # approved tasks whose 'Head <sha>' is not on the ref (run it in the repo; read-only)
+coral-board task unlanded [--ref main] [--since 7d]   # approved tasks whose head (from the approval, the submit text, an artifact revision or the recorded head) is not on the ref, or on no remote branch (run it in the repo; read-only)
 ```
 
 A team can limit its planning (Team settings, the Operator's): a cap on open goals (`goal add` is refused with a plain sentence naming it), and "new goals" or "new tasks need my approval". With approval on, your `goal add` or `task add` prints `waiting for the Operator's approval (#N)` and creates nothing yet: do not repeat it (the same title is merged anyway) and do not work on it as if it existed. You are told once, on the board, when the Operator approves it (it is then the goal or task the message names) or rejects it (with their reason, as data), and a proposal not decided in 7 days expires. A task for a goal that is itself waiting: `task add "title" --goal-proposal <N>`. Your own self tasks (`--self`) are not held.
