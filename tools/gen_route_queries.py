@@ -94,6 +94,8 @@ DROP = {
 # (internal/background and coral-hub internal/feed): a dashboard-less client that must not consume the machine's pending UI
 # notifications. Only that exact value is accepted through the tunnel; anything else (feed=, feed=Hub, feed=hub2, two values) is refused.
 ENUM = {
+    # The Skills page list through the Hub (#19627): only the three statuses the handler knows pass (a removed skill is never listed).
+    'GET /api/skills': {'status': ['approved', 'pending', 'rejected']},
     # Needs you filtered to one kind (#13834): only a kind the answer counts passes.
     'GET /api/needs-you': {'kind': ['agent', 'question', 'wait', 'proposal', 'review', 'goal_done', 'skill']},
     # The preview of Record for all agents (#13834): only dry_run=1 passes, so the dry run and the confirm are two signed targets.

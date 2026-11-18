@@ -44,7 +44,7 @@ func instances(pattern string) []string {
 	hex := strings.Repeat("a", 64)
 	var out []string
 	for _, id := range []string{"12", "x"} {
-		p := strings.NewReplacer("{hex64}", hex).Replace(pattern)
+		p := strings.NewReplacer("{hex64}", hex, "{hex32}", hex[:32]).Replace(pattern)
 		segs := strings.Split(p, "/")
 		for i, s := range segs {
 			if strings.HasPrefix(s, "{") {
@@ -97,6 +97,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// The $ skills menu through the Hub (#19430) is new: the old list never had it.
 			if (m == http.MethodGet && p == "/api/skills/search") || (m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/skills")) {
+				continue
+			}
+			// The Skills page's two reads through the Hub (#19627) are new: the old list never had them.
+			if m == http.MethodGet && (p == "/api/skills" || strings.HasPrefix(p, "/api/skills/")) {
 				continue
 			}
 			// The live list is an OwnerSees route since #12377 (the owner's rows carry waits_on_this): the old list never had it.

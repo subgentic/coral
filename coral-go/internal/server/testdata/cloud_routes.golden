@@ -231,9 +231,9 @@ GET /api/sessions/{sessionID}/status view
 GET /api/settings never
 GET /api/settings/default-prompts view
 GET /api/settings/prompt-inspection launch
-GET /api/skills never
+GET /api/skills view
 GET /api/skills/search view
-GET /api/skills/{id} never
+GET /api/skills/{id} view
 GET /api/spec.json never
 GET /api/system/api-key never
 GET /api/system/artifact-store never

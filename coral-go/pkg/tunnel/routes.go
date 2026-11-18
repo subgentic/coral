@@ -68,7 +68,7 @@ func Lower(a, b Mode) Mode {
 }
 
 // route is "METHOD /path/{param}/more": a {param} matches exactly one non-empty
-// segment, except {hex64}, which matches exactly 64 lowercase hex digits (a content digest). There are no prefix or wildcard rules, so a rule can never swallow a
+// segment, except {hex64}, which matches exactly 64 lowercase hex digits (a content digest), and {hex32}, exactly 32 (a skill's id). There are no prefix or wildcard rules, so a rule can never swallow a
 // sibling route.
 type route struct {
 	method  string // "*" matches every method (used for explicit TierNever rules)
@@ -298,6 +298,10 @@ var routeTable = cat(
 	// skill's line into a running agent (Interact), so the machine's own mode still caps it. Approval of a skill stays the person's act on the computer.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/skills/search")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/skills")),
+	// The Skills page's two reads through the Hub (#19627, coral-hub's Operator yes, #19626 section 4): the list (with its one status filter) and one skill's page, the computer OWNER's alone. The server cuts
+	// both replies to an allow-list (its SKILL.md text alone, redacted and capped, never another file, a scanner line or a host). A skill's id is exactly 32 lowercase hex digits ({hex32}). Import, approve, reject and
+	// remove stay unlisted: they are the person's act on the computer.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/skills", "/api/skills/{hex32}")),
 	// A picture for a new goal's description (#11650): the owner's alone, like the goal it goes in.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/goal-images")),
 	// A question from an agent that is on no team, in the Hub's own Needs you (#19628, the Hub's beta): answering types the answer into that agent, dismissing tells it, and a picture for the answer is kept as the agent's
@@ -899,6 +903,12 @@ func matchSegments(pattern string, segs []string) bool {
 			}
 			continue
 		}
+		if ps == "{hex32}" {
+			if !isHex32(segs[i]) {
+				return false
+			}
+			continue
+		}
 		if ps == "{uiid}" {
 			if !isUIID(segs[i]) {
 				return false
@@ -937,8 +947,13 @@ func FrameTier(decodedPath string, data []byte) Tier {
 }
 
 // isHex64 reports whether s is exactly 64 lowercase hexadecimal digits.
-func isHex64(s string) bool {
-	if len(s) != 64 {
+func isHex64(s string) bool { return isLowerHex(s, 64) }
+
+// isHex32 reports whether s is exactly 32 lowercase hex digits (a skill's id).
+func isHex32(s string) bool { return isLowerHex(s, 32) }
+
+func isLowerHex(s string, n int) bool {
+	if len(s) != n {
 		return false
 	}
 	for i := 0; i < len(s); i++ {
