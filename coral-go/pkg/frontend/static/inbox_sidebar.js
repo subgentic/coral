@@ -87,7 +87,7 @@ const AF = await importOnce('./operator_activity_filters.js'); // its search and
 const IA = await importOnce('./inbox_artifacts.js'); // the Artifacts folder (Goal #62): every team's files in one list
 const { answerCell: agentAnswerCell, rowActions, readWholeQuestion, promptCell, promptCanSelect, promptDismiss, waitingCell, goalTaskLine } = await importOnce('./inbox_answer.js');
 const { trustRows, trustGroupCell, prepareTrustRows, folderPermission } = await importOnce('./inbox_trust_group.js');
-const answerCell = (s, opts) => s.trustGroup ? trustGroupCell(s) : agentAnswerCell(s, opts); // the choices of a question or a permission, answered from the row (#10400)
+const answerCell = (s, opts) => s.trustGroup ? trustGroupCell(s) : agentAnswerCell(s, { ...opts, primaryOpen: true }); // an unreadable request's Open agent is the main button on the row (#15501); the bare cell keeps it Default (#17450) the choices of a question or a permission, answered from the row (#10400)
 
 /** The agent's own chat card, on the Agents tab (a row that needs an answer shows the chat card, not the terminal saved last, #10141). */
 const openInAgents = s => { window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); };

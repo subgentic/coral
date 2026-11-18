@@ -243,7 +243,7 @@ const stillArming = b => !!b._armEntry && Date.now() < b._armEntry.at;
 
 const lastRead = new Map(); // `server:session` -> the last question read for that agent: a row drawn again for a new reading shows these choices until the new one is in, so its Yes is never gone in between (#15309)
 /** Draws the choices into the cell once they are read (again after a question changed). */
-function fill(s, cell, withDismiss = true) {
+function fill(s, cell, withDismiss = true, primaryOpen = false) {
     const key = askKey(s), who = `${sessionServer(s)}:${s.session_id}`;
     const fresh = read.has(key);
     if (!fresh) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false, unreadable: false })).then(r => { lastRead.set(who, r); return r; }));
@@ -314,7 +314,7 @@ function fill(s, cell, withDismiss = true) {
             note.className = unreadable ? 'inbox-only-reject inbox-unread' : 'inbox-only-reject';
             const t = autoBlockAt ? new Date(autoBlockAt) : null, at = t && !Number.isNaN(t.getTime()) ? t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
             note.textContent = unreadable ? UNREAD_ROW : `It can only be rejected here. Open the agent to read it${at ? `; Claude Code blocks it on its own at ${at}` : ''}.`;
-            const o = document.createElement('button'); o.type = 'button'; o.className = unreadable ? 'btn btn-primary btn-small inbox-open-agent' : 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
+            const o = document.createElement('button'); o.type = 'button'; o.className = unreadable && primaryOpen ? 'btn btn-primary btn-small inbox-open-agent' : 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
             o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to ${unreadable ? 'answer' : 'read the request'}`);
             o.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
             o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
@@ -353,7 +353,7 @@ export function rowActions(s) {
 }
 
 /** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. `dismiss: false` leaves the Dismiss to the row's ⋯ menu (a phone's). */
-export function answerCell(s, { dismiss = true } = {}) {
+export function answerCell(s, { dismiss = true, primaryOpen = false } = {}) {
     if (s.waiting_for_input && waitIgnored(s) && !s.sleeping && !s.archived) {
         const cell = document.createElement('span'); cell.className = 'inbox-answers';
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small inbox-open-agent'; button.textContent = 'Open agent';
@@ -386,7 +386,7 @@ export function answerCell(s, { dismiss = true } = {}) {
     }
     const cell = document.createElement('span');
     cell.className = 'inbox-answers';
-    fill(s, cell, dismiss);
+    fill(s, cell, dismiss, primaryOpen);
     return cell;
 }
 
