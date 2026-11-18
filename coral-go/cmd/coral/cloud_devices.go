@@ -21,7 +21,8 @@ func pairingPrompt(mode string) string {
 	case "view":
 		can = "look at your sessions on this computer, and nothing more"
 	default:
-		return ""
+		// Fail safe: say what the most could be, never nothing.
+		return "\nThis computer's setting for what a paired browser may do could not be read, so assume the most: this browser may be able to start sessions on this computer.\nTo give it less, press Ctrl-C and run first: coral cloud devices web-mode view\nYou can lower or remove any paired device later, here: coral cloud devices\n"
 	}
 	return fmt.Sprintf("\nThis browser will be able to %s (access: %s).\nTo give it less, press Ctrl-C and run first: coral cloud devices web-mode view\nYou can lower or remove any paired device later, here: coral cloud devices\n", can, mode)
 }

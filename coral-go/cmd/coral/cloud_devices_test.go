@@ -42,9 +42,14 @@ func TestConnectPromptSaysWhatThePairedBrowserCanDoBeforeTheLink(t *testing.T) {
 }
 
 // A log or a script gets no prompt (it asks nobody), and an unknown mode word says nothing rather than something false.
-func TestConnectPromptIsOnlyForAPersonAndNeverForAnUnknownMode(t *testing.T) {
-	assert.Empty(t, pairingPrompt(""))
-	assert.Empty(t, pairingPrompt("root"))
+func TestConnectPromptIsOnlyForAPersonAndFailsSafeForAnUnknownMode(t *testing.T) {
+	// Security's SHOULD on slice 5: a mode that could not be read (an older server, a bad word) is never silence: the prompt says so and names the most it could be.
+	for _, bad := range []string{"", "root", "LAUNCH"} {
+		p := pairingPrompt(bad)
+		assert.Contains(t, p, "could not be read", bad)
+		assert.Contains(t, p, "start sessions on this computer", "names launch, the most it could be: "+bad)
+		assert.Contains(t, p, "coral cloud devices web-mode view", bad)
+	}
 	fastPoll(t)
 	f := newFakeCoral(t, ready, enrolled)
 	f.statuses = []string{idle, enrolling, connected}
