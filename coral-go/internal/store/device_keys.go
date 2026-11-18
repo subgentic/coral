@@ -37,15 +37,16 @@ const (
 )
 
 var (
-	ErrDeviceKeyForm  = errors.New("device key is not well formed")
-	ErrUnknownSigner  = errors.New("unknown device key")
-	ErrSignerRemoved  = errors.New("device key is removed or expired")
-	ErrKeyLimit       = errors.New("device key limit reached")
-	ErrNonceRepeat    = errors.New("nonce already accepted")
-	ErrNonceForm      = errors.New("nonce is not 22 base64url characters of 16 bytes")
-	ErrNonceStoreFull = errors.New("nonce store is full")
-	ErrClockBack      = errors.New("the computer's clock is behind the latest accepted time")
-	deviceNonceCap    = 10000 // a count cap: a new message is refused before a live nonce is dropped
+	ErrDeviceKeyForm    = errors.New("device key is not well formed")
+	ErrUnknownSigner    = errors.New("unknown device key")
+	ErrSignerRemoved    = errors.New("device key is removed or expired")
+	ErrKeyLimit         = errors.New("device key limit reached")
+	ErrNonceRepeat      = errors.New("nonce already accepted")
+	ErrNonceForm        = errors.New("nonce is not 22 base64url characters of 16 bytes")
+	ErrNonceStoreFull   = errors.New("nonce store is full")
+	ErrClockBack        = errors.New("the computer's clock is behind the latest accepted time")
+	deviceNonceKidShare = 1000  // one signer may hold this many live nonces, so a stolen one cannot fill the cap
+	deviceNonceCap      = 10000 // a count cap: a new message is refused before a live nonce is dropped
 )
 
 // DeviceKey is one row of the device list.
@@ -180,9 +181,10 @@ func (s *SessionStore) ListDeviceKeys(ctx context.Context) ([]DeviceKey, error) 
 	return out, rows.Err()
 }
 
-// TouchDeviceKey records a use, which pushes the 90-day expiry out. A removed or unknown key is left alone.
+// TouchDeviceKey records a use, which pushes the 90-day expiry out. A removed, unknown or already idle-expired key is left alone: a touch never brings one back. Call it only after a signature has verified.
 func (s *SessionStore) TouchDeviceKey(ctx context.Context, kid string, now time.Time) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE device_keys SET last_used_at = ? WHERE kid = ? AND removed_at IS NULL`, now.Unix(), kid)
+	cutoff := now.Unix() - int64(deviceIdleExpiry/time.Second)
+	_, err := s.db.ExecContext(ctx, `UPDATE device_keys SET last_used_at = ? WHERE kid = ? AND removed_at IS NULL AND COALESCE(last_used_at, created_at) > ?`, now.Unix(), kid, cutoff)
 	return err
 }
 
@@ -305,6 +307,13 @@ func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now t
 		return err
 	}
 	if live >= deviceNonceCap {
+		return ErrNonceStoreFull
+	}
+	var mine int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM device_nonces WHERE kid = ? AND expires_at > ?`, kid, now.Unix()).Scan(&mine); err != nil {
+		return err
+	}
+	if mine >= deviceNonceKidShare {
 		return ErrNonceStoreFull
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO device_nonces (nonce, kid, accepted_at, expires_at) VALUES (?, ?, ?, ?)`, nonce, kid, now.Unix(), now.Add(window+deviceNonceSkew).Unix()); err != nil {

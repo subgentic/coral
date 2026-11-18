@@ -56,11 +56,11 @@ func (f fx) msg(a devicekey.Action) devicekey.Message {
 	case devicekey.TrustPasskey:
 		m.PasskeyPK, m.Label = f.passkeyPK, "Work phone"
 	case devicekey.ApproveDevice:
-		m.TargetKID, m.TargetPK, m.Label, m.Mode = f.targetKID, f.targetPK, "My laptop", "launch"
+		m.TargetKID, m.TargetPK, m.Label, m.Mode = f.targetKID, f.targetPK, "My laptop", "interact"
 	case devicekey.RemoveDevice:
 		m.TargetKID = f.targetKID
 	case devicekey.RaiseMode:
-		m.TargetKID, m.Mode = f.targetKID, "write"
+		m.TargetKID, m.Mode = f.targetKID, "interact"
 	}
 	return m
 }
@@ -72,7 +72,7 @@ func TestCanonicalFormByHand(t *testing.T) {
 	f := fixture(t)
 	got, err := f.msg(devicekey.RaiseMode).Canonical()
 	require.NoError(t, err)
-	want := `{"kid":"` + f.signerKID + `","computer":"` + f.computer + `","ts":1800000000,"nonce":"` + f.nonce + `","target_kid":"` + f.targetKID + `","mode":"write"}`
+	want := `{"kid":"` + f.signerKID + `","computer":"` + f.computer + `","ts":1800000000,"nonce":"` + f.nonce + `","target_kid":"` + f.targetKID + `","mode":"interact"}`
 	assert.Equal(t, want, string(got))
 	assert.Equal(t, 43, len(f.signerKID))
 	assert.Equal(t, 43, len(f.computer))
@@ -122,10 +122,10 @@ func TestParseRefusesEveryNonCanonicalOrMalformedBody(t *testing.T) {
 		"newline":                   g + "\n",
 		"trailing data":             g + "{}",
 		"leading space":             " " + g,
-		"keys out of order":         `{"computer":"` + f.computer + `","kid":"` + f.signerKID + `","ts":1800000000,"nonce":"` + f.nonce + `","target_kid":"` + f.targetKID + `","mode":"write"}`,
-		"unknown key":               sub(`"mode":"write"}`, `"mode":"write","extra":"x"}`),
+		"keys out of order":         `{"computer":"` + f.computer + `","kid":"` + f.signerKID + `","ts":1800000000,"nonce":"` + f.nonce + `","target_kid":"` + f.targetKID + `","mode":"interact"}`,
+		"unknown key":               sub(`"mode":"interact"}`, `"mode":"interact","extra":"x"}`),
 		"missing key":               pre + `"target_kid":"` + f.targetKID + `"}`,
-		"duplicate key":             sub(`"mode":"write"`, `"mode":"write","mode":"write"`),
+		"duplicate key":             sub(`"mode":"interact"`, `"mode":"interact","mode":"interact"`),
 		"ts leading zero":           sub(`1800000000`, `01800000000`),
 		"ts plus sign":              sub(`1800000000`, `+1800000000`),
 		"ts float":                  sub(`1800000000`, `1800000000.0`),
@@ -134,25 +134,25 @@ func TestParseRefusesEveryNonCanonicalOrMalformedBody(t *testing.T) {
 		"ts negative":               sub(`1800000000`, `-1`),
 		"ts zero":                   sub(`1800000000`, `0`),
 		"ts too long":               sub(`1800000000`, `18000000000000000000`),
-		"escaped letter":            sub(`"mode":"write"`, `"mode":"writ\u0065"`),
-		"escaped slash":             sub(`"mode":"write"`, `"mode":"wr\/ite"`),
+		"escaped letter":            sub(`"mode":"interact"`, `"mode":"writ\u0065"`),
+		"escaped slash":             sub(`"mode":"interact"`, `"mode":"wr\/ite"`),
 		"kid short":                 sub(f.signerKID, f.signerKID[:42]),
 		"kid padded":                sub(f.signerKID, f.signerKID[:42]+"="),
 		"kid not base64url":         sub(f.signerKID, f.signerKID[:42]+"+"),
 		"computer long":             sub(f.computer, f.computer+"A"),
 		"nonce 15 bytes":            sub(f.nonce, b64.EncodeToString([]byte("fifteen-bytes!!"))),
 		"nonce non-canonical bits":  sub(f.nonce, f.nonce[:21]+"B"),
-		"mode empty":                sub(`"mode":"write"`, `"mode":""`),
-		"mode with a space":         sub(`"mode":"write"`, `"mode":"wr ite"`),
-		"mode uppercase":            sub(`"mode":"write"`, `"mode":"Write"`),
-		"mode 33 chars":             sub(`"mode":"write"`, `"mode":"`+strings.Repeat("a", 33)+`"`),
-		"value is null":             sub(`"mode":"write"`, `"mode":null`),
-		"value is a number":         sub(`"mode":"write"`, `"mode":5`),
+		"mode empty":                sub(`"mode":"interact"`, `"mode":""`),
+		"mode with a space":         sub(`"mode":"interact"`, `"mode":"wr ite"`),
+		"mode uppercase":            sub(`"mode":"interact"`, `"mode":"Write"`),
+		"mode 33 chars":             sub(`"mode":"interact"`, `"mode":"`+strings.Repeat("a", 33)+`"`),
+		"value is null":             sub(`"mode":"interact"`, `"mode":null`),
+		"value is a number":         sub(`"mode":"interact"`, `"mode":5`),
 		"array body":                `[` + g + `]`,
 		"not json":                  `kid`,
 		"empty":                     ``,
 		"over 2048 bytes":           pre + `"target_kid":"` + f.targetKID + `","mode":"` + strings.Repeat("a", 2100) + `"}`,
-		"invalid utf-8 in a string": sub(`"mode":"write"`, "\"mode\":\"wr\xffte\""),
+		"invalid utf-8 in a string": sub(`"mode":"interact"`, "\"mode\":\"wr\xffte\""),
 	}
 	for name, body := range cases {
 		_, err := devicekey.Parse(devicekey.RaiseMode, []byte(body))
@@ -226,9 +226,9 @@ func TestVectorsFile(t *testing.T) {
 	good, _ := f.msg(devicekey.RaiseMode).Canonical()
 	for _, r := range []struct{ n, body string }{
 		{"refused: spaces", strings.Replace(string(good), `"ts":`, `"ts": `, 1)},
-		{"refused: keys out of order", `{"computer":"` + f.computer + `","kid":"` + f.signerKID + `","ts":1800000000,"nonce":"` + f.nonce + `","target_kid":"` + f.targetKID + `","mode":"write"}`},
+		{"refused: keys out of order", `{"computer":"` + f.computer + `","kid":"` + f.signerKID + `","ts":1800000000,"nonce":"` + f.nonce + `","target_kid":"` + f.targetKID + `","mode":"interact"}`},
 		{"refused: ts leading zero", strings.Replace(string(good), `1800000000`, `01800000000`, 1)},
-		{"refused: escaped slash", strings.Replace(string(good), `"write"`, `"wr\/ite"`, 1)},
+		{"refused: escaped slash", strings.Replace(string(good), `"interact"`, `"wr\/ite"`, 1)},
 	} {
 		want = append(want, vector{Name: r.n, Action: "raise-mode", Body: r.body, Refused: true})
 	}

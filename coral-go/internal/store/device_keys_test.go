@@ -363,3 +363,28 @@ func TestOwnerClearsTheClockMark(t *testing.T) {
 	assert.NoError(t, ss.CheckClock(ctx, dkT0))
 	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("n1"), "kid", dkT0.Add(time.Minute), win5), store.ErrNonceRepeat, "clearing the mark does not forget a nonce")
 }
+
+// Security SHOULD 3 (#248367): a touch must not bring an idle-expired key back. A key idle for 90 days that the sweep has not reached yet stays expired.
+func TestTouchDoesNotReviveAnIdleExpiredKey(t *testing.T) {
+	ss, ctx := dkStore(t), context.Background()
+	k := dkKey(1, store.DeviceKindDevice, store.DeviceOriginPairing)
+	_, _ = ss.AddDeviceKey(ctx, k, dkT0)
+	late := dkT0.Add(91 * 24 * time.Hour)
+	require.NoError(t, ss.TouchDeviceKey(ctx, k.KID, late))
+	_, err := ss.ActiveDeviceKey(ctx, k.KID, late)
+	assert.ErrorIs(t, err, store.ErrSignerRemoved, "the touch did not make it active again")
+	assert.Zero(t, mustList(t, ss)[0].LastUsedAt, "and wrote nothing")
+}
+
+// Security SHOULD 4: one kid may hold only its share of the nonce cap, so one stolen signer cannot make every other device's signed message return nonce_store_full.
+func TestNonceCapHasAPerKidShare(t *testing.T) {
+	ss, ctx := dkStore(t), context.Background()
+	store.SetNonceCapForTest(t, 20)
+	store.SetNonceKidShareForTest(t, 4)
+	for i := 0; i < 4; i++ {
+		require.NoError(t, ss.RecordNonce(ctx, nn(fmt.Sprintf("a%d", i)), "kidA", dkT0, win5))
+	}
+	assert.ErrorIs(t, ss.RecordNonce(ctx, nn("a4"), "kidA", dkT0, win5), store.ErrNonceStoreFull, "kid A is at its share")
+	assert.NoError(t, ss.RecordNonce(ctx, nn("b0"), "kidB", dkT0, win5), "kid B is not blocked by kid A")
+	assert.NoError(t, ss.RecordNonce(ctx, nn("a4"), "kidA", dkT0.Add(10*time.Minute), win5), "A's earlier nonces expired: room again")
+}
