@@ -104,7 +104,8 @@ const { coralReady } = require('./helpers/wait');
             // Coral Hub: the list carries no state, so no icon.
             await render(undefined, 'hub-' + TEAM);
             assert.equal(await icon(), null, `${dev}: no icon where the list gives no state`);
-            assert.deepEqual(await ev(`import(${MOD} + 'list_card_parts.js').then(m => { const host = document.createElement('div'); host.innerHTML = m.teamHealthBtn('@remote/${TEAM}', [{ team_health_on: true }]); const icon = host.firstElementChild; return { tag: icon.tagName, role: icon.getAttribute('role'), label: icon.getAttribute('aria-label'), action: icon.hasAttribute('data-on-click'), focusable: icon.tabIndex >= 0 }; })`), { tag: 'SPAN', role: 'img', label: 'Health check is on', action: false, focusable: false }, 'remote Hub keeps the on signal without an unavailable settings action');
+            // A team on another computer of a self-hosted hub (#19509): the pulse is a button that opens its settings, on that computer; it was a span that did nothing when clicked.
+            assert.deepEqual(await ev(`import(${MOD} + 'list_card_parts.js').then(m => { const host = document.createElement('div'); host.innerHTML = m.teamHealthBtn('@remote/${TEAM}', [{ team_health_on: true }]); const icon = host.firstElementChild; return { tag: icon.tagName, role: icon.getAttribute('role'), label: icon.getAttribute('aria-label'), action: icon.getAttribute('data-on-click'), board: icon.dataset.board, focusable: icon.tabIndex >= 0 }; })`), { tag: 'BUTTON', role: null, label: 'Health check settings for ' + TEAM, action: 'team-health', board: '@remote/' + TEAM, focusable: true }, 'a remote team has the same pulse button, naming the team');
         }
 
         // A click opens the team's settings on the Health check tab, which (real server) shows a new team's check on and what it costs.
