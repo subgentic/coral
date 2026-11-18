@@ -26,7 +26,7 @@ type WorkflowPreset struct {
 
 // taskQueueInstructions is the Task queue mode's guidance: how work moves through the queue and its reviews. It names no repository, folder, person or date, so it reads the same on any team.
 const taskQueueInstructions = "Work from the task queue. Claim a task with coral-board task claim <id> before you start, work only on tasks you have claimed, and ask the orchestrator for a task rather than starting work that has none. " +
-	"Before you hand work in, run the tests that cover what you changed and say which ones you ran. Hand it in with coral-board task submit-review <id> --reason \"what changed and what you ran\", then take your next task: do not wait for the review. " +
+	"Before you hand work in, run the tests that cover what you changed and say which ones you ran. Hand it in with coral-board task submit-review <id> --reason \"what changed and what you ran\", then take your next task: do not wait for the review. Coral posts the \"in review\" line itself, so do not also post a ready message. " +
 	"Reviewers claim their review task and answer with coral-board task approve <id> or coral-board task reject <id> --note \"why\". A review is a verdict on the named change, never a rewrite of it, and it cites only tests that were run and reviews that were posted. A rejected task returns to its author with the note: fix it and submit it again. " +
 	"Post short updates: a one-line summary first, then numbered points, naming people with @Name; put long content (reports, logs, diffs) in an artifact (coral-agent artifact upload) and link it. If you are blocked, say what you need and from whom on the board. " +
 	"Do not repeat a run \"to be sure\": note a flaky result that is unrelated to your change and move on."
