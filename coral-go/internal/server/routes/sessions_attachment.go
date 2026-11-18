@@ -20,6 +20,9 @@ import (
 // what the chat route does for the same caller (the Operator, or an agent token on its own session under the identity rules); a reference that matches no
 // image in that transcript is 404, and one that is not a reference is 400.
 func (h *SessionsHandler) ChatAttachment(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the table's owner route (#19629): through the Hub a pasted image is the computer owner's alone
+		return
+	}
 	ref := chi.URLParam(r, "ref")
 	if !agent.ValidImageRef(ref) {
 		errBadRequest(w, "not an attachment reference")

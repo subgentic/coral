@@ -33,6 +33,7 @@ GET /api/board/{project}/orchestrator-grant launch owner-only
 GET /api/board/{project}/proposals view owner-only
 GET /api/board/{project}/settings view owner-sees
 GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
+GET /api/board/{project}/tasks/{taskID}/changes.diff view owner-only
 GET /api/chief view owner-only
 GET /api/custom-models view owner-only
 GET /api/custom-modes view owner-only
@@ -50,6 +51,7 @@ GET /api/scheduled/jobs/{jobID}/runs view owner-only
 GET /api/scheduled/runs/recent view owner-only
 GET /api/session-artifacts view owner-only
 GET /api/sessions/live view owner-sees
+GET /api/sessions/live/{name}/attachment/{ref} view owner-only
 GET /api/settings/prompt-inspection launch owner-only
 GET /api/skills/search view owner-only
 GET /api/system/update view owner-update

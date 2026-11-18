@@ -238,6 +238,9 @@ func (h *BoardHandler) ActiveTask(w http.ResponseWriter, r *http.Request) {
 // TaskChangesDiff serves the patch captured when a task completed or was skipped.
 // GET /api/board/{project}/tasks/{taskID}/changes.diff
 func (h *BoardHandler) TaskChangesDiff(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the table's owner route (#19629): through the Hub a task's diff is the computer owner's alone
+		return
+	}
 	project := urlParam(r, "project")
 	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil {
