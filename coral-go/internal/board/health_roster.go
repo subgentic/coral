@@ -18,6 +18,51 @@ func (s *Store) SleepingSubscribers(ctx context.Context, project string) (map[st
 	return s.asleepSubscribers(ctx, project, false)
 }
 
+// ArchivedSubscribers is the set of subscriber ids on project that are Archived (#19673): their session is archived, or it ended and was not started again. They stay on the team but are no one for the
+// health check to chase (no "asleep with unread", no "offline"), as for a notification or a task. Empty when the sessions database is not attached.
+func (s *Store) ArchivedSubscribers(ctx context.Context, project string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if s.sessionsDB == nil {
+		return out, nil
+	}
+	var subs []struct {
+		SubscriberID string  `db:"subscriber_id"`
+		SessionName  *string `db:"session_name"`
+	}
+	if err := s.reader().SelectContext(ctx, &subs, `SELECT subscriber_id, session_name FROM board_subscribers WHERE project = ? AND is_active = 1`, project); err != nil {
+		return nil, err
+	}
+	byID := map[string][]string{}
+	var uuids []string
+	for _, sub := range subs {
+		if sub.SessionName == nil || strings.TrimSpace(*sub.SessionName) == "" {
+			continue
+		}
+		id := naming.SessionIDFromName(*sub.SessionName)
+		if _, seen := byID[id]; !seen {
+			uuids = append(uuids, id)
+		}
+		byID[id] = append(byID[id], sub.SubscriberID)
+	}
+	for start := 0; start < len(uuids); start += idChunkSize {
+		chunk := uuids[start:min(start+idChunkSize, len(uuids))]
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
+		}
+		var gone []string
+		if err := s.sessionsDB.SelectContext(ctx, &gone, `SELECT session_id FROM live_sessions WHERE (is_archived = 1 OR (status = 'inactive' AND stopped_at IS NOT NULL)) AND session_id IN (`+placeholders(len(chunk))+`)`, args...); err != nil {
+			return nil, err
+		}
+		for _, id := range gone {
+			for _, sub := range byID[id] {
+				out[sub] = true
+			}
+		}
+	}
+	return out, nil
+}
+
 // AutoAsleepSubscribers is the set of subscriber ids on project whose session Coral put to sleep for being idle (#12111): auto-asleep, shown as available, and woken by any delivery. They are
 // not in SleepingSubscribers: a person's Sleep is a decision to leave the agent alone, an auto-sleep is not.
 func (s *Store) AutoAsleepSubscribers(ctx context.Context, project string) (map[string]bool, error) {

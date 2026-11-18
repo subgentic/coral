@@ -36,7 +36,7 @@ func (h *checkHarness) sleeping(n int) {
 		db, err := sqlx.Open("sqlite", filepath.Join(h.t.TempDir(), "sessions.db"))
 		require.NoError(h.t, err)
 		h.t.Cleanup(func() { db.Close() })
-		_, err = db.Exec(`CREATE TABLE live_sessions (session_id TEXT PRIMARY KEY, is_sleeping INTEGER NOT NULL DEFAULT 0, sleep_reason TEXT)`)
+		_, err = db.Exec(`CREATE TABLE live_sessions (session_id TEXT PRIMARY KEY, is_sleeping INTEGER NOT NULL DEFAULT 0, sleep_reason TEXT, is_archived INTEGER NOT NULL DEFAULT 0, status TEXT, stopped_at TEXT)`)
 		require.NoError(h.t, err)
 		h.s.SetSessionsDB(db)
 		h.sessions = db
@@ -381,4 +381,29 @@ func TestRosterDoesNotEscalateASleepersWait(t *testing.T) {
 	require.NoError(t, err)
 	h.m.scan(ctx)
 	assert.Equal(t, 1, posted(), "awake and still waiting: it is told")
+}
+
+// #19673: an Archived agent (archived, or ended and not started again) stays on the team and is nobody's to chase: no "asleep with unread", no count.
+func TestAnArchivedAgentIsNotChasedByTheHealthCheck(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Asleep", "Cloud", 2, 0)
+	h.member("Archived", "Cloud", 3, 0)
+	h.member("Ended", "Cloud", 4, 0)
+	for _, n := range []int{2, 3, 4} {
+		h.sleeping(n)
+	}
+	_, err := h.sessions.Exec(`UPDATE live_sessions SET is_archived = 1 WHERE session_id LIKE '00000003%'`)
+	require.NoError(t, err)
+	_, err = h.sessions.Exec(`UPDATE live_sessions SET status = 'inactive', stopped_at = '2026-11-18T10:00:00Z', is_sleeping = 0 WHERE session_id LIKE '00000004%'`)
+	require.NoError(t, err)
+	for _, who := range []string{"Asleep", "Archived", "Ended"} {
+		_, err = h.s.CreateTask(ctx, "team", "Do the thing "+who, "", "medium", "Orchestrator", who)
+		require.NoError(t, err)
+	}
+	out := h.check()
+	assert.Contains(t, out, "Asleep: asleep with 1 task assigned to it not started", "a plain sleeper is still chased")
+	assert.NotContains(t, out, "Archived: asleep", "an archived agent is left alone")
+	assert.NotContains(t, out, "Ended: ", "an ended agent is archived too")
 }

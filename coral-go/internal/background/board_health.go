@@ -214,6 +214,15 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	if err != nil {
 		return "", 0, nil, err
 	}
+	if archived, _ := m.store.ArchivedSubscribers(ctx, project); len(archived) > 0 { // an Archived agent stays on the team and is nobody's to chase (#19673)
+		kept := subs[:0:0]
+		for _, sub := range subs {
+			if !archived[sub.SubscriberID] {
+				kept = append(kept, sub)
+			}
+		}
+		subs = kept
+	}
 	all, err := m.store.ListOpenTaskStates(ctx, project)
 	if err != nil {
 		return "", 0, nil, err
