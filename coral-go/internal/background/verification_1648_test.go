@@ -74,6 +74,7 @@ func TestTask1648_ComprehensiveStartupAndNotificationRetest(t *testing.T) {
 		require.NoError(t, err)
 
 		// Pass: must notify because latestID > seeded latestID!
+		pastTheAllModeFloor(notifier)
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 1, "fresh same-count message arriving after startup must trigger notification")
 		require.Contains(t, rt.sent[0].text, "You have unread messages")
@@ -102,6 +103,7 @@ func TestTask1648_ComprehensiveStartupAndNotificationRetest(t *testing.T) {
 		_, err = bs.PostMessage(ctx, "proj", "Worker", "msg 2", nil)
 		require.NoError(t, err)
 
+		pastTheAllModeFloor(notifier)
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 1, "arrival while unread after startup must trigger nudge")
 		require.Contains(t, rt.sent[0].text, "You have unread messages")

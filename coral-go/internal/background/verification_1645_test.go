@@ -44,6 +44,7 @@ func TestTask1645_ComprehensiveNotifierVerification(t *testing.T) {
 		_, err = bs.PostMessage(ctx, "proj", "Worker", "message B", nil)
 		require.NoError(t, err)
 
+		pastTheAllModeFloor(notifier)
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 2, "nudge 2 sent for message B when A left unread for receive_mode=all")
 		require.Contains(t, rt.sent[1].text, "You have unread messages")
@@ -110,6 +111,7 @@ func TestTask1645_ComprehensiveNotifierVerification(t *testing.T) {
 		require.NoError(t, err)
 
 		// With Lead's #1643 fix, latestID > last.latestID is true, so nudge 2 is delivered!
+		pastTheAllModeFloor(notifier)
 		require.NoError(t, notifier.RunOnce(ctx))
 		require.Len(t, rt.sent, 2, "new batch with same count after read must be notified via latestID watermark")
 	})
@@ -295,6 +297,7 @@ func TestSeedFromDB_NotifiesSubsequentSameCountBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// Run notifier pass
+	pastTheAllModeFloor(notifier)
 	require.NoError(t, notifier.RunOnce(ctx))
 
 	require.Len(t, rt.sent, 1, "fresh same-count arrival after startup must notify")

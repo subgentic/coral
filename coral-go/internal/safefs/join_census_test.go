@@ -209,6 +209,7 @@ var joinSites = map[string]joinEntry{
 	"cmd/coral-board/state.go\tstateFilePath":                                                {1, joinOwn, "the session name goes through hooks.BoardStateFileName, which makes every path separator \"_\""},
 	"cmd/coral-board/task_review.go\tseenRoundsPath":                                         {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"cmd/coral-hook-agentic-state/main.go\tagyStepOutputResult":                              {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
+	"cmd/coral-hook-message-check/main.go\tsaidStatePath":                                    {1, joinOwn, "the session name goes through hooks.BoardStateFileName, which makes every path separator \"_\", after a fixed prefix"},
 	"cmd/coral-hook-message-check/main.go\tloadBoardState":                                   {1, joinOwn, "the session name goes through hooks.BoardStateFileName, which makes every path separator \"_\""},
 	"cmd/coral/password.go\tresetOffline":                                                    {1, joinOwn, "a program-made or constant name in its own folder (mock-agent is a test tool; launch-coral builds names from checked ids)"},
 	"cmd/launch-coral/main.go\tlaunchAgentSessions":                                          {2, joinOwn, "a program-made or constant name in its own folder (mock-agent is a test tool; launch-coral builds names from checked ids)"},

@@ -403,6 +403,10 @@ func (n *BoardNotifier) runPassWithBefore4599(ctx context.Context, boards map[st
 		if last.latestID > 0 && sub.LastReadID >= last.latestID && latestID > last.latestID {
 			newBatch = true
 		}
+		// #19622, the one intended difference from the code before the split: an all-messages subscriber is nudged at most once per floor unless a mention or the Operator's message is waiting.
+		if notified && sub.ReceiveMode == "all" && n.now().Sub(last.at) < allModeNudgeFloor && !n.nudgeUrgent(ctx, sub.Project, subscriberID) {
+			continue
+		}
 		// The reminder window is spread per agent (#3613), so reminders set in one pass, or
 		// seeded at one start, don't all come due together.
 		if notified && !newBatch && (unread <= last.count || sub.ReceiveMode != "all") && n.now().Sub(last.at) < ptymanager.JitterAround(n.remindAfter, sessName) {
