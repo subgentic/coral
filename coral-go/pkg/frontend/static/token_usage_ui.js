@@ -132,4 +132,4 @@ export async function showTeamTokenUsage(boardName) {
     ] }).el);
 }
 
-export const distillTeamKnowledge = (board, sid) => importOnce('./team_knowledge_page.js').then(m => m.distillTeam(board, sid)); // the run starts from the page's own module, loaded when it is asked for (#19560)
+export const distillTeamKnowledge = (b, s) => importOnce('./team_knowledge_page.js').then(m => m.distillTeam(b, s));
