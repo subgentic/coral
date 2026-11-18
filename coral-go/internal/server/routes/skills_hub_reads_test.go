@@ -156,3 +156,13 @@ func TestThroughTheHubARemovedSkillIsItsRowAloneAndAnUnknownIdIs404(t *testing.T
 	code, _ = e.hub("/api/skills?status=bogus", e.ownerHdr)
 	assert.Equal(t, 400, code)
 }
+
+// Security's INFO on #19627: a skill's name is text a publisher wrote, so it goes through the same redaction as the description.
+func TestThroughTheHubASkillNameIsRedactedAsTheDescriptionIs(t *testing.T) {
+	e := newHubSkillEnv(t)
+	row := e.approved("tok-"+hubSkillSecret, "Plain.", 1)
+	code, body := e.hub("/api/skills", e.ownerHdr)
+	require.Equal(t, 200, code)
+	assert.NotContains(t, body, "hunter2hunter2", "a secret in a name does not cross the Hub")
+	_ = row
+}
