@@ -74,6 +74,19 @@ const interleave = texts => texts.flatMap(t => [{ type: 'user', content: OPERATO
         assert.equal(c.pills, 2, 'a streamed pasted notice and a streamed flagged turn are both notices');
         assert.equal(c.bubbles.length, quotes.length + 2, 'only the two operator turns were added as bubbles');
         console.log('   ✓ live append');
+        // 5. #19534: the nudge and the person's typed lines are one turn when the agent was busy: the notice, then their lines as their own bubble (flagged or not, plain or pasted)
+        await ev(`import((window.__coralStatic || '/static/') + 'import_once.js').then(m => m.importOnce('./chat_team_instructions.js')).then(() => true)`); // the chat loads it with the history, before it draws a message (live_history.js)
+        const typed = '1. lets just finish the work in progress there is no rush\n2. close';
+        const mixed = "You have unread messages on the message board. Run 'coral-board read' to see them.\n" + typed;
+        for (const [label, msg] of [['plain', { type: 'user', content: mixed }], ['pasted', { type: 'user', content: wrap(mixed) }], ['flagged', { type: 'user', content: mixed, coral_notice: true }]]) {
+            await fresh();
+            await render([msg]);
+            c = await count();
+            assert.equal(c.pills, 1, `${label}: the nudge is still a notice`);
+            assert.equal(c.bubbles.length, 1, `${label}: the person's lines are a bubble: ${JSON.stringify(c.bubbles)}`);
+            assert.ok(c.bubbles[0].startsWith('lets just finish'), `${label}: the bubble holds what they typed: ${JSON.stringify(c.bubbles)}`);
+        }
+        console.log('   ✓ a nudge with typed lines after it shows the lines');
         console.log('\nPASS Coral notices are never the operator\'s bubbles');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

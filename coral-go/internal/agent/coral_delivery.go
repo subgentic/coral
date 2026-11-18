@@ -13,6 +13,9 @@ func IsCoralDelivery(content string) bool {
 	if text == "" {
 		return false
 	}
+	if _, typed := SplitNudge(content); typed != "" {
+		return false // the nudge and a person's lines in one turn: the turn is the person's (#19534)
+	}
 	for _, re := range coralDeliveryRes {
 		if re.MatchString(text) {
 			return true
@@ -53,4 +56,28 @@ func normalizeDelivery(content string) string {
 		}
 	}
 	return text
+}
+
+// nudgeLeadRe is the board nudge as its own first line, with more lines after it.
+var nudgeLeadRe = regexp.MustCompile(`(?s)^(You have (?:\d+ )?unread messages? on the message board\.(?: Run 'coral-board read' to see them\.)?)[ \t]*\r?\n+(\S.*)$`)
+
+// SplitNudge separates the unread-messages nudge from what a person typed after it (#19534): when the agent was busy, Coral's one-line nudge and the person's typed lines were sent together and are one
+// user turn in the transcript, which was read as a delivery and skipped whole, so the person's words vanished from the chat. typed is "" when the turn is not a nudge followed by more text.
+func SplitNudge(content string) (nudge, typed string) {
+	text := strings.TrimSpace(content)
+	if m := pastedRe.FindStringSubmatch(text); m != nil {
+		text = strings.TrimSpace(m[1])
+	}
+	if m := nudgeLeadRe.FindStringSubmatch(text); m != nil {
+		return m[1], strings.TrimSpace(m[2])
+	}
+	return "", ""
+}
+
+// PersonText is the turn's text without a leading nudge line: what a person typed.
+func PersonText(content string) string {
+	if _, typed := SplitNudge(content); typed != "" {
+		return typed
+	}
+	return content
 }

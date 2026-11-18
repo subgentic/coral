@@ -116,7 +116,7 @@ func (t *goalTranscript) feed(messages []map[string]any) {
 			if agent.IsCoralDelivery(c) {
 				continue // Coral's own nudge, task notice or health check typed into the agent (#10046)
 			}
-			if c = userRequestText(c); c != "" {
+			if c = userRequestText(agent.PersonText(c)); c != "" {
 				t.prevRequest, t.lastRequest = t.lastRequest, truncateRunes(c, 1500)
 			}
 		case "assistant":

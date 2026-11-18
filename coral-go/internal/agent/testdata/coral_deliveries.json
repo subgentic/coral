@@ -32,5 +32,9 @@
   "What does the Stop hook do?",
   "I got: Stop hook feedback: new messages, why?",
   "<pasted_content id=\"1\">fix the failing test</pasted_content id=\"1\">"
+ ],
+ "mixed": [
+  {"text": "You have unread messages on the message board. Run 'coral-board read' to see them.\n1. lets just finish the work in progress there is no rush\n2. close", "typed": "1. lets just finish the work in progress there is no rush\n2. close"},
+  {"text": "You have 2 unread messages on the message board.\nship it", "typed": "ship it"}
  ]
 }
