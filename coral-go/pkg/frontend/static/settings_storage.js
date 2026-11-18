@@ -133,7 +133,7 @@ export async function loadExamples() {
                     showToast('The examples are removed.');
                 } catch (e) { showToast(`Couldn't remove the examples: ${e.message}`, true); }
                 loadExamples();
-                importOnce('./scheduler.js').then(m => m.refreshJobs && m.refreshJobs()).catch(() => {});
+                if (!isCloud()) importOnce('./scheduler.js').then(m => m.refreshJobs && m.refreshJobs()).catch(() => {});
             }, undefined, { label: 'Remove', danger: true }));
         }
     } catch { out.hidden = button.hidden = true; }
