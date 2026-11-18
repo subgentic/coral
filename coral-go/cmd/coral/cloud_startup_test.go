@@ -228,6 +228,7 @@ func TestCloudStartupStepLogsWithoutATerminal(t *testing.T) {
 	assert.Less(t, time.Since(start), 2*time.Second, "returns at once")
 	require.Eventually(t, func() bool { return strings.Contains(logs.String(), "Connected to Coral Hub as build-box") }, 5*time.Second, 10*time.Millisecond, logs.String())
 	assert.Contains(t, logs.String(), "[CLOUD] To connect this server to Coral Hub, open https://app.coralhub.dev/enroll?code=ABCD-EFGH and enter code ABCD-EFGH")
+	assert.NotContains(t, logs.String(), "#p=", "the startup step's log never holds a pairing secret: it makes none")
 	assert.Equal(t, 1, f.connects)
 	for _, c := range f.callList() {
 		assert.NotContains(t, c, "max-mode", "nothing asked or changed without a terminal")

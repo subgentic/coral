@@ -251,6 +251,8 @@ type connectUI struct {
 	ask   bool   // a person is at a terminal: offer a retry, ask for the access mode
 	how   string // how to do it later, for the messages
 	force bool   // --force: forget an existing enrollment here, then enroll again
+	// noSecret: the output goes to a log (the startup step), where the pairing secret must never be. No secret is made, so no `#p=` link; a browser pairing from that code is refused, with a message.
+	noSecret bool
 }
 
 func (u connectUI) prompt(q string) (string, bool) {
@@ -305,8 +307,12 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 	}
 	for {
 		// The pairing secret (wire format section 3): made here, put in the link's fragment (which a browser never sends to the Hub) and handed to this Coral in this one local call. Not in an argument, a file or the status.
-		secret := devicekey.NewPairingSecret()
-		if code := c.call(ctx, http.MethodPost, "/api/cloud/connect", map[string]any{"pairing_secret": secret}, nil, 30*time.Second, &st); code >= 0 {
+		body, frag := map[string]any{}, ""
+		if !ui.noSecret {
+			secret := devicekey.NewPairingSecret()
+			body["pairing_secret"], frag = secret, "#p="+secret
+		}
+		if code := c.call(ctx, http.MethodPost, "/api/cloud/connect", body, nil, 30*time.Second, &st); code >= 0 {
 			if code == 130 {
 				return c.cancelled(ui)
 			}
@@ -317,11 +323,11 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 			return 4
 		}
 		if ui.ask {
-			fmt.Fprintf(ui.out, "\nOpen %s\nYour code %s should already be filled in. Approve it there (from any computer).\n", st.VerificationURL+"#p="+secret, st.UserCode)
+			fmt.Fprintf(ui.out, "\nOpen %s\nYour code %s should already be filled in. Approve it there (from any computer).\n", st.VerificationURL+frag, st.UserCode)
 			fmt.Fprintln(ui.out, "\nWaiting for you to approve… (Ctrl-C to cancel)")
 		} else {
 			// One line, for a log or a script (#3285).
-			fmt.Fprintf(ui.out, "To connect this server to Coral Hub, open %s and enter code %s\n", st.VerificationURL+"#p="+secret, st.UserCode)
+			fmt.Fprintf(ui.out, "To connect this server to Coral Hub, open %s and enter code %s\n", st.VerificationURL+frag, st.UserCode)
 		}
 		st, code = c.waitEnrollment(ctx)
 		switch {
