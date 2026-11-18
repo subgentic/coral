@@ -542,7 +542,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-folded .inbox-kind-row .inbox-review-item > .inbox-review-name { min-width: 0; } /* a narrow row (a phone, an item cell about 130 px wide): the file name's 44 px minimum width, the sender, the gaps and the kind icon no longer fit on one line, so the name wrapped to a line of its own and the row grew; with no minimum the name takes what is left and is cut with an ellipsis, as it was with no icon (#13144, measured: the row is 77 px with or without the icon) */
 .dt-folded .inbox-review-item { flex-wrap: wrap; }
 .dt-folded .inbox-review-item > .inbox-review-name { flex: 1 1 0; }
-.inbox-needs-results tr:has(.inbox-review-item) .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
+.inbox-needs-results .dt-subtitle { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; margin-top: 2px; }
 
 /* A column with nothing in it on any row is not drawn (#9846): its head and its cells; the header draws it again when a row has a value. */
 .dt-table .dt-col-unused, .dt-table .dt-col-tight { display: none; }
@@ -651,11 +651,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-kind > .inbox-answers { grid-column: 1 / -1; grid-row: 2; padding-left: 0; }
 .dt-mail-kind > .dt-mail-extra { grid-column: 2 / -1; grid-row: 2; padding: 0 12px 8px 0; }
 .dt-mail-kind > .dt-mail-extra ~ .inbox-answers { grid-row: 3; }
-.material-icons.inbox-kind-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 2rem; height: 2rem; margin: 0; border-radius: var(--radius-lg); font-size: var(--needs-icon-size); line-height: 1; color: var(--needs-icon-indigo-fg); background: var(--needs-icon-indigo-bg); }
-.inbox-kind-icon[data-kind="review"] { color: var(--needs-icon-green-fg); background: var(--needs-icon-green-bg); }
-.inbox-kind-icon[data-kind="proposal"], .inbox-kind-icon[data-kind="goal_done"] { color: var(--needs-icon-purple-fg); background: var(--needs-icon-purple-bg); }
-.inbox-kind-icon[data-kind="permission"], .inbox-kind-icon[data-kind="run"] { color: var(--needs-icon-amber-fg); background: var(--needs-icon-amber-bg); }
-.inbox-kind-icon[data-kind="other"], .inbox-kind-icon[data-kind="ask"], .inbox-kind-icon[data-kind="welcome"] { color: var(--needs-icon-blue-fg); background: var(--needs-icon-blue-bg); }
+.material-icons.inbox-kind-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 2rem; height: 2rem; margin: 0; font-size: var(--needs-icon-size); line-height: 1; color: var(--text-secondary); background: transparent; }
+@media (max-width: 760px) { .material-icons.inbox-kind-icon { width: 40px; height: 40px; } }
 @media (forced-colors: active) { .material-icons.inbox-kind-icon { color: CanvasText; background: Canvas; outline: 1px solid CanvasText; } }
 .inbox-kind-icon::before { content: 'help_outline'; }
 .inbox-kind-icon[data-kind="permission"]::before { content: 'lock'; }
@@ -751,3 +748,5 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 
 :is(.dt-primary, .dt-link, .dt-mail-open)[data-goal-id]::before { content: '#' attr(data-goal-id) ' '; color: var(--text-secondary); } /* the number agents write in 'goal #3' (#15245): drawn from the element's data-goal-id, so the name's own text is unchanged */
 .dt-row:hover .dt-reveal, .dt-row:focus-within .dt-reveal { opacity: 1; } /* a control that shows on its row's hover or focus (the Agents table's Details link, #15857) */
+
+.inbox-needs-results .dt-table .inbox-goal-task .dt-link { color: inherit; font: inherit; text-decoration: underline; min-height: 0; height: auto; padding: 0; display: inline; }

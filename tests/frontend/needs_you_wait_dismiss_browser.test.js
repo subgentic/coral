@@ -28,13 +28,14 @@ const BASE = require('./test_base').BASE;
         await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')); true`);
         const rowOf = who => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(who)}))`;
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, 'the four rows', 10000);
+        const dismissVia = async words => { await ev(`(${rowOf(words)}).querySelector('.inbox-row-more-toggle').click(); true`); await waitFor(`!!(${rowOf(words)}).querySelector('.inbox-row-more [role=menuitem]:not([hidden])') && !(${rowOf(words)}).querySelector('.inbox-row-more .menu[hidden]')`, 'the row\'s menu opens', 4000); await ev(`[...(${rowOf(words)}).querySelectorAll('.inbox-row-more [role=menuitem]')].find(b => b.textContent.trim() === 'Dismiss').click(); true`); }; // N5 (#17451): Dismiss is in the kebab
         const dismissOf = who => ev(`!!(${rowOf(who)} || document.body).querySelector('.inbox-dismiss')`);
         for (const [who, words] of [['inputter', 'Needs input: pick a colour'], ['signer', 'Sign in to continue'], ['sleeper', 'Wants to know: which font'], ['permit', 'Wants to run: npm test']]) {
             assert.ok(await ev(`!!(${rowOf(words)})`), `${who}: its row is listed`);
-            assert.ok(await ev(`!!(${rowOf(words)}).querySelector('.inbox-dismiss')`), `${who}: its row has a Dismiss`);
+            assert.ok(await ev(`!!(${rowOf(words)}).querySelector('.inbox-row-more-toggle')`), `${who}: its row has a Dismiss (in its kebab, #17451 N5)`);
         }
         // an input prompt: hidden here, nothing sent, the count follows, and it stays hidden when the list is drawn again
-        await ev(`${`(${rowOf('Needs input: pick a colour')})`}.querySelector('.inbox-dismiss').click(); true`);
+        await dismissVia('Needs input: pick a colour');
         await waitFor(`!!(${rowOf('Needs input: pick a colour')})?.querySelector('.inbox-open-agent')`, 'the input wait remains reachable', 6000);
         assert.equal(await waiting(), 4, 'the active wait stays counted');
         await ev(`window.T.render.renderLiveSessions(window.T.state.liveSessions); true`);
@@ -44,14 +45,14 @@ const BASE = require('./test_base').BASE;
         await ev(`Object.assign(window.T.state.liveSessions.find(s => s.session_id === 'inputter-id'), { waiting_since: '2026-11-02T02:00:00Z', waiting_summary: 'Needs input: and the size?', wait_ignored: false }); true`); // the machine names the request: a new one is not the hidden one
         assert.equal(await waiting(), 4, 'a later request of the same agent is not hidden by it');
         // a sign-in, and a request asked before the agent went to sleep
-        await ev(`(${rowOf('Sign in to continue')}).querySelector('.inbox-dismiss').click(); true`);
+        await dismissVia('Sign in to continue');
         await waitFor(`!!(${rowOf('Sign in to continue')})?.querySelector('.inbox-open-agent')`, 'sign-in remains reachable', 6000);
-        await ev(`(${rowOf('Wants to know: which font')}).querySelector('.inbox-dismiss').click(); true`);
+        await dismissVia('Wants to know: which font');
         await waitFor(`!(${rowOf('Wants to know: which font')})`, 'the asked-before row is gone', 6000);
         assert.equal(await waiting(), 3, 'only the sleeping request leaves the count');
         assert.deepEqual(await ev(`window.__posts.map(p => p.body.session_id)`), ['inputter-id', 'signer-id'], 'the sleeping agent\'s request is hidden in this browser: nothing was asked of the machine for it');
         // a permission on an awake agent still clears Coral's record of the wait
-        await ev(`(${rowOf('Wants to run: npm test')}).querySelector('.inbox-dismiss').click(); true`);
+        await dismissVia('Wants to run: npm test');
         await waitFor(`window.__posts.length === 3`, 'the permission Dismiss goes to the machine', 6000);
         assert.deepEqual(await ev(`window.__posts.slice(-1).map(p => p.body)`), [{ session_id: 'permit-id', agent_type: 'claude' }]);
         console.log('PASS active waits stay reachable after Dismiss; a dismissed sleeping request leaves Needs you');

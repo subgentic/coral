@@ -1,0 +1,5 @@
+/* The measured Needs-you strip and its compact replacement share one visible control. */
+.inbox-kind-strip[hidden], .inbox-kind-control[hidden] { display: none !important; }
+.inbox-folder-toolbar .inbox-kind-control { display: inline-flex; flex: none; margin: 0; padding: 0; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .inbox-kind-strip,
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-kind-strip { display: flex; flex-wrap: nowrap; flex: none; width: max-content; }

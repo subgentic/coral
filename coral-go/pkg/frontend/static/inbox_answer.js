@@ -16,6 +16,8 @@ import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('inbox_answer.css'); // the step line's rules (#11981) are a sheet of their own: not in the start's stylesheet, and here before any step is drawn
 const { canDismissWait, dismissButton, dismissWait, canRemoveWait, removeWait, REMOVE_WAIT_LINE } = await importOnce('./dismiss_wait.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
+const { shortWait, WAIT_LIMIT_MS } = await importOnce('./waiting_text.js');
+const mk = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, ...(text ? { textContent: text } : {}) });
 importOnce('./inbox_row_keys.js'); // the arrow keys between the rows of Needs you (#17226)
 
 const MAX_CHOICES = 4;
@@ -241,7 +243,7 @@ const stillArming = b => !!b._armEntry && Date.now() < b._armEntry.at;
 
 const lastRead = new Map(); // `server:session` -> the last question read for that agent: a row drawn again for a new reading shows these choices until the new one is in, so its Yes is never gone in between (#15309)
 /** Draws the choices into the cell once they are read (again after a question changed). */
-function fill(s, cell, withDismiss = true) {
+function fill(s, cell, withDismiss = true, primaryOpen = false) {
     const key = askKey(s), who = `${sessionServer(s)}:${s.session_id}`;
     const fresh = read.has(key);
     if (!fresh) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false, unreadable: false })).then(r => { lastRead.set(who, r); return r; }));
@@ -288,7 +290,8 @@ function fill(s, cell, withDismiss = true) {
             note.append('Folder: ', path, '. Yes adds this folder to Claude’s own trust list.');
             cell.append(note);
         }
-        for (const o of picks) {
+        const shown = picks.length > 3 ? picks.slice(0, 2) : picks; // N5 (#19247): more than three choices: the first two, then More choices, which opens the agent
+        for (const o of shown) {
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn btn-small inbox-answer'; b.textContent = o.label.length > 500 ? `${o.label.slice(0, 499).trimEnd()}\u2026` : o.label; b.title = o.label; // the whole label is the title and the name; only after 500 characters is the words cut (#14574)
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
@@ -300,6 +303,7 @@ function fill(s, cell, withDismiss = true) {
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }
+        if (shown !== picks) { const m = document.createElement('button'); m.type = 'button'; m.className = 'btn btn-small inbox-more-choices'; m.textContent = 'More choices'; m.setAttribute('aria-label', `More choices: open ${resolveSessionIdentity(s)} to see all ${picks.length}`); m.addEventListener('click', e => { e.stopPropagation(); openAgent(s); }); m.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }); cell.append(m); }
         gate?.apply();
         if (held) { const more = document.createElement('span'); more.className = 'inbox-only-reject'; more.textContent = trustWhy ? `Folder trust is unavailable here. ${trustWhy} Open the agent to review it.` : 'More choices: open the agent.'; cell.append(more);
             if (typeof trustWhy === 'string') { const r = document.createElement('button'); r.type = 'button'; r.className = 'btn btn-small inbox-review-trust'; r.textContent = 'Review and trust'; r.setAttribute('aria-label', `Review and trust the folder of ${resolveSessionIdentity(s)}`); // the full card in a dialog over the Inbox, with Yes, I trust this folder (#15090; the row keeps #14110's rule)
@@ -310,7 +314,7 @@ function fill(s, cell, withDismiss = true) {
             note.className = unreadable ? 'inbox-only-reject inbox-unread' : 'inbox-only-reject';
             const t = autoBlockAt ? new Date(autoBlockAt) : null, at = t && !Number.isNaN(t.getTime()) ? t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
             note.textContent = unreadable ? UNREAD_ROW : `It can only be rejected here. Open the agent to read it${at ? `; Claude Code blocks it on its own at ${at}` : ''}.`;
-            const o = document.createElement('button'); o.type = 'button'; o.className = unreadable ? 'btn btn-primary btn-small inbox-open-agent' : 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
+            const o = document.createElement('button'); o.type = 'button'; o.className = unreadable && primaryOpen ? 'btn btn-primary btn-small inbox-open-agent' : 'btn btn-small inbox-open-agent'; o.textContent = 'Open agent';
             o.setAttribute('aria-label', `Open ${resolveSessionIdentity(s)} to ${unreadable ? 'answer' : 'read the request'}`);
             o.addEventListener('click', e => { e.stopPropagation(); openAgent(s); });
             o.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
@@ -349,7 +353,7 @@ export function rowActions(s) {
 }
 
 /** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. `dismiss: false` leaves the Dismiss to the row's ⋯ menu (a phone's). */
-export function answerCell(s, { dismiss = true } = {}) {
+export function answerCell(s, { dismiss = true, primaryOpen = false } = {}) {
     if (s.waiting_for_input && waitIgnored(s) && !s.sleeping && !s.archived) {
         const cell = document.createElement('span'); cell.className = 'inbox-answers';
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small inbox-open-agent'; button.textContent = 'Open agent';
@@ -382,6 +386,36 @@ export function answerCell(s, { dismiss = true } = {}) {
     }
     const cell = document.createElement('span');
     cell.className = 'inbox-answers';
-    fill(s, cell, dismiss);
+    fill(s, cell, dismiss, primaryOpen);
     return cell;
+}
+
+/** N5 (#17451): an agent's prompt keeps its choices where Answer sits; Dismiss is in the row's kebab, like every other row's. answer, more and name are the list's own (the Inbox passes them in: this lazy file does not import the list). */
+export function promptCell(s, answer, more, name, phone) {
+    const acts = rowActions(s);
+    if (phone || !acts.length || acts[0].label !== 'Dismiss') return answer(s); // a phone has its own ⋯; Remove from Needs you (an ignored wait) stays a button
+    const cell = answer(s, { dismiss: false }), box = mk('span', 'inbox-answers-with-more'); box.append(...(cell ? [cell] : []), more(acts, name(s))); // beside the answers, not in them: they are drawn again when the choices are read
+    return box;
+}
+export const promptCanSelect = s => !!(!(s.review || s.autorun || s.proposal || s.goalDone || s.skillReview || s.operatorAsk || s.unrecorded || s.welcome) && s.agent_type && s.waiting_for_input && canDismissWait(s, s.waiting_kind));
+export const promptDismiss = s => dismissWait(s, null);
+
+/** N7 (#17451): the wait is grey and short ("2 h"); the amber triangle only past the limit (a day), and the words say so too (never colour alone). */
+export function waitingCell(s, hidden, byAgent) {
+    const t = hidden ? '' : shortWait(s.waiting_since); if (!t) return t;
+    const late = !byAgent && Date.now() - Date.parse(s.waiting_since) >= WAIT_LIMIT_MS, span = mk('span', late ? 'inbox-age inbox-age-late' : 'inbox-age');
+    span.append(...(late ? [mk('span', 'material-icons inbox-age-flag', 'warning')] : []), mk('span', 'inbox-age-t', t), mk('span', 'sr-only', late ? ' waiting, late' : ' waiting'));
+    if (late) span.firstChild.setAttribute('aria-hidden', 'true');
+    return span;
+}
+
+/** N3 (#19247): a row's goal and task as ONE grey line under its text: two links, the goal first, each opening in the Inbox. `link` and `go` come from the list, so this file never imports it. */
+export function goalTaskLine(s, link, go, team) {
+    const g = s.goal && s.goal.id && s.goal.title ? s.goal : null, t = s.task && s.task.id ? s.task : null;
+    if (!team || (!g && !t)) return null;
+    const box = mk('span', 'inbox-goal-task');
+    if (g) { const l = link(String(g.title), () => go({ view: 'inbox-goals', sub: 'goals', id: team, item: Number(g.id) })); l.setAttribute('aria-label', `Goal: ${g.title}`); l.dataset.goalId = String(g.id); l.title = `Goal: ${g.title}`; box.append(l); }
+    if (g && t) box.append(mk('span', 'inbox-goal-task-sep', ' \u00b7 '));
+    if (t) { const l = link(String(t.title || `Task #${t.id}`), () => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: t.id })); l.setAttribute('aria-label', `Task: ${t.title || '#' + t.id}`); l.dataset.taskId = String(t.id); l.title = `Task: ${t.title || '#' + t.id}`; box.append(l); }
+    return box;
 }

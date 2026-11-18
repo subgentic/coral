@@ -37,9 +37,6 @@
 #group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; }
 
 
-.inbox-age { display: inline-block; padding: 1px 8px; border-radius: var(--radius-xl); border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap; } /* the age pill (#16576): neutral under 1 hour */
-.inbox-age-amber { color: var(--warning-text); border-color: var(--warning-text); } /* from 1 hour */
-.inbox-age-red { color: var(--error-text); border-color: var(--error-text); } /* from 1 day */
 
 /* The collapsed Inbox rail: one icon per folder with its count, in place of the agents' avatars (#15347) */
 .sidebar-rail-inbox { display: none; }
@@ -86,3 +83,16 @@
 
 /* An opened question (#16680): its points and choices each on a line of their own (the words carry the breaks), and a line of words no wider than about 90 characters. */
 .inbox-ask-words, .inbox-agent-ask > .inbox-ask-whole { display: block; white-space: pre-line; max-width: 90ch; }
+/* Needs you's header in two rows (#17450, N2): row one is the title, the count and More; row two is the search, the strip and the Filters icon. The strip wraps inside its own row, so it is never cut. */
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) { flex-wrap: wrap; row-gap: 8px; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-folder-head { order: 0; flex: 1 1 calc(100% - 5rem); max-width: none; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .needs-more { order: 1; flex: none; margin-left: auto; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > :not(.inbox-folder-head, .needs-more) { order: 2; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .team-tb-pills { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; overflow: visible; }
+@media (max-width: 639px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { #group-table-view[data-group^="hub-inbox"] .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-folder-head { flex: 1 1 calc(100% - 5rem); } } /* the phone rule above gives the title the whole row: keep More beside it */
+@media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:has(.needs-more):not(:has(.team-toolbar-selecting)) { padding-bottom: calc(var(--tb-bar-h) + 16px); } } /* the selection bar is row three, under the title row and the search row (#15540): its room is kept while nothing is ticked, so the list does not move (#15339) */
+
+.inbox-age { color: var(--text-muted); white-space: nowrap; } .inbox-age-late { color: var(--warning-text); display: inline-flex; align-items: center; gap: 4px; } .inbox-age-flag { font-size: var(--fs-xl); } /* the wait (#17451, N7): grey and short; past the limit an amber triangle goes with it */.inbox-answers-with-more { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+/* N3 (#19247): a Needs you row's text is at most two lines; its goal and task are one grey line */
+.inbox-goal-task { display: block; contain: inline-size; min-width: 0; max-width: 100%; color: var(--text-muted); font-size: var(--table-tertiary-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

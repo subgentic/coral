@@ -51,7 +51,7 @@ const AGENTS = [
             await shot(`inbox-mail-needs-${w}`);
             assert.equal(r.length, 2, at + 'two mail rows ' + JSON.stringify(r));
             for (const x of r) {
-                assert.ok(x.leadW >= 44 && x.lead >= 44 && x.avatar === 32, at + 'a 44 px target around a 32 px avatar ' + JSON.stringify(x));
+                assert.ok(x.leadW >= 44 && x.lead >= 44 && x.avatar === 40, at + 'a 44 px target around the shared 40 px Needs you kind icon (#17453) ' + JSON.stringify(x));
                 assert.ok(x.open && x.dot && x.bold >= 600, at + 'a button, the amber dot, the title bold ' + JSON.stringify(x));
                 assert.ok(x.h === 56 && x.sameLine && !x.ask && x.snippet.trim(), at + 'Needs you is one line, 56 px like Tasks and Saved: the agent, then what it asks (#9986, the operator: Gmail-like one-line rows) ' + JSON.stringify(x));
                 assert.ok(x.timeRight <= (x.more ? 16 + 44 : 16) && /ago|min|\d/.test(x.time), at + 'the time is at the right (a row with a ⋯ keeps its 44 px: #137104) ' + JSON.stringify(x));

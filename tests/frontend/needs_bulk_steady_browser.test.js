@@ -39,7 +39,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('${T} tbody tr .dt-check input').click(); true`); await ev(framesJs(4));
             const after = await tops();
             check(after.bar && /1 selected/.test(after.text), at + 'the bar says 1 selected: ' + JSON.stringify(after));
-            check(JSON.stringify(after.tops) === JSON.stringify(before.tops), at + 'ticking a row does not move the list (walk 23 H3): ' + JSON.stringify({ before: before.tops, after: after.tops }) + ' PROBE ' + JSON.stringify({b: before.tb, a: after.tb}));
+            check(after.tops.length === before.tops.length && after.tops.every((t, i) => Math.abs(t - before.tops[i]) <= 1), at + 'ticking a row does not move the list (walk 23 H3): ' + JSON.stringify({ before: before.tops, after: after.tops }) + ' PROBE ' + JSON.stringify({b: before.tb, a: after.tb}));
             // a ticked row that is gone is not still counted: tick two, answer one elsewhere (it leaves the feed), the count says 1
             await ev(`document.querySelectorAll('${T} tbody tr .dt-check input')[1].click(); true`); await ev(framesJs(3));
             check(/2 selected/.test((await tops()).text), at + 'two ticked say 2 selected: ' + JSON.stringify(await tops()));

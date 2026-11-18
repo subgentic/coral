@@ -60,10 +60,10 @@ export function askFull(a) {
 /** The whole question, hidden characters written out, line breaks kept. */
 export const askWhole = a => markHidden(a && a.text, { strict: true });
 /** Whether the row's preview leaves words out: the question runs past the preview (#14617). */
-export const askIsLong = a => String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN;
+export const askIsLong = a => String((a && a.text) == null ? '' : a.text).length > PREVIEW_IN || /^```[^\n]*\n/m.test(String(a?.text || ''));
 /** The question as an opened row says it (#14617): ALL the words the Operator's list carries (up to 4096 characters), white space collapsed as the preview's is; a question the server itself cut says so after it. */
-export function askOpened(a) {
-    const one = listsOf(byLines(withoutOperator(plainMarkdown(askWhole(a))))); // the question's own lines kept; points and choices on lines of their own (#16680)
+export function askOpened(a, { code = false } = {}) {
+    const one = code ? askWhole(a) : listsOf(byLines(withoutOperator(plainMarkdown(askWhole(a)))));
     return (a && a.cut ? `${one} \u2026 (cut: the board has the rest)` : one) + duplicateSources(a);
 }
 /** A stable id of one question among the rows. */
