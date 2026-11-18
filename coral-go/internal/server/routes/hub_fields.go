@@ -120,12 +120,26 @@ var (
 	hubWfList hubShape = func(m map[string]any) map[string]any {
 		return project(m, map[string]keepAs{"workflows": each(hubWorkflow)})
 	}
-	hubWfOne     hubShape = hubWorkflow
-	hubRunOne    hubShape = hubRun
-	hubErrorBody hubShape = func(m map[string]any) map[string]any {
-		return project(m, map[string]keepAs{"error": same, "code": same})
-	}
+	hubWfOne  hubShape = hubWorkflow
+	hubRunOne hubShape = hubRun
 )
+
+// hubErrorBody is an error reply through the tunnel: its status, a fixed sentence for that status and, when the reply had one, its code if it is a plain word. The handlers' own text is never passed on:
+// several of these reads send err.Error() (a database or path message) or echo a name from the request (#19583).
+func hubErrorBody(status int, m map[string]any) map[string]any {
+	text := "Something went wrong reading this through Coral Hub"
+	switch {
+	case status == http.StatusNotFound:
+		text = "Not found"
+	case status >= 400 && status < 500:
+		text = "The request was not accepted"
+	}
+	out := map[string]any{"error": text}
+	if c, ok := m["code"].(string); ok && hubWord.MatchString(c) {
+		out["code"] = c
+	}
+	return out
+}
 
 // holdingWriter keeps a handler's reply so it can be cut before it is sent.
 type holdingWriter struct {
@@ -169,11 +183,10 @@ func HubFields(shape hubShape) func(http.Handler) http.Handler {
 				errInternalServer(w, "Not shown through Coral Hub")
 				return
 			}
-			use := shape
+			out := shape(decoded)
 			if hw.code >= 300 {
-				use = hubErrorBody
+				out = hubErrorBody(hw.code, decoded)
 			}
-			out := use(decoded)
 			w.Header().Set("Content-Type", "application/json")
 			if v := hw.h.Get("Cache-Control"); v != "" {
 				w.Header().Set("Cache-Control", v)
