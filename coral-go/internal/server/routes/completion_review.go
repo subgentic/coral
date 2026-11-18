@@ -60,7 +60,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if h.bs.InReviewByAuthor(r.Context(), project, id, body.SubscriberID) { // the author's new revision while the task is in review (#18336): same review tasks, next round
-		h.submitNewRevisionInReview(w, r, project, id, body.SubscriberID, body.Message, body.Outcome, body.Reason, body.Artifacts, body.ExpectedRevision, body.CandidateRevision)
+		h.submitNewRevisionInReview(w, r, project, id, body.SubscriberID, body.Message, body.Outcome, body.Reason, body.Artifacts, body.ExpectedRevision, body.CandidateRevision, body.Head)
 		return
 	}
 	vetted := h.vetTaskArtifacts(r, project, body.Artifacts)
@@ -329,10 +329,10 @@ func (h *BoardHandler) ReleaseCompletionReview(w http.ResponseWriter, r *http.Re
 }
 
 // submitNewRevisionInReview records the author's new revision of a task in review and tells the reviewers that the earlier one is superseded (#18336).
-func (h *BoardHandler) submitNewRevisionInReview(w http.ResponseWriter, r *http.Request, project string, id int64, author, message, outcome, reason string, artifacts []board.TaskArtifact, expectedRevision *int, candidateRevision string) {
+func (h *BoardHandler) submitNewRevisionInReview(w http.ResponseWriter, r *http.Request, project string, id int64, author, message, outcome, reason string, artifacts []board.TaskArtifact, expectedRevision *int, candidateRevision, head string) {
 	ctx := r.Context()
 	vetted := h.vetTaskArtifacts(r, project, artifacts)
-	orch, reopened, err := h.bs.NewRevisionInReview(ctx, project, id, author, message, outcome, reason, artifacts, expectedRevision, candidateRevision)
+	orch, reopened, err := h.bs.NewRevisionInReviewAtHead(ctx, project, id, author, message, outcome, reason, artifacts, expectedRevision, candidateRevision, head)
 	if err != nil {
 		if strings.Contains(err.Error(), "revision") {
 			errConflict(w, err.Error())

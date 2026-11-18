@@ -24,6 +24,15 @@ func (s *Store) InReviewByAuthor(ctx context.Context, project string, id int64, 
 // and the open round's reviewers (when one is open) get the next round on the SAME review tasks, each pending again, so the old revision is superseded. The task stays in review with the orchestrator.
 // reopened is nil when no round is open yet (the review waits for the orchestrator or the pool): the new evidence is what they will read. orch is who holds the task.
 func (s *Store) NewRevisionInReview(ctx context.Context, project string, id int64, actor, message, outcome, reason string, artifacts []TaskArtifact, expectedRevision *int, candidateRevision string) (orch string, reopened *ReviewRound, err error) {
+	return s.NewRevisionInReviewAtHead(ctx, project, id, actor, message, outcome, reason, artifacts, expectedRevision, candidateRevision, "")
+}
+
+// NewRevisionInReviewAtHead is that with the commit the author names ("" for none): it replaces the head recorded at the first submit, so the author can correct a wrong one (#19685).
+func (s *Store) NewRevisionInReviewAtHead(ctx context.Context, project string, id int64, actor, message, outcome, reason string, artifacts []TaskArtifact, expectedRevision *int, candidateRevision, head string) (orch string, reopened *ReviewRound, err error) {
+	head = strings.TrimSpace(head)
+	if head != "" && !commitHead.MatchString(head) {
+		return "", nil, fmt.Errorf("head must be a commit id: 7 to 64 hex characters (got %q)", clipHead(head))
+	}
 	if strings.TrimSpace(reason) == "" || len(reason) > 4096 || len(message) > 65536 {
 		return "", nil, fmt.Errorf("a review reason is required (maximum 4096 characters); message maximum is 65536")
 	}
@@ -73,6 +82,9 @@ func (s *Store) NewRevisionInReview(ctx context.Context, project string, id int6
 	n := len(w.ReviewRounds)
 	if row.Status != "review_pending" || w.CompletionReview == nil || !SameIdentity(w.OriginalAuthor, actor) || (n > 0 && w.ReviewRounds[n-1].Result != "") {
 		return "", nil, fmt.Errorf("task #%d changed while the revision was being sent: it is no longer in review with you", id)
+	}
+	if head != "" {
+		w.SubmittedHead = head
 	}
 	w.CompletionReview = &CompletionReview{SubmittedBy: actor, SubmittedAt: nowUTC(), Message: message, ProposedOutcome: outcome, Reason: reason, Artifacts: artifacts, CandidateRevision: candidateRevision, GateResults: gateResults,
 		ReleasedBy: "Coral", ReleasedAt: nowUTC(), ReleaseReason: "a new revision was submitted while the task was in review"}

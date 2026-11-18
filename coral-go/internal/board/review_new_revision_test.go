@@ -53,3 +53,27 @@ func TestANewRevisionIsRefusedFromAnyoneButTheAuthorOrOnceTheRoundHasConcluded(t
 	_, _, err = s.NewRevisionInReview(ctx, "team", parent, "Dev", "x", "", "too late", nil, nil, "")
 	require.Error(t, err, "an approved round is not reopened by a new revision")
 }
+
+// #19685: a new revision sent while the task is in review records the commit it names, replacing the one first submitted (which a wrong folder could have made the shared checkout's); a malformed one is refused and nothing changes; none named keeps the one on record.
+func TestANewRevisionInReviewRecordsTheHeadItNames(t *testing.T) {
+	s, parent, _, _ := reviewToReassign(t)
+	ctx := t.Context()
+	head := func() string {
+		task, err := s.GetTask(ctx, "team", parent)
+		require.NoError(t, err)
+		return task.Workflow.SubmittedHead
+	}
+	first := head() // the head the fixture's first submit recorded, whatever it is
+
+	_, _, err := s.NewRevisionInReviewAtHead(ctx, "team", parent, "Dev", "rework", "", "wrong folder", nil, nil, "", "not a commit")
+	require.Error(t, err, "a word that is not a commit id is refused")
+	assert.Equal(t, first, head(), "nothing changed")
+
+	_, _, err = s.NewRevisionInReviewAtHead(ctx, "team", parent, "Dev", "rework", "", "right commit", nil, nil, "", "11879ab80414151ca73db468b1649b437bd9ecb5")
+	require.NoError(t, err)
+	assert.Equal(t, "11879ab80414151ca73db468b1649b437bd9ecb5", head(), "the named head wins")
+
+	_, _, err = s.NewRevisionInReviewAtHead(ctx, "team", parent, "Dev", "again", "", "no head named", nil, nil, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, "11879ab80414151ca73db468b1649b437bd9ecb5", head(), "no head named keeps the one on record")
+}
