@@ -69,6 +69,9 @@ func TestASingleLaunchGetsTheOrchestratorModelOnlyWhereItTakesTheSeat(t *testing
 	r := seatRig(t)
 	launch := func(name, boardID string, client *http.Client, tok string) []string {
 		before := len(r.term.sentCommands())
+		if boardID != "" {
+			name = name + " " + nextHelperName() // a team's names are unique (#19673)
+		}
 		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": name}
 		if boardID != "" {
 			body["board_id"] = boardID

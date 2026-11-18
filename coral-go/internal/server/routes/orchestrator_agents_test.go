@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -487,8 +488,15 @@ func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 	ctx := context.Background()
 	r.usualBoard()
 	work := r.work
+	launched := 0
 	launch := func(who, boardName string) (int, map[string]any) {
-		b, _ := json.Marshal(map[string]any{"working_dir": work, "agent_type": "claude", "board_id": boardName, "display_name": "Helper"})
+		// a team's names are unique, so every launch after the first names its helper (the name rule, #19673)
+		launched++
+		name := "Helper"
+		if launched > 1 {
+			name = fmt.Sprintf("Helper%d", launched)
+		}
+		b, _ := json.Marshal(map[string]any{"working_dir": work, "agent_type": "claude", "board_id": boardName, "display_name": name})
 		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok[who])
 	}
 	// the switch is off (no grant row is off, #19138): an agent's launch is refused and nothing is started or logged

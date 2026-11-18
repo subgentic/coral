@@ -182,7 +182,7 @@ func TestAnAgentsLaunchStaysInTheTeamsFolder(t *testing.T) {
 		t.Skip("no symlinks here:", err)
 	}
 	launch := func(dir string, client *http.Client, tok string) (int, map[string]any) {
-		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": "Helper"})
+		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": nextHelperName()})
 		return r.do("POST", "/api/sessions/launch", string(b), client, tok)
 	}
 	code, out := launch(inside, nil, r.tok["Dev2"])
@@ -211,7 +211,7 @@ func TestTheFolderRuleDoesNotApplyWhereTheGrantIsOffOrAbsent(t *testing.T) {
 	r.usualBoard() // no grant row
 	// a launched helper's folder becomes one of the team's, so each step names a folder of its own
 	launch := func(dir string) (int, map[string]any) {
-		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": "Helper"})
+		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": nextHelperName()})
 		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok["Dev2"])
 	}
 	code, out := launch(t.TempDir())
@@ -246,7 +246,7 @@ func TestASiblingWorktreeOfTheTeamsRepoIsTheTeamsFolder(t *testing.T) {
 	code, _ := r.operatorGrant("Orchestrator", nil)
 	require.Equal(t, http.StatusOK, code)
 	launch := func(dir string) (int, map[string]any) {
-		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": "Helper"})
+		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": nextHelperName()})
 		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok["Dev3"])
 	}
 	code, out := launch(sibling)
@@ -271,7 +271,7 @@ func TestAnAgentsLaunchWithNoBoardGoesOntoItsOwnTeamWhereTheGrantIsOn(t *testing
 	ctx := context.Background()
 	r.usualBoard() // Orchestrator and Dev2 awake, Dev asleep
 	launch := func(extra map[string]any) (int, map[string]any) {
-		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": "Helper"}
+		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": nextHelperName()}
 		for k, v := range extra {
 			body[k] = v
 		}
@@ -332,7 +332,7 @@ func TestEverySpellingOfSomewhereElseIsHeldToTheCallersTeam(t *testing.T) {
 	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_live": 3, "max_per_hour": 50})
 	require.Equal(t, http.StatusOK, code)
 	launch := func(extra map[string]any) (int, map[string]any) {
-		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": "Helper"}
+		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": nextHelperName()}
 		for k, v := range extra {
 			body[k] = v
 		}

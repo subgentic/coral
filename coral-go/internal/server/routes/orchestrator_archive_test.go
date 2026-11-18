@@ -1,6 +1,10 @@
 package routes
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http/httptest"
+	"sync/atomic"
 	"time"
 
 	"context"
@@ -122,3 +126,44 @@ func TestStopRefusesAnAgentThatWaitsOnThePerson(t *testing.T) {
 	assert.Equal(t, "waiting_for_the_person", out["code"])
 	assert.False(t, r.archived("Dev2"))
 }
+
+// #19673: names are unique in a team, archived agents included.
+func TestALaunchWithATeamMembersNameIsRefusedWithTheChoices(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	require.NoError(t, r.ss.SetSessionArchived(ctx, r.sid["Dev"], true))
+
+	for _, name := range []string{"Dev", "dev", " DEV "} { // case and spacing do not make another name
+		w := httptest.NewRecorder()
+		assert.True(t, r.h.refuseMemberName(w, ctx, orchBoard, name, ""), name)
+		assert.Equal(t, http.StatusConflict, w.Code)
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+		assert.Equal(t, "name_archived", out["code"], name)
+		assert.Equal(t, "Dev", out["member"])
+		assert.Equal(t, r.sid["Dev"], out["session_id"], "Start it is the wake route on this session")
+		assert.Equal(t, "Dev 2", out["suggested_name"])
+	}
+
+	w := httptest.NewRecorder() // an awake member's name is taken: its own refusal, not an upsert
+	assert.True(t, r.h.refuseMemberName(w, ctx, orchBoard, "Dev2", ""))
+	assert.Contains(t, w.Body.String(), "name_taken")
+
+	w = httptest.NewRecorder() // the member asking from its own session is not in conflict with itself (a restart, its own Start)
+	assert.False(t, r.h.refuseMemberName(w, ctx, orchBoard, "Dev", naming.SessionName("claude", r.sid["Dev"])))
+	w = httptest.NewRecorder()
+	assert.False(t, r.h.refuseMemberName(w, ctx, orchBoard, "Somebody New", ""))
+	w = httptest.NewRecorder()
+	assert.False(t, r.h.refuseMemberName(w, ctx, "another-team", "Dev", ""), "another team's name is another name")
+
+	// the launch route itself
+	code, out := r.do("POST", "/api/sessions/launch", `{"working_dir":"`+r.work+`","agent_type":"claude","display_name":"Dev","board_id":"`+orchBoard+`"}`, nil, r.tok["Orchestrator"])
+	assert.Equal(t, http.StatusConflict, code, "%v", out)
+	assert.Equal(t, "name_archived", out["code"])
+}
+
+var helperSeq atomic.Int64
+
+// nextHelperName gives each launch in a test a name of its own: a team's names are unique, archived members included (#19673).
+func nextHelperName() string { return fmt.Sprintf("Helper %d", helperSeq.Add(1)) }

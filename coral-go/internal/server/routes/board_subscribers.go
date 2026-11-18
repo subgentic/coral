@@ -112,6 +112,9 @@ func (h *BoardHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if h.nameRule != nil && h.nameRule(w, r.Context(), project, subscriberID, body.SessionName) { // names are unique in a team, archived agents included (#19673)
+		return
+	}
 	sub, err := h.bs.Join(r.Context(), project, subscriberID, body.JobTitle, body.SessionName, nil, body.ReceiveMode) // keeps a launch record a re-join cannot carry (#11759)
 	if err != nil {
 		errInternalServer(w, err.Error())
