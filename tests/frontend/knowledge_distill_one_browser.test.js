@@ -63,10 +63,10 @@ const TEAM = `qa-distill-one-${Date.now() % 100000}`;
             const row = sid => `document.querySelector('#live-sessions-list li[data-session-id="${sid}"]')`;
             const menu = async sid => { await waitFor(`!!${row(sid)}`, 'the row of ' + sid, 8000); await ev(`${row(sid)}.querySelector('.sidebar-kebab-btn').click(); true`); await waitFor(`!!${row(sid)}.querySelector('[data-on-click="agent-info"]')`, 'the row menu', 6000);
                 return ev(`[...${row(sid)}.querySelectorAll('.sidebar-kebab-menu [data-on-click]')].map(b => b.dataset.onClick)`); };
-            assert.ok((await menu('sid-solo')).every(a => a !== 'agent-distill'), w + ': an agent on no team has no Distill knowledge in its menu');
+            assert.ok((await menu('sid-solo')).every(a => a !== 'team-distill'), w + ': an agent on no team has no Distill knowledge in its menu');
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
-            assert.ok((await menu('sid-1')).includes('agent-distill'), w + ': an agent on the team has Distill knowledge in its menu');
-            await ev(`${row('sid-1')}.querySelector('[data-on-click="agent-distill"]').click(); true`);
+            assert.ok((await menu('sid-1')).includes('team-distill'), w + ': an agent on the team has Distill knowledge in its menu');
+            await ev(`${row('sid-1')}.querySelector('[data-on-click="team-distill"]').click(); true`);
             await waitFor(`window.__posts === 3`, 'the run from the menu', 8000);
             assert.equal(await ev('window.__bodies[2]'), JSON.stringify({ session_id: 'sid-1' }), 'the menu entry starts a run for that agent');
         }
