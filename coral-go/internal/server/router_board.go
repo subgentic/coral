@@ -55,6 +55,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetLiveSessionLookup(routes.LiveSessionLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetSessionAsleepLookup(routes.SessionAsleepLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetChangeWords(sessHandler.ChangeRequestWords)
+	boardHandler.SetNameRule(sessHandler.RefuseMemberName)
 	boardHandler.SetMemberNameLookup(routes.MemberDisplayNames(s.boardStore, store.NewSessionStore(s.db))) // @<new name> of an agent renamed in the dashboard reaches it; its rows say the new name (#17421)
 	boardHandler.SetMemberRestLookup(routes.MemberRestLookup(s.boardStore, store.NewSessionStore(s.db)))   // a post to an agent that will not read it now says so (#13189)
 	boardHandler.SetNeedsYouAgents(sessHandler.NeedsYouAgents)
@@ -183,6 +184,7 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/sleep", sessHandler.OrchestratorSleep)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/restart", sessHandler.OrchestratorRestart)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/stop", sessHandler.OrchestratorStop)
+		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/interrupt", sessHandler.OrchestratorInterrupt)
 	})
 
 	// These work without an open board, so they stay outside the board group (#4924): team

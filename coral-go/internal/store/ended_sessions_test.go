@@ -48,3 +48,38 @@ func TestEndedSessionsOnBoardAreTheEndedAndNotStartedAgain(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, none)
 }
+
+// #19696: Start brings an ended agent back by making its row a sleeping one; a name that is running again on the board is not taken from it, and a row that did not end is left alone.
+func TestReviveEndedSessionMakesAnEndedRowSleepingAndKeepsNamesUnique(t *testing.T) {
+	ss := autoSleepStore(t)
+	ctx := context.Background()
+	board := "revive-board"
+	reg := func(id, name string) {
+		t.Helper()
+		n, b := name, board
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: "claude", AgentName: "proj", DisplayName: &n, WorkingDir: "/tmp/p", BoardName: &b}))
+	}
+	reg("r-dev", "Dev")
+	reg("r-qa-old", "QA")
+	reg("r-qa-new", "QA") // QA was started again
+	reg("r-live", "Live") // never ended
+	for _, id := range []string{"r-dev", "r-qa-old"} {
+		require.NoError(t, ss.UnregisterLiveSession(ctx, id))
+	}
+
+	ok, err := ss.ReviveEndedSession(ctx, "r-dev")
+	require.NoError(t, err)
+	require.True(t, ok)
+	ls, err := ss.GetLiveSession(ctx, "r-dev")
+	require.NoError(t, err)
+	require.Equal(t, "active", ls.Status)
+	require.Equal(t, 1, ls.IsSleeping, "a sleeper a Start wakes")
+	require.Nil(t, ls.StoppedAt)
+
+	ok, err = ss.ReviveEndedSession(ctx, "r-qa-old")
+	require.NoError(t, err)
+	require.False(t, ok, "another QA runs on the board: its name is not taken from it")
+	ok, err = ss.ReviveEndedSession(ctx, "r-live")
+	require.NoError(t, err)
+	require.False(t, ok, "a row that did not end is left alone")
+}

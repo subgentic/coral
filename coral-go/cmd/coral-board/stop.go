@@ -15,8 +15,9 @@ import (
 
 const stopUsageText = `Usage: coral-board stop <member> [--board <project>]
 
-  Stop an agent's current turn (the same as the red Stop in its composer: the agent reads "Interrupted" and waits with its conversation; it is not put to sleep).
-  An agent that is idle or asleep gets a plain sentence, not an error.
+  Stop an agent: its session ends and it is archived. It stays with the team (name, role, tasks and history), leaves the Agents list, and no longer gets nudges or tasks; coral-board wake <member> starts it
+  again, coral-board sleep <member> turns it into a sleeping agent. A working agent is cut off with its session. To end only the current turn use coral-board interrupt <member>.
+  An agent already archived gets a plain sentence. The Orchestrator itself and the team's last Orchestrator are refused, and so is an agent that waits for a person's answer or sits at a dialog.
 
   Only the board's Orchestrator, and only while BOTH the main orchestrator switch AND the separate "stop" setting are on in the board's orchestrator grant: any other caller, either switch off, is refused
   with the server's reason.`
@@ -69,5 +70,5 @@ func cmdStop() {
 		fmt.Println(clitext.Clean(out.Note))
 		return
 	}
-	fmt.Printf("Stopped %s's turn.\n", who)
+	fmt.Printf("Stopped %s: its session ended and it is archived (coral-board wake %q starts it again).\n", who, who)
 }

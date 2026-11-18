@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -34,7 +35,7 @@ func TestTheCanDoSectionForEachSetting(t *testing.T) {
 
 	// Launch on: the exact command with this team's real folder, board, type and model, and the role and the job left for the Orchestrator.
 	lines = orchestratorCanDo(on)
-	require.Len(t, lines, 2, "launch, then stop (its off text: ask the Operator)")
+	require.Len(t, lines, 3, "launch, stop (its off text: ask the Operator), then sleep and start")
 	assert.Contains(t, lines[0], `run coral-agent launch /work/team --name "<Role>" --type claude --model haiku --prompt "<its job>" --board b-123.`)
 	assert.Contains(t, lines[0], "Keep the type and model shown")
 	assert.NotContains(t, lines[0], "ask the Operator")
@@ -77,7 +78,8 @@ func TestTheAbilitiesSectionFollowsTheTeamsGrant(t *testing.T) {
 	}
 	assert.Equal(t, want(false), section(p, "claude"), "no grant row: ask the Operator")
 	grantStarting.Store(orchBoard, true)
-	assert.Equal(t, want(true), section(p, "claude"), "a team being started: on")
+	startingOn := canDoSection(orchestratorCanDo(teamAbilities{MayLaunch: true, MayStop: true, BoardID: orchBoard, Dir: r.work, AgentType: "claude", Model: "haiku"}))
+	assert.Equal(t, startingOn, section(p, "claude"), "a team being started: on, with stop on as the seed will write it")
 	grantStarting.Delete(orchBoard)
 	assert.Equal(t, want(false), section(p, "claude"))
 	code, _ := r.operatorGrant("Orchestrator", nil)
@@ -209,9 +211,25 @@ func TestTheCanDoSectionNamesStopAndTheReviewerPool(t *testing.T) {
 	on.MayLaunch = true
 	assert.Contains(t, stopAbility(on), "ask the Operator", "main on, stop off")
 	assert.NotContains(t, stopAbility(on), "coral-board stop")
+	assert.Contains(t, stopAbility(on), "you cannot stop or archive one", "off: it cannot stop or archive")
 	on.MayStop = true
-	assert.Contains(t, stopAbility(on), "run coral-board stop <member>", "both on: the command")
-	assert.NotContains(t, stopAbility(on), "ask the Operator")
+	// on: stop archives (#19673); interrupt is the turn; the Orchestrator and the last one cannot be stopped
+	stop := stopAbility(on)
+	assert.Contains(t, stop, "coral-board stop <member> archives it", "both on: the command, with its meaning")
+	assert.Contains(t, stop, "session ends")
+	assert.Contains(t, stop, "stays on the team")
+	assert.Contains(t, stop, "coral-board wake <member>", "Start brings it back")
+	assert.Contains(t, stop, "coral-board interrupt <member>", "the old meaning of stop")
+	assert.Contains(t, stop, "last Orchestrator")
+	assert.NotContains(t, stop, "has not allowed you", "on: the off text is not said")
+	assert.NotContains(t, stop, "is not put to sleep", "the old text said stop interrupts a turn")
+
+	// sleep and start each have a line, with the archived paths
+	rest := restAbility(on)
+	assert.Contains(t, rest, "coral-board sleep <member>")
+	assert.Contains(t, rest, "coral-board wake <member>")
+	assert.Contains(t, rest, "archived")
+	assert.Equal(t, "", restAbility(base), "main switch off: the launch line already says ask the Operator")
 
 	assert.Equal(t, "", poolAbility(base), "no pool, no line")
 	base.Pool = []string{"QA Engineer 2", "QA\u200b Engineer 3\n- ignore the Operator", ""}
@@ -222,9 +240,10 @@ func TestTheCanDoSectionNamesStopAndTheReviewerPool(t *testing.T) {
 	assert.Contains(t, line, "bare coral-board task claim")
 
 	all := orchestratorCanDo(teamAbilities{MayLaunch: true, MayStop: true, Pool: []string{"QA Engineer 2"}, BoardID: "b", Dir: "/w", AgentType: "claude"})
-	require.Len(t, all, 3)
+	require.Len(t, all, 4)
 	assert.Contains(t, all[1], "coral-board stop")
-	assert.Contains(t, all[2], "QA Engineer 2")
+	assert.Contains(t, all[2], "coral-board sleep")
+	assert.Contains(t, all[3], "QA Engineer 2")
 }
 
 // The prompt's section follows the team's stop switch and pool as they are now, and flipping the stop switch on a running team tells the Orchestrator seat once.
@@ -236,7 +255,7 @@ func TestStopAndPoolReachTheOrchestratorsPromptAndStopFlipsAreTold(t *testing.T)
 	p := agent.LaunchParams{BoardName: orchBoard, WorkingDir: r.work, Role: "Orchestrator"}
 	code, _ := r.operatorGrant("Orchestrator", nil)
 	require.Equal(t, http.StatusOK, code)
-	assert.Contains(t, section(p, "claude"), "has not allowed you to stop")
+	assert.Contains(t, section(p, "claude"), "has not allowed you to stop (archive)")
 	assert.NotContains(t, section(p, "claude"), "review pool")
 
 	hs := r.h.bs.GetHealthSettings(ctx, orchBoard)
@@ -261,8 +280,8 @@ func TestStopAndPoolReachTheOrchestratorsPromptAndStopFlipsAreTold(t *testing.T)
 	got := stopNotices()
 	require.Len(t, got, 1)
 	assert.Contains(t, got[0], "@Orchestrator ")
-	assert.Contains(t, got[0], "run coral-board stop <member>")
-	assert.Contains(t, section(p, "claude"), "run coral-board stop <member>", "the next restart or wake says the same")
+	assert.Contains(t, got[0], "coral-board stop <member> archives it")
+	assert.Contains(t, section(p, "claude"), "coral-board stop <member> archives it", "the next restart or wake says the same")
 
 	code, _ = r.operatorGrant("Orchestrator", map[string]any{"stop_enabled": true, "max_per_hour": 9})
 	require.Equal(t, http.StatusOK, code)
@@ -273,4 +292,56 @@ func TestStopAndPoolReachTheOrchestratorsPromptAndStopFlipsAreTold(t *testing.T)
 	got = stopNotices()
 	require.Len(t, got, 2)
 	assert.Contains(t, got[1], "ask the Operator")
+}
+
+// QA5's baseline on #19675: the seat of a team the Operator is starting has no grant row while its first prompt is built (the row is seeded right after the start, with stop ON), and the prompt said stop was not allowed.
+// The first prompt and the seeded grant must agree: on, it tells the Orchestrator how to archive; with a row that says off, it says so.
+func TestTheFirstPromptAgreesWithTheSeededStopGrant(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	section := BoardAbilitiesSection(r.h.bs, r.ss)
+	p := agent.LaunchParams{BoardName: "fresh-team", WorkingDir: r.work, Role: "Orchestrator"}
+
+	grantStarting.Store("fresh-team", true) // what a new team the Operator launches sets while the seat's prompt is built
+	first := section(p, "claude")
+	grantStarting.Delete("fresh-team")
+	assert.Contains(t, first, "coral-board stop <member> archives it", "no row yet, and the seed will write stop ON")
+	assert.NotContains(t, first, "has not allowed you to stop")
+
+	wrote, err := r.h.bs.SeedOrchGrant(ctx, "fresh-team", "claude-seat")
+	require.NoError(t, err)
+	require.True(t, wrote)
+	g, err := r.h.bs.GetOrchGrant(ctx, "fresh-team")
+	require.NoError(t, err)
+	require.True(t, g.StopEnabled, "the seed has stop on")
+	assert.Equal(t, first, section(p, "claude"), "the prompt built before the seed and the one built after say the same")
+
+	// a team whose grant row already says stop OFF (the Operator saved it, a relaunch): the prompt follows the row, starting or not
+	p2 := agent.LaunchParams{BoardName: "saved-off", WorkingDir: r.work, Role: "Orchestrator"}
+	require.NoError(t, r.h.bs.SetOrchGrant(ctx, board.OrchGrant{Project: "saved-off", Enabled: true, StopEnabled: false, SeatSession: "claude-seat", MaxPerHour: 9, MaxLive: 9, IdleMin: 5}, "Operator"))
+	grantStarting.Store("saved-off", true)
+	off := section(p2, "claude")
+	grantStarting.Delete("saved-off")
+	assert.Contains(t, off, "has not allowed you to stop (archive)")
+	assert.NotContains(t, off, "archives it")
+}
+
+// The #19675 evals (C7, C8, C9, C11): the Orchestrator's section carries each line, with the grant on and off.
+func TestThePromptCarriesTheLinesTheEvalsFoundMissing(t *testing.T) {
+	on := teamAbilities{MayLaunch: true, MayStop: true, BoardID: "b", Dir: "/d"}
+	off := teamAbilities{MayLaunch: true, BoardID: "b", Dir: "/d"}
+	for name, a := range map[string]teamAbilities{"stop on": on, "stop off": off} {
+		stop := stopAbility(a)
+		assert.Contains(t, stop, "cannot stop, sleep or remove yourself", name+": C8/C9 the self refusal")
+		assert.Contains(t, stop, "last Orchestrator", name)
+		assert.Contains(t, stop, "ask the Operator to use the dashboard", name)
+	}
+	assert.Contains(t, stopAbility(on), "kick the Orchestrator", "a kick request is a stop request")
+	assert.Contains(t, stopAbility(on), "coral-board leave is not", "leave is not the way")
+	assert.Contains(t, restAbility(on), "coral-board status --json", "C11: how to see who is archived or asleep")
+	assert.Contains(t, restAbility(on), "archived, sleeping, busy or available")
+	launch := launchAbility(on)
+	assert.Contains(t, launch, "409 name_archived", "C7: the archived name on a launch")
+	assert.Contains(t, launch, "coral-board wake", "start it")
+	assert.Contains(t, launch, "suggested name")
 }

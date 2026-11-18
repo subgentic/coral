@@ -24,6 +24,9 @@ func insideAnAgent() bool { return os.Getenv("CORAL_SESSION_TOKEN") != "" }
 
 var errOperatorOnly = fmt.Errorf("this is the Operator's command: run it in your own terminal, outside an agent")
 
+// errLeaveAsOperatorOnly names the way for an Orchestrator (#19673): removing a seat is the Operator's, but an agent can be taken off the team's list with coral-board stop.
+var errLeaveAsOperatorOnly = fmt.Errorf("removing a member's seat is the Operator's command: run it in your own terminal, outside an agent. To take an agent off the team's active list and keep it (name, tasks, history), the Orchestrator can use: coral-board stop <member> (when the Operator's grant allows it); coral-board wake <member> starts it again")
+
 // runSeats is `coral-board seats --foreign [--json]`: the seats of agents that were launched on another board than the one they sit on, with the command that removes each.
 func runSeats(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("seats", flag.ContinueOnError)
@@ -87,7 +90,7 @@ func runLeaveAs(args []string, out io.Writer) error {
 		return fmt.Errorf("usage: coral-board leave --board <board> --as <name>  (the Operator removes the seat <name> from <board>)")
 	}
 	if insideAnAgent() {
-		return errOperatorOnly
+		return errLeaveAsOperatorOnly
 	}
 	data, status, err := apiCallRawAt("/api/board", "DELETE", "/"+url.PathEscape(*board)+"/seats/"+url.PathEscape(*as), nil, 10*time.Second)
 	if err != nil {

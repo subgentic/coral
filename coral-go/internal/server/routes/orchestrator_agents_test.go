@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -62,6 +63,10 @@ func newOrchRig(t *testing.T) *orchRig {
 	rt.Post("/api/board/{project}/agents/{subscriber}/sleep", h.OrchestratorSleep)
 	rt.Post("/api/board/{project}/agents/{subscriber}/restart", h.OrchestratorRestart)
 	rt.Post("/api/board/{project}/agents/{subscriber}/stop", h.OrchestratorStop)
+	rt.Post("/api/board/{project}/agents/{subscriber}/interrupt", h.OrchestratorInterrupt)
+	rt.Post("/api/sessions/live/{sessionID}/wake", h.WakeSession)
+	rt.Post("/api/sessions/live/{sessionID}/sleep", h.SleepSession)
+	rt.Post("/api/sessions/live/{sessionID}/archive", h.ArchiveSession)
 	rt.Post("/api/sessions/launch", h.Launch)
 	rt.Post("/api/sessions/launch-team", h.LaunchTeam)
 	own := httptest.NewServer(rt)
@@ -486,8 +491,15 @@ func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 	ctx := context.Background()
 	r.usualBoard()
 	work := r.work
+	launched := 0
 	launch := func(who, boardName string) (int, map[string]any) {
-		b, _ := json.Marshal(map[string]any{"working_dir": work, "agent_type": "claude", "board_id": boardName, "display_name": "Helper"})
+		// a team's names are unique, so every launch after the first names its helper (the name rule, #19673)
+		launched++
+		name := "Helper"
+		if launched > 1 {
+			name = fmt.Sprintf("Helper%d", launched)
+		}
+		b, _ := json.Marshal(map[string]any{"working_dir": work, "agent_type": "claude", "board_id": boardName, "display_name": name})
 		return r.do("POST", "/api/sessions/launch", string(b), nil, r.tok[who])
 	}
 	// the switch is off (no grant row is off, #19138): an agent's launch is refused and nothing is started or logged
@@ -801,19 +813,19 @@ func TestStopRefusesNonAgentsAndSendsEscapeToAWorkingClaude(t *testing.T) {
 		"an unknown name": {"Orchestrator", "Nobody", "no_such_agent"},
 		"the Operator":    {"Orchestrator", "Operator", "bad_target"},
 	} {
-		code, out := r.agentPost(c.who, "stop", c.target, "")
+		code, out := r.agentPost(c.who, "interrupt", c.target, "")
 		assert.GreaterOrEqual(t, code, 400, name)
 		assert.Equal(t, c.want, out["code"], name)
 	}
 
 	// a sleeping agent: OK with stopped=false
-	code, out := r.agentPost("Orchestrator", "stop", "Dev", "")
+	code, out := r.agentPost("Orchestrator", "interrupt", "Dev", "")
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, false, out["stopped"])
 	assert.Contains(t, out["note"], "asleep")
 
 	// an idle (awake, no events) agent: OK with stopped=false
-	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, out = r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, false, out["stopped"])
 	assert.Contains(t, out["note"], "not working")
@@ -823,7 +835,7 @@ func TestStopRefusesNonAgentsAndSendsEscapeToAWorkingClaude(t *testing.T) {
 	bash := "Bash"
 	_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-5 * time.Second).Format(store.ISOFormat)})
 	require.NoError(t, err)
-	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, out = r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, true, out["stopped"])
 	assert.Equal(t, "Dev2", out["name"])
@@ -870,7 +882,7 @@ func TestStopSendsCtrlCToAWorkingHermesAgent(t *testing.T) {
 	_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "HermesBot", SessionID: &hSid, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-5 * time.Second).Format(store.ISOFormat)})
 	require.NoError(t, err)
 
-	code, out := r.agentPost("Orchestrator", "stop", "HermesBot", "")
+	code, out := r.agentPost("Orchestrator", "interrupt", "HermesBot", "")
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, true, out["stopped"])
 
@@ -884,7 +896,7 @@ func TestStopIsRefusedWithTheSwitchOff(t *testing.T) {
 	r := newOrchRig(t)
 	r.usualBoard()
 	// no grant: the switch is off
-	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, out := r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	assert.Equal(t, http.StatusForbidden, code)
 	assert.Equal(t, "orchestrator_switch_off", out["code"])
 }
@@ -895,14 +907,14 @@ func TestStopIsRefusedWhenStopNotEnabled(t *testing.T) {
 	code, _ := r.operatorGrant("Orchestrator", nil) // main switch on, stop_enabled defaults to false
 	require.Equal(t, http.StatusOK, code)
 
-	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, out := r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	assert.Equal(t, http.StatusForbidden, code)
 	assert.Equal(t, "stop_not_enabled", out["code"], "stop is off by default even when the main switch is on")
 
 	// Turn stop on: the same request now passes orchSeat and the stop_enabled check.
 	code, _ = r.operatorGrant("Orchestrator", map[string]any{"stop_enabled": true})
 	require.Equal(t, http.StatusOK, code)
-	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, out = r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	assert.Equal(t, http.StatusOK, code, "stop_enabled: true allows the stop")
 	assert.Equal(t, false, out["stopped"], "Dev2 is idle, so stopped=false (not an error)")
 }
@@ -919,7 +931,7 @@ func TestStopRefusesAnAgentAtAPrompt(t *testing.T) {
 	now := time.Now().UTC()
 	_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "permission_request", Summary: "Waiting for the user", CreatedAt: now.Add(-5 * time.Second).Format(store.ISOFormat)})
 	require.NoError(t, err)
-	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, out := r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	assert.Equal(t, http.StatusConflict, code)
 	assert.Equal(t, "waiting_for_the_person", out["code"], "a prompt refuses the stop")
 	assert.Contains(t, out["message"], "dialog by accident", "the refusal says stopping could answer the dialog")
@@ -947,7 +959,7 @@ func TestStopRecordsTouchStopAndUsesHourlyCap(t *testing.T) {
 	_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-5 * time.Second).Format(store.ISOFormat)})
 	require.NoError(t, err)
 
-	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, out := r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, true, out["stopped"])
 
@@ -961,13 +973,13 @@ func TestStopRecordsTouchStopAndUsesHourlyCap(t *testing.T) {
 	// The stop counts toward the hourly cap: make Dev2 working again and stop it.
 	_, err = r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-2 * time.Second).Format(store.ISOFormat)})
 	require.NoError(t, err)
-	code, _ = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, _ = r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	require.Equal(t, http.StatusOK, code)
 
 	// Third stop hits the cap (max_per_hour: 2, two stops already used).
 	_, err = r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: "tool_use", ToolName: &bash, Summary: "Bash", RefID: &bash, CreatedAt: time.Now().UTC().Add(-1 * time.Second).Format(store.ISOFormat)})
 	require.NoError(t, err)
-	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	code, out = r.agentPost("Orchestrator", "interrupt", "Dev2", "")
 	assert.Equal(t, http.StatusTooManyRequests, code, "the hourly cap is reached")
 	assert.Equal(t, "board_hourly_limit", out["code"])
 }

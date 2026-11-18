@@ -30,9 +30,10 @@ func taskClaimNudge(taskID int64) string {
 
 // BoardHandler handles message board HTTP endpoints.
 type BoardHandler struct {
-	countCache  allCountCache    // the cross-team list's answers to a count-only read (#18623)
-	itemsCache  teamItemsCache   // the built list of a team's artifacts, kept for a walk of its pages (#13522)
-	goalDoneNow func() time.Time // the clock of the "Goal looks done" quiet period (#12161); nil is time.Now
+	nameRule    func(w http.ResponseWriter, ctx context.Context, project, name, exceptSessionName string) bool // names are unique in a team, archived agents included (#19673)
+	countCache  allCountCache                                                                                  // the cross-team list's answers to a count-only read (#18623)
+	itemsCache  teamItemsCache                                                                                 // the built list of a team's artifacts, kept for a walk of its pages (#13522)
+	goalDoneNow func() time.Time                                                                               // the clock of the "Goal looks done" quiet period (#12161); nil is time.Now
 	// goalDoneQuiet reads the quiet period (goal_done_quiet_minutes, #12161); nil: 15 minutes.
 	goalDoneQuietFn func(ctx context.Context) time.Duration
 	proposalNow     func() time.Time // a test's clock for the proposal sweeps (expiry and stuck claims); nil is time.Now
@@ -171,6 +172,11 @@ func (h *BoardHandler) SetHubOperatorAllowed(fn func(*http.Request) bool) {
 // SetIdleWaker gives the board the way to wake an auto-asleep agent for a delivery (#12111).
 func (h *BoardHandler) SetIdleWaker(fn func(ctx context.Context, sessionID string) bool) {
 	h.idleWaker = fn
+}
+
+// SetNameRule gives the board the team's name rule (#19673): it answers a refused join itself and returns true.
+func (h *BoardHandler) SetNameRule(fn func(w http.ResponseWriter, ctx context.Context, project, name, exceptSessionName string) bool) {
+	h.nameRule = fn
 }
 
 // SetArchivedSessionLookup tells the board which sessions are archived agents:

@@ -281,6 +281,14 @@ func (h *SessionsHandler) SleepSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if sess.IsArchived == 1 { // Archived -> Sleep -> Sleeping (#19673): the session is already ended, only the flag goes
+		if err := h.ss.SetSessionArchived(ctx, sessionID, false); err != nil {
+			errInternalServer(w, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sleeping": true, "archived": false})
+		return
+	}
 	h.modelSwitches.end(sessionID, "The agent was put to sleep before the change was confirmed.") // #6219
 	h.ss.SetSessionSleeping(ctx, sessionID, true)                                                 // for an agent whose terminal is gone this also clears that reason: it is filed under plain sleeping, resume info kept (#13171)
 	h.stopOpencode(sessionID)
@@ -334,6 +342,7 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session not found"})
 		return
 	}
+	sess = h.startable(ctx, sess) // an ended agent is Archived: Start brings it back (#19696)
 	if sess.IsSleeping != 1 {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session is not sleeping"})
 		return
@@ -402,6 +411,9 @@ func (h *SessionsHandler) ArchiveSession(w http.ResponseWriter, r *http.Request)
 	sess, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || sess == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session not found"})
+		return
+	}
+	if h.refuseArchive(w, ctx, sess) { // a team keeps its last Orchestrator (#19673)
 		return
 	}
 	if sess.IsSleeping != 1 {

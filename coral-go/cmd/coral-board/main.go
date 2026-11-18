@@ -156,6 +156,8 @@ func main() {
 		cmdRestart()
 	case "stop":
 		cmdStop()
+	case "interrupt":
+		cmdInterrupt()
 	case "remind":
 		cmdRemind()
 	case "settings":
@@ -296,6 +298,10 @@ Commands:
                                awake agent of this board to sleep
   stop <member> [--board <project>]
                                The Orchestrator only, with the Operator's grant: stop an
+                               agent: its session ends and it is archived (it stays on the
+                               team; wake starts it again)
+  interrupt <member> [--board <project>]
+                               The Orchestrator only, with the Operator's grant: end an
                                agent's current turn (it reads "Interrupted" and waits)
   remind add|list|show|done|cancel
                                Reminders for an agent: tell it something at a time, once or

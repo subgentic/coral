@@ -542,7 +542,8 @@ func TestAnEndedAgentsRowCarriesTheSessionToResume(t *testing.T) {
 	for _, a := range result.Agents {
 		by[a.Name] = a
 	}
-	require.Equal(t, "offline", by["Lead"].Availability)
+	require.Equal(t, "archived", by["Lead"].Availability, "an ended member is Archived (#19673), not offline")
+	require.Equal(t, "offline", by["Ghost"].Availability, "a member that never had a session stays offline")
 	require.NotNil(t, by["Lead"].EndedSession, "the ended agent names the session a Resume starts from")
 	require.Equal(t, "lead-sid", by["Lead"].EndedSession.SessionID)
 	require.Equal(t, "claude", by["Lead"].EndedSession.AgentType)

@@ -160,7 +160,8 @@ func (h *SessionsHandler) teamAvailabilityUncached(w http.ResponseWriter, r *htt
 				for _, e := range ended {
 					if e.Name == sub.SubscriberID {
 						a.EndedSession = &endedSessionRef{SessionID: e.SessionID, AgentType: e.AgentType}
-						a.Reason = "Ended. Resume it to bring it back."
+						a.Availability, a.Available = "archived", false // Ended is Archived (#19673): the session ended and it was not started again; Start (the wake route) resumes it from EndedSession
+						a.Reason = "Archived. Start it to bring it back."
 						break
 					}
 				}
@@ -406,9 +407,13 @@ func taskStateOf(tasks []availabilityTask, subscriberID string, personal []store
 
 // availabilitySummary counts the agents by availability.
 func availabilitySummary(agents []availableAgent) map[string]int {
+	// archived agents are listed (flagged by availability) but are not counted in total (#19673)
 	summary := map[string]int{"total": len(agents), "available": 0, "busy": 0, "task_idle": 0, "queued": 0, "needs_input": 0, "sleeping": 0, "archived": 0, "offline": 0, "unknown": 0, "unavailable": 0, "waiting": 0}
 	for _, a := range agents {
 		summary[a.Availability]++
+		if a.Availability == "archived" {
+			summary["total"]--
+		}
 	}
 	return summary
 }
