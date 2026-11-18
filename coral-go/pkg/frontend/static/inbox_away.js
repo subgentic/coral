@@ -3,6 +3,7 @@
  * minutes the input before the gap is when they went away. It asks the server once for what happened since then (GET /api/away, this computer's, the person's alone), says it, and keeps it until Dismiss or the next gap.
  * Switched off in Settings > Inbox (inbox_away). It is no item of Needs you and changes no count. Built with textContent only. */
 import { state } from './state.js';
+import { serverFetch, isCloud, LOCAL_SERVER, personalInboxSources, personalInboxAllowed } from './server_base.js';
 import { el } from './dom_el.js';
 import { loadStyles } from './lazy_styles.js';
 import { settingBool } from './settings_core.js';
@@ -49,8 +50,14 @@ function fill(slot) {
     if (asking === from) return;
     asking = from;
     loadStyles('inbox_away.css').catch(() => {});
-    fetch(`/api/away?since=${encodeURIComponent(new Date(from).toISOString())}`).then(r => (r.ok ? r.json() : null)).then(a => {
-        if (!a || typeof a.tasks_done !== 'number') { asking = 0; return; }
+    // On this computer's own dashboard the one server is "local". Through the Hub the page's own origin is the Hub, which has no /api/away: the question goes to each computer the person owns that is online
+    // (as the rest of Needs you does, personalInboxAllowed) and the counts are added (#19645).
+    const servers = isCloud() ? personalInboxSources().map(x => x.id).filter(id => personalInboxAllowed(id)) : [LOCAL_SERVER];
+    const since = encodeURIComponent(new Date(from).toISOString());
+    Promise.all(servers.map(sv => serverFetch(sv, `/api/away?since=${since}`).then(r => (r.ok ? r.json() : null)).catch(() => null))).then(all => {
+        const got = all.filter(a => a && typeof a.tasks_done === 'number');
+        if (!got.length) { asking = 0; return; }
+        const a = { tasks_done: got.reduce((n, x) => n + x.tasks_done, 0), goals_done: got.reduce((n, x) => n + (Number(x.goals_done) || 0), 0) };
         result = { from, text: awayText(a, idleAgents(), Date.now() - from) };
         if (newest && newest.isConnected) draw(newest);
     }).catch(() => { asking = 0; });
