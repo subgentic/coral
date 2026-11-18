@@ -41,8 +41,12 @@ func hubSkillRow(v skillRowView) map[string]any {
 	if r := []rune(desc); len(r) > hubSkillDescMax {
 		desc = string(r[:hubSkillDescMax])
 	}
+	name, ok := redactComment(v.Name)
+	if !ok {
+		name = "" // the redactor is unavailable: no free text goes out
+	}
 	return map[string]any{
-		"id": v.ID, "name": v.Name, "version": v.Version, "description": desc, "status": v.Status,
+		"id": v.ID, "name": name, "version": v.Version, "description": desc, "status": v.Status,
 		"has_scripts": v.HasScripts, "not_reviewable": v.NotReviewable, "file_count": v.FileCount, "created_at": v.CreatedAt, "decided_at": v.DecidedAt,
 	}
 }
