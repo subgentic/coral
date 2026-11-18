@@ -141,10 +141,10 @@ func (s *Store) GetOrchGrant(ctx context.Context, project string) (OrchGrant, er
 	return g, nil
 }
 
-// defaultOrchGrant is the grant of a board with no saved row: on for its one local member titled Orchestrator, else g as it is (off).
+// defaultOrchGrant is the grant of a board with no saved row: on for its one local member the launch made Orchestrator (can_peek, set only by a launch; a title a member joined with is not a seat), else g as it is (off).
 func (s *Store) defaultOrchGrant(ctx context.Context, g OrchGrant) OrchGrant {
 	var seats []string
-	if err := s.reader().SelectContext(ctx, &seats, `SELECT COALESCE(session_name, '') FROM board_subscribers WHERE project = ? AND is_active = 1 AND COALESCE(session_name, '') <> '' AND LOWER(TRIM(job_title)) = 'orchestrator' AND COALESCE(origin_server, '') = ''`, g.Project); err != nil || len(seats) != 1 {
+	if err := s.reader().SelectContext(ctx, &seats, `SELECT COALESCE(session_name, '') FROM board_subscribers WHERE project = ? AND is_active = 1 AND can_peek = 1 AND COALESCE(session_name, '') <> '' AND LOWER(TRIM(job_title)) = 'orchestrator' AND COALESCE(origin_server, '') = ''`, g.Project); err != nil || len(seats) != 1 {
 		return g
 	}
 	id := naming.SessionIDFromName(seats[0])

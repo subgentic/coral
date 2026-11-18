@@ -79,7 +79,7 @@ func (r *orchRig) seat(member, title, boardName, agentType string, sleeping bool
 		ls.IsSleeping = 1
 	}
 	require.NoError(r.t, r.ss.RegisterLiveSession(ctx, ls))
-	_, err := r.h.bs.Subscribe(ctx, boardName, member, title, naming.SessionName(agentType, sid), nil, "all")
+	_, err := r.h.bs.Subscribe(ctx, boardName, member, title, naming.SessionName(agentType, sid), nil, "all", title == "Orchestrator") // a launch gives the Orchestrator seat can_peek (#19516)
 	require.NoError(r.t, err)
 	if !sleeping && agentType != "terminal" {
 		r.term.addSession(naming.SessionName(agentType, sid), "/w")
