@@ -24,6 +24,8 @@ type pairingState struct {
 	mu   sync.Mutex
 	hold *devicekey.SecretHold
 	note string
+	// clearPending: the last clear of the device list failed and none has worked since.
+	clearPending bool
 }
 
 // SetPairingSecret hands the manager the secret the person's `#p=` link carries (22 characters of base64url). It is kept in memory for at most ten minutes, never stored, shown or logged. A secret that is not well formed is dropped: the pairing then has none, and says so.
@@ -77,14 +79,29 @@ func (m *Manager) pairNote() string {
 	return m.pair.note
 }
 
-// clearDeviceKeys makes every device key removed: a new enrollment, or a link lost, is a new account's list (Lead Q1).
-func (m *Manager) clearDeviceKeys(ctx context.Context) {
+// clearDeviceKeys makes every device key removed: a new enrollment, or a link lost, is a new account's list (Lead Q1). It reports whether the list is clear. A failure fails closed: nothing new is written beside the old keys (the callers stop), the failure is remembered, and every later call tries again.
+func (m *Manager) clearDeviceKeys(ctx context.Context) bool {
 	if m.o.Devices == nil {
-		return
+		return true
 	}
 	if _, err := m.o.Devices.RemoveAllDeviceKeys(ctx, m.o.Now()); err != nil {
 		m.o.Logger.Warn("cloud: could not clear the device keys")
+		m.pair.mu.Lock()
+		m.pair.clearPending = true
+		m.pair.mu.Unlock()
+		return false
 	}
+	m.pair.mu.Lock()
+	m.pair.clearPending = false
+	m.pair.mu.Unlock()
+	return true
+}
+
+// deviceClearPending is whether the last clear failed and has not worked since.
+func (m *Manager) deviceClearPending() bool {
+	m.pair.mu.Lock()
+	defer m.pair.mu.Unlock()
+	return m.pair.clearPending
 }
 
 // recordBootstrapDevice writes the device key a credential redeemed with as a `bootstrap` row at the lowest mode: it never approves or raises anything. The key is public.
@@ -110,16 +127,24 @@ const (
 	pairWhyMAC        = "the browser's proof did not match. Pair again from the link `coral cloud connect` prints."
 	pairWhyOther      = "it could not be listed here. Pair again."
 	pairWhyNoReplyKey = "this computer's device key is not available, so Coral could not answer the browser."
+	pairWhyClear      = "this computer could not clear its old device list, so it added nothing. Pair again."
 )
 
 // finishDevicePairing runs after a token is stored. The old list is cleared first (a new enrollment); then, only when the Hub's answer carries a pairing, the check, the listing and the one reply. Nothing is written before the check passes, and the reply is sent once.
 func (m *Manager) finishDevicePairing(ctx context.Context, dc *DeviceCode, en *Enrolled) {
-	m.clearDeviceKeys(ctx)
+	cleared := m.clearDeviceKeys(ctx)
 	hold := m.takeHold()
 	if hold != nil {
 		defer hold.Wipe()
 	}
 	m.setPairNote("")
+	if !cleared {
+		// Fail closed: a pairing is never added beside an earlier account's keys. Only a pairing says so; a plain enrollment has nothing to report.
+		if en.Pairing != nil {
+			m.setPairNote(pairNoteRefused + pairWhyClear)
+		}
+		return
+	}
 	if en.Pairing == nil || m.o.Devices == nil {
 		return
 	}
@@ -138,7 +163,7 @@ func (m *Manager) finishDevicePairing(ctx context.Context, dc *DeviceCode, en *E
 		m.setPairNote(pairNoteRefused + pairWhyNoSecret)
 		return
 	}
-	mode := "launch"
+	mode := "view" // no function: the lowest mode, never launch
 	if m.o.PairedDeviceMode != nil {
 		mode = m.o.PairedDeviceMode()
 	}

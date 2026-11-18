@@ -3,6 +3,7 @@ package devicekey_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -78,4 +79,39 @@ func TestOnlyTheKeyPackageNamesTheKeyFile(t *testing.T) {
 		return nil
 	}))
 	assert.Empty(t, hits)
+}
+
+// coral-hub Security on #19689 (3): nothing copies the data folder, so nothing copies device-computer.key. A guard for the future: a source file that copies or archives a tree (archive/zip, archive/tar, os.CopyFS, a walk) AND names Coral's data folder must be on the list below, each checked by hand to walk only a sub-folder, fix permissions, or archive something that is not the data folder. A new one fails here until someone reads it and either excludes the key or adds it to the list. (Checked on 2026-11-18: no support bundle, export or whole-folder backup exists; the database backups, `VACUUM INTO` of one named database file and `coral db compact`'s backup of sessions.db, copy one database each.)
+func TestNothingThatCopiesTheDataFolderCanTakeTheKeyFile(t *testing.T) {
+	allowed := map[string]string{
+		"internal/background/workflow_runner.go":        "removes workflow run folders",
+		"internal/background/token_poller.go":           "walks the Pi sessions sub-folder",
+		"internal/config/datadir_secure_windows.go":     "fixes permissions",
+		"internal/server/data_perms.go":                 "fixes permissions of named sub-trees",
+		"internal/server/routes/artifacts_store.go":     "walks the artifacts sub-folder",
+		"internal/server/routes/artifact_prune_scan.go": "walks the artifacts sub-folder",
+		"internal/server/routes/skills_publish.go":      "walks a skill's own folder",
+		"internal/updater/apply/linux.go":               "walks the unpacked update",
+		"internal/agent/pi.go":                          "reads the Pi sessions sub-folder",
+		"internal/jsonl/parse_pi.go":                    "reads the Pi sessions sub-folder",
+		"internal/sshprov/install.go":                   "archives Coral's binaries to install them elsewhere",
+	}
+	copier := regexp.MustCompile(`archive/(zip|tar)|os\.CopyFS|filepath\.Walk(Dir)?\(|fs\.WalkDir\(`)
+	names := regexp.MustCompile(`CoralDir\(\)|CORAL_DATA_DIR|dataDir|DataDir`)
+	var unknown []string
+	root := filepath.Join("..", "..")
+	require.NoError(t, filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+			return err
+		}
+		b, _ := os.ReadFile(p)
+		if copier.Match(b) && names.Match(b) {
+			rel := filepath.ToSlash(strings.TrimPrefix(p, root+string(filepath.Separator)))
+			if _, ok := allowed[rel]; !ok {
+				unknown = append(unknown, rel)
+			}
+		}
+		return nil
+	}))
+	assert.Empty(t, unknown, "a file that copies a tree and names the data folder: read it, keep device-computer.key out of what it copies, then list it")
 }

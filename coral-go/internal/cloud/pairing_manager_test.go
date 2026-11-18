@@ -187,3 +187,81 @@ func TestABootstrapEnrollmentClearsTheKeysEvenWithoutADevicePK(t *testing.T) {
 	r.m.afterBootstrap(ctx, BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{DevicePK: newDevicePK(t)})
 	assert.Len(t, r.listed(t), 1, "with a key: cleared, then the new bootstrap row")
 }
+
+// A list that will not clear (the store errors on RemoveAllDeviceKeys) fails closed. Embedded: every other call is the real store.
+type clearFails struct {
+	*store.SessionStore
+	fail bool
+	n    int
+}
+
+func (c *clearFails) RemoveAllDeviceKeys(ctx context.Context, now time.Time) (int, error) {
+	c.n++
+	if c.fail {
+		return 0, fmt.Errorf("disk is full")
+	}
+	return c.SessionStore.RemoveAllDeviceKeys(ctx, now)
+}
+
+// coral-hub Security on #19689 (1): a failed clear adds no new pairing and says so, the old list is not extended, and the next call retries the clear.
+func TestAFailedClearAddsNoPairingAndIsRetriedNextTime(t *testing.T) {
+	r := pairingSetup(t, true)
+	cf := &clearFails{SessionStore: r.ss, fail: true}
+	r.m.o.Devices = cf
+	oldPK := newDevicePK(t)
+	r.m.recordBootstrapDevice(context.Background(), oldPK) // the earlier account's key
+	require.Len(t, r.listed(t), 1)
+
+	r.connect(t)
+	assert.Len(t, r.listed(t), 1, "only the earlier key: the new pairing was not added to a list that would not clear")
+	assert.Contains(t, r.m.Status().DevicePairing, "not added")
+	assert.Contains(t, r.m.Status().DevicePairing, "old device list")
+	assert.Empty(t, r.e.hub.replyBodies(), "no reply is sent for a pairing that was not added")
+
+	// The next enrollment retries the clear, and with it working the pairing goes through.
+	cf.fail = false
+	require.NoError(t, r.m.Disconnect(context.Background()))
+	r.connect(t)
+	assert.GreaterOrEqual(t, cf.n, 2, "retried")
+	l := r.listed(t)
+	require.Len(t, l, 1)
+	assert.Equal(t, r.kid, l[0].KID)
+}
+
+// The same for a bootstrap enrollment: a clear that fails records no bootstrap row beside the old keys.
+func TestABootstrapWhoseClearFailsRecordsNoRow(t *testing.T) {
+	r := pairingSetup(t, true)
+	cf := &clearFails{SessionStore: r.ss, fail: true}
+	r.m.o.Devices = cf
+	r.m.afterBootstrap(context.Background(), BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{DevicePK: newDevicePK(t)})
+	assert.Empty(t, r.listed(t))
+	cf.fail = false
+	r.m.afterBootstrap(context.Background(), BootstrapResult{Status: BootstrapEnrolled}, CredentialSource{DevicePK: newDevicePK(t)})
+	assert.Len(t, r.listed(t), 1, "retried and recorded")
+}
+
+// (2) No PairedDeviceMode function: the lowest mode, never launch.
+func TestNoPairedDeviceModeFunctionGivesView(t *testing.T) {
+	r := pairingSetup(t, true)
+	r.m.o.PairedDeviceMode = nil
+	r.connect(t)
+	l := r.listed(t)
+	require.Len(t, l, 1)
+	assert.Equal(t, "view", l[0].Mode)
+}
+
+// A link lost whose clear fails still ends what it must end (the wipe and the callback), and the next pairing then refuses until a clear works.
+func TestALinkLostWhoseClearFailsStillWipesTheSecretAndFailsClosedAfter(t *testing.T) {
+	r := pairingSetup(t, true)
+	cf := &clearFails{SessionStore: r.ss, fail: true}
+	r.m.o.Devices = cf
+	r.m.SetPairingSecret(r.secret)
+	r.m.recordBootstrapDevice(context.Background(), newDevicePK(t))
+	called := false
+	r.m.o.OnLinkLost = func(context.Context) { called = true }
+	r.m.linkLost(context.Background())
+	assert.True(t, called)
+	assert.False(t, r.m.PairingSecretHeld(), "the secret is wiped whatever the store did")
+	assert.Len(t, r.listed(t), 1, "the stale key could not be removed")
+	assert.True(t, r.m.deviceClearPending(), "and the manager knows: a pairing refuses until a clear works")
+}

@@ -294,7 +294,9 @@ func (m *Manager) afterBootstrap(ctx context.Context, res BootstrapResult, src C
 	if res.Status != BootstrapEnrolled {
 		return
 	}
-	m.clearDeviceKeys(ctx)
+	if !m.clearDeviceKeys(ctx) {
+		return // fail closed: no row beside the old keys; the next clear retries
+	}
 	if src.DevicePK != "" {
 		pk := src.DevicePK
 		m.devicePK.Store(&pk)
