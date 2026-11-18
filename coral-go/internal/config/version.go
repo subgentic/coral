@@ -12,6 +12,10 @@ import (
 // set by the Makefile via ldflags. Release builds set Version and ignore it.
 var DevBase string
 
+// DevCommit and DevDirty are the commit (and "1" for uncommitted changes) the Makefile passes with -X (a dev build only: a release reports Version). Go's own VCS stamp is missing from a build made in a
+// git worktree or a copied tree, so a walk's binary could not prove which commit it was (#17637); a stamp from the Makefile is used when Go's is absent.
+var DevCommit, DevDirty string
+
 var (
 	reportedOnce sync.Once
 	reported     string
@@ -48,18 +52,20 @@ func devVersion(base string, info *debug.BuildInfo) string {
 		}
 	}
 	v := next + "-dev"
-	if info == nil {
-		return v
-	}
 	var rev string
 	var dirty bool
-	for _, s := range info.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			rev = s.Value
-		case "vcs.modified":
-			dirty = s.Value == "true"
+	if info != nil {
+		for _, s := range info.Settings {
+			switch s.Key {
+			case "vcs.revision":
+				rev = s.Value
+			case "vcs.modified":
+				dirty = s.Value == "true"
+			}
 		}
+	}
+	if rev == "" { // Go stamped no commit: the Makefile's, if it gave one
+		rev, dirty = DevCommit, DevDirty == "1"
 	}
 	if len(rev) > 8 {
 		rev = rev[:8]

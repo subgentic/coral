@@ -63,3 +63,18 @@ func TestDevVersionAfterAMajorRelease(t *testing.T) {
 	assert.Equal(t, "10.0.1-dev+8f406dae", devVersion("v10.0.0", buildInfo("vcs.revision", rev)))
 	assert.Equal(t, "1.4.171-dev+8f406dae", devVersion("v1.4.170", buildInfo("vcs.revision", rev)), "the old line is unchanged")
 }
+
+// A build made where Go stamps no commit (a git worktree, a copied tree) still names its commit when the Makefile passed it (#17637).
+func TestDevVersionUsesTheMakefileCommitWhenGoStampedNone(t *testing.T) {
+	oc, od := DevCommit, DevDirty
+	t.Cleanup(func() { DevCommit, DevDirty = oc, od })
+	DevCommit, DevDirty = "8f406daea75d473877f5e9d2bbe6798f77a41ee9", "1"
+	assert.Equal(t, "1.4.2-dev+8f406dae.dirty", devVersion("v1.4.1", buildInfo()))
+	assert.Equal(t, "1.4.2-dev+8f406dae.dirty", devVersion("v1.4.1", nil))
+	DevDirty = ""
+	assert.Equal(t, "1.4.2-dev+8f406dae", devVersion("v1.4.1", buildInfo()))
+	// Go's own stamp wins when it has one
+	assert.Equal(t, "1.4.2-dev+11111111", devVersion("v1.4.1", buildInfo("vcs.revision", "1111111122223333444455556666777788889999")))
+	DevCommit = "not hex"
+	assert.Equal(t, "1.4.2-dev", devVersion("v1.4.1", buildInfo()))
+}
