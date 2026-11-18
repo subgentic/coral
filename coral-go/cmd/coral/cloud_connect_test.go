@@ -419,7 +419,7 @@ func TestCloudConnectInteractive(t *testing.T) {
 	assert.Equal(t, 0, code, errb.String())
 	o := out.String()
 	// No terminal: one line a script or a log can use.
-	assert.Contains(t, o, "To connect this server to Coral Hub, open https://app.coralhub.dev/enroll?code=ABCD-EFGH and enter code ABCD-EFGH\n")
+	assert.Regexp(t, `To connect this server to Coral Hub, open https://app.coralhub.dev/enroll\?code=ABCD-EFGH#p=[A-Za-z0-9_-]{22} and enter code ABCD-EFGH\n`, o)
 	assert.Contains(t, o, "Connected to Coral Hub as build-box.")
 	assert.Contains(t, o, "Coral Hub can view this server")
 	assert.Equal(t, 1, f.connects)

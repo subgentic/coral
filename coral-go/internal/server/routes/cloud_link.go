@@ -13,6 +13,7 @@ import (
 
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/httputil"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
@@ -140,6 +141,9 @@ func (h *CloudHandler) Connect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if ans.pairingSecret != "" {
+		m.SetPairingSecret(ans.pairingSecret)
+	}
 	if err := m.Connect(r.Context()); err != nil {
 		if err == cloud.ErrNotConfigured {
 			errBadRequest(w, err.Error())
@@ -167,6 +171,7 @@ func (h *CloudHandler) Connect(w http.ResponseWriter, r *http.Request) {
 type connectAnswer struct {
 	mode            *tunnel.Mode
 	allowAutoAccept *bool
+	pairingSecret   string // the `#p=` secret `coral cloud connect` made (22 characters); kept in memory by the manager, never shown
 }
 
 // decodeConnectAnswer reads POST /api/cloud/connect's optional body {"mode": "view|interact|launch", "allow_auto_accept": bool}: both fields optional, an empty body or {} is the plain connect the
@@ -176,6 +181,7 @@ func decodeConnectAnswer(r *http.Request) (connectAnswer, error) {
 	var body struct {
 		Mode            *string `json:"mode"`
 		AllowAutoAccept *bool   `json:"allow_auto_accept"`
+		PairingSecret   *string `json:"pairing_secret"`
 	}
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 257))
 	if err != nil || len(raw) > 256 {
@@ -200,6 +206,12 @@ func decodeConnectAnswer(r *http.Request) (connectAnswer, error) {
 		out.mode = &m
 	}
 	out.allowAutoAccept = body.AllowAutoAccept
+	if body.PairingSecret != nil {
+		if _, ok := devicekey.ParsePairingSecret(*body.PairingSecret); !ok {
+			return out, errors.New("pairing_secret is not the 22 characters `coral cloud connect` makes")
+		}
+		out.pairingSecret = *body.PairingSecret
+	}
 	return out, nil
 }
 

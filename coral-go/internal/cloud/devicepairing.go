@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"sync"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/store"
 )
+
+var b64u = base64.RawURLEncoding
 
 // DeviceKeys is the part of the device list the manager writes: the pairing, the bootstrap row and the clearing when the link changes.
 type DeviceKeys interface {
@@ -35,6 +38,14 @@ func (m *Manager) SetPairingSecret(s string) {
 	if ok {
 		m.pair.hold = devicekey.NewSecretHold(raw, m.o.Now())
 	}
+}
+
+// PairingSecretHeld reports whether a live secret is held (tests and the start of a pairing; it says nothing of the value).
+func (m *Manager) PairingSecretHeld() bool {
+	m.pair.mu.Lock()
+	h := m.pair.hold
+	m.pair.mu.Unlock()
+	return h != nil && h.Alive(m.o.Now())
 }
 
 func (m *Manager) takeHold() *devicekey.SecretHold {

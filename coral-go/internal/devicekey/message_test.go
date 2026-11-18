@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/devicekey"
+	"github.com/subgentic/coral/internal/store"
 )
 
 var b64 = base64.RawURLEncoding
@@ -259,4 +260,25 @@ func TestVectorsFile(t *testing.T) {
 			assert.NoError(t, err, v.Name)
 		}
 	}
+}
+
+// QA Engineer 4 (slice 3, INFO): the ts cap. Sixteen digits is the most; 9_999_999_999_999_999 parses and the verifier refuses it as outside the window, a seventeenth digit is a bad form.
+func TestTsCapIsSixteenDigits(t *testing.T) {
+	f := fixture(t)
+	good, _ := f.msg(devicekey.RaiseMode).Canonical()
+	sub := func(ts string) []byte { return []byte(strings.Replace(string(good), `1800000000`, ts, 1)) }
+	m, err := devicekey.Parse(devicekey.RaiseMode, sub("9999999999999999"))
+	require.NoError(t, err)
+	assert.EqualValues(t, int64(9999999999999999), m.Ts)
+	_, err = devicekey.Parse(devicekey.RaiseMode, sub("10000000000000000"))
+	assert.ErrorIs(t, err, devicekey.ErrBadForm)
+}
+
+func TestVerifierRefusesTheLargestTsAsOutsideTheWindow(t *testing.T) {
+	r := newRig(t)
+	target := newSigner(t)
+	r.add(target, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+	m := r.raise(r.signer, target.kid, "interact")
+	m.Ts = 9999999999999999
+	r.refused(devicekey.ErrTsWindow, m, r.signer, t0)
 }

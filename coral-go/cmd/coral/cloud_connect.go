@@ -19,6 +19,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/hooks"
 	"golang.org/x/term"
 )
@@ -303,7 +304,9 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 		fmt.Fprintf(ui.out, "\nConnect to Coral Hub (%s)\n", st.HubURL)
 	}
 	for {
-		if code := c.call(ctx, http.MethodPost, "/api/cloud/connect", map[string]any{}, nil, 30*time.Second, &st); code >= 0 {
+		// The pairing secret (wire format section 3): made here, put in the link's fragment (which a browser never sends to the Hub) and handed to this Coral in this one local call. Not in an argument, a file or the status.
+		secret := devicekey.NewPairingSecret()
+		if code := c.call(ctx, http.MethodPost, "/api/cloud/connect", map[string]any{"pairing_secret": secret}, nil, 30*time.Second, &st); code >= 0 {
 			if code == 130 {
 				return c.cancelled(ui)
 			}
@@ -314,11 +317,11 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 			return 4
 		}
 		if ui.ask {
-			fmt.Fprintf(ui.out, "\nOpen %s\nYour code %s should already be filled in. Approve it there (from any computer).\n", st.VerificationURL, st.UserCode)
+			fmt.Fprintf(ui.out, "\nOpen %s\nYour code %s should already be filled in. Approve it there (from any computer).\n", st.VerificationURL+"#p="+secret, st.UserCode)
 			fmt.Fprintln(ui.out, "\nWaiting for you to approve… (Ctrl-C to cancel)")
 		} else {
 			// One line, for a log or a script (#3285).
-			fmt.Fprintf(ui.out, "To connect this server to Coral Hub, open %s and enter code %s\n", st.VerificationURL, st.UserCode)
+			fmt.Fprintf(ui.out, "To connect this server to Coral Hub, open %s and enter code %s\n", st.VerificationURL+"#p="+secret, st.UserCode)
 		}
 		st, code = c.waitEnrollment(ctx)
 		switch {

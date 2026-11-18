@@ -2,7 +2,6 @@ package cloud
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -15,8 +14,6 @@ import (
 	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/store"
 )
-
-var b64u = base64.RawURLEncoding
 
 type pairingRig struct {
 	e      *env
