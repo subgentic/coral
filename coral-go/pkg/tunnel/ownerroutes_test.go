@@ -242,6 +242,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if (m == http.MethodPost && strings.HasPrefix(p, "/api/agent-asks/")) || (m == http.MethodGet && p == "/api/away") {
 				continue
 			}
+			// A chat's pasted image and a done task's changes.diff (#19629) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodGet && (strings.Contains(p, "/attachment/") || strings.HasSuffix(p, "/changes.diff") && strings.HasPrefix(p, "/api/board/")) {
+				continue
+			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).
 			if strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/artifact-content") && m == http.MethodGet {
 				continue

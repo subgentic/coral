@@ -276,6 +276,14 @@ var routeTable = cat(
 		// Every team's artifacts in one list (Goal #62, the Inbox's Artifacts folder): the team route's query plus team, one cursor, the owner's alone like the per-team read.
 		"/api/team-artifacts",
 	)),
+	// A pasted image of a chat and a done task's changes.diff, through the Hub (#19629, coral-hub's point 7 of the #19626 audit): the pages ask for both and the table had neither, so a Hub chat showed
+	// no thumbnail and a done task no diff. Reads, and the OWNER's alone like the artifact reads above: an image in a transcript and a diff can hold anything the agents saw. The image is named by a
+	// 32-hex reference the handler validates (400 otherwise) and found again in the session's own transcript; its query is session_id and agent_type (the page leaves working_directory off through a
+	// hub, and an absolute path is refused here as it is for the chat). The diff reaches the Hub through the handler's own filter (cloud.Tunneled: sensitive and binary files left out, capped).
+	owner(OwnerRefuse, rules(http.MethodGet, TierView,
+		"/api/sessions/live/{name}/attachment/{ref}",
+		"/api/board/{project}/tasks/{id}/changes.diff",
+	)),
 	// A comment, a reply (the same route with a parent_id) and a resolve or reopen, through the Hub (#7052, the Hub's #7039 request): the OWNER's alone, as the artifact reads are (#5575). A comment changes state on this
 	// computer and runs nothing, so Interact; the machine's own mode still caps it. Edit and delete (PATCH, DELETE), send (hands a thread to an agent), the lock and an agent's reply (POST .../{id}/reply, which is never a person's
 	// and refuses anything tunnelled) stay unlisted.

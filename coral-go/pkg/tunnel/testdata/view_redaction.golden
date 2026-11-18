@@ -39,6 +39,7 @@ GET /api/board/{project}/subscribers redact
 GET /api/board/{project}/tasks redact
 GET /api/board/{project}/tasks/{id} redact
 GET /api/board/{project}/tasks/{id}/artifact-content redact
+GET /api/board/{project}/tasks/{id}/changes.diff redact
 GET /api/board/{project}/tasks/{id}/cost redact
 GET /api/board/{project}/tasks/{id}/history redact
 GET /api/board/{project}/working-mode redact
@@ -81,6 +82,7 @@ GET /api/sessions/history/{id}/tasks redact
 GET /api/sessions/live redact
 GET /api/sessions/live/team/{board}/sleep-status redact
 GET /api/sessions/live/{name} redact
+GET /api/sessions/live/{name}/attachment/{ref} redact
 GET /api/sessions/live/{name}/branches redact
 GET /api/sessions/live/{name}/branches/detail redact
 GET /api/sessions/live/{name}/capture redact
