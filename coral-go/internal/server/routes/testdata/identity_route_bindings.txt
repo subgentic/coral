@@ -177,6 +177,7 @@ POST /api/artifacts/{id}/comments | token-session | operator-only
 POST /api/artifacts/{id}/comments/{cid}/reply | token-session
 POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only
 POST /api/board/remotes | board-unchecked | operator-only
+POST /api/board/{project}/agents/{subscriber}/interrupt | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/restart | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/sleep | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/stop | board-claims +token-session

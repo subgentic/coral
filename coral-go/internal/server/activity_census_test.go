@@ -133,6 +133,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/board/{project}/agents/{subscriber}/restart":                "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/agents/{subscriber}/sleep":                  "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/agents/{subscriber}/stop":                   "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
+	"POST /api/board/{project}/agents/{subscriber}/interrupt":              "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/agents/{subscriber}/wake":                   "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle": "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/clashes":                                    "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",

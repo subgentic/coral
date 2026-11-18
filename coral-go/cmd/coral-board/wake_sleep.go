@@ -20,8 +20,9 @@ import (
 const wakeUsageText = `Usage: coral-board wake <member> [--swap] [--board <project>]
        coral-board sleep <member> [--board <project>]
 
-  wake    Wake an agent of this board that is asleep (it resumes its conversation and is told to read the board first).
-  sleep   Put an awake agent of this board to sleep (it is woken again by wake, a task or a message for it that wakes it).
+  wake    Start an agent of this board that is asleep or archived (it resumes its conversation and is told to read the board first).
+  sleep   Put an awake agent of this board to sleep (it is woken again by wake, a task or a message for it that wakes it). An archived agent becomes a sleeping one.
+          To end an agent's session and take it off the Agents list, use coral-board stop.
 
   --swap  At the board's live-agent limit, put the agent that has been idle longest (no task in progress, nothing waiting on the person) to sleep first, then wake. Without it a refused wake names those agents.
 

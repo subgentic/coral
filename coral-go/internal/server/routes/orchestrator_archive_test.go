@@ -1,7 +1,11 @@
 package routes
 
 import (
+	"time"
+
 	"context"
+	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/naming"
 	"net/http"
 	"testing"
 
@@ -89,4 +93,32 @@ func TestTheLastOrchestratorIsNeverArchived(t *testing.T) {
 	require.NoError(t, r.ss.SetSessionArchived(ctx, r.sid["Orch2"], true))
 	code, _ = r.h.archiveRefusal(ctx, ls)
 	assert.Equal(t, "last_orchestrator", code, "an archived Orchestrator does not count")
+}
+
+// QA5 on #19675: a stop must not archive an agent that waits on a person (an open wait, an open ask to the Operator), since archiving hides the question; once it is answered the stop goes through.
+func TestStopRefusesAnAgentThatWaitsOnThePerson(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"stop_enabled": true})
+	require.Equal(t, http.StatusOK, code)
+
+	_, err := r.h.bs.RegisterWait(ctx, orchBoard, "Dev2", naming.SessionName("claude", r.sid["Dev2"]), board.WaitOperator, "", "may I delete it?", time.Hour)
+	require.NoError(t, err)
+	code, out := r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusConflict, code, "%v", out)
+	assert.Equal(t, "waiting_for_the_person", out["code"])
+	assert.False(t, r.archived("Dev2"), "nothing was archived")
+	assert.False(t, r.asleep("Dev2"), "and its session was not ended")
+	require.NoError(t, r.h.bs.CancelActiveWait(ctx, orchBoard, "Dev2"))
+
+	q, err := r.h.bs.PostMessage(ctx, orchBoard, "Dev2", "@Operator which one?", nil)
+	require.NoError(t, err)
+	_, err = r.h.bs.Subscribe(ctx, orchBoard, "Operator", "Operator", "", nil, "all")
+	require.NoError(t, err)
+	require.NoError(t, r.h.bs.RecordAsk(ctx, orchBoard, q, []string{"Operator"}))
+	code, out = r.agentPost("Orchestrator", "stop", "Dev2", "")
+	assert.Equal(t, http.StatusConflict, code, "%v", out)
+	assert.Equal(t, "waiting_for_the_person", out["code"])
+	assert.False(t, r.archived("Dev2"))
 }
