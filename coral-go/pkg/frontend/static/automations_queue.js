@@ -10,7 +10,7 @@ import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 import { registerActions } from './actions.js';
 import { isCloud, serverFetch, boardTeamKey, keyLabel } from './server_base.js';
-const HUB_WORDS = 'The queue is kept by each computer: open this computer\'s own Coral to see it, and move or remove an entry there.';
+const HUB_WORDS = 'The queue is kept by each computer: link a computer to see its queue; to move or remove an entry, open that computer\'s own Coral.';
 const DT = await importOnce('./data_table.js');
 const { agentLink } = await importOnce('./agent_link.js');
 const { liveAgentOf, openAgent } = await importOnce('./agent_live.js'); // the one way an agent's name opens its chat (#12168); a task and a goal open where their own links do (opened when clicked)

@@ -33,6 +33,17 @@ const STUB = `(() => { const real = window.fetch; window.__reads = 0; window.__h
         await sleep(300); // sleep-ok: a request would be sent within this time
         assert.equal(await ev('window.__reads'), before + 1, 'exactly one read on show');
         await waitFor(`window.__reads >= ${before + 2}`, 'the poll runs again after', 9000);
+        // leaving the Queue for another view stops the read too (C7: leaveQueueTab -> watchQueue(false)); coming back reads at once
+        await ev(`history.pushState(null, '', '/agents'); window.dispatchEvent(new PopStateEvent('popstate')); true`);
+        await waitFor(`!document.getElementById('queue-view') || document.getElementById('queue-view').style.display === 'none'`, 'the Queue view is left', 5000);
+        await sleep(300); // sleep-ok: a request in flight finishes
+        const left = await ev('window.__reads');
+        await sleep(15000); // sleep-ok: the check is 15 s of silence
+        assert.equal(await ev('window.__reads'), left, 'another view is shown: no /api/resources for 15 s');
+        await ev(`history.pushState(null, '', '/queue'); window.dispatchEvent(new PopStateEvent('popstate')); true`);
+        await waitFor(`window.__reads >= ${left + 1}`, 'back on the Queue: it reads at once', 3000);
+        // the tab says nothing about this computer in the Hub's words (QA4): its title is of each computer
+        assert.doesNotMatch(await ev(`document.getElementById('nav-tab-queue').title`), /this computer/i, 'the tab title does not say this computer');
         console.log('PASS Queue read stops while the tab is hidden (15 s, no /api/resources), one read on show, the poll resumes');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
