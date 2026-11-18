@@ -67,7 +67,7 @@ export function loadInitialData(popout) {
     if (!popout) {
         if (isCloud()) startHistoryList().finally(() => markReady('history')); // the hub's Chats tab; a local Coral reads its chat list when an opened chat that comes without its entry (a link, a saved message) or the Resume dialog wants one (#8195); the Inbox's chat folders read /api/sessions/history with their own type and pass the entry they open
         else markReady('history');
-        initScheduler();
+        if (!isCloud()) initScheduler();
         initLiveJobs();
     }
     if (popout) markReady('history'); // a popout has no history list
