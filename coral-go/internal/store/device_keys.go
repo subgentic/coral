@@ -206,6 +206,16 @@ func (s *SessionStore) RemoveDeviceKey(ctx context.Context, kid, reason string, 
 	return nil
 }
 
+// PromoteDeviceOrigin raises an active key's origin from bootstrap or noproof to pairing, and does nothing else: it is the only way an origin changes and there is no way back. The pairing-proof path (devicekey.CompletePairing) is its one caller, which a source scan test holds.
+func (s *SessionStore) PromoteDeviceOrigin(ctx context.Context, kid string, now time.Time) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE device_keys SET origin = ? WHERE kid = ? AND removed_at IS NULL AND origin IN (?, ?)`, DeviceOriginPairing, kid, DeviceOriginBootstrap, DeviceOriginNoProof)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // validDeviceMode: coral-hub's wire format has exactly these three modes.
 func validDeviceMode(m string) bool { return m == "view" || m == "interact" || m == "launch" }
 

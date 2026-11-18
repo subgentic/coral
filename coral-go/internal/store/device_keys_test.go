@@ -408,3 +408,41 @@ func TestStoredModeIsOneOfThreeModes(t *testing.T) {
 		assert.NoError(t, ss.SetDeviceMode(ctx, k.KID, ok, dkT0), ok)
 	}
 }
+
+// Security SHOULD 6: an origin only goes up, bootstrap or noproof to pairing, never the reverse.
+func TestPromoteDeviceOriginIsUpgradeOnly(t *testing.T) {
+	ss, ctx := dkStore(t), context.Background()
+	boot := dkKey(10, store.DeviceKindDevice, store.DeviceOriginBootstrap)
+	np := dkKey(11, store.DeviceKindDevice, store.DeviceOriginNoProof)
+	pair := dkKey(12, store.DeviceKindDevice, store.DeviceOriginPairing)
+	for _, k := range []store.DeviceKey{boot, np, pair} {
+		_, err := ss.AddDeviceKey(ctx, k, dkT0)
+		require.NoError(t, err)
+	}
+	origin := func(kid string) string {
+		for _, k := range mustList(t, ss) {
+			if k.KID == kid {
+				return k.Origin
+			}
+		}
+		return ""
+	}
+	for _, k := range []store.DeviceKey{boot, np} {
+		ok, err := ss.PromoteDeviceOrigin(ctx, k.KID, dkT0)
+		require.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, store.DeviceOriginPairing, origin(k.KID))
+	}
+	ok, err := ss.PromoteDeviceOrigin(ctx, pair.KID, dkT0)
+	require.NoError(t, err)
+	assert.False(t, ok, "a pairing key is already there: nothing changes")
+	ok, _ = ss.PromoteDeviceOrigin(ctx, "nope", dkT0)
+	assert.False(t, ok)
+	// a removed row is not promoted
+	b2 := dkKey(13, store.DeviceKindDevice, store.DeviceOriginBootstrap)
+	_, _ = ss.AddDeviceKey(ctx, b2, dkT0)
+	require.NoError(t, ss.RemoveDeviceKey(ctx, b2.KID, store.DeviceRemoved, dkT0))
+	ok, _ = ss.PromoteDeviceOrigin(ctx, b2.KID, dkT0)
+	assert.False(t, ok)
+	assert.Equal(t, store.DeviceOriginBootstrap, origin(b2.KID))
+}

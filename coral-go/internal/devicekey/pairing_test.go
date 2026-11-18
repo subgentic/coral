@@ -1,15 +1,19 @@
 package devicekey_test
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/devicekey"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // coral-hub's independent vector (internal/pagekit/testdata/reply-mac-vector.json): our reply MAC, the computer fingerprint and the shown fingerprint must all match it.
@@ -49,4 +53,138 @@ func dec(t *testing.T, s string) []byte {
 	b, err := b64.DecodeString(s)
 	require.NoError(t, err)
 	return b
+}
+
+func pairingFixture(t *testing.T) (secret []byte, userCode, label string, s signer, ans devicekey.PairingAnswer) {
+	t.Helper()
+	secret = []byte("0123456789abcdef")
+	userCode, label = "ABCD-EFGH", "My laptop"
+	s = newSigner(t)
+	pk := dec(t, s.pk)
+	ans = devicekey.PairingAnswer{V: 1, KID: s.kid, MAC: b64.EncodeToString(devicekey.PairMAC(secret, userCode, label, pk)), UserCode: userCode, PK: s.pk}
+	return
+}
+
+func TestCheckPairingAcceptsAGoodAnswerAndReturnsTheKey(t *testing.T) {
+	secret, uc, label, s, ans := pairingFixture(t)
+	pk, err := devicekey.CheckPairing(secret, uc, label, ans)
+	require.NoError(t, err)
+	assert.Equal(t, dec(t, s.pk), pk)
+}
+
+func TestCheckPairingRefusals(t *testing.T) {
+	secret, uc, label, s, good := pairingFixture(t)
+	other := newSigner(t)
+	for name, tc := range map[string]struct {
+		secret []byte
+		uc     string
+		label  string
+		mut    func(a *devicekey.PairingAnswer)
+		want   error
+	}{
+		"no pk":        {secret, uc, label, func(a *devicekey.PairingAnswer) { a.PK = "" }, devicekey.ErrPairingNoKey},
+		"wrong secret": {[]byte("fedcba9876543210"), uc, label, func(a *devicekey.PairingAnswer) {}, devicekey.ErrPairingMAC},
+		"own user code is the input, not the echoed one": {secret, "WXYZ-ABCD", label, func(a *devicekey.PairingAnswer) {}, devicekey.ErrPairingMAC},
+		"swapped label":            {secret, uc, "Other", func(a *devicekey.PairingAnswer) {}, devicekey.ErrPairingMAC},
+		"swapped key, kid follows": {secret, uc, label, func(a *devicekey.PairingAnswer) { a.PK, a.KID = other.pk, other.kid }, devicekey.ErrPairingMAC},
+		"kid not of pk":            {secret, uc, label, func(a *devicekey.PairingAnswer) { a.KID = other.kid }, devicekey.ErrPairingMAC},
+		"pk not a point":           {secret, uc, label, func(a *devicekey.PairingAnswer) { a.PK = s.pk[:80] + "AAAAAAA" }, devicekey.ErrPairingMAC},
+		"short mac":                {secret, uc, label, func(a *devicekey.PairingAnswer) { a.MAC = a.MAC[:42] }, devicekey.ErrPairingMAC},
+		"wrong v":                  {secret, uc, label, func(a *devicekey.PairingAnswer) { a.V = 2 }, devicekey.ErrPairingMAC},
+		"no secret held":           {nil, uc, label, func(a *devicekey.PairingAnswer) {}, devicekey.ErrPairingNoSecret},
+	} {
+		a := good
+		tc.mut(&a)
+		pk, err := devicekey.CheckPairing(tc.secret, tc.uc, tc.label, a)
+		assert.ErrorIs(t, err, tc.want, name)
+		assert.Nil(t, pk, name)
+	}
+}
+
+// The compare is constant time (a source check, design page section 7).
+func TestPairingMACCompareIsConstantTime(t *testing.T) {
+	src, err := os.ReadFile("pairing.go")
+	require.NoError(t, err)
+	assert.Contains(t, string(src), "hmac.Equal(")
+	assert.NotContains(t, string(src), "bytes.Equal(")
+	assert.NotContains(t, string(src), "== mac")
+}
+
+func TestNewPairingSecretIs22CharactersOf16RandomBytes(t *testing.T) {
+	a, b := devicekey.NewPairingSecret(), devicekey.NewPairingSecret()
+	assert.Len(t, a, 22)
+	assert.NotEqual(t, a, b)
+	raw, ok := devicekey.ParsePairingSecret(a)
+	require.True(t, ok)
+	assert.Len(t, raw, 16)
+	for _, bad := range []string{"", a[:21], a + "A", strings.Repeat("!", 22)} {
+		_, ok := devicekey.ParsePairingSecret(bad)
+		assert.False(t, ok, bad)
+	}
+}
+
+func TestCompletePairingAddsADeviceAtTheWebMode(t *testing.T) {
+	r := newRig(t)
+	secret, uc, label, s, ans := pairingFixture(t)
+	kid, err := devicekey.CompletePairing(context.Background(), r.ss, secret, uc, label, ans, "launch", t0)
+	require.NoError(t, err)
+	assert.Equal(t, s.kid, kid)
+	k, ok := r.listed(s.kid)
+	require.True(t, ok)
+	assert.Equal(t, store.DeviceOriginPairing, k.Origin)
+	assert.Equal(t, "launch", k.Mode)
+	assert.Equal(t, label, k.Label)
+	assert.Equal(t, store.DeviceKindDevice, k.Kind)
+}
+
+func TestCompletePairingStoresNothingWhenARefusalComes(t *testing.T) {
+	r := newRig(t)
+	secret, uc, label, s, ans := pairingFixture(t)
+	ans.MAC = b64.EncodeToString(make([]byte, 32))
+	_, err := devicekey.CompletePairing(context.Background(), r.ss, secret, uc, label, ans, "launch", t0)
+	assert.ErrorIs(t, err, devicekey.ErrPairingMAC)
+	_, ok := r.listed(s.kid)
+	assert.False(t, ok)
+	// a label outside the shared rule is refused too, before anything is stored
+	good := ans
+	good.MAC = b64.EncodeToString(devicekey.PairMAC(secret, uc, "  padded ", dec(t, s.pk)))
+	_, err = devicekey.CompletePairing(context.Background(), r.ss, secret, uc, "  padded ", good, "launch", t0)
+	assert.Error(t, err)
+	_, ok = r.listed(s.kid)
+	assert.False(t, ok)
+}
+
+// A bootstrap key that the person then pairs for real is promoted; it is the only way up.
+func TestCompletePairingPromotesABootstrapKey(t *testing.T) {
+	r := newRig(t)
+	secret, uc, label, s, ans := pairingFixture(t)
+	r.add(s, "view", store.DeviceOriginBootstrap, store.DeviceKindDevice)
+	_, err := devicekey.CompletePairing(context.Background(), r.ss, secret, uc, label, ans, "launch", t0)
+	require.NoError(t, err)
+	k, _ := r.listed(s.kid)
+	assert.Equal(t, store.DeviceOriginPairing, k.Origin)
+	assert.Equal(t, "view", k.Mode, "the mode it already had is not changed by a promotion")
+}
+
+// Only the pairing-proof path reaches the promotion: no other non-test file calls it.
+func TestOnlyThePairingPathCallsPromoteDeviceOrigin(t *testing.T) {
+	var hits []string
+	root := filepath.Join("..", "..")
+	require.NoError(t, filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+			return err
+		}
+		sl := filepath.ToSlash(p)
+		if strings.HasSuffix(sl, "internal/store/device_keys.go") || strings.HasSuffix(sl, "internal/devicekey/pairing.go") {
+			return nil
+		}
+		if b, _ := os.ReadFile(p); strings.Contains(string(b), "PromoteDeviceOrigin") {
+			hits = append(hits, p)
+		}
+		return nil
+	}))
+	assert.Empty(t, hits)
+	// and the verifier's own store interface cannot reach it
+	src, _ := os.ReadFile("verify.go")
+	assert.NotContains(t, string(src), "PromoteDeviceOrigin")
 }
