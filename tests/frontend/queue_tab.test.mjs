@@ -28,7 +28,7 @@ const rows = () => [...document.querySelectorAll('#queue-tab-body tr[data-key]')
 assert.deepEqual(R.parse ? R.parse('/queue') : null, { view: 'queue' }, '/queue is a route');
 assert.equal(R.parse('/queue/x'), null);
 assert.equal(R.build({ view: 'queue' }), '/queue');
-assert.ok(R.HIDDEN_IN_CLOUD.includes('queue'), 'the Hub does not serve the queue');
+assert.ok(!R.HIDDEN_IN_CLOUD.includes('queue'), 'the Hub shows the queue (#19568): each computer keeps its own, read through the link');
 
 // one computer: no picker; this computer's own queue
 state.hub = false; state.servers = [];
