@@ -324,7 +324,7 @@ async function readCounts() {
     importOnce('./team_pause.js').then(m => m.readTeamPause(team)); // the pause is read on every poll, so a pause made elsewhere (another tab, a restart) shows here too
     const [goals, tasks, avail, kn] = await Promise.allSettled([
         boardFetch(team, '/goals?state=proposed,active,blocked,done,dropped&limit=200').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
-        boardFetch(team, `/tasks?counts=1&since=${encodeURIComponent(new Date(new Date().setHours(0, 0, 0, 0)).toISOString().replace(/\.\d+Z$/, 'Z'))}`).then(async r => { const data = await r.json(); return r.ok ? data : null; }),
+        boardFetch(team, '/tasks?counts=1').then(async r => { const data = await r.json(); return r.ok ? data : null; }),
         refreshTeamAvailability(team, true),
         knowledge,
     ]);
