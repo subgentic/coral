@@ -57,6 +57,7 @@ type Store interface {
 	RecordNonce(ctx context.Context, nonce, kid string, now time.Time, window time.Duration) error
 	NonceSeen(ctx context.Context, nonce string, now time.Time) error
 	CheckClock(ctx context.Context, now time.Time) error
+	ListDeviceKeys(ctx context.Context) ([]store.DeviceKey, error)
 }
 
 // Verifier checks a signed step-2 message against Coral's own device list and applies it. It trusts nothing the Hub says: the signer's key and mode come from the list, the time from the clock passed in.
@@ -65,6 +66,9 @@ type Verifier struct {
 	Computer string // this computer's fingerprint: a body for any other is refused
 	// RefuseBefore, when set, refuses every message whose ts is earlier. Coral sets it to its start time plus the window when the nonce store could not be read at start (design page v4 section 4, `before_start`).
 	RefuseBefore time.Time
+
+	// HubOrigin is the Hub address this computer is enrolled with (https://host, no path): a passkey certificate's origin must equal it and its rp id is its host. Empty refuses every certificate.
+	HubOrigin string
 
 	// Refuse, when set, is asked first of all: while it returns true (a device-key clear is pending) every message is refused with ErrListUnavailable before anything of it is read.
 	Refuse func() bool
