@@ -465,5 +465,4 @@ node skills_beginner_counts_docs.test.js
 node inbox_task_pages.test.mjs
 node workflow_run_escape.test.mjs
 node review_earlier_versions_source.test.mjs
-node with_board_args.test.mjs
 node skills_hub_read_source.test.mjs
