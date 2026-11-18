@@ -18,11 +18,11 @@ for (const f of fs.readdirSync(STATIC).filter(n => n.endsWith('.js'))) {
         let body = m[1].replace(/\$\{(_mk\d+)\}/g, (_, k) => consts[k] || '');
         const label = body.replace(/<[^>]*>/g, ' ').replace(/\$\{[^}]*\}/g, ' ').replace(/\s+/g, ' ').trim();
         const idle = /\$\{_mk\d+\}/.test(m[1]); // the sleeping and archived menus keep theirs in a constant (the live menu's item is written out)
-        if (idle) { idleItems++; if (!/(^|\s)Remove Agent$/.test(label)) bad.push(`${f}: a sleeping or archived agent's menu item is labelled "${label.slice(-40)}", not Remove Agent`); }
+        if (idle) { idleItems++; if (!(m[1].includes('_mk2') ? /(^|\s)Stop agent$/ : /(^|\s)Remove Agent$/).test(label)) bad.push(`${f}: a sleeping or archived agent's menu item is labelled "${label.slice(-40)}", not Remove Agent`); }
         else if (!/(^|\s)Stop [Aa]gent$/.test(label)) bad.push(`${f}: an agent-kill menu item is labelled "${label.slice(-40)}", not Stop agent`); // menus are sentence case since #15286: 'Stop agent' is the same name
     }
 }
-assert.equal(idleItems, 2, 'the sleeping and archived menus each say Remove Agent');
+assert.equal(idleItems, 2, 'the sleeping menu says Stop agent (it archives, #19674) and the archived one Remove Agent');
 assert.ok(kills >= 2, `the agent-kill menu items were found (${kills})`);
 assert.deepEqual(bad, []);
 console.log(`kill_action_name: ok (${kills} menu items)`);

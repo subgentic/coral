@@ -351,14 +351,14 @@
 1	session_header_updates.js	_whereBack
 2	session_rows.js	!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-i
 1	session_rows.js	MORE_DOTS_SVG
-19	session_rows.js	SVGO.o0
+18	session_rows.js	SVGO.o0
 8	session_rows.js	SVGO.o1
 4	session_rows.js	SVGO.o2
 2	session_rows.js	SVGO.o4
 1	session_rows.js	['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access === 'boolean' ? (() => { const 
-2	session_rows.js	_archiveItem
 2	session_rows.js	_mk0
-2	session_rows.js	_mk1
+1	session_rows.js	_mk1
+1	session_rows.js	_mk2
 1	session_rows.js	_why ? `<button class="menu-item overflow-menu-item" data-on-click="agent-sleep" data-name="${escapeAttr(s.nam
 1	session_rows.js	agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''
 1	session_rows.js	attentionClass

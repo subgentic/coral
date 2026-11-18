@@ -26,7 +26,7 @@ let agentsTableState = DT.tableState();
 // The chips: the statuses people look for first; any other status that has agents gets its own chip after them.
 // One word for a working agent (#15830, design guidelines 4.5): Working covers busy and an idle agent whose task is started; the task number is in Doing. The strip keeps four (All, Working, Has a task, Sleeping); the other states are in a More select beside it.
 const STRIP = ['working', 'has_task', 'sleeping'], MORE = ['available', 'queued', 'waiting', 'needs_input', 'offline', 'unavailable', 'unknown', 'archived'];
-const BUCKET_WORD = { working: 'Working', has_task: 'Has a task', available: 'Waiting for work', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Ended', archived: 'Archived', unavailable: 'Unavailable', unknown: 'Not reported' };
+const BUCKET_WORD = { working: 'Working', has_task: 'Has a task', available: 'Waiting for work', queued: 'Queued', waiting: 'Waiting', needs_input: 'Needs input', sleeping: 'Sleeping', offline: 'Not running', archived: 'Archived', unavailable: 'Unavailable', unknown: 'Not reported' };
 const MARK = { working: 'working', needs_input: 'waiting', sleeping: 'sleeping', offline: 'done', unavailable: 'failed' }; // any other state is the grey hollow dot
 const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', needs_input: 'goal-state-blocked', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
 const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
@@ -40,7 +40,9 @@ const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type 
 
 // One status per agent (#10603, the Beta tester): an agent that is idle with a task already in progress is working on it, not "Task assigned, idle" beside "#1 in progress".
 const startedTask = (a) => (a.tasks || []).find(t => t.status === 'in_progress');
-const bucket = (a) => { const v = a.availability === 'waiting' && !(a.tasks || []).length ? 'available' : a.availability || 'unknown'; return v === 'busy' || (v === 'task_idle' && startedTask(a)) ? 'working' : v === 'task_idle' ? 'has_task' : v; }; // exclusive: every agent is in one, so the counts add up
+// Archived (#19674): ended, out of the list; the server's offline + ended_session is one too
+const isArchived = (a) => a.availability === 'archived' || (a.availability === 'offline' && !!a.ended_session);
+const bucket = (a) => { if (isArchived(a)) return 'archived'; const v = a.availability === 'waiting' && !(a.tasks || []).length ? 'available' : a.availability || 'unknown'; return v === 'busy' || (v === 'task_idle' && startedTask(a)) ? 'working' : v === 'task_idle' ? 'has_task' : v; }; // exclusive: every agent is in one, so the counts add up
 const statusWord = (a) => BUCKET_WORD[bucket(a)] || 'Not reported';
 const statusNode = (a) => statusMark(MARK[bucket(a)] || 'idle', statusWord(a)); // the shared mark: a shape and a word, no blue
 // dropAt is one of the steps data_table.css has (62, 52, 36, 28, 20, 16): 32 and 33 had no rule, so those two columns never gave way and a phone's Status chip and row broke (#14903). Open tasks and Time on current task (#14861, the Operator): the tasks assigned to the agent that are pending, in progress or in review (a link to the Tasks tab filtered to the agent), and how long it has had its task in progress (since the claim; a dash with none).
@@ -77,7 +79,7 @@ function chipCounts(agents) {
     for (const a of agents) count[bucket(a)] = (count[bucket(a)] || 0) + 1;
     const row = k => ({ key: k, label: BUCKET_WORD[k] || k, count: count[k] || 0 });
     const extra = Object.keys(count).filter(k => !STRIP.includes(k) && !MORE.includes(k)); // a state this page does not know yet still has a place
-    return { strip: [{ key: 'all', label: 'All', count: agents.filter(a => a.availability !== 'archived').length }, ...STRIP.map(row)], more: [...MORE, ...extra].filter(k => count[k] || k === 'available').map(row) };
+    return { strip: [{ key: 'all', label: 'All', count: agents.filter(a => !isArchived(a)).length }, ...STRIP.map(row)], more: [...MORE, ...extra].filter(k => count[k] || k === 'available').map(row) };
 }
 
 // ── the tab ──────────────────────────────────────────────────────────────
@@ -92,7 +94,7 @@ async function load() {
         if (!data || !Array.isArray(data.agents)) throw new Error('no answer');
         model.data = data; model.failed = '';
         model.levels = await readSearchLevels(team);
-        hooks.onCount?.(data.agents.filter(a => a.availability !== 'archived').length); // the sidebar group lists a team's live agents and keeps an archived one in its own section: the tab says the same number (#10164); the Archived chip still finds it
+        hooks.onCount?.(data.agents.filter(a => !isArchived(a)).length); // the sidebar group lists a team's live agents and keeps an archived one in its own section: the tab says the same number (#10164); the Archived chip still finds it
     } catch (e) {
         if (team !== model.team) return;
         model.failed = 'The agents could not be read.';
@@ -151,9 +153,9 @@ function removeSeatButton(agent, ctx) {
 
 /** Resume an ended agent from its earlier chat: the same action as Continue this chat, Resume session in All chats (resume_ended.js), on the agent's page (#15294, #15857). Null when the server named no session to resume. */
 function resumeButton(agent, cls, onDone) {
-    const e = agent.ended_session; if (!e || agent.availability !== 'offline') return null;
-    const b = btn(cls, 'Resume', null);
-    b.setAttribute('aria-label', `Resume ${agent.name}`);
+    const e = agent.ended_session; if (!e || !isArchived(agent)) return null;
+    const b = btn(cls, 'Start', null);
+    b.setAttribute('aria-label', `Start ${agent.name}`);
     b.addEventListener('click', async (ev) => {
         ev.stopPropagation(); b.disabled = true;
         const { showToast } = await importOnce('./utils.js');
@@ -181,7 +183,7 @@ function sidebarIndex(a) {
 }
 function visibleAgents() {
     const all = (model.data && model.data.agents) || [];
-    const byState = model.filter === 'all' ? all.filter(a => a.availability !== 'archived') : all.filter(a => bucket(a) === model.filter);
+    const byState = model.filter === 'all' ? all.filter(a => !isArchived(a)) : all.filter(a => bucket(a) === model.filter);
     const q = model.search.trim().toLowerCase();
     const shown = q ? byState.filter(a => `${a.name || ''} ${a.role || ''}`.toLowerCase().includes(q)) : byState;
     return [...shown].sort((x, y) => (isOrchestrator(y) - isOrchestrator(x)) || (rank(x) - rank(y)) || (sidebarIndex(x) - sidebarIndex(y)));
@@ -212,13 +214,12 @@ function draw() {
     if (!data) return;
     if (!data.agents.length) { body.append(el('div', 'empty-state empty-state-tight', 'No agents on this board yet.')); return; }
     drawChips(body);
-    const ended = data.agents.filter(a => a.availability === 'offline').length; // the tab lists every member, the sidebar only the live ones: this says why they differ (#8271)
-    const archived = data.agents.filter(a => a.availability === 'archived').length, live = data.agents.length - archived; // the same rule as the tab's badge and the sidebar group: an archived agent is told apart, not counted (#10369)
-    body.append(el('p', 'goals-note team-agents-count', `${live} agent${live === 1 ? '' : 's'}${ended ? `, ${ended} ended` : ''}${archived ? `, +${archived} archived` : ''}`));
+    const live = data.agents.filter(a => !isArchived(a)).length;
+    body.append(el('p', 'goals-note team-agents-count', `${live} agent${live === 1 ? '' : 's'}`));
     const rows = visibleAgents(), searchShown = [...model.levels.values()].some(l => l && l.level && l.level !== 'own');
     body.append(DT.dataTable({
         label: `Agents, ${rows.length}`, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,
-        open: (ag, tr) => { const session = chatSessionOf(ag); if (session) openChat(session); else hooks.openAgent?.(ag, tr.querySelector('.dt-primary')); }, // the row opens the agent's chat (#15857); an ended agent or a terminal has none, so its row opens its page (Resume is there)
+        open: (ag, tr) => { const session = !isArchived(ag) && chatSessionOf(ag); if (session) openChat(session); else hooks.openAgent?.(ag, tr.querySelector('.dt-primary')); }, // the row opens the agent's chat (#15857); an ended agent or a terminal has none, so its row opens its page (Resume is there)
         columns: [
             { key: 'agent', label: 'Agent', primary: true, width: 'grow', line: 1, field: 'name', sort: true,
                 cell: ag => { const b = DT.primaryButton('', ''); b.classList.add('team-agent-name'); b.append(DT.avatar(ag.name)); const dot = el('span', `team-agent-dot team-agent-dot-${ag.availability === 'available' || ag.availability === 'busy' ? 'ok' : ag.availability === 'needs_input' ? 'ask' : 'quiet'}`); dot.setAttribute('aria-hidden', 'true'); dot.title = statusWord(ag); b.prepend(dot); b.append(el('span', 'team-agent-state sr-only', `, ${statusWord(ag)}`)); if (ag.availability === 'needs_input' || ag.availability === 'unavailable') { const ask = DT.chip(statusWord(ag), CLASS[ag.availability]); ask.classList.add('team-agent-ask'); ask.setAttribute('aria-hidden', 'true'); b.append(ask); } const more = el('button', 'team-agent-details dt-reveal', 'Details'); more.type = 'button'; more.setAttribute('aria-label', `Details for ${ag.name}`); more.addEventListener('click', e => { e.stopPropagation(); hooks.openAgent?.(ag, more); }); const cell = el('span', 'team-agent-namecell'); cell.append(b, more); return cell; } }, // the state as a dot by the name where the Status column has given way (a phone); a state that asks something of a person also keeps its word there, as a chip the dot already names for a screen reader (#9713)
@@ -312,6 +313,7 @@ export function renderAgentPage(host, agent, ctx) {
     const session = sessionOf(agent), reach = model.levels.get(agent.name);
     if (reach) { const c = searchChip(reach.level); if (c) line.append(c); const b = btn('btn', 'Search access\u2026', null); b.setAttribute('aria-label', `Search access for ${agent.name}`); b.addEventListener('click', () => openSearchAccess({ name: agent.name, team: model.team, ...reach }, { opener: b, onChanged: () => load().then(() => renderAgentPage(host, agent, ctx)) })); bar.append(b); }
     if (!isCloud() && !String(model.team).startsWith('@') && agent.subscriber_id) bar.append(removeSeatButton(agent, ctx)); // the Operator takes a seat off the board (#11112): on this computer only, never through the Hub
+    if (agent.availability === 'archived' && session && session.session_id) importOnce('./kill_session.js').then(m => bar.prepend(...m.archivedButtons(agent, session, async () => { await load(); ctx.onBack(); })));
     const resume = resumeButton(agent, 'btn btn-primary', () => { const fresh = ((model.data && model.data.agents) || []).find(a => a.name === agent.name); if (fresh) renderAgentPage(host, fresh, ctx); }); if (resume) bar.append(resume); // the page reads the agent again once it is back (it was the row's Resume before, #15857)
     if (session) bar.append(btn('btn', 'Open chat', () => openChat(session)));
     if (agent.reminder) {

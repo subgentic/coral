@@ -28,7 +28,7 @@ const TEAM = `qa-count-${Date.now() % 100000}`;
         assert.equal(r.tab, r.group, 'the tab says the same number as the sidebar group: ' + JSON.stringify(r));
         assert.ok(r.chips.some(c => /^Archived\s*1/.test(c)), 'the archived agent is still found under its chip: ' + JSON.stringify(r.chips));
         const line = await ev(`(document.querySelector('.team-agents-count') || {}).textContent || ''`);
-        assert.equal(line, '2 agents, +1 archived', 'the count line follows the badge and tells the archived one apart (#10369): ' + line);
+        assert.equal(line, '2 agents', 'the count line follows the badge and does not count the archived one (#10369, #19674): ' + line);
         assert.ok(r.chips.some(c => /^All\s*2/.test(c)), 'the All chip counts the same two: ' + JSON.stringify(r.chips));
         await ev(`(() => { const s = document.querySelector('.team-tb-more'); const o = [...s.options].find(o => /^Archived/.test(o.textContent.trim())); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`[...document.querySelectorAll('tr.dt-row')].filter(r => r.getClientRects().length).length === 1`, 'the archived agent under its chip', { timeout: 8000 });

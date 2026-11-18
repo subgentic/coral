@@ -136,7 +136,7 @@ async function postLaunch(server, path, payload) {
  * on success, or null after showing the error. Never falls back to another
  * server.
  */
-export async function _launchOn(server, path, payload, agentType, { dirInput = null, teamFailures = false, retry = null, fields = null } = {}) { // exported for board_ids_browser
+export async function _launchOn(server, path, payload, agentType, { dirInput = null, teamFailures = false, retry = null, fields = null, nameInput = null } = {}) { // exported for board_ids_browser
     let sent = payload; // the request as the person has shaped it so far: the board they chose is kept when the home-folder question comes after (#13425, UI Reviewer's MUST)
     let res = await postLaunch(server, path, { ...sent, home_folder_ask: true }); // this page can answer the home-folder question (#13425)
     // A board of that name exists (#3536): the person chooses to join it or start another.
@@ -155,6 +155,7 @@ export async function _launchOn(server, path, payload, agentType, { dirInput = n
         res = await postLaunch(server, path, { ...sent, home_folder_ask: true, confirm_home_folder: true });
     }
     if (res.cancelled) return null;
+    if (!res.ok && res.status === 409 && res.data && res.data.code === 'name_archived') return (await importOnce('./launch_name_choice.js')).nameArchivedChoice(res.data, server, nameInput);
     if (res.ok && res.data && res.data.board_id) noteBoardLabels([res.data], 'board_id', server); // the board it joined or started
     // A team in which no member started (#122): the answer carries each member's error. A caller that shows them per member (the team dialog, the
     // template launcher) takes the answer as it is (data.ok is false) instead of one toast of the joined text.

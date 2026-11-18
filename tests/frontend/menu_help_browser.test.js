@@ -19,7 +19,7 @@ const AGENT_WORDS = {
     'Restart, same settings': 'Starts a fresh conversation with the same settings; the instructions are sent again.',
     'Restart with changes': 'Starts a fresh conversation with the settings you choose; the instructions are sent again. A Claude agent\'s model or thinking level changes live, without a restart: use Model and thinking.',
     'Sleep': 'Stops the terminal. The chat and files stay; Wake continues the conversation.',
-    'Stop agent': 'Ends its process now. Its chat stays in History.',
+    'Stop agent': 'Ends its session and archives it: it can be started again.',
 };
 
 (async () => {
