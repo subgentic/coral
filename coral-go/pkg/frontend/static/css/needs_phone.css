@@ -55,3 +55,9 @@
 .inbox-computer-chip { flex: 0 1 auto; min-width: 0; margin-inline-start: 0; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A narrow window that has a mouse (a laptop at 200% zoom, 720 px, #15303): the welcome rows keep their buttons on the row. A phone's row has none (tap opens): this is for a pointer that can press them. */
 @media (max-width: 760px) and (pointer: fine) { .inbox-needs-results [class]:has(> .inbox-welcome-actions) { position: static; width: auto; height: auto; margin: 0; padding: 0; overflow: visible; clip-path: none; } }
+
+.inbox-command { display: block; min-width: 0; max-width: 100%; white-space: normal; }
+.inbox-command pre { margin: var(--space-sm) 0; padding: var(--space-sm); max-width: 100%; overflow: auto; white-space: pre; background: var(--bg-tertiary); font-size: var(--fs-sm); }
+@media (max-width: 760px), (pointer: coarse) { .inbox-command > button { min-height: var(--control-touch-height, 44px); } }
+
+.inbox-command code { font-size: var(--fs-sm); }

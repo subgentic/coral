@@ -13,7 +13,7 @@ const BASE=require('./test_base').BASE;
    await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>{m.updateInboxTab();return m.selectInboxTab('needs')}).then(()=>true)`);
    await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-actions').length===5`,'five Welcome actions');
    const got=await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-actions')].map(e=>({text:e.querySelector('.inbox-main-action').textContent,primary:e.querySelector('.inbox-main-action').classList.contains('btn-primary')}))`);
-   assert.equal(got[0].text,'Open guide','the guide is first (#18825)');assert.equal(got[1].text,'New agent','Start your first agent follows it');assert.deepEqual(got.filter(a=>a.primary).map(a=>a.text),['New agent'],'one primary action');
+   assert.equal(got[0].text,'Open guide','the guide is first (#18825)');assert.equal(got[1].text,'New agent','Start your first agent follows it');assert.deepEqual(got.filter(a=>a.primary).map(a=>a.text),[],'Needs you list rows have no Primary action (#17450 N4)');
    await ev(`import((window.__coralStatic||'/static/')+'launch_disclosure.js').then(m=>m.refreshLaunchDisclosure()).then(()=>true)`);
    assert.equal(await ev(`!!document.getElementById('launch-disclosure-banner')`),false,'no auto-mode banner without any agents');
    // Open the first action before a live agent makes that completed Welcome item disappear.
@@ -25,6 +25,6 @@ const BASE=require('./test_base').BASE;
    await waitFor(`!document.getElementById('launch-disclosure-banner')`,'notice removed without local agents');
 
   }
-  console.log('PASS Welcome starts with its only primary New agent; no pre-agent banner');
+  console.log('PASS Welcome keeps New agent as its default action; no Primary in the list or pre-agent banner');
  } finally {await client.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -33,7 +33,9 @@
   :root .activity-folder tr.activity-card > td[data-key="action"] { grid-column: 1; grid-row: 2; justify-self: start; }
   :root .activity-folder tr.activity-card > td[data-key="who"] { grid-column: 2; grid-row: 2; }
   :root .activity-folder tr.activity-card > td[data-key="team"] { display: none; }
-  :root .activity-folder tr.activity-card .activity-kind { display: none; }
+
   :root .activity-folder tr.activity-card .activity-detail { grid-column: 1 / -1; grid-row: 3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   :root .activity-folder tr.activity-card .activity-about { grid-column: 1 / -1; grid-row: 4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 }
+
+@media (max-width: 760px) { .activity-who .inbox-kind-icon { width: 40px; height: 40px; } }

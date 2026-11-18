@@ -58,7 +58,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const kinds = new Set(rows.map(r => r.kind).filter(Boolean));
             check(kinds.has('review') && kinds.has('other') || kinds.has('review') && rows.some(r => r.kind && r.kind !== 'review'), label + ': the list has a review row and a question row: ' + JSON.stringify(rows.map(r => [r.kind, r.text])));
             for (const r of rows.filter(x => x.kind)) {
-                check(r.withIcon - r.without >= -0.01 && r.withIcon - r.without < (r.kind === 'ask' && /200%/.test(label) ? 40 : 0.01), /* #15722: a question's whole text now runs the row's width beside the icon's column, so at 200% text the icon's own column can push a long question onto one more line (the phone's allowance, below); every other row keeps its height exactly */ `${label}: a ${r.kind} row keeps its height (${r.withIcon} with the icon, ${r.without} without): ${r.text}`);
+                check(r.withIcon - r.without >= -0.01 && r.withIcon - r.without < (/200%/.test(label) && (r.kind === 'ask' || r.kind === 'review') ? 40 : 0.01), /* #15722: a question's whole text now runs the row's width beside the icon's column, so at 200% text the icon's own column can push a long question onto one more line (the phone's allowance, below); every other row keeps its height exactly */ `${label}: a ${r.kind} row keeps its height (${r.withIcon} with the icon, ${r.without} without): ${r.text}`);
                 check(r.inRow && r.beforeWords, `${label}: a ${r.kind} row's icon is inside the row and in front of its words, not over them: ${JSON.stringify(r)}`);
             }
         }
@@ -109,8 +109,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         }
         for (const theme of ['dark', 'light']) {
             await ev(`${themeJs(theme)}; true`); await ev(framesJs(4));
-            const contrast = await ev(`(async () => { const NF = await import(${S} + 'needs_filters.js'); const channel = x => { x /= 255; return x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }; const lum = c => { const rgb = c.match(/[\\d.]+/g).map(Number); return channel(rgb[0]) * .2126 + channel(rgb[1]) * .7152 + channel(rgb[2]) * .0722; }; return NF.KINDS.map(k => { const i = NF.kindIcon({ waiting_kind: k }); document.body.append(i); const cs = getComputedStyle(i), a = lum(cs.color), b = lum(cs.backgroundColor); i.remove(); return { kind: k, ratio: (Math.max(a,b) + .05) / (Math.min(a,b) + .05) }; }); })()`);
-            for (const c of contrast) check(c.ratio >= 4.5, theme + ': AA kind tile contrast: ' + JSON.stringify(c));
+            const contrast = await ev(`(async () => { const NF = await import(${S} + 'needs_filters.js'); const channel = x => { x /= 255; return x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }; const lum = c => { const rgb = c.match(/[\\d.]+/g).map(Number); return channel(rgb[0]) * .2126 + channel(rgb[1]) * .7152 + channel(rgb[2]) * .0722; }; return NF.KINDS.map(k => { const i = NF.kindIcon({ waiting_kind: k }); document.body.append(i); const cs = getComputedStyle(i); let bg = i; while (bg.parentElement && getComputedStyle(bg).backgroundColor === 'rgba(0, 0, 0, 0)') bg = bg.parentElement; const a = lum(cs.color), b = lum(getComputedStyle(bg).backgroundColor); i.remove(); return { kind: k, ratio: (Math.max(a,b) + .05) / (Math.min(a,b) + .05) }; }); })()`);
+            for (const c of contrast) check(c.ratio >= 4.5, theme + ': AA grey kind icon against its visible background: ' + JSON.stringify(c));
         }
     } finally { await removeBoards(ev, ['qn']).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }

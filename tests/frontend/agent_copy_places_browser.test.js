@@ -36,9 +36,10 @@ const { coralReady } = require('./helpers/wait');
 
             console.log(`${at}2. Needs you`);
             await load('/inbox/needs');
-            await has('.inbox-folder-toolbar .agent-copy', at, 'the robot on the Needs you list');
-            await robot('.inbox-folder-toolbar .agent-copy', 'Needs you');
-            assert.match(await press('.inbox-folder-toolbar .agent-copy', at, 'the Needs you line'), /Needs you[\s\S]*\nDocs: coral-agent docs artifacts, section “Answer a comment the Operator sent you”$/);
+            await has('#needs-more', at, 'More on the Needs you header (the robot is its item, #17450 N2)');
+            await ev(`document.getElementById('needs-more').click(); true`); await has('#needs-more-menu:not([hidden]) [role=menuitem]', at, 'the More menu');
+            assert.equal(await ev(`document.querySelector('#needs-more-menu [role=menuitem]').textContent`), 'Copy for an agent', at + 'More holds Copy for an agent');
+            assert.match(await press('#needs-more-menu [role=menuitem]', at, 'the Needs you line'), /Needs you[\s\S]*\nDocs: coral-agent docs artifacts, section “Answer a comment the Operator sent you”$/);
 
             console.log(`${at}3. Saved`);
             await load('/inbox/saved');

@@ -21,8 +21,9 @@ const ART = { id: HEX, name: 'screen.png', media_type: 'image/png', starred: tru
             if (url.pathname === '/api/team-artifacts') { window.__starRead.push(Object.fromEntries(url.searchParams)); return json({ artifacts: ${JSON.stringify(arts)}, teams: [], all: ${arts.length}, total: ${arts.length}, has_more: false }); }
             return R(u, o); }; return true; })()`);
     const openStarred = async mobile => {
-        if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); s.value = 'chats-starred'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-        else await ev(`document.querySelector('.view-list-item[data-key="chats-starred"]').click(); true`);
+        // Empty folders are hidden (#17453). The explicit destination still opens
+        // the list when counts lag a known starred chat or when checking emptiness.
+        await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats-starred')).then(() => true)`);
         await waitFor(`!!document.querySelector('#group-table-view')`, 'the Starred page', 10000); await settle(500);
     };
     try {
