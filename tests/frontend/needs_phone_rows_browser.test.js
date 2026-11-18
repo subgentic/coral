@@ -82,9 +82,19 @@ const { coralReady } = require('./helpers/wait');
             let b = await bar();
             assert.ok(b && b.count === '1 selected', at + 'the bar says 1 selected: ' + JSON.stringify(b));
             assert.deepEqual(b.actions.map(a => a.label), ['Cancel', 'Approve', 'Dismiss', 'Save for later', 'More actions', 'Changes', 'Mark read', 'Mark unread'], at + 'Cancel (X), the icon buttons, then More with Changes, Mark read, Mark unread; Close goal and Not yet are a goal\'s (#12328) and are not offered for a file (#12401): ' + JSON.stringify(b.actions));
-            // while rows are selected the toolbar is the bar and nothing else: no sort icon alone on a blank row under it (#11778)
-            const tb = await ev(`(() => { const t = document.querySelector('.gt-toolbar'), sel = t.querySelector(':scope > .team-tb-selection').getBoundingClientRect(); const shown = [...t.children].filter(k => k.getClientRects().length && k.getBoundingClientRect().height > 2 && !k.classList.contains('team-tb-selection') && !k.classList.contains('inbox-folder-head')).map(k => String(k.className).slice(0, 45)); return { shown, toolbarH: Math.round(t.getBoundingClientRect().height), barH: Math.round(sel.height) }; })()`);
-            assert.ok(tb.shown.every(c => /^(list-bar-search-wrap|goals-chips|btn btn-quiet btn-icon sidebar-collapse-btn|btn btn-quiet btn-small|needs-more$)/.test(c)), at + 'the toolbar holds the selection bar, and above it only the search, the filter chips and the toolbar\'s own icon buttons (#15540; #17450 puts Copy for an agent in the header More): ' + JSON.stringify(tb));
+            // #17450 N2 deliberately uses two header rows; #19470 makes the kinds a compact filter on a phone.
+            // Selecting keeps that header and adds one actions line below, without an orphan control row.
+            const tb = await ev(`(() => {
+                const t = document.querySelector('#group-table-view .gt-toolbar'), box = e => { const r = e?.getBoundingClientRect(); return r && r.width > 0 && r.height > 2 ? { top: r.top, bottom: r.bottom } : null; };
+                const sel = box(t.querySelector(':scope > .team-tb-selection')), head = box(t.querySelector(':scope > .inbox-folder-head')), more = box(t.querySelector(':scope > .needs-more'));
+                const controls = [...t.children].filter(k => box(k) && !k.matches('.team-tb-selection,.inbox-folder-head,.needs-more'));
+                return { head, more, sel, controls: controls.map(k => ({ cls: String(k.className), ...box(k) })) };
+            })()`);
+            assert.ok(tb.controls.every(c => /^(list-bar-search-wrap|goals-chips|inbox-kind-control task-more|btn btn-quiet btn-icon sidebar-collapse-btn|btn btn-quiet btn-small)/.test(c.cls)), at + 'only search, kind filters and toolbar icons share the filter row: ' + JSON.stringify(tb));
+            assert.ok(tb.head && tb.more && tb.sel && tb.controls.length, at + 'title, More, filters and selection are visible: ' + JSON.stringify(tb));
+            assert.ok(Math.max(tb.head.top, tb.more.top) < Math.min(tb.head.bottom, tb.more.bottom), at + 'title and More share header row one: ' + JSON.stringify(tb));
+            assert.ok(tb.controls.every(c => c.top >= Math.max(tb.head.bottom, tb.more.bottom) - 1 && c.bottom <= tb.sel.top + 1), at + 'filters sit below the title and above the selection: ' + JSON.stringify(tb));
+            assert.ok(Math.max(...tb.controls.map(c => c.top)) < Math.min(...tb.controls.map(c => c.bottom)), at + 'all filter controls share one row, with no orphan control row: ' + JSON.stringify(tb));
             assert.ok(b.oneLine && b.h <= 64 && b.small.length === 0, at + 'the bar is one line, every target 44 px, each named (Gmail, #11707): ' + JSON.stringify({ h: b.h, oneLine: b.oneLine, small: b.small }));
             // the bar is the top row of the screen and stays there while the list scrolls (the operator, comment 28; #11707): this check was dropped by the rebase onto ux-details and is back
             const stay = await ev(`(() => { const bar = document.querySelector('.dt-bar'), sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollTop + 500; const r = bar.getBoundingClientRect(), t = sc.getBoundingClientRect(); return { top: Math.round(r.top - t.top), shown: r.height > 0 }; })()`);
