@@ -7,7 +7,7 @@ installDom({ mode: 'cloud' });
 const R = await importUi('routes');
 assert.ok(!R.HIDDEN_IN_CLOUD.includes('skills'), 'Skills is not a hidden view in a Hub page');
 assert.deepEqual(R.cloudRedirect({ view: 'skills' }, true), { view: 'skills' }, 'a /skills address stays on Skills in a Hub page');
-assert.ok(R.HIDDEN_IN_CLOUD.includes('queue'), 'the others stay hidden');
+assert.deepEqual(R.HIDDEN_IN_CLOUD, [], 'nothing is hidden in a Hub page: Skills was the last view the Hub did not serve');
 
 const root = new URL('../../coral-go/pkg/frontend/', import.meta.url);
 const html = readFileSync(new URL('templates/index.html', root), 'utf8');
