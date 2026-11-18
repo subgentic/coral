@@ -44,6 +44,7 @@ assert.equal(isBoardNameExists({ ok: false, status: 400, data: { code: 'board_na
 const body = { working_dir: '/w', agent_type: 'claude', board_name: 'sprint' };
 assert.deepEqual(JSON.parse(JSON.stringify(retryPayload(body, { board_id: 'sprint' }))), { working_dir: '/w', agent_type: 'claude', board_name: 'sprint', board_id: 'sprint' }, 'join: its id');
 assert.deepEqual(JSON.parse(JSON.stringify(retryPayload(body, { new_board: true }))), { working_dir: '/w', agent_type: 'claude', board_name: 'sprint', new_board: true }, 'another: new_board');
+assert.deepEqual(JSON.parse(JSON.stringify(retryPayload(body, { rename_old_board: true }))), { working_dir: '/w', agent_type: 'claude', board_name: 'sprint', rename_old_board: true }, 'rename the old team (#19724)');
 assert.equal(retryPayload(body, null), null, 'cancel: no launch');
 assert.match(candidateDetail(res409.data.candidates[0], 'en-US'), /^created Oct 1[12](, 2026)?, 4 members$/);
 assert.equal(candidateDetail({ members: 1 }, 'en-US'), '1 member');

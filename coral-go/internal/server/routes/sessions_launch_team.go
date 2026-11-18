@@ -57,8 +57,9 @@ type launchTeamAgent struct {
 // launchTeamRequest is a team launch's body.
 type launchTeamRequest struct {
 	BoardName         string            `json:"board_name"`
-	BoardID           string            `json:"board_id"`  // relaunch on this board (#3536)
-	NewBoard          bool              `json:"new_board"` // create another board even if the name exists
+	BoardID           string            `json:"board_id"`         // relaunch on this board (#3536)
+	NewBoard          bool              `json:"new_board"`        // create another board even if the name exists
+	RenameOldBoard    bool              `json:"rename_old_board"` // relabel the one team with this name <name>-YYYY-MM-DD, then start the new one (#19724)
 	WorkingDir        string            `json:"working_dir"`
 	HomeFolderAsk     bool              `json:"home_folder_ask"`     // the page can answer the home-folder question (#13425)
 	ConfirmHomeFolder bool              `json:"confirm_home_folder"` // the person said Launch anyway to the home-folder question (#13425)
@@ -196,7 +197,7 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	boardCreated := false // this request made the board (and so takes it back if nobody starts)
 	if body.BoardName != "" || body.BoardID != "" {
-		key, created, ok := h.launchBoardCreated(w, r, body.BoardID, body.BoardName, body.NewBoard)
+		key, created, ok := h.launchBoardWith(w, r, body.BoardID, body.BoardName, body.NewBoard, body.RenameOldBoard)
 		if !ok {
 			return
 		}

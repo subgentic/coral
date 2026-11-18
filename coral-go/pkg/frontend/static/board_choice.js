@@ -8,6 +8,7 @@
 export function retryPayload(payload, pick) {
     if (pick && pick.board_id) return { ...payload, board_id: pick.board_id, board_name: pick.board_id, new_board: undefined };
     if (pick && pick.new_board) return { ...payload, new_board: true, board_id: undefined };
+    if (pick && pick.rename_old_board) return { ...payload, rename_old_board: true, board_id: undefined };
     return null;
 }
 
@@ -47,7 +48,7 @@ export function chooseBoard(data, name) {
         h.textContent = candidates.length > 1 ? `Boards named "${name}" already exist` : `A board named "${name}" already exists`;
         const p = document.createElement('p');
         p.className = 'board-choice-text';
-        p.textContent = 'Join it, so the agents share its messages and tasks, or start another board with the same name.';
+        p.textContent = 'Join it, so the agents share its messages and tasks, start another board with the same name, or rename the old team and start the new one.';
         box.append(h, p);
 
         const done = pick => {
@@ -86,8 +87,26 @@ export function chooseBoard(data, name) {
         cancel.dataset.action = 'cancel';
         const another = button(`Create another "${name}"`, 'btn', { new_board: true });
         another.dataset.action = 'new';
-        actions.append(cancel, another);
+        // One old team holding the name (#19724): free the name by relabelling it <name>-YYYY-MM-DD, then start the new team. Not offered for an ambiguous name; off, with the reason, while it has running agents.
+        let whyEl = null;
+        const renameTo = candidates.length === 1 && data && typeof data.rename_to === 'string' ? data.rename_to : '';
+        actions.append(cancel);
+        if (renameTo) {
+            const running = data.rename_blocked === 'running_agents';
+            const rename = button(`Rename the old team to "${renameTo}" and start the new one`, 'btn btn-primary', { rename_old_board: true });
+            rename.dataset.action = 'rename-old';
+            if (running) {
+                rename.disabled = true;
+                const why = document.createElement('p');
+                why.className = 'board-choice-text board-choice-why';
+                why.textContent = 'The old team has agents running, so it is not renamed under them. Stop them first, or use another name.';
+                whyEl = why;
+            }
+            actions.append(rename);
+        }
+        actions.append(another);
         box.append(list, actions);
+        if (whyEl) box.append(whyEl);
         overlay.appendChild(box);
         // Escape and the backdrop cancel this dialog only, never the launch dialog under it.
         overlay.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(null); } });

@@ -139,6 +139,39 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         check('Escape: no launch', (await result()) === null && !(await ev(`!!document.getElementById('board-choice-modal')`)));
         check('and no agent was started', sessions.length === before);
 
+        const NAME2 = 'ids-rename-19724';
+        const launchNamed = (name = NAME2) => ev(`(async () => {
+            const m = await import((window.__coralStatic || '/static/') + 'modals.js');
+            window.__launchDone = false;
+            window.__launch = m._launchOn('local', '/api/sessions/launch', { working_dir: ${JSON.stringify(require('node:os').tmpdir())}, agent_type: 'terminal', display_name: 'Rename QA', board_name: ${JSON.stringify(name)} })
+                .then(r => { window.__launchResult = r; window.__launchDone = true; return r; });
+            return true; })()`);
+        console.log('4a. A team with a running agent: the rename choice is there, off, with the reason (#19724)');
+        await launchNamed('ids-running-19724');
+        await record(await result());
+        await launchNamed('ids-running-19724');
+        await until(`!!document.getElementById('board-choice-modal')`, 'the choice dialog');
+        const blocked = await ev(`(() => { const b = document.querySelector('#board-choice-modal [data-action="rename-old"]');
+            return b && { text: b.textContent, disabled: b.disabled, why: (document.querySelector('#board-choice-modal .board-choice-why') || {}).textContent || '' }; })()`);
+        check('rename is offered but off while the old team has an agent running, and says why', !!blocked && blocked.disabled && /^Rename the old team to "[^"]+-\d{4}-\d{2}-\d{2}" and start the new one$/.test(blocked.text) && /agents running/.test(blocked.why), JSON.stringify(blocked));
+        await ev(`document.querySelector('#board-choice-modal [data-action="cancel"]').click(); true`);
+        await result();
+
+        console.log('4b. A previous team with nothing running: one click renames it and starts the new one (#19724)');
+        await launchNamed();
+        const prev = await record(await result());
+        const oldId = prev && prev.board_project;
+        await api('POST', `/api/sessions/live/${encodeURIComponent(sessions[sessions.length - 1].name)}/kill`, { agent_type: 'terminal', session_id: prev.session_id });
+        await launchNamed();
+        await until(`!!document.getElementById('board-choice-modal')`, 'the choice for the old team');
+        const open = await ev(`(() => { const b = document.querySelector('#board-choice-modal [data-action="rename-old"]'); return b && { disabled: b.disabled, text: b.textContent }; })()`);
+        check('the rename is offered and on', !!open && !open.disabled, JSON.stringify(open));
+        await ev(`document.querySelector('#board-choice-modal [data-action="rename-old"]').click(); true`);
+        const fresh = await record(await result());
+        check('the new team is a new board under the name', !!fresh && fresh.board_project !== oldId && fresh.board_label === NAME2, JSON.stringify(fresh && { board: fresh.board_project, label: fresh.board_label }));
+        const oldBoard = await api('GET', `/api/board/${encodeURIComponent(oldId)}`);
+        check('the old team keeps its board, under the dated name', oldBoard.status === 200 && oldBoard.data && oldBoard.data.board_id === oldId && /^ids-rename-19724-\d{4}-\d{2}-\d{2}$/.test(oldBoard.data.board_label), JSON.stringify(oldBoard.data));
+
         console.log('5. The launch picker lists boards by label');
         const opts = await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'modals.js');
             m.showLaunchModal && m.showLaunchModal(); window._selectLaunchType('agent'); // the agent step fills the board picker

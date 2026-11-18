@@ -81,7 +81,7 @@ func launchAbility(a teamAbilities) string {
 		cmd += " --model " + shellWord(m)
 	}
 	cmd += ` --prompt "<its job>" --board ` + shellWord(promptValue(a.BoardID))
-	return "Adding a member: when your plan needs a role the team lacks, run " + cmd + ". Keep the type and model shown: they are the team's own. If the name you want already belongs to an archived or sleeping member, do not start it on your own: ask the Operator whether to start that member or to pick another name, and launch only after they answer. If the launch answers 409 name_archived, that name belongs to an archived member: start it with coral-board wake, or launch again with the suggested name. Then post one line naming who you added and why."
+	return "Adding a member: when your plan needs a role the team lacks, run " + cmd + ". Keep the type and model shown: they are the team's own. If the name you want already belongs to an archived or sleeping member, do not start it on your own: ask the Operator whether to start that member or to pick another name, and launch only after they answer. Starting a new team under the name of another team (409 board_name_exists) is the Operator's choice, including renaming the old team to free the name: ask the Operator. If the launch answers 409 name_archived, that name belongs to an archived member: after the Operator says so, start it with coral-board wake, or launch again with the suggested name. Then post one line naming who you added and why."
 }
 
 // orchestratorCanDo is the lines for a team's settings: settings in, lines out.

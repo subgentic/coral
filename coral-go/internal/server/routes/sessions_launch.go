@@ -36,8 +36,9 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		Prompt          string                 `json:"prompt"`
 		Skills          []string               `json:"skills"` // approved skills to tell the agent about (#12023): ids from the Skills Store
 		BoardName       string                 `json:"board_name"`
-		BoardID         string                 `json:"board_id"`  // join this board (#3536)
-		NewBoard        bool                   `json:"new_board"` // create another board even if the name exists
+		BoardID         string                 `json:"board_id"`         // join this board (#3536)
+		NewBoard        bool                   `json:"new_board"`        // create another board even if the name exists
+		RenameOldBoard  bool                   `json:"rename_old_board"` // relabel the one team with this name <name>-YYYY-MM-DD, then start the new one (#19724)
 		BoardServer     string                 `json:"board_server"`
 		Backend         string                 `json:"backend"`
 		BoardType       string                 `json:"board_type"`
@@ -109,7 +110,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	boardCreated := false // this request made the board: it has no switch yet (#19138)
 	// Which board on this Coral the agent joins or starts (#3536); a remote board's Coral decides its own.
 	if (body.BoardName != "" || body.BoardID != "") && (body.BoardServer == "" || body.BoardServer == "local") {
-		key, created, ok := h.launchBoardCreated(w, r, body.BoardID, body.BoardName, body.NewBoard)
+		key, created, ok := h.launchBoardWith(w, r, body.BoardID, body.BoardName, body.NewBoard, body.RenameOldBoard)
 		if !ok {
 			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
 			return

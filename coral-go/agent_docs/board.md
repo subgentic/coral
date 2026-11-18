@@ -51,7 +51,7 @@ the label.
 - **Launching** (`/api/sessions/launch`, `/api/sessions/launch-team`): `board_id` joins that
   board. `board_name` starts a NEW board with that label, but if a board with that id or label
   already exists the answer is 409 `board_name_exists` with the `candidates`. Retry with
-  `board_id` to join one, or with `"new_board": true` to start another with the same name.
+  `board_id` to join one, with `"new_board": true` to start another with the same name, or with `"rename_old_board": true` to relabel the one old team `<name>-YYYY-MM-DD` (`-2`, `-3` if that is taken) and start the new one under the name. The 409 carries `rename_to` (that name) and, when the old team has an agent running, `rename_blocked: "running_agents"`; asking anyway answers 409 `board_has_running_agents` and renames nothing. Only the label changes: the old team's board, messages, tasks and goals stay under its new name. Like `new_board`, it is the Operator's choice: an agent's token is refused with `forbidden_for_agent`.
 
 **One name per running agent (#3543):** when an agent joins a board where another running
 agent already holds its role (a team template launched onto a board that has those roles),
