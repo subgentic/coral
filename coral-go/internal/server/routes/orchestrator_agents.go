@@ -272,6 +272,7 @@ func (h *SessionsHandler) OrchestratorWake(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
+	target = h.startable(r.Context(), target) // an ended agent is Archived: Start brings it back (#19696)
 	if target.IsSleeping != 1 {
 		// A row still awake whose CLI has ended and left a plain shell (a killed process the reconciler has not marked yet, #13413) is Ended: it is put to sleep as the reconciler would and woken now,
 		// instead of refused as awake. A running CLI, or a terminal that cannot be read, is still awake.

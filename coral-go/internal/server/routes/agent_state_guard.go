@@ -47,3 +47,18 @@ func (h *SessionsHandler) refuseArchive(w http.ResponseWriter, ctx context.Conte
 	orchRefusal(w, http.StatusConflict, code, why)
 	return true
 }
+
+// startable is the row a Start works on: an agent whose session ended (a Stop that killed it, its own exit) is Archived too, and Start brings it back like any sleeper (#19696). The row is made a sleeping one first; the
+// returned row is fresh. A row that is not ended is returned as it is.
+func (h *SessionsHandler) startable(ctx context.Context, sess *store.LiveSession) *store.LiveSession {
+	if sess == nil || sess.IsSleeping == 1 || sess.Status != "inactive" || sess.StoppedAt == nil {
+		return sess
+	}
+	if ok, err := h.ss.ReviveEndedSession(ctx, sess.SessionID); err != nil || !ok {
+		return sess
+	}
+	if fresh, err := h.ss.GetLiveSession(ctx, sess.SessionID); err == nil && fresh != nil {
+		return fresh
+	}
+	return sess
+}

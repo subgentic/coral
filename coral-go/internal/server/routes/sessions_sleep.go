@@ -342,6 +342,7 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session not found"})
 		return
 	}
+	sess = h.startable(ctx, sess) // an ended agent is Archived: Start brings it back (#19696)
 	if sess.IsSleeping != 1 {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session is not sleeping"})
 		return

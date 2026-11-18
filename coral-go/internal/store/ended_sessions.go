@@ -44,3 +44,19 @@ func (s *SessionStore) EndedSessionsOnBoard(ctx context.Context, board string) (
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Order < out[j].Order }) // in the order the team was started (Lead, Dev, QA), not the order Kill All ended them
 	return out, nil
 }
+
+// ReviveEndedSession turns an ended agent's row (inactive, with a stop time) into a sleeping one, so a Start wakes it like any sleeper: its resume info is the row's own (#19696). It refuses, reporting false, when the row is not ended
+// or another active session of the same board already has the name (the agent was started again): a team's names are unique.
+func (s *SessionStore) ReviveEndedSession(ctx context.Context, sessionID string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE live_sessions SET status = 'active', stopped_at = NULL, is_sleeping = 1, is_archived = 0
+		WHERE session_id = ? AND status = 'inactive' AND stopped_at IS NOT NULL AND is_job = 0
+		  AND NOT EXISTS (SELECT 1 FROM live_sessions o WHERE o.status = 'active' AND o.session_id <> live_sessions.session_id
+		                  AND COALESCE(o.board_name, '') = COALESCE(live_sessions.board_name, '')
+		                  AND COALESCE(NULLIF(o.display_name, ''), o.agent_name) = COALESCE(NULLIF(live_sessions.display_name, ''), live_sessions.agent_name))`, sessionID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
