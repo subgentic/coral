@@ -38,7 +38,19 @@ func TestTrustAgyAddsTheOneFolderToTrustedWorkspacesAndKeepsTheRest(t *testing.T
 	require.NoError(t, err)
 	b, _ = os.ReadFile(cfg)
 	assert.Contains(t, string(b), `"model": "x"`)
-	assert.Contains(t, string(b), r.work)
+	// JSON writes a Windows path's backslashes escaped, so the raw text never holds the plain path: read the list back (#19663)
+	require.NoError(t, json.Unmarshal(b, &got))
+	assert.Equal(t, []string{r.work}, got.Trust, "a list made with the one folder")
+
+	// a Windows-style path (backslashes) is written escaped and reads back whole, on every OS
+	winPath := `C:\Users\x\work`
+	require.NoError(t, os.WriteFile(cfg, []byte(`{"model":"x"}`), 0o600))
+	_, err = TrustAgy(cfg, winPath)
+	require.NoError(t, err)
+	b, _ = os.ReadFile(cfg)
+	got.Trust = nil
+	require.NoError(t, json.Unmarshal(b, &got))
+	assert.Equal(t, []string{winPath}, got.Trust)
 
 	// a file that is not there: the CLI makes it at its first start, and its prompt stays until then
 	_, err = TrustAgy(filepath.Join(r.home, "nothing.json"), r.work)
