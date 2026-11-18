@@ -601,7 +601,7 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 	n.notifiedMu.Lock()
 	n.notified[sessName] = notifyState{count: unread, latestID: latestID, at: n.now()}
 	n.notifiedMu.Unlock()
-	ptymanager.NoteBoardAnnounced(a.SessionID, latestID) // the turn-end hand-off does not announce these again (#19622)
+	ptymanager.NoteBoardAnnounced(sessName, latestID) // the turn-end hand-off does not announce these again (#19622)
 }
 
 // modelRefused says whether a is a Codex agent whose model is refused (#13480), and which; and forgets the log of one whose refusal is gone.

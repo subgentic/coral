@@ -81,7 +81,7 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 	// At most one hand-off per window per agent, so an agent flooded with board messages is not sent from turn to turn without a pause (#10996 (a)): what waits is handed over when the window is over, or by the
 	// notifier's reminder. A message that @mentions the agent, or is from the Operator, goes at once; a check that fails counts as one (today's behaviour).
 	urgency := h.handoffUrgency(ctx, owner.SessionName)
-	if urgency != urgentNow && h.announcedByNudge(ctx, owner.SessionID, owner.SessionName) {
+	if urgency != urgentNow && h.announcedByNudge(ctx, owner.SessionName) {
 		// One channel per message (#19622): a routine message the typed nudge already announced is not announced again by this block; a mention of the agent or the Operator's message still goes at once.
 		slog.Info("turn-end hand-off held: the nudge announced these messages", "session", owner.SessionName, "unread", unread)
 		writeJSON(w, http.StatusOK, none)
@@ -209,8 +209,8 @@ func (h *SessionsHandler) handoffUrgency(ctx context.Context, sessionName string
 }
 
 // announcedByNudge says whether a typed board nudge already covered every message the agent has unread.
-func (h *SessionsHandler) announcedByNudge(ctx context.Context, sessionID, sessionName string) bool {
-	told := ptymanager.BoardAnnouncedUpTo(sessionID)
+func (h *SessionsHandler) announcedByNudge(ctx context.Context, sessionName string) bool {
+	told := ptymanager.BoardAnnouncedUpTo(sessionName)
 	if told <= 0 {
 		return false
 	}

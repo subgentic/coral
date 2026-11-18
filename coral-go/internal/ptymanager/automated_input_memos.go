@@ -70,6 +70,7 @@ func ForgetSessionKeepingProcess(name string) { forgetSession(name, false) }
 func forgetSession(name string, processEnded bool) {
 	name = sessionOfTarget(name)
 	forgotten.notify(name)
+	forgetBoardAnnounced(name)
 	gate.mu.Lock()
 	delete(gate.lastTyped, name)
 	gate.mu.Unlock()

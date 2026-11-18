@@ -468,12 +468,25 @@ func TestTurnEndHandoffDoesNotRepeatWhatANudgeAnnounced(t *testing.T) {
 		return id
 	}
 	post("Lead", "fyi the build is green")
-	ptymanager.NoteBoardAnnounced(sid, latest()) // the nudge for it was typed
+	ptymanager.NoteBoardAnnounced(name, latest()) // the nudge for it was typed
 	assert.False(t, ask(), "a routine message the nudge announced is not announced again by the Stop hook")
 	post("Lead", "fyi another thing")
 	assert.True(t, ask(), "a newer routine message the nudge did not cover is handed over")
-	ptymanager.NoteBoardAnnounced(sid, latest())
+	ptymanager.NoteBoardAnnounced(name, latest())
 	post("Lead", "@Orch please look now")
-	ptymanager.NoteBoardAnnounced(sid, latest())
+	ptymanager.NoteBoardAnnounced(name, latest())
 	assert.True(t, ask(), "a mention goes at once even when a nudge covered it")
+
+	// #19640: a restart (or sleep and wake, or /clear) keeps the session id but is a conversation that never saw those nudges: the mark is cleared.
+	h.handoffs.setEvery(time.Millisecond)
+	time.Sleep(5 * time.Millisecond) // sleep-ok: the window is wall-clock time
+	_, err = h.bs.ReadMessages(ctx, board, "Orch", 100) // the mention above is read: only routine messages wait
+	require.NoError(t, err)
+	post("Lead", "fyi after a restart")
+	ptymanager.NoteBoardAnnounced(name, latest())
+	assert.False(t, ask(), "announced: held")
+	ptymanager.ForgetSession(name)
+	assert.Zero(t, ptymanager.BoardAnnouncedUpTo(name), "a restart clears the mark")
+	time.Sleep(5 * time.Millisecond) // sleep-ok: the window is wall-clock time
+	assert.True(t, ask(), "the fresh conversation is handed the messages it never saw")
 }
