@@ -1,5 +1,71 @@
 # Release Notes
 
+## v2.1.0 — Search across tasks and goals, reminders for any agent, a calmer Needs you list, an Activity view that leaves out the noise, and spend broken down by goal
+
+Task numbers in brackets. Built on v2.0.70. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Search finds tasks and goals, and past chats** (#19161, #19236, #19237, #19423, #19448, #19476, #19481): `coral-board search` covers tasks and goals as well as messages, takes words in any order, ranks the closest matches first (`--sort oldest|newest` for time order), leaves out task-queue notices and says how to narrow a search. The dashboard search uses the same search.
+- **Any agent can have reminders** (#19162, #19245, #19288, #19350, #19528, #19531): a reminder is a check with an origin (the Operator, an agent, the Orchestrator); an agent cancels only its own; Settings shows each agent's reminder count with a per-agent switch; a single agent has Reminders in its Info tab, and a task's reminder time runs on the same machinery.
+- **Needs you is calmer and reads one way** (#17450, #17451, #19247, #19425, #19469, #19061, #19122): the header is two rows, counts are plain numbers, a row has one layout with its waiting time grey and short (amber only past a day), a goal and task sit on one grey line, and an agent's question has a tick box and Answer beside Dismiss.
+- **Activity has an Important view, on by default** (#19149, #19219): it leaves out delivery bookkeeping; Everything is one click away and Clear all lands on it.
+- **Analytics can group spend by goal** (#17633, #19182, #19191, #19192, #19197, #19227, #19246): usage by goal comes from the recorded task work windows, the burn rate is the cost over the hours of the chosen range, and the input column is headed New input tokens.
+- **Artifact preview size is a setting** (#17210): the 2 MB limit is now a setting with a 16 MB default.
+- **A Dismiss of a file with earlier versions is one Activity row**, not one per version (#19139).
+
+#### Teams, agents and the Orchestrator
+
+- The Orchestrator can start agents only where the team's Orchestrator access is switched on, and the default grant goes only to the seat the launch made, and an existing team gets no default grant switched on (#19138, #19507, #19516, #19530). The Orchestrator's can-do section names the stop switch and the reviewer pool (#17710).
+- A woken or restarted Claude agent keeps the permission mode it was last in, and a restart starts on the model the transcript says the agent runs now (#19543, #19506, #19513).
+- The shared team Model reaches the Orchestrator, and a Blank team can set it (#17484).
+- Team trust: a New agent launch trusts its folder under the team rule, with a Trust this folder tick; agy is included (#19128, #19176, #19216).
+- Coral sees an agent compacting: a message sent meanwhile is queued, not refused; a compaction with no event after it stops showing Compacting after ten minutes (#19090, #19151).
+- A team's first goal closes the opening ask once, and only the Orchestrator's first ask is marked (#19170, #19196).
+- An agent in tmux no longer holds an auto-install; a hold says an update is ready (#19487, #19493).
+- Distill knowledge for one agent, from the agent's menu (#19560).
+- The Orchestrator skill has a Managing agents already on the board section (#19508).
+
+#### Chat, comments and the board
+
+- A refused send says why in plain words (#19173); a nudge and the person's typed text in one turn read as the person's lines (#19534, #19548).
+- An Operator comment sent while an agent is busy is no longer dropped when that turn uploads the next version (#19563).
+- Board notices about an agent are not every agent's unread mail, and each board message is announced once (#19608, #19622, #19640).
+- Health nudges: no wait or status nudge for a sleeper or an Operator wait; the Orchestrator is tagged on a could-not-resume line and the final-approval line (#19614, #19615, #19619, #19633).
+- Task release is not a broadcast; submit-review is the report (#19623).
+- Agents are told once how to look things up (#19422); `coral-board task unlanded` finds a head where the submit text names none (#19603).
+
+#### Inbox, Activity and the phone
+
+- A question answered in the agent's chat closes without telling the agent it was dismissed (#18553, #19355); a failed task read gives up its body, and Open agent is the main button on an unreadable request (#19524, #19553).
+- Counts match their lists: Open plus Done equals All, and a team's Open view counts only unfinished tasks (#17692, #19274, #17130).
+- Dismiss on a welcome item says so with Undo and is listed in Settings > Inbox with Restore (#17410).
+- Opened questions keep the question's own lines (#19295); the 150% zoom pass fits the ask reply row, comment composer and toasts (#17300).
+- Touch targets at tablet width are larger (#17694); the phone Inbox top bar does not repeat the folder name (#19082).
+- A kept record from before Important existed opens on Important, one time (#19149).
+
+#### Files, artifacts, skills and docs
+
+- Version compare of an HTML file has a Before / after view with both versions drawn as pages (#17818).
+- A saved file says Saved, not For review (#18132); the artifact viewer's Download says it started and where the file goes (#17676).
+- The Knowledge page says a saved hand-edit reaches the agent at its next start (#19252).
+- Jobs: a finished run whose chat is gone shows what its agent said last (#16958).
+- Docs: Skills sits in Getting started and the guides come before the developer pages (#17362, #19273).
+- SKILL.md rendering keeps script, img onerror and javascript: links inert (#19357).
+- The `$` menu matches words against every local skill (#19431).
+
+#### For the team
+
+- Test and gate work: chat_rollup_closed, theme_load_applies, needs_new_comments, chat_banners, skills_versions, launch_skills_phone, keyboard_inbox_rows and others got their causes fixed instead of retried; `tests/stress/run_search_sources.sh` checks the coral-search done-when on an isolated server (#19650, #19657, #19505, #19519, #19525, #19275, #19449, #19402).
+- `coral-board resource claim --run` gives the slot back when the run ends or is stopped (#18488, #19309).
+- The safefs join census and the dataowner census list the new callers with their reasons (#19565, #19607, #19622).
+
+### Known issues
+
+- None from the gate: go-tests, go-race, gofmt, cross-build, the cdp-gate (2127 of 2127 suites) and the Windows tests all passed on their first run.
+
 ## v2.0.70 — A Getting started guide with sharp pictures, computer status and Hub history out of Settings, approved skills for existing teams, team questions beside agents and goals, and a steadier team tab strip
 
 Task numbers in brackets. Built on v2.0.69, which was published but never promoted: v2.0.70 is the release to promote. Everything in the v2.0.69 notes below is in this release too. A prerelease until the Operator promotes it.
