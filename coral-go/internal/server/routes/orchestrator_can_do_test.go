@@ -69,7 +69,7 @@ func TestModelInFlags(t *testing.T) {
 // The prompt's section is built from the grant as it is now: off, on, and on while the Operator's team is still starting (the grant row is written once the seat has started).
 func TestTheAbilitiesSectionFollowsTheTeamsGrant(t *testing.T) {
 	r := newOrchRig(t)
-	r.usualBoard()
+	r.usualBoardOff()
 	section := BoardAbilitiesSection(r.h.bs, r.ss)
 	p := agent.LaunchParams{BoardName: orchBoard, WorkingDir: r.work, Role: "Orchestrator", Flags: []string{"--model", "haiku"}}
 	want := func(mayLaunch bool) string {
@@ -92,7 +92,7 @@ func TestTheAbilitiesSectionFollowsTheTeamsGrant(t *testing.T) {
 func TestFlippingTheLaunchSettingTellsTheRunningOrchestratorOnce(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
-	r.usualBoard()
+	r.usualBoardOff()
 	seat, err := r.ss.GetLiveSession(ctx, r.sid["Orchestrator"])
 	require.NoError(t, err)
 	onLine := launchAbility(abilitiesOf(seat, orchBoard, true))
@@ -231,7 +231,7 @@ func TestTheCanDoSectionNamesStopAndTheReviewerPool(t *testing.T) {
 func TestStopAndPoolReachTheOrchestratorsPromptAndStopFlipsAreTold(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
-	r.usualBoard()
+	r.usualBoardOff()
 	section := BoardAbilitiesSection(r.h.bs, r.ss)
 	p := agent.LaunchParams{BoardName: orchBoard, WorkingDir: r.work, Role: "Orchestrator"}
 	code, _ := r.operatorGrant("Orchestrator", nil)

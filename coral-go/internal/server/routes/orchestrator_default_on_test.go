@@ -208,7 +208,7 @@ func TestAnAgentsLaunchStaysInTheTeamsFolder(t *testing.T) {
 // The folder rule applies only where the grant is on: with no grant row or an off grant an agent may not start agents at all (#17661, #19138), so there is no folder to hold it to.
 func TestTheFolderRuleDoesNotApplyWhereTheGrantIsOffOrAbsent(t *testing.T) {
 	r := newOrchRig(t)
-	r.usualBoard() // no grant row
+	r.usualBoardOff() // no grant row
 	// a launched helper's folder becomes one of the team's, so each step names a folder of its own
 	launch := func(dir string) (int, map[string]any) {
 		b, _ := json.Marshal(map[string]any{"working_dir": dir, "agent_type": "claude", "board_id": orchBoard, "display_name": "Helper"})
@@ -269,7 +269,7 @@ func TestASiblingWorktreeOfTheTeamsRepoIsTheTeamsFolder(t *testing.T) {
 func TestAnAgentsLaunchWithNoBoardGoesOntoItsOwnTeamWhereTheGrantIsOn(t *testing.T) {
 	r := newOrchRig(t)
 	ctx := context.Background()
-	r.usualBoard() // Orchestrator and Dev2 awake, Dev asleep
+	r.usualBoardOff() // Orchestrator and Dev2 awake, Dev asleep
 	launch := func(extra map[string]any) (int, map[string]any) {
 		body := map[string]any{"working_dir": r.work, "agent_type": "claude", "display_name": "Helper"}
 		for k, v := range extra {

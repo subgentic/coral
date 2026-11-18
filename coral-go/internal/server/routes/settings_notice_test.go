@@ -102,7 +102,7 @@ func TestAWorkingModeSaveIsToldToTheOrchestrator(t *testing.T) {
 func TestAnOrchestratorGrantChangeIsToldToTheOrchestrator(t *testing.T) {
 	holdSettingsNotices(t)
 	r := newOrchRig(t)
-	r.usualBoard()
+	r.usualBoardOff()
 	code, out := r.operatorGrant("Orchestrator", map[string]any{"max_live": 9})
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	r.h.bs.FlushSettingsNotice(context.Background(), orchBoard)
