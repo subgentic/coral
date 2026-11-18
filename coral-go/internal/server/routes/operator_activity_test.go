@@ -424,3 +424,26 @@ func TestTheSurfaceHeaderIsKeptOnlyAsOneOfTwoWords(t *testing.T) {
 	}
 	assert.Equal(t, "", surfaceOf(httptest.NewRequest("GET", "/", nil)))
 }
+
+// #19139: Dismiss on a file with earlier versions settles each version but is ONE Activity row: the earlier ones are sent with older_version and write none (the Operator saw 'Dismissed site-first-look.md' twice).
+func TestDismissingAFileWithEarlierVersionsIsOneActivityRow(t *testing.T) {
+	e := newReviewEnv(t, true)
+	act := e.activityServer(t, true)
+	e.tag(t, `["for review"]`)
+	post := func(body string) {
+		t.Helper()
+		req, _ := http.NewRequest("POST", e.srv.URL+"/api/board/alpha/artifacts/"+e.id+"/review", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, body)
+	}
+	post(`{"decision":"ignore","older_version":true}`) // an earlier version of the same file: settled, no row of its own
+	_, out := getActivity(t, act.URL, "?action=ignore", nil)
+	require.Empty(t, out["actions"], "an earlier version's dismissal writes no row")
+	post(`{"decision":"unignore","older_version":true}`)
+	post(`{"decision":"ignore"}`) // the newest version, the row the person pressed
+	_, out = getActivity(t, act.URL, "?action=ignore", nil)
+	require.Len(t, out["actions"].([]any), 1, "the file's Dismiss is one row")
+}
