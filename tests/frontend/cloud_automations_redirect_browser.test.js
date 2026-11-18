@@ -1,6 +1,5 @@
-// The Hub does not serve Automations (#9711, coral-hub's fact of 00:07Z): on a Hub-served dashboard typing /jobs, /workflows or any /automations/** address lands on Agents, never on the Automations
-// screen (its New job, Build with agent, New workflow, run controls). The page is the local server's own with the Hub's boot flag and a Hub sign-in answered (as team_presets_hub_browser does it);
-// a local dashboard keeps the screen (the control, in the same run).
+// #19571: Automations addresses remain available in cloud with the approved
+// owner-only, metadata-allow-list server prerequisite. Local routing is unchanged.
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
@@ -35,8 +34,8 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.getElementById('coral-boot') && JSON.parse(document.getElementById('coral-boot').textContent).mode === 'cloud'`, `${url}: the Hub's boot flag`, 10000);
             await waitFor(`!!document.body.getAttribute('data-nav-tab')`, `${url}: a tab is on screen`, 10000);
             w = await where();
-            assert.ok(w.tab === 'agents' && !w.screen && !w.path.startsWith('/automations') && !w.path.startsWith('/jobs') && !w.path.startsWith('/workflows'), `${url} on the Hub lands on Agents, not on the Automations screen: ` + JSON.stringify(w));
+            assert.ok(w.tab === 'automations' && w.screen && w.path.startsWith('/automations'), `${url} opens read-only Automations in cloud: ` + JSON.stringify(w));
         }
-        console.log('PASS the Hub redirects ' + ADDRESSES.length + ' Automations addresses to Agents');
+        console.log('PASS the Hub opens ' + ADDRESSES.length + ' read-only Automations addresses');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
