@@ -152,6 +152,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/custom-modes": true, "/api/custom-models": true, // the custom models are the owner's alone through the hub (#5996)
 		"/api/skills/search": true, // the skills menu is the owner's alone through the hub (#19430)
 		"/api/board/{project}/tasks/{taskID}/changes.diff": true, "/api/sessions/live/{name}/attachment/{ref}": true, // a task's diff and a chat's pasted image are the owner's alone through the hub (#19629)
+		"/api/skills": true, "/api/skills/{id}": true, // the Skills page's two reads are the owner's alone through the hub (#19627)
 		"/api/resources": true} // the resource queue's list is the owner's alone through the hub, notes redacted (#16140)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
@@ -174,6 +175,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		}
 		if f[1] == "/api/artifacts/{id}" {
 			path = "/api/artifacts/" + artifactHex
+		}
+		if f[1] == "/api/skills/{id}" { // a skill id is 32 lowercase hex digits (#19627); the rig has none, so the owner's answer is the route's own 404 (the plain hub caller was refused above)
+			path = "/api/skills/" + strings.Repeat("c", 32)
 		}
 		if f[1] == "/api/artifacts/resolve" { // which artifact a shortened link means (#9841): it needs a link to answer 200 (none matches in the rig)
 			path = "/api/artifacts/resolve?link=" + artifactHex[:8]
@@ -236,10 +240,11 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		editAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/edit") || strings.HasSuffix(f[1], "/edit/send")) && (rec.Code == 404 || rec.Code == 409) // 409 not_an_edit: the rig's artifact is no saved edit
 		// The chat's pasted image (#19629) names an image in the session's transcript; the rig's has none, so the owner's answer is the route's own 404 "no such attachment" (the plain hub caller was refused above).
 		attachmentAbsent := f[1] == "/api/sessions/live/{name}/attachment/{ref}" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no such attachment")
+		skillAbsent := f[1] == "/api/skills/{id}" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no such skill")
 		thumbnailAbsent := f[1] == "/api/artifacts/{id}/thumbnail" && rec.Code == 404 && strings.Contains(rec.Body.String(), "thumbnail unavailable")
 		// The thread reads (#14440) need a team and a goal or task of it: the rig sends neither, so the owner's answer is the route's own 400 or 404 (the plain hub caller was refused above).
 		threadAbsent := (f[1] == "/api/thread" || f[1] == "/api/threads") && (rec.Code == 400 || rec.Code == 404)
-		if rec.Code == 200 || attachmentAbsent || thumbnailAbsent || threadAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
+		if rec.Code == 200 || skillAbsent || attachmentAbsent || thumbnailAbsent || threadAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
 			answered++
 		}
 		for _, home := range homes {

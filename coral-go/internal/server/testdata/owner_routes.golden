@@ -48,7 +48,9 @@ GET /api/session-artifacts view owner-only
 GET /api/sessions/live view owner-sees
 GET /api/sessions/live/{name}/attachment/{ref} view owner-only
 GET /api/settings/prompt-inspection launch owner-only
+GET /api/skills view owner-only
 GET /api/skills/search view owner-only
+GET /api/skills/{id} view owner-only
 GET /api/system/update view owner-update
 GET /api/team-artifacts view owner-only
 GET /api/thread view owner-only

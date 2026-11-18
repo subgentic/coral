@@ -78,6 +78,7 @@ var routeQueries = map[string]string{
 	"GET /api/sessions/live/{}/subagents/{}":      "session_id",
 	"GET /api/sessions/live/{}/tasks":             "limit,session_id",
 	"GET /api/settings/prompt-inspection":         "board",
+	"GET /api/skills":                             "status=approved|pending|rejected",
 	"GET /api/skills/search":                      "q,session_id",
 	"GET /api/system/cli-check":                   "signin,source=cli_recheck,type=claude|agy|antigravity|gemini|codex|pi|opencode|hermes",
 	"GET /api/team-artifacts":                     "board,by,cursor,digest,facets,goal,kept,kind,limit,muted,offset,origin,q,read,since,sort,starred,starred_first=true,tag,task,team,until,versions=newest|all,waiting",
