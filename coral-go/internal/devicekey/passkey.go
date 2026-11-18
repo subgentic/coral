@@ -123,8 +123,9 @@ func (v *Verifier) HandleCertificate(ctx context.Context, c Certificate, now tim
 	} else if !errors.Is(err, store.ErrUnknownSigner) {
 		return none, mapStoreErr(err) // a key on the removed list is refused, not added again
 	}
-	pm, ok := tunnel.ParseMode(pass.Mode) // the new device starts at view, never above the passkey's own mode
-	if !ok || pm < tunnel.TierView {
+	newMode := tunnel.TierView
+	pm, ok := tunnel.ParseMode(pass.Mode) // the new mode never exceeds the passkey's own (a row with a word that is no mode adds nothing)
+	if !ok || newMode > pm {
 		return none, ErrAboveSigner
 	}
 	if err := v.Store.RecordNonce(ctx, nonce, pass.KID, now, passkeyCertWindow); err != nil {
@@ -133,7 +134,7 @@ func (v *Verifier) HandleCertificate(ctx context.Context, c Certificate, now tim
 	if err := v.Store.TouchDeviceKey(ctx, pass.KID, now); err != nil {
 		return none, err
 	}
-	k := store.DeviceKey{KID: devKID, PK: devRaw, Label: c.Label, Mode: tunnel.TierView.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}
+	k := store.DeviceKey{KID: devKID, PK: devRaw, Label: c.Label, Mode: newMode.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}
 	if _, err := v.Store.AddDeviceKey(ctx, k, now); err != nil {
 		return none, mapStoreErr(err)
 	}
