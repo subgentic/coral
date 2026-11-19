@@ -20,15 +20,14 @@
 @media (max-width: 40rem) { .version-compare-panes { grid-template-columns: minmax(0, 1fr); } }
 
 /* From a row's "N earlier versions" link the list is a small popover under the link, as the approved design draws it (#19833): a quiet head, one line per earlier version, the actions as links. */
-.version-list-pop { position: fixed; inset: auto; z-index: 30; box-sizing: border-box; width: 360px; max-width: calc(100vw - 24px); margin: 0; padding: 6px; border: 1px solid var(--border-light); border-radius: var(--radius-lg); background: var(--bg-secondary); box-shadow: var(--shadow-lg); }
+.version-list-pop { position: fixed; inset: auto; z-index: 30; box-sizing: border-box; width: 420px; max-width: calc(100vw - 24px); margin: 0; padding: 6px; border: 1px solid var(--border-light); border-radius: var(--radius-lg); background: var(--bg-secondary); box-shadow: var(--shadow-lg); }
 .version-list-pop h2:focus { outline: none; }
 .version-list-pop h2 { margin: 0; padding: 3px 6px 5px; font-size: var(--fs-sm); font-weight: var(--fw-strong); text-transform: uppercase; color: var(--text-muted); }
 .version-list-pop .version-list { margin: 0; }
 .version-list-pop .version-list-entry { flex-wrap: nowrap; gap: 10px; justify-content: space-between; padding: 5px 6px; border: 0; font-size: var(--fs-md); }
-.version-list-pop .version-list-entry[aria-current="true"]:not(:only-child) { display: none; }
 .version-list-pop .version-list-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-medium); color: var(--text-primary); }
 .version-list-pop .version-list-who { flex: 0 0 auto; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-sm); }
-.version-list-pop .version-list-note, .version-list-pop .version-list-compare { display: none; }
+.version-list-pop .version-list-note { display: none; }
 .version-list-pop .version-list-confirm { flex: 1 1 100%; }
 .version-list-pop .version-list-actions { flex: none; flex-wrap: nowrap; gap: 0; margin-left: 0; justify-content: flex-start; white-space: nowrap; }
 .version-list-pop .version-list-actions .btn + .btn::before { content: '\00b7'; margin-inline: 4px; color: var(--text-muted); }
