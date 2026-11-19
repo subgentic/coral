@@ -93,6 +93,9 @@ type RemoteAgentHubConfig struct {
 	// A rejected key, a refused host or an unreadable key shows at once.
 	// Default 20s; negative means none (every failure shows at once).
 	OfflineGrace time.Duration
+	// WakeGap: a gap this long between two looks of the hub's own 5 s clock check (by wall time, which a sleeping computer's monotonic clock hides) means the computer was asleep: every
+	// remote's connections are dialled again at once, so what the sleep left half-dead is not reused. Default 30 s; a test sets less.
+	WakeGap time.Duration
 }
 
 func (c *RemoteAgentHubConfig) fill() {
@@ -116,6 +119,9 @@ func (c *RemoteAgentHubConfig) fill() {
 	}
 	if c.FeedPingInterval <= 0 {
 		c.FeedPingInterval = 30 * time.Second
+	}
+	if c.WakeGap <= 0 {
+		c.WakeGap = 30 * time.Second
 	}
 	if c.OfflineGrace == 0 {
 		c.OfflineGrace = 20 * time.Second
@@ -178,6 +184,8 @@ type RemoteAgentHub struct {
 	// now and sleep are the clock the probe spacing reads; tests replace them to drive a burst without real time (#4958).
 	now   func() time.Time
 	sleep func(ctx context.Context, d time.Duration) bool
+	// wall is the wall clock with no monotonic reading (a sleeping computer's monotonic clock stands still, so only the wall clock shows how long it slept); tests replace it to jump time.
+	wall func() time.Time
 
 	mu      sync.Mutex
 	remotes map[string]*remoteState
@@ -199,6 +207,7 @@ func NewRemoteAgentHub(reg RemoteRegistry, resolver proxy.Resolver, cfg RemoteAg
 		reg: reg, resolver: resolver, cfg: cfg,
 		logger:  slog.Default().With("service", "remote_agents"),
 		now:     time.Now,
+		wall:    func() time.Time { return time.Now().Round(0) },
 		sleep:   SleepCtx,
 		remotes: map[string]*remoteState{},
 		subs:    map[int]chan struct{}{},
@@ -213,8 +222,17 @@ func (h *RemoteAgentHub) Run(ctx context.Context) {
 	h.reconcile(ctx)
 	t := time.NewTicker(h.cfg.RegistryRefresh)
 	defer t.Stop()
+	wakeTick := time.NewTicker(wakeLook)
+	defer wakeTick.Stop()
+	lastLook := h.wall()
 	for {
 		select {
+		case <-wakeTick.C:
+			if now := h.wall(); now.Sub(lastLook) >= h.cfg.WakeGap {
+				h.logger.Info("the hub's computer was asleep; dialling every remote again", "asleep_for", now.Sub(lastLook).Round(time.Second).String())
+				h.ReconnectAll()
+			}
+			lastLook = h.wall()
 		case <-ctx.Done():
 			h.mu.Lock()
 			for _, st := range h.remotes {
@@ -347,6 +365,25 @@ func (h *RemoteAgentHub) current(id string) (*remoteState, bool) {
 	return st, ok
 }
 
+// wakeLook is how often the hub looks at the wall clock to notice that its computer was asleep (a var for the tests).
+var wakeLook = 5 * time.Second
+
+// connResetter is a resolver that keeps connections of its own (an SSH server's stream target and its idle `ssh -W` streams): ResetConnections drops them for one server, so the next request dials from scratch.
+type connResetter interface{ ResetConnections(id string) }
+
+// ReconnectAll is Reconnect for every server, after the hub's computer woke: what the sleep left half-dead (pooled connections, a feed, an ssh stream) is dropped and each server is dialled again at once.
+func (h *RemoteAgentHub) ReconnectAll() {
+	h.mu.Lock()
+	ids := make([]string, 0, len(h.remotes))
+	for id := range h.remotes {
+		ids = append(ids, id)
+	}
+	h.mu.Unlock()
+	for _, id := range ids {
+		h.Reconnect(id)
+	}
+}
+
 // Reconnect stops a server's poll loop and feed, forgets what they knew (its failure run, its
 // feed state, its idle connections) and starts them again at once, so a server stuck on an old
 // failure is dialled from scratch (the operator's Reconnect). An unknown id is ignored.
@@ -367,6 +404,9 @@ func (h *RemoteAgentHub) Reconnect(id string) {
 	h.mu.Unlock()
 	h.logger.Info("remote reconnect requested", "server", id)
 	proxy.CloseIdleConnections()
+	if r, ok := h.resolver.(connResetter); ok {
+		r.ResetConnections(id) // an ssh server's own pooled streams are not in the proxy's transports: the next dial starts a new set
+	}
 	if ctx != nil {
 		h.reconcile(ctx)
 	}

@@ -256,6 +256,7 @@ type Provisioner struct {
 	installOwner       func(ctx context.Context, p *provisionPlan, secret string) error
 	version            string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
 	onRemoved          func(id string)         // a remove took the server out of the registry
+	reconnect          func(id string)         // restarts the hub's workers for a server and drops its pooled connections (the hub's Reconnect): after a Start that brought a computer back (#19885)
 	notify             func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
 	startedAt          time.Time
 	beforeUploadCommit func(p *provisionPlan) // test seam (hub_provision_upload.go)
@@ -291,6 +292,9 @@ const noEULAMarker = "This hub has not accepted Coral's terms yet, so it cannot 
 
 // SetStatusListener sets who hears that a server was registered (the hub's remote workers, as for the registry's own edits).
 func (pr *Provisioner) SetStatusListener(f func(id, status string)) { pr.notify = f }
+
+// SetReconnector sets who restarts a server's connections once a Start brought it back.
+func (pr *Provisioner) SetReconnector(f func(id string)) { pr.reconnect = f }
 
 // NewProvisioner is the setup routes' handler. The paths are the hub user's own (never a path from a request).
 func NewProvisioner(s *store.RemoteServerStore) *Provisioner {

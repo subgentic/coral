@@ -906,6 +906,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		s.authRoutes.SetOnSignOut(s.hubNeedsRemotes.Forget) // a signed-out owner leaves no merged answer behind (#15404)
 		prov.SetOnRemoved(remoteResolver.Forget)
 		prov.SetStatusListener(s.remoteAgents.Refresh) // a server the setup registered shows at once
+		prov.SetReconnector(s.remoteAgents.Reconnect)  // a Start that brought a computer back dials it again from scratch (#19885)
 		rsHandler.SetReconnector(s.remoteAgents.Reconnect)
 		remoteResolver.SetFailureSink(s.remoteAgents)
 		sessHandler.SetRemoteAgents(s.remoteAgents)
