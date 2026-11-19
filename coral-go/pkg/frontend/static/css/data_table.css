@@ -667,7 +667,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .inbox-kind-icon[data-kind="welcome"]::before { content: 'info'; }
 
 /* Needs you goal dividers and document pins (#13888/#13889). */
-.inbox-needs-results .dt-group th { white-space: pre-line; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; color: var(--text-secondary); padding-block: 10px; }
+.inbox-needs-results .dt-group th { white-space: pre-line; text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; color: var(--text-primary); font-weight: var(--fw-strong); background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding-block: 10px; } /* the approved list's group heading: a raised band, the title strong (#19824) */
 .inbox-needs-results .inbox-review-star.dt-star-on { color: var(--accent); }
 
 /* A task's heading inside its goal in Needs you (#14441): one button that opens and shuts the task's items; a chevron, the title and counts, a chip while something waits on the Operator. 44 px high, the whole width. */
