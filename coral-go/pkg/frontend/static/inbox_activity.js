@@ -5,8 +5,8 @@
 import { importOnce } from './import_once.js';
 import { requestJson } from './request_json.js';
 import { teamLabel } from './server_status.js';
-import { serverFetch, identityKey, LOCAL_SERVER, splitKey, decisionNeedsPerson } from './server_base.js';
-import { copyText, showToast } from './utils.js';
+import { serverFetch, identityKey, LOCAL_SERVER, splitKey, decisionNeedsPerson, serverUrl } from './server_base.js';
+import { copyText, showToast, OPERATOR_ID } from './utils.js';
 import { state as appState } from './state.js';
 import { inboxSources, multipleServers, serverLabel } from './inbox_servers.js';
 const { activityParts, aboutWords, jobRunParts } = await importOnce('./operator_activity_words.js');
@@ -195,16 +195,19 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                     items.push({ label: 'Copy link', run: async () => { if (await copyText(`coral://artifacts/${hex}`)) showToast('Link copied.'); else showToast('Could not copy the link.', true); } });
                 } else if (r.item_kind === 'question' && (r.action === 'answer' || r.action === 'dismiss') && /^\d+$/.test(r.item_id)) {
                     items.push({ label: 'Reply in thread', run: () => open.question(r) });
-                    items.push({ label: 'Reopen question', run: async () => { try { const { reopenAsk } = await importOnce('./ask_ignore.js'); await reopenAsk({ server: team.server, board: team.name, id: Number(r.item_id) }, { unanswer: true }); showToast('The question is back in Needs you, unanswered.'); } catch (e) { showToast(e.message || 'Could not reopen the question.', true); } } });
+                    if (!decisionNeedsPerson(team.server)) items.push({ label: 'Reopen question', run: async () => { try { const { reopenAsk } = await importOnce('./ask_ignore.js'); await reopenAsk({ server: team.server, board: team.name, id: Number(r.item_id) }, { unanswer: true }); showToast('The question is back in Needs you, unanswered.'); } catch (e) { showToast(e.message || 'Could not reopen the question.', true); } } });
                     if (open.board) items.push({ label: 'Open on Board', run: () => open.board(r) });
                     if (open.taskOf && r.task_id) items.push({ label: 'Open task', run: () => open.taskOf(r) });
+                }
+                else if (r.item_kind === 'goal' && r.action === 'goal_close' && /^\d+$/.test(r.item_id) && team && !decisionNeedsPerson(team.server)) {
+                    items.push({ label: 'Reopen goal', run: async () => { try { const { goalWrite } = await importOnce('./goal_write.js'), id = Number(r.item_id), res = await goalWrite(team.name, 'goal_update', id, `/goals/${id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' }); if (!res.ok) throw new Error(`HTTP ${res.status}`); showToast(`Goal #${id} reopened. The team read it on the board.`); } catch (e) { showToast(`Not reopened: ${e && e.message || 'try again'}`, true); } } });
                 }
                 return items;
             };
             const openPrimary = r => (r.item_kind === 'file' && open.viewer && ['approve', 'changes', 'deny'].includes(r.action)) ? open.viewer(r) : openRow(r); // "Open file" opens the file; the row's title opens its decision
             const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
-            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
+            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
             const gaps = missingWords(missingComputers());
             if (gaps) { const n = DT.el('p', 'activity-check', gaps); n.setAttribute('role', 'status'); wrap.prepend(n); }
             if (more) { const b = DT.el('button', 'btn btn-small activity-more', 'Show older actions'); b.type = 'button'; b.addEventListener('click', () => refresh(null, { next: true })); wrap.append(b); }
