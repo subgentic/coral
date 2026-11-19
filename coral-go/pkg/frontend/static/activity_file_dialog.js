@@ -41,7 +41,7 @@ export function openFileDecision(row, { openFile, onDone } = {}) {
         }
     }
     // one comment box (Comment and Send reply are one box in v3): a note for the team on this file, with pictures
-    const label = el('label', 'activity-thread-label', 'Comment on this file'); const box = el('textarea', 'field activity-thread-box'); box.rows = 3; box.maxLength = 8000; box.placeholder = `Add a follow-up comment on ${row.title || 'this file'}…`; label.append(box);
+    const label = el('label', 'activity-thread-label', 'Comment on this file'); const box = el('textarea', 'field activity-thread-box'); box.rows = 3; box.maxLength = 8000; box.placeholder = `Add a follow-up comment on ${markHidden(row.title || 'this file', { strict: true })}…`; label.append(box);
     const tray = createImageTray({ upload: (blob, versionOf) => uploadCommentImage(hex, server, blob, versionOf, board) });
     const err = el('p', 'activity-thread-error'); err.setAttribute('role', 'alert');
     const withIcon = (b, icon) => { const i = el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.prepend(i); return b; }; // the mock's buttons carry an icon before the words (#19871)

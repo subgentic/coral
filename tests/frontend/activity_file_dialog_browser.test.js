@@ -46,6 +46,10 @@ const HEX = 'a'.repeat(64);
         // Reopen for review
         await ev(`[...document.querySelectorAll('.activity-file-dialog .btn')].find(b => b.textContent.trim().endsWith('Reopen for review')).click(); true`);
         await waitFor(`window.__calls.includes('review') && !document.querySelector('dialog.activity-file-dialog')`, 'Reopen for review sends the file for review and shuts the dialog', 8000);
+        // #19905: the comment box names the file as the heading does, a hidden character shown as <U+..>, not drawn as nothing
+        await ev(`import((window.__coralStatic || '/static/') + 'activity_file_dialog.js').then(m => { m.openFileDecision({ id: 2, team: 'tm', action: 'approve', item_kind: 'file', item_id: '${HEX}', version: '${HEX}', title: 'pl\u200Ean.md', source: 'dashboard' }); return true; })`);
+        await waitFor(`!!document.querySelector('dialog.activity-file-dialog[open] textarea')`, 'the second dialog opens', 8000);
+        assert.equal(await ev(`document.querySelector('dialog.activity-file-dialog[open] textarea').placeholder`), 'Add a follow-up comment on pl<U+200E>an.md…', 'the placeholder marks the hidden character like the heading');
         console.log('PASS activity file dialog');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
