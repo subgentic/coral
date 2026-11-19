@@ -77,6 +77,13 @@ const B = 'goal-done-' + Date.now().toString(36);
             assert.ok(g.border >= 1 && g.edge >= 3 && g.text >= 4.5, `${theme}: Dismiss has an outline (3:1) and words at 4.5:1: ` + JSON.stringify(g));
             assert.ok(g.fits, `${theme}: nothing is cut off in the actions cell: ` + JSON.stringify(g));
         }
+        if (process.env.CORAL_SCREENSHOT_DIR) { // the row on a phone, for the review page (#19841)
+            await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+            await openNeeds();
+            await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item at 390', 20000);
+            const d = process.env.CORAL_SCREENSHOT_DIR; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/inbox-goal-done-390.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+            await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        }
         // the same row in a list that also has a review row (a review row alone wants 15rem: the goal row's four controls decide, whichever kinds are listed with it)
         const stub = `(() => { const original = window.fetch; window.fetch = (url, opts = {}) => { const pageURL=new URL(String(url),location.href),page=pageURL.pathname==='/api/team-artifacts'?window.__reviewFixturePage(pageURL,location.href,{'${B}':[{ id: 'a'.repeat(64), name: 'plan-mixed.md', media_type: 'text/markdown', size: 30, created_at: new Date().toISOString(), source: 'upload', available: true, tags: ['for review'], produced_by: 'Boss', review_question: 'Ship it?' }]}):null;if(page)return Promise.resolve(Response.json(page)); const u = window.__reviewFixtureURL(String(url), location.origin);
             if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${B}/artifacts' && u.searchParams.get('tag') === 'for review') return Promise.resolve(new Response(JSON.stringify({ project: '${B}', has_more: false, artifacts: [{ id: 'a'.repeat(64), name: 'plan-mixed.md', media_type: 'text/markdown', size: 30, created_at: new Date().toISOString(), source: 'upload', available: true, tags: ['for review'], produced_by: 'Boss', review_question: 'Ship it?' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));

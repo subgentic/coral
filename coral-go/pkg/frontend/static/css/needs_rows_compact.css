@@ -128,9 +128,7 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-goaldone-actions) .inbox-row-words { overflow: visible; white-space: normal; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-goaldone-actions) .inbox-row-words::after { content: 'Goal looks done'; display: block; margin-top: 6px; font-size: var(--fs-base); color: var(--text-muted); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-row-words.inbox-row-command { display: block; max-height: none; overflow: visible; text-overflow: clip; white-space: normal; }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-row-words.inbox-row-command .inbox-cmd-colon { display: none; }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-row-words.inbox-row-command .inbox-cmd-lead::after { content: ' a bash command'; }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-row-words.inbox-row-command .inbox-cmd-code { display: block; width: fit-content; max-width: 70ch; margin-top: 5px; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-row-words.inbox-row-command .inbox-cmd-code { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; width: fit-content; max-width: 70ch; margin-top: 5px; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="agent"] > .inbox-row-words.inbox-cmd-note { order: 7; font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* Needs you's empty state is the approved list's centred card: the line strong, the hint under it, the action below (#19824) */
