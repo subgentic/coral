@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/internal/store"
 )
 
 const taskNudge = "You have tasks available. Run 'coral-board task claim' to start."
@@ -140,6 +141,8 @@ type BoardHandler struct {
 	needsYouAgents func(r *http.Request) ([]NeedsYouItem, error)
 	// agentAsks lists the open questions of single agents (no team) for GET /api/operator-asks and Needs you (#18106). Nil: none.
 	agentAsks func(r *http.Request) []operatorAskRow
+	// waitingComments lists the Operator's comments sent to an agent that it has not answered, for GET /api/waiting-on-agent (SetWaitingComments, #19916). Nil: none.
+	waitingComments func(ctx context.Context) ([]store.WaitingComment, error)
 	// needsYouRemotes: on a self-hosted Hub, how GET /api/needs-you reads its computers too (SetNeedsYouRemotes, #15380). Nil: this Coral's own answer alone.
 	needsYouRemotes *NeedsYouRemotes
 	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.
