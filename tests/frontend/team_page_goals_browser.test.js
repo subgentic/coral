@@ -53,9 +53,10 @@ const GOAL = 'Explore goals with two teams';
                     assert.match(names.at(-1), /no goal/, 'no-goal navigation stays last');
                 }
                 await click('button', /^New goal$/i, 'button'); // a phone's New goal is a compact + named 'New goal'
+                await waitFor(`!!document.querySelector('dialog[open]')`, 'the New goal dialog is open (a slow CPU opens it late, and an Escape before it would be lost)', 20000);
                 await ev(`(() => { const e = document.activeElement; if (e && e.tagName === 'TEXTAREA' || e && e.tagName === 'INPUT') {} return true; })()`);
                 // A real key press: the New goal dialog is a native modal dialog, and only the browser's own Escape closes it (a script-made keydown does not, and the page stays inert behind it).
-                await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await settle(300);
+                await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await waitFor(`!document.querySelector('dialog[open]')`, 'Escape closed the New goal dialog', 10000).catch(() => {}); await settle(200);
                 assert.equal(await ev(`!!document.querySelector('dialog[open]')`), false, 'Escape closed the New goal dialog');
             });
             await S.run(`${label}: choosing a goal swaps the body for the goal's page: back link, h2, Description and Done when, its tasks in a column, and a pinned bar with Add task and Close goal`, async () => {

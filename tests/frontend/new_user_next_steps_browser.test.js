@@ -102,7 +102,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         const sn = () => ev(`(() => { const n = document.querySelector('#sn-host .launch-signin-notice'); const b = n && n.querySelector('button'), st = n && n.querySelector('.launch-signin-steps'); return n ? { shown: !n.hidden, text: n.textContent.replace(/\\s+/g, ' ').trim(), expanded: b.getAttribute('aria-expanded'), steps: !st.hidden } : null; })()`);
         let n0 = await sn();
         check(n0 && !n0.shown, `signed in: no notice: ${JSON.stringify(n0)}`);
-        await ev(`window.__signed = false; window.__sl.setClaudeSignedIn(false); true`); n0 = await sn();
+        await ev(`window.__signed = false; window.__sl.setClaudeSignedIn(false); true`); await waitFor(`(() => { const n = document.querySelector('#sn-host .launch-signin-notice'); return !!n && !n.hidden; })()`, 'the not-signed-in notice', 20000); n0 = await sn();
         check(n0.shown && /Claude isn't signed in on this computer\./.test(n0.text) && /How to sign in/.test(n0.text), `Claude not signed in: a notice with How to sign in: ${JSON.stringify(n0)}`);
         await ev(`document.querySelector('#sn-host .launch-signin-how').click(); true`); n0 = await sn();
         check(n0.expanded === 'true' && n0.steps && /run claude/.test(n0.text) && /Open terminal and Check again/.test(n0.text), `How to sign in opens the steps: ${JSON.stringify(n0)}`);

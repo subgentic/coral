@@ -90,7 +90,7 @@ const TEAM = `header-${Date.now() % 100000}`;
         const end = await ev(`(() => { const list = document.getElementById('mobile-agent-list'); list.scrollTop = list.scrollHeight; const card = [...list.querySelectorAll('button, a, [role=button], .welcome-launch')].filter(e => e.getClientRects().length && /New goal/.test(e.textContent)).pop(); const nav = document.getElementById('phone-nav'); if (!card) return null; return { cardBottom: Math.round(card.getBoundingClientRect().bottom), navTop: getComputedStyle(nav).display === 'none' ? 9999 : Math.round(nav.getBoundingClientRect().top) }; })()`);
         assert.ok(end && end.cardBottom <= end.navTop, 'the New goal card scrolls to above the bottom nav: ' + JSON.stringify(end));
         // a drill-down is not this bar: no ☰ and no avatar
-        await ev(`window.switchNavTab('tokens'); true`); await settle(700);
+        await ev(`window.switchNavTab('tokens'); true`); await waitFor(`[...document.querySelectorAll('.phone-bar')].filter(b => b.getClientRects().length > 0).length === 0`, 'the Analytics view has taken the phone bar away', 20000); await settle(200);
         assert.equal(await ev(`[...document.querySelectorAll('.phone-bar')].filter(b => b.getClientRects().length > 0).length`), 0, 'a drill-down (an Analytics view) draws neither ☰ nor the avatar');
         console.log('PASS the phone bar: one bar in every top-level view');
     } finally { await require('./helpers/board_cleanup').removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
