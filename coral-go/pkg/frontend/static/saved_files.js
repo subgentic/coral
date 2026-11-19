@@ -1,12 +1,12 @@
 /* "Files for review" at the top of Saved (#11641): the review files the Operator saved for later. Each row keeps Approve, Changes and Deny (the Deny word on a wide screen), and the three dots have "Move to Needs you". Lazy: the Inbox
  * loads it when Saved has such a file. A row opens the file (the viewer), as a Needs you row does. */
 /* The Inbox hands it the table and the row's actions, shown(file) (the name with hidden characters written out) and subtitleOf(file) (the question and the sender, as Needs you words them: Security, #11641) (inbox_sidebar.js is loaded through importOnce, which a lazy module may not import). */
-export function fillSavedFiles(host, files, { DT, reviewActions, openReview, shown, subtitleOf }) {
+export function fillSavedFiles(host, files, { DT, reviewActions, openReview, shown, subtitleOf, fileTile }) {
     const title = DT.el('h3', 'saved-files-title', 'Files for review');
     const table = DT.dataTable({ label: `Files for review, ${files.length}`, compact: true, bare: true, rows: files, rowKey: a => a.reviewKey, rowName: a => shown(a),
         open: a => openReview(a),
         columns: [
-            { key: 'name', label: 'File', primary: true, width: 'grow', line: 1, cell: a => { const n = (a.earlier || []).length, tile = DT.el('span', 'material-icons inbox-kind-icon'); tile.dataset.kind = 'review'; tile.dataset.type = /^video\//.test(a.media_type || '') ? 'video' : /html/.test(a.media_type || '') ? 'html' : /markdown/.test(a.media_type || '') ? 'md' : ''; tile.setAttribute('aria-hidden', 'true'); const wrap = DT.el('span', 'inbox-review-item inbox-saved-file'); wrap.append(tile, shown(a)); /* the file's tile in front of its name, as in Needs you (#19833) */ if (n) wrap.append(DT.el('span', 'inbox-review-earlier', `${n} earlier version${n === 1 ? '' : 's'}`)); if (a.new_comments > 0) wrap.append(DT.tag('New comments')); return wrap; }, subtitle: a => subtitleOf(a) }, // one row per file: the newest, with its older saved versions (#11937)
+            { key: 'name', label: 'File', primary: true, width: 'grow', line: 1, cell: a => { const n = (a.earlier || []).length, tile = fileTile(a); const wrap = DT.el('span', 'inbox-review-item inbox-saved-file'); wrap.append(tile, shown(a)); /* the file's tile in front of its name, as in Needs you (#19833) */ if (n) wrap.append(DT.el('span', 'inbox-review-earlier', `${n} earlier version${n === 1 ? '' : 's'}`)); if (a.new_comments > 0) wrap.append(DT.tag('New comments')); return wrap; }, subtitle: a => subtitleOf(a) }, // one row per file: the newest, with its older saved versions (#11937)
             { key: 'actions', label: 'Actions', hideLabel: true, fixed: true, align: 'end', width: '26rem', line: 1, cell: a => reviewActions(a, true) },
         ] }).el;
     host.replaceChildren(title, table);
