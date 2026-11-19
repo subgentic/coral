@@ -1,5 +1,5 @@
 /* The Needs you line "While you were away" (inbox_away.js, #17537). Lazy: loaded with the line. */
 .inbox-away { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; padding: 9px 14px; color: var(--text-secondary); font-size: var(--fs-md); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); } /* the approved strip (#19833) */
 .inbox-away strong { color: var(--text-primary); font-weight: var(--fw-strong); }
-.inbox-away-dismiss { height: 26px; }
+.inbox-away .inbox-away-dismiss { height: 26px; margin: 0; }
 .inbox-away-text { min-width: 0; overflow-wrap: anywhere; }

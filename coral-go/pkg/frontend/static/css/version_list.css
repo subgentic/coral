@@ -25,7 +25,7 @@
 .version-list-pop h2 { margin: 0; padding: 3px 6px 5px; font-size: var(--fs-sm); font-weight: var(--fw-strong); text-transform: uppercase; color: var(--text-muted); }
 .version-list-pop .version-list { margin: 0; }
 .version-list-pop .version-list-entry { flex-wrap: nowrap; gap: 10px; justify-content: space-between; padding: 5px 6px; border: 0; font-size: var(--fs-md); }
-.version-list-pop .version-list-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-medium); color: var(--text-primary); }
+.version-list-pop .version-list-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; white-space: normal; font-weight: var(--fw-medium); color: var(--text-primary); }
 .version-list-pop .version-list-who { flex: 0 0 auto; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-sm); }
 .version-list-pop .version-list-note { display: none; }
 .version-list-pop .version-list-confirm { flex: 1 1 100%; }
@@ -33,3 +33,4 @@
 .version-list-pop .version-list-actions .btn + .btn::before { content: '\00b7'; margin-inline: 4px; color: var(--text-muted); }
 .version-list-pop .version-list-actions .btn { min-height: 0; height: auto; padding: 0; border: 0; background: none; color: var(--link-text); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .version-list-pop .inbox-ask-buttons { display: none; }
+.version-list-latest { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: var(--radius-sm); background: rgba(var(--accent-rgb), 0.15); color: var(--accent); font-size: var(--fs-sm); font-weight: var(--fw-strong); vertical-align: middle; }

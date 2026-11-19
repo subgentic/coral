@@ -56,14 +56,15 @@ export async function openVersionList(opts) {
     };
     for (const [i, v] of versions.entries()) {
         const li = document.createElement('li'); li.className = 'version-list-entry'; if (!v.guess) li.dataset.version = String(v.n); if (v.current) li.setAttribute('aria-current', 'true');
-        const name = document.createElement('span'); name.className = 'version-list-name'; name.textContent = `${v.guess ? 'Upload' : 'v' + v.n}${pop ? ` \u00b7 ${shown(v.note) || shown(opts.name)}` : ''}${v.current ? ' (newest)' : ''}`;
+        const name = document.createElement('span'); name.className = 'version-list-name'; name.textContent = `${v.guess ? 'Upload' : 'v' + v.n}${pop ? ` \u00b7 ${shown(v.note) || shown(opts.name)}` : ''}${v.current && !pop ? ' (newest)' : ''}`;
+        if (v.current && pop) { const latest = document.createElement('span'); latest.className = 'version-list-latest'; latest.textContent = 'Latest'; name.append(' ', latest); } // the popover marks the newest with a pill, as the mock does (#19870 MUST-8)
         const who = document.createElement('span'); who.className = 'version-list-who'; if (pop) who.title = [when(v.at), v.you ? 'You' : shown(v.who) ? `${shown(v.who)}, an agent` : ''].filter(Boolean).join(' \u00b7 ');
         who.textContent = pop ? ago(v.at) || when(v.at) : [when(v.at), v.you ? 'You' : shown(v.who) ? `${shown(v.who)}, an agent` : ''].filter(Boolean).join(' · '); // who made it: you (an edit in the dashboard) or an agent (#15329)
         const actions = document.createElement('span'); actions.className = 'version-list-actions';
         const open = document.createElement('button'); open.type = 'button'; open.className = 'btn btn-small version-list-open'; open.textContent = 'Open'; open.setAttribute('aria-label', v.guess ? `Open the upload of ${when(v.at)}` : `Open v${v.n}`);
         open.addEventListener('click', () => { finish(); opts.open(v); });
         actions.append(open);
-        if (i > 0 && !v.guess) {
+        if (i > 0 && !v.guess && !(pop && v.current)) { // the newest in the popover has no Compare of its own: it would compare the newest with the one before it, and the row says Latest
             const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'btn btn-small version-list-compare';
             compare.textContent = pop ? 'Compare' : `Compare with v${versions[i - 1].n}`; compare.setAttribute('aria-label', `Compare v${v.n} with v${versions[i - 1].n}`);
             compare.addEventListener('click', async () => {
