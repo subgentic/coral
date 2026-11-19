@@ -11,12 +11,12 @@ const D = 'a'.repeat(64), D2 = 'b'.repeat(64), V1 = 'c'.repeat(64), V2 = 'd'.rep
  const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
  const min = n => new Date(Date.now() - n * 60000).toISOString();
  const actions = [
-  { id: 9, goal_id: 241, goal_title: 'A new user\'s first team', task_id: 19808, task_title: 'Inbox list design mocks', team: 'coral-go-team', at: min(2), action: 'approved', item_kind: 'file', item_id: D, version: D, title: 'inbox-list-design-mocks.html', asker: 'Inbox Designer', note: '', source: 'local' },
+  { id: 9, goal_id: 241, goal_title: 'A new user\'s first team', task_id: 19808, task_title: 'Inbox list design mocks', team: 'coral-go-team', at: min(2), action: 'approved', item_kind: 'file', item_id: D, version: D, title: 'inbox-list-design-mocks.html', asker: 'Inbox Designer', note: '', file_n: 1, file_latest_n: 1, ask: 'Please review the Inbox list mocks.', source: 'local' },
   { id: 8, goal_id: 256, goal_title: 'Coral 3.0', task_id: 18583, task_title: 'Compaction message check', team: 'coral-hub', at: min(24), action: 'answer', item_kind: 'question', item_id: '18583', title: 'One quick check for #18583: does a message sent while compacting arrive after compaction finishes?', asker: 'Orchestrator', note: 'Yes: sent right while compacting and it delivered ~2 seconds after compaction finished.', source: 'local' },
-  { id: 7, goal_id: 259, goal_title: 'Promo video', task_id: 19787, task_title: 'Promo video cut 1', team: 'coral-go-team', at: min(41), action: 'changes', item_kind: 'file', item_id: V2, version: V2, title: 'promo-cut-1.mp4', asker: 'Video Producer', note: '00:00-00:23: show working agents as green. 01:17: open the Inbox first, then click the document.', source: 'local' },
-  { id: 6, goal_id: 259, goal_title: 'Promo video', task_id: 19787, task_title: 'Promo video cut 1', team: 'coral-go-team', at: min(55), action: 'changes', item_kind: 'file', item_id: V1, version: V1, title: 'promo-cut-1.mp4', asker: 'Video Producer', note: 'Second look: better.', source: 'local' },
+  { id: 7, goal_id: 259, goal_title: 'Promo video', task_id: 19787, task_title: 'Promo video cut 1', team: 'coral-go-team', at: min(41), action: 'changes', item_kind: 'file', item_id: V2, version: V2, title: 'promo-cut-1.mp4', asker: 'Video Producer', note: '00:00-00:23: show working agents as green. 01:17: open the Inbox first, then click the document.', file_n: 2, file_latest_n: 2, ask: 'Cut 1 of the promo video, ready for review.', file_versions: [{ digest: V1, n: 1, at: min(60*3) }, { digest: V2, n: 2, at: min(45) }], source: 'local' },
+  { id: 6, goal_id: 259, goal_title: 'Promo video', task_id: 19787, task_title: 'Promo video cut 1', team: 'coral-go-team', at: min(55), action: 'changes', item_kind: 'file', item_id: V1, version: V1, title: 'promo-cut-1.mp4', asker: 'Video Producer', note: 'Second look: better.', file_n: 1, file_latest_n: 2, ask: 'Cut 1 of the promo video, ready for review.', file_versions: [{ digest: V1, n: 1, at: min(60*3) }, { digest: V2, n: 2, at: min(45) }], source: 'local' },
   { id: 5, team: 'coral-go-team', at: min(60), action: 'goal_close', item_kind: 'goal', item_id: '258', title: 'Team agents have three states (Awake, Asleep, Archived)', note: 'Marked done after v2.1.1 evals passed 3 of 3 runs per case.', source: 'local' },
-  { id: 4, goal_id: 256, goal_title: 'Coral 3.0', task_id: 19750, task_title: 'Device keys design', team: 'coral-go-team', at: min(60 * 24 + 30), action: 'approved', item_kind: 'file', item_id: D2, version: D2, title: 'design-19669.md', asker: 'Backend Dev', note: 'Ship draft 7: keep offline fallback read-only until key rotation lands.', source: 'local' },
+  { id: 4, goal_id: 256, goal_title: 'Coral 3.0', task_id: 19750, task_title: 'Device keys design', team: 'coral-go-team', at: min(60 * 24 + 30), action: 'approved', item_kind: 'file', item_id: D2, version: D2, title: 'design-19669.md', asker: 'Backend Dev', note: 'Ship draft 7: keep offline fallback read-only until key rotation lands.', file_n: 7, file_latest_n: 7, ask: 'Approve draft 7 of the device keys design?', source: 'local' },
  ];
  try {
   await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -36,10 +36,21 @@ const D = 'a'.repeat(64), D2 = 'b'.repeat(64), V1 = 'c'.repeat(64), V2 = 'd'.rep
     const hasLedger = await ev(`!!document.querySelector('.al-row')`);
     if (hasLedger) {
      assert.equal(await ev(`!!document.querySelector('.al-date-head')`), true, `${at}: date headers`);
+     const gap = await ev(`(()=>{const bar=document.querySelector('.inbox-folder-toolbar'), h=document.querySelector('.al-date-head'); return {headTop:Math.round(h.getBoundingClientRect().top), barBottom:Math.round(bar.getBoundingClientRect().bottom)}})()`);
+     assert.ok(gap.headTop - gap.barBottom <= 24, `${at}: no empty band between the toolbar and the first date header: ${JSON.stringify(gap)}`);
+     assert.ok(await ev(`[...document.querySelectorAll('.al-date-head')].every(h => /^\\d+$/.test(h.querySelector('.al-day-count')?.textContent || ''))`), `${at}: every date header has its day count`);
+     assert.ok(await ev(`[...document.querySelectorAll('.al-chip')].every(c => c.getBoundingClientRect().width < 160)`), `${at}: chips hold short labels`);
+     assert.equal(await ev(`document.querySelectorAll('.al-tile.al-fk-video, .al-tile.al-fk-markdown, .al-tile.al-fk-html').length>=3`), true, `${at}: video, markdown and html tiles are tinted by kind`);
+     assert.ok(await ev(`!!document.querySelector('.al-vnewer') && /v1 reviewed/.test(document.querySelector('.al-vnewer').textContent)`), `${at}: v1 reviewed · v2 newer`);
+     assert.ok(await ev(`!!document.querySelector('.al-ask')`), `${at}: the asked question shows under a file name`);
+     await ev(`document.querySelector('details.al-more > summary').click(); true`); await ev(framesJs(2));
+     assert.ok(await ev(`document.querySelectorAll('details.al-more[open] .al-menu-item').length>=2`), `${at}: the More menu opens with its actions`);
+     await ev(`document.querySelector('details.al-more').open=false; true`);
      await ev(`document.querySelector('details.al-versions > summary').click(); true`); await ev(framesJs(2));
      assert.equal(await ev(`(()=>{const p=document.querySelector('.al-pop').getBoundingClientRect();return p.left>=0&&p.right<=innerWidth+1})()`), true, `${at}: the Versions popover stays on screen`);
      await shot(`activity-versions-${width}-${theme}`);
      await ev(`document.querySelector('details.al-versions').open=false; document.querySelector('details.al-qa > summary').click(); true`); await ev(framesJs(2));
+     assert.ok(await ev(`document.querySelectorAll('details.al-qa[open] .al-qa-msg').length>=2`), `${at}: the Q&A preview shows its messages`);
      await shot(`activity-qa-${width}-${theme}`);
     }
    } catch (e) { failures.push(`${at}: ${e.message}`); }
