@@ -61,6 +61,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
             await openNeeds();
             await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, `${theme}: the goal item`, 20000);
+        { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/inbox-goal-done-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // the row as the approved list draws it (#19824)
             const g = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(),
                 btns = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), tr_ = R(tr), c = e => { const r = R(e); return (r.top + r.bottom) / 2; },
                 px = col => { const cv = document.createElement('canvas'); cv.width = cv.height = 1; const x = cv.getContext('2d'); x.fillStyle = col; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); },
