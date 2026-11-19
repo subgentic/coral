@@ -2,7 +2,7 @@
 // argument that is not one of these (or the value of one that takes a value) is refused with exit 2 before anything starts. Keep this list in step with the flag()/arg()/intArg() calls in the runner
 // (cdp_args.test.mjs reads the runner and fails when they differ).
 export const FLAGS = ['--allow-flaky', '--fail-on-leak', '--isolate', '--keep', '--no-restore', '--no-strict', '--no-tmux', '--prod-tier', '--sequences', '--strict', '--stress', '--tmux'];
-export const VALUE_FLAGS = ['--chrome', '--cpu-throttle', '--only', '--part', '--results-out', '--retries', '--runs', '--shards', '--shuffle', '--timeout'];
+export const VALUE_FLAGS = ['--chrome', '--cpu-throttle', '--only', '--part', '--results-out', '--retries', '--retry-max-secs', '--runs', '--shards', '--shuffle', '--timeout'];
 
 /** What is wrong with `argv` (the arguments after the script's name), as lines to print; [] when it is all known. */
 export function badArgs(argv) {

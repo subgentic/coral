@@ -71,7 +71,7 @@ const GS = await importOnce('./goal_short.js'); // a goal's short name and #N (#
 const GW = await importOnce('./goal_words.js'); // a goal's state word, said in a phone row's button name (#9747)
 const { mountGoal } = await importOnce('./goal_view.js');
 const { arrangeReviewRows, reviewGroupLookup } = await importOnce('./inbox_review_groups.js');
-const { waitingOnAgent, needsReviewAttention, reviewChangeLabels, hasNewVersion, decidedWithNews, decidedWord, sentBackSince, sentBackChip, sentBackExcerpt } = await importOnce('./inbox_review_state.js');
+const { waitingOnAgent, needsReviewAttention, reviewChangeLabels, hasNewVersion, decidedWithNews, decidedWord, sentBackSince, sentBackChip, sentBackExcerpt, producerArchived } = await importOnce('./inbox_review_state.js');
 const { starControl } = await importOnce('./artifact_star.js');
 const { askSubjectLinks } = await importOnce('./ask_subject_links.js');
 const { mountInboxItem } = await importOnce('./inbox_item_page.js');
@@ -1432,11 +1432,11 @@ export function needsListSpec() {
 const tags = DT.el('span', 'inbox-review-tags');
 if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-version', `v${versionOf(s.review)}`); version.title = hasNewVersion(s.review) ? `New version v${versionOf(s.review)}` : `Version ${versionOf(s.review)}`; version.setAttribute('aria-hidden', 'true'); tags.append(version); }
 wrap.append(sender, name); if (tags.childNodes.length) wrap.append(tags); if (pills.childNodes.length) wrap.append(pills);
-wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); if (waitingOnAgent(s.review)) wrap.append(sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true })), sentBackExcerpt(s.review, splitKey(s.review.team).server, splitKey(s.review.team).name)); return wrap;
+wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); if (waitingOnAgent(s.review)) wrap.append(sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true }), producerArchived(s.review, state.liveSessions)), sentBackExcerpt(s.review, splitKey(s.review.team).server, splitKey(s.review.team).name)); return wrap;
     }
     const ver = DT.el('span', 'inbox-review-version', versionOf(s.review) > 1 ? ` \u00b7 version ${versionOf(s.review)}` : ''); ver.hidden = !(versionOf(s.review) > 1); // the version, once, in the meta strip (#19812); its text carries its own dot
     const meta = DT.el('span', 'inbox-meta'); // the headline is the subject; under it the kind, the sender and the file's own words, then the pills; the team stays in its own column (#16678, Option B)
-    meta.append(waitingOnAgent(s.review) ? sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true })) : DT.el('span', `inbox-kind inbox-kind-${kindWord(s.review.kind) ? s.review.kind : 'file'}`, (kindWord(s.review.kind) || 'For review')), sender, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), ...(pills.childNodes.length ? [pills] : []));
+    meta.append(waitingOnAgent(s.review) ? sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true }), producerArchived(s.review, state.liveSessions)) : DT.el('span', `inbox-kind inbox-kind-${kindWord(s.review.kind) ? s.review.kind : 'file'}`, (kindWord(s.review.kind) || 'For review')), sender, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), ...(pills.childNodes.length ? [pills] : []));
     wrap.append(name, meta, ...(waitingOnAgent(s.review) ? [sentBackExcerpt(s.review, splitKey(s.review.team).server, splitKey(s.review.team).name)] : []), DT.el('span', 'sr-only', readWords), ...waitMark(s)); return wrap;
 } if (isPhoneLayout()) { const f = DT.primaryButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); f.classList.add('inbox-review-from'); Object.assign(f.dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); const row = phoneRow(s, f, agentAskWords(s), [], true); if (agentAskIsLong(s)) row.append(...agentAskControls(s)); return row; }
   const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; })(s)) },

@@ -410,6 +410,7 @@ node artifact_message_source.test.mjs
 
 node artifact_inventory_wait.test.mjs
 node inbox_review_groups.test.mjs
+node inbox_sent_back_archived.test.mjs
 node inbox_review_star_cache.test.mjs
 
 node starred_review_pages.test.mjs
@@ -469,3 +470,4 @@ node review_earlier_versions_source.test.mjs
 node with_board_args.test.mjs
 node queue_cloud.test.mjs
 node skills_hub_read_source.test.mjs
+node fail_fast_suites.test.mjs

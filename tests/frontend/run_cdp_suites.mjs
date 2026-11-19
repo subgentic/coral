@@ -39,6 +39,8 @@
 // fresh Coral server and Chrome (its shard is replaced first). A suite that
 // passes only on a retry is FLAKY: it is listed separately in the summary and is NOT counted as passed.
 // --retries 0 disables retries.
+// --retry-max-secs N: a suite whose failed attempt took longer than N seconds is not retried (it fails as it is): a slow suite's retry
+// is what pushed cdp-gate part 2/6 past its job timeout (#19012). 0 (the default) retries every failure.
 //
 // Exit status: 0 when every suite passed on its first attempt, 1 when any suite failed every attempt,
 // 3 when the only problems are FLAKY suites (--allow-flaky turns that 3 into 0), 2 on a setup error,
@@ -153,6 +155,7 @@ const timeoutS = intArg('--timeout', 180, 1);
 const localShards = localShardDefault({ cpus: os.availableParallelism(), ci: !!process.env.CI, narrowed: !!(only || flag('--sequences') || arg('--part', '')) });
 const shards = intArg('--shards', stress ? 3 : localShards, 1);
 const retries = stress ? 0 : intArg('--retries', 1, 0);
+const retryMaxSecs = intArg('--retry-max-secs', 0, 0); // 0 = no limit
 const runs = stress ? intArg('--runs', 3, 1) : 1;
 const throttle = stress ? Number(arg('--cpu-throttle', '4')) : 1;
 if (!(throttle >= 1)) { console.error('--cpu-throttle must be a number >= 1'); process.exit(2); }
@@ -1000,6 +1003,10 @@ async function runOnce(run) {
         const r = await runAttempt(t, shard);
         attempts.push(r);
         if (r.status === 'pass') break;
+        if (a < retries && retryMaxSecs > 0 && Number(r.secs) > retryMaxSecs) {
+          console.log(`NO RETRY ${phase}${t}  (the attempt took ${r.secs}s, over --retry-max-secs ${retryMaxSecs}: a retry would cost as long again)${label}`);
+          break;
+        }
         if (a < retries) {
           console.log(`RETRY ${phase}${t}  (${r.status === 'timeout' ? `TIMEOUT after ${r.secs}s` : `exit=${r.code} after ${r.secs}s`})${shards > 1 ? `  [shard ${r.shard}]` : ''}${label}`);
           // A retry gets a fresh Coral and Chrome: retrying on the same server and browser would repeat a
