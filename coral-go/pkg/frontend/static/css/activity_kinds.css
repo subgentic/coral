@@ -1,9 +1,26 @@
-/* Activity's kind chips (#16087): several at once. Lazy: loaded by inbox_activity.js, not at start. Below 66 rem of toolbar the seven chips and their counts no longer fit beside the title, the search and the icon: they become check boxes in the Filters panel, never scrolled or cut. */
-@container inboxfolder (max-width: 66rem) { /* Activity's seven chips and their counts (#16087, #19149) take about 42 rem beside the title, the search and the icon: below that they are the panel's check boxes, never scrolled or cut */
-    .inbox-folder-toolbar:has(.team-tb-pills-multi) .team-tb-pills { display: none; }
-    .inbox-folder-toolbar:has(.team-tb-pills-multi) .inbox-pill-field { display: flex; }
+/* Activity's kind chips (#16087): several at once. Lazy: loaded by inbox_activity.js, not at start. Beside the title and the search where 66 rem allow, else on the toolbar's own second line (the mock, #19871). */
+@container inboxfolder (max-width: 66rem) { /* the mock's second row (#19813 v1 section 1): the seven chips and their counts take their own line under the title, the search and the icon, one line that scrolls sideways at 390, never check boxes in the panel (#19871 MUST-12) */
+    .inbox-folder-toolbar:has(.team-tb-pills-multi) .list-bar-search-row.gt-toolbar > .team-tb-pills { display: flex; flex: 1 1 100%; order: 9; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .inbox-folder-toolbar:has(.team-tb-pills-multi) .team-tb-pills .goals-chip { flex: none; }
+    .inbox-folder-toolbar:has(.team-tb-pills-multi) .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
 }
+.inbox-folder-toolbar:has(.team-tb-pills-multi) .inbox-pill-field { display: none; }
 .inbox-folder-toolbar .inbox-pill-field .team-tb-checks { display: flex; flex-wrap: wrap; gap: 2px 14px; } /* a folder whose pills are several at once (Activity, #16087) lists them as check boxes in the panel */
 .team-tb-check { display: inline-flex; align-items: center; gap: 6px; min-height: var(--toolbar-control-h, 32px); white-space: nowrap; }
 @media (max-width: 767px), (pointer: coarse) { .team-tb-check { min-height: var(--control-touch-height, 44px); } }
 .inbox-folder-toolbar .team-tb-pills-multi .goals-chip { padding: 0 10px; } /* seven pills (Important was added, #19149) with a little less padding each, so the strip still fits whole beside the title and the search */
+.al-presets { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-xs); } /* the quick dates under Since (#19871) */
+.al-preset[aria-pressed="true"] { background: var(--accent); color: var(--text-on-accent); border-color: var(--accent); }
+.inbox-folder-toolbar .list-bar-menu .list-bar-field.inbox-activity-group-toggle { flex-wrap: nowrap; display: flex; flex-direction: column; align-items: stretch; gap: var(--space-xs); min-width: 0; }
+.inbox-folder-toolbar .list-bar-menu .inbox-activity-group-toggle select { width: 100%; max-width: 100%; box-sizing: border-box; }
+@media (max-width: 767px) { .inbox-folder-toolbar .list-bar-menu.list-bar-sheet { max-height: min(60vh, calc(100dvh - 24rem)); } } /* the sheet ends above the bottom bar, its own scroll reaching Since, Sort and Group by (#19871) */
+/* the record integrity notice and the empty state as cards (#19813 v1 section 5, #19871): an icon tile, a heading, the detail under it, on a tinted surface */
+.activity-check { display: flex; align-items: flex-start; gap: var(--space-lg); padding: var(--space-lg); background: var(--bg-secondary); font-weight: var(--fw-regular); }
+.activity-check-broken { background: rgba(var(--error-rgb), 0.1); border-color: rgba(var(--error-rgb), 0.4); }
+.activity-check-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 2rem; min-height: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border); font-size: var(--fs-lg); }
+.activity-check-broken .activity-check-tile { color: var(--error-text); background: rgba(var(--error-rgb), 0.14); border-color: rgba(var(--error-rgb), 0.3); }
+.activity-check-tile::before { content: "warning"; }
+.activity-check-title { display: block; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); }
+.activity-check-detail { color: var(--text-secondary); font-size: var(--fs-base); }
+#group-table-view:has(.inbox-activity-group-toggle) .empty-state { align-items: center; text-align: center; padding: var(--space-2xl) var(--space-xl); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
+#group-table-view:has(.inbox-activity-group-toggle) .empty-state::before { content: "history"; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; aspect-ratio: 1; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-tertiary); font-family: "Material Icons"; font-size: var(--fs-2xl); font-feature-settings: "liga"; color: var(--text-secondary); }

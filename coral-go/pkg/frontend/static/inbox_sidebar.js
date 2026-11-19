@@ -894,6 +894,7 @@ function inboxActivityToolbar() {
         const label = groupModeField('inbox-activity-group-mode', 'inbox-activity-group-toggle');
         menu.insertBefore(label, menu.querySelector(':scope > .list-bar-clear-all, :scope > .list-bar-done'));
     }
+    AC.mountPresets(node);
     return { node, signature: JSON.stringify([activityFilters, teams, AC.countsKey(activityFilters), groupMode, serverChoices()]) };
 }
 function refreshGoals(force = true) {

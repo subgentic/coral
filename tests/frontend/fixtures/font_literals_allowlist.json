@@ -1,4 +1,8 @@
 {
   "about": "A literal font size or family, per file and declaration, with its count. Fixing one lowers the count here (font_literal_census.test.mjs); a new one fails the test.",
-  "files": {}
+  "files": {
+    "coral-go/pkg/frontend/static/css/activity_kinds.css": {
+      "font-family: ": 1
+    }
+  }
 }
