@@ -56,3 +56,28 @@ func TestAResubmittedReviewEndsTheWaitOfAParkedReviewer(t *testing.T) {
 	}, 2*time.Second, 20*time.Millisecond, "and its terminal is told, so the tool call returns and it reads the board")
 	assert.NotNil(t, got)
 }
+
+// #19914: only a notice that asks the agent to act (a review reopened or assigned) ends a wait. Any other notice that tags an agent,
+// an edit or a goal for instance, leaves its `coral-board wait --task` alone: that wait is for something else.
+func TestANoticeThatAsksNothingLeavesAWaitTaskAlone(t *testing.T) {
+	_, h, _ := reviewTeam(t, "keep", true)
+	ctx := context.Background()
+	terminal := newMockTerminal()
+	const qa = "claude-0000002c-3864-4864-8864-00000000002c"
+	terminal.addSession(qa, "/tmp/qa")
+	_, err := h.bs.Subscribe(ctx, "keep", "QA Engineer", "QA Engineer", qa, nil, "mentions")
+	require.NoError(t, err)
+	h.SetTerminal(terminal)
+	_, err = h.bs.RegisterWait(ctx, "keep", "QA Engineer", qa, "task", "99999", "", time.Hour)
+	require.NoError(t, err)
+
+	h.postNotice(ctx, "keep", "@QA Engineer [Task #99999 edited] the title changed")
+	h.postNotice(ctx, "keep", "@QA Engineer [Goal #7] you now drive this goal: x")
+	time.Sleep(400 * time.Millisecond)
+
+	w, _ := h.bs.GetActiveWait(ctx, "keep", "QA Engineer")
+	assert.NotNil(t, w, "a notice that only informs does not end a wait --task")
+	for _, s := range terminal.sentTo(qa) {
+		assert.NotContains(t, s, "[Wait resolved]")
+	}
+}

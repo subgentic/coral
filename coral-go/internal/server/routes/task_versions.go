@@ -133,8 +133,17 @@ func (h *BoardHandler) postNotice(ctx context.Context, project, content string, 
 		sender = from[0]
 	}
 	h.bs.PostSystemDefusedMessage(ctx, project, sender, content, nil)
-	// A notice that names an agent parked in `coral-board wait` ends that wait, as an agent's own post that names it does (#19910): a parked agent is inside a tool call with no end, so the line
-	// the notifier types is not read until the wait ends, and a reviewer sat 80 minutes with two resubmissions naming it. Only an explicit tag ends a wait; the notice's text is what was posted.
+}
+
+// postWakingNotice is postNotice for a notice that asks the agents it names to act now: a review reopened for a new round, a review assigned. An agent parked in `coral-board wait` is inside a tool call with no end, so the line the
+// notifier types is not read until the wait ends, and a reviewer sat 80 minutes with two resubmissions naming it (#19910). The notice ends the wait of each agent it tags, as an agent's own post that names it does. Every other notice
+// leaves a wait alone: a `wait --task` or `--commit` is for something else, and an edit, a release or a goal notice that happens to tag its agent is no reason to cut it short (#19914).
+func (h *BoardHandler) postWakingNotice(ctx context.Context, project, content string, from ...string) {
+	h.postNotice(ctx, project, content, from...)
+	sender := "Coral Task Queue"
+	if len(from) > 0 && from[0] != "" {
+		sender = from[0]
+	}
 	h.goBG(func() { h.resolveMessageWaits(project, sender, content) })
 }
 
