@@ -469,3 +469,4 @@ node review_earlier_versions_source.test.mjs
 node with_board_args.test.mjs
 node queue_cloud.test.mjs
 node skills_hub_read_source.test.mjs
+node fail_fast_suites.test.mjs
