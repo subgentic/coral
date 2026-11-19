@@ -10,7 +10,7 @@
 @media (max-width: 767px), (pointer: coarse) { .team-tb-check { min-height: var(--control-touch-height, 44px); } }
 .inbox-folder-toolbar .team-tb-pills-multi .goals-chip { padding: 0 10px; } /* seven pills (Important was added, #19149) with a little less padding each, so the strip still fits whole beside the title and the search */
 .al-presets { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-xs); } /* the quick dates under Since (#19871) */
-.al-preset[aria-pressed="true"] { background: var(--accent); color: var(--accent-contrast, #fff); border-color: var(--accent); }
+.al-preset[aria-pressed="true"] { background: var(--accent); color: var(--text-on-accent); border-color: var(--accent); }
 .inbox-folder-toolbar .list-bar-menu .list-bar-field.inbox-activity-group-toggle { flex-wrap: nowrap; display: flex; flex-direction: column; align-items: stretch; gap: var(--space-xs); min-width: 0; }
 .inbox-folder-toolbar .list-bar-menu .inbox-activity-group-toggle select { width: 100%; max-width: 100%; box-sizing: border-box; }
 @media (max-width: 767px) { .inbox-folder-toolbar .list-bar-menu.list-bar-sheet { max-height: min(60vh, calc(100dvh - 24rem)); } } /* the sheet ends above the bottom bar, its own scroll reaching Since, Sort and Group by (#19871) */
@@ -19,7 +19,7 @@
 .activity-check-broken { background: rgba(var(--error-rgb), 0.1); border-color: rgba(var(--error-rgb), 0.4); }
 .activity-check-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 2rem; aspect-ratio: 1; border-radius: var(--radius-lg); border: 1px solid var(--border); font-size: var(--fs-lg); }
 .activity-check-broken .activity-check-tile { color: var(--error-text); background: rgba(var(--error-rgb), 0.14); border-color: rgba(var(--error-rgb), 0.3); }
-.activity-check-tile::before { content: "warning"; font-family: "Material Icons"; font-feature-settings: "liga"; }
+.activity-check-tile::before { content: "warning"; }
 .activity-check-title { display: inline; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); }
 .activity-check-detail { color: var(--text-secondary); font-size: var(--fs-base); }
 #group-table-view:has(.inbox-activity-group-toggle) .empty-state { align-items: center; text-align: center; padding: var(--space-2xl) var(--space-xl); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }

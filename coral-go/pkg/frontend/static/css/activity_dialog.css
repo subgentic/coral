@@ -26,8 +26,6 @@
 .activity-thread-attach { display: flex; flex-wrap: wrap; gap: var(--space-md, 8px); align-items: center; }
 .activity-thread-hint { color: var(--text-muted); font-size: var(--fs-sm); }
 .activity-thread-pics { display: flex; flex-wrap: wrap; gap: 8px; }
-.activity-file-line { padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); overflow-wrap: anywhere; }
-.activity-file-version { color: var(--text-muted); }
 .activity-file-said { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .activity-file-said:empty { display: none; }
 
@@ -35,7 +33,7 @@
 .activity-file-dialog h2 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md); }
 .activity-file-dialog .al-answer { margin: var(--space-lg) 0; }
 .activity-file-series { margin: var(--space-lg) 0; padding: var(--space-md) var(--space-lg); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-tertiary); }
-.activity-file-series-head { margin: 0 0 var(--space-sm); font-size: var(--fs-sm); font-weight: var(--fw-strong); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.activity-file-series-head { margin: 0 0 var(--space-sm); font-size: var(--fs-sm); font-weight: var(--fw-strong); text-transform: uppercase; color: var(--text-muted); }
 .activity-file-series-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md); padding: var(--space-xs) 0; }
 .activity-file-series-name { overflow-wrap: anywhere; }
 .activity-file-series-at { margin-left: auto; color: var(--text-muted); font-size: var(--fs-base); }

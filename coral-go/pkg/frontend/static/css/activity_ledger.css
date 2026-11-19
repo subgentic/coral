@@ -47,9 +47,8 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
 @media (max-width: 599px) {
   .al-row { grid-template-columns: 2rem minmax(0, 1fr); padding: var(--space-lg); }
-  .al-right-meta { white-space: normal; flex-wrap: wrap; }
+  .al-right-meta { white-space: normal; flex-wrap: wrap; flex: 1 0 100%; }
   .al-right { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; }
-  .al-right-meta { flex: 1 0 100%; }
   .al-actions { justify-content: flex-start; }
   .al-actions .btn { margin: 0; }
 }

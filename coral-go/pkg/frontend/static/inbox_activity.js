@@ -192,7 +192,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
             if (words) { // a notice with its icon, a heading and the detail under it (the mock's record integrity notice, #19871)
-                const n = DT.el('div', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`), cut = words.search(/[:.](\s|$)/), tile = DT.el('span', 'activity-check-tile'), text = DT.el('div', 'activity-check-text');
+                const n = DT.el('div', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`), cut = words.search(/[:.](\s|$)/), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
                 tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', cut > 0 ? words.slice(0, cut) : words), ...(cut > 0 ? [DT.el('span', 'activity-check-detail', words.slice(cut))] : []));
                 n.append(tile, text); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n);
             }
