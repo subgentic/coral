@@ -86,12 +86,6 @@
    "covered_by": "files"
   },
   {
-   "file": "inbox_activity.js",
-   "calls": 1,
-   "surface": "Inbox: Activity (what the Operator decided)",
-   "covered_by": "activity"
-  },
-  {
    "file": "inbox_sidebar.js",
    "calls": 4,
    "surface": "Inbox: Saved, Needs you, Tasks, Goals",

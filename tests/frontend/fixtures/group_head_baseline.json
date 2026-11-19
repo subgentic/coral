@@ -4,6 +4,7 @@
     "session-group-header": "the sidebar's group row (name, count, chevron): slice 4's list rows",
     "group-name-line": "its name line, the same row",
     "group-name-text": "its name text, the same row",
-    "theme-group-title": "a group title inside the theme editor dialog: the dialogs and form rows slices"
+    "theme-group-title": "a group title inside the theme editor dialog: the dialogs and form rows slices",
+    "al-group-head": "the Activity ledger goal/task heading with its Story toggle, drawn to the approved Inbox Activity mocks (#19813 v1) (#19816)"
   }
 }

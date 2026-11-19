@@ -32,18 +32,18 @@ const BASE = require('./test_base').BASE;
             window.switchNavTab('hub-inbox');
             await (await import(prefix + 'inbox_sidebar.js')).openInboxGroup('activity');
         })()`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, 'the page opens on Everything: four actions (the record has five: "Sent words to an agent" is not a row, #18466)');
+        await waitFor(`document.querySelectorAll('#group-table-view .al-row').length === 4`, 'the page opens on Everything: four actions (the record has five: "Sent words to an agent" is not a row, #18466)');
         assert.ok(!/Sent words to an agent|\bhello\b/.test(await ev(`document.getElementById('group-table-view').innerText`)), 'a chat_send row is not shown');
         const pills = await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()).filter(Boolean)`);
         for (const w of ['Everything', 'Decisions', 'Answers', 'Permissions', 'Files and tasks', 'Words sent']) assert.ok(pills.some(p => p.startsWith(w)), `a '${w}' chip: ${JSON.stringify(pills)}`);
         const pick = word => ev(`(() => { const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.textContent.trim().startsWith('${word}')); if (!b) return false; b.click(); return true; })()`);
         for (const [word, n] of [['Permissions', 1], ['Everything', 4], ['Answers', 1], ['Everything', 4], ['Decisions', 4], ['Everything', 4]]) { // a chip adds to the others (#16087): Everything clears between; 'Sent words' rows are not shown (#18466), so Everything is 4
             assert.ok(await pick(word), `the ${word} chip is there`); await ev(framesJs(4));
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === ${n}`, `${word}: ${n} row(s)`);
+            await waitFor(`document.querySelectorAll('#group-table-view .al-row').length === ${n}`, `${word}: ${n} row(s)`);
         }
         assert.ok(pills.some(p => /^Words sent\s*0?$/.test(p) || p === 'Words sent'), `the Words sent chip counts none of the hidden rows: ${JSON.stringify(pills)}`);
         // the answered question opens as a thread
-        await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => /Ship it/.test(r.textContent)).querySelector('button.dt-primary').click(); true`);
+        await ev(`[...document.querySelectorAll('#group-table-view .al-row')].find(r => /Ship it/.test(r.textContent)).querySelector('button.al-title').click(); true`);
         await waitFor(`!!document.querySelector('dialog.activity-thread-dialog[open] .activity-thread-msg')`, 'the thread dialog opens', 8000);
         await waitFor(`document.querySelectorAll('.activity-thread-msg').length === 3`, 'three messages: the question, the answer, the later reply (not the unrelated one)');
         assert.deepEqual(await ev(`[...document.querySelectorAll('.activity-thread-msg .activity-thread-name')].map(e => e.textContent)`), ['Ada', 'You', 'Ada'], 'in order, the Operator as You');
@@ -84,14 +84,14 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('.activity-thread-actions .btn')].find(b => b.textContent.trim() === 'Close').click(); true`);
         await waitFor(`!document.querySelector('dialog.activity-thread-dialog')`, 'Close shuts it');
         // a thread the board no longer has: the record's words stand in
-        await ev(`window.__noThread = true; [...document.querySelectorAll('#group-table-view tbody tr')].find(r => /Ship it/.test(r.textContent)).querySelector('button.dt-primary').click(); true`);
+        await ev(`window.__noThread = true; [...document.querySelectorAll('#group-table-view .al-row')].find(r => /Ship it/.test(r.textContent)).querySelector('button.al-title').click(); true`);
         await waitFor(`document.querySelectorAll('.activity-thread-msg').length === 2 && /no longer/.test(document.querySelector('.activity-thread-status').textContent)`, 'the record kept the question and the answer', 8000);
         assert.deepEqual(await ev(`[...document.querySelectorAll('.activity-thread-body')].map(e => e.textContent.trim())`), ['Ship it?', 'yes, ship it']);
         for (const theme of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); true`); await shot('activity-thread-fallback-' + theme); }
         // Reopen question (#15792): the answered question goes back to Needs you, unanswered, and the dialog closes
         await ev(`[...document.querySelectorAll('.activity-thread-actions .btn')].find(b => b.textContent.trim() === 'Close').click(); true`);
         await waitFor(`!document.querySelector('dialog.activity-thread-dialog')`, 'the fallback dialog shuts');
-        await ev(`window.__noThread = false; window.__closes = []; [...document.querySelectorAll('#group-table-view tbody tr')].find(r => /Ship it/.test(r.textContent)).querySelector('button.dt-primary').click(); true`);
+        await ev(`window.__noThread = false; window.__closes = []; [...document.querySelectorAll('#group-table-view .al-row')].find(r => /Ship it/.test(r.textContent)).querySelector('button.al-title').click(); true`);
         await waitFor(`!!document.querySelector('dialog.activity-thread-dialog[open] .activity-thread-reopen')`, 'the thread opens with Reopen question', 8000);
         await ev(`document.querySelector('.activity-thread-reopen').click(); true`);
         await waitFor(`(window.__closes || []).length === 1 && !document.querySelector('dialog.activity-thread-dialog')`, 'Reopen question posts the undo with unanswer and shuts the dialog', 8000);

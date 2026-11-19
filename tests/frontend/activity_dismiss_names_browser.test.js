@@ -23,7 +23,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="activity"]')`, 'the Activity folder in the sidebar', 10000);
             await ev(`document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="activity"]').click(); true`);
             await waitFor(`document.getElementById('group-table-view')?.dataset.group === 'hub-inbox:activity'`, 'the folder on screen', 10000);
-            const mine = `[...document.querySelectorAll('#group-table-view tbody tr.activity-card')].filter(r => r.textContent.includes('Read the Coral guide'))`;
+            const mine = `[...document.querySelectorAll('#group-table-view .al-row')].filter(r => r.textContent.includes('Read the Coral guide'))`;
             await waitFor(`${mine}.length >= 1`, 'a row that names the item dismissed', 10000);
             const text = await ev(`${mine}[0].textContent.replace(/\\s+/g, ' ')`);
             assert.match(text, /Dismissed/); assert.doesNotMatch(text, /a row in Needs you/, 'the row names the item, not the kind: ' + text);

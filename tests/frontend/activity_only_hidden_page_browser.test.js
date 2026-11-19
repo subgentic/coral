@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
             window.switchNavTab('hub-inbox');
             await (await import(prefix + 'inbox_sidebar.js')).openInboxGroup('activity');
         })()`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'the empty pages were read past: the three real actions show without a click', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view .al-row').length === 3`, 'the empty pages were read past: the three real actions show without a click', 10000);
         assert.deepEqual(await ev(`window.__asked`), [null, '204', '4'], 'three pages were read, each from the last id of the one before');
         assert.ok(!/hello/.test(await ev(`document.getElementById('group-table-view').innerText`)), 'no Sent words row');
         assert.equal(await ev(`!!document.querySelector('.activity-more')`), false, 'the record ended: no Show older actions');

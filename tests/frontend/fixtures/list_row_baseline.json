@@ -35,6 +35,7 @@
     "team-page-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
     "viz-legend-item": "a chart legend entry, not a list row",
     "wf-step-editor-item": "a list inside a pane or the rail (slice 4's second pass)",
-    "wt-item": "a list inside a pane or the rail (slice 4's second pass)"
+    "wt-item": "a list inside a pane or the rail (slice 4's second pass)",
+    "al-row": "the Activity ledger row (tile, subject + verdict, Operator-answer callout) drawn to the approved Inbox Activity mocks (#19813 v1); not a sidebar list row (#19816)"
   }
 }

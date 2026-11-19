@@ -42,10 +42,10 @@ const question = '@Operator Please inspect this command. ' + 'Context to keep th
    const folders=await ev(`import((window.__coralStatic||'/static/')+'mailbox_chats.js').then(m=>m.chatSections({all:0,group:0,notes:0,starred:0,active:0,archived:0,by_agent_type:{claude:1,codex:0,opencode:0,hermes:0},tags:[]}).flatMap(s=>s.items.map(i=>i.key)))`);
    try { assert.deepEqual(folders,['chats'],`${width}: empty folders hidden and By CLI waits for second CLI`); } catch(e) { failures.push(e.message); }
    await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('activity'))`);
-   await waitFor(`!!document.querySelector('.activity-card')`, 'Activity card', 10000); await ev(framesJs(3)); await shot(`activity-${width}`);
+   await waitFor(`!!document.querySelector('.al-row')`, 'Activity card', 10000); await ev(framesJs(3)); await shot(`activity-${width}`);
    try {
-    const icon=await ev(`(()=>{const n=document.querySelector('.activity-who .inbox-kind-icon');return n&&{kind:n.dataset.kind,color:getComputedStyle(n).color,width:n.getBoundingClientRect().width,glyph:getComputedStyle(n,'::before').content};})()`);
-    assert.ok(icon,`${width}: Activity reuses kind icon`); assert.equal(icon.kind,'question'); assert.equal(icon.color,await ev(`window.__kindColor`),'same grey kind icon on both pages'); assert.ok(icon.glyph.includes('help_outline')); assert.equal(icon.width,width===390?40:32);
+    const icon=await ev(`(()=>{const n=document.querySelector('.al-row .al-tile');return n&&{width:n.getBoundingClientRect().width,glyph:n.textContent.trim()};})()`);
+    assert.ok(icon,`${width}: Activity rows wear a kind tile`); assert.equal(icon.glyph,'help_outline','a question row shows the question tile'); assert.ok(icon.width>=32,'the tile is at least 32 px');
     assert.equal(await ev(`!!document.querySelector('.activity-check')`),false,'healthy record check remains hidden');
     assert.equal(await ev(`document.querySelector('.activity-folder').textContent.includes('hub-user-private-id')`),false,'no actor id');
    } catch(e) { failures.push(e.message); }
