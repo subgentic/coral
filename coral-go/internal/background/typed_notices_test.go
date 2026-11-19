@@ -72,6 +72,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("health_limit.go", `deliver(ctx, a, key, text)`, 1, "sendUnlessBlocked: forwards the text of the callers listed here"),
 		typedcensus.S("health_nudges.go", `board.OneLine(text), "health nudge"`, 1, "the nudges' deliver: forwards the builders below"),
 		typedcensus.S("health_nudges.go", `claimNudgeText(`, 1, "census"),
+		typedcensus.S("health_review_reopen.go", `claimNudgeText(`, 1, "census: the claim nudge's fixed text (a task number only), for a review task in a reviewer's queue (#19910)"),
 		typedcensus.S("health_nudges.go", `statusNudgeText(`, 1, "census"),
 		typedcensus.S("health_nudges.go", `mentionRenudgeText(`, 1, "census"),
 		typedcensus.S("health_nudges.go", `askReminderText(`, 1, "census"),

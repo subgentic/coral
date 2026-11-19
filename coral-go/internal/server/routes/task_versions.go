@@ -133,6 +133,9 @@ func (h *BoardHandler) postNotice(ctx context.Context, project, content string, 
 		sender = from[0]
 	}
 	h.bs.PostSystemDefusedMessage(ctx, project, sender, content, nil)
+	// A notice that names an agent parked in `coral-board wait` ends that wait, as an agent's own post that names it does (#19910): a parked agent is inside a tool call with no end, so the line
+	// the notifier types is not read until the wait ends, and a reviewer sat 80 minutes with two resubmissions naming it. Only an explicit tag ends a wait; the notice's text is what was posted.
+	h.goBG(func() { h.resolveMessageWaits(project, sender, content) })
 }
 
 // quoteNotice puts text already made by noticeText in double quotes, escaping a backslash and a quote as %q does but leaving every other character as it is: %q would write the zero-width
