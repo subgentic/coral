@@ -48,6 +48,7 @@ const BASE = require('./test_base').BASE;
             check(c.goals >= 1 && c.tasks === 0, `${at}Goal: a heading per goal and NO task headings: ` + JSON.stringify(c));
             check(await ev(`[...document.querySelectorAll('#group-table-view tbody tr.dt-row')].some(r => /Story one/.test(r.textContent)) && [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].some(r => /Docs draft/.test(r.textContent))`), `${at}Goal: a task's files and the agents working on it are plain rows in the goal`);
             await setMode('.inbox-group-review-toggle', 'task'); await waitFor(`document.querySelectorAll('.dt-group-task').length === 2`, `${at}Goal and task: two task headings`, 8000);
+            { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/inbox-groups-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // the headings as the approved list draws them (#19824)
             c = await counts();
             check(c.goals >= 1 && c.tasks === 2, `${at}Goal and task: a heading per task inside its goal (as built): ` + JSON.stringify(c));
             await snap('group-mode');
