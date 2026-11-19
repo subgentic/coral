@@ -751,3 +751,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-row:hover .dt-reveal, .dt-row:focus-within .dt-reveal { opacity: 1; } /* a control that shows on its row's hover or focus (the Agents table's Details link, #15857) */
 
 .inbox-needs-results .dt-table .inbox-goal-task .dt-link { color: inherit; font: inherit; text-decoration: underline; min-height: 0; height: auto; padding: 0; display: inline; }
+
+/* the approved Inbox list (#19824): a goal that looks done and a permission's command, in the subtitle */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-goaldone-actions) .dt-subtitle { overflow: visible; white-space: normal; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-goaldone-actions) .dt-subtitle::after { content: 'Goal looks done'; display: block; margin-top: 6px; font-size: var(--fs-base); color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-kind-icon[data-kind="permission"]) .dt-subtitle { width: fit-content; max-width: 70ch; margin-top: 4px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
