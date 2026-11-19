@@ -11,6 +11,7 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"math/big"
 	"net/http/httptest"
@@ -294,4 +295,19 @@ func TestGoodMessagesNeverUseTheBudget(t *testing.T) {
 		rec := d.post("/api/device-keys/message", msgJSON("remove-device", body, sig), nil)
 		require.Equal(t, 200, rec.Code, "removal %d: %s", i, rec.Body.String())
 	}
+}
+
+// Review #19745 SHOULD 1: invented kids cannot push a listed signer out (any number of them share one bucket), and a signer's budget is its own.
+func TestInventedKidsShareOneBucketAndNeverTouchAListedSigner(t *testing.T) {
+	d := newDKRig(t)
+	_, target := d.addDevice("view", store.DeviceKindDevice)
+	body, sig := d.removal(target)
+	for i := 0; i < 400; i++ {
+		fake := fmt.Sprintf("%043d", i)
+		d.post("/api/device-keys/message", msgJSON("remove-device", strings.Replace(body, d.kid, fake, 1), sig), nil)
+	}
+	rec := d.post("/api/device-keys/message", msgJSON("remove-device", strings.Replace(body, d.kid, fmt.Sprintf("%043d", 999), 1), sig), nil)
+	assert.Equal(t, "internal", errCode(t, rec), "all invented kids share one spent bucket")
+	rec = d.post("/api/device-keys/message", msgJSON("remove-device", body, sig), nil)
+	require.Equal(t, 200, rec.Code, "the listed signer still has its own budget: %s", rec.Body.String())
 }

@@ -290,3 +290,10 @@ func AuditCertLine(lg *slog.Logger) func(passkeyKID, deviceKID, mode string) {
 		lg.Info("cloud: device certified by passkey", "passkey", passkeyKID, "kid", deviceKID, "mode", mode)
 	}
 }
+
+// SetRefuseBefore sets (or, with the zero time, clears) RefuseBefore while no message is being handled.
+func (v *Verifier) SetRefuseBefore(t time.Time) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.RefuseBefore = t
+}

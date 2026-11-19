@@ -20,7 +20,7 @@ const (
 	deviceMsgPerMin   = 30 // this computer's own limit, whatever the Hub's
 )
 
-// deviceMsgLimit counts only the checks that FAILED, per claimed signer: a good message never uses the budget, so a flood of bad ones cannot delay a signed removal from another signer. The Hub forwards unstamped, so there is no source address to key on; the claimed kid (or "" when the body has none, or a shared "other" bucket once deviceMsgKeysMax kids are tracked) is the key.
+// deviceMsgLimit counts only the checks that FAILED, per signer bucket: a good message never uses the budget. The Hub forwards unstamped, so there is no source address; the bucket is the claimed kid only when that kid is on the device list (each listed kid has its own, so a flood of invented kids cannot push a real signer out), and every unlisted kid shares one "unknown" bucket. What remains: a flood that claims a LISTED kid with bad signatures can spend that signer's budget for a minute (the signature cannot be checked for free before it is charged).
 type deviceMsgLimit struct {
 	mu sync.Mutex
 	by map[string]*deviceBucket
@@ -31,7 +31,7 @@ type deviceBucket struct {
 	n     int
 }
 
-const deviceMsgKeysMax = 256
+const deviceBucketsMax = 64 // listed kids are at most 10 active; expired buckets are dropped past this
 
 func (l *deviceMsgLimit) bucket(key string, now time.Time) *deviceBucket {
 	if l.by == nil {
@@ -39,17 +39,11 @@ func (l *deviceMsgLimit) bucket(key string, now time.Time) *deviceBucket {
 	}
 	b, ok := l.by[key]
 	if !ok {
-		if len(l.by) >= deviceMsgKeysMax {
-			for k, o := range l.by { // drop the buckets whose minute is over
+		if len(l.by) >= deviceBucketsMax {
+			for k, o := range l.by {
 				if now.Sub(o.start) >= time.Minute {
 					delete(l.by, k)
 				}
-			}
-		}
-		if len(l.by) >= deviceMsgKeysMax {
-			key = "other"
-			if b, ok = l.by[key]; ok {
-				return b
 			}
 		}
 		b = &deviceBucket{start: now}
@@ -77,13 +71,16 @@ func (l *deviceMsgLimit) failed(key string, now time.Time) {
 
 var deviceMsgLimiter deviceMsgLimit
 
-// claimedKID is the signer a message says it is from (no check): only a bucket key.
-func claimedKID(body string) string {
+// limiterKey is the bucket a message's failures are charged to: its claimed kid when that kid is on the device list, "unknown" for any other kid, "form" when the body names none.
+func limiterKey(r *http.Request, v *devicekey.Verifier, body string, now time.Time) string {
 	var m struct {
 		KID string `json:"kid"`
 	}
-	if json.Unmarshal([]byte(body), &m) != nil || len(m.KID) > 64 {
-		return ""
+	if json.Unmarshal([]byte(body), &m) != nil || m.KID == "" || len(m.KID) > 64 {
+		return "form"
+	}
+	if _, err := v.Store.ActiveDeviceKey(r.Context(), m.KID, now); err != nil {
+		return "unknown"
 	}
 	return m.KID
 }
@@ -156,11 +153,11 @@ func (h *CloudHandler) DeviceKeyMessage(w http.ResponseWriter, r *http.Request) 
 		Sig    string `json:"sig"`
 	}
 	if err := readDeviceBody(w, r, &req); err != nil {
-		deviceMsgLimiter.failed("", time.Now())
+		deviceMsgLimiter.failed("form", time.Now())
 		deviceReply(w, err)
 		return
 	}
-	key := claimedKID(req.Body)
+	key := limiterKey(r, v, req.Body, time.Now())
 	if !deviceMsgLimiter.allow(key, time.Now()) {
 		deviceReply(w, errors.New("rate limited"))
 		return

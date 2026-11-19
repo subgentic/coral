@@ -19,6 +19,16 @@ func (m *Manager) NewDeviceVerifier(st devicekey.Store) *devicekey.Verifier {
 	m.devVerMu.Lock()
 	defer m.devVerMu.Unlock()
 	if m.devVer != nil {
+		if m.devRefusing && time.Since(m.devProbeAt) >= m.devProbeEvery() {
+			m.devProbeAt = time.Now()
+			if m.probeNonceStore(st) == nil {
+				m.devVer.SetRefuseBefore(time.Time{})
+				m.devRefusing = false
+				if m.o.Logger != nil {
+					m.o.Logger.Info("cloud: the device-key nonce store reads again: signed messages are accepted")
+				}
+			}
+		}
 		return m.devVer
 	}
 	v := &devicekey.Verifier{
@@ -29,9 +39,11 @@ func (m *Manager) NewDeviceVerifier(st devicekey.Store) *devicekey.Verifier {
 		Audit:     devicekey.AuditLine(m.o.Logger),
 		AuditCert: devicekey.AuditCertLine(m.o.Logger),
 	}
-	// The nonce store is probed once, when the verifier is built (the first message after start): if it cannot be read, a message whose ts is before now plus the window is refused with before_start, so no replay of an older message gets through a store that forgot it (design page v4 section 4).
-	if err := st.NonceSeen(context.Background(), "startup-probe", time.Now()); err != nil && !errors.Is(err, store.ErrNonceRepeat) {
+	// The nonce store is probed when the verifier is built (the first message after start), with retries so one transient error does not decide: if it still cannot be read, a message whose ts is before now plus the window is refused with before_start, so no replay of an older message gets through a store that forgot it (design page v4 section 4). The probe is repeated later (below) and clears the refusal once the store reads again.
+	m.devProbeAt = time.Now()
+	if err := m.probeNonceStore(st); err != nil {
 		v.RefuseBefore = time.Now().Add(24 * time.Hour)
+		m.devRefusing = true
 		if m.o.Logger != nil {
 			m.o.Logger.Warn("cloud: the device-key nonce store could not be read: signed messages dated before now are refused for the longest window", "err", err)
 		}
@@ -40,7 +52,39 @@ func (m *Manager) NewDeviceVerifier(st devicekey.Store) *devicekey.Verifier {
 	return m.devVer
 }
 
+// probeNonceStore reads the nonce store up to three times (devProbeWait apart) and reports the last error when none read.
+func (m *Manager) probeNonceStore(st devicekey.Store) error {
+	var err error
+	for i := 0; i < 3; i++ {
+		if i > 0 {
+			time.Sleep(m.devProbeRetryWait())
+		}
+		if err = st.NonceSeen(context.Background(), "startup-probe", time.Now()); err == nil || errors.Is(err, store.ErrNonceRepeat) {
+			return nil
+		}
+	}
+	return err
+}
+
+func (m *Manager) devProbeEvery() time.Duration {
+	if m.devProbeEveryD > 0 {
+		return m.devProbeEveryD
+	}
+	return 30 * time.Second
+}
+
+func (m *Manager) devProbeRetryWait() time.Duration {
+	if m.devProbeWaitD > 0 {
+		return m.devProbeWaitD
+	}
+	return 50 * time.Millisecond
+}
+
 type deviceVerifierState struct {
-	devVerMu sync.Mutex
-	devVer   *devicekey.Verifier
+	devVerMu       sync.Mutex
+	devVer         *devicekey.Verifier
+	devRefusing    bool          // RefuseBefore is set because the nonce store could not be read
+	devProbeAt     time.Time     // the last probe
+	devProbeEveryD time.Duration // test knob: how long before a re-probe (30 s when zero)
+	devProbeWaitD  time.Duration // test knob: the wait between retries (50 ms when zero)
 }

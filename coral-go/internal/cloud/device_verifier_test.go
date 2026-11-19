@@ -44,6 +44,38 @@ func TestTheBuiltVerifierRefusesWhileAClearIsPending(t *testing.T) {
 	assert.False(t, v.Refuse())
 }
 
+// flaky fails NonceSeen the first n times, then reads.
+type flaky struct {
+	*store.SessionStore
+	fail int
+}
+
+func (f *flaky) NonceSeen(ctx context.Context, n string, now time.Time) error {
+	if f.fail > 0 {
+		f.fail--
+		return errors.New("transient")
+	}
+	return f.SessionStore.NonceSeen(ctx, n, now)
+}
+
+// Review #19745 SHOULD 2: one transient error does not set the refusal, and a refusal that was set is cleared when a later probe reads.
+func TestATransientNonceStoreErrorIsRetriedAndALaterReadClearsTheRefusal(t *testing.T) {
+	r := pairingSetup(t, true)
+	r.m.devProbeWaitD = time.Millisecond
+	v := r.m.NewDeviceVerifier(&flaky{SessionStore: r.ss, fail: 2})
+	require.NotNil(t, v)
+	assert.True(t, v.RefuseBefore.IsZero(), "two failures then a read: no refusal")
+
+	r2 := pairingSetup(t, true)
+	r2.m.devProbeWaitD = time.Millisecond
+	r2.m.devProbeEveryD = time.Nanosecond
+	f := &flaky{SessionStore: r2.ss, fail: 3}
+	v2 := r2.m.NewDeviceVerifier(f)
+	assert.False(t, v2.RefuseBefore.IsZero(), "three failures in a row set the refusal")
+	assert.Same(t, v2, r2.m.NewDeviceVerifier(f), "the next call re-probes, the store reads now, and clears it on the same verifier")
+	assert.True(t, v2.RefuseBefore.IsZero(), "a later read clears the refusal")
+}
+
 // A nonce store that cannot be read when the verifier is built refuses what is dated before now (before_start); a readable one sets nothing.
 type nonceUnreadable struct{ *store.SessionStore }
 
