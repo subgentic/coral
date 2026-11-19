@@ -10,8 +10,15 @@ Task numbers in brackets. Built on v2.1.0. A prerelease until the Operator promo
 
 - **An agent is Awake, Asleep or Archived** (#19673, #19674, #19684, #19696, #19707): Stop agent on a team agent now archives it, its session ends and its seat stays, and Start brings it back Awake. The separate Archive item is gone from the row menu; an archived agent's menu has Sleep. The Agents tab keeps Archived agents out of its list and count, behind More > Archived, and an agent whose session ended is Archived, not Ended.
 - **Start works on an Archived agent from every route** (#19696): the dashboard Start and the Orchestrator's wake no longer refuse it with "Session is not sleeping".
-- **A name an archived member has is not free** (#19673, #19674, #19693): a New agent launch or a team join with it asks Start it or Use another name; a failed Start it says why in a toast and launches nothing.
+- **A name an archived member has is not free** (#19673, #19674, #19693, #19718): a New agent launch or a team join with it asks Start it or Use another name; a failed Start it says why in a toast and launches nothing; the launch line for such a name asks the Operator to start that member or pick another name.
+- **A new team can take a previous team's name** (#19724, #19744): the old team is renamed `<name>-YYYY-MM-DD` and the new one starts; two renames at once never share a label, and a team with a running agent is not renamed.
+- **An archived agent's composer offers Start and Sleep**, as its menu does (#19733).
 - **The Orchestrator and the board follow the new states** (#19673, #19684, #19707): `coral-board stop` archives and `coral-board interrupt` ends a turn; the Team settings switch reads "Orchestrator may archive agents (Stop)"; the health check leaves Archived agents alone; the Orchestrator cannot stop, sleep or remove itself or the last Orchestrator.
+
+#### Device keys
+
+- **A computer can be paired to the Hub with device keys** (#19669, #19689, #19708, #19709, #19716, #19717, #19726, #19738, #19745, #19750, #19756): the device list and nonce store, the verifier, pairing with a plain-words prompt, a passkey certificate, the signed-message routes, and a limiter. A clear that fails fails closed, and a pending clear refuses every signed message. `coral cloud devices` lists, removes and sets the mode; the web mode is the computer's own setting. Coral Hub is told; against a Hub that has not deployed its half, only the pairing is skipped.
+- **`coral-go/internal/devicekey/codes.go` is new in this release** (the Hub team diffs it).
 
 #### Coral Hub
 
@@ -25,11 +32,13 @@ Task numbers in brackets. Built on v2.1.0. A prerelease until the Operator promo
 
 - `coral --version` names the commit in a make dev build, in a worktree too (#17637).
 - `coral-board task submit-review` with a new revision while the task is in review records the head it names (#19685).
-- Test and gate work: the lazy-group order test, suite_durations from the v2.1.0 gate, and timing fixes for team_artifacts_not_found, heap_growth (now three suites) and actions_tasks (#19721, #19725, #19755, #19763, #19766, #19770).
+- Test and gate work: the lazy-group order test, suite_durations from the v2.1.0 gate, timing fixes for team_artifacts_not_found, heap_growth (now three suites) and actions_tasks, tab-page tests that wait for content, a Windows stand-in agent that stops on Ctrl-C, and the release ldflags check that knows DevCommit and DevDirty (#19721, #19725, #19755, #19761, #19763, #19766, #19769, #19770, #19777).
+- The frontier copy recipe uses `COPYFILE_DISABLE=1` and fails if a `._` file reaches the run folder (#18043).
 
 ### Known issues
 
-- None from the gate: go-tests, go-race, gofmt, cross-build, the cdp-gate (2136 of 2136 suites) and the Windows tests all passed on their first run.
+- Device keys: a Hub that has not deployed its half skips the pairing, nothing else changes.
+- None from the gate: go-tests, go-race, gofmt, cross-build, the cdp-gate (2139 of 2139 suites) and the Windows tests all passed on their first run.
 
 ## v2.1.0 — Search across tasks and goals, reminders for any agent, a calmer Needs you list, an Activity view that leaves out the noise, and spend broken down by goal
 
