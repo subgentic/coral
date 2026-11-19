@@ -130,3 +130,49 @@ func TestRenameOldBoardFreesTheNameForANewTeam(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, again2, 1, "the old team keeps its name")
 }
+
+// #19744: an agent that starts on the old team between the check and the rename: the name is put back and nothing is renamed.
+func TestRenameOldBoardRefusesWhenAnAgentStartsDuringTheRename(t *testing.T) {
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stubCLIPaths(t, store.NewSessionStore(db))
+	bs, err := boardtest.Open(filepath.Join(t.TempDir(), "board.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { bs.Close() })
+	handler := NewSessionsHandler(db, &config.Config{LogDir: t.TempDir()}, nil, newMockTerminal(), bs)
+	handler.SetTeamStore(store.NewTeamStore(db))
+	ctx := context.Background()
+	old, err := bs.CreateBoard(ctx, "epsilon", "operator")
+	require.NoError(t, err)
+	_, err = bs.PostMessage(ctx, old.ID, "someone", "x", nil)
+	require.NoError(t, err)
+
+	launch := func(body map[string]any) (int, map[string]any) {
+		body["working_dir"] = t.TempDir()
+		body["agents"] = []map[string]any{{"name": "Dev", "prompt": "build"}}
+		b, _ := json.Marshal(body)
+		req := httptest.NewRequest(http.MethodPost, "/x", bytes.NewReader(b))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		handler.LaunchTeam(rec, req)
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	// The agent starts on the old team (by its id) just after the rename.
+	afterBoardRename = func() {
+		code, out := func() (int, map[string]any) { afterBoardRename = nil; return launch(map[string]any{"board_id": old.ID}) }()
+		require.Equal(t, http.StatusOK, code, out)
+	}
+	t.Cleanup(func() { afterBoardRename = nil })
+	code, out := launch(map[string]any{"board_name": "epsilon", "rename_old_board": true})
+	require.Equal(t, http.StatusConflict, code, out)
+	assert.Equal(t, "board_has_running_agents", out["code"])
+	got, err := bs.GetBoard(ctx, old.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "epsilon", got.Label, "the name is put back")
+	fresh, err := bs.BoardsLabelled(ctx, "epsilon")
+	require.NoError(t, err)
+	assert.Len(t, fresh, 1, "no new team was started")
+}

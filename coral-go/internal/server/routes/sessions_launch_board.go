@@ -176,6 +176,9 @@ func (h *SessionsHandler) boardLabel(key string) string {
 
 var launchBoardMu sync.Mutex
 
+// afterBoardRename is a test seam (#19744): it runs between a rename-and-start's rename and its second running-agents check, where an agent can start.
+var afterBoardRename func()
+
 // launchBoard decides the board a launch uses (#3536, the operator's decision): board_id
 // joins that board; board_name starts a NEW board (a fresh b- id, that label) unless a board
 // with that id or label already exists, which is answered 409 board_name_exists with the
@@ -269,13 +272,25 @@ func (h *SessionsHandler) launchBoardWith(w http.ResponseWriter, r *http.Request
 				"message": "The team \"" + boardName + "\" has " + strconv.Itoa(n) + " running agent(s), so it is not renamed under them: stop them first, or use another name"})
 			return "", false, false
 		}
-		label := h.freeDatedLabel(ctx, boardName)
-		if problem := h.bs.LabelProblem(label); problem != "" {
+		dated := boardName + "-" + time.Now().Format("2006-01-02")
+		if problem := h.bs.LabelProblem(dated); problem != "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_board_name", "code": "invalid_board_name", "message": problem})
 			return "", false, false
 		}
-		if err := h.bs.RenameBoard(ctx, old.ID, label); err != nil {
+		// The free label is picked and taken in one statement, so two renames at once cannot share a dated name; the running check is repeated after it, and an agent that started in between puts the name back (#19744).
+		if _, err := h.bs.RenameBoardToFree(ctx, old.ID, dated); err != nil {
 			errInternalServer(w, err.Error())
+			return "", false, false
+		}
+		if afterBoardRename != nil {
+			afterBoardRename()
+		}
+		if n := h.liveAgentsOn(ctx, old.ID, h.liveSessionNames(ctx)); n > 0 {
+			if err := h.bs.RenameBoard(ctx, old.ID, old.Label); err != nil {
+				log.Printf("[launch] could not put the name %q back on %s: %v", old.Label, old.ID, err)
+			}
+			writeJSON(w, http.StatusConflict, map[string]any{"error": "board_has_running_agents", "code": "board_has_running_agents", "board_id": old.ID, "live_agents": n,
+				"message": "An agent started on the team \"" + boardName + "\" while it was being renamed, so it was not: stop it first, or use another name"})
 			return "", false, false
 		}
 		existing = nil
