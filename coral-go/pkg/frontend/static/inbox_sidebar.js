@@ -275,6 +275,7 @@ const askUnder = a => questionContextNote(a) || 'Needs your answer'; // the row'
 const versionOf = r => Number(r.version) > 1 ? Number(r.version) : (r.earlier || []).length ? r.earlier.length + 1 : 0;
 const earlierWords = r => { const n = Math.max((r.earlier || []).length, (r.version || 1) - 1); return n ? `${n} earlier version${n === 1 ? '' : 's'}` : ''; };
 /** "3 earlier versions" as a link: it opens the list of the file's versions (#15285), with Open and Restore; lazy, so the start bundle holds only this line. */
+const KIND_WORD = { done: 'Finished request', release: 'Release summary', decided: 'Decisions made for you', digest: 'Daily digest' }; // what a report from Coral is called in its row (#19812, the mocks)
 const earlierLink = s => {
     const b = DT.el('button', 'inbox-review-earlier default-notice-link', earlierWords(s.review)); b.type = 'button'; b.title = 'See every version of this file';
     b.addEventListener('click', e => {
@@ -557,7 +558,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     const menu = [];
     if (decidedWithNews(row)) { menu.push({ label: 'Got it', title: 'Take it out of Needs you; nobody is told', run: ignore }); } // already decided: the reply is to be read (the row opens the file at its thread), not decided on again (#16399)
     else if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
-        box.append(word('Approve', 'Approve', waitingOnAgent(row) ? 'btn-quiet' : '', b => (isRead(row) ? approve(b) : approveUnopened(b))));
+        box.append(word('Approve', 'Approve', waitingOnAgent(row) ? 'btn-quiet inbox-approve-action' : 'inbox-approve-action', b => (isRead(row) ? approve(b) : approveUnopened(b))));
         const changes = DT.el('button', 'btn btn-quiet btn-icon inbox-changes'); changes.type = 'button'; changes.setAttribute('data-slot', 'changes'); changes.setAttribute('aria-label', `Request changes: ${file}`); changes.title = 'Request changes'; changes.append(changesIcon()); if (isPhoneLayout()) { changes.className = 'btn inbox-changes'; changes.replaceChildren('Request changes'); } else { changes.className = 'btn btn-quiet btn-small inbox-changes'; changes.replaceChildren('Request changes'); } /* the row's button says what the form it opens is called: it said Comment beside a Comments header that opens the thread, and nobody found Request changes (#16909, walk 41 F6, walk 26 M1) */ /* a phone's card says it in words beside Approve, as the approved mock does (#14627) */ changes.addEventListener('click', () => openReview(row, { requestChanges: true })); box.append(changes); if (saveButton) box.append(saveButton); // option B (the operator's pick, #12231): one Approve, a quiet icon for Request changes, Save beside it, the rest in the dots
         menu.push({ label: 'Approve with a note', title: 'Approve it with one short comment for the agent; it is not shown again', run: approveNote }, { label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }, { label: 'Deny', title: 'A final no: the agent is told', danger: true, run: deny });
         if (inSaved) menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave });
@@ -658,7 +659,7 @@ function goalDoneActions(g) {
         renderInboxNav(true);
     };
     const btn = (label, aria, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`, label); b.type = 'button'; b.setAttribute('aria-label', aria); b.addEventListener('click', e => { e.stopPropagation(); run(); }); return b; };
-    box.append(btn('Mark done', `Mark goal ${g.id} done: ${title}`, 'inbox-main-action', () => openGoalDone(g, true)), btn('Not yet', `Not yet for goal ${g.id}: ${title}`, '', () => hide('not-yet', 'Hidden until a task is added')));
+    box.append(btn('Mark done', `Mark goal ${g.id} done: ${title}`, 'inbox-main-action inbox-approve-action', () => openGoalDone(g, true)), btn('Not yet', `Not yet for goal ${g.id}: ${title}`, '', () => hide('not-yet', 'Hidden until a task is added')));
     const menu = [];
     if (isPhoneLayout()) menu.push({ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: () => hide('ignore', 'Dismissed') });
     else box.append(btn('Dismiss', `Dismiss goal ${g.id}: ${title}`, 'btn-quiet', () => hide('ignore', 'Dismissed')));
@@ -1433,9 +1434,9 @@ if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-versi
 wrap.append(sender, name); if (tags.childNodes.length) wrap.append(tags); if (pills.childNodes.length) wrap.append(pills);
 wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); if (waitingOnAgent(s.review)) wrap.append(sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true })), sentBackExcerpt(s.review, splitKey(s.review.team).server, splitKey(s.review.team).name)); return wrap;
     }
-    const ver = DT.el('span', 'inbox-review-version', versionOf(s.review) > 1 ? ` · version ${versionOf(s.review)}` : ''); ver.hidden = !(versionOf(s.review) > 1);
+    const ver = DT.el('span', 'inbox-review-version', versionOf(s.review) > 1 ? ` \u00b7 version ${versionOf(s.review)}` : ''); ver.hidden = !(versionOf(s.review) > 1); // the version, once, in the meta strip (#19812); its text carries its own dot
     const meta = DT.el('span', 'inbox-meta'); // the headline is the subject; under it the kind, the sender and the file's own words, then the pills; the team stays in its own column (#16678, Option B)
-    meta.append(waitingOnAgent(s.review) ? sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true })) : DT.el('span', 'inbox-kind', 'For review'), sender, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), ...(pills.childNodes.length ? [pills] : []));
+    meta.append(waitingOnAgent(s.review) ? sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true })) : DT.el('span', `inbox-kind inbox-kind-${KIND_WORD[s.review.kind] ? s.review.kind : 'file'}`, (KIND_WORD[s.review.kind] || 'For review')), sender, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), ...(pills.childNodes.length ? [pills] : []));
     wrap.append(name, meta, ...(waitingOnAgent(s.review) ? [sentBackExcerpt(s.review, splitKey(s.review.team).server, splitKey(s.review.team).name)] : []), DT.el('span', 'sr-only', readWords), ...waitMark(s)); return wrap;
 } if (isPhoneLayout()) { const f = DT.primaryButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); f.classList.add('inbox-review-from'); Object.assign(f.dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); const row = phoneRow(s, f, agentAskWords(s), [], true); if (agentAskIsLong(s)) row.append(...agentAskControls(s)); return row; }
   const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; })(s)) },

@@ -40,6 +40,7 @@ export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browse
 export function kindIcon(s) {
     const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // board questions share the Question chip (#16548)
     i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
+    if (s?.review) i.dataset.type = /^video\//.test(s.review.media_type || '') ? 'video' : /html/.test(s.review.media_type || '') ? 'html' : /markdown/.test(s.review.media_type || '') ? 'md' : '';
     if (s?.review) { i.classList.add('inbox-artifact-thumbnail'); i.append(artifactThumbnail(s.review, { size: 32, url: typeof s.server === 'string' && thumbnailPath(s.review) ? serverUrl(thumbnailPath(s.review), s.server) : '' })); }
     return i;
 }
