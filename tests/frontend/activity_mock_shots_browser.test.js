@@ -76,6 +76,7 @@ const D = 'a'.repeat(64), D2 = 'b'.repeat(64), V1 = 'c'.repeat(64), V2 = 'd'.rep
      await shot(`activity-file-${width}-${theme}`);
      await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.querySelector('.activity-file-dialog')?.closest('dialog, .modal, .coral-dialog')?.remove(); true`);
      await ev(`window.__broken = true; import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(async m => { await m.openInboxGroup('saved'); await m.openInboxGroup('activity'); })`); await ev(framesJs(6));
+     assert.equal(await ev(`(()=>{const t=document.querySelector('.activity-check-broken .activity-check-title'), d=document.querySelector('.activity-check-broken .activity-check-detail'); return !t || d.getBoundingClientRect().top >= t.getBoundingClientRect().bottom - 1})()`), true, `${at}: the notice's sentence sits under its title`);
      if (await ev(`!!document.querySelector('.activity-check-broken')`)) { await shot(`activity-integrity-${width}-${theme}`); }
      await ev(`window.__broken = false; window.__empty = true; import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(async m => { await m.openInboxGroup('saved'); await m.openInboxGroup('activity'); })`); await ev(framesJs(6));
      if (await ev(`!!document.querySelector('#group-table-view .empty-state')`)) await shot(`activity-empty-${width}-${theme}`);

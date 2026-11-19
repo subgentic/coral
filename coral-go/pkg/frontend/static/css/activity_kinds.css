@@ -20,7 +20,7 @@
 .activity-check-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 2rem; min-height: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border); font-size: var(--fs-lg); }
 .activity-check-broken .activity-check-tile { color: var(--error-text); background: rgba(var(--error-rgb), 0.14); border-color: rgba(var(--error-rgb), 0.3); }
 .activity-check-tile::before { content: "warning"; }
-.activity-check-title { display: inline; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); }
+.activity-check-title { display: block; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); }
 .activity-check-detail { color: var(--text-secondary); font-size: var(--fs-base); }
 #group-table-view:has(.inbox-activity-group-toggle) .empty-state { align-items: center; text-align: center; padding: var(--space-2xl) var(--space-xl); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 #group-table-view:has(.inbox-activity-group-toggle) .empty-state::before { content: "history"; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; aspect-ratio: 1; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-tertiary); font-family: "Material Icons"; font-size: var(--fs-2xl); font-feature-settings: "liga"; color: var(--text-secondary); }
