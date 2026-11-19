@@ -76,8 +76,13 @@ const { coralReady } = require('./helpers/wait');
             if (w === 390 && theme === 'dark' && font === 16) {
                 await ev(`document.querySelector('#group-table-view tbody tr.dt-row .dt-primary').click(); true`);
                 await waitFor(`(() => { const v = document.getElementById('artifact-viewer'); return !!v && !v.hidden; })()`, `${at}one tap opens the file`, 8000);
+                // the sender's question is in Details (#19771: the header is one row): on a phone Details is an item of the ⋯ menu
+                await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
+                await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-details-item') && document.querySelector('#artifact-viewer .artifact-viewer-details-item').getClientRects().length > 0`, `${at}the Details item is in the menu`, 6000);
+                await ev(`document.querySelector('#artifact-viewer .artifact-viewer-details-item').click(); true`);
+                await waitFor(`(() => { const f = document.querySelector('#artifact-viewer .artifact-viewer-from'); return !!f && f.getClientRects().length > 0; })()`, `${at}Details shows the question`, 6000);
                 const said = await ev(`(document.getElementById('artifact-viewer').innerText || '').replace(/\\s+/g, ' ')`);
-                check(said.includes('A longer second sentence that must not make the card taller.'), `${at}the file's header carries the whole question the card cut: ` + JSON.stringify(said.slice(0, 300)));
+                check(said.includes('A longer second sentence that must not make the card taller.'), `${at}the file's Details carry the whole question the card cut: ` + JSON.stringify(said.slice(0, 300)));
                 await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close')?.click(); true`);
                 opened = true;
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge')?.textContent === '1'`, `${at}opening marks one card read and drops unread attention`);
