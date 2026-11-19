@@ -21,7 +21,7 @@ let waking = false;
  * Show or hide the sleeping composer for the current session.
  * manageInput: false leaves the text input to the caller (the popout drives
  * its input from its own lifecycle state).
- * archived: an archived agent (#3030) offers Unarchive and Wake, no Restart.
+ * archived: an archived agent (#3030) offers Start and Sleep, no Restart.
  * Omitted, it is read from the current session's live row.
  */
 export function applySleepingView(sleeping, { manageInput = true, archived } = {}) {
@@ -90,11 +90,7 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     if (wakeBtn) wakeBtn.hidden = gone;
     const unarchive = document.getElementById('sleeping-unarchive-btn');
     if (unarchive) unarchive.hidden = !archived;
-    const wake = document.getElementById('sleeping-wake-btn');
-    if (wake) {
-        // Archived: Unarchive is the primary action, Wake the second.
-        wake.classList.toggle('btn-primary', !archived);
-    }
+    if (wakeBtn && !waking) wakeBtn.textContent = archived ? 'Start' : 'Wake';
     const restart = document.getElementById('sleeping-restart-btn');
     if (restart) restart.hidden = archived;
     if (!manageInput) return;
