@@ -189,6 +189,7 @@
 .ac-ask .ac-ask-label { display: inline-flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px; width: auto; margin: 0; padding: 0; font-size: var(--fs-sm, 0.8125rem); color: var(--text-primary); cursor: pointer; }
 .ac-ask .ac-ask-label input[type="checkbox"] { flex: none; width: 16px; height: 16px; margin: 0; padding: 0; }
 .ac-ask .ac-ask-now { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: flex-start; gap: 8px; width: auto; margin: 0; padding: 0; font-size: var(--fs-sm, 0.8125rem); color: var(--text-secondary); cursor: pointer; }
+.ac-ask .ac-ask-now input[type="checkbox"] { flex: none; width: auto; min-width: 0; margin: 2px 0 0; padding: 0; } /* the tick keeps its own size beside its words: a stretched field made it 112 px wide with the tick in the middle (#19823) */
 .ac-ask-sub { color: var(--text-secondary); }
 .ac-ask-sub::before { content: "· "; }
 .ac-ask-state { align-self: center; margin: 0; font-size: var(--fs-sm, 0.8125rem); line-height: var(--lh-label); color: var(--text-secondary); }
