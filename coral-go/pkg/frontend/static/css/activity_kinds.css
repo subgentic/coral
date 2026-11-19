@@ -1,8 +1,10 @@
-/* Activity's kind chips (#16087): several at once. Lazy: loaded by inbox_activity.js, not at start. Below 66 rem of toolbar the seven chips and their counts no longer fit beside the title, the search and the icon: they become check boxes in the Filters panel, never scrolled or cut. */
-@container inboxfolder (max-width: 66rem) { /* Activity's seven chips and their counts (#16087, #19149) take about 42 rem beside the title, the search and the icon: below that they are the panel's check boxes, never scrolled or cut */
-    .inbox-folder-toolbar:has(.team-tb-pills-multi) .team-tb-pills { display: none; }
-    .inbox-folder-toolbar:has(.team-tb-pills-multi) .inbox-pill-field { display: flex; }
+/* Activity's kind chips (#16087): several at once. Lazy: loaded by inbox_activity.js, not at start. Beside the title and the search where 66 rem allow, else on the toolbar's own second line (the mock, #19871). */
+@container inboxfolder (max-width: 66rem) { /* the mock's second row (#19813 v1 section 1): the seven chips and their counts take their own line under the title, the search and the icon, one line that scrolls sideways at 390, never check boxes in the panel (#19871 MUST-12) */
+    .inbox-folder-toolbar:has(.team-tb-pills-multi) .team-tb-pills { display: flex; flex: 1 1 100%; order: 9; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .inbox-folder-toolbar:has(.team-tb-pills-multi) .team-tb-pills .goals-chip { flex: none; }
+    .inbox-folder-toolbar:has(.team-tb-pills-multi) .list-bar-search-row.gt-toolbar { flex-wrap: wrap; }
 }
+.inbox-folder-toolbar:has(.team-tb-pills-multi) .inbox-pill-field { display: none; }
 .inbox-folder-toolbar .inbox-pill-field .team-tb-checks { display: flex; flex-wrap: wrap; gap: 2px 14px; } /* a folder whose pills are several at once (Activity, #16087) lists them as check boxes in the panel */
 .team-tb-check { display: inline-flex; align-items: center; gap: 6px; min-height: var(--toolbar-control-h, 32px); white-space: nowrap; }
 @media (max-width: 767px), (pointer: coarse) { .team-tb-check { min-height: var(--control-touch-height, 44px); } }
