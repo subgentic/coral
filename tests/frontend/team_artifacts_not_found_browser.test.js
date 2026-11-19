@@ -27,7 +27,8 @@ const ITEMS = ['plan.md'].map((name, i) => ({ name, media_type: 'text/markdown',
             for (const team of [REAL, 'no-such-team']) {
                 await ev(`window.switchNavTab('agents'); window.openTeamPage(${JSON.stringify(team)}, { tab: 'artifacts' }); true`);
                 await waitFor(`!!document.querySelector('#team-panel-artifacts') && !document.querySelector('#team-panel-artifacts').hidden`, `${label}: the Artifacts tab`, 10000);
-                await settle(900);
+                await waitFor(`(() => { const p = document.querySelector('#team-panel-artifacts'); return !!p && (p.querySelectorAll('tbody tr').length > 0 || !!p.querySelector('.team-artifacts-error')); })()`, `${label}: ${team} answered (rows or an error)`, 20000);
+                await settle(300);
                 const s = await ev(`({ rows: document.querySelectorAll('#team-panel-artifacts tbody tr').length, error: ((document.querySelector('#team-panel-artifacts .team-artifacts-error') || {}).textContent || '').trim(), retry: !!document.querySelector('#team-panel-artifacts .team-artifacts-retry') })`);
                 if (team === REAL) check(`${label}: a team that exists lists its file, no error`, s.rows === 1 && !s.error, JSON.stringify(s));
                 else check(`${label}: a name no board has says "No team named no-such-team", with no Retry`, /^No team named no-such-team/.test(s.error) && !s.retry && s.rows === 0, JSON.stringify(s));
