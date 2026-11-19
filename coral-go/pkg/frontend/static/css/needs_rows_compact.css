@@ -120,3 +120,8 @@
 /* a goal that looks done: its Done-when words, then the kind word in the meta line, as the approved list draws it (#19824) */
 
 /* a permission's command is a code box under the headline, as the approved list draws it (#19824) */
+
+/* the approved list (#19824): a goal that looks done says so under its words; a permission's command is a code box */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-goaldone-actions) .inbox-row-words { overflow: visible; white-space: normal; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-goaldone-actions) .inbox-row-words::after { content: 'Goal looks done'; display: block; margin-top: 6px; font-size: var(--fs-base); color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-row-words.inbox-row-command { width: fit-content; max-width: 70ch; margin-top: 4px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
