@@ -403,7 +403,7 @@ export function savedItemFacts(it) {
     const c = chipFor(it), chk = checks.get(uid(it));
     return { id: uid(it), server: it.server, title: srcLabel(it), snippet: it.snippet || '', snip: rowSnippet(it), saved: ago(it.saved_at), said: it.said_at ? when(it.said_at) : '', done: !!it.done_at,
         state: chk && chk.state === 'gone' ? 'Gone' : it.done_at ? 'Done' : 'Open', gone: !!(chk && chk.state === 'gone'), noopen: !!(chk && chk.state === 'noopen'), why: chk ? chk.why || '' : '',
-        serverName: multi ? serverName(it.server) : '', which: whichOne(it), open: openLabel(it), chip: c.text, kind: it.kind };
+        serverName: multi ? serverName(it.server) : '', team: String(it.team || ''), which: whichOne(it), open: openLabel(it), chip: c.text, kind: it.kind };
 }
 export const findSavedItem = id => items.find(i => uid(i) === id) || null;
 export function setSavedTab(t) { tab = t === 'done' ? 'done' : 'open'; render(); }
