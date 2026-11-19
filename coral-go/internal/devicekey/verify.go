@@ -67,7 +67,7 @@ type Verifier struct {
 	// RefuseBefore, when set, refuses every message whose ts is earlier. Coral sets it to its start time plus the window when the nonce store could not be read at start (design page v4 section 4, `before_start`).
 	RefuseBefore time.Time
 
-	// HubOrigin is the Hub address this computer is enrolled with (https://host, no path): a passkey certificate's origin must equal it and its rp id is its host. Empty refuses every certificate.
+	// HubOrigin is the Hub address this computer is configured with, its Manager HubURL (https://host, no path; set by Coral, never read from a request): a passkey certificate's origin must equal it and its rp id is its host. Empty refuses every certificate.
 	HubOrigin string
 
 	// Refuse, when set, is asked first of all: while it returns true (a device-key clear is pending) every message is refused with ErrListUnavailable before anything of it is read.

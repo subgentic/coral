@@ -269,3 +269,29 @@ func TestAnUnlistedRemovedOrWrongComputerSenderGetsBadSignature(t *testing.T) {
 	b, _ = m.Canonical()
 	assert.Equal(t, "bad_signature", errCode(t, d.post("/api/device-keys/message", msgJSON("remove-device", string(b), signP1363(t, d.signer, devicekey.SigningInput(m.Action, b))), nil)))
 }
+
+// Review #19738 SHOULD 1: only FAILED checks use the budget, per claimed signer, so a flood of bad messages cannot delay a signed removal from another signer, and good ones never use it.
+func TestAFloodOfBadMessagesDoesNotDelayAnotherSignersRemoval(t *testing.T) {
+	d := newDKRig(t)
+	_, target := d.addDevice("view", store.DeviceKindDevice)
+	body, sig := d.removal(target)
+	// The flood claims a kid nobody listed: more failed checks than the budget.
+	flood := msgJSON("remove-device", strings.Replace(body, d.kid, "A"+d.kid[1:], 1), sig)
+	for i := 0; i < 80; i++ {
+		d.post("/api/device-keys/message", flood, nil)
+	}
+	rec := d.post("/api/device-keys/message", flood, nil)
+	assert.Equal(t, "internal", errCode(t, rec), "the flooded signer's own budget is spent")
+	rec = d.post("/api/device-keys/message", msgJSON("remove-device", body, sig), nil)
+	require.Equal(t, 200, rec.Code, "another signer's signed removal still goes through: %s", rec.Body.String())
+}
+
+func TestGoodMessagesNeverUseTheBudget(t *testing.T) {
+	d := newDKRig(t)
+	for i := 0; i < 40; i++ {
+		_, target := d.addDevice("view", store.DeviceKindDevice)
+		body, sig := d.removal(target)
+		rec := d.post("/api/device-keys/message", msgJSON("remove-device", body, sig), nil)
+		require.Equal(t, 200, rec.Code, "removal %d: %s", i, rec.Body.String())
+	}
+}

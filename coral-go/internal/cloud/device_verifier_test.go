@@ -3,6 +3,7 @@ package cloud
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -14,9 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/devicekey"
+	"github.com/subgentic/coral/internal/store"
 )
 
-// The verifier in production (#19669 slice 7): built in one place, with Refuse on the manager's pending-clear mark, HubOrigin from the enrolled Hub's own address and the audit line.
+// The verifier in production (#19669 slice 7): built in one place, with Refuse on the manager's pending-clear mark, HubOrigin from the configured HubURL and the audit line.
 
 func TestTheBuiltVerifierHasRefuseHubOriginAndAudit(t *testing.T) {
 	r := pairingSetup(t, true)
@@ -24,7 +26,7 @@ func TestTheBuiltVerifierHasRefuseHubOriginAndAudit(t *testing.T) {
 	require.NotNil(t, v)
 	assert.NotNil(t, v.Refuse, "a verifier without Refuse would act while a clear is pending")
 	assert.NotNil(t, v.Audit)
-	assert.Equal(t, r.m.o.HubURL, v.HubOrigin, "the enrolled Hub's address, never one from a message")
+	assert.Equal(t, r.m.o.HubURL, v.HubOrigin, "the configured HubURL, never an address from a message")
 	assert.Equal(t, r.key.Computer(), v.Computer)
 }
 
@@ -40,6 +42,23 @@ func TestTheBuiltVerifierRefusesWhileAClearIsPending(t *testing.T) {
 	cf.fail = false
 	require.True(t, r.m.clearDeviceKeys(context.Background()))
 	assert.False(t, v.Refuse())
+}
+
+// A nonce store that cannot be read when the verifier is built refuses what is dated before now (before_start); a readable one sets nothing.
+type nonceUnreadable struct{ *store.SessionStore }
+
+func (nonceUnreadable) NonceSeen(context.Context, string, time.Time) error {
+	return errors.New("disk error")
+}
+
+func TestAnUnreadableNonceStoreSetsRefuseBeforeAndAReadableOneDoesNot(t *testing.T) {
+	r := pairingSetup(t, true)
+	v := r.m.NewDeviceVerifier(r.ss)
+	assert.True(t, v.RefuseBefore.IsZero(), "a readable nonce store sets no refusal")
+	r2 := pairingSetup(t, true)
+	v2 := r2.m.NewDeviceVerifier(nonceUnreadable{r2.ss})
+	require.NotNil(t, v2)
+	assert.True(t, v2.RefuseBefore.After(time.Now().Add(23*time.Hour)), "an unreadable one refuses what is dated before now plus the window")
 }
 
 func TestTheBuiltVerifierWithNoComputerKeyOrHubIsNil(t *testing.T) {

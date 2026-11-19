@@ -20,23 +20,73 @@ const (
 	deviceMsgPerMin   = 30 // this computer's own limit, whatever the Hub's
 )
 
+// deviceMsgLimit counts only the checks that FAILED, per claimed signer: a good message never uses the budget, so a flood of bad ones cannot delay a signed removal from another signer. The Hub forwards unstamped, so there is no source address to key on; the claimed kid (or "" when the body has none, or a shared "other" bucket once deviceMsgKeysMax kids are tracked) is the key.
 type deviceMsgLimit struct {
-	mu    sync.Mutex
+	mu sync.Mutex
+	by map[string]*deviceBucket
+}
+
+type deviceBucket struct {
 	start time.Time
 	n     int
 }
 
-func (l *deviceMsgLimit) allow(now time.Time) bool {
+const deviceMsgKeysMax = 256
+
+func (l *deviceMsgLimit) bucket(key string, now time.Time) *deviceBucket {
+	if l.by == nil {
+		l.by = map[string]*deviceBucket{}
+	}
+	b, ok := l.by[key]
+	if !ok {
+		if len(l.by) >= deviceMsgKeysMax {
+			for k, o := range l.by { // drop the buckets whose minute is over
+				if now.Sub(o.start) >= time.Minute {
+					delete(l.by, k)
+				}
+			}
+		}
+		if len(l.by) >= deviceMsgKeysMax {
+			key = "other"
+			if b, ok = l.by[key]; ok {
+				return b
+			}
+		}
+		b = &deviceBucket{start: now}
+		l.by[key] = b
+	}
+	if now.Sub(b.start) >= time.Minute {
+		b.start, b.n = now, 0
+	}
+	return b
+}
+
+// allow reports whether this signer still has failed-check budget.
+func (l *deviceMsgLimit) allow(key string, now time.Time) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if now.Sub(l.start) >= time.Minute {
-		l.start, l.n = now, 0
-	}
-	l.n++
-	return l.n <= deviceMsgPerMin
+	return l.bucket(key, now).n < deviceMsgPerMin
+}
+
+// failed charges one failed check to the signer.
+func (l *deviceMsgLimit) failed(key string, now time.Time) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.bucket(key, now).n++
 }
 
 var deviceMsgLimiter deviceMsgLimit
+
+// claimedKID is the signer a message says it is from (no check): only a bucket key.
+func claimedKID(body string) string {
+	var m struct {
+		KID string `json:"kid"`
+	}
+	if json.Unmarshal([]byte(body), &m) != nil || len(m.KID) > 64 {
+		return ""
+	}
+	return m.KID
+}
 
 // deviceReply writes {"error": code} (the closed list) or {"status":"ok"}, at most 1 KB, and nothing else.
 func deviceReply(w http.ResponseWriter, err error) {
@@ -100,20 +150,25 @@ func (h *CloudHandler) DeviceKeyMessage(w http.ResponseWriter, r *http.Request) 
 		deviceReply(w, devicekey.ErrListUnavailable)
 		return
 	}
-	if !deviceMsgLimiter.allow(time.Now()) {
-		deviceReply(w, errors.New("rate limited"))
-		return
-	}
 	var req struct {
 		Action string `json:"action"`
 		Body   string `json:"body"`
 		Sig    string `json:"sig"`
 	}
 	if err := readDeviceBody(w, r, &req); err != nil {
+		deviceMsgLimiter.failed("", time.Now())
 		deviceReply(w, err)
 		return
 	}
+	key := claimedKID(req.Body)
+	if !deviceMsgLimiter.allow(key, time.Now()) {
+		deviceReply(w, errors.New("rate limited"))
+		return
+	}
 	_, err := v.Handle(r.Context(), devicekey.Action(req.Action), []byte(req.Body), req.Sig, time.Now())
+	if err != nil {
+		deviceMsgLimiter.failed(key, time.Now())
+	}
 	deviceReply(w, err)
 }
 
@@ -128,10 +183,6 @@ func (h *CloudHandler) DeviceKeyCertificate(w http.ResponseWriter, r *http.Reque
 		deviceReply(w, devicekey.ErrListUnavailable)
 		return
 	}
-	if !deviceMsgLimiter.allow(time.Now()) {
-		deviceReply(w, errors.New("rate limited"))
-		return
-	}
 	var req struct {
 		Label             string `json:"label"`
 		DevicePK          string `json:"device_pk"`
@@ -141,10 +192,18 @@ func (h *CloudHandler) DeviceKeyCertificate(w http.ResponseWriter, r *http.Reque
 		Signature         string `json:"signature"`
 	}
 	if err := readDeviceBody(w, r, &req); err != nil {
+		deviceMsgLimiter.failed("cert", time.Now())
 		deviceReply(w, err)
+		return
+	}
+	if !deviceMsgLimiter.allow("cert", time.Now()) {
+		deviceReply(w, errors.New("rate limited"))
 		return
 	}
 	_, err := v.HandleCertificate(r.Context(), devicekey.Certificate{Label: req.Label, DevicePK: req.DevicePK, Ts: req.Ts,
 		AuthenticatorData: req.AuthenticatorData, ClientDataJSON: req.ClientDataJSON, Signature: req.Signature}, time.Now())
+	if err != nil {
+		deviceMsgLimiter.failed("cert", time.Now())
+	}
 	deviceReply(w, err)
 }

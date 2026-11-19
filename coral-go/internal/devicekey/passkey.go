@@ -54,7 +54,7 @@ func Challenge(computer, label string, devicePK []byte, ts int64) []byte {
 	return h.Sum(nil)
 }
 
-// HandleCertificate verifies a passkey certificate against Coral's own list and, only when every check has passed, records its nonce, touches the passkey and adds the new device at view. The origin and rp id come from the enrolled Hub (Verifier.HubOrigin), the passkey's key from the list, the time from now. A refusal changes nothing.
+// HandleCertificate verifies a passkey certificate against Coral's own list and, only when every check has passed, records its nonce, touches the passkey and adds the new device at view. The origin and rp id come from the Hub this computer is configured with (Verifier.HubOrigin, the Manager HubURL), the passkey's key from the list, the time from now. A refusal changes nothing.
 func (v *Verifier) HandleCertificate(ctx context.Context, c Certificate, now time.Time) (store.DeviceKey, error) {
 	var none store.DeviceKey
 	v.mu.Lock()
