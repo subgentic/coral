@@ -32,6 +32,7 @@ const (
 	sendCommentCap   = 700     // characters of the comment itself, shrunk further when the message would pass sendMessageCap
 	sendLimitPerHour = 60      // asks per owner per hour; a refused or failed ask counts
 	sendBodyMax      = 4 << 10 // bytes of the request
+	sendAllPerHour   = 10      // Send all presses per owner per hour (#19861); a refused or failed press counts
 )
 
 // sendLimiter allows the owner sendLimitPerHour asks in any hour, in memory, with a bounded table.
@@ -41,6 +42,11 @@ type sendLimiter struct {
 }
 
 func (l *sendLimiter) allow(key string, now time.Time) bool {
+	return l.allowN(key, now, sendLimitPerHour)
+}
+
+// allowN is allow with its own number of asks an hour (Send all has fewer: one press reaches every open thread, #19861).
+func (l *sendLimiter) allowN(key string, now time.Time, max int) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.seen == nil {
@@ -53,7 +59,7 @@ func (l *sendLimiter) allow(key string, now time.Time) bool {
 			kept = append(kept, t)
 		}
 	}
-	if len(kept) >= sendLimitPerHour {
+	if len(kept) >= max {
 		l.seen[key] = kept
 		return false
 	}
@@ -263,7 +269,12 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 	}
 	h.keepOwnerSubject(r.Context(), &caller)
 	key := caller.Issuer + "|" + caller.Subject
-	if !h.sendLimit.allow(key, time.Now()) { // a refused or failed ask counts too
+	if isSendAll(r) { // Send all has its own, smaller limit: one press reaches every open thread of a file (#19861)
+		if !h.sendAllLimit.allowN(key, time.Now(), sendAllPerHour) {
+			httputil.WriteActionLimit(w, 60, "rate_limited", "too many comments sent to agents; try again later")
+			return
+		}
+	} else if !h.sendLimit.allow(key, time.Now()) { // a refused or failed ask counts too
 		httputil.WriteActionLimit(w, 60, "rate_limited", "too many comments sent to agents; try again later")
 		return
 	}
@@ -301,6 +312,10 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 	}
 	if len(names) == 0 || len(names) > sendMaxAgents {
 		errBadRequest(w, fmt.Sprintf("name between 1 and %d agents", sendMaxAgents))
+		return
+	}
+	if isSendAll(r) { // every open comment of the file in one message per agent (#19861): the same route and body as one comment's send
+		h.sendAllComments(w, r, id, names)
 		return
 	}
 	t, ok := h.commentTarget(w, r, id)
@@ -342,19 +357,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 		commentRefuse(w, http.StatusServiceUnavailable, "redaction_unavailable", "the comment could not be checked for secrets, so it was not sent")
 		return
 	}
-	author := sendDashes.ReplaceAllString(cleanSendText(capChars(t.AuthorName, 32)), "- - -") // a name is quoted too: no marker lookalike
-	switch {
-	case t.AuthorKind == commentCallerOwner:
-		author = sendAuthorOperator // the person at this computer wrote it: decided by who the comment is stored as, never by what it says
-	case t.AuthorKind == commentCallerHub:
-		author = "a Coral Hub viewer" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
-	case t.AuthorKind == commentCallerGuide:
-		author = "a guide" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
-	case t.AuthorKind == commentCallerAgent:
-		author = "an agent" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
-	case author == "":
-		author = "someone"
-	}
+	author := sendAuthorOf(t)
 	version := h.sendVersionLine(id, t.Board)
 	var mentionNames []string // the board's names: DefuseMentions also breaks "Name:" forms for them
 
@@ -533,3 +536,24 @@ func newVersionLine(kind sendKind) string {
 	}
 	return "If your answer changes the file, upload the next version of this same file under the same name: coral-agent artifact upload <file> --new-version-of <the link on the Version line; when it says the newest is a later version, that newest link>. Do not upload it as a new file. In your reply say everything you changed, not only the main edit.\n"
 }
+
+// sendAuthorOf is who a comment is quoted as written by: the Operator (decided by who the comment is stored as, never by what it says), or a cleaned name with its kind.
+func sendAuthorOf(t store.ArtifactComment) string {
+	author := sendDashes.ReplaceAllString(cleanSendText(capChars(t.AuthorName, 32)), "- - -") // a name is quoted too: no marker lookalike
+	switch {
+	case t.AuthorKind == commentCallerOwner:
+		author = sendAuthorOperator // the person at this computer wrote it: decided by who the comment is stored as, never by what it says
+	case t.AuthorKind == commentCallerHub:
+		author = "a Coral Hub viewer" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
+	case t.AuthorKind == commentCallerGuide:
+		author = "a guide" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
+	case t.AuthorKind == commentCallerAgent:
+		author = "an agent" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
+	case author == "":
+		author = "someone"
+	}
+	return author
+}
+
+// isSendAll is whether the request is the bundle route, /api/artifacts/{id}/comments/all/send (#19861): its own row in the routing table and the tunnel's, the same handler.
+func isSendAll(r *http.Request) bool { return strings.HasSuffix(r.URL.Path, "/comments/all/send") }

@@ -110,6 +110,7 @@ type SessionsHandler struct {
 	changeClaims     sync.Map    // comment id -> struct{}: the notice of a Request changes comment is being delivered (#13998)
 	changeDelivering func()      // a test's hook: called after the notice is claimed and the lock released, before it is delivered (nil outside tests)
 	sendLimit        sendLimiter // Send to agent: asks per owner per hour (#6443)
+	sendAllLimit     sendLimiter // Send all open comments: presses per owner per hour (#19861)
 	// wsHeartbeat overrides wsHeartbeatInterval when set (nanoseconds; tests).
 	wsHeartbeat  atomic.Int64
 	remoteAgents background.RemoteAgentSource

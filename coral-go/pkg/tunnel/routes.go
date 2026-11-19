@@ -341,6 +341,8 @@ var routeTable = cat(
 	// to comment (artifact_comments_hub_write on) edits and deletes only a comment whose stored author is that same Hub viewer; the owner only their own too (the comment policy), never another's.
 	owner(OwnerSees, rules(http.MethodPatch, TierInteract, "/api/artifacts/{hex64}/comments/{id}")),
 	owner(OwnerSees, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/comments/{id}")),
+	// Send ALL open comments of a file to the agents picked (#19861): its own row, since it reaches many threads in one request. The same body as one comment's send ({agents}), the owner's alone, with its own limit and audit line on the machine; the id is the word all.
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, "/api/artifacts/{hex64}/comments/all/send")),
 	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, "/api/artifacts/{hex64}/comments/{id}/send")),
 	// The Operator's review of a for-review artifact (#136584, #11354: the owner gets everything through the Hub): Approve takes it out of Needs you and posts ONE fixed-sentence board message to the agent that uploaded it
 	// (the artifact's name quoted as cleaned data), "changes" only records the state (the comment itself is the comment route above; its send to an agent stays unlisted). The OWNER's alone: a guest or a grantee is refused

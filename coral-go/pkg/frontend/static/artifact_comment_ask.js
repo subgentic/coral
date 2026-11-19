@@ -134,13 +134,16 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         let res, sentThreads = 0;
         try {
             const { sendCommentQueue } = await importOnce('./artifact_comment_send_queue.js');
-            const batch = await sendCommentQueue(k.queue, {
+            // Several open comments on a team's file go as ONE message per agent (#19861): the same send route with the id "all" (the computer lists the open threads itself), once per file of the queue (a carried comment is on an earlier version's file).
+            const bundle = k.queue.length > 1 && k.context.board !== '~no-team';
+            const units = bundle ? [...k.queue.reduce((m, c) => m.set(c.artifactId, [...(m.get(c.artifactId) || []), c]), new Map())].map(([artifactId, members]) => ({ artifactId, id: 'all', members })) : k.queue;
+            const batch = await sendCommentQueue(units, {
                 isCurrent: () => current(k),
                 send: c => api.sendComment(c.artifactId, k.context.server, c.id, agents, k.now),
-                record: (c, results) => { for (const r of results) if (r.state === 'sent' || r.state === 'queued' || r.state === 'already_asked') { names.set(r.agent.toLowerCase(), r.agent); askedOf(c.id).set(r.agent.toLowerCase(), (r.state === 'sent' || r.state === 'queued') ? 'Asked just now' : 'Already asked'); } },
+                record: (c, results) => { for (const m of (c.members || [c])) for (const r of results) if (r.state === 'sent' || r.state === 'queued' || r.state === 'already_asked') { names.set(r.agent.toLowerCase(), r.agent); askedOf(m.id).set(r.agent.toLowerCase(), (r.state === 'sent' || r.state === 'queued') ? 'Asked just now' : 'Already asked'); } },
             });
             if (batch.cancelled) return;
-            res = batch.response; sentThreads = batch.sentThreads;
+            res = batch.response; sentThreads = bundle ? units.reduce((n, u, i) => n + (i < batch.sentThreads ? u.members.length : 0), 0) : batch.sentThreads;
         } catch { res = { ok: false, status: 0, results: [], error: 'Coral could not be reached. Some earlier comments may already have been sent; their status stays in each thread.' }; }
         if (!current(k)) return;
         k.busy = false;

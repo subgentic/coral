@@ -191,7 +191,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 91 { // 91 since generation 15 (#15729, the delete of unlisted received files); 90 since generation 14 (#15729, the acknowledgement of artifact retention); 89 since generation 13 (#15720, the delete of ended agents' terminal logs); 88 since generation 12 (#15717, a team's daily-knowledge writes); 84 since generation 11 (#15715, the team import from a folder); 83 since generation 10 (#15713, the private mark of an artifact); 82 since generation 9 (#15708, the person-only reads of audit group 4); 66 since generation 8 (#15697, pause and resume of an agent's notices); 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
+	if n := len(Routes()); n != 92 { // 92 since generation 16 (#19861, Send all open comments to the agent); 91 since generation 15 (#15729, the delete of unlisted received files); 90 since generation 14 (#15729, the acknowledgement of artifact retention); 89 since generation 13 (#15720, the delete of ended agents' terminal logs); 88 since generation 12 (#15717, a team's daily-knowledge writes); 84 since generation 11 (#15715, the team import from a folder); 83 since generation 10 (#15713, the private mark of an artifact); 82 since generation 9 (#15708, the person-only reads of audit group 4); 66 since generation 8 (#15697, pause and resume of an agent's notices); 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
@@ -248,6 +248,8 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 		{"GET", "/api/system/terminal-logs", 8, false, true}, // #15708: the person-only reads of audit group 4 are generation 9: a generation 8 remote gets them unstamped
 		{"GET", "/api/system/terminal-logs", 9, true, true},
 		{"GET", "/api/sessions/live/x/loaded-skills", 9, true, true},
+		{"POST", "/api/artifacts/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/comments/all/send", 15, false, true}, // #19861: Send all open comments is generation 16: a generation 15 remote gets it unstamped
+		{"POST", "/api/artifacts/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/comments/all/send", 16, true, true},
 		{"GET", "/api/sessions/live/x/mcp-servers", 9, true, true},
 		{"GET", "/api/artifacts/abc/readers", 9, true, true},
 		{"GET", "/api/threads", 9, true, true},
@@ -288,7 +290,7 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
 		}
 	}
-	if RoutesVersion != 15 {
+	if RoutesVersion != 16 {
 		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }
@@ -403,5 +405,64 @@ func TestTheTooLongSentenceIsInTheWordsOfWhatThePersonWasDoing(t *testing.T) {
 	code, text = TooLong("POST", "/api/sessions/live/x/send")
 	if code != "hub_message_too_long" || !strings.Contains(text, "This message is too long") {
 		t.Errorf("an agent message: %s %q", code, text)
+	}
+}
+
+// #19861, coral-hub's question: a Coral at generation 16 behind a Hub that stamps at 15. Every route the Hub could stamp before is still stamped and still verifies; only all/send, which is new in 16, is not stamped for a
+// generation 15 Hub (and is a request that must be signed, so it is refused with the hub's clear answer, never sent unstamped).
+func TestAGeneration15HubStillStampsEveryOlderRouteAndNotAllSend(t *testing.T) {
+	hex := strings.Repeat("a", 64)
+	older := []struct{ m, p string }{
+		{"POST", "/api/artifacts/" + hex + "/comments/7/send"}, // the single send shares its shape with all/send and is listed after it: it is still generation 1
+		{"POST", "/api/board/team/artifacts/abc123/review"},
+		{"POST", "/api/artifacts/received/unlisted/delete"}, // generation 15
+		{"POST", "/api/sessions/live/x/send"},
+	}
+	for _, r := range older {
+		if !AllowedAt(r.m, r.p, 15) {
+			t.Errorf("%s %s is not stamped for a generation 15 hub", r.m, r.p)
+		}
+		now := t0
+		stamp, err := Sign(secret, "ssh-box", r.m, r.p, nil, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := verifier(now).Verify(stamp, r.m, r.p, r.p, nil); err != nil {
+			t.Errorf("%s %s: a stamp made by a generation 15 hub is refused: %v", r.m, r.p, err)
+		}
+	}
+	all := "/api/artifacts/" + hex + "/comments/all/send"
+	if AllowedAt("POST", all, 15) {
+		t.Error("all/send is stamped for a generation 15 hub: it is new in generation 16")
+	}
+	if !AllowedAt("POST", all, 16) || !MustBeSigned("POST", all) {
+		t.Error("all/send is stamped at generation 16 and must be signed")
+	}
+}
+
+// #19861, the other direction: a generation 16 hub and a remote that is today's generation 15 (its list has no all/send row; the single send's row, `comments/{cid}/send`, matches the word all). A hub only stamps up to what the
+// remote reports (15), and at 15 all/send is not stamped, so nothing is made. Were a stamp made anyway, the old remote's list accepts it (the row matches), the signature is checked as for any request, and the old router then
+// answers 400 "invalid comment id" (its {cid} is a number): refused by the old remote, no harm, and no other route changes.
+func TestAGeneration16StampOnAGeneration15RemoteIsAcceptedByItsListAndRefusedByItsRouter(t *testing.T) {
+	hex := strings.Repeat("a", 64)
+	all := "/api/artifacts/" + hex + "/comments/all/send"
+	if AllowedAt("POST", all, 15) {
+		t.Fatal("a hub at 16 stamps all/send for a remote that reports 15")
+	}
+	current := routes
+	defer func() { routes = current }()
+	var old []route // the list of generation 15: no all/send row
+	for _, r := range routes {
+		if !strings.Contains(r.pattern, "/comments/all/send") {
+			old = append(old, r)
+		}
+	}
+	routes = old
+	stamp, err := Sign(secret, "ssh-box", "POST", all, nil, t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifier(t0).Verify(stamp, "POST", all, all, nil); err != nil {
+		t.Errorf("the generation 15 remote's list refuses the stamp (%v): the answer for the person changes from the router's 400 to a stamp refusal", err)
 	}
 }

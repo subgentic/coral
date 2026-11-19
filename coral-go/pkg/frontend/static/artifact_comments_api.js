@@ -30,11 +30,11 @@ const boardQuery = (board) => (board ? `&board=${encodeURIComponent(board)}` : '
 export async function listComments(hex, server, board, series = false) {
     const d = await requestJson('GET', `${base(hex, server)}?state=all${boardQuery(board)}${series ? '&series=1' : ''}`);
     const you = d.you || {};
-    const out = { comments: (d.comments || []).map(normalizeComment), locked: !!d.locked, canComment: !!you.can_comment, canLock: !!you.can_lock, reason: you.reason || '', limits: d.limits || {}, lockScope: d.lock_scope || '', lockBoard: d.lock_board || '' };
+    const out = { comments: (d.comments || []).map(normalizeComment), locked: !!d.locked, canComment: !!you.can_comment, canLock: !!you.can_lock, isOwner: !!you.can_lock, reason: you.reason || '', limits: d.limits || {}, lockScope: d.lock_scope || '', lockBoard: d.lock_board || '' };
     // Through Coral Hub the comments can be read and not written: writing, replying, resolving and the lock are not routed from there (pkg/tunnel/routes.go). Offering the controls would end in a refused request, so the panel says where to write instead (#6245).
     if (isCloud() && commentWritesOn() && !commentSendOn()) out.canLock = false; // writes are routed, the lock and the send to an agent are not said to be: not drawn (#14549)
     if (isCloud() && !commentWritesOn()) { // the Hub does not say it routes writes: read only, as before. When it does, the computer's own answer (can_comment, can, can_lock) is used as it is (#14549)
-        out.canComment = false; out.canLock = false; out.reason = 'Comments can be added on the computer itself.';
+        out.canComment = false; out.canLock = false; out.isOwner = false; out.reason = 'Comments can be added on the computer itself.';
         for (const c of out.comments) c.can = { reply: false, edit: false, delete: false, resolve: false };
     }
     return out;

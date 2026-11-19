@@ -144,7 +144,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     // (`gone`, `unchecked`): the last two are listed apart and are about the older version's text, so nothing on this one's text marks them (#6472).
     const stampRange = c => `${st.videoTime?.(c.atS) || ''}${c.endS != null ? '–' + st.videoTime?.(c.endS) : ''}`;
     const groupOf = (c) => (c.fromVersion == null || c.carried === 'found') ? 'main' : c.carried === 'ambiguous' ? 'look' : c.resolved || st.video ? 'earlier' : 'main';
-    const sendOffThroughHub = (c) => api.hubSendOff() && !!st.board && !!st.data?.canComment && !c.deleted && !c.resolved && c.parentId == null; // an open thread on a board, on a Hub page that does not forward Send to agent (#19854)
+    const sendOffThroughHub = (c) => api.hubSendOff() && !!st.board && !!st.data?.isOwner && !!st.data?.canComment && !c.deleted && !c.resolved && c.parentId == null; // an open thread on a board, on a Hub page that does not forward Send to agent (#19854)
     const ownHex = (c) => c.artifactId || st.hex; // a carried comment's replies, resolving and edits go to the version it was written on
     // the box takes focus and is shown whole, Save/Cancel (or Comment/Reply) with it: it was cut at the bottom of the panel (#15239, walk 10 M12)
     const focusComposer = () => { const ta = panel.querySelector('.ac-input'); if (!ta) return; ta.focus({ preventScroll: true }); (ta.closest('.ac-composer') || ta).scrollIntoView({ block: 'nearest' }); };
@@ -290,7 +290,8 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one, or Tab to the document and press Enter to choose a passage.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
         const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked);
-        if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
+        if (sendable.length > (st.video ? 0 : 1)) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); } // every file, phone and desktop (#19861): one message per agent
+        else if (list.length > 1) { const off = list.map(t => t.c).find(sendOffThroughHub); if (off) panel.append(el('p', 'ac-note ac-send-help ac-send-hub', api.SEND_NOT_THROUGH_HUB)); } // through the Hub, switched off there: the owner is told once at the top (#19854, #19861)
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked && !opts.compact) {
             const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); focusComposer(); });

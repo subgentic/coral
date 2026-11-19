@@ -172,7 +172,7 @@ func ownerCommentWrite(r *http.Request) bool {
 	pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)
 	switch pattern {
 	case "/api/artifacts/{hex64}/comments", "/api/artifacts/{hex64}/comments/{id}/resolve", "/api/artifacts/{hex64}/comments/{id}/reopen",
-		"/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send", "/api/artifacts/{hex64}/comment-images",
+		"/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send", "/api/artifacts/{hex64}/comments/all/send", "/api/artifacts/{hex64}/comment-images",
 		"/api/board/{project}/artifacts/{digest}/edit/send", // Send to agent with the diff (#13802): the owner's alone, as the comment send
 		"/api/board/{project}/artifacts/{id}/review":        // Request changes with words (#13976) makes the owner's thread comment: the decision is the owner's alone, so its words are (#16749: through the Hub the owner was a plain Hub caller here and refused owner_only)
 		return mode != tunnel.OwnerNone && mode.Refuses()

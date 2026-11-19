@@ -46,10 +46,10 @@ const Skew = 30 * time.Second
 // secretBytes is the length of a secret, hex-encoded in its file and on the wire between the hub and the human act.
 const secretBytes = 32
 
-// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact, 11 (#15715) a team import from a folder on the computer, 12 (#15717) a team's daily-knowledge writes, 13 (#15720) the delete of ended agents' terminal logs, 14 (#15729) the acknowledgement of artifact retention, 15 (#15729) the delete of unlisted received files. A remote says in
+// RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact, 11 (#15715) a team import from a folder on the computer, 12 (#15717) a team's daily-knowledge writes, 13 (#15720) the delete of ended agents' terminal logs, 14 (#15729) the acknowledgement of artifact retention, 15 (#15729) the delete of unlisted received files, 16 (#19861) Send all open comments to the agent. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 15
+const RoutesVersion = 16
 
 type route struct {
 	pattern string
@@ -61,6 +61,7 @@ type route struct {
 // neverStamped in hubowner_test.go names what must never be here (code and settings of the computer itself).
 var routes = []route{
 	{"POST /api/board/{project}/artifacts/{id}/review", 1},
+	{"POST /api/artifacts/{id}/comments/all/send", 16}, // #19861: the owner's Send all open comments to the agent through the hub: a person's input on the remote, as one comment's send // listed before the single send's row: the first row that matches decides
 	{"POST /api/artifacts/{id}/comments/{cid}/send", 1},
 	{"POST /api/sessions/live/{name}/send", 1},              // #13456: the owner's own message to an agent through the hub: a person's input on the remote, not automation
 	{"POST /api/board/{project}/proposals/{id}/approve", 1}, // #13454: the owner's decision on a team's proposed goal or task, made at the hub: a person's act on the remote

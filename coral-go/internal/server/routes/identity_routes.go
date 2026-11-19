@@ -253,6 +253,7 @@ var operatorOnlyRoutes = map[string]string{
 	"DELETE /api/artifacts/{id}/comments/{cid}":                            "delete a comment on an artifact",
 	"POST /api/artifacts/{id}/comments/{cid}/resolve":                      "resolve a comment thread",
 	"POST /api/artifacts/{id}/comments/{cid}/send":                         "send a comment to agents",
+	"POST /api/artifacts/{id}/comments/all/send":                           "send a comment to agents",
 	"POST /api/artifacts/{id}/comment-images":                              "add a picture to a comment",
 	"POST /api/artifacts/{id}/comments/{cid}/reopen":                       "reopen a comment thread",
 	"PUT /api/artifacts/{id}/comments/lock":                                "lock the comments on an artifact",
@@ -683,6 +684,7 @@ func orchestratorOwnBoardWords(route string) string {
 // no more, so an agent is not pointed at a way that does not work (#6495, QA's #6483).
 var dashboardOnlyRoutes = map[string]bool{
 	"POST /api/artifacts/{id}/comments/{cid}/send": true,
+	"POST /api/artifacts/{id}/comments/all/send":   true,
 }
 
 // operatorOnlyWhere is the end of an agent's refusal on an operator-only route: where the Operator does it.

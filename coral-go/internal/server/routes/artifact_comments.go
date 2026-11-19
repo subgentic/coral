@@ -109,6 +109,7 @@ func (h *SessionsHandler) RegisterArtifactComments(r chi.Router) {
 	r.With(RefuseSignInLink).Patch("/api/artifacts/{id}/comments/{cid}", h.editArtifactComment)
 	r.Delete("/api/artifacts/{id}/comments/{cid}", h.deleteArtifactComment)
 	r.With(RefuseSignInLink).Post("/api/artifacts/{id}/comments/{cid}/send", h.sendArtifactComment)
+	r.With(RefuseSignInLink).Post("/api/artifacts/{id}/comments/all/send", h.sendArtifactComment) // every open comment of the file in one message per agent (#19861): its own row, the tunnel's too
 	r.With(RefuseSignInLink).Post("/api/artifacts/{id}/comments/{cid}/reply", h.agentReplyArtifactComment)
 	r.Post("/api/artifacts/{id}/comments/{cid}/resolve", h.resolveArtifactComment(true))
 	r.Post("/api/artifacts/{id}/comments/{cid}/reopen", h.resolveArtifactComment(false))

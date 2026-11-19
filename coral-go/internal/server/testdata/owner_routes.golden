@@ -73,6 +73,7 @@ POST /api/agent-asks/{id}/dismiss interact owner-only
 POST /api/agent-asks/{id}/images interact owner-only
 POST /api/artifacts/{id}/comment-images interact owner-only
 POST /api/artifacts/{id}/comments interact owner-only
+POST /api/artifacts/{id}/comments/all/send launch owner-only
 POST /api/artifacts/{id}/comments/{cid}/reopen interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/resolve interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/send launch owner-only

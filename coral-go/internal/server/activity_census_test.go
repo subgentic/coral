@@ -58,6 +58,7 @@ var activityCommentsOut = map[string]string{
 	"POST /api/artifacts/{id}/comments/{cid}/reply":   "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
 	"POST /api/artifacts/{id}/comments/{cid}/resolve": "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
 	"POST /api/artifacts/{id}/comments/{cid}/send":    "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
+	"POST /api/artifacts/{id}/comments/all/send":      "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
 	"PUT /api/artifacts/{id}/comments/lock":           "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
 }
 

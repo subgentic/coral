@@ -64,6 +64,7 @@ var signInGuardedRoutes = []string{
 	"POST /api/artifacts/{id}/comments",
 	"PATCH /api/artifacts/{id}/comments/{cid}",
 	"POST /api/artifacts/{id}/comments/{cid}/send",
+	"POST /api/artifacts/{id}/comments/all/send",
 	"POST /api/artifacts/{id}/comments/{cid}/reply",
 	"PUT /api/agent/ui/{id}",
 	"POST /api/agent/ui-request",

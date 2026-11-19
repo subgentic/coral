@@ -22,6 +22,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             { id: 1, asks: [{ agent: 'Reviewer', open: true, replies: 2, seen: true, nudged: true }, { agent: 'Docs Writer', open: false, replies: 0, seen: true, nudged: true }], parent_id: null, anchor: { quote: 'backfill in batches of 500 rows.', prefix: 'columns behind a flag and', suffix: '2. Switch' }, body: 'Batches of 500 is too small. Try 5,000.', author: { kind: 'owner', issuer: 'local', subject: 'Operator', name: 'You' }, created_at: new Date(Date.now() - 600000).toISOString() },
             { id: 2, parent_id: 1, anchor: null, body: 'Measured: 9 s per 5,000.', author: { kind: 'agent', issuer: 'local', subject: 'qa', name: 'QA Engineer' }, created_at: new Date(Date.now() - 60000).toISOString() },
             { id: 3, parent_id: null, anchor: { quote: 'Switch reads to the new columns.' }, body: 'Fine.', author: { kind: 'owner', issuer: 'local', subject: 'Operator', name: 'You' }, created_at: new Date(Date.now() - 86400000).toISOString(), resolved_at: new Date(Date.now() - 80000000).toISOString(), resolved_by: { subject: 'Operator' } },
+            { id: 4, parent_id: null, anchor: { quote: 'Add the new columns behind a flag' }, body: 'Name the flag.', author: { kind: 'owner', issuer: 'local', subject: 'Operator', name: 'You' }, created_at: new Date(Date.now() - 1000).toISOString() },
         ];
         window.__agents = [
             { name: 'QA', role: 'QA Engineer', agent_type: 'claude', availability: 'available' },
@@ -38,8 +39,8 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             if (/\\/api\\/board\\/[^/]+\\/status/.test(url)) return json({ agents: window.__agents, summary: {}, unassigned_tasks: [], health_report: [], observed_at: new Date().toISOString() });
             if (url.includes('/api/artifacts/${HEX}/comments')) {
                 const sub = url.split('/comments')[1].split('?')[0];
-                if (method === 'POST' && /^\\/\\d+\\/send$/.test(sub)) {
-                    const b = JSON.parse(o.body); window.__sends.push({ id: Number(sub.split('/')[1]), agents: b.agents, now: b.now === true });
+                if (method === 'POST' && /^\\/(\\d+|all)\\/send$/.test(sub)) {
+                    const b = JSON.parse(o.body); window.__sends.push({ id: sub.split('/')[1] === 'all' ? 'all' : Number(sub.split('/')[1]), agents: b.agents, now: b.now === true });
                     if (window.__send.body) return json(window.__send.body, window.__send.status);
                     return json({ ok: true, results: b.agents.map((a, i) => ({ agent: a, state: a === 'Backend Dev' ? 'already_asked' : 'sent', ask_id: i + 1 })) });
                 }
@@ -241,6 +242,24 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await ev(`window.__you_next = { can_comment: true, can_lock: false }; true`);
             await open('ask-team', { can_comment: true, can_lock: false });
             check(`${tag}: a viewer who is not the owner has no Send to agent`, !(await ev(`!!${sendBtn(1)}`)));
+            await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
+            await sleep(300); // sleep-ok: the viewer closes over a frame
+            // #19861: Send all open comments: one button on any file, one request, one message per agent; the owner's alone
+            console.log(`${tag}: Send all open comments`);
+            await open('ask-team');
+            check(`${tag}: two open threads give "Send 2 open comments to an agent" (a markdown file, not a video)`, (await ev(`document.querySelector('.ac-send-open')?.textContent || ''`)) === 'Send 2 open comments to an agent');
+            await ev(`window.__sends.length = 0; document.querySelector('.ac-send-open').click(); true`);
+            await waitFor(`!!document.querySelector('.ac-ask input[type="checkbox"]')`, 'the send-all picker', 8000);
+            check(`${tag}: the picker says how many, in time order`, /Send 2 open comments to agents on .*in time order/.test(await ev(`document.querySelector('.ac-ask-title').textContent`)));
+            check(`${tag}: the picker fits the screen`, await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 && document.querySelector('.ac-ask').getBoundingClientRect().right <= innerWidth + 1`));
+            await ev(`[...document.querySelectorAll('.ac-ask input[type="checkbox"]')].find(i => i.value === 'QA Engineer').click(); document.querySelector('.ac-ask-go').click(); true`);
+            await waitFor(`window.__sends.length >= 1`, 'the bundle sent', 8000);
+            await sleep(300); // sleep-ok: a second request would land within a frame or two
+            check(`${tag}: ONE request, to the route with the id all and the agents only: ` + JSON.stringify(await ev('window.__sends')), JSON.stringify(await ev('window.__sends')) === JSON.stringify([{ id: 'all', agents: ['QA Engineer'], now: false }]));
+            await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
+            await sleep(300); // sleep-ok: the viewer closes over a frame
+            await open('ask-team', { can_comment: true, can_lock: false });
+            check(`${tag}: a viewer who is not the owner has no Send all either`, !(await ev(`!!document.querySelector('.ac-send-open')`)));
             await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
             await sleep(300); // sleep-ok: the viewer closes over a frame
         }
