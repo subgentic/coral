@@ -607,3 +607,39 @@ func TestNeedsYouListsAnAgentAtADialogOnceItIsDue(t *testing.T) {
 	assert.Equal(t, DialogWords, got[0].Line)
 	assert.Equal(t, now.Add(-6*time.Minute).Format(time.RFC3339Nano), got[0].At, "it began when the dialog was first seen")
 }
+
+// #19864 (QA): a page that reads only the needs-you feed gets the dialog's options too: numbers and cleaned, cut labels, at most four, none for an unnumbered menu or one seen once; a Hub keeps them through its merge.
+func TestNeedsYouDialogItemCarriesItsOptionsAsWords(t *testing.T) {
+	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
+	menu := promptScreen{Title: "Hooks need review", Options: []promptOption{{N: 1, Label: "Review hooks"}, {N: 2, Label: "Trust all and continue"}, {N: 3, Label: "Continue without trusting " + strings.Repeat("x", 200)}}}
+	var w dialogWatch
+	w.observe("s1", menu, true, now, 5, true)
+	assert.Nil(t, w.options("s1"), "seen once: not a dialog yet")
+	w.observe("s1", menu, true, now.Add(15*time.Second), 5, true)
+	opts := w.options("s1")
+	require.Len(t, opts, 3)
+	assert.Equal(t, NeedsYouOption{N: 1, Label: "Review hooks"}, opts[0])
+	assert.LessOrEqual(t, len([]rune(opts[2].Label)), needsYouOptionLabelMax, "a long label is cut")
+
+	many := promptScreen{Options: []promptOption{{N: 1, Label: "a"}, {N: 2, Label: "b"}, {N: 3, Label: "c"}, {N: 4, Label: "d"}, {N: 5, Label: "e"}}}
+	w.observe("s2", many, true, now, 5, true)
+	w.observe("s2", many, true, now.Add(15*time.Second), 5, true)
+	assert.Nil(t, w.options("s2"), "a menu with more than four options is named in none of it")
+	arrows := promptScreen{Unnumbered: true, Options: []promptOption{{N: 1, Label: "Yes"}, {N: 2, Label: "No"}}}
+	w.observe("s3", arrows, true, now, 5, true)
+	w.observe("s3", arrows, true, now.Add(15*time.Second), 5, true)
+	assert.Nil(t, w.options("s3"), "an arrow-and-Enter menu has no key to name")
+
+	item := needsYouAgentItems([]map[string]any{{"session_id": "s1", "display_name": "UI Reviewer", "board_project": "team",
+		"at_dialog": map[string]any{"since": now.Add(-6 * time.Minute).Format(time.RFC3339), "after_min": 5, "notify": true}}}, now)
+	require.Len(t, item, 1)
+	assert.True(t, item[0].Dialog)
+	item[0].Options = opts
+	body, err := json.Marshal(map[string]any{"counts": map[string]int{"agent": 1}, "items": item})
+	require.NoError(t, err)
+	got, _, ok := rebuildRemoteNeeds("m2", body)
+	require.True(t, ok)
+	require.Len(t, got, 1)
+	assert.True(t, got[0].Dialog)
+	assert.Equal(t, opts, got[0].Options, "a Hub keeps the options of a computer's dialog item")
+}

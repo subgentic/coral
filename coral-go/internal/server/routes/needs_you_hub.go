@@ -131,6 +131,11 @@ type remoteNeedsIn struct {
 		TaskTitle    string      `json:"task_title"`
 		NewComments  json.Number `json:"new_comments"`
 		StillWaiting bool        `json:"still_waiting"`
+		Dialog       bool        `json:"dialog"`
+		Options      []struct {
+			N     json.Number `json:"n"`
+			Label string      `json:"label"`
+		} `json:"options"`
 	} `json:"items"`
 }
 
@@ -178,7 +183,19 @@ func rebuildRemoteNeeds(machine string, body []byte) (items []NeedsYouItem, coun
 		if id == "" {
 			continue
 		}
+		var opts []NeedsYouOption
+		if it.Dialog && it.Kind == "agent" && len(it.Options) <= needsYouOptionsMax {
+			for _, o := range it.Options {
+				if n := int(nonNegInt(o.N, 9)); n >= 1 && strings.TrimSpace(o.Label) != "" {
+					opts = append(opts, NeedsYouOption{N: n, Label: needsYouOptionLabel(o.Label)})
+				}
+			}
+			if len(opts) != len(it.Options) {
+				opts = nil
+			}
+		}
 		items = append(items, NeedsYouItem{
+			Dialog: it.Dialog && it.Kind == "agent", Options: opts,
 			Kind: it.Kind, From: needsYouTitle(it.From), Line: needsYouLine(it.Line), Team: needsYouTitle(it.Team),
 			ID: machine + "/" + id, At: needsYouTime(it.At), Server: machine,
 			GoalID: int64(nonNegInt(it.GoalID, 1<<53)), TaskID: int64(nonNegInt(it.TaskID, 1<<53)),

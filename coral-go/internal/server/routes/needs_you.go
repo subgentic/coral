@@ -51,8 +51,32 @@ type NeedsYouItem struct {
 	// StillWaiting: on an agent item, the Operator dismissed this request but the agent is still waiting in its terminal (#14203): Dismiss marks it ignored, it does not resolve it, so the row stays, flagged,
 	// until the agent's own evidence clears it.
 	StillWaiting bool `json:"still_waiting,omitempty"`
+	// Dialog and Options: on an agent item, the agent stands at a terminal dialog Coral read from its screen (#19864), and the numbers and labels of the menu's options as read, so a page that reads only this feed can draw them.
+	// Words only (cleaned, secrets redacted, cut), at most needsYouOptionsMax: they are never a command, and what is pressed is answered by the agent's own answer-prompt, which re-reads the screen.
+	Dialog  bool             `json:"dialog,omitempty"`
+	Options []NeedsYouOption `json:"options,omitempty"`
 	// Server: on an item a Hub read from one of its computers (#15380), the Hub's own id for that computer (never a name the computer chose); absent on this Coral's own items.
 	Server string `json:"server,omitempty"`
+}
+
+// NeedsYouOption is one option of a dialog's menu: its number and its label.
+type NeedsYouOption struct {
+	N     int    `json:"n"`
+	Label string `json:"label"`
+}
+
+const (
+	needsYouOptionsMax     = 4
+	needsYouOptionLabelMax = 60
+)
+
+// needsYouOptionLabel is a menu label as one clean line, secrets redacted, cut at needsYouOptionLabelMax characters.
+func needsYouOptionLabel(s string) string {
+	l := needsYouTitle(s)
+	if r := []rune(l); len(r) > needsYouOptionLabelMax {
+		return strings.TrimSpace(string(r[:needsYouOptionLabelMax-1])) + "…"
+	}
+	return l
 }
 
 // needsYouAnswer is the whole answer. Count is every waiting thing. The order of items is (time, id). The first read (no ?after=) gives the newest few, newest first, and the cursor is "<time>|<id>" of the newest item. A poll with ?after=<cursor> gives the items strictly after that place, OLDEST first, up to the limit, and the cursor becomes the last item given: a burst bigger than the limit, and items in one instant, are read in several polls, none skipped and none given twice (a poller reads until a poll is shorter than the limit). A bare time as the cursor is still taken, and includes the items at that time.
@@ -87,7 +111,13 @@ func (h *SessionsHandler) NeedsYouAgents(r *http.Request) ([]NeedsYouItem, error
 	if err != nil {
 		return nil, err
 	}
-	return needsYouAgentItems(rows, time.Now()), nil
+	items := needsYouAgentItems(rows, time.Now())
+	for i := range items {
+		if items[i].Dialog {
+			items[i].Options = h.dialogs.options(strings.TrimPrefix(items[i].ID, "agent:"))
+		}
+	}
+	return items, nil
 }
 
 // needsYouAgentItems is the live list's rows reduced to the agents that wait on the Operator: awake, not archived, waiting for input (a request the Operator dismissed is still there while the agent waits, flagged StillWaiting, #14203). A row with no start time of its wait is given now (it is waiting now).
@@ -126,7 +156,7 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 		if at = needsYouTime(at); at == "" {
 			at = now.UTC().Format(time.RFC3339Nano)
 		}
-		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid})
+		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid, Dialog: !wait})
 	}
 	return out
 }

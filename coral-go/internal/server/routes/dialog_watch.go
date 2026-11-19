@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -107,6 +108,25 @@ func (w *dialogWatch) field(sid string) any {
 		return nil
 	}
 	return map[string]any{"since": e.first.UTC().Format(time.RFC3339), "after_min": e.afterMin, "notify": e.notify}
+}
+
+// options are the numbered options of the dialog the agent stands at, when the same menu has been seen on two passes: their numbers and cleaned labels, at most needsYouOptionsMax, none when it has more or is
+// unnumbered (an arrow-and-Enter menu has no key to name). Words only, for the Needs you feed (#19864).
+func (w *dialogWatch) options(sid string) []NeedsYouOption {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	e := w.seen[sid]
+	if e == nil || e.passes < dialogConfirmAt || e.screen.Unnumbered || len(e.screen.Options) == 0 || len(e.screen.Options) > needsYouOptionsMax {
+		return nil
+	}
+	var out []NeedsYouOption
+	for _, o := range e.screen.Options {
+		if o.N < 1 || o.N > 9 || strings.TrimSpace(o.Label) == "" {
+			return nil // a menu that cannot be named whole is named in none of it
+		}
+		out = append(out, NeedsYouOption{N: o.N, Label: needsYouOptionLabel(o.Label)})
+	}
+	return out
 }
 
 // forgetDialog clears an agent's dialog at once (an answer was sent); the next pass sees the screen again.
