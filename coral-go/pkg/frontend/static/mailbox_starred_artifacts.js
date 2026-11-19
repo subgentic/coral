@@ -5,8 +5,8 @@ import { teamLabel } from './server_status.js';
 import { splitKey } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { visibleName } from './artifact_names.js';
-import { starControl } from './artifact_star.js';
 const DT = await importOnce('./data_table.js');
+const { starControl } = await importOnce('./artifact_star.js');
 
 const STALE_MS = 30000;
 const state = { rows: [], total: null, busy: false, error: '', at: 0 };
