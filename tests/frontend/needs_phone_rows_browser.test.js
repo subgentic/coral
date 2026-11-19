@@ -81,7 +81,7 @@ const { coralReady } = require('./helpers/wait');
             { const sel = await selected(); assert.ok(sel.length === 1 && sel[0].includes('Phone review 1.txt'), at + 'a long press selects that row and only it: ' + JSON.stringify(sel)); }
             let b = await bar();
             assert.ok(b && b.count === '1 selected', at + 'the bar says 1 selected: ' + JSON.stringify(b));
-            assert.deepEqual(b.actions.map(a => a.label), ['Cancel', 'Approve', 'Dismiss', 'Save for later', 'More actions', 'Changes', 'Mark read', 'Mark unread'], at + 'Cancel (X), the icon buttons, then More with Changes, Mark read, Mark unread; Close goal and Not yet are a goal\'s (#12328) and are not offered for a file (#12401): ' + JSON.stringify(b.actions));
+            assert.deepEqual(b.actions.map(a => a.label), ['Cancel', 'Approve', 'Save for later', 'Dismiss', 'More actions', 'Changes', 'Mark read', 'Mark unread'], at + 'Cancel (X), the buttons in the order of the approved bulk bar (Approve, Save for later, Dismiss: mock #19808 v1, row states and bulk selection bar, #19833), then More with Changes, Mark read, Mark unread; Close goal and Not yet are a goal\'s (#12328) and are not offered for a file (#12401): ' + JSON.stringify(b.actions));
             // #17450 N2 deliberately uses two header rows; #19470 makes the kinds a compact filter on a phone.
             // Selecting keeps that header and adds one actions line below, without an orphan control row.
             const tb = await ev(`(() => {

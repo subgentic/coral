@@ -63,3 +63,24 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-pop-row { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-xs) var(--space-sm); }
 .al-pop-name { font-weight: var(--fw-strong); }
 .al-pop-state { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: anywhere; }
+
+.al-vchip, .al-vnewer { display: inline-flex; align-items: center; padding: 1px var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); }
+.al-vnewer { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.14); }
+.al-ask { margin-top: var(--space-xs); font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); overflow-wrap: anywhere; }
+.al-glyph { font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: 0; }
+.al-fk-html, .al-fk-code { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.14); border-color: rgba(var(--warning-rgb), 0.3); }
+.al-fk-video, .al-fk-audio { color: var(--error-text); background: rgba(var(--error-rgb), 0.14); border-color: rgba(var(--error-rgb), 0.3); }
+.al-fk-markdown, .al-fk-pdf { color: var(--accent); background: rgba(var(--accent-rgb), 0.14); border-color: rgba(var(--accent-rgb), 0.3); }
+.al-fk-image, .al-fk-sheet { color: var(--success-text); background: rgba(var(--success-rgb), 0.14); border-color: rgba(var(--success-rgb), 0.3); }
+.al-pop-row .al-pop-state { white-space: normal; }
+.al-more { position: relative; }
+.al-more > summary { list-style: none; cursor: pointer; }
+.al-more > summary::-webkit-details-marker { display: none; }
+.al-more .al-pop { min-width: 12rem; display: flex; flex-direction: column; gap: var(--space-xs); }
+.al-menu-item { justify-content: flex-start; width: 100%; }
+/* Activity has no selection bar, so its toolbar keeps no empty actions line under it (the 50 px band at 1280, QA's #19816 note) */
+#group-table-view .inbox-folder-toolbar.list-bar-bar:has(+ .activity-folder) { padding-bottom: var(--space-md); }
+.al-ans-label { font-weight: var(--fw-strong); color: var(--text-primary); }
+.al-tile-thumb { padding: 0; overflow: hidden; background: none; }
+.al-tile-thumb .artifact-thumbnail { width: 100%; height: 100%; }
+.al-via { color: var(--accent); border-color: var(--accent); background: none; }

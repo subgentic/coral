@@ -37,6 +37,13 @@ export const loadFilters = () => ({ ...kept.load('inbox-needs', browserLocal), q
 export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browserLocal);
 
 /** The leading icon of a Needs you row (#13144): one glyph per kind, drawn in a full-height gutter by css/data_table.css from data-kind (all from the icon subset, tests/frontend/fixtures/material-icons.names.txt), named by the kind's own word for a screen reader. The glyph is drawn by CSS (data-kind), so the row's text stays its words. */
+/** A file's tile: its type's mark, or its own picture when it is a stored image (the Activity thumbnail path), for the Saved and Starred rows (#19841). */
+export function fileTile(item, server) {
+    const i = document.createElement('span'), m = item.media_type || '';
+    i.className = 'material-icons inbox-kind-icon inbox-artifact-thumbnail'; i.dataset.kind = 'review'; i.dataset.type = /^video\//.test(m) ? 'video' : /html/.test(m) ? 'html' : /markdown/.test(m) ? 'md' : ''; i.setAttribute('aria-hidden', 'true');
+    i.append(artifactThumbnail(item, { size: 32, url: typeof server === 'string' && thumbnailPath(item) ? serverUrl(thumbnailPath(item), server) : '' }));
+    return i;
+}
 export function kindIcon(s) {
     const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // board questions share the Question chip (#16548)
     i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
@@ -50,13 +57,24 @@ export function withKindIcon(s, cell) {
     node.insertBefore(kindIcon(s), node.firstChild);
     return node;
 }
+/** A permission's "Wants to run: <command>" as the approved design draws it: the line, the command alone in its own box, and what Yes and No do. The words keep their text (the colon is only hidden), so search and screen readers read what they did. */
+function splitCommand(words) {
+    const text = words.textContent, mk = (tag, cls, t) => { const n = document.createElement(tag); n.className = cls; n.textContent = t; return n; };
+    words.classList.add('inbox-row-command');
+    words.replaceChildren(mk('span', 'inbox-cmd-lead', 'Wants to run'), mk('span', 'inbox-cmd-colon', ': '), mk('span', 'inbox-cmd-code', text.slice(14)));
+    words.lastChild.title = text.slice(14); // a long command is cut to its first lines in the box: the whole of it is on the hover
+    words.after(mk('span', 'inbox-cmd-note inbox-row-words', 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.'));
+}
 /** Reserve one full-height icon gutter without changing the table's data/action columns. */
 export function decorateKindRow(tr) {
     const icon = tr.querySelector('.inbox-kind-icon');
     if (!icon || tr.classList.contains('dt-mailed')) return;
     tr.classList.add('inbox-kind-row');
+    const badge = icon.dataset.kind === 'permission' ? ['Permission', 'warn', '.dt-person'] : tr.querySelector('.inbox-deny-action') ? ['Yes / No', 'indigo', '.inbox-review-from'] : null; // the kind chip beside the name, drawn from data-badge so the name's text stays the name (#19833)
+    if (badge && badge[0] === 'Permission') { const cli = tr.querySelector('td[data-key="cli"]'), folder = tr.querySelector('td[data-key="folder"]'); if (cli && folder && folder.textContent.trim()) { cli.append(' \u00b7 ' + folder.textContent.trim()); folder.hidden = true; } } // "Claude · folder" is one meta line under the command, as the mock draws it
+    const host = badge && tr.querySelector(badge[2]); if (host) { host.setAttribute('data-badge', badge[0]); host.setAttribute('data-tone', badge[1]); if (badge[0] === 'Permission') host.querySelector('.dt-avatar')?.remove(); }
     if (tr.querySelector('.inbox-bookmark')) tr.classList.add('inbox-file-row'); // not a :has() in css (#15953)
-    const words = tr.querySelector('.dt-subtitle'); if (words) { words.classList.add('inbox-row-words'); if (/^Wants to run/.test(words.textContent)) words.classList.add('inbox-row-command'); } /* the row's own class for it: the lazy card CSS styles this, not the table's (data_table_census) */ const wrap = tr.querySelector('.inbox-agent-first'), kindWord = words && /^(For review|Needs your answer)$/.test(words.textContent.trim());
+    const words = tr.querySelector('.dt-subtitle'); if (words) { words.classList.add('inbox-row-words'); if (/^Wants to run: ./.test(words.textContent)) splitCommand(words); } /* the row's own class for it: the lazy card CSS styles this, not the table's (data_table_census) */ const wrap = tr.querySelector('.inbox-agent-first'), kindWord = words && /^(For review|Needs your answer)$/.test(words.textContent.trim());
     const phone = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 760px)').matches, holds = phone && wrap && tr.querySelector('.inbox-blocks'); // what a file or an agent holds up goes on the description's own lines, after it, never as a line of its own (#13911: three lines at most)
     if (holds && holds.textContent.trim()) { wrap.classList.add('has-holds'); holds.classList.add('inbox-holds-inline'); wrap.append(holds); const news = wrap.querySelector('.inbox-new-comments'); if (news) holds.prepend(news, ' '); } // the row's third line: the file's name takes one line, what it holds up the next; the file's question gives way to it
     if (words && wrap && !kindWord && !tr.querySelector('.inbox-holds-inline') && tr.querySelector('[data-review-artifact]') && words.textContent.trim()) { wrap.classList.add('has-question'); words.classList.add('inbox-file-question'); } // the question put on a file (#11555) is what the person is to decide: it stays, as the one line under the file's name

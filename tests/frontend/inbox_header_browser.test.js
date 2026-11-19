@@ -51,7 +51,7 @@ const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks
                 } else {
                     const ys = [two ? null : g.titleY, g.searchY, g.iconY, g.pillsY].filter(y => y != null); // Needs you's header is two rows (#17450, N2): title, count and More, then the search, the strip and the icon
                     check(`${name}: the title, the search${g.pillsShown ? ', the pills' : ''} and the icon are on one line (same centre) and the row is one line high`, ys.length >= (two ? 2 : 3) && Math.max(...ys) - Math.min(...ys) <= 6 && g.rowH <= (two ? 128 : 64) && g.over <= 0, JSON.stringify(g));
-                    check(`${name}: the count is beside the title`, g.count !== null && /^\d+$/.test(g.count), JSON.stringify(g.count));
+                    check(`${name}: the count is beside the title`, g.count !== null && (/^\d+$/.test(g.count) || (/Saved/.test(name) && /^\d+ files? · \d+ messages?$/.test(g.count))), JSON.stringify(g.count));
                     check(`${name}: the search keeps at least 10rem`, g.searchW >= 158, String(g.searchW));
                 }
                 if (mobile && (key === 'goals' || key === 'tasks')) {

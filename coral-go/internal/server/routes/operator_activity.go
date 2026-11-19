@@ -62,13 +62,64 @@ type activityRowView struct {
 	board.OperatorAction
 	GoalTitle string `json:"goal_title,omitempty"`
 	TaskTitle string `json:"task_title,omitempty"`
+	// FileN, FileLatestN and FileVersions (#19828): on a row about a file that is a version of its team's series, the number of the version the row acted on, the newest number now, and the team's versions of it (oldest
+	// first, at most maxEarlierDigests, the newest kept when there are more), read from the upload records at the time of the read. Nothing is stored in the row, so the chain is untouched; a file in no series, or a row
+	// of another kind, has none.
+	FileN        int                   `json:"file_n,omitempty"`
+	FileLatestN  int                   `json:"file_latest_n,omitempty"`
+	FileVersions []activityFileVersion `json:"file_versions,omitempty"`
+}
+
+// activityFileVersion is one version of a file as the upload records say: its digest, its number in the series and when it was made.
+type activityFileVersion struct {
+	Digest string `json:"digest"`
+	N      int    `json:"n"`
+	At     string `json:"at,omitempty"`
+}
+
+// activityFileVersions is the team's versions of the series a file row's digest is in, and the row's own number; ok is false when the file is in no series of that team.
+func (h *BoardHandler) activityFileVersions(r board.OperatorAction, cache map[string][]seriesMember) (n int, versions []seriesMember, ok bool) {
+	digest := r.Version
+	if digest == "" {
+		digest = r.ItemID
+	}
+	if h.coralDir == "" || r.ItemKind != "file" || r.Team == "" || !objectNameRe.MatchString(digest) {
+		return 0, nil, false
+	}
+	sid, n, ok := digestSeriesOnBoard(h.coralDir, digest, r.Team)
+	if !ok {
+		return 0, nil, false
+	}
+	key := r.Team + "|" + sid
+	members, seen := cache[key]
+	if !seen {
+		for _, m := range seriesMembers(h.coralDir, sid) {
+			if m.Board == r.Team { // a series is one team's: another team's copy of the same bytes is another file
+				members = append(members, m)
+			}
+		}
+		cache[key] = members
+	}
+	return n, members, len(members) > 0
 }
 
 func (h *BoardHandler) activityRows(ctx context.Context, rows []board.OperatorAction) []activityRowView {
 	out := make([]activityRowView, len(rows))
 	links := map[string]*askSubjectLinks{}
+	series := map[string][]seriesMember{}
 	for i, r := range rows {
 		out[i].OperatorAction = r
+		if n, members, ok := h.activityFileVersions(r, series); ok {
+			out[i].FileN = n
+			shown := members
+			if len(shown) > maxEarlierDigests {
+				shown = shown[len(shown)-maxEarlierDigests:]
+			}
+			for _, m := range shown {
+				out[i].FileVersions = append(out[i].FileVersions, activityFileVersion{Digest: m.Digest, N: m.N, At: m.At})
+			}
+			out[i].FileLatestN = members[len(members)-1].N
+		}
 		if (r.GoalID == nil && r.TaskID == nil) || r.Team == "" {
 			continue
 		}

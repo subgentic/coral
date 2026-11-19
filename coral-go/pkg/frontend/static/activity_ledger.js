@@ -4,6 +4,8 @@
 import { importOnce } from './import_once.js';
 import { timeCell } from './data_table.js';
 const { decisionOf } = await importOnce('./operator_activity_filters.js');
+const { fileKindOf } = await importOnce('./file_kind.js');
+const { artifactThumbnail, thumbnailPath } = await importOnce('./artifact_thumbnail.js');
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const TILE = { file: 'description', question: 'help_outline', goal: 'flag', task: 'task_alt', proposal: 'checklist', skill: 'auto_awesome', run: 'error_outline', job_run: 'error_outline', workflow_run: 'error_outline', permission: 'lock' };
@@ -22,18 +24,37 @@ export function dayWords(at, now = Date.now()) {
     return days === 0 ? 'Today' : days === 1 ? 'Yesterday' : new Date(t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', ...(new Date(t).getFullYear() !== new Date(now).getFullYear() ? { year: 'numeric' } : {}) });
 }
 
-/** A file's other versions, from the records the list holds (same file name and team): the one this row reviewed against the newest, as a popover. Nothing is fetched; a version no record names is not listed. */
+/** A file's versions as a popover: the server's list (the team's series, from the upload records) when the row has one, else the versions the records in the list name (same file name and team). Each says what was done to it when a record
+ * in the list holds that digest, else whether it is the newest; Open opens that version. */
 const fileKey = r => `${r.server || ''}|${r.team || ''}|${r.title || ''}`;
 function versionsOf(r, x) {
-    const all = (x.versions && x.versions.get(fileKey(r))) || [];
-    if (r.item_kind !== 'file' || all.length < 2) return null;
-    const d = el('details', 'al-versions'), sum = el('summary', 'btn btn-small', `Versions (${all.length})`), pop = el('div', 'al-pop'); pop.setAttribute('role', 'group'); pop.setAttribute('aria-label', 'Document versions');
     const mine = String(r.version || r.item_id || '');
-    all.forEach((v, i) => {
-        const row = el('div', 'al-pop-row'), isLatest = i === all.length - 1, isMine = String(v.version || v.item_id || '') === mine;
-        row.append(el('span', 'al-pop-name', `v${i + 1}`), el('span', 'al-pop-state', isLatest ? `Latest${isMine ? ' (reviewed)' : ''}` : isMine ? 'Reviewed here' : (x.parts(v).did || '')));
-        const ob = el('button', 'btn btn-small', 'Open'); ob.type = 'button'; ob.setAttribute('aria-label', `Open v${i + 1} of ${r.title || 'the file'}`); ob.addEventListener('click', () => { d.open = false; x.openRow(v); }); row.append(ob); pop.append(row);
-    });
+    const known = (x.versions && x.versions.get(fileKey(r))) || [];
+    const said = new Map(known.map(v => [String(v.version || v.item_id), v]));
+    let all;
+    if (Array.isArray(r.file_versions) && r.file_versions.length) all = r.file_versions.map(v => ({ n: v.n, at: v.at, digest: v.digest, row: said.get(v.digest) || { ...r, item_id: v.digest, version: v.digest } }));
+    else all = known.map((v, i) => ({ n: i + 1, at: v.at, digest: String(v.version || v.item_id), row: v }));
+    if (r.item_kind !== 'file' || all.length < 2) return null;
+    const latest = all[all.length - 1].digest;
+    const d = el('details', 'al-versions'), sum = el('summary', 'btn btn-small', `Versions (${all.length})`), pop = el('div', 'al-pop'); pop.setAttribute('role', 'group'); pop.setAttribute('aria-label', 'Document versions');
+    for (const v of [...all].reverse()) { // newest first, as the mock lists them
+        const row = el('div', 'al-pop-row'), has = said.get(v.digest);
+        const state = v.digest === latest ? (has ? `Latest \u00b7 ${x.parts(has).did}` : 'Latest') : has ? x.parts(has).did : v.digest === mine ? 'Reviewed here' : 'Earlier';
+        row.append(el('span', 'al-pop-name', `v${v.n}`), el('span', 'al-pop-state', state));
+        if (v.at) row.append(timeCell(v.at));
+        const ob = el('button', 'btn btn-small', 'Open'); ob.type = 'button'; ob.setAttribute('aria-label', `Open v${v.n} of ${r.title || 'the file'}`); ob.addEventListener('click', () => { d.open = false; x.openRow(v.row); }); row.append(ob); pop.append(row);
+    }
+    d.addEventListener('keydown', e => { if (e.key === 'Escape') { d.open = false; sum.focus(); } });
+    d.append(sum, pop);
+    return d;
+}
+
+/** The row's More menu: the extra things to do with a record, as the caller lists them (`x.moreFor(r)` -> [{label, run}]); none, no menu. */
+function moreMenu(r, x) {
+    const items = x.moreFor ? x.moreFor(r) : [];
+    if (!items.length) return null;
+    const d = el('details', 'al-more'), sum = el('summary', 'btn btn-small btn-quiet', 'More'), pop = el('div', 'al-pop'); pop.setAttribute('role', 'menu'); sum.setAttribute('aria-label', `More for ${x.openLabel(r)}`);
+    for (const it of items) { const b = el('button', 'btn btn-small al-menu-item', it.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.addEventListener('click', () => { d.open = false; it.run(); }); pop.append(b); }
     d.addEventListener('keydown', e => { if (e.key === 'Escape') { d.open = false; sum.focus(); } });
     d.append(sum, pop);
     return d;
@@ -43,27 +64,50 @@ function versionsOf(r, x) {
 export function ledgerRow(r, x) {
     const p = x.parts(r), kind = tileKind(r), v = verdictOf(r), open = x.opens(r);
     const li = el('li', `al-row${r.action === 'wait_send' ? ' is-noise' : ''}`); li.dataset.key = x.keyOf(r); li.dataset.kind = kind || 'other';
-    const tile = el('span', `al-tile al-tile-${kind || 'other'}`); tile.setAttribute('aria-hidden', 'true'); tile.append(el('span', 'material-icons', TILE[kind] || 'info'));
+    const fk = kind === 'file' || kind === 'image' ? fileKindOf(r.title) : null; // a file's tile says its type (document, video, image, code), not just "file"
+    const tile = el('span', `al-tile al-tile-${kind || 'other'}${fk ? ` al-fk-${fk.kind}` : ''}`); tile.setAttribute('aria-hidden', 'true');
+    tile.append(fk && fk.glyph ? el('span', 'al-glyph', fk.glyph) : el('span', 'material-icons', fk ? fk.icon : TILE[kind] || 'info'));
+    if (fk && fk.kind === 'image' && x.thumbUrl) { // a stored picture is drawn as the Inbox list draws it: its own thumbnail in the tile (the icon stands until it loads, or for a file with none)
+        const item = { name: r.title, id: String(r.version || r.item_id || '') }, path = thumbnailPath(item);
+        if (path) { tile.classList.add('al-tile-thumb'); tile.replaceChildren(artifactThumbnail(item, { size: 32, url: x.thumbUrl(path, r) })); }
+    }
     const main = el('div', 'al-main'), head = el('div', 'al-head');
     const title = open ? el('button', 'al-title', p.on) : el('span', 'al-title al-title-plain', p.on);
     if (open) { title.type = 'button'; title.setAttribute('aria-label', `${p.on}. ${p.about ? `${p.about}. ` : ''}Open ${x.openLabel(r)}`); title.addEventListener('click', () => x.openRow(r)); }
     head.append(title, el('span', `al-verdict al-v-${v}`, p.did));
+    if (r.file_n) head.append(el('span', 'al-vchip', `v${r.file_n}`)); // the version this row acted on (the upload records' number)
+    if (r.file_n && r.file_latest_n > r.file_n) head.append(el('span', 'al-vnewer', `v${r.file_n} reviewed \u00b7 v${r.file_latest_n} newer`));
     main.append(head);
+    if (r.ask) main.append(el('div', 'al-ask', r.ask)); // the question the file was sent with, kept on the row when it was decided
     const said = p.detail.replace(/^from [^\u00b7]+(?: \u00b7 |$)/, ''); // who asked is the meta line's: the callout holds what you said
-    if (said) main.append(el('div', `al-answer al-ans-${v}`, said));
+    if (said) { // the callout says what the words are: the note you approved with, the changes you asked for
+        const note = el('div', `al-answer al-ans-${v}`), label = r.item_kind === 'file' ? ({ approved: 'Approved with note:', approve: 'Approved with note:', changes: 'Changes requested:', deny: 'Denied:' })[r.action] : '';
+        if (label) note.append(el('b', 'al-ans-label', label), document.createTextNode(' ')); note.append(said); main.append(note);
+    }
     if (said && r.item_kind === 'question') {
         const qa = el('details', 'al-qa'), sum = el('summary', null, 'Preview Q&A (2 messages)'), body = el('div', 'al-qa-body');
         for (const [who, text] of [[x.fromWords(r) || 'An agent', p.on], ['You', said]]) { const m = el('div', 'al-qa-msg'); m.append(el('b', 'al-qa-who', who), el('span', 'al-qa-text', text)); body.append(m); }
         qa.append(sum, body); main.append(qa);
+        // the real thread, read when the preview is opened: up to the first three messages (question, answer, next reply); the two above stand if the board has no more
+        if (x.threadFor) qa.addEventListener('toggle', async () => {
+            if (!qa.open || qa.dataset.read) return; qa.dataset.read = '1';
+            let msgs = []; try { msgs = await x.threadFor(r); } catch { msgs = []; }
+            if (msgs.length < 2) return;
+            const first = msgs.slice(0, 3); body.replaceChildren();
+            for (const m of first) { const row = el('div', 'al-qa-msg'); row.append(el('b', 'al-qa-who', m.who), el('span', 'al-qa-text', m.text)); body.append(row); }
+            sum.textContent = `Preview Q&A (${first.length}${msgs.length > 3 ? ` of ${msgs.length}` : ''} messages)`;
+        });
     }
     const meta = el('div', 'al-meta');
     meta.append(el('span', 'al-author', x.fromWords(r) || 'You'), el('span', 'al-sr', `. Done from ${x.doneFrom(r)}. `));
-    if (p.about) p.about.split(' · Task #').forEach((part, i) => { if (i) meta.append(el('span', 'al-sr', ' · ')); meta.append(el('span', 'chip chip-tag al-chip', i ? `Task #${part}` : part)); });
+    if (p.about) p.about.split(' · Task #').forEach((part, i) => { if (i) meta.append(el('span', 'al-sr', ' · ')); const full = i ? `Task #${part}` : part, [short, ...rest] = full.split(' \u00b7 '), c = el('span', 'chip chip-tag al-chip', short); if (rest.length) { c.title = full; c.append(el('span', 'al-sr', ` \u00b7 ${rest.join(' \u00b7 ')}`)); } meta.append(c); }); // short label as in the mock ("Goal #259", "Task #19787"); the title is in the tooltip and read out in full
+    if (r.source === 'hub') meta.append(el('span', 'chip chip-tag al-via', 'via Coral Hub')); // the decision came through Coral Hub (the record's source)
     main.append(meta);
     const right = el('div', 'al-right'), rm = el('div', 'al-right-meta');
     rm.append(el('span', 'al-team', x.teamWords(r)), el('span', 'al-dot', '·'), timeCell(r.at));
     right.append(rm);
-    if (open) { const b = el('button', 'btn btn-small al-open', OPEN_WORD[r.item_kind] || 'Open'); b.type = 'button'; b.setAttribute('aria-label', `${OPEN_WORD[r.item_kind] || 'Open'}: ${x.openLabel(r)}`); b.addEventListener('click', () => x.openRow(r)); const acts = el('div', 'al-actions'); acts.append(b); const vs = versionsOf(r, x); if (vs) acts.append(vs); right.append(acts); }
+    if (open) { const word = r.item_kind === 'file' && r.file_n && r.file_latest_n > r.file_n ? `Open v${r.file_n}` : OPEN_WORD[r.item_kind] || 'Open'; const b = el('button', 'btn btn-small al-open', word); b.type = 'button'; b.setAttribute('aria-label', `${word}: ${x.openLabel(r)}`); b.addEventListener('click', () => (x.openPrimary || x.openRow)(r)); const acts = el('div', 'al-actions'); acts.append(b); const vs = versionsOf(r, x); if (vs) acts.append(vs); right.append(acts); }
+    const more = moreMenu(r, x); if (more) (right.querySelector('.al-actions') || right.appendChild(el('div', 'al-actions'))).append(more);
     li.append(tile, main, right);
     return li;
 }
@@ -99,7 +143,7 @@ export function ledger(rows, x, { groupFor = null, now = Date.now() } = {}) {
             if (g && g.open === false) continue;
         } else {
             const head = dayWords(r.at, now);
-            if (head !== lastHead) { lastHead = head; const h = el('li', 'al-date-head'); h.append(el('span', '', head)); ul.append(h); }
+            if (head !== lastHead) { lastHead = head; const n = rows.filter(q => dayWords(q.at, now) === head).length, h = el('li', 'al-date-head'); h.append(el('span', '', head), el('span', 'al-day-count', String(n))); ul.append(h); }
         }
         ul.append(ledgerRow(r, x));
     }

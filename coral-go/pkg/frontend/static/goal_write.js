@@ -132,3 +132,6 @@ export async function goalWrite(project, action, goalId, path, method, body, { b
         return hubsOwn || resp.status === 429 || resp.status === 413 ? refused(resp.status, word) : resp;
     }
 }
+
+/** The Operator reopens a closed goal (state active). `teamKey` is the team's KEY (@server/name for a team on another computer, a bare name here), never just its name: the write goes to the computer the key names, not to a local team with the same name. */
+export const reopenGoal = (teamKey, id, opts) => goalWrite(teamKey, 'goal_update', id, `/goals/${id}`, 'PATCH', { subscriber_id: 'Operator', state: 'active' }, opts);

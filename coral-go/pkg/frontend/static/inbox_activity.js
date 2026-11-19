@@ -5,7 +5,8 @@
 import { importOnce } from './import_once.js';
 import { requestJson } from './request_json.js';
 import { teamLabel } from './server_status.js';
-import { serverFetch, identityKey, LOCAL_SERVER } from './server_base.js';
+import { serverFetch, identityKey, LOCAL_SERVER, splitKey, decisionNeedsPerson, serverUrl } from './server_base.js';
+import { copyText, showToast } from './utils.js';
 import { state as appState } from './state.js';
 import { inboxSources, multipleServers, serverLabel } from './inbox_servers.js';
 const { activityParts, aboutWords, jobRunParts } = await importOnce('./operator_activity_words.js');
@@ -177,9 +178,36 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const words = checkWords(check);
             if (words) { const n = DT.el('p', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`, words); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n); }
             const openRow = r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); }
+            // the row's More menu: what else can be done with this record, from the actions the dialogs already have (#19828). A file's decision: its details and comments, back to review, its link. An answered question: the thread, back to Needs you, its board message, its task.
+            const threadFor = async r => { // the question's thread, read on demand for the row's Q&A preview
+                const { fetchMessages } = await importOnce('./board_fetch.js'), { threadOf } = await importOnce('./activity_dialog.js'), askId = Number(r.item_id);
+                if (!r.team || !askId) return [];
+                const all = []; let after = Math.max(0, askId - 1);
+                for (let page = 0; page < 5; page++) { const { messages } = await fetchMessages(r.team, 200, { after_id: after }); all.push(...messages); const last = Math.max(after, ...messages.map(m => Number(m.id) || 0)); if (messages.length < 200 || last === after) break; after = last; }
+                return threadOf(all, askId).map(m => ({ who: m.subscriber_id === 'dashboard' || /operator/i.test(m.subscriber_id || '') ? 'You' : M(m.subscriber_id || 'An agent'), text: String(m.content || '').replace(/\s+/g, ' ').trim() }));
+            };
+            const moreFor = r => {
+                const items = [], team = r.team ? splitKey(r.team) : null;
+                if (r.item_kind === 'file' && ['approve', 'changes', 'deny'].includes(r.action) && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) {
+                    const hex = String(r.version || r.item_id).toLowerCase();
+                    items.push({ label: 'Comment / details', run: () => open.file(r) });
+                    if (!decisionNeedsPerson(team.server)) items.push({ label: 'Reopen for review', run: async () => { try { const { sendForReview } = await importOnce('./artifact_send_review.js'); await sendForReview(team.name, hex); showToast('The file is back in Needs you, waiting for a decision.'); } catch (e) { showToast(e.message || 'Could not send the file for review.', true); } } });
+                    items.push({ label: 'Copy link', run: async () => { if (await copyText(`coral://artifacts/${hex}`)) showToast('Link copied.'); else showToast('Could not copy the link.', true); } });
+                } else if (r.item_kind === 'question' && (r.action === 'answer' || r.action === 'dismiss') && /^\d+$/.test(r.item_id)) {
+                    items.push({ label: 'Reply in thread', run: () => open.question(r) });
+                    if (!decisionNeedsPerson(team.server)) items.push({ label: 'Reopen question', run: async () => { try { const { reopenAsk } = await importOnce('./ask_ignore.js'); await reopenAsk({ server: team.server, board: team.name, id: Number(r.item_id) }, { unanswer: true }); showToast('The question is back in Needs you, unanswered.'); } catch (e) { showToast(e.message || 'Could not reopen the question.', true); } } });
+                    if (open.board) items.push({ label: 'Open on Board', run: () => open.board(r) });
+                    if (open.taskOf && r.task_id) items.push({ label: 'Open task', run: () => open.taskOf(r) });
+                }
+                else if (r.item_kind === 'goal' && r.action === 'goal_close' && /^\d+$/.test(r.item_id) && team && !decisionNeedsPerson(team.server)) {
+                    items.push({ label: 'Reopen goal', run: async () => { try { const { reopenGoal } = await importOnce('./goal_write.js'), id = Number(r.item_id), res = await reopenGoal(r.team, id); if (!res.ok) throw new Error(`HTTP ${res.status}`); showToast(`Goal #${id} reopened. The team read it on the board.`); } catch (e) { showToast(`Not reopened: ${e && e.message || 'try again'}`, true); } } });
+                }
+                return items;
+            };
+            const openPrimary = r => (r.item_kind === 'file' && open.viewer && ['approve', 'changes', 'deny'].includes(r.action)) ? open.viewer(r) : openRow(r); // "Open file" opens the file; the row's title opens its decision
             const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
-            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
+            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
             const gaps = missingWords(missingComputers());
             if (gaps) { const n = DT.el('p', 'activity-check', gaps); n.setAttribute('role', 'status'); wrap.prepend(n); }
             if (more) { const b = DT.el('button', 'btn btn-small activity-more', 'Show older actions'); b.type = 'button'; b.addEventListener('click', () => refresh(null, { next: true })); wrap.append(b); }
