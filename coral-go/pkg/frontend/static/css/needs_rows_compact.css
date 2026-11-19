@@ -108,7 +108,7 @@
 :root .material-icons.inbox-kind-icon[data-type="html"] { background: var(--needs-icon-amber-bg); color: var(--needs-icon-amber-fg); border-color: color-mix(in srgb, var(--needs-icon-amber-fg) 30%, transparent); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="waiting"]::before { content: '·'; margin-inline-end: 6px; font-weight: var(--fw-strong); } /* the team and the time are told apart by a dot */
 /* A selected row is a tinted surface with the accent rail, a pointed-at row lifts and its quiet buttons come up to full text (#19812, the mocks' states). */
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr.dt-selected { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 12%, transparent); } /* ticked: the accent rail and a wash over the row, painted over the row's own lift (#19824) */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 12%, transparent); } /* ticked: the accent rail and a wash over the row, painted over the row's own lift (#19824) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:hover .inbox-review-actions :is(.inbox-bookmark, .inbox-star, .inbox-row-more-toggle) { color: var(--text-primary); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:hover .inbox-review-name { color: var(--text-primary); }
 
@@ -132,4 +132,4 @@
 
 /* a markdown file's tile is blue, as in the approved list (#19824, QA) */
 :root .material-icons.inbox-kind-icon[data-type="md"] { background: var(--needs-icon-blue-bg); color: var(--needs-icon-blue-fg); border-color: color-mix(in srgb, var(--needs-icon-blue-fg) 30%, transparent); }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr:not(.dt-selected):hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--text-primary) 5%, transparent); } /* the row under the pointer lifts, as in the approved list (#19824) */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:not([aria-selected="true"]):hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--text-primary) 5%, transparent); } /* the row under the pointer lifts, as in the approved list (#19824) */
