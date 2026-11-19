@@ -35,6 +35,7 @@
 .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chips { gap: 8px; border: 0; border-radius: 0; overflow: visible; }
 .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip, .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip + .goals-chip { border: 1px solid var(--control-border); border-radius: var(--radius-md); background: transparent; }
 .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); color: color-mix(in srgb, var(--accent) 70%, var(--text-primary)); }
+@media (forced-colors: active) { :root .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip:not([aria-pressed="true"]) { border: 2px solid ButtonBorder; } :root .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip[aria-pressed="true"] { border: 2px solid Highlight; color: Highlight; background: none; } } /* the pressed pill's own colours above beat forced-colors.css; a pressed chip is marked by a system colour (forced_colors_browser) */
 /* A starred chat: who and team, then the chat's label, then when and the blue star (#19841) */
 .inbox-starred-folder .inbox-chat-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding-block: 6px; min-width: 0; }
 .inbox-chat-who { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-title); font-weight: var(--fw-strong); color: var(--text-primary); }
