@@ -12,6 +12,7 @@ const css = path.resolve(here, '../../coral-go/pkg/frontend/static/css');
 
 // the card looks, and the padding kind each takes ('none': the card holds rows that carry their own padding)
 export const CARDS = {
+    'inbox-saved-card': 'none',       // the Saved folder's files and messages (#19833)
     'activity-card': 'regular',       // an Activity action (#15774)
     'launch-computer-card': 'regular', // a computer to launch on, in the Hub's Which computer? step (#15014)
     'chief-check-card': 'regular',    // Chief's sources, checks and trigger summaries

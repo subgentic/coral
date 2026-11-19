@@ -34,7 +34,7 @@
 #group-table-view { --tb-bar-h: 40px; }
 #group-table-view .gt-toolbar { min-height: var(--tb-bar-h); }
 #group-table-view .gt-toolbar.team-toolbar-selecting:not(.tb-low) > :not(.team-tb-selection) { display: none !important; }
-#group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); } /* the bulk bar is a panel of its own, as the approved list draws it (#19833) */
+#group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { flex: 1 1 100%; padding: 0 12px; box-sizing: border-box; block-size: var(--tb-bar-h); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); } /* the bulk bar is a panel of its own, as the approved list draws it (#19833) */
 
 
 
