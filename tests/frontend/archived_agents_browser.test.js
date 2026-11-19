@@ -1,7 +1,7 @@
 // Archived agents (#3030): archived agents leave the main list, team groups and
 // counts and sit in one collapsed 'Archived (N)' section grouped by team; the
 // kebab offers Archive / Unarchive; an archived agent's chat is readable with
-// Unarchive + Wake in the composer; bulk wakes never wake it. Local and
+// Start + Sleep in the composer; bulk wakes never wake it. Local and
 // hub-remote agents, the popout and a phone-width viewport.
 //
 // Drives Chrome over CDP (chrome-remote-interface) through agent_view_harness.js; run_cdp_suites.mjs
@@ -147,8 +147,10 @@ const SLEEPING_PLACEHOLDER = '';
         await waitFor(`window.__view().composer`, 'archived composer right after the POST (no feed yet)', 2000);
         let v = await view();
         assert.equal(v.composerText, 'This agent is archived');
-        assert.ok(v.unarchive && v.unarchivePrimary, 'Unarchive shown as the primary action');
-        assert.ok(v.wake && v.wakePrimary === false, 'Wake shown as the secondary action');
+        assert.ok(v.unarchive && v.unarchivePrimary === false, 'Sleep (the unarchive call) shown as the secondary action');
+        assert.ok(v.wake && v.wakePrimary === true, 'Start (the wake call) shown as the main action');
+        assert.equal(v.wakeText, 'Start', 'an archived agent offers Start, not Wake (#19733)');
+        assert.equal(await ev(`document.getElementById('sleeping-unarchive-btn').textContent.trim()`), 'Sleep', 'and Sleep, not Unarchive (#19733)');
         assert.equal(v.restart, false, 'no Restart for an archived agent');
         assert.equal(v.inputDisabled, true, 'input disabled');
         assert.equal(v.placeholder, ARCHIVED_PLACEHOLDER);
@@ -165,7 +167,7 @@ const SLEEPING_PLACEHOLDER = '';
         assert.match(sb.summary, /^Archived \(6\)(?: · .*)?$/);
         console.log('   ✓ archived view at once, 1 POST, ≤1 re-select, row moved, count 6');
 
-        console.log('5. An archived agent: history, autoload, Unarchive in place');
+        console.log('5. An archived agent: history, autoload, Sleep (unarchive) in place');
         await select('t1-arch-a');
         const first = await firstPage();
         v = await view();
@@ -194,7 +196,7 @@ const SLEEPING_PLACEHOLDER = '';
         assert.ok(sb.main.includes('t1-sleeper-id') && sb.main.includes('t1-arch-a-id'), `team-one now has 2 sleeping, both rows (${JSON.stringify(sb.main)})`);
         console.log('   ✓ unarchived in place: sleeping composer, row back in team-one (2 sleeping)');
 
-        console.log('6. Wake on an archived agent wakes and unarchives it');
+        console.log('6. Start (wake) on an archived agent wakes and unarchives it');
         await select('t1-arch-b');
         await firstPage();
         await clearReqs();
@@ -289,7 +291,7 @@ const SLEEPING_PLACEHOLDER = '';
         console.log('   ✓ phone: Archived (1), tap expands');
         await Emulation.clearDeviceMetricsOverride();
 
-        console.log('11. Popout of an archived agent: Unarchive + Wake, no Restart');
+        console.log('11. Popout of an archived agent: Sleep + Start, no Restart');
         const PID = '55555555-5555-4555-8555-555555555581';
         await Page.addScriptToEvaluateOnNewDocument({ source: `window.__qaSeed = [{ name: 'qa-pop-arch', prefix: 'P', n: 120, archived: true, session_id: '${PID}' }];` });
         await Page.navigate({ url: `${BASE}/agent/${PID}` });
@@ -298,7 +300,7 @@ const SLEEPING_PLACEHOLDER = '';
         await install();
         await firstPage();
         v = await view();
-        assert.ok(v.composer && v.unarchive && v.wake, `popout: Unarchive + Wake (${JSON.stringify({ c: v.composer, u: v.unarchive, w: v.wake })})`);
+        assert.ok(v.composer && v.unarchive && v.wake, `popout: Sleep + Start (${JSON.stringify({ c: v.composer, u: v.unarchive, w: v.wake })})`);
         assert.equal(v.restart, false, 'popout: no Restart');
         assert.equal(v.composerText, 'This agent is archived');
         assert.equal(v.inputDisabled, true);
@@ -307,7 +309,7 @@ const SLEEPING_PLACEHOLDER = '';
         await waitFor(`window.__view().composerText === 'This agent is sleeping'`, 'popout unarchive', 3000);
         assert.equal((await reqs()).filter(x => x.kind === 'unarchive').length, 1, 'popout: one POST /unarchive');
         assert.equal((await view()).inputDisabled, true, 'popout: still asleep after unarchive');
-        console.log('   ✓ popout: Unarchive + Wake, unarchive keeps it asleep');
+        console.log('   ✓ popout: Sleep + Start, Sleep keeps it asleep');
 
         console.log('\nAll archived agent checks passed');
     } finally {

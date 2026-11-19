@@ -190,7 +190,7 @@
                                 <span class="sleeping-composer-hint" id="sleeping-composer-hint" hidden>Wake continues the conversation. Restart starts a fresh conversation; the instructions are sent again.</span><!-- an ended agent: what Wake and Restart each do (sleeping_view.js, #10439) -->
                                 <span class="sleeping-composer-asked" id="sleeping-composer-asked" hidden><span id="sleeping-composer-asked-text"></span> <button class="btn btn-small" id="sleeping-asked-dismiss" type="button" data-action="dismiss-asked">Dismiss</button></span><!-- a question the agent asked before Coral restarted (asked_before_restart.js, #10368): its CLI is gone, so Restart (or Wake) and Dismiss, no answer buttons -->
                                 <span class="sleeping-composer-actions">
-                                    <button class="btn btn-primary btn-small" id="sleeping-unarchive-btn" type="button" data-action="unarchive" hidden>Unarchive</button>
+                                    <button class="btn btn-small" id="sleeping-unarchive-btn" type="button" data-action="unarchive" title="Puts it to sleep, not running" hidden>Sleep</button>
                                     <button class="btn btn-primary btn-small" id="sleeping-wake-btn" type="button" data-action="wake" title="Continues the conversation">Wake</button>
                                     <button class="btn btn-small" id="sleeping-restart-btn" type="button" data-action="restart" title="Starts a fresh conversation; the instructions are sent again">Restart…</button>
                                 </span>
