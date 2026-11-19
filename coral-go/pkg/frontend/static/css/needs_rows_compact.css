@@ -34,7 +34,7 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] > .inbox-review-item { display: contents; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-review-from { grid-column: 3 / 5; order: 3; font-size: var(--fs-title); font-weight: var(--fw-strong); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-subject-links) > td[data-key="agent"] .inbox-review-from { grid-column: 3; }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-ask-subject-links { grid-column: 4; order: 3; align-self: center; justify-self: end; min-width: 0; text-align: right; } /* a question's goal and task (#19425, the Operator): on the title's line, right-justified against the team and the wait, the same right edge on every row, not a line of their own above the row */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-ask-subject-links { display: inline-flex; gap: 6px; align-items: center; min-width: 0; color: transparent; text-decoration: none; } /* a question's goal and task are chips in its meta line, under the question (#19812, the approved list; #19425 had them on the title's line) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-ask-subject-links::before { content: none; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-ask-name { grid-column: 3 / -1; order: 7; min-width: 0; margin: 0; max-width: 74ch; font-size: var(--fs-copy); white-space: pre-line; overflow-wrap: anywhere; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-review-wait { display: none; }
@@ -112,3 +112,7 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr[aria-selected="true"] > td { background: transparent; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:hover .inbox-review-actions :is(.inbox-bookmark, .inbox-star, .inbox-row-more-toggle) { color: var(--text-primary); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:hover .inbox-review-name { color: var(--text-primary); }
+
+/* the question row's meta line: "Question", then the goal and task it is about as the same chips the review rows wear (#19812) */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-meta { grid-column: 3 / -1; order: 8; min-width: 0; margin-top: 2px; font-size: var(--fs-base); color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr :is(.inbox-ask-subject-link, .inbox-ask-subject-links > strong) { height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); text-decoration: none; background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
