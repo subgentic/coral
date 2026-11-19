@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #19861: "Send all open comments to the agent": the same route and the same {agents} body as one comment's send, with the id "all". One board message per agent lists every open comment in time order.
@@ -113,4 +115,33 @@ func TestSendAllHasItsOwnSmallerLimit(t *testing.T) {
 	c := rig.ownerComment("Two, one comment's own send is not spent by Send all.")
 	code, _ = rig.send(c, "Dev")
 	assert.Equal(t, http.StatusOK, code)
+}
+
+// #19891: the comments past the cap are never asked (no write each, no close each): a file with many open comments costs the asks of what is in the message only.
+func TestSendAllCreatesNoAskForACommentPastTheCap(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	long := strings.Repeat("word ", 130)
+	var ids []int64
+	for i := 0; i < 60; i++ {
+		c, err := rig.ss.CreateArtifactComment(context.Background(), store.ArtifactComment{ArtifactID: cmtDoc, Board: "team-a", AnchorJSON: `{"whole":true}`,
+			Body: fmt.Sprintf("n%d %s", i, long), AuthorIssuer: "local", AuthorSubject: "install-owner-id", AuthorKind: "owner"})
+		require.NoError(t, err)
+		ids = append(ids, c.ID)
+	}
+	code, out := rig.sendAll("Dev")
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, 1)
+	listed := strings.Count(msgs[0].Content, "--- comment ")
+	require.Greater(t, listed, 0)
+	require.Less(t, listed, 60)
+	rows := 0
+	for _, id := range ids {
+		if _, found, err := rig.ss.GetArtifactAsk(context.Background(), id, sendSid(1)); err == nil && found {
+			rows++
+		}
+	}
+	assert.Equal(t, listed, rows, "an ask row exists only for a comment that is in the message")
+	assert.Contains(t, msgs[0].Content, fmt.Sprintf("and %d more, read them on the file", 60-listed))
 }

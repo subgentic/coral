@@ -133,7 +133,12 @@ func (h *SessionsHandler) sendAllComments(w http.ResponseWriter, r *http.Request
 				return ""
 			}
 			failed := false
-			for _, e := range entries {
+			for i, e := range entries {
+				piece := bundlePiece(e.c, len(included)+1, id, e.author, e.text, e.snippet, e.pic, mentionNames)
+				if len(fixed)+b.Len()+len(piece)+len(tail(len(entries)))+len("--- end ---") > sendAllCap {
+					more = len(entries) - i // the rest is not asked at all: no write for a comment that is not in the message (#19891)
+					break
+				}
 				ask, created, err := h.ss.CreateArtifactAsk(r.Context(), e.c.ID, id, boardID, ls.SessionID, title, time.Now())
 				if err != nil {
 					slog.Warn("[artifact comments] ask not recorded", "error", err)
@@ -141,12 +146,6 @@ func (h *SessionsHandler) sendAllComments(w http.ResponseWriter, r *http.Request
 					continue
 				}
 				if !created { // this agent already has that thread open: it is not listed again
-					continue
-				}
-				piece := bundlePiece(e.c, len(included)+1, id, e.author, e.text, e.snippet, e.pic, mentionNames)
-				if len(fixed)+b.Len()+len(piece)+len(tail(len(entries)))+len("--- end ---") > sendAllCap {
-					_ = h.ss.CloseArtifactAsk(r.Context(), e.c.ID, ls.SessionID, time.Now())
-					more++
 					continue
 				}
 				b.WriteString(piece)
