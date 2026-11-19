@@ -59,17 +59,21 @@ async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Age
     if (WIN) {
         // The same stand-in as a batch file: Coral's launch line runs it from PowerShell (`& 'claude.cmd' ...`), which a .cmd answers. ping is the sleep.
         const q = f => '"' + f + '"';
+        // The sleep: reads the keyboard and ends on Ctrl-C, so Coral's stop (a typed Ctrl-C) ends it at once. A program that does not read the key
+        // (ping, a plain exe) never sees the typed Ctrl-C under the pane's PowerShell and costs the whole 5 s kill grace on every stop (#19769, 0.78 s vs 5.01 s
+        // on frontier). Typed text does not end it, unlike set /p or pause.
+        const SLEEP = 'powershell -NoProfile -Command "[Console]::TreatControlCAsInput=$true; do { $k=[Console]::ReadKey($true) } until ($k.KeyChar -eq [char]3)"';
         fs.writeFileSync(cli, [
             '@echo off',
             'if "%~1"=="--version" (echo 0.0.0 ^(stand-in^) & exit /b 0)',
             'if "%~1"=="auth" (echo {"loggedIn": true}& exit /b 0)', // the version probe and the sign-in check (#5838) are answered like the real CLI
             `if "%~1"=="-p" (set /p REQ=& echo ${MODELS_REPLY}& exit /b 0)`, // the model list (no ping)
             `type nul > ${q(ranFile)}`,
-            `if "%CORAL_SESSION_TOKEN%"=="" (echo stand-in: no CORAL_SESSION_TOKEN 1>&2 & type nul > ${q(tokenFile + '.none')} & ping -n 600 127.0.0.1 >nul & exit /b 0)`,
+            `if "%CORAL_SESSION_TOKEN%"=="" (echo stand-in: no CORAL_SESSION_TOKEN 1>&2 & type nul > ${q(tokenFile + '.none')} & ${SLEEP} & exit /b 0)`,
             `<nul set /p "=%CORAL_SESSION_TOKEN%" > ${q(tokenFile + '.tmp')}`,
             `move /y ${q(tokenFile + '.tmp')} ${q(tokenFile)} >nul`,
             'echo stand-in agent ready', // a real agent draws its screen (#5911): the suites that wait for text in the terminal need some
-            'ping -n 600 127.0.0.1 >nul', '',
+            SLEEP, '',
         ].join('\r\n'));
     } else {
         fs.writeFileSync(cli, [
