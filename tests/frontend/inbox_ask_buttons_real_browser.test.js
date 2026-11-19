@@ -163,10 +163,10 @@ async function httpJson(method, path, body, headers = {}) {
             const action = record.data.actions.find(r => r.item_kind === 'question' && String(r.item_id) === String(documentQuestion));
             assert.ok(action, 'the question has an Activity record: ' + JSON.stringify(record));
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('activity')).then(() => true)`);
-            const activityRow = `document.querySelector('#group-table-view .ac-row[data-key="${action.id}"]')`;
+            const activityRow = `document.querySelector('#group-table-view .al-row[data-key="${action.id}"]')`;
             await waitFor(`!!(${activityRow})`, 'the question in Activity', 10000);
-            assert.ok(await ev(`!!(${activityRow}).querySelector('button.ac-title')`), 'the question in Activity can be opened');
-            await ev(`(${activityRow}).querySelector('button.ac-title').click(); true`);
+            assert.ok(await ev(`!!(${activityRow}).querySelector('button.al-title')`), 'the question in Activity can be opened');
+            await ev(`(${activityRow}).querySelector('button.al-title').click(); true`);
             // an answered question opens as a thread (#15724); its Open on the Board button goes to the original message
             await waitFor(`!!document.querySelector('dialog.activity-thread-dialog[open] .activity-thread-board')`, 'the thread dialog opens', 10000);
             await ev(`document.querySelector('.activity-thread-board').click(); true`);

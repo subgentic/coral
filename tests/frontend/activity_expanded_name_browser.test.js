@@ -17,8 +17,8 @@ const detail2 = t => t;
                 { id: 3, action: 'wait_send', item_kind: 'agent', item_id: 'sid-3', title: 'Wai\\u200Bter', note: '', at: new Date(Date.now() - 180000).toISOString(), ...base, team: 'te\\u200Bam' }];
             const real = window.fetch; window.fetch = (u, o) => new URL(String(u), location.origin).pathname === '/api/activity' ? Promise.resolve(new Response(JSON.stringify({ actions: window.__rows, check: { intact: true, rows: 1 } }), { headers: { 'Content-Type': 'application/json' } })) : real(u, o);
             localStorage.setItem('coral-inbox-activity-filters', JSON.stringify({ important: false })); window.switchNavTab('hub-inbox'); return import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('activity')).then(() => true); })()`);
-        await waitFor(`document.querySelectorAll('#group-table-view .ac-row').length === 3`, 'the cards', 15000);
-        const detail = await ev(`[...document.querySelectorAll('.activity-folder .ac-row')].map(d => d.textContent).join(' | ')`); // the cards show the words whole: there is no expanded row
+        await waitFor(`document.querySelectorAll('#group-table-view .al-row').length === 3`, 'the cards', 15000);
+        const detail = await ev(`[...document.querySelectorAll('.activity-folder .al-row')].map(d => d.textContent).join(' | ')`); // the cards show the words whole: there is no expanded row
         assert.ok(!detail.includes('\u200b'), 'no raw zero-width space in the cards: ' + JSON.stringify(detail));
         assert.ok(detail.includes('Orch<U+200B>estrator'), 'the card writes the hidden character out of the asker: ' + JSON.stringify(detail));
         assert.ok(detail.includes('Dev<U+200B>eloper'), 'and out of the agent name an ON line is built from (a permission row): ' + JSON.stringify(detail));

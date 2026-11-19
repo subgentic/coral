@@ -103,7 +103,7 @@ await AC.refresh();
 const opened = [];
 const table = AC.spec(filt(), { file: r => opened.push(r), goal() {}, question() {}, task() {}, agent() {}, message() {}, chat() {}, workflow() {}, job() {} }).node();
 document.body.append(table);
-const btn = table.querySelector('button.ac-title');
+const btn = table.querySelector('button.al-title');
 assert.ok(btn, 'the row has a button that opens its file');
 btn.click();
 assert.equal(opened.length, 1, 'clicking the remote file row opens it once');
