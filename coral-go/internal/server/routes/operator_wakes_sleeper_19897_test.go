@@ -18,10 +18,19 @@ import (
 // wakeable lets agent n's sleeping row be woken against a fake terminal: its pane is known and its input box is ready (what a real wake finds).
 func (rig *cmtRig) wakeable(n int) {
 	rig.t.Helper()
-	mock, ok := rig.h.terminal.(*mockSessionTerminal)
-	require.True(rig.t, ok, "the rig's terminal is the mock")
+	var mock *mockSessionTerminal
+	switch term := rig.h.terminal.(type) {
+	case *mockSessionTerminal:
+		mock = term
+	case *autoSleepTerm: // an earlier agent of this rig already made it wakeable
+		mock = term.mockSessionTerminal
+	default:
+		require.Fail(rig.t, "the rig's terminal is the mock")
+	}
 	mock.addSession(naming.SessionName("claude", sendSid(n)), rig.t.TempDir())
-	rig.h.terminal = &autoSleepTerm{mockSessionTerminal: mock, screen: emptyBoxScreen}
+	if _, ok := rig.h.terminal.(*autoSleepTerm); !ok {
+		rig.h.terminal = &autoSleepTerm{mockSessionTerminal: mock, screen: emptyBoxScreen}
+	}
 }
 
 func (rig *cmtRig) awake(n int) bool {
@@ -81,4 +90,23 @@ func TestAnAgentsMessageNeverWakesAManualSleeper(t *testing.T) {
 	assert.False(t, rig.h.WakeIdleForDelivery(context.Background(), sendSid(1)), "a delivery from an agent or Coral keeps a person's Sleep")
 	assert.True(t, rig.h.WakeForOperator(context.Background(), sendSid(1)), "the Operator's own word wakes it")
 	assert.True(t, rig.awake(1))
+}
+
+// #19901: Send all is the Operator's own press too: it wakes a sleeping agent whoever put it to sleep, and an archived one is not woken.
+func TestSendAllWakesAManuallySleepingAgentAndAnArchivedOneIsNot(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Video Producer", true)
+	rig.wakeable(1)
+	rig.agent(2, "Gone", true)
+	rig.wakeable(2)
+	require.NoError(t, rig.ss.SetSessionArchived(context.Background(), sendSid(2), true))
+	rig.ownerComment("Shorten the pause.")
+	rig.ownerComment("Brighter intro.")
+	code, out := rig.sendAll("Video Producer", "Gone")
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(out))
+	assert.Equal(t, map[string]string{"Video Producer": "sent", "Gone": "unavailable"}, states(out))
+	assert.True(t, rig.awake(1), "Send all woke the sleeping agent")
+	ls, _ := rig.ss.GetLiveSession(context.Background(), sendSid(2))
+	assert.Equal(t, 1, ls.IsSleeping, "an archived agent is not started")
+	require.Len(t, rig.operatorMessages(), 1)
 }

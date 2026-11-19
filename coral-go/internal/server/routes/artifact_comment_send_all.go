@@ -109,7 +109,7 @@ func (h *SessionsHandler) sendAllComments(w http.ResponseWriter, r *http.Request
 		if sub != nil {
 			ls, live = bySession[sub.SessionName]
 		}
-		if live && ls.IsSleeping == 1 && sleepReason(ls) == store.SleepReasonIdle && h.WakeIdleForDelivery(r.Context(), ls.SessionID) {
+		if live && ls.IsSleeping == 1 && ls.IsArchived == 0 && h.WakeForOperator(r.Context(), ls.SessionID) { // Send all is the Operator's own press: it wakes a sleeper whoever put it to sleep (#19901)
 			ls.IsSleeping = 0
 		}
 		switch {
