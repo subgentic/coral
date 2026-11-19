@@ -161,6 +161,8 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         await ev(`const ta = document.getElementById('task-complete-message'); ta.value = 'the tests are missing'; true`);
         await ev(`${barBtn('Changes')}.click(); true`);
         await until(`fetch('/api/board/${BOARD}/messages/all?limit=20').then(r => r.json()).then(j => JSON.stringify(j).includes('Not done yet') && JSON.stringify(j).includes('the tests are missing'))`, 'the message to the agent', 5000);
+        // the form closes after the POST returns (sendBack redraws the page then), so wait for it: a loaded runner checked before the redraw (#19770)
+        await until(`!document.getElementById('task-complete-message')`, 'the form to close after Changes', 5000);
         check('Changes posts what is missing to the agent and leaves the task open', !(await ev(`!!document.getElementById('task-complete-message')`)) && (await task(made.claimed)).status !== 'completed', JSON.stringify(await task(made.claimed)));
         await ev(`${barBtn('Complete')}.click(); true`);
         await until(`!!document.getElementById('task-complete-message') && !!${barBtn('Back')}`, 'the completion form for the last step');
