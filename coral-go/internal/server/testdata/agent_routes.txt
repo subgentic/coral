@@ -538,6 +538,8 @@ b PUT /api/cloud/device-web-mode
 b PUT /api/cloud/devices/{kid}/mode
 b DELETE /api/cloud/devices/{kid}
 b POST /api/cloud/devices/clear-clock
+b POST /api/device-keys/message
+b POST /api/device-keys/certificate
 b PUT /api/custom-models
 b PUT /api/custom-modes
 b PUT /api/system/identity-actor

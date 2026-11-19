@@ -138,6 +138,9 @@ func (v *Verifier) HandleCertificate(ctx context.Context, c Certificate, now tim
 	if _, err := v.Store.AddDeviceKey(ctx, k, now); err != nil {
 		return none, mapStoreErr(err)
 	}
+	if v.AuditCert != nil {
+		v.AuditCert(pass.KID, devKID, k.Mode)
+	}
 	return k, nil
 }
 

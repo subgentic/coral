@@ -316,3 +316,19 @@ func TestACertificateWithAnOriginWithAPortOrPathHubRecordIsRefused(t *testing.T)
 		r.refused(devicekey.ErrBadSignature, r.cert(dev, &assertion{origin: o}), dev, t0)
 	}
 }
+
+// Security's MUST (b): an accepted certificate is audited with the passkey's kid, the new device's kid and the mode; a refused one is not.
+func TestACertificateIsAuditedOnlyWhenItAddsADevice(t *testing.T) {
+	r := newPkRig(t)
+	type row struct{ pk, dev, mode string }
+	var rows []row
+	r.v.AuditCert = func(p, d, m string) { rows = append(rows, row{p, d, m}) }
+	bad := newSigner(t)
+	c := r.cert(bad, nil)
+	c.Signature = c.Signature[:len(c.Signature)-4] + "AAAA"
+	assert.Error(t, r.handle(c, t0))
+	assert.Empty(t, rows, "a refused certificate writes no audit row")
+	dev := newSigner(t)
+	require.NoError(t, r.handle(r.cert(dev, nil), t0))
+	assert.Equal(t, []row{{r.passkey.kid, dev.kid, "view"}}, rows)
+}

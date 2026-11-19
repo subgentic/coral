@@ -1,6 +1,8 @@
 package cloud
 
 import (
+	"sync"
+
 	"github.com/subgentic/coral/internal/devicekey"
 )
 
@@ -9,11 +11,24 @@ func (m *Manager) NewDeviceVerifier(st devicekey.Store) *devicekey.Verifier {
 	if m.o.ComputerKey == nil || st == nil {
 		return nil
 	}
-	return &devicekey.Verifier{
+	// One verifier per manager: its mutex is what serializes the nonce check and the apply, so a second one would race the first.
+	m.devVerMu.Lock()
+	defer m.devVerMu.Unlock()
+	if m.devVer != nil {
+		return m.devVer
+	}
+	m.devVer = &devicekey.Verifier{
 		Store:     st,
 		Computer:  m.o.ComputerKey.Computer(),
 		HubOrigin: m.o.HubURL,
 		Refuse:    m.DeviceClearPending,
 		Audit:     devicekey.AuditLine(m.o.Logger),
+		AuditCert: devicekey.AuditCertLine(m.o.Logger),
 	}
+	return m.devVer
+}
+
+type deviceVerifierState struct {
+	devVerMu sync.Mutex
+	devVer   *devicekey.Verifier
 }

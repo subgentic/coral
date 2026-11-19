@@ -157,8 +157,9 @@ func pollGap(interval time.Duration) time.Duration { return 2*interval + 30*time
 
 // Manager owns the enrollment and the tunnel.
 type Manager struct {
-	o  Options
-	hc *http.Client
+	deviceVerifierState // the one device-key verifier (device_verifier.go)
+	o                   Options
+	hc                  *http.Client
 
 	pair pairingState
 
@@ -319,11 +320,15 @@ func (m *Manager) PreCheck(ctx context.Context) BootstrapResult {
 }
 
 // deviceKeyStepsBuilt is whether Coral does its part of the device key beyond handing the public key over (step 2: its own key, the signing, the check of the Hub's pairing). While it is false the
-// handshake never offers device_key/1, whatever was redeemed: the Hub's ruling is that the capability is said only when the key exists and steps 1 and 2 are built (#16726).
-const deviceKeyStepsBuilt = false
+// handshake never offers device_key/1, whatever was redeemed: the Hub's ruling is that the capability is said only when the key exists and steps 1 and 2 are built (#16726). It is true from slice 7 (#19738): the verifier,
+// the two device-signed routes and the pairing are built, and the Hub needs the capability in Hello or answers 502.
+const deviceKeyStepsBuilt = true
 
 // offersDeviceKey is tunnel.ClientOptions.DeviceKey.
-func (m *Manager) offersDeviceKey() bool { return deviceKeyStepsBuilt && m.devicePK.Load() != nil }
+// It is said when a key exists (a redeemed one, or this computer's own) and the steps are built.
+func (m *Manager) offersDeviceKey() bool {
+	return deviceKeyStepsBuilt && (m.devicePK.Load() != nil || m.o.ComputerKey != nil)
+}
 
 // Redeem enrolls the running server with a credential handed over by
 // `coral cloud connect --ticket-file` (the server stays the only writer of the

@@ -319,6 +319,8 @@ var activityNotAnInboxAction = map[string]string{
 	"PUT /api/cloud/max-mode":                                              "Coral Hub connection and Hub-to-computer calls",
 	"PUT /api/cloud/device-web-mode":                                       "Coral Hub connection and Hub-to-computer calls",
 	"PUT /api/cloud/devices/{kid}/mode":                                    "Coral Hub connection and Hub-to-computer calls",
+	"POST /api/device-keys/message":                                        "Coral Hub connection and Hub-to-computer calls",
+	"POST /api/device-keys/certificate":                                    "Coral Hub connection and Hub-to-computer calls",
 	"DELETE /api/cloud/devices/{kid}":                                      "Coral Hub connection and Hub-to-computer calls",
 	"POST /api/cloud/devices/clear-clock":                                  "Coral Hub connection and Hub-to-computer calls",
 	"PUT /api/cloud/redact-tokens":                                         "Coral Hub connection and Hub-to-computer calls",

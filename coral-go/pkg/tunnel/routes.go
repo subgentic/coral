@@ -359,6 +359,8 @@ var routeTable = cat(
 	service(rules(http.MethodGet, TierView, "/api/goal-links")),
 	// Coral Hub's word that a guide's grant ended (#11457): the Hub's own service stream (its stamp and the guide's board as the asker), never a person's, and View so a computer in any mode takes it: it only takes proposals back.
 	service(rules(http.MethodPost, TierView, "/api/cloud/guide-revoked")),
+	// The device-signed routes (#19669 slice 7, wire format draft 11): what a trusted browser signed, forwarded by the Hub unstamped. View, so a computer in any mode takes it, and neither owner nor service: the signature is the only authority, the verifier decides, and no Hub user, owner or account header is read.
+	rules(http.MethodPost, TierView, "/api/device-keys/message", "/api/device-keys/certificate"),
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),

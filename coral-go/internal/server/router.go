@@ -597,6 +597,9 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/cloud/devices/clear-clock", s.cloudHandler.ClearDevicesClock)
 	r.Put("/api/cloud/devices/{kid}/mode", s.cloudHandler.SetDeviceMode)
 	r.Delete("/api/cloud/devices/{kid}", s.cloudHandler.RemoveDevice)
+	// Device keys, slice 7 (#19669): what a trusted browser signed, forwarded by the Hub unstamped. The signature is the only authority; these routes read no Hub user, owner or account header.
+	r.Post("/api/device-keys/message", s.cloudHandler.DeviceKeyMessage)
+	r.Post("/api/device-keys/certificate", s.cloudHandler.DeviceKeyCertificate)
 	r.Put("/api/cloud/hub-relaunch", s.cloudHandler.SetHubRelaunch)        // #5280
 	r.Put("/api/cloud/hub-cross-team", s.cloudHandler.SetHubCrossTeam)     // #5572
 	r.Get("/api/system/codex-trust-hooks", s.cloudHandler.CodexTrustHooks) // #153

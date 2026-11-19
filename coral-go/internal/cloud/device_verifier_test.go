@@ -59,6 +59,19 @@ func TestTheAuditLineOfARemovalHasTheKidsAndModeAndNoLabel(t *testing.T) {
 	assert.Contains(t, out, "interact")
 }
 
+func TestTheAuditLineOfACertificateNamesBothKidsAndNoLabel(t *testing.T) {
+	var buf bytes.Buffer
+	r := pairingSetup(t, true)
+	r.m.o.Logger = slog.New(slog.NewTextHandler(&buf, nil))
+	v := r.m.NewDeviceVerifier(r.ss)
+	require.NotNil(t, v.AuditCert)
+	v.AuditCert("passkey-kid", "device-kid", "view")
+	out := buf.String()
+	assert.Contains(t, out, "passkey-kid")
+	assert.Contains(t, out, "device-kid")
+	assert.Contains(t, out, "view")
+}
+
 // A pin: a Verifier is built in one place only, so no second construction can leave Refuse or HubOrigin out.
 func TestNoVerifierIsBuiltOutsideTheManagersBuilder(t *testing.T) {
 	var offenders []string
@@ -73,4 +86,9 @@ func TestNoVerifierIsBuiltOutsideTheManagersBuilder(t *testing.T) {
 		return nil
 	}))
 	assert.Empty(t, offenders, "build the verifier with Manager.NewDeviceVerifier")
+}
+
+func TestTheManagerBuildsOneVerifier(t *testing.T) {
+	r := pairingSetup(t, true)
+	assert.Same(t, r.m.NewDeviceVerifier(r.ss), r.m.NewDeviceVerifier(r.ss), "one mutex serializes every message")
 }

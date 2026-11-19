@@ -14,6 +14,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/devicekey"
 )
 
 // #16726 item 4: the poll answer may carry pairing{v, kid, mac, user_code} (never pk). Step 1 parses and ignores it: the enrollment completes exactly as without it, and nothing of it is kept.
@@ -95,15 +97,20 @@ func TestAcceptsOnlyOneP256PublicKey(t *testing.T) {
 	require.Equal(t, base64.RawURLEncoding.EncodeToString(sum[:]), kid, "kid = b64url(SHA-256(raw public key))")
 }
 
-// #16726 item 2: until Coral does its part of the key beyond handing it over (step 2), the handshake never says device_key/1, whatever was redeemed (the Hub's ruling: only when the key exists and steps 1 and 2 are built).
-func TestTheManagerDoesNotOfferDeviceKeyUntilStepTwoIsBuilt(t *testing.T) {
+// #16726 item 2, as of slice 7 (#19738): the handshake says device_key/1 only when a key exists (a redeemed one, or this computer's own) and the steps are built; with neither key it never does.
+func TestTheManagerOffersDeviceKeyOnlyWithAKeyOnceTheStepsAreBuilt(t *testing.T) {
+	require.True(t, deviceKeyStepsBuilt, "slice 7 turns the capability on")
 	e := newEnv(t)
 	m := e.manager(e.hub.srv.URL)
 	require.False(t, m.offersDeviceKey(), "no key")
 	pk := newDevicePK(t)
 	m.devicePK.Store(&pk)
-	require.Equal(t, deviceKeyStepsBuilt, m.offersDeviceKey(), "a key alone is not enough")
-	require.False(t, deviceKeyStepsBuilt, "when step 2 lands, this pin and the capability go together")
+	require.True(t, m.offersDeviceKey(), "a redeemed key")
+	m2 := e.manager(e.hub.srv.URL)
+	k, err := devicekey.LoadOrCreateComputerKey(t.TempDir())
+	require.NoError(t, err)
+	m2.o.ComputerKey = k
+	require.True(t, m2.offersDeviceKey(), "this computer's own key")
 }
 
 // Slice 4: the poll answer's pairing object is parsed (v, kid, mac, user_code and, when the Hub sends it, pk) so Coral can check it; anything that is not that shape is no pairing and the enrollment still completes. It never prints.

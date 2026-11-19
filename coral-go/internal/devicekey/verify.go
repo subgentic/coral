@@ -75,6 +75,8 @@ type Verifier struct {
 
 	// Audit, when set, is called after each applied removal with the signer's kid, the target's, and the mode the target had.
 	Audit func(a Action, signerKID, targetKID, targetMode string)
+	// AuditCert, when set, is called after a passkey certificate added a device: the passkey's kid, the new device's kid and its mode (never a label or key bytes).
+	AuditCert func(passkeyKID, deviceKID, mode string)
 
 	mu sync.Mutex // one message at a time: the nonce check and the apply are not racing each other
 }
@@ -279,5 +281,12 @@ func verifyP1363(pk []byte, msg []byte, sig string) bool {
 func AuditLine(lg *slog.Logger) func(a Action, signerKID, targetKID, targetMode string) {
 	return func(a Action, signerKID, targetKID, targetMode string) {
 		lg.Info("cloud: device removed", "action", string(a), "signer", signerKID, "kid", targetKID, "mode", targetMode)
+	}
+}
+
+// AuditCertLine is the Verifier.AuditCert that writes a certified device to the log: the passkey's kid and the new device's kid (public hashes) and the mode, never a label or key bytes.
+func AuditCertLine(lg *slog.Logger) func(passkeyKID, deviceKID, mode string) {
+	return func(passkeyKID, deviceKID, mode string) {
+		lg.Info("cloud: device certified by passkey", "passkey", passkeyKID, "kid", deviceKID, "mode", mode)
 	}
 }
