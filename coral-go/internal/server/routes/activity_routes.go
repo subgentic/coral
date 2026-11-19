@@ -194,6 +194,17 @@ func withFileTask(m board.ActivityMeta, item teamArtifact) board.ActivityMeta {
 	return m
 }
 
+// withFileAsk puts on a file's decision the question the agent asked with the file (#19828), as the person saw it in Needs you: read from the team's stored questions when the decision is made, so a row keeps the
+// question it was decided on even if the file is sent again with another. A file sent with none, or a read that fails, leaves the row without one; nothing is looked up afterwards.
+func (h *BoardHandler) withFileAsk(ctx context.Context, project, id string, m board.ActivityMeta) board.ActivityMeta {
+	if qs, err := h.bs.ArtifactQuestions(ctx, project); err == nil {
+		if q, ok := qs[id]; ok {
+			m.Ask = q.Question
+		}
+	}
+	return m
+}
+
 // fileTaskOf reads a team file's task for a handler that has not loaded the file.
 func (h *BoardHandler) fileTaskOf(ctx context.Context, project, id string) int64 {
 	if item, ok := h.teamManagedArtifact(ctx, project, id); ok {

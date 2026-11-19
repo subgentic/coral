@@ -180,7 +180,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	if throughAHub(r) { // a hub caller (the tunnel, or the self-hosted hub: its stamp or its API key) never changes a decision already made on the file (#13494); this computer's own dashboard still may
 		r = r.WithContext(board.WithOneDecision(r.Context()))
 	}
-	r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, note), item))) // the Activity record: the decision and its row are one transaction (#12069); the row carries the file's task (#14421)
+	r = r.WithContext(board.WithActivity(r.Context(), h.withFileAsk(r.Context(), project, id, withFileTask(activityMetaFor(r, item.Name, note), item)))) // the Activity record: the decision and its row are one transaction (#12069); the row carries the file's task (#14421)
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
 	switch {
 	case errors.Is(err, board.ErrAlreadyDecided):
@@ -339,7 +339,7 @@ func (h *BoardHandler) ignoreArtifact(w http.ResponseWriter, r *http.Request, pr
 		return
 	}
 	if !olderVersion { // the newest version's row says it once: a file with earlier versions is one row, not one per version (#19139)
-		r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, ""), item)))
+		r = r.WithContext(board.WithActivity(r.Context(), h.withFileAsk(r.Context(), project, id, withFileTask(activityMetaFor(r, item.Name, ""), item))))
 	}
 	change, tags, err := h.bs.IgnoreArtifactReview(r.Context(), project, id, ignore)
 	switch {
@@ -364,7 +364,7 @@ func (h *BoardHandler) saveArtifact(w http.ResponseWriter, r *http.Request, proj
 		return
 	}
 	if !olderVersion { // the newest version's row says it once: a file with earlier versions is one row, not one per version (#19139)
-		r = r.WithContext(board.WithActivity(r.Context(), withFileTask(activityMetaFor(r, item.Name, ""), item)))
+		r = r.WithContext(board.WithActivity(r.Context(), h.withFileAsk(r.Context(), project, id, withFileTask(activityMetaFor(r, item.Name, ""), item))))
 	}
 	change, tags, err := h.bs.SaveArtifactReview(r.Context(), project, id, save)
 	switch {

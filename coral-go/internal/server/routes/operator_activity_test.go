@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
@@ -470,4 +471,20 @@ func TestAFileRowCarriesItsVersionNumberTheNewestAndTheTeamsVersions(t *testing.
 	assert.EqualValues(t, 1, versions[0].(map[string]any)["n"])
 	assert.Equal(t, newer, versions[1].(map[string]any)["digest"])
 	assert.Equal(t, true, got["check"].(map[string]any)["intact"], "reading versions stores nothing: the chain is whole")
+}
+
+func TestAFilesDecisionKeepsTheQuestionItWasSentWith(t *testing.T) {
+	e := newReviewEnv(t, true)
+	act := e.activityServer(t, true)
+	e.tag(t, `["for review"]`)
+	require.NoError(t, e.h.bs.SetArtifactQuestionByOperator(context.Background(), "alpha", e.id, "Approve this plan?", time.Now()))
+	code, out := e.approve(t)
+	require.Equal(t, http.StatusOK, code, out)
+	_, got := getActivity(t, act.URL, "", nil)
+	row := got["actions"].([]any)[0].(map[string]any)
+	assert.Equal(t, "Approve this plan?", row["ask"], "the row keeps the question the file was decided on")
+	require.NoError(t, e.h.bs.SetArtifactQuestionByOperator(context.Background(), "alpha", e.id, "A different question now?", time.Now()))
+	_, got = getActivity(t, act.URL, "", nil)
+	assert.Equal(t, "Approve this plan?", got["actions"].([]any)[0].(map[string]any)["ask"], "a later question does not change a row already made")
+	assert.Equal(t, true, got["check"].(map[string]any)["intact"])
 }
