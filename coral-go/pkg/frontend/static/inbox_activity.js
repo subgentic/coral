@@ -13,9 +13,10 @@ import { markHidden } from './visible_marks.js';
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
 const Threads = await importOnce('./activity_threads.js');
-const NF = await importOnce('./needs_filters.js');
+const Ledger = await importOnce('./activity_ledger.js');
 const AF = await importOnce('./operator_activity_filters.js'); // lazy, as the sidebar loads it: its failure is retried
 await loadStyles('inbox_activity.css'); // the folder's rules load with the folder, not at start (page_weight)
+await loadStyles('activity_ledger.css'); // the ledger's rows (#19816)
 await loadStyles('activity_kinds.css'); // the kind chips' rules (several at once, #16087): not at start
 
 const PAGE = 200;
@@ -25,7 +26,6 @@ let rows = [], check = null, loaded = false, loading = null, more = false, faile
 let cursors = {}, moreBy = {}, checks = {}, unread = []; // unread: [{ id, why }] the computers that could not give their record this time
 /** A row's own key: ids are only unique on their computer. */
 export const keyOf = r => r.server && r.server !== LOCAL_SERVER ? `${r.server}/${r.id}` : String(r.id);
-const state = DT.tableState();
 let onChange = () => {};
 
 /** The row as the one rule says it (#14423): verb, object, detail. */
@@ -165,9 +165,6 @@ export const showPills = (f, change) => {
 export function spec(f, open, { grouped = false, byTask = true, tasks, taskSignature = '' } = {}) {
     const list = filtered(f);
     const parts = r => { const p = partsOf(r); return grouped && byTask && r.goal_id && r.task_id ? { ...p, about: '' } : p; };
-    const who = r => { const c = DT.el('span', 'activity-who'), kind = r.item_kind === 'question' || r.action === 'answer' || r.action === 'prompt_answer' ? 'question' : /^(prompt_|wait_)/.test(r.action || '') ? 'permission' : r.item_kind === 'file' ? 'review' : r.item_kind === 'goal' ? 'goal_done' : r.item_kind === 'proposal' ? 'proposal' : ['run', 'job_run', 'workflow_run'].includes(r.item_kind) ? 'run' : 'other'; c.append(NF.kindIcon({ waiting_kind: kind }), DT.el('b', 'activity-name', markHidden(AF.agentOf(r) || 'You', { strict: true }))); return c; };
-    const decision = r => { const label = AF.DECISION_LABEL[AF.decisionOf(r)]; const chip = DT.tag(parts(r).did); chip.classList.add('activity-decision', `activity-decision-${label ? AF.decisionOf(r) : 'plain'}`); return chip; };
-    const summary = r => { const p = parts(r); return [p.did, p.detail, p.about].filter(Boolean).join(' · '); };
     const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks, byTask) : null;
     const opens = r => (r.item_kind === 'job_run' && !!jobRunParts(r.item_id)) || (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message', 'workflow_run'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
     const narrowed = AF.isFiltered(f), onlyNotes = !narrowed && f.important === true && shown().length > 0; // the view is Important (the default, not a filter the person set) and every row read is a delivery note (#19219)
@@ -179,17 +176,10 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
             if (words) { const n = DT.el('p', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`, words); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n); }
-            const t = DT.dataTable({ label: `Activity, ${list.length}`, fold: 'always',  rows: list, ...(grouped ? { orderRows: Threads.arrangeActivityRows, groupSorted: true, groupBy: groupFor } : {}), rowKey: keyOf, state, decorate: (r, tr) => { tr.classList.add('activity-card'); const ask = tr.querySelector('.dt-mail-ask'); if (ask) { const p = parts(r); ask.replaceChildren(decision(r)); if (p.detail) ask.append(' · ', p.detail); if (p.about) ask.append(' · ', p.about); } if (opens(r)) return; const button = tr.querySelector('button.dt-mail-open'); if (button) { const text = DT.el('span', button.className.replace('dt-primary', '')); text.append(...button.childNodes); button.replaceWith(text); } }, rowName: r => { const p = parts(r); return `${p.on} ${summary(r)}`; },  resize: true, sortBar: false,
-                open: r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); },
-                columns: [ // narrowing drops From (62 rem), then Team (52), then When (36), then You did (16): the data table's own thresholds, so the On column (the item) never shrinks (the table rules' R2)
-                    { key: 'who', label: 'From', sort: true, sortValue: r => AF.agentOf(r) || 'You', line: 1, width: '11rem', cell: who },
-                    { key: 'action', label: 'You did', sort: true, sortValue: r => parts(r).did, line: 1, width: '12rem', dropAt: 16, cell: decision },
-                    { key: 'item', label: 'On', primary: true, width: 'grow', sort: true, sortValue: r => parts(r).on, line: 1, cell: r => { const p = parts(r), el = opens(r) ? DT.primaryButton(p.on, `${p.on}. ${p.about ? `${p.about}. ` : ''}Open ${M(itemWords(r))}`) : DT.el('span', 'activity-item', p.on); DT.tipIf(el, p.on, () => el.scrollWidth > el.clientWidth); if (!p.detail && !p.about) return el; const cell = DT.el('span', 'activity-on'); cell.append(el); if (p.detail) cell.append(DT.el('span', 'activity-detail', p.detail)); if (p.about) cell.append(DT.el('span', 'activity-about', p.about)); return cell; } }, // the detail is its own line under the object, whole (never cut)
-                    { key: 'team', label: 'Team', sort: true, sortValue: teamOf, line: 1, width: '9rem', dropAt: 52, cell: r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r) }, // with several computers read, the computer is named beside the team (#15730): the card has no room for a column of it
-                    { key: 'from', label: 'Done from', sort: true, sortValue: fromCell, line: 0, tone: 'tertiary', width: '11rem', dropAt: 62, cell: fromCell },
-                    { key: 'when', label: 'When', sort: 'date', sortValue: r => r.at, firstDir: 'desc', line: 1, tone: 'tertiary', align: 'end', width: '7rem', dropAt: 36, cell: r => DT.timeCell(r.at) },
-                ] });
-            wrap.append(t.el);
+            const openRow = r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); }
+            const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
+            const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
+            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
             const gaps = missingWords(missingComputers());
             if (gaps) { const n = DT.el('p', 'activity-check', gaps); n.setAttribute('role', 'status'); wrap.prepend(n); }
             if (more) { const b = DT.el('button', 'btn btn-small activity-more', 'Show older actions'); b.type = 'button'; b.addEventListener('click', () => refresh(null, { next: true })); wrap.append(b); }

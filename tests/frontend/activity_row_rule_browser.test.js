@@ -28,7 +28,7 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
                 ];
                 const real = window.fetch; window.fetch = (u, o) => new URL(String(u), location.origin).pathname === '/api/activity' ? Promise.resolve(new Response(JSON.stringify({ actions: window.__rows, check: { intact: true, rows: 9 } }), { headers: { 'Content-Type': 'application/json' } })) : real(u, o);
                 localStorage.removeItem('coral-inbox-activity-filters'); window.switchNavTab('hub-inbox'); return import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('activity')).then(() => true); })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 9`, `${width}: the nine rows`, 15000);
+            await waitFor(`document.querySelectorAll('#group-table-view .ac-row').length === 9`, `${width}: the nine rows`, 15000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the columns settle
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/activity-rule-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             const text = await ev(`document.querySelector('#group-table-view').textContent.replace(/\\s+/g, ' ')`);
@@ -42,15 +42,15 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
             assert.ok(text.includes('a file'), `${width}: an older starred row falls back to "a file"`);
             assert.ok(text.includes(LONG), `${width}: a long note is whole, not cut`);
             if (width === 1280) {
-                const cols = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => ({ did: (tr.querySelector('td[data-key="action"]') || {}).textContent, on: (tr.querySelector('td[data-key="item"] .dt-primary, td[data-key="item"] .activity-item') || {}).textContent, detail: (tr.querySelector('.activity-detail') || {}).textContent || '', cut: tr.querySelector('.activity-detail') ? tr.querySelector('.activity-detail').scrollWidth > tr.querySelector('.activity-detail').clientWidth + 1 : false }))`);
+                const cols = await ev(`[...document.querySelectorAll('#group-table-view .ac-row')].map(tr => ({ did: (tr.querySelector('.ac-verdict') || {}).textContent, on: (tr.querySelector('.ac-title') || {}).textContent, detail: (tr.querySelector('.ac-answer') || {}).textContent || '', cut: tr.querySelector('.ac-answer') ? tr.querySelector('.ac-answer').scrollWidth > tr.querySelector('.ac-answer').clientWidth + 1 : false }))`);
                 assert.deepEqual(cols.map(c => c.did), ['Dismissed', 'Answered', 'Answered', 'Answered', 'Dismissed', 'Unstarred', 'Starred', 'Changed the tags', 'Shared'], `${width}: YOU DID is the verb alone: ${JSON.stringify(cols.map(c => c.did))}`);
                 assert.deepEqual(cols.map(c => c.on), ['a question', 'Orchestrator’s question', 'Which of the two designs should ship in v2.0.61?', 'a question', 'Ship it?', 'release-plan.md', 'a file', 'tagged-plan.md', 'shared-plan.md'], `${width}: ON is the object alone: ${JSON.stringify(cols.map(c => c.on))}`);
-                assert.deepEqual(cols.map(c => c.detail), ['', 'Your answer: 1 is fine for now', 'from Orchestrator · Your answer: Option 2', 'Your answer: Yes', LONG, '', '', '', ''], `${width}: the detail is on its own line: ${JSON.stringify(cols.map(c => c.detail))}`);
+                assert.deepEqual(cols.map(c => c.detail), ['', 'Your answer: 1 is fine for now', 'Your answer: Option 2', 'Your answer: Yes', LONG, '', '', '', ''], `${width}: the detail is on its own line: ${JSON.stringify(cols.map(c => c.detail))}`);
                 assert.ok(cols.every(c => !c.cut), `${width}: no detail is cut`);
             } else {
-                // a phone card (#15774): the words on line 1, the badge and who on line 2, the answer/detail on one line cut with an ellipsis, no team column
-                const ph = await ev(`[...document.querySelectorAll('#group-table-view tbody tr.activity-card')].map(r => { const q = s => r.querySelector(s); const d = q('.activity-detail'), cs = d && getComputedStyle(d); return { badge: !!q('td[data-key="action"] .chip'), who: !!q('td[data-key="who"] .activity-name'), team: getComputedStyle(q('td[data-key="team"]')).display, detail: d ? d.textContent : '', ellipsis: !d || (cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap'), top: q('button, .activity-item').getBoundingClientRect().top, badgeTop: q('td[data-key="action"]').getBoundingClientRect().top }; })`);
-                assert.ok(ph.length >= 5 && ph.every(c => c.badge && c.who && c.team === 'none' && c.ellipsis && c.badgeTop > c.top), `${width}: each phone card is the words, then the badge and who, with the detail cut to one line and no team column: ${JSON.stringify(ph)}`);
+                // a phone card (#19816): the tile, the subject and verdict, the quoted answer and the chips, every one whole and inside the width
+                const ph = await ev(`[...document.querySelectorAll('#group-table-view .ac-row')].map(r => ({ tile: !!r.querySelector('.ac-tile'), title: !!r.querySelector('.ac-title'), verdict: !!r.querySelector('.ac-verdict'), detail: (r.querySelector('.ac-answer') || {}).textContent || '', fits: r.scrollWidth <= r.clientWidth + 1 }))`);
+                assert.ok(ph.length >= 5 && ph.every(c => c.tile && c.title && c.verdict && c.fits), `${width}: each phone card has its tile, subject and verdict and fits the width: ${JSON.stringify(ph)}`);
                 assert.ok(ph.some(c => /^from Orchestrator \u00b7 Your answer: Option 2$/.test(c.detail) || /Your answer: Option 2/.test(c.detail)), `${width}: the answer is on the card: ${JSON.stringify(ph.map(c => c.detail))}`);
             }
         }
