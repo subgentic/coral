@@ -18,6 +18,7 @@ const { execFileSync } = createRequire(import.meta.url)('./helpers/child_process
 
 const args = process.argv.slice(2), flags = new Set(args.filter(a => a.startsWith('--'))), [base, head] = args.filter(a => !a.startsWith('--'));
 if (!base || !head) { console.error('usage: node fail_fast_suites.mjs <base> <head> [--only | --why | --json]'); process.exit(2); }
+if (base.startsWith('-') || head.startsWith('-')) { console.error('base and head must be commits, not options (a value starting with "-" is refused)'); process.exit(2); }
 const top = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
 const git = (...a) => execFileSync('git', a, { cwd: top, encoding: 'utf8', maxBuffer: 1 << 29, stdio: ['ignore', 'pipe', 'pipe'] });
 const STATIC = 'coral-go/pkg/frontend/static/', SUITES = 'tests/frontend/';

@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const has = c => { try { execFileSync('git', ['cat-file', '-e', `${c}^{commit}`], { cwd: here, stdio: 'ignore' }); return true; } catch { return false; } };
 const pick = (b, h) => execFileSync('node', [path.join(here, 'fail_fast_suites.mjs'), b, h], { cwd: here, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\n').filter(Boolean);
+for (const argv of [['-x', 'HEAD'], ['HEAD', '-x'], ['-x', '-y']]) {
+  let code = 0; try { execFileSync('node', [path.join(here, 'fail_fast_suites.mjs'), ...argv], { cwd: here, stdio: 'ignore' }); } catch (e) { code = e.status; }
+  assert.strictEqual(code, 2, `a base or head that starts with '-' is refused: ${argv.join(' ')}`);
+}
 if (!['1897d44111', '44f6a9c7bf', '092ce22ae3'].every(has)) { console.log('ok fail_fast_suites (skipped: the proof commits are not in this clone)'); process.exit(0); }
 const a = pick('44f6a9c7bf', '092ce22ae3');
 assert.ok(a.includes('one_line_rows_browser') && a.includes('launch_notice_phone_inbox_browser'), 'a layout change under #group-table-view lists the suites that measure it');
