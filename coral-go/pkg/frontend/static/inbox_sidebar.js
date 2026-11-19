@@ -97,8 +97,9 @@ const openInAgents = s => { window.switchNavTab?.('agents'); Promise.resolve(win
 // complete. Warn only when it also reports omitted rows or fills the 50-row page.
 const cutShort = () => reviewPages().some(p => p.truncated && (p.has_more || p.total > p.loadedCount || p.loadedCount >= 50)) ? (NF.isFiltered(needsFilters) ? 'filtered' : 'open') : '';
 function cutShortLine() { // "Showing 8 of 23" (the number it hides, not "cut short"); the Show more button of a computer that has more is under the list (appendReviewPaging), and one that cannot give more says how to get fewer (#17450, 4.14 rule 8)
-    const c = cutShort(); if (!c || reviewPages().some(p => p.has_more && !p.ownerOnly)) return null; // a computer that has more says its count on the Show more line under the list (#19833)
-    const cut = reviewPages().filter(p => p.truncated && (p.has_more || p.total > p.loadedCount || p.loadedCount >= 50)), shown = cut.reduce((n, p) => n + (p.loadedCount || 0), 0), total = cut.reduce((n, p) => n + Math.max(p.total || 0, p.loadedCount || 0), 0), exact = cut.every(p => p.total > p.loadedCount);
+    const c = cutShort(); if (!c) return null;
+    const cut = reviewPages().filter(p => p.truncated && (c === 'filtered' || !(p.has_more && !p.ownerOnly)) && (p.has_more || p.total > p.loadedCount || p.loadedCount >= 50)); if (!cut.length) return null; // a computer that has more says its count on its own Show more line under the list (#19833); one that is cut and has no more says it here
+    const shown = cut.reduce((n, p) => n + (p.loadedCount || 0), 0), total = cut.reduce((n, p) => n + Math.max(p.total || 0, p.loadedCount || 0), 0), exact = cut.every(p => p.total > p.loadedCount);
     const more = reviewPages().some(p => p.has_more), tail = more ? '' : c === 'filtered' ? ' Narrow the filters further.' : ' Use Filters to narrow it.';
     return DT.el('p', 'goals-note inbox-cut-short', `Showing ${shown} of ${total}${exact ? '' : '+'}.${tail}`);
 }
@@ -1147,7 +1148,7 @@ function appendReviewPaging(host, savedPage = false) {
         if (!page.has_more && !page.error) continue;
         const line = DT.el('p', 'inbox-review-more');
         const label = pagingServerLabel(page.server), shownN = page.loadedCount || 0, totalN = Math.max(page.total || 0, shownN); // as the approved footer says it: how many of how many, on which computer (#19833)
-        line.append(document.createTextNode(savedPage || !page.truncated || !shownN ? `${label}: ` : `Showing ${shownN}${totalN > shownN ? ` of ${totalN}` : ''} review items on ${label}.`));
+        line.append(document.createTextNode(savedPage || !(page.truncated || cutShort()) || !shownN ? `${label}: ` : `Showing ${shownN}${totalN > shownN ? ` of ${totalN}` : ''} review items on ${label}.`));
         const button = DT.el('button', 'btn btn-small', page.loading ? 'Loading…' : page.error ? 'Retry' : 'Show more');
         button.type = 'button'; button.disabled = page.loading;
         button.dataset.reviewMore = page.server;

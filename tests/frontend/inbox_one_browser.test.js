@@ -160,12 +160,12 @@ const AGENTS = (waiting) => waiting ? [
             // a row reads who said what: the sender 14/600, the message after it in the secondary colour; Done is drawn on the row's hover or keyboard focus only (a desktop here has a pointer)
             await mouseTo(2, 2);
             const look = await ev(`(() => { const who = document.querySelector('#group-table-view .dt-saved-who'), text = document.querySelector('#group-table-view .dt-saved-text'), btn = document.querySelector('#group-table-view tbody .dt-hover-action'); const cs = e => getComputedStyle(e); return { who: [cs(who).fontSize, cs(who).fontWeight, who.textContent], textColor: cs(text).color !== cs(who).color, textWeight: cs(text).fontWeight, rest: cs(btn).opacity }; })()`);
-            assert.deepEqual([look.who, look.textColor, look.textWeight, look.rest], [['13px', '500', 'Agent One'], true, '400', '0'], at + 'sender 13/500 (a name), the message secondary, Done hidden at rest ' + JSON.stringify(look));
+            assert.deepEqual([look.who, look.textColor, look.textWeight, look.rest], [['15px', '600', 'Agent One'], true, '400', '1'], at + 'sender 15/600 (a name: the approved list draws Saved senders as the strong title, mock #19808 v1, #19841), the message secondary, Done drawn at rest as an outlined pill (the mock draws it so) ' + JSON.stringify(look));
             await ev(`document.querySelector('#group-table-view tbody .dt-hover-action').focus(); true`);
             await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'Done shows when the keyboard is on it', 3000); // the button's own transition settles
             await ev(`document.activeElement.blur(); true`);
             await mouseTo(2, 2);
-            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '0'`, at + 'and hidden again at rest on a pointer (the mouse in a neutral corner)', 3000); // the 10 s above is for the emulation to switch; the hide itself is a transition, so a 6 s product lag still fails
+            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'and still drawn at rest on a pointer (the mouse in a neutral corner): an outlined pill, as the approved Saved draws it (mock #19808 v1, #19841)', 3000); // the 10 s above is for the emulation to switch; the hide itself is a transition, so a 6 s product lag still fails
             const rowAt = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr.dt-row').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             await mouseTo(rowAt.x, rowAt.y);
             await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'and shown again when the mouse is on the row', 3000);

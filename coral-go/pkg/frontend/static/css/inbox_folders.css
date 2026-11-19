@@ -18,7 +18,7 @@
 .inbox-folder-word + .inbox-folder-word::before { content: "\00b7"; margin-inline-end: 6px; }
 .inbox-folder-chip { color: var(--text-secondary); }
 .inbox-folder-star { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: var(--radius-md); background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
-.inbox-saved-card button.inbox-saved-message.inbox-saved-message { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 2px; padding-block: 10px; white-space: normal; }
+.inbox-saved-card button.inbox-saved-message.inbox-saved-message { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 2px; padding-block: 10px; block-size: auto; min-block-size: var(--table-touch, 44px); white-space: normal; }
 .inbox-saved-card .inbox-saved-who { display: flex; align-items: baseline; gap: 8px; max-width: none; font-size: var(--fs-title); font-weight: var(--fw-strong); color: var(--text-primary); }
 .inbox-saved-team { font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-muted); }
 .inbox-saved-team::before { content: "\00b7"; margin-inline-end: 8px; }
@@ -34,7 +34,8 @@
 /* The Saved page's Open and Done are outlined pills, the one that is on in the accent (#19841, the approved list) */
 .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chips { gap: 8px; border: 0; border-radius: 0; overflow: visible; }
 .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip, .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip + .goals-chip { border: 1px solid var(--control-border); border-radius: var(--radius-md); background: transparent; }
-.inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); color: color-mix(in srgb, var(--accent) 70%, var(--text-primary)); }
 /* A starred chat: who and team, then the chat's label, then when and the blue star (#19841) */
 .inbox-starred-folder .inbox-chat-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding-block: 6px; min-width: 0; }
 .inbox-chat-who { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-title); font-weight: var(--fw-strong); color: var(--text-primary); }
+@media (max-width: 639px) { .inbox-saved-card, .inbox-starred-folder { margin-inline: 0; border-inline: 0; border-radius: 0; } } /* a phone: the folders run edge to edge like the list under them (inbox_phone_edge) */

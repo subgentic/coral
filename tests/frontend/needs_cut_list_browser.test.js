@@ -12,7 +12,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const failures = [], team = 'cut-' + Date.now().toString(36), T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const words = () => ev(`(() => { const t = document.querySelector('${T}').textContent.replace(/\\s+/g, ' '); return { incomplete: /incomplete (review )?list/i.test(t), cut: [...document.querySelectorAll('${T} .inbox-cut-short')].map(e => e.textContent.trim()) }; })()`);
+    const words = () => ev(`(() => { const t = document.querySelector('${T}').textContent.replace(/\\s+/g, ' '); return { incomplete: /incomplete (review )?list/i.test(t), cut: [...document.querySelectorAll('${T} .inbox-cut-short, ${T} .inbox-review-more')].map(e => ([...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('') || e.textContent).trim()).filter(t => /^Showing/.test(t)) }; })()`);
     const open = async (w, mobile, truncated, itemCount = 51) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
@@ -35,7 +35,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await open(w, mobile, true);
             g = await words();
             check(!g.incomplete, at + 'no "incomplete list" words under Needs you, whichever list it was');
-            check(g.cut.length === 1 && g.cut[0] === 'Showing 50 of 51.' && await ev(`!![...document.querySelectorAll('${T} [data-review-more], #group-table-view [data-review-more]')].find(b => b.textContent === 'Show more')`), at + 'a cut list says how many it shows and has a Show more button, once (#17450: "Showing 50 of 51", not "cut short"): ' + JSON.stringify(g.cut));
+            check(g.cut.length === 1 && /^Showing 50 of 51( review items on .+)?\.( Narrow the filters further\.| Use Filters to narrow it\.)?$/.test(g.cut[0]) && await ev(`!![...document.querySelectorAll('${T} [data-review-more], #group-table-view [data-review-more]')].find(b => b.textContent === 'Show more')`), at + 'a cut list says how many it shows and has a Show more button, once (#17450: "Showing 50 of 51", or the approved footer, Showing 50 of 51 review items on a computer (mock #19808 v1, #19833); not "cut short"): ' + JSON.stringify(g.cut));
             // counts are numbers (#17450, N1): "50+" where more are not read yet, the same in the title, the sidebar row and the tab's name; the words "at least" are nowhere
             const nums = await ev(`(() => { const t = e => e ? e.textContent.replace(/\\s+/g, ' ').trim() : ''; const side = document.querySelector('.view-list-item[data-key="needs"], #group-table-view .view-list-item[data-key="needs"]'); return { page: t(document.querySelector('#group-table-view')), side: t(side), tab: (document.querySelector('[data-tab="hub-inbox"], #nav-tab-hub-inbox, .nav-tab[data-tab="hub-inbox"]') || {}).getAttribute ? document.querySelector('[data-tab="hub-inbox"], #nav-tab-hub-inbox, .nav-tab[data-tab="hub-inbox"]').getAttribute('aria-label') : '' }; })()`);
             check(!/at least/i.test(nums.page + ' ' + nums.side + ' ' + (nums.tab || '')), at + 'no "at least" in the Needs you page, its sidebar row or the Inbox tab\'s name: ' + JSON.stringify(nums).slice(0, 400));
@@ -44,7 +44,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'plan'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await ev(framesJs(8));
             g = await words();
-            check(!g.incomplete && g.cut.length === 1 && g.cut[0] === 'Showing 50 of 51.', at + 'with a filter on and the list still cut, it says the same number: ' + JSON.stringify(g));
+            check(!g.incomplete && g.cut.length === 1 && /^Showing 50 of 51( review items on .+)?\.( Narrow the filters further\.| Use Filters to narrow it\.)?$/.test(g.cut[0]), at + 'with a filter on and the list still cut, it says the same number: ' + JSON.stringify(g));
             // a list that is not cut: nothing
             await open(w, mobile, false);
             g = await words();
