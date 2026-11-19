@@ -3,7 +3,7 @@
    of their own under it (a question, a yes/no and everything else: layout B, so a question is never cut); the buttons, every one a labelled button, are the bottom line. Everything is under the folded
    card list (.dt-fold-always), which only a computer's Needs you has: a phone's rows are not touched. */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr {
-    display: grid; grid-template-columns: auto auto minmax(0, clamp(15rem, 30%, 24rem)) minmax(0, 1fr) minmax(0, 8rem) 3.25rem; /* the tracks give way when the card is narrow (200% text): nothing is wider than the card */ column-gap: var(--space-md, 8px); row-gap: 2px; align-items: start; align-content: start;
+    display: grid; grid-template-columns: auto auto minmax(0, clamp(15rem, 30%, 24rem)) minmax(0, 1fr) minmax(0, auto) 5rem; /* the tracks give way when the card is narrow (200% text): nothing is wider than the card */ column-gap: var(--space-md, 8px); row-gap: 2px; align-items: start; align-content: start;
     padding: 14px var(--table-pad-x, 16px) 14px 4px; min-height: 0; --table-primary-size: var(--fs-title); /* #19812: 14 px rhythm; one 15 px headline on every kind; team and time are two fixed right tracks */
 }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr::before { display: none; } /* the folded row's line break is a flex thing: in the grid it would be a cell */
@@ -54,7 +54,7 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta :is(.inbox-review-from, .inbox-review-version, .inbox-kind) { font-weight: var(--fw-regular); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta .inbox-review-from::after { content: none; }
 @container (min-width: 50rem) { /* a wide card: line 1 is the name with its team and how long it has waited at the top right; the question and the meta line are the next two lines; the buttons stand at the right, level with the bottom of them (no row of their own, no empty area under the question; the Operator: buttons to the bottom, the waiting time top right) */
-  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row { grid-template-columns: auto auto minmax(0, 1fr) minmax(8rem, max-content) 3.25rem; }
+  :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row { grid-template-columns: auto auto minmax(0, 1fr) auto 5rem; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td:first-child { grid-row: 1; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-kind-column { grid-row: 1; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td[data-key="agent"] > .inbox-review-item { display: contents; }
@@ -80,7 +80,7 @@
 :root .material-icons.inbox-kind-icon:is([data-kind="permission"], [data-kind="other"]) { background: var(--needs-icon-amber-bg); color: var(--needs-icon-amber-fg); border-color: color-mix(in srgb, var(--needs-icon-amber-fg) 30%, transparent); }
 :root .material-icons.inbox-kind-icon:is([data-kind="review"], [data-kind="skill_review"], [data-kind="welcome"]) { background: var(--needs-icon-blue-bg); color: var(--needs-icon-blue-fg); border-color: color-mix(in srgb, var(--needs-icon-blue-fg) 28%, transparent); }
 :root .material-icons.inbox-kind-icon[data-kind="proposal"] { background: var(--needs-icon-purple-bg); color: var(--needs-icon-purple-fg); border-color: color-mix(in srgb, var(--needs-icon-purple-fg) 30%, transparent); }
-:root .material-icons.inbox-kind-icon[data-kind="run"] { background: color-mix(in srgb, var(--error) 15%, transparent); color: var(--error-text, var(--error)); border-color: color-mix(in srgb, var(--error) 32%, transparent); }
+:root .material-icons.inbox-kind-icon[data-kind="run"] { background: var(--needs-icon-red-bg); color: var(--needs-icon-red-fg); border-color: var(--needs-icon-red-fg); } /* a run that failed: a solid red tile, read at AA */
 :root .material-icons.inbox-kind-icon.inbox-artifact-thumbnail { padding: 0; overflow: hidden; background: var(--bg-tertiary); border-color: var(--border); } /* a picture shows itself */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-pill { height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: var(--fw-medium); background: color-mix(in srgb, var(--text-primary) 5%, transparent); } /* 6: small cohesive Goal and Task chips */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-blocks { display: inline-flex; align-items: center; gap: 5px; width: fit-content; max-width: 100%; padding: 3px 9px; border-radius: var(--radius-md); font-size: var(--fs-base); font-weight: var(--fw-regular); color: var(--warning-text, var(--text-primary)); background: color-mix(in srgb, var(--warning) 11%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 26%, transparent); } /* 7: what a row holds up or closes is a tinted pill with its own mark, not bold text louder than the name */
