@@ -191,9 +191,9 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
         node: () => {
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
-            if (words) { // a notice with its icon, a heading and the detail under it (the mock's record integrity notice, #19871)
-                const n = DT.el('div', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`), cut = words.search(/[:.](\s|$)/), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
-                tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', cut > 0 ? words.slice(0, cut) : words), ...(cut > 0 ? [DT.el('span', 'activity-check-detail', words.slice(cut))] : []));
+            if (words) { // a notice with its icon, a heading and the sentence under it (the mock's record integrity notice, #19871)
+                const n = DT.el('div', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
+                tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', 'Activity record check warning'), DT.el('span', 'activity-check-detail', words));
                 n.append(tile, text); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n);
             }
             const openRow = r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); }

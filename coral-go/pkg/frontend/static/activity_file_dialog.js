@@ -35,18 +35,19 @@ export function openFileDecision(row, { openFile, onDone } = {}) {
         series.setAttribute('aria-label', 'Versions in this series'); series.append(el('h3', 'activity-file-series-head', `Versions in this series (${versions.length})`));
         const mine = String(row.version || row.item_id || '');
         for (const v of [...versions].reverse()) {
-            const line = el('div', 'activity-file-series-row'), pill = v.digest === versions[versions.length - 1].digest ? 'Latest' : v.digest === mine ? 'Reviewed here' : '';
-            line.append(el('b', 'activity-file-series-name', `v${v.n} \u00b7 ${markHidden(row.title || 'a file', { strict: true })}`), ...(pill ? [el('span', 'al-vchip', pill)] : []), el('span', 'activity-file-series-at', v.at ? whenText(v.at) : ''));
+            const line = el('div', 'activity-file-series-row'), pills = [v.digest === versions[versions.length - 1].digest ? ['Latest', 'al-vchip-latest'] : null, v.digest === mine ? ['Reviewed here', 'al-vchip-mine'] : null].filter(Boolean);
+            line.append(el('b', 'activity-file-series-name', `v${v.n} \u00b7 ${markHidden(row.title || 'a file', { strict: true })}`), ...pills.map(([w, c]) => el('span', `al-vchip ${c}`, w)), el('span', 'activity-file-series-at', v.at ? whenText(v.at) : ''));
             const ob = el('button', 'btn btn-small', `Open v${v.n}`); ob.type = 'button'; ob.addEventListener('click', () => { finish(); if (openFile) openFile({ ...row, item_id: v.digest, version: v.digest }); }); line.append(ob); series.append(line);
         }
     }
     // one comment box (Comment and Send reply are one box in v3): a note for the team on this file, with pictures
-    const label = el('label', 'activity-thread-label', 'Comment on this file'); const box = el('textarea', 'field activity-thread-box'); box.rows = 3; box.maxLength = 8000; box.placeholder = 'Comment on this file…'; label.append(box);
+    const label = el('label', 'activity-thread-label', 'Comment on this file'); const box = el('textarea', 'field activity-thread-box'); box.rows = 3; box.maxLength = 8000; box.placeholder = `Add a follow-up comment on ${row.title || 'this file'}…`; label.append(box);
     const tray = createImageTray({ upload: (blob, versionOf) => uploadCommentImage(hex, server, blob, versionOf, board) });
     const err = el('p', 'activity-thread-error'); err.setAttribute('role', 'alert');
-    const copy = el('button', 'btn btn-small', 'Copy link'); copy.type = 'button';
-    const reopen = el('button', 'btn btn-small activity-file-reopen', 'Reopen for review'); reopen.type = 'button'; reopen.hidden = decisionNeedsPerson(server);
-    const open = el('button', 'btn btn-primary', 'Open file'); open.type = 'button';
+    const withIcon = (b, icon) => { const i = el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.prepend(i); return b; }; // the mock's buttons carry an icon before the words (#19871)
+    const copy = withIcon(el('button', 'btn btn-small', 'Copy link'), 'link'); copy.type = 'button';
+    const reopen = withIcon(el('button', 'btn btn-small activity-file-reopen', 'Reopen for review'), 'replay'); reopen.type = 'button'; reopen.hidden = decisionNeedsPerson(server);
+    const open = withIcon(el('button', 'btn btn-primary', 'Open file'), 'description'); open.type = 'button';
     const post = el('button', 'btn btn-small activity-file-comment', 'Send comment'); post.type = 'button'; post.disabled = true;
     const close = el('button', 'btn btn-small', 'Close'); close.type = 'button';
     const actions = el('div', 'activity-thread-actions'); actions.append(copy, reopen, close, post, open);

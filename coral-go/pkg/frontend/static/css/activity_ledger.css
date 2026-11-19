@@ -68,6 +68,8 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-pop-state { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: break-word; }
 
 .al-vchip, .al-vnewer { display: inline-flex; align-items: center; padding: 1px var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); }
+.al-vchip-latest { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.14); } /* in a file's version list: the newest is blue, the one decided here is green (#19871) */
+.al-vchip-mine { color: var(--success-text); border-color: rgba(var(--success-rgb), 0.3); background: rgba(var(--success-rgb), 0.14); }
 .al-vnewer { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.14); }
 .al-ask { margin-top: var(--space-xs); font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); overflow-wrap: anywhere; }
 .al-glyph { font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: 0; }

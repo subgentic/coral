@@ -29,20 +29,22 @@ const HEX = 'a'.repeat(64);
         await waitFor(`document.querySelectorAll('#group-table-view .al-row').length === 1`, 'the one action');
         await ev(`document.querySelector('#group-table-view .al-row button.al-title').click(); true`);
         await waitFor(`!!document.querySelector('dialog.activity-file-dialog[open]')`, 'the file dialog opens', 8000);
-        const d = await ev(`(() => { const x = document.querySelector('dialog.activity-file-dialog'); return { head: x.querySelector('h2').textContent, file: x.querySelector('.activity-file-name').textContent, said: x.querySelector('.activity-file-said').textContent, buttons: [...x.querySelectorAll('.activity-thread-actions .btn')].map(b => b.textContent.trim()), attach: /Attach image/.test(x.textContent), hint: /Paste or drop/.test(x.textContent), boxes: x.querySelectorAll('textarea').length }; })()`);
+        const d = await ev(`(() => { const x = document.querySelector('dialog.activity-file-dialog'); return { head: x.querySelector('h2').textContent, file: x.querySelector('.activity-file-name').textContent, said: x.querySelector('.activity-file-said').textContent, buttons: [...x.querySelectorAll('.activity-thread-actions .btn')].map(b => [...b.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim()), icons: [...x.querySelectorAll('.activity-thread-actions .btn .material-icons')].map(i => i.textContent), placeholder: x.querySelector('textarea').placeholder, attach: /Attach image/.test(x.textContent), hint: /Paste or drop/.test(x.textContent), boxes: x.querySelectorAll('textarea').length }; })()`);
         assert.match(d.head, /Approved$/); assert.equal(d.file, 'plan.md'); assert.match(d.said, /Orchestrator was told/);
         for (const b of ['Copy link', 'Reopen for review', 'Open file']) assert.ok(d.buttons.includes(b), `${b}: ${JSON.stringify(d.buttons)}`);
         assert.equal(d.buttons[d.buttons.length - 1], 'Open file', 'Open file is the right-most button');
+        assert.deepEqual(d.icons, ['link', 'replay', 'description'], 'Copy link, Reopen for review and Open file carry the mock\'s icons'); assert.equal(d.placeholder, 'Add a follow-up comment on plan.md…');
         // #19871 (MUST-13): the file's tile, the verdict as a pill, the feedback in a tinted callout, the versions as a card
         const m = await ev(`(() => { const x = document.querySelector('dialog.activity-file-dialog'); return { tile: !!x.querySelector('.al-tile.al-fk-markdown'), pill: x.querySelector('h2 .al-verdict.al-v-approve')?.textContent, label: x.querySelector('.al-answer .al-ans-label')?.textContent, rows: [...x.querySelectorAll('.activity-file-series-row')].map(r => r.textContent), head: x.querySelector('.activity-file-series-head')?.textContent, pills: [...x.querySelectorAll('.activity-file-series .al-vchip')].map(e => e.textContent) }; })()`);
         assert.equal(m.tile, true, 'the dialog draws the file kind tile'); assert.equal(m.pill, 'Approved', 'the verdict is a pill by the name'); assert.equal(m.label, 'Your feedback on v1: ');
+        { const h = await ev(`(() => { const c = getComputedStyle(document.querySelector('.activity-file-series-head')); return [parseFloat(c.fontSize), Number(c.fontWeight)]; })()`); assert.ok(h[0] <= 12 && h[1] <= 500, `the series heading is small and light as the mock's: ${h}`); }
         assert.equal(m.head, 'Versions in this series (2)'); assert.equal(m.rows.length, 2, JSON.stringify(m)); assert.match(m.rows[0], /^v2/); assert.match(m.rows[1], /^v1/); assert.deepEqual(m.pills, ['Latest', 'Reviewed here']);
         assert.ok(d.attach && d.hint && d.boxes === 1, JSON.stringify(d));
         // a comment
         await ev(`(() => { const t = document.querySelector('.activity-file-dialog textarea'); t.value = 'Looks good, thanks.'; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('.activity-file-comment').click(); return true; })()`);
         await waitFor(`window.__calls.includes('comment:Looks good, thanks.')`, 'the comment is sent', 8000);
         // Reopen for review
-        await ev(`[...document.querySelectorAll('.activity-file-dialog .btn')].find(b => b.textContent.trim() === 'Reopen for review').click(); true`);
+        await ev(`[...document.querySelectorAll('.activity-file-dialog .btn')].find(b => b.textContent.trim().endsWith('Reopen for review')).click(); true`);
         await waitFor(`window.__calls.includes('review') && !document.querySelector('dialog.activity-file-dialog')`, 'Reopen for review sends the file for review and shuts the dialog', 8000);
         console.log('PASS activity file dialog');
     } finally { await client.close(); }
