@@ -41,6 +41,7 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-meta { min-width: 0; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font-size: var(--fs-base); color: var(--text-muted); }
 .al-author { color: var(--text-secondary); font-weight: var(--fw-medium); }
 .al-chip { max-width: 100%; overflow-wrap: anywhere; }
+.al-chip, .al-via { border: 1px solid var(--border); background: var(--bg-tertiary); } /* Goal and Task are chips with an edge, as the mock draws them (#19871) */
 .al-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; align-self: stretch; gap: var(--space-lg); }
 .al-right-meta { display: inline-flex; align-items: center; gap: var(--space-sm); font-size: var(--fs-base); color: var(--text-muted); white-space: nowrap; }
 .al-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }

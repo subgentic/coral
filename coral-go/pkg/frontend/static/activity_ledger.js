@@ -104,7 +104,9 @@ export function ledgerRow(r, x) {
     if (r.source === 'hub') meta.append(el('span', 'chip chip-tag al-via', 'via Coral Hub')); // the decision came through Coral Hub (the record's source)
     main.append(meta);
     const right = el('div', 'al-right'), rm = el('div', 'al-right-meta');
-    rm.append(el('span', 'al-team', x.teamWords(r)), el('span', 'al-dot', '·'), timeCell(r.at));
+    const team = x.teamWords(r); // a row with no team has no team name and no dot before the time (#19871)
+    if (team) rm.append(el('span', 'al-team', team), el('span', 'al-dot', '·'));
+    rm.append(timeCell(r.at));
     right.append(rm);
     if (open) { const word = r.item_kind === 'file' && r.file_n && r.file_latest_n > r.file_n ? `Open v${r.file_n}` : OPEN_WORD[r.item_kind] || 'Open'; const b = el('button', 'btn btn-small al-open', word); b.type = 'button'; b.setAttribute('aria-label', `${word}: ${x.openLabel(r)}`); b.addEventListener('click', () => (x.openPrimary || x.openRow)(r)); const acts = el('div', 'al-actions'); acts.append(b); const vs = versionsOf(r, x); if (vs) acts.append(vs); right.append(acts); }
     const more = moreMenu(r, x); if (more) (right.querySelector('.al-actions') || right.appendChild(el('div', 'al-actions'))).append(more);

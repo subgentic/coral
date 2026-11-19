@@ -11,6 +11,7 @@ await loadStyles('activity_dialog.css');
 const { createComment, uploadCommentImage } = await importOnce('./artifact_comments_api.js'); // lazy modules load the others through importOnce (import_hygiene)
 const { createImageTray } = await importOnce('./artifact_comment_images.js');
 const { sendForReview } = await importOnce('./artifact_send_review.js');
+const { fileKindOf } = await importOnce('./file_kind.js');
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const DECIDED = { approve: 'Approved', changes: 'Asked for changes', deny: 'Denied', ignore: 'Dismissed', save: 'Saved', unsave: 'Moved back', supersede: 'Superseded' };
@@ -20,14 +21,25 @@ export function openFileDecision(row, { openFile, onDone } = {}) {
     const hex = String(row.version || row.item_id || '').toLowerCase();
     const { server, name: board } = splitKey(row.team);
     const dlg = el('dialog', 'modal-content dlg-flow activity-thread-dialog activity-file-dialog'); dlg.setAttribute('aria-labelledby', 'activity-file-title');
-    const icon = el('span', 'activity-kind activity-kind-code', '</>'); icon.setAttribute('aria-hidden', 'true');
-    const title = el('h2', null, ''); title.id = 'activity-file-title'; title.append(el('span', 'activity-thread-state', DECIDED[row.action] || 'Decided'));
+    const fk = fileKindOf(row.title), icon = el('span', `al-tile al-tile-file al-fk-${fk.kind}`); icon.setAttribute('aria-hidden', 'true'); // the file's own tile, as its row draws it (#19871)
+    icon.append(fk.glyph ? el('span', 'al-glyph', fk.glyph) : el('span', 'material-icons', fk.icon));
+    const title = el('h2', null, ''); title.id = 'activity-file-title'; title.append(el('span', 'activity-file-name', markHidden(row.title || 'a file', { strict: true })), el('span', `al-verdict al-v-${row.action}`, DECIDED[row.action] || 'Decided'));
     const who = row.asker ? `from ${markHidden(row.asker, { strict: true })}` : '';
-    const sub = el('p', 'activity-thread-sub', [board, who, `decided ${whenText(row.at)}`].filter(Boolean).join(' · '));
+    const sub = el('p', 'activity-thread-sub', [board, who, `decided ${whenText(row.at)}`, row.goal_id ? `Goal #${row.goal_id}` : '', row.task_id ? `Task #${row.task_id}` : ''].filter(Boolean).join(' \u00b7 '));
     const names = el('div', 'activity-thread-names'); names.append(title, sub);
     const head = el('div', 'activity-thread-headrow'); head.append(icon, names);
-    const item = el('div', 'activity-file-line'); item.append(el('b', 'activity-file-name', markHidden(row.title || 'a file', { strict: true })), ...(row.version ? [el('span', 'activity-file-version', ' version')] : []));
-    const said = el('p', 'activity-file-said', row.note ? String(row.note) : '');
+    const said = el('p', `al-answer al-ans-${row.action} activity-file-said`); said.hidden = !row.note;
+    if (row.note) said.append(el('span', 'al-ans-label', `Your feedback${row.file_n ? ` on v${row.file_n}` : ''}: `), String(row.note));
+    const versions = Array.isArray(row.file_versions) && row.file_versions.length > 1 ? row.file_versions : null, series = el('section', 'activity-file-series'); series.hidden = !versions; // the file's versions, newest first, each opening its own (the mock's Versions in this series)
+    if (versions) {
+        series.setAttribute('aria-label', 'Versions in this series'); series.append(el('h3', 'activity-file-series-head', `Versions in this series (${versions.length})`));
+        const mine = String(row.version || row.item_id || '');
+        for (const v of [...versions].reverse()) {
+            const line = el('div', 'activity-file-series-row'), pill = v.digest === versions[versions.length - 1].digest ? 'Latest' : v.digest === mine ? 'Reviewed here' : '';
+            line.append(el('b', 'activity-file-series-name', `v${v.n} \u00b7 ${markHidden(row.title || 'a file', { strict: true })}`), ...(pill ? [el('span', 'al-vchip', pill)] : []), el('span', 'activity-file-series-at', v.at ? whenText(v.at) : ''));
+            const ob = el('button', 'btn btn-small', `Open v${v.n}`); ob.type = 'button'; ob.addEventListener('click', () => { finish(); if (openFile) openFile({ ...row, item_id: v.digest, version: v.digest }); }); line.append(ob); series.append(line);
+        }
+    }
     // one comment box (Comment and Send reply are one box in v3): a note for the team on this file, with pictures
     const label = el('label', 'activity-thread-label', 'Comment on this file'); const box = el('textarea', 'field activity-thread-box'); box.rows = 3; box.maxLength = 8000; box.placeholder = 'Comment on this file…'; label.append(box);
     const tray = createImageTray({ upload: (blob, versionOf) => uploadCommentImage(hex, server, blob, versionOf, board) });
@@ -42,7 +54,7 @@ export function openFileDecision(row, { openFile, onDone } = {}) {
     box.addEventListener('input', () => { err.textContent = ''; sync(); }); tray.listen(sync);
     const pick = tray.picker(), add = pick.querySelector('.ac-add-image'); if (add) add.textContent = 'Attach image'; // the mockup's word
     const attachRow = el('div', 'activity-thread-attach'); attachRow.append(pick, el('span', 'activity-thread-hint', 'Paste or drop an image here too'));
-    dlg.append(head, item, said, label, attachRow, tray.node, tray.hint(), err, actions); document.body.append(dlg);
+    dlg.append(head, said, series, label, attachRow, tray.node, tray.hint(), err, actions); document.body.append(dlg);
     tray.attach(dlg, box);
     const opener = document.activeElement;
     const finish = () => { tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true }); };
