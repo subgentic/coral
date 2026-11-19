@@ -1,7 +1,7 @@
 // #13503: a goal create, close or update through the Coral Hub carries the Hub's preview token. With the Hub's boot value goal_preview off (a computer's own dashboard, the self-hosted Hub) the write is exactly what it always was;
 // with it on, the preview comes first, the write carries X-Hub-Goal-Preview and the SAME bytes, every write is previewed again, a token that ran out is asked for once more, and each of the Hub's words is one plain sentence.
 import assert from 'node:assert/strict';
-import { goalWrite, PREVIEW_HEADER, checkGoalBody, writeEach, BULK_GAP_MS, computerHasOperatorRoutes, offersOperatorChanges, operatorChangesNeedNewer, operatorChangesNote, OPERATOR_ROUTES_SINCE } from '../../coral-go/pkg/frontend/static/goal_write.js';
+import { reopenGoal, goalWrite, PREVIEW_HEADER, checkGoalBody, writeEach, BULK_GAP_MS, computerHasOperatorRoutes, offersOperatorChanges, operatorChangesNeedNewer, operatorChangesNote, OPERATOR_ROUTES_SINCE } from '../../coral-go/pkg/frontend/static/goal_write.js';
 import { PREVIEW_WORDS } from '../../coral-go/pkg/frontend/static/goal_words.js';
 import { LOCAL_SERVER } from '../../coral-go/pkg/frontend/static/server_base.js';
 
@@ -175,5 +175,10 @@ for (const [resp, word] of [[json({ error: 'mode_too_low' }, 403), 'mode_too_low
     assert.equal(all.done, 6); assert.deepEqual(off, [], 'flag off: no pause, no progress line, as before');
     const fails = await writeEach([1, 2], async g => { if (g === 1) throw new Error('x'); return json({}, 500); }, { on: () => false });
     assert.deepEqual([fails.done, fails.failed, fails.stopped], [0, 2, ''], 'a failure counts and the rest go on');
+}
+{ // Activity's Reopen goal sends the team KEY: a goal on another computer is written there, not to a local team with the same name (#19836)
+    const sent = [], boardFn = async (project, path, o) => { sent.push({ project, path, method: o.method, body: JSON.parse(o.body) }); return json({ ok: true }); };
+    await reopenGoal('@box/team-a', 7, { boardFn, on: () => false }); await reopenGoal('team-a', 8, { boardFn, on: () => false });
+    assert.deepEqual(sent.map(x => [x.project, x.path, x.method, x.body.state]), [['@box/team-a', '/goals/7', 'PATCH', 'active'], ['team-a', '/goals/8', 'PATCH', 'active']]);
 }
 console.log('goal_write: ok');
