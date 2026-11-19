@@ -22,7 +22,8 @@ func (m *Manager) NewDeviceVerifier(st devicekey.Store) *devicekey.Verifier {
 		if m.devRefusing && time.Since(m.devProbeAt) >= m.devProbeEvery() {
 			m.devProbeAt = time.Now()
 			if m.probeNonceStore(st) == nil {
-				m.devVer.SetRefuseBefore(time.Time{})
+				// Not the zero time: a message signed before the outage could replay if the store came back without its older nonce records (a restored file), so what is dated before the recovery stays refused; a browser signs a fresh one at once.
+				m.devVer.SetRefuseBefore(time.Now())
 				m.devRefusing = false
 				if m.o.Logger != nil {
 					m.o.Logger.Info("cloud: the device-key nonce store reads again: signed messages are accepted")
@@ -39,7 +40,7 @@ func (m *Manager) NewDeviceVerifier(st devicekey.Store) *devicekey.Verifier {
 		Audit:     devicekey.AuditLine(m.o.Logger),
 		AuditCert: devicekey.AuditCertLine(m.o.Logger),
 	}
-	// The nonce store is probed when the verifier is built (the first message after start), with retries so one transient error does not decide: if it still cannot be read, a message whose ts is before now plus the window is refused with before_start, so no replay of an older message gets through a store that forgot it (design page v4 section 4). The probe is repeated later (below) and clears the refusal once the store reads again.
+	// The nonce store is probed when the verifier is built (the first message after start), with retries so one transient error does not decide: if it still cannot be read, a message whose ts is before now plus the window is refused with before_start, so no replay of an older message gets through a store that forgot it (design page v4 section 4). The probe is repeated later (below) and moves the refusal up to the recovery time once the store reads again.
 	m.devProbeAt = time.Now()
 	if err := m.probeNonceStore(st); err != nil {
 		v.RefuseBefore = time.Now().Add(24 * time.Hour)

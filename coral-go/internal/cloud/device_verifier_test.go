@@ -72,8 +72,15 @@ func TestATransientNonceStoreErrorIsRetriedAndALaterReadClearsTheRefusal(t *test
 	f := &flaky{SessionStore: r2.ss, fail: 3}
 	v2 := r2.m.NewDeviceVerifier(f)
 	assert.False(t, v2.RefuseBefore.IsZero(), "three failures in a row set the refusal")
-	assert.Same(t, v2, r2.m.NewDeviceVerifier(f), "the next call re-probes, the store reads now, and clears it on the same verifier")
-	assert.True(t, v2.RefuseBefore.IsZero(), "a later read clears the refusal")
+	before := time.Now()
+	assert.Same(t, v2, r2.m.NewDeviceVerifier(f), "the next call re-probes and the store reads now, on the same verifier")
+	assert.False(t, v2.RefuseBefore.Before(before), "Security #19750: the refusal moves up to the recovery time, it is not cleared, so a message stamped before recovery stays refused (before_start)")
+	assert.False(t, v2.RefuseBefore.After(time.Now()), "and it is the recovery time, not the 24 h of the outage")
+	old := devicekey.Message{Action: devicekey.RemoveDevice, KID: strings.Repeat("A", 43), Computer: r2.key.Computer(), Ts: before.Add(-time.Minute).Unix(), Nonce: strings.Repeat("A", 22), TargetKID: strings.Repeat("A", 43)}
+	body, err := old.Canonical()
+	require.NoError(t, err)
+	_, err = v2.Handle(context.Background(), devicekey.RemoveDevice, body, strings.Repeat("A", 86), time.Now())
+	assert.ErrorIs(t, err, devicekey.ErrBeforeStart, "a message stamped before the recovery is refused after the store reads again")
 }
 
 // A nonce store that cannot be read when the verifier is built refuses what is dated before now (before_start); a readable one sets nothing.
