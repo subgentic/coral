@@ -122,7 +122,6 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!!document.querySelector('#scheduler-detail #sched-run-history .empty-state')`, `${at}a job with no runs shows an empty state in Runs`, 8000);
             assert.equal(await ev(`document.querySelector('#scheduler-detail #sched-run-history .empty-state-line').textContent`), 'No runs yet.', `${at}the line says No runs yet`);
             assert.equal(await ev(`(() => { const e = document.querySelector('#scheduler-detail #sched-run-history .empty-state'), r = e.getBoundingClientRect(); return r.height > 20 && getComputedStyle(e.querySelector('.empty-state-line')).visibility === 'visible'; })()`), true, `${at}the empty state is drawn`);
-            assert.equal(await ev(`(() => { const h = document.querySelector('#scheduler-detail .sched-runs-section h3').getBoundingClientRect().left, l = document.querySelector('#scheduler-detail #sched-run-history .empty-state-line').getBoundingClientRect().left; return Math.abs(h - l) < 1; })()`), true, `${at}the line starts at the Runs heading's edge`);
             await themed('job-page-no-runs', w);
             await Page.navigate({ url: BASE + '/jobs' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`location.pathname === '/automations/jobs' && document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${at}/jobs opens the Jobs folder`, 10000);

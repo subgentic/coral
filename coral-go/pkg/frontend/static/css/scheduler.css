@@ -224,4 +224,3 @@
 .queue-actions { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .queue-act:disabled, .queue-act:disabled:hover { border-color: transparent; background: transparent; }
 .queue-act.queue-sure { color: var(--danger, var(--text-primary)); border-color: currentColor; }
-.sched-runs-section .empty-state { padding-left: 0; padding-right: 0; } /* a job with no runs: its line starts at the page's content edge under the Runs heading, not 24 px in (#19855) */
