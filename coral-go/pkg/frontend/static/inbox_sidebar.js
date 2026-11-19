@@ -598,7 +598,7 @@ function askActions(a) {
     const reply = DT.el('button', 'btn btn-small', 'Answer'); reply.type = 'button'; reply.setAttribute('data-slot', 'approve'); // Answer sits where Approve does (#11630); it is the row's main button
     reply.classList.add('inbox-main-action'); // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
     reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }), askRunners));
-    const offers = a.kind === 'ask' && !isPhoneLayout() && yesNoButtons(a) ? buttonsOffered(a) : [];
+    const offers = a.kind === 'ask' && !isPhoneLayout() && yesNoButtons(a) && !askIsLong(a) ? buttonsOffered(a) : [];
     if (offers.length === 2) { // an explicit Yes / No question is answered from its row: Approve is Yes, Deny is No, through the same claim the dialog uses (#19833, the approved design)
         box.classList.remove('inbox-slots'); box.classList.add('inbox-yesno-actions'); reply.classList.remove('inbox-main-action'); reply.removeAttribute('data-slot');
         for (const b of [offers.find(o => o.label === 'Yes'), offers.find(o => o.label === 'No')]) {
