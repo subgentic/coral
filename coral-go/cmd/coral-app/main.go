@@ -295,6 +295,7 @@ func main() {
 	w.Navigate(startURL)
 
 	log.Printf("[WEBVIEW] starting event loop (goroutines=%d)", runtime.NumGoroutine())
+	raiseWindow() // the window opens in front: a start the person asked for (a click on Open Coral) is not left behind other windows (#19789)
 	w.Run()
 	log.Printf("[WEBVIEW] event loop exited (goroutines=%d)", runtime.NumGoroutine())
 	log.Println("[SHUTDOWN] coral-app exiting normally")
