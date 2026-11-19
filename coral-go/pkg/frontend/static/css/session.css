@@ -426,8 +426,8 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
 .session-list .sleeping-summary-row {
     font-size: var(--fs-base);
     color: var(--text-muted);
-    /* The moon sits where an agent's status dot does and the label where its name does. */
-    padding: 6px 8px 6px 3px;
+    /* The moon sits where an agent's status dot does and the label where its name does (#19791). */
+    padding: 6px 8px 6px 23px;
     display: flex;
     align-items: center;
     gap: 5px;
