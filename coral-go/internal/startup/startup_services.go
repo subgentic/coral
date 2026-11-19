@@ -23,6 +23,7 @@ import (
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/gitguard"
 	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/license"
@@ -488,6 +489,16 @@ func configuredHubURL(cfg *config.Config) string {
 	return u
 }
 
+// loadComputerKey is this computer's one X25519 key (slice 4 of the device keys), made on first use. A key file Coral will not use leaves the device pairing off (nil) and says so; it never stops startup.
+func loadComputerKey(dir string) *devicekey.ComputerKey {
+	k, err := devicekey.LoadOrCreateComputerKey(dir)
+	if err != nil {
+		log.Printf("[CLOUD] the computer key is not available, so browser device pairing is off: %v", err)
+		return nil
+	}
+	return k
+}
+
 func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, srv cloudAttacher, ss *store.SessionStore) {
 	hubURL := configuredHubURL(cfg)
 	keywordSwitch := routes.RedactKeywordsFromSettings(ss)
@@ -502,6 +513,10 @@ func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, 
 		HubLimits:    routes.HubLimitsFromSettings(ss),
 		CoralVersion: config.ReportedVersion(),
 		Logger:       slog.Default(),
+		// Device keys: the list the pairing writes, this computer's key, and the mode a browser-paired device starts at: this computer's own setting, read at each pairing (Launch in the beta).
+		Devices:          ss,
+		ComputerKey:      loadComputerKey(cfg.CoralDir()),
+		PairedDeviceMode: func() string { return ss.DeviceWebMode(context.Background()) },
 		// Sign in with Coral Hub (#3966): the return origins, the owner-pin events, and the
 		// sessions a lost link ends.
 		SigninOrigins: srv.HubSigninOrigins,

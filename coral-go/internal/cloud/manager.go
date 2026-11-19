@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/redact"
@@ -63,6 +64,10 @@ type Options struct {
 	Backoff      tunnel.Backoff
 	Logger       *slog.Logger
 	Now          func() time.Time
+	// Devices, ComputerKey and PairedDeviceMode are the device-key pairing (slice 4): the list the pairing writes, this computer's own key (nil until it has one), and the mode a browser-paired device starts at (the web setting; default launch in the beta).
+	Devices          DeviceKeys
+	ComputerKey      *devicekey.ComputerKey
+	PairedDeviceMode func() string
 	// PollInterval overrides the hub's suggested enrollment poll interval (tests).
 	PollInterval time.Duration
 	// OnLinkLost runs when this server stops being linked to the hub: the user
@@ -108,6 +113,8 @@ type Status struct {
 	// moved, #3546). It stays set through any failed attempt to enroll again (their errors show
 	// in LastError and LastErrorCode) until an enrollment succeeds or the operator disconnects.
 	HubMoved bool `json:"hub_moved,omitempty"`
+	// DevicePairing is what the last browser pairing came to ("added", or why a device was not added): a sentence, never a key, a proof or the secret.
+	DevicePairing string `json:"device_pairing,omitempty"`
 }
 
 // applyTunnelState records a tunnel state change: ConnectedAt is set when the tunnel comes
@@ -150,8 +157,11 @@ func pollGap(interval time.Duration) time.Duration { return 2*interval + 30*time
 
 // Manager owns the enrollment and the tunnel.
 type Manager struct {
-	o  Options
-	hc *http.Client
+	deviceVerifierState // the one device-key verifier (device_verifier.go)
+	o                   Options
+	hc                  *http.Client
+
+	pair pairingState
 
 	devicePK atomic.Pointer[string] // the device public key this Coral redeemed with (#16726); memory only, public
 
@@ -241,6 +251,11 @@ func (m *Manager) Run(ctx context.Context) {
 	m.root = ctx
 	m.mu.Unlock()
 
+	// A clear that failed before this start left its mark in the store: try it again now (every key still listed is an earlier account's: pairings were refused while it was pending).
+	if m.o.Devices != nil && m.o.Devices.DeviceClearPending(ctx) {
+		m.clearDeviceKeys(ctx)
+	}
+
 	conn, err := m.o.Store.Get(ctx)
 	switch {
 	case errors.Is(err, store.ErrNoCloudConnection):
@@ -276,11 +291,23 @@ func (m *Manager) Bootstrap(ctx context.Context, settings *store.SessionStore, h
 	m.redeemMu.Lock()
 	defer m.redeemMu.Unlock()
 	res := m.bootstrapOnce(ctx, settings, hostname, src)
-	if res.Status == BootstrapEnrolled && src.DevicePK != "" {
+	m.afterBootstrap(ctx, res, src)
+	return res
+}
+
+// afterBootstrap: every bootstrap enrollment is a new account's list, so the keys are cleared whether or not a device key came with it (a credential without one must not leave the old account's devices trusted); the redeemed key, if any, is then written as a bootstrap row.
+func (m *Manager) afterBootstrap(ctx context.Context, res BootstrapResult, src CredentialSource) {
+	if res.Status != BootstrapEnrolled {
+		return
+	}
+	if !m.clearDeviceKeys(ctx) {
+		return // fail closed: no row beside the old keys; the next clear retries
+	}
+	if src.DevicePK != "" {
 		pk := src.DevicePK
 		m.devicePK.Store(&pk)
+		m.recordBootstrapDevice(ctx, pk)
 	}
-	return res
 }
 
 func (m *Manager) bootstrapOnce(ctx context.Context, settings *store.SessionStore, hostname string, src CredentialSource) BootstrapResult {
@@ -293,11 +320,15 @@ func (m *Manager) PreCheck(ctx context.Context) BootstrapResult {
 }
 
 // deviceKeyStepsBuilt is whether Coral does its part of the device key beyond handing the public key over (step 2: its own key, the signing, the check of the Hub's pairing). While it is false the
-// handshake never offers device_key/1, whatever was redeemed: the Hub's ruling is that the capability is said only when the key exists and steps 1 and 2 are built (#16726).
-const deviceKeyStepsBuilt = false
+// handshake never offers device_key/1, whatever was redeemed: the Hub's ruling is that the capability is said only when the key exists and steps 1 and 2 are built (#16726). It is true from slice 7 (#19738): the verifier,
+// the two device-signed routes and the pairing are built, and the Hub needs the capability in Hello or answers 502.
+const deviceKeyStepsBuilt = true
 
 // offersDeviceKey is tunnel.ClientOptions.DeviceKey.
-func (m *Manager) offersDeviceKey() bool { return deviceKeyStepsBuilt && m.devicePK.Load() != nil }
+// It is said when a key exists (a redeemed one, or this computer's own) and the steps are built.
+func (m *Manager) offersDeviceKey() bool {
+	return deviceKeyStepsBuilt && (m.devicePK.Load() != nil || m.o.ComputerKey != nil)
+}
 
 // Redeem enrolls the running server with a credential handed over by
 // `coral cloud connect --ticket-file` (the server stays the only writer of the
@@ -322,6 +353,7 @@ func (m *Manager) Status() Status {
 	defer m.mu.Unlock()
 	s := m.st
 	s.HubMoved = m.hubMoved
+	s.DevicePairing = m.pairNote()
 	s.MaxMode = m.currentMode().String()
 	s.Loading = !m.isLoaded()
 	if s.State == StateIdle && (s.LastErrorCode == ErrCodeRateLimited || s.LastErrorCode == ErrCodeHubUnreachable) {
@@ -503,6 +535,7 @@ func (m *Manager) CancelEnrollment(ctx context.Context) {
 	}
 	m.stopLocked()
 	m.st = Status{Configured: true, HubURL: m.o.HubURL, State: StateIdle, LastError: "enrollment cancelled"}
+	m.wipePairing()
 	running := m.root != nil
 	m.mu.Unlock()
 	if conn, err := m.o.Store.Get(ctx); err == nil && running && conn.HubURL == m.o.HubURL {
@@ -577,6 +610,7 @@ func (m *Manager) pollEnrollment(ctx context.Context, gen int, dc *DeviceCode, r
 				return
 			}
 			m.mu.Unlock()
+			m.finishDevicePairing(ctx, dc, en)
 			m.startTunnel(conn)
 			return
 		case errors.Is(err, ErrAuthorizationPending):
@@ -717,6 +751,8 @@ func (m *Manager) Disconnect(ctx context.Context) error {
 }
 
 func (m *Manager) linkLost(ctx context.Context) {
+	m.wipePairing()
+	m.clearDeviceKeys(ctx)
 	if m.o.OnLinkLost != nil {
 		m.o.OnLinkLost(ctx)
 	}

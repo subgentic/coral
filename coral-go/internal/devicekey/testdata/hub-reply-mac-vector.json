@@ -1,0 +1,10 @@
+{
+ "note": "Device keys step 2 reply MAC (wire format section 9), made with an independent Python HKDF/HMAC, not the module. info = coral-hub/device-keys/1/reply-mac, message = v1 0x00 user_code 0x00 pk_raw 0x00 computer_pub. Fingerprint = first 16 base32 (RFC 4648, no padding) characters of SHA-256(computer_pub), groups of four.",
+ "secret": "AAECAwQFBgcICQoLDA0ODw",
+ "user_code": "ABCD-EFGH",
+ "pk_raw": "BAEEBwoNEBMWGRwfIiUoKy4xNDc6PUBDRklMT1JVWFteYWRnam1wc3Z5fH-ChYiLjpGUl5qdoKOmqayvsrW4u74",
+ "computer_pub": "BwwRFhsgJSovNDk-Q0hNUldcYWZrcHV6f4SJjpOYnaI",
+ "reply_mac": "zsh9wGpG8hqpIXGrwvFeQMj3ohvFTnEzxDiFvzBYoUc",
+ "computer": "-6-O7b6xRFsEK4BLcHoE5TXfOGMbRkorIX-kDSUIVkE",
+ "fingerprint": "7OXY-53N6-WFCF-WBBL"
+}

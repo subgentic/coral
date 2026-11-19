@@ -148,3 +148,5 @@ GET /api/views/{id} redact
 GET /ws/coral redact
 GET /ws/terminal/{name} redact
 POST /api/cloud/guide-revoked redact
+POST /api/device-keys/certificate redact
+POST /api/device-keys/message redact

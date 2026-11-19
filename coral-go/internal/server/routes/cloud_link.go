@@ -13,6 +13,7 @@ import (
 
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/httputil"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
@@ -23,6 +24,8 @@ import (
 type cloudStatus struct {
 	cloud.Status
 	AllowHubAutoAccept bool `json:"allow_hub_auto_accept"`
+	// DeviceWebMode is the mode a browser paired from the connect link starts at: this computer's own setting (#19669; beta default launch).
+	DeviceWebMode string `json:"device_web_mode"`
 	// MaxMode is the saved cap (the connector's own max_mode is what the tunnel enforces); MaxModeSaved says the owner chose it (Connect's question, or Settings): an unset cap reads as view, so without this an
 	// existing install and a new one look the same, and the Connect screen could not keep what an install has while offering Launch to a new one.
 	MaxModeSaved bool `json:"max_mode_saved"`
@@ -76,7 +79,7 @@ func (h *CloudHandler) status() cloudStatus {
 			boot = json.RawMessage(v)
 		}
 	}
-	out := cloudStatus{Status: st, AllowHubAutoAccept: allow, MaxModeSaved: modeSaved, RedactTokens: redact, HubRelaunchUpdates: relaunch, HubRelaunchNeedsHere: relaunchNeedsLocalApproval, HubRelaunchAvailable: updateRelaunchFeature, HubCrossTeamSettings: crossTeam, AllowHubAutoAcceptChanged: changed, Bootstrap: boot, OfferAtLaunch: h.OfferAtLaunch}
+	out := cloudStatus{Status: st, DeviceWebMode: h.ss.DeviceWebMode(context.Background()), AllowHubAutoAccept: allow, MaxModeSaved: modeSaved, RedactTokens: redact, HubRelaunchUpdates: relaunch, HubRelaunchNeedsHere: relaunchNeedsLocalApproval, HubRelaunchAvailable: updateRelaunchFeature, HubCrossTeamSettings: crossTeam, AllowHubAutoAcceptChanged: changed, Bootstrap: boot, OfferAtLaunch: h.OfferAtLaunch}
 	out.HubRelaunchUpdatesAtLaunch = h.HubUpdateAtLaunch
 	if missing, known := h.ownerLabelState(context.Background()); known && missing {
 		out.OwnerLabelMissing = true
@@ -140,6 +143,9 @@ func (h *CloudHandler) Connect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if ans.pairingSecret != "" {
+		m.SetPairingSecret(ans.pairingSecret)
+	}
 	if err := m.Connect(r.Context()); err != nil {
 		if err == cloud.ErrNotConfigured {
 			errBadRequest(w, err.Error())
@@ -167,6 +173,7 @@ func (h *CloudHandler) Connect(w http.ResponseWriter, r *http.Request) {
 type connectAnswer struct {
 	mode            *tunnel.Mode
 	allowAutoAccept *bool
+	pairingSecret   string // the `#p=` secret `coral cloud connect` made (22 characters); kept in memory by the manager, never shown
 }
 
 // decodeConnectAnswer reads POST /api/cloud/connect's optional body {"mode": "view|interact|launch", "allow_auto_accept": bool}: both fields optional, an empty body or {} is the plain connect the
@@ -176,6 +183,7 @@ func decodeConnectAnswer(r *http.Request) (connectAnswer, error) {
 	var body struct {
 		Mode            *string `json:"mode"`
 		AllowAutoAccept *bool   `json:"allow_auto_accept"`
+		PairingSecret   *string `json:"pairing_secret"`
 	}
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 257))
 	if err != nil || len(raw) > 256 {
@@ -200,6 +208,12 @@ func decodeConnectAnswer(r *http.Request) (connectAnswer, error) {
 		out.mode = &m
 	}
 	out.allowAutoAccept = body.AllowAutoAccept
+	if body.PairingSecret != nil {
+		if _, ok := devicekey.ParsePairingSecret(*body.PairingSecret); !ok {
+			return out, errors.New("pairing_secret is not the 22 characters `coral cloud connect` makes")
+		}
+		out.pairingSecret = *body.PairingSecret
+	}
 	return out, nil
 }
 

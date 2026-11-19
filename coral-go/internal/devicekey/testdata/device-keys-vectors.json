@@ -1,0 +1,62 @@
+{
+ "note": "Device keys step 2 (coral-hub wire format draft 7, section 10). Signing input = \"coral-hub/device-keys/2/\" + action + 0x00 + body. Keys: P-256 points from fixed scalars (byte i = seed+i, first byte \u0026 0x7f), computer = base64url SHA-256 of the 32 X25519 public bytes of the private key \"0123456789abcdef0123456789abcdef\".",
+ "keys": {
+  "computer": "n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg",
+  "nonce": "bm9uY2UtMTYtYnl0ZXMhIQ",
+  "passkey_pk": "BFFC9Ip8gMr0dUSkKPxX0nKmxnitXpP_y6NmZqmWOeUd0b22-1mBRFZ6Jlfo_zYZ-6oM0qBAwZqyKvkQxwWnV7o",
+  "signer_kid": "QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE",
+  "signer_pk": "BFFcPW6545a5BNP-yn9U_c0MwemXvzddylFa0KbDtANfRTa-OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q",
+  "target_kid": "tN2uu-v2hukcUkb6W57W-3zROzfTC722qSEfhWC3K4s",
+  "target_pk": "BLIPl1GDdYDyGamlooBqZcUpgSzNc_9g0bgoD44Ty_5e8OuWxhsfm9xPnD7OyLJaObZTbn41TjX-NxOEW_ek4BA"
+ },
+ "vectors": [
+  {
+   "name": "trust-passkey",
+   "action": "trust-passkey",
+   "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\":1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"passkey_pk\":\"BFFC9Ip8gMr0dUSkKPxX0nKmxnitXpP_y6NmZqmWOeUd0b22-1mBRFZ6Jlfo_zYZ-6oM0qBAwZqyKvkQxwWnV7o\",\"label\":\"Work phone\"}",
+   "signing_input_hex": "636f72616c2d6875622f6465766963652d6b6579732f322f74727573742d706173736b6579007b226b6964223a22516d6d496c44486a45786c6d5f4b3971525846426c443753773174626b58726d4c4c4d35564739534e5645222c22636f6d7075746572223a226e336f722d6a326e53505956746d6d696666746e5f66364b2d3149477549596451665a496d5762654a4b67222c227473223a313830303030303030302c226e6f6e6365223a22626d3975593255744d545974596e6c305a584d684951222c22706173736b65795f706b223a224246464339497038674d72306455536b4b507858306e4b6d786e69745870505f79364e6d5a716d574f655564306232322d316d4252465a364a6c666f5f7a595a2d366f4d30714241775a71794b766b517877576e56376f222c226c6162656c223a22576f726b2070686f6e65227d"
+  },
+  {
+   "name": "approve-device",
+   "action": "approve-device",
+   "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\":1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"target_kid\":\"tN2uu-v2hukcUkb6W57W-3zROzfTC722qSEfhWC3K4s\",\"target_pk\":\"BLIPl1GDdYDyGamlooBqZcUpgSzNc_9g0bgoD44Ty_5e8OuWxhsfm9xPnD7OyLJaObZTbn41TjX-NxOEW_ek4BA\",\"label\":\"My laptop\",\"mode\":\"interact\"}",
+   "signing_input_hex": "636f72616c2d6875622f6465766963652d6b6579732f322f617070726f76652d646576696365007b226b6964223a22516d6d496c44486a45786c6d5f4b3971525846426c443753773174626b58726d4c4c4d35564739534e5645222c22636f6d7075746572223a226e336f722d6a326e53505956746d6d696666746e5f66364b2d3149477549596451665a496d5762654a4b67222c227473223a313830303030303030302c226e6f6e6365223a22626d3975593255744d545974596e6c305a584d684951222c227461726765745f6b6964223a22744e3275752d763268756b63556b6236573537572d337a524f7a66544337323271534566685743334b3473222c227461726765745f706b223a22424c49506c3147446459447947616d6c6f6f42715a63557067537a4e635f39673062676f44343454795f3565384f7557786873666d3978506e44374f794c4a614f625a54626e3431546a582d4e784f45575f656b344241222c226c6162656c223a224d79206c6170746f70222c226d6f6465223a22696e746572616374227d"
+  },
+  {
+   "name": "remove-device",
+   "action": "remove-device",
+   "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\":1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"target_kid\":\"tN2uu-v2hukcUkb6W57W-3zROzfTC722qSEfhWC3K4s\"}",
+   "signing_input_hex": "636f72616c2d6875622f6465766963652d6b6579732f322f72656d6f76652d646576696365007b226b6964223a22516d6d496c44486a45786c6d5f4b3971525846426c443753773174626b58726d4c4c4d35564739534e5645222c22636f6d7075746572223a226e336f722d6a326e53505956746d6d696666746e5f66364b2d3149477549596451665a496d5762654a4b67222c227473223a313830303030303030302c226e6f6e6365223a22626d3975593255744d545974596e6c305a584d684951222c227461726765745f6b6964223a22744e3275752d763268756b63556b6236573537572d337a524f7a66544337323271534566685743334b3473227d"
+  },
+  {
+   "name": "raise-mode",
+   "action": "raise-mode",
+   "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\":1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"target_kid\":\"tN2uu-v2hukcUkb6W57W-3zROzfTC722qSEfhWC3K4s\",\"mode\":\"interact\"}",
+   "signing_input_hex": "636f72616c2d6875622f6465766963652d6b6579732f322f72616973652d6d6f6465007b226b6964223a22516d6d496c44486a45786c6d5f4b3971525846426c443753773174626b58726d4c4c4d35564739534e5645222c22636f6d7075746572223a226e336f722d6a326e53505956746d6d696666746e5f66364b2d3149477549596451665a496d5762654a4b67222c227473223a313830303030303030302c226e6f6e6365223a22626d3975593255744d545974596e6c305a584d684951222c227461726765745f6b6964223a22744e3275752d763268756b63556b6236573537572d337a524f7a66544337323271534566685743334b3473222c226d6f6465223a22696e746572616374227d"
+  },
+  {
+   "name": "refused: spaces",
+   "action": "raise-mode",
+   "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\": 1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"target_kid\":\"tN2uu-v2hukcUkb6W57W-3zROzfTC722qSEfhWC3K4s\",\"mode\":\"interact\"}",
+   "refused": true
+  },
+  {
+   "name": "refused: keys out of order",
+   "action": "raise-mode",
+   "body": "{\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"ts\":1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"target_kid\":\"tN2uu-v2hukcUkb6W57W-3zROzfTC722qSEfhWC3K4s\",\"mode\":\"interact\"}",
+   "refused": true
+  },
+  {
+   "name": "refused: ts leading zero",
+   "action": "raise-mode",
+   "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\":01800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"target_kid\":\"tN2uu-v2hukcUkb6W57W-3zROzfTC722qSEfhWC3K4s\",\"mode\":\"interact\"}",
+   "refused": true
+  },
+  {
+   "name": "refused: escaped slash",
+   "action": "raise-mode",
+   "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\":1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"target_kid\":\"tN2uu-v2hukcUkb6W57W-3zROzfTC722qSEfhWC3K4s\",\"mode\":\"wr\\/ite\"}",
+   "refused": true
+  }
+ ]
+}
