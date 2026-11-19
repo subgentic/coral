@@ -56,8 +56,8 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
      if(/\\/api\\/artifacts\\/[89]{64}\\/comments/.test(url)){
       if(method==='GET')return json({comments:window.__comments,you:{can_comment:true,can_lock:true},locked:false});
       const body=o.body?JSON.parse(o.body):null;window.__writes.push({url,method,body});
-      const m=url.match(/comments\\/(\\d+)\\/(resolve|reopen|send)/);
-      if(m){const c=window.__comments.find(c=>c.id===+m[1]);if(m[2]==='send')return json({ok:true,results:[{agent:'Dev',state:'sent'}]});c.resolved_at=m[2]==='resolve'?new Date().toISOString():null;return json(c);}
+      const m=url.match(/comments\\/(\\d+|all)\\/(resolve|reopen|send)/);
+      if(m){if(m[2]==='send')return json({ok:true,results:[{agent:'Dev',state:'sent'}]});const c=window.__comments.find(c=>c.id===+m[1]);c.resolved_at=m[2]==='resolve'?new Date().toISOString():null;return json(c);}
       const c={...window.__comments[0],...body,id:window.__comments.length+1,artifact_id:'${HEX}'};window.__comments.push(c);return json(c);
      }
      if(url.includes('/api/board/team-a/status'))return json({agents:[{role:'Dev',name:'Dev',agent_type:'codex',availability:'ready'}]});

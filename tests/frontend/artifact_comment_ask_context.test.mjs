@@ -6,7 +6,7 @@ const { sendCommentQueue } = await importUi('artifact_comment_send_queue');
 let controls, release, started;
 const calls=[];
 registerBundled({
- 'artifact_comments_api.js':{listComments:async()=>({comments:[],canComment:true,canLock:true}),sendComment:async(hex,server,id,agents)=>{calls.push({hex,server,id,agents:[...agents]});if(id===1){started?.();await new Promise(r=>release=r);}return{ok:true,results:[{agent:'Dev',state:'sent'}],error:''};}},
+ 'artifact_comments_api.js':{listComments:async()=>({comments:[],canComment:true,canLock:true}),sendComment:async(hex,server,id,agents)=>{calls.push({hex,server,id,agents:[...agents]});if(id==='all'&&(hex==='earlier'||hex==='first-original')){started?.();await new Promise(r=>release=r);}return{ok:true,results:[{agent:'Dev',state:'sent'}],error:''};}},
  'artifact_comment_send.js':{MAX_AGENTS:10,pickableAgents:()=>[],askedWords:()=>'',buildSendBlock:args=>{controls=args;const e=document.createElement('div');e.className='ac-ask';return e;}},
  'artifact_comment_send_queue.js':{sendCommentQueue},
  'agent_link.js':{agentLink:()=>document.createElement('a')},
@@ -26,8 +26,8 @@ for(const change of ['computer','team','file','same context','open only']) {
  if(change!=='open only')panel.close();
  panel.open(change==='file'?'different':'current',change==='computer'?'B':'A',change==='team'?'team-b':'team-a');
  release();await pending;
- assert.equal(calls.length,before+1,change+': queued second write cancelled');
- assert.deepEqual(calls[before],{hex:'earlier',server:'A',id:1,agents:['Dev']},'original artifact/computer captured');
+ assert.equal(calls.length,before+1,change+': queued second file bundle cancelled');
+ assert.deepEqual(calls[before],{hex:'earlier',server:'A',id:'all',agents:['Dev']},'original artifact/computer captured');
  assert.equal(ask.askedNow(1).size,0,change+': stale response cannot record in reopened panel');
  assert.equal(dialog.querySelector('.ac-live').textContent,'',change+': stale response cannot announce success');
  panel.close();dialog.remove();
@@ -55,14 +55,14 @@ panel.close();dialog.remove();
   await ask.openMany(comments);st.ask.picked.add('Dev');ask.askBlock();
   const context=[st.hex,st.server,st.board,st.lifetime],before=calls.length;
   const began=new Promise(r=>started=r),pending=controls.onSend();await began;
-  assert.deepEqual(calls.slice(before),[{hex:'first-original',server:'A',id:1,agents:['Dev']}],'first original thread sent to the captured computer');
+  assert.deepEqual(calls.slice(before),[{hex:'first-original',server:'A',id:'all',agents:['Dev']}],'first original thread sent to the captured computer');
   st.ask.picked.clear();st.ask.picked.add('Different agent');
   comments[1].artifactId='changed-after-picker-open';
   release();await pending;
   assert.deepEqual([st.hex,st.server,st.board,st.lifetime],context,'the context stays current so cancellation cannot hide a wrong second request');
   assert.deepEqual(calls.slice(before),[
-   {hex:'first-original',server:'A',id:1,agents:['Dev']},
-   {hex:'second-original',server:'A',id:2,agents:['Dev']},
+   {hex:'first-original',server:'A',id:'all',agents:['Dev']},
+   {hex:'second-original',server:'A',id:'all',agents:['Dev']},
   ],'both writes use the same captured computer, each original artifact, and the original picked agents');
   assert.equal(ask.askedNow(1).get('dev'),'Asked just now');
   assert.equal(ask.askedNow(2).get('dev'),'Asked just now');
