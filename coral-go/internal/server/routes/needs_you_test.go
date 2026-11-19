@@ -572,3 +572,38 @@ func TestAMessageWithButtonsOrAQuestionAroundTheLinkIsNeverHiddenAsAFileLink(t *
 	assert.Equal(t, 3, n, "an ask word keeps it a question")
 	assert.Equal(t, 3, rows)
 }
+
+// #19864 (the Operator: "the hooks isn't in my inbox on CoralHub"): an agent that stands at a terminal dialog (Codex's "Hooks need review") is on the live row as at_dialog, which only the dashboard's JavaScript
+// turned into a Needs you item. The feed a Hub and the phone push read (needsYouAgentItems) must list it too, once the dialog has stood for its minutes, and not before, not when dismissed, not when the team
+// turned the notice off, not when asleep or archived.
+func TestNeedsYouListsAnAgentAtADialogOnceItIsDue(t *testing.T) {
+	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
+	row := func(sid string, dialog any, mod func(map[string]any)) map[string]any {
+		r := map[string]any{"session_id": sid, "display_name": "Agent " + sid, "waiting_for_input": false, "board_project": "team", "at_dialog": dialog}
+		if mod != nil {
+			mod(r)
+		}
+		return r
+	}
+	dlg := func(ago time.Duration, extra map[string]any) map[string]any {
+		d := map[string]any{"since": now.Add(-ago).Format(time.RFC3339), "after_min": 5, "notify": true}
+		for k, v := range extra {
+			d[k] = v
+		}
+		return d
+	}
+	got := needsYouAgentItems([]map[string]any{
+		row("due", dlg(6*time.Minute, nil), nil),
+		row("early", dlg(2*time.Minute, nil), nil),
+		row("dismissed", dlg(9*time.Minute, map[string]any{"dismissed": true}), nil),
+		row("muted", dlg(9*time.Minute, map[string]any{"notify": false}), nil),
+		row("asleep", dlg(9*time.Minute, nil), func(r map[string]any) { r["sleeping"] = true }),
+		row("archived", dlg(9*time.Minute, nil), func(r map[string]any) { r["archived"] = true }),
+		row("none", nil, nil),
+	}, now)
+	require.Len(t, got, 1, "only the agent whose dialog is due is waiting on the Operator: %v", got)
+	assert.Equal(t, "agent:due", got[0].ID)
+	assert.Equal(t, "agent", got[0].Kind)
+	assert.Equal(t, DialogWords, got[0].Line)
+	assert.Equal(t, now.Add(-6*time.Minute).Format(time.RFC3339Nano), got[0].At, "it began when the dialog was first seen")
+}

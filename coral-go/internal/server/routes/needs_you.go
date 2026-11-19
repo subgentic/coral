@@ -94,7 +94,9 @@ func (h *SessionsHandler) NeedsYouAgents(r *http.Request) ([]NeedsYouItem, error
 func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 	var out []NeedsYouItem
 	for _, row := range rows {
-		if wait, _ := row["waiting_for_input"].(bool); !wait {
+		wait, _ := row["waiting_for_input"].(bool)
+		dialogAt, dialog := dueDialogSince(row, now) // an agent at a terminal dialog the hook never reported (#19864)
+		if !wait && !dialog {
 			continue
 		}
 		if asleep, _ := row["sleeping"].(bool); asleep {
@@ -113,17 +115,58 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 			name, _ = row["name"].(string)
 		}
 		line, _ := row["waiting_summary"].(string)
+		at, _ := row["waiting_since"].(string)
+		if !wait {
+			line, at = DialogWords, dialogAt
+		}
 		if strings.TrimSpace(line) == "" {
 			line = "Is waiting for you"
 		}
 		team, _ := row["board_project"].(string)
-		at, _ := row["waiting_since"].(string)
 		if at = needsYouTime(at); at == "" {
 			at = now.UTC().Format(time.RFC3339Nano)
 		}
 		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid})
 	}
 	return out
+}
+
+// DialogWords is the line of an agent at a dialog, the dashboard's own words (at_dialog.js DIALOG_WORDS, #11430).
+const DialogWords = "Needs one click: it is at a dialog"
+
+// dueDialogSince: the row's agent stands at a dialog Coral read on its screen (at_dialog, #11437) that has stood for the minutes the row says, that the team wants to hear of and the Operator did not
+// dismiss: the dashboard's dialogDue (at_dialog.js), so the dashboard, the phone push and a Hub list the same agents. It returns when the dialog began.
+func dueDialogSince(row map[string]any, now time.Time) (string, bool) {
+	d, _ := row["at_dialog"].(map[string]any)
+	if d == nil {
+		return "", false
+	}
+	if notify, ok := d["notify"].(bool); ok && !notify {
+		return "", false
+	}
+	if gone, _ := d["dismissed"].(bool); gone {
+		return "", false
+	}
+	since, _ := d["since"].(string)
+	t, err := time.Parse(time.RFC3339Nano, since)
+	if err != nil {
+		return "", false
+	}
+	after := 5 // at_dialog.js DIALOG_AFTER_MIN, when the row does not say
+	switch m := d["after_min"].(type) {
+	case int:
+		if m > 0 {
+			after = m
+		}
+	case float64:
+		if m > 0 {
+			after = int(m)
+		}
+	}
+	if now.Sub(t) < time.Duration(after)*time.Minute {
+		return "", false
+	}
+	return t.UTC().Format(time.RFC3339Nano), true
 }
 
 // needsYouWithheld stands in for a line when the secrets redactor is unavailable.
