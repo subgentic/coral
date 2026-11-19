@@ -176,6 +176,9 @@ func (h *SessionsHandler) boardLabel(key string) string {
 
 var launchBoardMu sync.Mutex
 
+// afterBoardRename is a test seam (#19744): it runs between a rename-and-start's rename and its second running-agents check, where an agent can start.
+var afterBoardRename func()
+
 // launchBoard decides the board a launch uses (#3536, the operator's decision): board_id
 // joins that board; board_name starts a NEW board (a fresh b- id, that label) unless a board
 // with that id or label already exists, which is answered 409 board_name_exists with the
@@ -190,6 +193,11 @@ func (h *SessionsHandler) launchBoard(w http.ResponseWriter, r *http.Request, bo
 // launchBoardCreated is launchBoard that also says whether this call made the board (a team launch that starts nobody takes back
 // the board it made, and only that one).
 func (h *SessionsHandler) launchBoardCreated(w http.ResponseWriter, r *http.Request, boardID, boardName string, newBoard bool) (key string, created, ok bool) {
+	return h.launchBoardWith(w, r, boardID, boardName, newBoard, false)
+}
+
+// launchBoardWith is launchBoardCreated with the third choice for a name a previous team holds (#19724): renameOld relabels that one team <name>-YYYY-MM-DD and starts the new board under the name.
+func (h *SessionsHandler) launchBoardWith(w http.ResponseWriter, r *http.Request, boardID, boardName string, newBoard, renameOld bool) (key string, created, ok bool) {
 	ctx := r.Context()
 	if h.bs == nil {
 		if boardID != "" {
@@ -251,6 +259,42 @@ func (h *SessionsHandler) launchBoardCreated(w http.ResponseWriter, r *http.Requ
 			"message": "An agent can't start another board with a name that's taken: that is for the Operator. Join it with board_id, or pick a new name"})
 		return "", false, false
 	}
+	// Relabelling another team is the Operator's choice, like a second board with the name (#19724).
+	if len(existing) > 0 && renameOld && h.agentOperatorGate != nil && h.agentOperatorGate(r, "POST /api/sessions/launch rename_old_board") {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden_for_agent", "code": "forbidden_for_agent",
+			"message": "An agent can't rename another team to free its name: that is for the Operator. Ask the Operator, or pick a new name"})
+		return "", false, false
+	}
+	if len(existing) == 1 && renameOld && !newBoard {
+		old := existing[0]
+		if n := h.liveAgentsOn(ctx, old.ID, h.liveSessionNames(ctx)); n > 0 {
+			writeJSON(w, http.StatusConflict, map[string]any{"error": "board_has_running_agents", "code": "board_has_running_agents", "board_id": old.ID, "live_agents": n,
+				"message": "The team \"" + boardName + "\" has " + strconv.Itoa(n) + " running agent(s), so it is not renamed under them: stop them first, or use another name"})
+			return "", false, false
+		}
+		dated := boardName + "-" + time.Now().Format("2006-01-02")
+		if problem := h.bs.LabelProblem(dated); problem != "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_board_name", "code": "invalid_board_name", "message": problem})
+			return "", false, false
+		}
+		// The free label is picked and taken in one statement, so two renames at once cannot share a dated name; the running check is repeated after it, and an agent that started in between puts the name back (#19744).
+		if _, err := h.bs.RenameBoardToFree(ctx, old.ID, dated); err != nil {
+			errInternalServer(w, err.Error())
+			return "", false, false
+		}
+		if afterBoardRename != nil {
+			afterBoardRename()
+		}
+		if n := h.liveAgentsOn(ctx, old.ID, h.liveSessionNames(ctx)); n > 0 {
+			if err := h.bs.RenameBoard(ctx, old.ID, old.Label); err != nil {
+				log.Printf("[launch] could not put the name %q back on %s: %v", old.Label, old.ID, err)
+			}
+			writeJSON(w, http.StatusConflict, map[string]any{"error": "board_has_running_agents", "code": "board_has_running_agents", "board_id": old.ID, "live_agents": n,
+				"message": "An agent started on the team \"" + boardName + "\" while it was being renamed, so it was not: stop it first, or use another name"})
+			return "", false, false
+		}
+		existing = nil
+	}
 	if len(existing) > 0 && !newBoard {
 		// Next to the member count, how many of the board's agents are running (#3543).
 		cands := boardCandidates(r, h.bs, h.ss, existing)
@@ -258,9 +302,17 @@ func (h *SessionsHandler) launchBoardCreated(w http.ResponseWriter, r *http.Requ
 		for _, c := range cands {
 			c["live_agents"] = h.liveAgentsOn(ctx, c["board_id"].(string), live)
 		}
-		writeJSON(w, http.StatusConflict, map[string]any{"error": "board_name_exists", "code": "board_name_exists",
-			"message":    "A board named \"" + boardName + "\" already exists: join it (board_id) or start another (new_board)",
-			"candidates": cands})
+		resp := map[string]any{"error": "board_name_exists", "code": "board_name_exists",
+			"message":    "A board named \"" + boardName + "\" already exists: join it (board_id), start another (new_board), or rename the old one to free the name (rename_old_board)",
+			"candidates": cands}
+		// The choice is for the Operator: a caller shown none of the boards (an agent's token lists only its own team's) is offered none, and nothing here leaks a board it may not see.
+		if _, isAgent := agentSessionOf(r); len(existing) == 1 && len(cands) == 1 && !isAgent {
+			resp["rename_to"] = h.freeDatedLabel(ctx, boardName)
+			if live, _ := cands[0]["live_agents"].(int); live > 0 {
+				resp["rename_blocked"] = "running_agents"
+			}
+		}
+		writeJSON(w, http.StatusConflict, resp)
 		return "", false, false
 	}
 	if problem := h.bs.LabelProblem(boardName); problem != "" {
@@ -537,4 +589,22 @@ func launchedName(result map[string]any, asked string) string {
 		return n
 	}
 	return asked
+}
+
+// freeDatedLabel is <name>-YYYY-MM-DD for today, with -2, -3 added when a team already has that name (#19724).
+func (h *SessionsHandler) freeDatedLabel(ctx context.Context, name string) string {
+	base := name + "-" + time.Now().Format("2006-01-02")
+	for i := 1; ; i++ {
+		label := base
+		if i > 1 {
+			label = base + "-" + strconv.Itoa(i)
+		}
+		if _, err := h.bs.GetBoard(ctx, label); err == nil {
+			continue
+		}
+		if named, err := h.bs.BoardsLabelledForLaunch(ctx, label); err == nil && len(named) > 0 {
+			continue
+		}
+		return label
+	}
 }

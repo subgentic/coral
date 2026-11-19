@@ -38,7 +38,7 @@ func TestTheCanDoSectionForEachSetting(t *testing.T) {
 	require.Len(t, lines, 3, "launch, stop (its off text: ask the Operator), then sleep and start")
 	assert.Contains(t, lines[0], `run coral-agent launch /work/team --name "<Role>" --type claude --model haiku --prompt "<its job>" --board b-123.`)
 	assert.Contains(t, lines[0], "Keep the type and model shown")
-	assert.NotContains(t, lines[0], "ask the Operator")
+	assert.NotContains(t, lines[0], "has not allowed you to launch", "launch on: the off text is not said")
 
 	// A model the seat does not name is not made up; a folder with a space or a quote is one word.
 	bare := on
@@ -344,4 +344,8 @@ func TestThePromptCarriesTheLinesTheEvalsFoundMissing(t *testing.T) {
 	assert.Contains(t, launch, "409 name_archived", "C7: the archived name on a launch")
 	assert.Contains(t, launch, "coral-board wake", "start it")
 	assert.Contains(t, launch, "suggested name")
+	assert.Contains(t, launch, "after the Operator says so, start it with coral-board wake", "never starts it on its own")
+	assert.Contains(t, launch, "board_name_exists) is the Operator's choice, including renaming the old team", "#19724: an agent does not rename another team")
+	assert.Contains(t, launch, "archived or sleeping member, do not start it on your own", "C7: a held name is a question for the Operator, not a launch")
+	assert.Contains(t, launch, "start that member or to pick another name")
 }

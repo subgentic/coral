@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -285,6 +286,30 @@ func (s *Store) RenameBoard(ctx context.Context, id, label string) error {
 	}
 	s.NoteArtifactsChanged(id) // aggregate artifact rows carry this label
 	return nil
+}
+
+// RenameBoardToFree relabels the board base, base-2, base-3 ... whichever no board already has as its label or id, and returns it (#19744). The check and the change are ONE statement, so two renames at once
+// cannot take the same label; a board that is not there is ErrBoardNotFound.
+func (s *Store) RenameBoardToFree(ctx context.Context, id, base string) (string, error) {
+	for i := 1; i <= 200; i++ {
+		label := base
+		if i > 1 {
+			label = base + "-" + strconv.Itoa(i)
+		}
+		res, err := s.db.ExecContext(ctx, `UPDATE boards SET label = ?1 WHERE id = ?2
+			AND NOT EXISTS (SELECT 1 FROM boards WHERE label = ?1 OR id = ?1)`, label, id)
+		if err != nil {
+			return "", err
+		}
+		if n, _ := res.RowsAffected(); n == 1 {
+			s.NoteArtifactsChanged(id)
+			return label, nil
+		}
+		if _, err := s.GetBoard(ctx, id); err != nil {
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("no free label for %q", base)
 }
 
 // BoardLabels maps each id to its label; an id without a row maps to itself.
