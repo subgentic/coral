@@ -506,6 +506,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: none; }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: color-mix(in srgb, var(--text-primary) 5%, var(--table-bg)); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { font-weight: var(--fw-regular); }
+#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread { box-shadow: inset 3px 0 0 var(--accent); } /* unread: a rail at the edge (#19812) */
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-subtitle, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { color: var(--text-secondary); }
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: var(--table-bg); }
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td { background: color-mix(in srgb, var(--text-primary) 4%, var(--table-bg)); }

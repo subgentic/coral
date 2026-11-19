@@ -52,7 +52,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check(d.askBody === '13.5px', `5: a question's words are 13.5 px (${d.askBody})`);
         check(d.mainBg !== 'rgba(0, 0, 0, 0)' && d.starBorder === 'rgba(0, 0, 0, 0)' && d.moreBorder === 'rgba(0, 0, 0, 0)', `2: Approve is tonal, Star and More are quiet (${d.mainBg} ${d.starBorder} ${d.moreBorder})`);
         check(new Set(d.teamRight).size === 1 && new Set(d.waitRight).size === 1, `3: the team and the time are one right rail on every row (${JSON.stringify([d.teamRight, d.waitRight])})`);
-        check(d.pill === '5px', `6: a Goal or Task chip has 5 px corners (${d.pill})`);
+        check(d.pill === '4px', `6: a Goal or Task chip has small 4 px corners (was 12) (${d.pill})`);
         const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
         for (const w of [1280, 390]) for (const theme of ['dark', 'light']) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile: w === 390 }); await Emulation.setTouchEmulationEnabled({ enabled: w === 390 });

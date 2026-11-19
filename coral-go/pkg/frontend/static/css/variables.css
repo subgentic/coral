@@ -168,6 +168,8 @@
     --fs-md:   0.8125rem;  /* 13px */
     --fs-lg:   0.875rem;   /* 14px */
     --fs-xl:   1rem;       /* 16px */
+    --fs-title: 0.9375rem; /* 15px: a Needs you row's headline on every kind (#19812) */
+    --fs-copy: 0.84375rem; /* 13.5px: the words under it */
     --fs-2xl:  1.25rem;    /* 20px: a page title, an item page title, a big figure (Goal #84) */
     --needs-icon-size: 1.375rem; /* 22px: Needs you kind glyph inside its 32px tile */
     --glyph-sm: 1.5rem;    /* 24px: a decorative icon glyph, not a text step */
