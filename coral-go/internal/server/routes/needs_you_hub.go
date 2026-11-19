@@ -186,8 +186,9 @@ func rebuildRemoteNeeds(machine string, body []byte) (items []NeedsYouItem, coun
 		var opts []NeedsYouOption
 		if it.Dialog && it.Kind == "agent" && len(it.Options) <= needsYouOptionsMax {
 			for _, o := range it.Options {
-				if n := int(nonNegInt(o.N, 9)); n >= 1 && strings.TrimSpace(o.Label) != "" {
-					opts = append(opts, NeedsYouOption{N: n, Label: needsYouOptionLabel(o.Label)})
+				// An n outside 1-9 is dropped, never clamped to 9 (QA's SHOULD on #19872): a clamped number would name another option's key.
+				if n, err := o.N.Int64(); err == nil && n >= 1 && n <= 9 && strings.TrimSpace(o.Label) != "" {
+					opts = append(opts, NeedsYouOption{N: int(n), Label: needsYouOptionLabel(o.Label)})
 				}
 			}
 			if len(opts) != len(it.Options) {
