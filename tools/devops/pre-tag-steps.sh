@@ -30,7 +30,7 @@ echo "$n release-only steps; name each in the pre-tag post, and read the CHANGED
 sha=$(git -C "$root" rev-parse "$head^{commit}")
 echo "release dry run (runs every 'dryrun' step in pre_tag_steps.txt, incl. tests/release/ldflags_build_test.sh), on $sha:"
 if command -v gh >/dev/null 2>&1; then
-  dr=$(gh run list --workflow release-dryrun.yml --commit "$sha" --limit 1 --json databaseId,status,conclusion --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"' 2>/dev/null || true)
+  dr=$(gh run list --workflow release-dryrun.yml --commit "$sha" --limit 1 --json databaseId,status,conclusion --jq 'if length == 0 then "" else .[0] | "\(.databaseId) \(.status) \(.conclusion)" end' 2>/dev/null || true)
 else
   dr=""
 fi
