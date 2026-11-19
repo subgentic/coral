@@ -181,7 +181,21 @@
 :root .inbox-folder-toolbar .list-bar-menu-grid { row-gap: 4px; } /* the 4 px the label gap added, taken from the gap between lines so the panel push stays within 150 */ /* a Filters label sits a clear 8 px over its select, as the mock draws it (#19870, MUST-8) */
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state > .empty-state-line + .empty-state-hint:has(> .btn)::before { content: "Try clearing the active Team, Goal, or Kind filter to see the remaining waiting items."; display: block; margin-bottom: 14px; } /* the filtered result's hint line, as the mock draws it (#19870, MUST-8): drawn here, the one button of the empty state sits in the hint's own paragraph */
 /* Needs you's two tabs (#19904): Waiting on you, Waiting on an agent: underline tabs over the search row; only the first counts toward the badges. */
-:root .inbox-folder-toolbar .inbox-needs-tabs { display: flex; gap: 20px; margin: 0 0 10px; border-bottom: 1px solid var(--border); }
+:root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { display: flex; gap: 20px; order: 0; flex: 1 1 calc(100% - 5rem); min-width: 0; margin: 0; border-bottom: 1px solid var(--border); }
+:root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the tabs are the heading: it stays for a screen reader */
 :root .inbox-folder-toolbar .inbox-needs-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 2px 9px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; }
 :root .inbox-folder-toolbar .inbox-needs-tab.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
 :root .inbox-folder-toolbar .inbox-needs-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+/* Waiting on an agent rows (#19904): the agent's state after the chip; an asleep agent is amber with Wake, an archived one rose with Start agent; an awake one stays quiet. */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-state { font-size: var(--fs-sm); color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-line { grid-column: 3 / -1; font-size: var(--fs-md); color: var(--text-secondary); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-state.inbox-wait-asleep, :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-line.inbox-wait-asleep { color: var(--warning-text); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-state.inbox-wait-archived, :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-line.inbox-wait-archived { color: var(--error-text); }
+:root .inbox-folder-toolbar .inbox-needs-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
+@media (max-width: 767px) { /* a phone: the tabs sit right under the search, on a line of their own, the words not broken */
+  :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { order: -1; flex: 1 1 100%; gap: 16px; }
+  :root .inbox-folder-toolbar .inbox-needs-tab { white-space: nowrap; font-size: var(--fs-sm); }
+}
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-line { display: block; white-space: normal; overflow: visible; text-overflow: clip; }
+:root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head { position: absolute; display: block; width: 1px; height: 1px; flex: none; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head > .session-group-count { display: none; }
