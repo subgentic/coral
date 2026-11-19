@@ -144,6 +144,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     // (`gone`, `unchecked`): the last two are listed apart and are about the older version's text, so nothing on this one's text marks them (#6472).
     const stampRange = c => `${st.videoTime?.(c.atS) || ''}${c.endS != null ? '–' + st.videoTime?.(c.endS) : ''}`;
     const groupOf = (c) => (c.fromVersion == null || c.carried === 'found') ? 'main' : c.carried === 'ambiguous' ? 'look' : c.resolved || st.video ? 'earlier' : 'main';
+    const sendOffThroughHub = (c) => api.hubSendOff() && !!st.board && !!st.data?.canComment && !c.deleted && !c.resolved && c.parentId == null; // an open thread on a board, on a Hub page that does not forward Send to agent (#19854)
     const ownHex = (c) => c.artifactId || st.hex; // a carried comment's replies, resolving and edits go to the version it was written on
     // the box takes focus and is shown whole, Save/Cancel (or Comment/Reply) with it: it was cut at the bottom of the panel (#15239, walk 10 M12)
     const focusComposer = () => { const ta = panel.querySelector('.ac-input'); if (!ta) return; ta.focus({ preventScroll: true }); (ta.closest('.ac-composer') || ta).scrollIntoView({ block: 'nearest' }); };
@@ -337,6 +338,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (!c.deleted && c.images && c.images.length && !editing(c)) main.append(pictures(c));
         if (top && c.fromVersion != null && c.carried !== 'found') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
+        if (top && !canAsk(c) && sendOffThroughHub(c)) main.append(el('p', 'ac-note ac-send-help ac-send-hub', api.SEND_NOT_THROUGH_HUB)); // a phone through the Hub, switched off there: said, not missing (#19854)
         if (top && canAsk(c)) { const sp = el('p', 'ac-note ac-ask-status'); fillStatus(sp, c.id); main.append(sp, el('p', 'ac-note ac-send-help', 'Send to agent invites the agent to respond here. It is optional when posting a comment or reply.')); } // does the agent have it? said at rest, under the comment: the actions row is hidden until hover
         e.append(main);
         return e;

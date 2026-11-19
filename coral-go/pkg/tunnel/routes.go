@@ -268,7 +268,7 @@ var routeTable = cat(
 		"/api/artifacts/{hex64}/thumbnail",
 		// Who can read an artifact (#5577): the owners that hold it and the teams whose agents read it. No query.
 		"/api/artifacts/{hex64}/readers",
-		// The comments on an artifact (#5176): reads here; the owner's writes are the block below. Editing, deleting, sending a thread to an agent, the lock and an agent's reply are unlisted (never) from here.
+		// The comments on an artifact (#5176): reads here; the owner's writes are the block below. Editing, deleting, the lock and sending a thread to an agent (#11354) are the owner's blocks further down; an agent's reply is unlisted (never).
 		"/api/artifacts/{hex64}/comments",
 		"/api/board/{project}/tasks/{id}/artifact-content",
 		"/api/board/{project}/artifacts",
@@ -285,7 +285,7 @@ var routeTable = cat(
 		"/api/board/{project}/tasks/{id}/changes.diff",
 	)),
 	// A comment, a reply (the same route with a parent_id) and a resolve or reopen, through the Hub (#7052, the Hub's #7039 request): the OWNER's alone, as the artifact reads are (#5575). A comment changes state on this
-	// computer and runs nothing, so Interact; the machine's own mode still caps it. Edit and delete (PATCH, DELETE), send (hands a thread to an agent), the lock and an agent's reply (POST .../{id}/reply, which is never a person's
+	// computer and runs nothing, so Interact; the machine's own mode still caps it. Edit and delete (PATCH, DELETE), send (hands a thread to an agent) and the lock are the owner's blocks below, and an agent's reply (POST .../{id}/reply, which is never a person's
 	// and refuses anything tunnelled) stay unlisted.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract,
 		"/api/artifacts/{hex64}/comments",

@@ -1,6 +1,6 @@
 /* Send to agent on an artifact comment (#6357, #6456): the owner picks one comment, then the agents on its board to ask, 1 to 10, and Coral posts one board message to each, from the owner, with the comment quoted as
  * untrusted text. This draws the picker that opens inside the comment's card (in the comments panel's own style) and what came of the ask; artifact_comments.js owns the state and the requests. Everything shown is text.
- * Local only: it is never offered through Coral Hub. An agent that is asleep or not running cannot be picked (the server refuses it too); one already asked into this thread says so; the agent's reply is a reply in the thread. */
+ * On the computer itself, and through Coral Hub for its owner when the Hub's account says comment_send (#14549, the route is Launch-tier owner-only, #11354). An agent that is asleep or not running cannot be picked (the server refuses it too); one already asked into this thread says so; the agent's reply is a reply in the thread. */
 
 export const MAX_AGENTS = 10;
 /** The one agent offered on a file of an agent on no team (#18105): the server finds its uploader. */
