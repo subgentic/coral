@@ -108,14 +108,13 @@
 :root .material-icons.inbox-kind-icon[data-type="html"] { background: var(--needs-icon-amber-bg); color: var(--needs-icon-amber-fg); border-color: color-mix(in srgb, var(--needs-icon-amber-fg) 30%, transparent); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="waiting"]::before { content: '·'; margin-inline-end: 6px; font-weight: var(--fw-strong); } /* the team and the time are told apart by a dot */
 /* A selected row is a tinted surface with the accent rail, a pointed-at row lifts and its quiet buttons come up to full text (#19812, the mocks' states). */
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr[aria-selected="true"] > td { background: transparent; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.dt-selected { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 12%, transparent); } /* ticked: the accent rail and a wash over the row, painted over the row's own lift (#19824) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:hover .inbox-review-actions :is(.inbox-bookmark, .inbox-star, .inbox-row-more-toggle) { color: var(--text-primary); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:hover .inbox-review-name { color: var(--text-primary); }
 
 /* the question row's meta line: "Question", then the goal and task it is about as the same chips the review rows wear (#19812) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-meta { grid-column: 3 / -1; order: 8; min-width: 0; margin-top: 2px; font-size: var(--fs-base); color: var(--text-muted); }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr :is(.inbox-ask-subject-link, .inbox-ask-subject-links > strong) { height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); text-decoration: none; background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr :is(.inbox-ask-subject-link, .inbox-ask-subject-links > strong) { height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--text-secondary); text-decoration: none; background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
 
 /* a goal that looks done: its Done-when words, then the kind word in the meta line, as the approved list draws it (#19824) */
 
@@ -130,3 +129,7 @@
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state { align-items: center; gap: 8px; margin-top: 16px; padding: 28px 24px; border: 1px solid var(--border); border-radius: var(--radius-lg, 12px); text-align: center; background: var(--bg-secondary); }
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state .empty-state-line { font-size: var(--fs-title); font-weight: var(--fw-strong); color: var(--text-primary); }
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state .empty-state-hint { max-width: 52ch; color: var(--text-muted); }
+
+/* a markdown file's tile is blue, as in the approved list (#19824, QA) */
+:root .material-icons.inbox-kind-icon[data-type="md"] { background: var(--needs-icon-blue-bg); color: var(--needs-icon-blue-fg); border-color: color-mix(in srgb, var(--needs-icon-blue-fg) 30%, transparent); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:not(.dt-selected):hover { box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--text-primary) 5%, transparent); } /* the row under the pointer lifts, as in the approved list (#19824) */
