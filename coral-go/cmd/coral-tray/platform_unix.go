@@ -47,3 +47,6 @@ func onShowWindowSignal(show func()) {
 		}
 	}()
 }
+
+// raiseSignal is what the tray sends coral-app to bring its window to the front (#19789): the app raises itself.
+var raiseSignal os.Signal = syscall.SIGUSR1

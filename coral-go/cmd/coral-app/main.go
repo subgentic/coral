@@ -59,6 +59,7 @@ func init() {
 
 func main() {
 
+	watchRaiseSignal() // the tray's Open Coral click can come while this still starts: SIGUSR1 must never end the program (#19789)
 	cfg := parseAppFlags(flag.CommandLine, os.Args[1:])
 	// A sign-in link handed over by the tray (#3394), in the environment so no other user can
 	// read it with ps. Used once: drop it so nothing this window starts inherits it.
@@ -295,6 +296,7 @@ func main() {
 	w.Navigate(startURL)
 
 	log.Printf("[WEBVIEW] starting event loop (goroutines=%d)", runtime.NumGoroutine())
+	raiseWindow() // the window opens in front: a start the person asked for (a click on Open Coral) is not left behind other windows (#19789)
 	w.Run()
 	log.Printf("[WEBVIEW] event loop exited (goroutines=%d)", runtime.NumGoroutine())
 	log.Println("[SHUTDOWN] coral-app exiting normally")

@@ -47,3 +47,6 @@ func signalProcess(pid int, sig syscall.Signal) error {
 	}
 	return p.Kill()
 }
+
+// raiseSignal: Windows has no such signal (the window opens in front, and raiseApp does nothing there).
+var raiseSignal os.Signal = os.Interrupt
