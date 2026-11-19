@@ -27,6 +27,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 item(20, 'daily-digest.md', 'text/markdown', { kind: 'digest', muted: true }),
                 ...Array.from({ length: 6 }, (_, k) => item(10 + k, 'notes-' + k + '.md', 'text/markdown', { version: 1 }))];
             window.__asks = [{ board: '${team}', kind: 'ask', id: 7, asker: 'DevOps Engineer', text: 'Tag v2.1.1 from 64e10a3604 now that all 353 CDP suites are green?', at: new Date(Date.now() - 660000).toISOString(), buttons: [{ id: 1, label: 'Yes', action: 'reply', state: 'pending' }, { id: 2, label: 'No', action: 'reply', state: 'pending' }] },
+                { board: '${team}', kind: 'ask', id: 9, asker: 'QA Reviewer', text: 'Ship it? ' + 'x'.repeat(600), at: new Date(Date.now() - 900000).toISOString(), buttons: [{ id: 3, label: 'Yes', action: 'reply', state: 'pending' }, { id: 4, label: 'No', action: 'reply', state: 'pending' }] },
                 { board: '${team}', kind: 'ask', id: 8, asker: 'Orchestrator', text: 'One quick check for #18583, when you have a minute', at: new Date(Date.now() - 1740000).toISOString() }];
             window.fetch = (url, opts = {}) => { const p = new URL(String(url), location.href), page = p.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(p, location.href, { '${team}': window.__items }) : null; if (page) { if (window.__more) { page.has_more = true; page.next_cursor = 'next'; page.truncated = true; page.total = 23; page.all = 23; } return json(page); } const u = window.__reviewFixtureURL(String(url), location.origin);
                 if (/^[/]api[/]artifacts[/][0-9a-f]{64}[/]versions$/.test(u.pathname)) return json([1, 2, 3].map(n => ({ digest: n === 3 ? hex(1) : hex(30 + n), version: n, versions: 3, is_latest: n === 3, name: 'inbox-layout-spec.md', size: 30, media_type: 'text/markdown', at: new Date(Date.now() - (4 - n) * 3 * 3600000).toISOString(), role: 'UI/UX', uploader: 'UI/UX', note: n === 1 ? 'initial draft' : n === 2 ? 'round 2 tweaks' : '' })));
@@ -45,6 +46,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the list's first paint and the kind icons settle
         await ev(framesJs(10));
         const text = await ev(`document.querySelector('${T}').innerText`);
+        const yn = await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr')]; const has = re => rows.filter(r => re.test(r.textContent) && r.querySelector('.inbox-deny-action')).length; return { short: has(/Tag v2\\.1\\.1/), long: has(/Ship it\\? x{50}/), longRow: rows.filter(r => /Ship it\\? x{50}/.test(r.textContent)).length }; })()`);
+        check(yn.short === 1 && yn.longRow >= 1 && yn.long === 0, `Approve/Deny on a short Yes/No ask only; a 600-character ask the row cuts keeps Reply and the dialog: ${JSON.stringify(yn)}`);
         check(/New version v3/.test(text) && /2 new comments/.test(text), `the change badges are in the rows: ${text.slice(0, 200)}`);
         for (const theme of ['dark', 'light']) {
             await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); true`); await ev(framesJs(10));
