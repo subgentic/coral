@@ -1,3 +1,4 @@
+// cdp-timeout: 300 (60 rounds with three terminals each: 145 s of the runner's 180 s on a Windows CI runner at 121a5c2ff9, about 165 s of body and 17 s of cleanup at 39b13c2a82, where it was killed after its PASS line; #19763)
 // The dashboard stays small when it is left open and used (#5048): 20 agents with chats, and a loop of what an operator does all day — switch to the next agent,
 // a burst of feed diffs and a full update now and then, scroll the chat, open and shut the Display panel, open and shut a dialog — for many rounds. After the first
 // rounds (caches fill, the page warms) the heap after a forced GC, the DOM nodes, the event listeners and the documents may not keep growing: each is compared with
@@ -193,5 +194,6 @@ async function httpJson(method, path, body) {
         assert.ok(grew(base.listeners, end.listeners) <= 40 + per / 5, `event listeners grew ${grew(base.listeners, end.listeners)} over ${per} rounds`);
         assert.ok(grew(base.documents, end.documents) <= 3, `documents grew ${grew(base.documents, end.documents)} (detached frames or windows)`);
         console.log(`PASS heap growth: ${per} rounds after a ${WARM}-round warm-up: heap ${grew(base.heapMB, end.heapMB).toFixed(1)} MB, nodes ${grew(base.nodes, end.nodes)} (live ${grew(base.live, end.live)}), listeners ${grew(base.listeners, end.listeners)}`);
-    } finally { mark('cleanup: removeBoards'); await removeBoards(ev, [boardName]); mark('cleanup: stopping the stand-in agents'); for (const si of standIns) await si.stop().catch(() => {}); mark('cleanup: closing the page'); await client.close(); }
+    // The stand-ins stop together: each kill takes 5.5 s on Windows, three in a row were 17 s of the limit (#19763).
+    } finally { mark('cleanup: removeBoards'); await removeBoards(ev, [boardName]); mark('cleanup: stopping the stand-in agents'); await Promise.all(standIns.map(si => si.stop().catch(() => {}))); mark('cleanup: closing the page'); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
