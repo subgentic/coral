@@ -333,9 +333,10 @@ export function chatsSpec(key, ctx) {
     return { ...spec, count: spec.count == null || arts == null ? null : spec.count + arts, signature: spec.signature + SA.starredArtifactsSignature(), ...(alone ? { empty: undefined } : {}),
         node: () => {
             const wrap = DT.el('div', 'inbox-starred-folder');
-            if (spec.rows.length || !SA.hasStarredArtifacts()) wrap.append(chatsNode()); // with no starred chat, the artifacts stand alone; with nothing at all, the chat table says "Nothing starred yet"
             const part = SA.starredArtifactsSection();
-            if (part) wrap.append(part);
+            if (part) wrap.append(part); // the artifacts first, then the chats, each under its own head, as the approved folder draws it (#19833)
+            if (part && spec.rows.length) { const head = DT.el('h3', 'inbox-chats-head', 'Starred chats'); head.append(DT.el('span', 'inbox-chats-head-note', `${spec.rows.length} conversation${spec.rows.length === 1 ? '' : 's'}`)); wrap.append(head); }
+            if (spec.rows.length || !SA.hasStarredArtifacts()) wrap.append(chatsNode()); // with no starred chat, the artifacts stand alone; with nothing at all, the chat table says "Nothing starred yet"
             return wrap;
         } };
 }

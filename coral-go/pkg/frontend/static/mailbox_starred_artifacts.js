@@ -5,6 +5,7 @@ import { teamLabel } from './server_status.js';
 import { splitKey } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { visibleName } from './artifact_names.js';
+import { starControl } from './artifact_star.js';
 const DT = await importOnce('./data_table.js');
 
 const STALE_MS = 30000;
@@ -46,6 +47,18 @@ export const starredArtifactsSignature = () => JSON.stringify([state.busy, state
 // An error is visible content too: do not show “Nothing starred yet” beside a failed read.
 export const hasStarredArtifacts = () => state.rows.length > 0 || !!state.error;
 
+const typeOf = m => (/^video\//.test(m || '') ? 'video' : /html/.test(m || '') ? 'html' : /markdown/.test(m || '') ? 'md' : '');
+const STATE = { approved: 'Approved', denied: 'Denied', 'changes requested': 'Sent back', 'for review': 'For review' };
+/** The approved folder row (#19833): the file's tile, its name, and under it what it is, who made it and the goal and task it belongs to. */
+function folderItem(r, nameButton) {
+    const box = DT.el('span', 'inbox-folder-item'), tile = DT.el('span', 'material-icons inbox-kind-icon'), text = DT.el('span', 'inbox-folder-text'), meta = DT.el('span', 'inbox-folder-meta');
+    tile.dataset.kind = 'review'; tile.dataset.type = typeOf(r.media_type); tile.setAttribute('aria-hidden', 'true');
+    const got = Object.entries(STATE).find(([t]) => (r.tags || []).includes(t)), who = String(r.produced_by || r.uploaded_by || '');
+    meta.append(...[got && got[1], who].filter(Boolean).map(t => DT.el('span', 'inbox-folder-word', t)));
+    for (const [k, id] of [['Goal', r.goal_id], ['Task', r.task_id]]) if (id) meta.append(DT.el('span', 'chip chip-tag inbox-folder-chip', `${k} #${id}`));
+    text.append(nameButton, ...(meta.childNodes.length ? [meta] : [])); box.append(tile, text);
+    return box;
+}
 const hexOf = row => String(row.id || '').replace(/^sha256:/, '').toLowerCase();
 
 /** The Starred artifacts part of the folder, or null when there are none (and nothing failed). */
@@ -56,12 +69,13 @@ export function starredArtifactsSection() {
     const h = DT.el('h3', 'group-head group-head-lg', 'Starred artifacts'); section.append(h);
     if (state.error) { const e = DT.el('p', 'empty-state-line', state.error); e.setAttribute('role', 'status'); const retry = DT.el('button', 'btn btn-quiet btn-small', 'Retry'); retry.type = 'button'; retry.disabled = state.busy; retry.addEventListener('click', () => { retry.disabled = true; state.at = 0; ensureStarredArtifacts(redraw); }); e.append(document.createTextNode(' '), retry); section.append(e); if (!state.rows.length) return section; }
     const table = DT.dataTable({
-        label: `Starred artifacts, ${state.rows.length}`, rows: state.rows, rowKey: r => `${r.server}:${r.id}`, state: tableState, oneLine: true, resize: true, sortBar: false,
+        label: `Starred artifacts, ${state.rows.length}`, rows: state.rows, rowKey: r => `${r.server}:${r.id}`, state: tableState, oneLine: true, resize: true, sortBar: false, bare: true,
         open: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hexOf(r), { server: splitKey(r.board_id).server, filename: visibleName(r.name), mediaType: r.media_type, board: splitKey(r.board_id).name })),
         columns: [
-            { key: 'name', label: 'Name', primary: true, width: 'grow', cell: r => { const name = visibleName(r.name); return DT.primaryButton(name || hexOf(r).slice(0, 12), `Open ${name || 'artifact'}`); } }, // the uploader's text (Security on #220)
+            { key: 'name', label: 'Name', primary: true, width: 'grow', cell: r => { const name = visibleName(r.name); return folderItem(r, DT.primaryButton(name || hexOf(r).slice(0, 12), `Open ${name || 'artifact'}`)); } }, // the uploader's text (Security on #220)
             { key: 'team', label: 'Team', width: '10rem', dropAt: 36, cell: r => teamLabel(r.board_id, r.team) },
             { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '7.5rem', cell: r => DT.timeCell(r.created_at) },
+            { key: 'star', label: 'Star', hideLabel: true, align: 'end', width: '3rem', cell: r => { const b = starControl(r, { hex: hexOf(r), name: visibleName(r.name) || 'this file' }); if (b) b.classList.add('inbox-folder-star'); return b || ''; } }, // the blue star: one press takes it out of Starred (#19833)
         ],
     });
     section.append(table.el);
