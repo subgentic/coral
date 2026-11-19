@@ -7,6 +7,7 @@ import { badArgs, FLAGS, VALUE_FLAGS } from './helpers/cdp_args.mjs';
 
 assert.deepEqual(badArgs([]), [], 'no arguments: the full run, as before');
 assert.deepEqual(badArgs(['--only', 'inbox_group_tap', '--retries', '0']), [], '--only and its value');
+assert.deepEqual(badArgs(['--retry-max-secs', '120']), [], '--retry-max-secs and its value');
 assert.deepEqual(badArgs(['--only', 'a,b', '--keep', '--allow-flaky', '--shards', '2', '--timeout', '120']), [], 'flags and values mix');
 assert.deepEqual(badArgs(['inbox_group_tap']), ['unexpected argument "inbox_group_tap": did you mean --only inbox_group_tap?'], 'the bare name that started the full run');
 assert.deepEqual(badArgs(['--only', 'a', 'b']), ['unexpected argument "b": did you mean --only b?'], 'a second bare name');
