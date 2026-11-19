@@ -20,6 +20,16 @@ const BASE = require('./test_base').BASE;
                 ws.handleCoralMessage({ type: 'coral_update', servers: [], sessions }); return true; })()`);
             const openNeeds = async () => { await ev(`window.switchNavTab('hub-inbox'); true`); await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await waitFor(`document.getElementById('group-table-view') && document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group), #group-table-view .dt-mail-row, #group-table-view [data-row-key]').length >= 2`, `${w}: the two waiting agents`, 10000); };
             await openNeeds();
+            { // #19919 (MUST-8, the approved mock): a search that matches nothing while Getting started rows remain shows the same card (line, hint, Show all) above them, not a bare '4 hidden by the filters' line
+                await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'on' }; return true; })()`);
+                await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await settle(500);
+                await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'zzz-no-such-item'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(600);
+                const card = await ev(`(() => { const v = document.getElementById('group-table-view'), e = v.querySelector('.empty-state'); return { card: e ? e.textContent.replace(/\\s+/g, ' ').trim() : null, note: !!v.querySelector('.inbox-filter-hidden'), rows: v.querySelectorAll('tbody tr:not(.dt-group)').length, above: !!e && [...v.querySelectorAll('tbody tr')].every(r => e.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
+                assert.ok(/Nothing that needs you matches the search and filters\./.test(card.card || '') && /Show all/.test(card.card) && !card.note && card.rows >= 1 && card.above, `${w}: the filtered result is the card above the Getting started rows: ` + JSON.stringify(card));
+                await ev(`[...document.querySelectorAll('.empty-state button')].find(x => x.textContent.trim() === 'Show all').click(); true`); await settle(500);
+                await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'off' }; return true; })()`);
+                await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await settle(400);
+            }
             if (mobile) {
                 const text = await ev(`document.getElementById('group-table-view').innerText.replace(/\\s+/g, ' ')`);
                 assert.ok(/alpha-team/.test(text) && /beta-team/.test(text), `${w}: with two teams each row names its team: ` + text.slice(0, 300));
