@@ -25,3 +25,17 @@ while IFS='|' read -r item stage why; do
   printf '  %-9s %s  (%s)\n' "$st" "$item" "$why"
 done < "$list"
 echo "$n release-only steps; name each in the pre-tag post, and read the CHANGED ones"
+# The dry run is the step that runs everything else marked dryrun in the list (tests/release/ldflags_build_test.sh among them): v2.1.1 was tagged
+# without one and its release failed on that check (#19780). Name it in the pre-tag post with its result for this commit.
+sha=$(git -C "$root" rev-parse "$head^{commit}")
+echo "release dry run (runs every 'dryrun' step in pre_tag_steps.txt, incl. tests/release/ldflags_build_test.sh), on $sha:"
+if command -v gh >/dev/null 2>&1; then
+  dr=$(gh run list --workflow release-dryrun.yml --commit "$sha" --limit 1 --json databaseId,status,conclusion --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"' 2>/dev/null || true)
+else
+  dr=""
+fi
+if [ -n "$dr" ] && [ "$dr" != "null" ]; then
+  echo "  DRYRUN    run $dr  (a provenance-only FAIL while the gates still run is expected; any other failed step is not)"
+else
+  echo "  NO-DRYRUN none for this commit: gh workflow run release-dryrun.yml --ref main   (the candidate is the commit main is on)"
+fi
