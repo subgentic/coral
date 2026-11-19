@@ -2,5 +2,4 @@
 
 package main
 
-func raiseWindow()      {}
-func watchRaiseSignal() {}
+func raiseWindow() {}
