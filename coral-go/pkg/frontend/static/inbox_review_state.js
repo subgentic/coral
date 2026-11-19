@@ -20,10 +20,13 @@ export const decidedWord = row => (row?.tags?.includes('denied') ? 'Denied' : 'A
 /** A file the Operator sent back (#18701): the time it waited on the agent counts from the decision, not from the upload. */
 export const sentBackSince = a => (waitingOnAgent(a) && a.review?.at) || a.created_at;
 /** The state chip of a sent-back row: it says the agent has it, in place of "For review". `who` is the agent's name, already made safe by the caller. */
-export function sentBackChip(who) {
-    const chip = document.createElement('span'); chip.className = 'chip inbox-sent-back'; chip.textContent = `Sent back · waiting on ${who}`; chip.title = 'You asked for changes. The row comes back to you when the agent uploads a new version.';
+export function sentBackChip(who, archived = false) {
+    const chip = document.createElement('span'); chip.className = 'chip inbox-sent-back'; chip.textContent = archived ? `Sent back · ${who} is archived` : `Sent back · waiting on ${who}`;
+    chip.title = archived ? 'You asked for changes, but this agent is archived, so nobody is working on it. Start the agent again, or send the file to another agent.' : 'You asked for changes. The row comes back to you when the agent uploads a new version.'; // an archived agent never reads the note (#19897)
     return chip;
 }
+/** True when the agent that made a sent-back file is archived in the live list: the note was left, but nobody can read it. */
+export const producerArchived = (row, live) => !!row?.session_id && (live || []).some(s => s && s.session_id === row.session_id && s.archived);
 const _asked = new Map(); // hex -> the words of the Operator's last change request, read once per file
 /** One line of what the Operator asked for, read from the file's thread (the Operator's own newest top-level comment, "Changes requested:" cut off). Empty until it arrives, and when there is none. */
 export function sentBackExcerpt(row, server, board) {
