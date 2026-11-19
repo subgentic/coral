@@ -61,8 +61,11 @@ export function pickableAgents(list) {
     return out;
 }
 
+/** The agents a long list leads with (#19807): the one that made the artifact, then the Orchestrator, each once; empty when neither is on the list (then every agent is shown, as before). `maker` is a role. */
+export const frontAgents = (agents, maker) => [agents.find(a => maker && a.role.toLowerCase() === String(maker).toLowerCase()), agents.find(a => /^orchestrator$/i.test(a.role))].filter((a, i, all) => a && all.indexOf(a) === i);
+
 /**
- * The block under a comment's actions. `x`: { board, agents: array | null (loading) | 'error', picked: Set of roles, asked: Map role(lowercase) -> text, results: array | null, busy, error, onToggle(role), onCancel(), onSend() }.
+ * The block under a comment's actions. `x`: { board, agents: array | null (loading) | 'error', picked: Set of roles, asked: Map role(lowercase) -> text, results: array | null, busy, error, onToggle(role), onCancel(), onSend(), front: the maker's role, restOpen, onRest(open) }.
  * Returns the element; the caller puts it in the card and keeps focus where it was.
  */
 export function buildSendBlock(x) {
@@ -76,7 +79,8 @@ export function buildSendBlock(x) {
     else if (x.agents === 'error') { box.append(el('p', 'ac-error', 'The agents of this board could not be read.')); }
     else if (!x.agents.length) { box.append(el('p', 'ac-ask-note', x.empty || 'No agent on this board can be asked.')); }
     else {
-        const list = el('ul', 'ac-ask-list');
+        const list = el('ul', 'ac-ask-list'), rest = el('ul', 'ac-ask-list'), front = frontAgents(x.agents, x.front), hidden = [];
+        let n = 0;
         const full = x.picked.size >= MAX_AGENTS;
         for (const a of x.agents) {
             const li = el('li', 'ac-ask-agent');
@@ -93,16 +97,22 @@ export function buildSendBlock(x) {
             label.append(cb, el('span', 'ac-ask-name', a.role));
             if (a.name && a.name.toLowerCase() !== a.role.toLowerCase()) label.append(el('span', 'ac-ask-sub', a.name));
             li.append(label);
+            const into = !front.length || front.includes(a) ? list : rest; if (into === rest) hidden.push(a.role);
             const res = x.results && x.results.find(r => r.agent.toLowerCase() === a.role.toLowerCase());
             const why = res ? resultWords(res) : (asked || (!a.can ? a.why : ''));
             if (why) {
-                const s = el('span', 'ac-ask-state' + (res && (res.state === 'sent' || res.state === 'queued') ? ' ac-ask-sent' : ''), why); s.id = `ac-ask-why-${x.id}-${list.children.length}`;
+                const s = el('span', 'ac-ask-state' + (res && (res.state === 'sent' || res.state === 'queued') ? ' ac-ask-sent' : ''), why); s.id = `ac-ask-why-${x.id}-${n++}`;
                 li.append(s); li.dataset.state = res ? res.state : (asked ? 'asked' : 'unavailable');
                 cb.setAttribute('aria-describedby', s.id);
             } else if (off && full && !x.results) cb.setAttribute('aria-describedby', `ac-ask-cap-${x.id}`);
-            list.append(li);
+            into.append(li);
         }
         box.append(list);
+        if (hidden.length) { // the rest of the team (#19807): shut behind one line, open when one of them is ticked or answered
+            const d = el('details', 'ac-ask-rest'); d.append(el('summary', '', `More agents (${hidden.length})`), rest);
+            d.open = !!x.restOpen || hidden.some(r => x.picked.has(r) || (x.results && x.results.some(q => q.agent.toLowerCase() === r.toLowerCase())));
+            d.addEventListener('toggle', () => x.onRest?.(d.open)); box.append(d);
+        }
         if (full && !x.results) { const cap = el('p', 'ac-ask-note', `Up to ${MAX_AGENTS} agents at a time.`); cap.id = `ac-ask-cap-${x.id}`; box.append(cap); }
     }
     if (!x.results && x.onNow && box.querySelector('input[type="checkbox"]')) { // "Now" (#14860): a comment waits for a busy agent (mid-turn or with a task); this one waits only for the end of its turn, never typed mid-turn

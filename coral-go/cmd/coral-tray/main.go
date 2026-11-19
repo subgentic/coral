@@ -923,13 +923,7 @@ func raiseCoralApp() {
 	if coralAppProcess == nil {
 		return
 	}
-	if runtime.GOOS == "darwin" {
-		script := fmt.Sprintf(
-			`tell application "System Events" to set frontmost of (first process whose unix id is %d) to true`,
-			coralAppProcess.Pid,
-		)
-		exec.Command("osascript", "-e", script).Run()
-	}
+	_ = raiseApp(runtime.GOOS, coralAppProcess, coralAppProcess.Pid, systemEventsRaise)
 }
 
 // raiseCoralAppNow brings the running coral-app window to the front and says whether it could: an error while the window's process is not up yet, so the caller tries again (#15772).
@@ -940,11 +934,26 @@ func raiseCoralAppNow() error {
 	if p == nil {
 		return fmt.Errorf("the window is not started")
 	}
-	if runtime.GOOS != "darwin" {
-		return nil // only macOS has a way to bring another process's window forward from here; the others open it in front
-	}
-	script := fmt.Sprintf(`tell application "System Events" to set frontmost of (first process whose unix id is %d) to true`, p.Pid)
+	return raiseApp(runtime.GOOS, p, p.Pid, systemEventsRaise)
+}
+
+func systemEventsRaise(pid int) error {
+	script := fmt.Sprintf(`tell application "System Events" to set frontmost of (first process whose unix id is %d) to true`, pid)
 	return exec.Command("osascript", "-e", script).Run()
+}
+
+// raiseApp is the click on Open Coral while the window exists or is still starting (#19789). On macOS it signals the app (SIGUSR1: the app
+// activates itself, brings a minimized window back and takes the keyboard, with no permission to ask for); the AppleScript through System
+// Events, which needs the Automation permission and fails without a word, is only the way when the signal cannot be sent. The other systems open the window in front.
+func raiseApp(goos string, p interface{ Signal(os.Signal) error }, pid int, viaSystemEvents func(pid int) error) error {
+	if goos != "darwin" {
+		return nil
+	}
+	err := p.Signal(raiseSignal)
+	if err == nil {
+		return nil
+	}
+	return viaSystemEvents(pid)
 }
 
 // isInsideAppBundle detects if the binary is running inside a macOS .app bundle

@@ -57,7 +57,7 @@ const AGENTS = (waiting) => waiting ? [
             const c = getComputedStyle(e), px = parseFloat(c.fontSize); const label = e.tagName + '.' + e.className + ' "' + e.textContent.trim().slice(0, 24) + '" ' + c.fontSize + '/' + c.fontWeight;
             if (c.fontFamily !== want) out.push('family ' + label); else if (!sizes.includes(px)) out.push('size ' + label); else if (!['400', '500', '600', '700'].includes(c.fontWeight)) out.push('weight ' + label); }
         return out; }`;
-    const SCALE = '[11, 12, 13, 14, 17, 20]';
+    const SCALE = '[11, 12, 13, 13.5, 14, 15, 17, 20]'; // 15 px is a row's headline and 13.5 px its words (#19812, the approved list design)
     const setAgents = waiting => ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS(waiting))}; m.updateInboxTab(); return true; })()`);
     const tableTitle = () => ev(`(document.querySelector('#group-table-title') || {}).textContent`);
     try {
@@ -231,7 +231,7 @@ const AGENTS = (waiting) => waiting ? [
             await setAgents(false);
             await ev(`document.querySelector('${pane} .view-list-item[data-key="needs"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Needs you' && !!document.querySelector('#group-table-view .empty-state-line')`, at + 'the empty Needs you', 8000);
-            assert.deepEqual(await ev(`(() => { const l = document.querySelector('#group-table-view .empty-state-line'), c = getComputedStyle(l); return [l.textContent, c.fontSize, c.fontWeight]; })()`), ['You are all caught up', '14px', '400'], at + 'one empty line, 14/400');
+            assert.deepEqual(await ev(`(() => { const l = document.querySelector('#group-table-view .empty-state-line'), c = getComputedStyle(l); return [l.textContent, c.fontSize, c.fontWeight]; })()`), ['You are all caught up', '15px', '600'], at + 'one empty line, 15/600 in the approved list (#19824: a centred card, the line strong)');
             await shot(`inbox-one-empty-${w}`);
             await setAgents(true);
 

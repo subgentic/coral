@@ -40,6 +40,7 @@ export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browse
 export function kindIcon(s) {
     const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // board questions share the Question chip (#16548)
     i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
+    if (s?.review) i.dataset.type = /^video\//.test(s.review.media_type || '') ? 'video' : /html/.test(s.review.media_type || '') ? 'html' : /markdown/.test(s.review.media_type || '') ? 'md' : '';
     if (s?.review) { i.classList.add('inbox-artifact-thumbnail'); i.append(artifactThumbnail(s.review, { size: 32, url: typeof s.server === 'string' && thumbnailPath(s.review) ? serverUrl(thumbnailPath(s.review), s.server) : '' })); }
     return i;
 }
@@ -55,7 +56,7 @@ export function decorateKindRow(tr) {
     if (!icon || tr.classList.contains('dt-mailed')) return;
     tr.classList.add('inbox-kind-row');
     if (tr.querySelector('.inbox-bookmark')) tr.classList.add('inbox-file-row'); // not a :has() in css (#15953)
-    const words = tr.querySelector('.dt-subtitle'); if (words) words.classList.add('inbox-row-words'); /* the row's own class for it: the lazy card CSS styles this, not the table's (data_table_census) */ const wrap = tr.querySelector('.inbox-agent-first'), kindWord = words && /^(For review|Needs your answer)$/.test(words.textContent.trim());
+    const words = tr.querySelector('.dt-subtitle'); if (words) { words.classList.add('inbox-row-words'); if (/^Wants to run/.test(words.textContent)) words.classList.add('inbox-row-command'); } /* the row's own class for it: the lazy card CSS styles this, not the table's (data_table_census) */ const wrap = tr.querySelector('.inbox-agent-first'), kindWord = words && /^(For review|Needs your answer)$/.test(words.textContent.trim());
     const phone = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 760px)').matches, holds = phone && wrap && tr.querySelector('.inbox-blocks'); // what a file or an agent holds up goes on the description's own lines, after it, never as a line of its own (#13911: three lines at most)
     if (holds && holds.textContent.trim()) { wrap.classList.add('has-holds'); holds.classList.add('inbox-holds-inline'); wrap.append(holds); const news = wrap.querySelector('.inbox-new-comments'); if (news) holds.prepend(news, ' '); } // the row's third line: the file's name takes one line, what it holds up the next; the file's question gives way to it
     if (words && wrap && !kindWord && !tr.querySelector('.inbox-holds-inline') && tr.querySelector('[data-review-artifact]') && words.textContent.trim()) { wrap.classList.add('has-question'); words.classList.add('inbox-file-question'); } // the question put on a file (#11555) is what the person is to decide: it stays, as the one line under the file's name

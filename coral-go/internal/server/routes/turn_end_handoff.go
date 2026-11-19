@@ -74,6 +74,14 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 	}
 	counts, err := h.bs.GetUnreadCountsForSessions(ctx, []string{owner.SessionName})
 	unread := counts[owner.SessionName]
+	if err == nil && unread <= 0 && ls.AgentType == at.Claude {
+		// Nothing to read, but a task assigned to it waits unclaimed: say so now, once per task, rather than at the periodic nudge (#19802).
+		if text := h.claimNoticeAtIdle(ctx, owner.SessionName); text != "" {
+			slog.Info("turn-end hand-off: the agent has an assigned task unclaimed", "session", owner.SessionName, "board", board)
+			writeJSON(w, http.StatusOK, map[string]any{"handoff": true, "reason": "Task waiting", "context": text})
+			return
+		}
+	}
 	if err != nil || unread <= 0 {
 		writeJSON(w, http.StatusOK, none)
 		return
