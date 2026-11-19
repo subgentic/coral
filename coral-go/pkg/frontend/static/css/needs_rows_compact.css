@@ -127,6 +127,7 @@
 
 /* Needs you's empty state is the approved list's centred card: the line strong, the hint under it, the action below (#19824) */
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state { align-items: center; gap: 8px; margin-top: 16px; padding: 28px 24px; border: 1px solid var(--border); border-radius: var(--radius-lg, 12px); text-align: center; background: var(--bg-secondary); }
+:root #group-table-view[data-group="hub-inbox:needs"] #launch-disclosure-banner + .empty-state { margin-top: 0; } /* the launch notice sits between the heading and the card: the room reserved for it (a typical 53 px) is its whole gap, so the card's own 16 px does not push the list down when the notice arrives (launch_notice_phone_inbox_browser) */
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state .empty-state-line { font-size: var(--fs-title); font-weight: var(--fw-strong); color: var(--text-primary); }
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state .empty-state-hint { max-width: 52ch; color: var(--text-muted); }
 
