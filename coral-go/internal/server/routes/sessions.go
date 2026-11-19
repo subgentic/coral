@@ -114,20 +114,21 @@ type SessionsHandler struct {
 	wsHeartbeat  atomic.Int64
 	remoteAgents background.RemoteAgentSource
 	// remoteAfter is the timer of the feed's remote-change debounce (nil: time.After); a test supplies its own to fire the window itself, not by waiting for it (#5942).
-	remoteAfter func(time.Duration) <-chan time.Time
-	db          *store.DB
-	ss          *store.SessionStore
-	ts          *store.TaskStore
-	subagents   *store.SubagentStore
-	gs          *store.GitStore
-	bs          *board.Store
-	touches     *operatortouch.Recorder // the Operator's touches of agents, counted for the Analytics tab (#11225); nil: not recorded
-	handoffs    handoffLimiter          // when each agent was last handed its board messages at its turn's end (#10996)
-	cfg         *config.Config
-	terminal    ptymanager.SessionTerminal
-	jsonl       *jsonl.SessionReader
-	currentDir  func(ctx context.Context, a background.AgentInfo) string // where an agent is now, when that is another worktree of its repository (#11704)
-	backend     ptymanager.TerminalBackend                               // nil = use tmux directly
+	remoteAfter    func(time.Duration) <-chan time.Time
+	db             *store.DB
+	ss             *store.SessionStore
+	ts             *store.TaskStore
+	subagents      *store.SubagentStore
+	gs             *store.GitStore
+	bs             *board.Store
+	touches        *operatortouch.Recorder // the Operator's touches of agents, counted for the Analytics tab (#11225); nil: not recorded
+	claimReNotices claimReNotices          // the task each agent was last re-told about when its turn ended with it unclaimed (#19802)
+	handoffs       handoffLimiter          // when each agent was last handed its board messages at its turn's end (#10996)
+	cfg            *config.Config
+	terminal       ptymanager.SessionTerminal
+	jsonl          *jsonl.SessionReader
+	currentDir     func(ctx context.Context, a background.AgentInfo) string // where an agent is now, when that is another worktree of its repository (#11704)
+	backend        ptymanager.TerminalBackend                               // nil = use tmux directly
 
 	boardHandler   *BoardHandler                                                      // for sleep/wake board pausing
 	replyNudgeSend func(ctx context.Context, project, sessionName, text string) error // how a reminder to answer in a comment thread is typed (nil: through boardHandler); a test sets it (#11722)
