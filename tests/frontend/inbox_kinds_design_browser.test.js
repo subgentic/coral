@@ -55,7 +55,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         check(hov[2] && hov[0] !== hov[1], `hover lifts the row under the pointer: ${JSON.stringify(hov)}`);
         // selected: ticking a row tints it and gives it the rail
         await ev(`(() => { const c = document.querySelectorAll('${T} tbody tr.inbox-card-tr')[3].querySelector('input[type=checkbox]'); c.click(); return true; })()`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr.inbox-card-tr')[3].classList.contains('dt-selected')`, 'the ticked row is selected', 5000);
+        await waitFor(`document.querySelectorAll('${T} tbody tr.inbox-card-tr')[3].getAttribute('aria-selected') === 'true'`, 'the ticked row is selected', 5000);
         const sel = await ev(`(() => { const trs = [...document.querySelectorAll('${T} tbody tr.inbox-card-tr')], a = trs[3], b = trs[4]; const bg = t => getComputedStyle(t).boxShadow; return { bgA: bg(a), bgB: bg(b), ring: getComputedStyle(a).boxShadow }; })()`);
         check(sel.bgA !== sel.bgB && /3px/.test(sel.ring), `a selected row is tinted and has the 3 px rail: ${JSON.stringify(sel)}`);
         await shot('inbox-kinds-1280-dark');
