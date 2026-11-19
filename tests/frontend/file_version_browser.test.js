@@ -32,8 +32,9 @@ const { coralReady } = require('./helpers/wait');
             await open(H3, { fileId: FILE, versionLine: lineOf(3) });
             await waitFor(vis('#artifact-viewer .av-current'), `${at}: the bar`, 6000);
             await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, `${at}: the header line of v3`, 6000);
-            assert.equal(await headShown(), true, `${at}: the header line is visible`);
-            assert.equal(await detailsShown(), false, `${at}: a file id and line add no Details button of their own (row one on a phone stays the name, Comments and the menu)`);
+            assert.equal(await headShown(), false, `${at}: the version line is not in the header row (#19771, it is in Details)`);
+            assert.equal(await ev(`!!document.querySelector('#artifact-viewer .artifact-viewer-readers .artifact-viewer-versionline')`), true, `${at}: the version line is in Details`);
+            assert.equal(await ev(`!!document.querySelector('#artifact-viewer .artifact-viewer-details') || !!document.querySelector('#artifact-viewer .artifact-viewer-details-item')`), true, `${at}: the version line lives in Details, so Details has its button or ⋯ item (#19771)`);
 
             console.log(`${at}: choosing v2 replaces the line: a v2 is never labelled v3`);
             await ev(`document.querySelector('#artifact-viewer .av-current').click(); true`);
