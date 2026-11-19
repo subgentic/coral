@@ -6,7 +6,7 @@ import { importOnce } from './import_once.js';
 import { requestJson } from './request_json.js';
 import { teamLabel } from './server_status.js';
 import { serverFetch, identityKey, LOCAL_SERVER, splitKey, decisionNeedsPerson, serverUrl } from './server_base.js';
-import { copyText, showToast, OPERATOR_ID } from './utils.js';
+import { copyText, showToast } from './utils.js';
 import { state as appState } from './state.js';
 import { inboxSources, multipleServers, serverLabel } from './inbox_servers.js';
 const { activityParts, aboutWords, jobRunParts } = await importOnce('./operator_activity_words.js');
@@ -200,7 +200,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                     if (open.taskOf && r.task_id) items.push({ label: 'Open task', run: () => open.taskOf(r) });
                 }
                 else if (r.item_kind === 'goal' && r.action === 'goal_close' && /^\d+$/.test(r.item_id) && team && !decisionNeedsPerson(team.server)) {
-                    items.push({ label: 'Reopen goal', run: async () => { try { const { goalWrite } = await importOnce('./goal_write.js'), id = Number(r.item_id), res = await goalWrite(team.name, 'goal_update', id, `/goals/${id}`, 'PATCH', { subscriber_id: OPERATOR_ID, state: 'active' }); if (!res.ok) throw new Error(`HTTP ${res.status}`); showToast(`Goal #${id} reopened. The team read it on the board.`); } catch (e) { showToast(`Not reopened: ${e && e.message || 'try again'}`, true); } } });
+                    items.push({ label: 'Reopen goal', run: async () => { try { const { reopenGoal } = await importOnce('./goal_write.js'), id = Number(r.item_id), res = await reopenGoal(r.team, id); if (!res.ok) throw new Error(`HTTP ${res.status}`); showToast(`Goal #${id} reopened. The team read it on the board.`); } catch (e) { showToast(`Not reopened: ${e && e.message || 'try again'}`, true); } } });
                 }
                 return items;
             };
