@@ -23,6 +23,8 @@
     --needs-icon-amber-bg: #61401d;
     --needs-icon-blue-fg: #cdecff;
     --needs-icon-blue-bg: #204962;
+    --needs-icon-red-fg: #ffd5d0;
+    --needs-icon-red-bg: #5c2620;
 
 
     /* Surface / Background — deep warm black */
@@ -297,6 +299,8 @@
     --needs-icon-amber-bg: #ffe2bc;
     --needs-icon-blue-fg: #204962;
     --needs-icon-blue-bg: #cdecff;
+    --needs-icon-red-fg: #7a2318;
+    --needs-icon-red-bg: #ffe0dc;
 
     color-scheme: light;
 
