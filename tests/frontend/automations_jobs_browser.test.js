@@ -118,6 +118,12 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/automations/jobs/1' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-header')`, `${at}a job's address opens its page`, 10000);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-header h2').textContent`), 'nightly-build-job');
+            // a job that has never run says so (#19855): a short line in the Runs box, not an empty box (job 1's workflow has no runs)
+            await waitFor(`!!document.querySelector('#scheduler-detail #sched-run-history .empty-state')`, `${at}a job with no runs shows an empty state in Runs`, 8000);
+            assert.equal(await ev(`document.querySelector('#scheduler-detail #sched-run-history .empty-state-line').textContent`), 'No runs yet.', `${at}the line says No runs yet`);
+            assert.equal(await ev(`(() => { const e = document.querySelector('#scheduler-detail #sched-run-history .empty-state'), r = e.getBoundingClientRect(); return r.height > 20 && getComputedStyle(e.querySelector('.empty-state-line')).visibility === 'visible'; })()`), true, `${at}the empty state is drawn`);
+            assert.equal(await ev(`(() => { const h = document.querySelector('#scheduler-detail .sched-runs-section h3').getBoundingClientRect().left, l = document.querySelector('#scheduler-detail #sched-run-history .empty-state-line').getBoundingClientRect().left; return Math.abs(h - l) < 1; })()`), true, `${at}the line starts at the Runs heading's edge`);
+            await themed('job-page-no-runs', w);
             await Page.navigate({ url: BASE + '/jobs' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`location.pathname === '/automations/jobs' && document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${at}/jobs opens the Jobs folder`, 10000);
             assert.equal(await ev(vis('#scheduler-detail .sched-header')), false, `${at}and no job's page`);
