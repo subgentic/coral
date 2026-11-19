@@ -64,7 +64,7 @@ const TEAM = `qa-tasks-${Date.now() % 100000}`;
             await ev(`window.__more = false; window.dispatchEvent(new Event('focus')); true`); await settle(700);
         });
         await S.run('New task opens the task dialog', async () => {
-            assert.ok(await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-tasks button')].find(x => /^New task$/.test(x.textContent.trim())); if (!b) return false; b.click(); return true; })()`), 'a New task button'); await settle(500);
+            assert.ok(await ev(`(() => { const b = [...document.querySelectorAll('#team-panel-tasks button')].find(x => /^New task$/.test(x.textContent.trim())); if (!b) return false; b.click(); return true; })()`), 'a New task button'); await waitFor(`(() => { const m = document.getElementById('create-task-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'the create task dialog', 20000); await settle(300);
             assert.ok(await ev(`(() => { const m = document.getElementById('create-task-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`), 'the create task dialog is open');
             await ev(`window.hideCreateTaskModal && window.hideCreateTaskModal(); true`); await settle(200);
         });
