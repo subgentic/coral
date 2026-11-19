@@ -1,5 +1,36 @@
 # Release Notes
 
+## v2.1.1 — Coral Hub shows the Queue, Analytics, Automations and Skills pages, and an agent is Awake, Asleep or Archived
+
+Task numbers in brackets. Built on v2.1.0. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **An agent is Awake, Asleep or Archived** (#19673, #19674, #19684, #19696, #19707): Stop agent on a team agent now archives it, its session ends and its seat stays, and Start brings it back Awake. The separate Archive item is gone from the row menu; an archived agent's menu has Sleep. The Agents tab keeps Archived agents out of its list and count, behind More > Archived, and an agent whose session ended is Archived, not Ended.
+- **Start works on an Archived agent from every route** (#19696): the dashboard Start and the Orchestrator's wake no longer refuse it with "Session is not sleeping".
+- **A name an archived member has is not free** (#19673, #19674, #19693): a New agent launch or a team join with it asks Start it or Use another name; a failed Start it says why in a toast and launches nothing.
+- **The Orchestrator and the board follow the new states** (#19673, #19684, #19707): `coral-board stop` archives and `coral-board interrupt` ends a turn; the Team settings switch reads "Orchestrator may archive agents (Stop)"; the health check leaves Archived agents alone; the Orchestrator cannot stop, sleep or remove itself or the last Orchestrator.
+
+#### Coral Hub
+
+- **The Queue tab is shown through the Hub** (#19568): its picker lists the linked computers only, and leaving the Queue sends nothing until you come back.
+- **Analytics, Automations and Skills read through the Hub** (#19569, #19570, #19591, #19593, #19627): every read goes to a linked computer; Automations reads are the owner's alone; a skill's name is redacted as its description is.
+- **"While you were away", questions and files work through the Hub** (#19628, #19629, #19645): answer and dismiss an agent's question, add its picture, and a chat's pasted image and a done task's changes.diff reach the Hub, owner only.
+- **A Hub error is a status and a fixed sentence**, never database or path text (#19583); buttons for routes the Hub never serves are hidden in cloud (#19630).
+- **A self-hosted Hub never forwards the tunnel Via header** (#19686).
+
+#### For the team
+
+- `coral --version` names the commit in a make dev build, in a worktree too (#17637).
+- `coral-board task submit-review` with a new revision while the task is in review records the head it names (#19685).
+- Test and gate work: the lazy-group order test, suite_durations from the v2.1.0 gate, and timing fixes for team_artifacts_not_found, heap_growth (now three suites) and actions_tasks (#19721, #19725, #19755, #19763, #19766, #19770).
+
+### Known issues
+
+- None from the gate: go-tests, go-race, gofmt, cross-build, the cdp-gate (2136 of 2136 suites) and the Windows tests all passed on their first run.
+
 ## v2.1.0 — Search across tasks and goals, reminders for any agent, a calmer Needs you list, an Activity view that leaves out the noise, and spend broken down by goal
 
 Task numbers in brackets. Built on v2.0.70. A prerelease until the Operator promotes it.
