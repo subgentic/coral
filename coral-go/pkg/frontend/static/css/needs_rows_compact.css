@@ -180,3 +180,8 @@
 :root .inbox-folder-toolbar .list-bar-menu .list-bar-field:not(.list-bar-kept) { row-gap: 8px; }
 :root .inbox-folder-toolbar .list-bar-menu-grid { row-gap: 4px; } /* the 4 px the label gap added, taken from the gap between lines so the panel push stays within 150 */ /* a Filters label sits a clear 8 px over its select, as the mock draws it (#19870, MUST-8) */
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state > .empty-state-line + .empty-state-hint:has(> .btn)::before { content: "Try clearing the active Team, Goal, or Kind filter to see the remaining waiting items."; display: block; margin-bottom: 14px; } /* the filtered result's hint line, as the mock draws it (#19870, MUST-8): drawn here, the one button of the empty state sits in the hint's own paragraph */
+/* Needs you's two tabs (#19904): Waiting on you, Waiting on an agent: underline tabs over the search row; only the first counts toward the badges. */
+:root .inbox-folder-toolbar .inbox-needs-tabs { display: flex; gap: 20px; margin: 0 0 10px; border-bottom: 1px solid var(--border); }
+:root .inbox-folder-toolbar .inbox-needs-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 2px 9px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; }
+:root .inbox-folder-toolbar .inbox-needs-tab.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
+:root .inbox-folder-toolbar .inbox-needs-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
