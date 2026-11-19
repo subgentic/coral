@@ -17,7 +17,7 @@
 /* the record integrity notice and the empty state as cards (#19813 v1 section 5, #19871): an icon tile, a heading, the detail under it, on a tinted surface */
 .activity-check { display: flex; align-items: flex-start; gap: var(--space-lg); padding: var(--space-lg); background: var(--bg-secondary); font-weight: var(--fw-regular); }
 .activity-check-broken { background: rgba(var(--error-rgb), 0.1); border-color: rgba(var(--error-rgb), 0.4); }
-.activity-check-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 2rem; aspect-ratio: 1; border-radius: var(--radius-lg); border: 1px solid var(--border); font-size: var(--fs-lg); }
+.activity-check-tile { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 2rem; min-height: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border); font-size: var(--fs-lg); }
 .activity-check-broken .activity-check-tile { color: var(--error-text); background: rgba(var(--error-rgb), 0.14); border-color: rgba(var(--error-rgb), 0.3); }
 .activity-check-tile::before { content: "warning"; }
 .activity-check-title { display: inline; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); }
