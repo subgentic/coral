@@ -7,6 +7,7 @@ import { importOnce } from './import_once.js';
 import { visibleName } from './artifact_names.js';
 const DT = await importOnce('./data_table.js');
 const { starControl } = await importOnce('./artifact_star.js');
+const NF = await importOnce('./needs_filters.js');
 
 const STALE_MS = 30000;
 const state = { rows: [], total: null, busy: false, error: '', at: 0 };
@@ -47,12 +48,10 @@ export const starredArtifactsSignature = () => JSON.stringify([state.busy, state
 // An error is visible content too: do not show “Nothing starred yet” beside a failed read.
 export const hasStarredArtifacts = () => state.rows.length > 0 || !!state.error;
 
-const typeOf = m => (/^video\//.test(m || '') ? 'video' : /html/.test(m || '') ? 'html' : /markdown/.test(m || '') ? 'md' : '');
 const STATE = { approved: 'Approved', denied: 'Denied', 'changes requested': 'Sent back', 'for review': 'For review' };
 /** The approved folder row (#19833): the file's tile, its name, and under it what it is, who made it and the goal and task it belongs to. */
 function folderItem(r, nameButton) {
-    const box = DT.el('span', 'inbox-folder-item'), tile = DT.el('span', 'material-icons inbox-kind-icon'), text = DT.el('span', 'inbox-folder-text'), meta = DT.el('span', 'inbox-folder-meta');
-    tile.dataset.kind = 'review'; tile.dataset.type = typeOf(r.media_type); tile.setAttribute('aria-hidden', 'true');
+    const box = DT.el('span', 'inbox-folder-item'), tile = NF.fileTile({ ...r, id: hexOf(r) }, splitKey(r.board_id).server), text = DT.el('span', 'inbox-folder-text'), meta = DT.el('span', 'inbox-folder-meta');
     const got = Object.entries(STATE).find(([t]) => (r.tags || []).includes(t)), who = String(r.produced_by || r.uploaded_by || '');
     meta.append(...[got && got[1], who].filter(Boolean).map(t => DT.el('span', 'inbox-folder-word', t)));
     for (const [k, id] of [['Goal', r.goal_id], ['Task', r.task_id]]) if (id) meta.append(DT.el('span', 'chip chip-tag inbox-folder-chip', `${k} #${id}`));
