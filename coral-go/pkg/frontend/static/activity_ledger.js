@@ -5,6 +5,7 @@ import { importOnce } from './import_once.js';
 import { timeCell } from './data_table.js';
 const { decisionOf } = await importOnce('./operator_activity_filters.js');
 const { fileKindOf } = await importOnce('./file_kind.js');
+const { artifactThumbnail, thumbnailPath } = await importOnce('./artifact_thumbnail.js');
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const TILE = { file: 'description', question: 'help_outline', goal: 'flag', task: 'task_alt', proposal: 'checklist', skill: 'auto_awesome', run: 'error_outline', job_run: 'error_outline', workflow_run: 'error_outline', permission: 'lock' };
@@ -63,9 +64,13 @@ function moreMenu(r, x) {
 export function ledgerRow(r, x) {
     const p = x.parts(r), kind = tileKind(r), v = verdictOf(r), open = x.opens(r);
     const li = el('li', `al-row${r.action === 'wait_send' ? ' is-noise' : ''}`); li.dataset.key = x.keyOf(r); li.dataset.kind = kind || 'other';
-    const fk = kind === 'file' ? fileKindOf(r.title) : null; // a file's tile says its type (document, video, image, code), not just "file"
+    const fk = kind === 'file' || kind === 'image' ? fileKindOf(r.title) : null; // a file's tile says its type (document, video, image, code), not just "file"
     const tile = el('span', `al-tile al-tile-${kind || 'other'}${fk ? ` al-fk-${fk.kind}` : ''}`); tile.setAttribute('aria-hidden', 'true');
     tile.append(fk && fk.glyph ? el('span', 'al-glyph', fk.glyph) : el('span', 'material-icons', fk ? fk.icon : TILE[kind] || 'info'));
+    if (fk && fk.kind === 'image' && x.thumbUrl) { // a stored picture is drawn as the Inbox list draws it: its own thumbnail in the tile (the icon stands until it loads, or for a file with none)
+        const item = { name: r.title, id: String(r.version || r.item_id || '') }, path = thumbnailPath(item);
+        if (path) { tile.classList.add('al-tile-thumb'); tile.replaceChildren(artifactThumbnail(item, { size: 32, url: x.thumbUrl(path, r) })); }
+    }
     const main = el('div', 'al-main'), head = el('div', 'al-head');
     const title = open ? el('button', 'al-title', p.on) : el('span', 'al-title al-title-plain', p.on);
     if (open) { title.type = 'button'; title.setAttribute('aria-label', `${p.on}. ${p.about ? `${p.about}. ` : ''}Open ${x.openLabel(r)}`); title.addEventListener('click', () => x.openRow(r)); }
@@ -75,7 +80,10 @@ export function ledgerRow(r, x) {
     main.append(head);
     if (r.ask) main.append(el('div', 'al-ask', r.ask)); // the question the file was sent with, kept on the row when it was decided
     const said = p.detail.replace(/^from [^\u00b7]+(?: \u00b7 |$)/, ''); // who asked is the meta line's: the callout holds what you said
-    if (said) main.append(el('div', `al-answer al-ans-${v}`, said));
+    if (said) { // the callout says what the words are: the note you approved with, the changes you asked for
+        const note = el('div', `al-answer al-ans-${v}`), label = r.item_kind === 'file' ? ({ approved: 'Approved with note:', approve: 'Approved with note:', changes: 'Changes requested:', deny: 'Denied:' })[r.action] : '';
+        if (label) note.append(el('b', 'al-ans-label', label), document.createTextNode(' ')); note.append(said); main.append(note);
+    }
     if (said && r.item_kind === 'question') {
         const qa = el('details', 'al-qa'), sum = el('summary', null, 'Preview Q&A (2 messages)'), body = el('div', 'al-qa-body');
         for (const [who, text] of [[x.fromWords(r) || 'An agent', p.on], ['You', said]]) { const m = el('div', 'al-qa-msg'); m.append(el('b', 'al-qa-who', who), el('span', 'al-qa-text', text)); body.append(m); }
@@ -93,6 +101,7 @@ export function ledgerRow(r, x) {
     const meta = el('div', 'al-meta');
     meta.append(el('span', 'al-author', x.fromWords(r) || 'You'), el('span', 'al-sr', `. Done from ${x.doneFrom(r)}. `));
     if (p.about) p.about.split(' · Task #').forEach((part, i) => { if (i) meta.append(el('span', 'al-sr', ' · ')); const full = i ? `Task #${part}` : part, [short, ...rest] = full.split(' \u00b7 '), c = el('span', 'chip chip-tag al-chip', short); if (rest.length) { c.title = full; c.append(el('span', 'al-sr', ` \u00b7 ${rest.join(' \u00b7 ')}`)); } meta.append(c); }); // short label as in the mock ("Goal #259", "Task #19787"); the title is in the tooltip and read out in full
+    if (r.source === 'hub') meta.append(el('span', 'chip chip-tag al-via', 'via Coral Hub')); // the decision came through Coral Hub (the record's source)
     main.append(meta);
     const right = el('div', 'al-right'), rm = el('div', 'al-right-meta');
     rm.append(el('span', 'al-team', x.teamWords(r)), el('span', 'al-dot', '·'), timeCell(r.at));

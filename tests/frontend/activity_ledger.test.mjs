@@ -68,4 +68,13 @@ await new Promise(r => setTimeout(r, 10));
 assert.equal(qa3.querySelectorAll('.al-qa-msg').length, 3, 'the preview shows the first three messages');
 assert.match(qa3.querySelector('summary').textContent, /Preview Q&A \(3 of 4 messages\)/);
 assert.equal(qa3.querySelectorAll('.al-qa-text')[2].textContent, 'Thanks, closing it');
+// round 3: callout labels, the Hub mark, a picture's thumbnail
+const r3 = Ledger.ledger([{ ...file(50, 6, new Date(now).toISOString()), note: 'Ship it', action: 'approved', source: 'hub' }, { ...file(51, 7, new Date(now).toISOString(), 'changes'), note: 'Fix the title' }, { ...file(52, 8, new Date(now).toISOString()), title: 'shot.png' }], { ...x, parts: r => ({ did: r.action === 'approved' ? 'Approved' : 'Changes', on: r.title, detail: r.note || '', about: '' }), thumbUrl: (path, r) => 'http://x' + path }, { now });
+const [ra, rb, rc] = [...r3.querySelectorAll('.al-row')];
+assert.equal(ra.querySelector('.al-ans-label').textContent, 'Approved with note:');
+assert.equal(rb.querySelector('.al-ans-label').textContent, 'Changes requested:');
+assert.equal(ra.querySelector('.al-via').textContent, 'via Coral Hub');
+assert.equal(rb.querySelector('.al-via'), null, 'a local decision has no Hub mark');
+assert.ok(rc.querySelector('.al-tile.al-tile-thumb .artifact-thumbnail'), 'a picture row draws its thumbnail in the tile');
+assert.equal(ra.querySelector('.al-tile-thumb'), null, 'a document keeps its icon');
 console.log('ok activity_ledger');
