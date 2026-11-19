@@ -35,7 +35,10 @@ else
   dr=""
 fi
 if [ -n "$dr" ] && [ "$dr" != "null" ]; then
-  echo "  DRYRUN    run $dr  (a provenance-only FAIL while the gates still run is expected; any other failed step is not)"
+  case "$dr" in
+    *" completed "*) echo "  DRYRUN    run $dr  (a provenance-only FAIL while the gates still run is expected; any other failed step is not)" ;;
+    *) echo "  NOT-FINISHED run $dr  (queued or running: wait for it before the tag)" ;;
+  esac
 else
   echo "  NO-DRYRUN none for this commit: gh workflow run release-dryrun.yml --ref main   (the candidate is the commit main is on)"
 fi
