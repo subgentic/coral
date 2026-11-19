@@ -86,7 +86,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         return askUi.buildSendBlock({ id: k.id, board: st.board, title: st.board === '~no-team' ? (k.queue.length > 1 ? `Send ${k.queue.length} open comments to ${askUi.NO_TEAM_AGENT}, in time order` : `Send this comment to ${askUi.NO_TEAM_AGENT}`) : undefined, note: st.board === '~no-team' ? 'It is typed into that agent\'s session. There is no board to answer on: it applies the comment.' : undefined, agents: k.agents, empty: k.empty, picked: k.picked, asked: k.queue.length > 1 ? new Map() : askedNow(k.id), count: k.queue.length, long: k.queue.some(q => String(q.body || '').length > askUi.SEND_COMMENT_CAP), results: k.results, busy: k.busy, now: k.now, onNow: st.board === '~no-team' ? undefined : v => { k.now = v; }, error: k.error,
             onToggle: (role) => { if (k.picked.has(role)) k.picked.delete(role); else if (k.picked.size < askUi.MAX_AGENTS) k.picked.add(role); redrawAsk(role); },
             onCancel: () => { st.ask = null; render(); panel.querySelector(`.ac-card[data-id="${k.id}"] .ac-ask-open`)?.focus(); },
-            onSend: () => sendAsk() });
+            front: k.maker, restOpen: k.restOpen, onRest: v => { k.restOpen = v; }, onSend: () => sendAsk() });
     }
     // The block is drawn again in place (not the whole panel), so a checkbox keeps its focus while it is ticked.
     function redrawAsk(focusRole) {
@@ -101,6 +101,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
             const { uploaderOf } = await importOnce('./artifact_uploader.js');
             const who = String(await uploaderOf({ hex: k.context.hex, server: k.context.server, board: k.context.board }, uploaderHint?.()) /* the version DISPLAYED (captured at open), never the version the thread's comment was written on (#13995) */ || '').trim().toLowerCase();
             if (!who || !current(k)) return;
+            k.maker = who;
             const agent = k.agents.find(a => a.role.toLowerCase() === who);
             if (!agent || !agent.can || (k.queue.length === 1 && askedNow(k.id).has(who)) || k.picked.size >= askUi.MAX_AGENTS) return;
             k.picked.add(agent.role);
