@@ -295,6 +295,7 @@ func (pr *Provisioner) startSteps(ctx context.Context, p *provisionPlan) {
 	if h := pr.checkHealth(ctx, row, key); h.Status == store.RemoteStatusOnline {
 		p.setStep("start", stepSkipped, "Coral is already running there.")
 		p.setStep("verify", stepSkipped, "")
+		pr.answers(ctx, p.ServerID) // it answers here but the hub may still show it down: the hub's own connections to it are what went stale (#19885)
 		pr.done(p)
 		return
 	}
@@ -344,7 +345,20 @@ func (pr *Provisioner) startSteps(ctx context.Context, p *provisionPlan) {
 		return
 	}
 	p.setStep("verify", stepOK, "Coral is running.")
+	pr.answers(ctx, p.ServerID)
 	pr.done(p)
+}
+
+// answers is what a Start does once the computer answers (#19885): the stored status is online with a fresh Last seen, the hub's workers hear it and dial the computer again from scratch (an ssh stream the outage left
+// half-dead is dropped), so the main window changes by itself, with no Test and no reload.
+func (pr *Provisioner) answers(ctx context.Context, id string) {
+	_ = pr.store.SetStatus(ctx, id, store.RemoteStatusOnline, "")
+	if pr.notify != nil {
+		pr.notify(id, store.RemoteStatusOnline)
+	}
+	if pr.reconnect != nil {
+		pr.reconnect(id)
+	}
 }
 
 func (pr *Provisioner) stopRemote(ctx context.Context, p *provisionPlan) bool {
