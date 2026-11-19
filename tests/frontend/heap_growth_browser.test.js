@@ -1,11 +1,12 @@
-// cdp-timeout: 300 (60 rounds with three terminals each: 145 s of the runner's 180 s on a Windows CI runner at 121a5c2ff9, about 165 s of body and 17 s of cleanup at 39b13c2a82, where it was killed after its PASS line; #19763)
 // The dashboard stays small when it is left open and used (#5048): 20 agents with chats, and a loop of what an operator does all day — switch to the next agent,
 // a burst of feed diffs and a full update now and then, scroll the chat, open and shut the Display panel, open and shut a dialog — for many rounds. After the first
 // rounds (caches fill, the page warms) the heap after a forced GC, the DOM nodes, the event listeners and the documents may not keep growing: each is compared with
 // its value after the warm-up and must stay under a bound. HEAP_CYCLES=n runs longer (the hour on epoch is HEAP_CYCLES=3000 or so), HEAP_OUT=file writes the numbers as
 // JSON, HEAP_FETCHES=file counts the page's fetches by URL and whether the body was read, HEAP_LEAK_SELFTEST=1 adds a deliberate leak (a listener and three nodes a round) that the bounds must catch, HEAP_SNAPSHOT_DIR=dir takes a heap snapshot after the warm-up and at the end (for the retainer paths of what grew).
-// Part 2 (#5050): every round also opens three real terminals in turn (each an xterm and a /ws/terminal socket) and goes back to the chat, resizes the window, opens the
-// team page Board tab and posts to it, and pages History. HEAP_TERMINAL=0 leaves that part out.
+// Part 2 (#5050): a round also opens a real terminal (an xterm and a /ws/terminal socket) and goes back to the chat, resizes the window, opens the team page Board tab and posts to it, and pages History.
+// Three suites share this file so none runs more than about a minute on a Windows CI runner (it was 165 s in one, #19766): this one does the feed and the dialogs (HEAP_PARTS=feed,modals), heap_growth_terminals_browser
+// the terminals and History (HEAP_PARTS=terminal,history: the three stand-in agents in turn, one a round) and heap_growth_board_browser the window size and the Board tab (HEAP_PARTS=resize,board). HEAP_PARTS=all does
+// every part in one run (the long run on epoch); HEAP_TERMINAL=0 leaves the terminal, window, Board and History parts out. The bounds and the rounds are the same in each.
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -81,7 +82,9 @@ async function httpJson(method, path, body) {
         mark('snapshot: takeHeapSnapshot'); await HeapProfiler.takeHeapSnapshot({ reportProgress: false });
         fs.writeFileSync(`${process.env.HEAP_SNAPSHOT_DIR}/${name}.heapsnapshot`, chunks.join(''));
     };
-    const withTerminals = process.env.HEAP_TERMINAL !== '0';
+    // What a round does (HEAP_PARTS, default all of them): the three heap_growth_* suites each take some, so none runs longer than a minute on a Windows runner (#19766).
+    const PARTS = (process.env.HEAP_PARTS === 'all' ? 'feed,modals,terminal,resize,board,history' : process.env.HEAP_PARTS || 'feed,modals').split(',');
+    const withTerminals = process.env.HEAP_TERMINAL !== '0' && PARTS.includes('terminal');
     try {
         if (withTerminals) for (const name of ['HG Term A', 'HG Term B', 'HG Term C']) { const si = await launchStandIn(httpJson, { displayName: name }); if (!si.sid) throw new Error('no stand-in agent: ' + si.diag); standIns.push(si); }
         await Page.enable(); await HeapProfiler.enable(); await Performance.enable();
@@ -97,9 +100,9 @@ async function httpJson(method, path, body) {
         if (process.env.HEAP_FETCHES) await ev(`(() => { const R = window.fetch; window.__f = {}; window.fetch = (u, o) => { const k = (o && o.method || 'GET') + ' ' + String(u && u.url || u).replace(/[0-9a-f-]{8,}/g, '#').split('?')[0]; const e = window.__f[k] = window.__f[k] || { n: 0, settled: 0, bodyRead: 0 }; e.n++;
             return R(u, o).then(r => { e.settled++; const j = r.json.bind(r), t = r.text.bind(r), b = r.blob.bind(r); r.json = (...a) => { e.bodyRead++; return j(...a); }; r.text = (...a) => { e.bodyRead++; return t(...a); }; r.blob = (...a) => { e.bodyRead++; return b(...a); }; return r; }); }; return true; })()`);
         const BOARD = boardName;
-        const parts = (process.env.HEAP_PARTS || 'terminal,resize,board,history').split(',');
+        const parts = PARTS;
         const terminalPart = async n => {
-            for (const si of parts.includes('terminal') ? standIns : []) {
+            for (const si of parts.includes('terminal') ? [standIns[n % standIns.length]] : []) { // one of the three a round, in turn (each is opened every third round)
                 mark(`round ${n}: ${si.name}: opening it in the terminal view`);
                 await ev(`window.selectLiveSession(${JSON.stringify(si.name)}, 'claude', ${JSON.stringify(si.sid)}, ''); window.setLiveViewMode('terminal'); true`);
                 mark(`round ${n}: ${si.name}: waiting for its terminal canvas`);
@@ -124,6 +127,7 @@ async function httpJson(method, path, body) {
             mark(`round ${n}: select`); await select('hg-' + (n % AGENTS));
             if (process.env.HEAP_STALL_TEST && n === 3 && !process.env.HEAP_RETRIED) await ev(`new Promise(() => {})`); // the retry's own test: a step that never finishes
             if (process.env.HEAP_LEAK_SELFTEST) await ev(`(() => { document.addEventListener('hg-leak', () => document.body); for (let i = 0; i < 3; i++) (window.__leak = window.__leak || []).push(document.body.appendChild(document.createElement('i'))); return true; })()`);
+            if (PARTS.includes('feed') || n >= 1000) { // (the first rounds, 1000 and up, check the failed polls whatever the suite's parts)
             mark(`round ${n}: feed diffs and a full update`);
             await ev(`(async () => { const rnd = i => 'hg-' + ((i * 7 + ${n}) % ${AGENTS}) + '-id';
                 for (let i = 0; i < 10; i++) { const a = window.__m.agents[rnd(i)]; T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...window.__m.entry(a), summary: 'step ' + ${n} + '.' + i, working: i % 2 === 0, staleness_seconds: i }] }); }
@@ -131,12 +135,18 @@ async function httpJson(method, path, body) {
                 T.render.flushLiveSessionsRender();
                 { const cur = window.__m.agents['hg-' + (${n} % ${AGENTS}) + '-id']; if (cur) { for (let k = 0; k < 3; k++) cur.msgs.push(k % 2 ? { type: 'assistant', text: 'live ' + ${n} + '.' + k + ' ' + 'x'.repeat(200) } : { type: 'user', content: 'ask ' + ${n} + '.' + k }); }
                   const lc = await import((window.__coralStatic || '/static/') + 'live_chat.js'); if (lc.refreshLiveHistory) await lc.refreshLiveHistory(); }
+                await ${framesJs(2)}; return true; })()`);
+            }
+            if (PARTS.includes('modals')) {
+            mark(`round ${n}: modals`);
+            await ev(`(async () => {
                 if (window.showSettingsModal) { await window.showSettingsModal(); await ${framesJs(1)}; window.hideSettingsModal && window.hideSettingsModal(); }
                 const c = document.getElementById('live-history-messages'); if (c) { c.scrollTop = 0; c.dispatchEvent(new Event('scroll')); c.scrollTop = c.scrollHeight; c.dispatchEvent(new Event('scroll')); }
                 const b = document.querySelector('.sidebar-header [data-display-button]'); if (b) { b.click(); await ${framesJs(1)}; b.click(); }
                 if (window.showLaunchModal) { await window.showLaunchModal(); await ${framesJs(1)}; window.hideLaunchModal(); }
                 await ${framesJs(2)}; return true; })()`);
-            mark(`round ${n}: terminals`); if (withTerminals) await terminalPart(n);
+            }
+            mark(`round ${n}: terminals`); if (n < 1000 && process.env.HEAP_TERMINAL !== '0' && PARTS.some(x => ['terminal', 'resize', 'board', 'history'].includes(x))) await terminalPart(n);
         };
         // HEAP_LISTENERS=1: the event listeners on window, document, body and every element, by type, at the warm-up and at the end
         const listenerCensus = async () => {
