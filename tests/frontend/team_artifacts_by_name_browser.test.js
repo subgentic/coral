@@ -61,7 +61,8 @@ const ITEMS = ['plan.md', 'notes.md'].map((name, i) => ({ name, media_type: 'tex
                             return R(u, o); }; } return true; })()`);
                 await ev(`window.switchNavTab('agents'); window.openTeamPage(${JSON.stringify(LABEL)}, { tab: 'artifacts' }); true`);
                 await waitFor(`!!document.querySelector('#team-panel-artifacts') && !document.querySelector('#team-panel-artifacts').hidden`, `${label}: the Artifacts tab`, 10000);
-                await settle(900);
+                await waitFor(`(() => { const p = document.querySelector('#team-panel-artifacts'); return !!p && (p.querySelectorAll('tbody tr').length > 0 || !!p.querySelector('.team-artifacts-error')); })()`, `${label}: the tab answered (rows or an error)`, 20000);
+                await settle(300);
                 if (answerId === ID) check(`${label}: opened by name, the answer for the board the name's label names lists its two files, with no error`, (await rows()) === 2 && (await err()) === '', `${await rows()} rows; ${await err()}`);
                 else check(`${label}: an answer for another board is still refused ("unexpected response scope")`, (await rows()) === 0 && /unexpected response scope/.test(await err()), `${await rows()} rows; ${await err()}`);
             }
