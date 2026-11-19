@@ -757,3 +757,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 :root #group-table-view .inbox-starred-folder .dt-td[data-key="star"] > .dt-star { position: relative; inset-inline-end: 14px; } :root #group-table-view .inbox-starred-folder .dt-td[data-key="flags"] > .dt-chat-flags { position: relative; inset-inline-end: 4px; }
 :root #group-table-view .inbox-starred-folder .dt-td[data-key="flags"] { text-align: end; } :root #group-table-view .inbox-starred-folder .dt-chat-flags { flex-direction: row-reverse; }
 @media (max-width: 767px) { #group-table-view[data-group^="hub-inbox:"] :is(.inbox-saved-card, .inbox-starred-folder) .dt-box { margin-inline: 0; } }
+@media (max-width: 767px) { :root #group-table-view .inbox-starred-folder .dt-table { table-layout: auto !important; } }

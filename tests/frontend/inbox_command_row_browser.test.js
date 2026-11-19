@@ -62,6 +62,11 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             // what the row draws: the block (every line of the command, wrapped), Claude's own line under it, the Yes sentence, and whether a Yes is on the row; the invariant: Yes is on the row exactly when the block is not clipped
             const rowState = () => ev(`(() => { const c = document.querySelector('#group-table-view .inbox-answers'); const blk = c && c.querySelector('.inbox-cmd-block'); if (!blk) return null; const r = blk.getBoundingClientRect(); const yes = [...c.querySelectorAll('button:not(.inbox-dismiss):not(.inbox-cmd-more)')].filter(b => b.textContent === 'Yes' && !b.hidden && b.getClientRects().length > 0); return { text: blk.textContent, note: (c.querySelector('.inbox-cmd-note') || {}).textContent || '', sentence: (c.querySelector('.inbox-yes-note') || {}).textContent || '', clipped: blk.scrollHeight > blk.clientHeight + 1, yes: yes.length, no: [...c.querySelectorAll('button')].filter(b => b.textContent === 'No').length, h: Math.round(r.height), lines: Math.round(blk.clientHeight / (parseFloat(getComputedStyle(blk).lineHeight) || 1)), left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, mono: /mono|courier|menlo|consolas|ui-monospace/i.test(getComputedStyle(blk).fontFamily) }; })()`);
             const consistent = (s, what) => check(s && (s.yes === 1) === !s.clipped && s.no === 1, `${at}${what}: Yes is on the row exactly when the block is not clipped, No always: ` + JSON.stringify(s));
+            // the row's parts never lie over one another (#19870 round 3: 'Claude · dir' was drawn over the command box): the code box, the Yes sentence, the answer buttons and the Claude line each have their own place
+            const noOverlap = async what => {
+                const o = await ev(`(() => { const row = document.querySelector('#group-table-view .inbox-answers')?.closest('tr'); if (!row) return null; const q = s => [...row.querySelectorAll(s)].filter(e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden'); const parts = [...q('.inbox-cmd-block').map(e => ['code', e]), ...q('.inbox-yes-note').map(e => ['yes-sentence', e]), ...q('.inbox-answers button').map(e => ['button ' + e.textContent, e]), ...q('td[data-key="cli"] .chip, td[data-key="cli"]').slice(0, 1).map(e => ['claude-line', e])]; const hit = []; for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) { const a = parts[i][1].getBoundingClientRect(), b = parts[j][1].getBoundingClientRect(); if (parts[i][1].contains(parts[j][1]) || parts[j][1].contains(parts[i][1])) continue; if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) hit.push(parts[i][0] + ' over ' + parts[j][0]); } return { n: parts.length, hit }; })()`);
+                check(o && o.n >= 3 && o.hit.length === 0, `${at}${what}: no part of the row lies over another: ` + JSON.stringify(o));
+            };
             // observers: a command block's ResizeObserver goes when its cell is drawn again, so repeated redraws do not pile them up
             await ev(`(() => { const R = window.ResizeObserver; if (!window.__roLive) { window.__roLive = new Set(); window.ResizeObserver = class extends R { observe(t, o) { if (t && t.classList && t.classList.contains('inbox-cmd-block')) window.__roLive.add(this); return super.observe(t, o); } disconnect() { window.__roLive.delete(this); return super.disconnect(); } }; } return true; })()`);
             // 1) a one-line command, with Claude's own line under it: whole, in code type, Yes and No
@@ -70,6 +75,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             let st = await rowState();
             check(st && st.text === ONE && st.note === 'This command requires approval' && st.mono && !st.clipped && st.yes === 1 && st.no === 1 && st.left >= 0 && st.right <= st.vw, `${at}a one-line command with Claude's line under it: ` + JSON.stringify(st));
             check(/Yes lets it run this once\. No refuses it/.test(st.sentence), `${at}the row says what Yes allows: ` + JSON.stringify(st.sentence));
+            await noOverlap('a one-line command');
             await shot(`command-row-${w}`);
             // five cells drawn and thrown away (a row drawn again, a row gone): each one's observer goes with its block
             await ev(`window.__po = ${JSON.stringify(MENU({ target: 'echo one\\necho two' }))}; true`);
@@ -171,6 +177,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await show(MENU({ target: ['npm run build', 'npm test -- --reporter=dot', 'git status --short'].join('\n') }), 2);
             st = await rowState(); consistent(st, 'three short lines');
             check(st && st.text.includes('npm test -- --reporter=dot') && !st.clipped, `${at}three short lines fit and are all on the row: ` + JSON.stringify(st));
+            await noOverlap('three lines');
             // 3) a long command: the row shows the start and "Show all"; Yes is NOT on the row and says so; Show all opens the whole command in a capped box that scrolls inside; Yes turns on only once the person has reached its end
             const longStates = async (target, note, what) => {
                 await show(MENU({ target, target_note: note }), 2);
@@ -212,6 +219,7 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             await show(MENU({ target: 'echo ' + 'x'.repeat(420) }), 2);
             st = await rowState();
             check(st && st.clipped && st.yes === 0 && /Read the whole command to allow it/.test(st.sentence), `${at}one very long line is clipped: no Yes, said so: ` + JSON.stringify(st));
+            await noOverlap('a very long command');
             // 5) the width changes (a window resized, a phone turned): the gate is measured again
             await show(MENU({ target: 'echo ' + 'y'.repeat(260) }), 2);
             const widths = mobile ? [[390, 844], [900, 844], [390, 844]] : [[1280, 900], [700, 900], [1280, 900]];
