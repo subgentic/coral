@@ -125,3 +125,8 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-goaldone-actions) .inbox-row-words { overflow: visible; white-space: normal; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-goaldone-actions) .inbox-row-words::after { content: 'Goal looks done'; display: block; margin-top: 6px; font-size: var(--fs-base); color: var(--text-muted); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-row-words.inbox-row-command { width: fit-content; max-width: 70ch; margin-top: 4px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Needs you's empty state is the approved list's centred card: the line strong, the hint under it, the action below (#19824) */
+:root #group-table-view[data-group="hub-inbox:needs"] .empty-state { align-items: center; gap: 8px; margin-top: 16px; padding: 28px 24px; border: 1px solid var(--border); border-radius: var(--radius-lg, 12px); text-align: center; background: var(--bg-secondary); }
+:root #group-table-view[data-group="hub-inbox:needs"] .empty-state .empty-state-line { font-size: var(--fs-title); font-weight: var(--fw-strong); color: var(--text-primary); }
+:root #group-table-view[data-group="hub-inbox:needs"] .empty-state .empty-state-hint { max-width: 52ch; color: var(--text-muted); }
