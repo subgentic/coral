@@ -51,6 +51,7 @@ const TEAM = `qa-queued-${Date.now() % 100000}`, OTHER = `qa-hub-${Date.now() % 
         // the task's own page
         await goTab(ev, settle, 'Tasks');
         await waitFor(`/Say hello to the team/.test(document.body.textContent)`, 'the task on the Tasks tab', { timeout: 8000 });
+        await waitFor(`[...document.querySelectorAll('button.dt-primary, a, button')].some(x => /Say hello to the team/.test(x.textContent))`, 'the row to open (Say hello to the team)', { timeout: 20000 });
         await ev(`(() => { const b = [...document.querySelectorAll('button.dt-primary, a, button')].find(x => /Say hello to the team/.test(x.textContent)); b.click(); return true; })()`);
         await waitFor(`document.querySelector('.goals-detail-line')`, 'the task page', { timeout: 8000 });
         const line = await ev(`document.querySelector('.goals-detail-line').parentElement.textContent.replace(/\\s+/g, ' ')`);
@@ -58,6 +59,7 @@ const TEAM = `qa-queued-${Date.now() % 100000}`, OTHER = `qa-hub-${Date.now() % 
         await ev(`window.__tp.find('button, a', /Back|Tasks/i)?.click(); true`).catch(() => {});
         await goTab(ev, settle, 'Tasks');
         await waitFor(`/Needs the first one/.test(document.body.textContent)`, 'the waiting task on the Tasks tab', { timeout: 8000 });
+        await waitFor(`[...document.querySelectorAll('button.dt-primary, a, button')].some(x => /Needs the first one/.test(x.textContent))`, 'the row to open (Needs the first one)', { timeout: 20000 });
         await ev(`(() => { const b = [...document.querySelectorAll('button.dt-primary, a, button')].find(x => /Needs the first one/.test(x.textContent)); b.click(); return true; })()`);
         await waitFor(`document.querySelector('.goals-detail-line')`, 'the second task page', { timeout: 8000 });
         const line2 = await ev(`document.querySelector('.goals-detail-line').parentElement.textContent.replace(/\\s+/g, ' ')`);
@@ -70,6 +72,7 @@ const TEAM = `qa-queued-${Date.now() % 100000}`, OTHER = `qa-hub-${Date.now() % 
         assert.match(third, new RegExp('waiting on ' + OTHER + ' #' + farId + '\\b'), 'the Agents tab names the board of a blocker on another one: ' + third);
         await goTab(ev, settle, 'Tasks');
         await waitFor(`/Needs the hub/.test(document.body.textContent)`, 'the cross-board task on the Tasks tab', { timeout: 8000 });
+        await waitFor(`[...document.querySelectorAll('button.dt-primary, a, button')].some(x => /Needs the hub/.test(x.textContent))`, 'the row to open (Needs the hub)', { timeout: 20000 });
         await ev(`(() => { const b = [...document.querySelectorAll('button.dt-primary, a, button')].find(x => /Needs the hub/.test(x.textContent)); b.click(); return true; })()`);
         await waitFor(`document.querySelector('.goals-detail-line')`, 'the cross-board task page', { timeout: 8000 });
         const line3 = await ev(`document.querySelector('.goals-detail-line').parentElement.textContent.replace(/\\s+/g, ' ')`);

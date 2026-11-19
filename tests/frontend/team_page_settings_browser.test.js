@@ -144,7 +144,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
             await S.run(`${label}: a failed save says "Could not save: <reason>" in the status and Save is on again`, async () => {
                 await openFor('Send health check');
                 await ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o = {}) => (String((o && o.method) || 'GET').toUpperCase() !== 'GET' && /\\/settings$/.test(new URL(String(u), location.origin).pathname)) ? Promise.resolve(new Response(JSON.stringify({ error: 'disk full' }), { status: 500, headers: { 'Content-Type': 'application/json' } })) : R(u, o); ${sw('Send health check')}.click(); return true; })()`); await settle(250);
-                await ev(`window.__tp.find('button', /^Save settings$/i).click(); true`); await settle(900);
+                await ev(`window.__tp.find('button', /^Save settings$/i).click(); true`); for (let i = 0; i < 200 && !/^Could not save/.test((await bar()).status); i++) await settle(100); /* (polls until the failed save is answered) */
                 const b = await bar(); assert.match(b.status, /^Could not save: /, `the status says it could not save and why (got ${JSON.stringify(b.status)})`); assert.equal(b.save.disabled, false, 'Save settings is on again');
             });
             await group('Workflow'); await settle(150);

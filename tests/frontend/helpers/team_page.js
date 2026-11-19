@@ -89,4 +89,4 @@ async function agentsUp(ev) {
 }
 // The team page's header counts attention from the live rows and believes a "needs input" status only when a live row agrees (42b847cc3, #14437): otherwise it says "Checking attention status". A suite whose status says an agent waits makes the matching live row wait too (the seeded Backend Dev, sid-2).
 const liveWaiting = (ev, on = true, sid = 'sid-2') => ev(`(() => { for (const s of (T.state.liveSessions || [])) if (s.session_id === ${JSON.stringify(sid)}) s.waiting_for_input = ${on ? 'true' : 'false'}; return true; })()`);
-module.exports = { SOURCE, install, TABS, seed, agentsUp, liveWaiting, post, openTeam, goTab, openSettings, closeSettings, rect, scenarios: na.scenarios };
+module.exports = { SOURCE, install, TABS, seed, agentsUp, liveWaiting, post, openTeam, goTab, panelDrawn, openSettings, closeSettings, rect, scenarios: na.scenarios };

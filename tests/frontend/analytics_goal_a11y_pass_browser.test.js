@@ -27,6 +27,7 @@ const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
         const view = async key => { await ev(`(() => { const g = ({ provider: 'Provider', model: 'Model', thinking: 'Thinking level', team: 'Team', agent: 'Agent', branch: 'Branch', task: 'Task' })[${JSON.stringify(key)}]; const b = g ? [...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(x => x.textContent === g) : document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); }; // a grouping is Overview's Group by (#9236)
         await S.run('a phone: an agent name in a By agent row is a 44 px target', async () => {
             await view('agent');
+            await waitFor(`document.querySelectorAll('#cost-by-agent .dt-link').length >= 2`, 'the By agent rows', 20000); await settle(200);
             const links = await ev(`[...document.querySelectorAll('#cost-by-agent .dt-link')].filter(e => e.getClientRects().length).map(e => { const b = e.getBoundingClientRect(); return [e.textContent.trim(), Math.round(b.height)]; })`);
             assert.ok(links.length >= 2, 'the By agent table has agent links: ' + JSON.stringify(links)); for (const [n, h] of links) assert.ok(h >= 44, `${n} is ${h} px high`);
         });

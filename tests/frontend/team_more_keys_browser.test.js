@@ -4,13 +4,13 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 const BOARD = 'more-keys-' + Date.now().toString(36);
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
     const KEYS = { ArrowDown: 40, ArrowUp: 38, Home: 36, End: 35, Tab: 9 };
-    const press = async k => { const o = { key: k, code: k, windowsVirtualKeyCode: KEYS[k] }; await Input.dispatchKeyEvent({ type: 'rawKeyDown', ...o }); await Input.dispatchKeyEvent({ type: 'keyUp', ...o }); await new Promise(r => setTimeout(r, 120)); }; // sleep-ok: the key's handler runs
+    const press = async k => { const o = { key: k, code: k, windowsVirtualKeyCode: KEYS[k] }; await Input.dispatchKeyEvent({ type: 'rawKeyDown', ...o }); await Input.dispatchKeyEvent({ type: 'keyUp', ...o }); await ev(framesJs(3, 2000)); }; // (frames after the key, bounded: its handler has run at any CPU speed, where a fixed 120 ms did not at throttle 8)
     const mk = (id, name) => ({ session_id: id, name, display_name: name, agent_type: 'claude', summary: 'x', model: 'claude-opus-5-5', branch: 'main', repo_name: 'coral', working_directory: '/work/' + name, status: 'idle', server: 'local', board_project: BOARD, sleeping: false });
     const problems = [], check = (ok, msg) => { if (!ok) problems.push(msg); };
     const at = () => ev(`(() => { const items = [...document.querySelectorAll('#team-page-more-menu button')].filter(b => !b.hidden && b.getClientRects().length); const a = document.activeElement; return { idx: items.indexOf(a), id: a && a.id, n: items.length, open: !document.getElementById('team-page-more-menu').hidden }; })()`);

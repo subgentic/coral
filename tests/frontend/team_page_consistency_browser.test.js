@@ -45,8 +45,9 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
             await ev(`window.dispatchEvent(new Event('focus')); import((window.__coralStatic || '/static/') + 'team_page.js').then(m => m.goTab('goals', {})); true`);
             await waitFor(`document.getElementById('team-page-status').textContent.trim() === '1 needs attention' || true`, 'a pass', 500).catch(() => {});
             await ev(`document.dispatchEvent(new Event('visibilitychange')); true`);
-            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`); await settle(700);
-            assert.equal(await status(), 'All well');
+            await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_page.js'); await m.openTeamPage(${JSON.stringify(TEAM)}, { silent: true }); return true; })()`);
+            await ev(`new Promise(res => { const ok = () => document.getElementById('team-page-status').textContent.trim() === 'All well' && document.getElementById('team-page-health').hidden === true && getComputedStyle(document.getElementById('team-page-status')).position !== 'absolute'; const t0 = Date.now(); let since = 0; const tick = () => { if (ok()) { since = since || Date.now(); } else since = 0; return ((since && Date.now() - since >= 600) || Date.now() - t0 > 20000) ? res(true) : setTimeout(tick, 50); }; tick(); })`); /* All well, held for 600 ms: a read still in flight shows "Checking attention status" a moment after the first All well, on a slow CPU */ await settle(100);
+            { const st = await status(); assert.equal(st, 'All well', `the status reads ${JSON.stringify(st)}`); }
             assert.equal(await ev(`document.getElementById('team-page-health').hidden`), true, 'All well is plain text, not a button');
             assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-status')).position !== 'absolute'`), true, 'and it is drawn');
         });

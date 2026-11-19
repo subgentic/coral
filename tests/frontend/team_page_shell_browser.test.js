@@ -4,7 +4,7 @@
 // Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { install: installTP, TABS, seed, openTeam, goTab, closeSettings, rect, scenarios } = require('./helpers/team_page');
+const { install: installTP, TABS, seed, openTeam, goTab, panelDrawn, closeSettings, rect, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 
@@ -17,7 +17,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
     const S = scenarios();
     let phone = false; // a phone's More button names the open tab behind it (Board, Knowledge: #10759), so the strip beside it is as wide as the button leaves it: its width is the one thing that moves there (#10903)
     const same = (a, b, what) => { assert.ok(a && b, `${what}: the header and the tab strip are there`); for (const part of ['h1', 'tabs']) { assert.ok(a[part] && b[part], `${what}: the ${part} is there`); for (const k of (phone && part === 'tabs' ? ['x', 'y', 'h'] : ['x', 'y', 'w', 'h'])) assert.ok(Math.abs(a[part][k] - b[part][k]) <= 0.5, `${what}: the ${part} ${k} moved from ${a[part][k]} to ${b[part][k]}`); } };
-    const key = async k => { await ev(`(() => { const e = document.activeElement; e.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true })); return true; })()`); await settle(200); };
+    const key = async k => { await ev(`(() => { const e = document.activeElement; e.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true })); return true; })()`); await settle(100); await panelDrawn(ev); await settle(200); }; /* (the key selects the tab, whose page is a lazy module: its focus is taken once the page is drawn, #19776) */
     const activeTab = () => ev(`(() => { const t = window.__tp.allTabs().find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__tp.tabLabel(t) : ''; })()`);
     const focusedTab = () => ev(`(() => { const e = document.activeElement; return e && e.getAttribute('role') === 'tab' ? window.__tp.tabLabel(e) : ''; })()`);
     try {
@@ -72,10 +72,10 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 const hidden = () => ev(`['team-page-head', 'team-tabs-row'].every(id => getComputedStyle(document.getElementById(id)).display === 'none')`);
                 const back = sel => ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(sel)})].find(e => e.getClientRects().length); if (!b) return false; b.click(); return true; })()`);
                 await open('/Explore goals with two teams/', 'button, a, [role=row], tr');
-                if (phone) { assert.ok(await hidden(), 'on the goal page the phone has its own bar: the team header and strip are not drawn over it (#11314)'); assert.ok(await back('#team-panel-goals .goal-main .goals-back'), 'the goal page has its way back'); await settle(400); } /* a goal's page on a phone is a drill-down: the header and strip come back, at the same pixels, with the list */
+                if (phone) { await waitFor(`['team-page-head', 'team-tabs-row'].every(id => getComputedStyle(document.getElementById(id)).display === 'none')`, 'on the goal page the phone has its own bar: the team header and strip are not drawn over it (#11314)', 20000); assert.ok(await back('#team-panel-goals .goal-main .goals-back'), 'the goal page has its way back'); await waitFor(`['team-page-head', 'team-tabs-row'].every(id => getComputedStyle(document.getElementById(id)).display !== 'none')`, 'the header and strip are back', 20000); await settle(400); } /* a goal's page on a phone is a drill-down: the header and strip come back, at the same pixels, with the list */
                 same(base, await rect(ev), 'on the goal page');
                 await goTab(ev, settle, 'Tasks'); await open('/Add the goal filter/', 'button, a, [role=row], tr');
-                if (phone) { assert.ok(await hidden(), 'on the task page the phone has its own bar'); assert.ok(await back('#team-panel-item .goals-back'), 'the task page has its way back'); await settle(400); }
+                if (phone) { await waitFor(`['team-page-head', 'team-tabs-row'].every(id => getComputedStyle(document.getElementById(id)).display === 'none')`, 'on the task page the phone has its own bar', 20000); assert.ok(await back('#team-panel-item .goals-back'), 'the task page has its way back'); await waitFor(`['team-page-head', 'team-tabs-row'].every(id => getComputedStyle(document.getElementById(id)).display !== 'none')`, 'the header and strip are back', 20000); await settle(400); }
                 same(base, await rect(ev), 'on the task page');
             });
             await S.run(`${label}: The tabs have their own address (/team/<name>/<tab>); Settings, a popout, has none and leaves the address as it was`, async () => {
