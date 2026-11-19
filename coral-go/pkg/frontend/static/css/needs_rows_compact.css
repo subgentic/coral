@@ -68,3 +68,47 @@
     :root #group-table-view .inbox-needs-results tr.inbox-card-tr:not(:has(.inbox-ask-name)) .inbox-review-name { min-height: var(--table-touch, 44px); height: var(--table-touch, 44px); }
     :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > :is(.inbox-bookmark, .inbox-star) { min-width: var(--table-touch, 44px); }
 }
+
+/* The approved list design (#19812, Inbox Designer mocks v1, the Operator 2026-11-19): eight small tweaks on every kind of row, same data and actions. Tokens only; both themes. */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr { --row-lift: color-mix(in srgb, var(--accent) 6%, var(--table-bg)); padding: 14px 18px 14px 4px; row-gap: 3px; } /* 8: the rhythm, 14 px above and below */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.dt-unread { box-shadow: inset 3px 0 0 var(--accent); } /* 1: unread is a rail and a lifted surface, read is calm */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.dt-unread { background: var(--row-lift); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td { background: transparent; } /* the row paints its own surface: no patchwork of cells */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.dt-read .inbox-review-name, :root #group-table-view .inbox-needs-results tr.inbox-card-tr.dt-read .dt-primary { font-weight: var(--fw-medium); color: var(--text-secondary); }
+/* 5: one headline size, a 13.5 px body at most 74ch wide, a 12 px meta strip */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .dt-primary, :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-review-name { font-size: 0.9375rem; line-height: 1.35; letter-spacing: -0.012em; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) .inbox-review-from { font-size: 0.9375rem; font-weight: var(--fw-strong); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr :is(.inbox-row-words, .inbox-ask-name) { font-size: 0.84375rem; line-height: 1.48; max-width: 74ch; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta { font-size: 0.75rem; gap: 4px 6px; }
+/* 3: team and time are one right rail: the same two tracks on every row, the time in tabular figures */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr { grid-template-columns: auto auto minmax(0, clamp(15rem, 30%, 24rem)) minmax(0, 1fr) minmax(0, 8rem) 3.25rem; }
+@container (min-width: 50rem) { :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row { grid-template-columns: auto auto minmax(0, 1fr) minmax(8rem, max-content) 3.25rem; } }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="team"] { justify-self: end; text-align: right; color: var(--text-muted); font-size: 0.75rem; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="waiting"] { justify-self: end; justify-content: flex-end; text-align: right; color: var(--text-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+/* 4: every kind's icon is a 32 px rounded tile, tinted by its kind; a picture shows itself */
+:root .material-icons.inbox-kind-icon { border-radius: 8px; font-size: 1.25rem; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); }
+:root .material-icons.inbox-kind-icon:is([data-kind="ask"], [data-kind="question"]) { background: var(--needs-icon-indigo-bg); color: var(--needs-icon-indigo-fg); border-color: color-mix(in srgb, var(--needs-icon-indigo-fg) 28%, transparent); }
+:root .material-icons.inbox-kind-icon:is([data-kind="goal_done"]) { background: var(--needs-icon-green-bg); color: var(--needs-icon-green-fg); border-color: color-mix(in srgb, var(--needs-icon-green-fg) 28%, transparent); }
+:root .material-icons.inbox-kind-icon:is([data-kind="permission"], [data-kind="other"]) { background: var(--needs-icon-amber-bg); color: var(--needs-icon-amber-fg); border-color: color-mix(in srgb, var(--needs-icon-amber-fg) 30%, transparent); }
+:root .material-icons.inbox-kind-icon:is([data-kind="review"], [data-kind="skill_review"], [data-kind="welcome"]) { background: var(--needs-icon-blue-bg); color: var(--needs-icon-blue-fg); border-color: color-mix(in srgb, var(--needs-icon-blue-fg) 28%, transparent); }
+:root .material-icons.inbox-kind-icon[data-kind="proposal"] { background: var(--needs-icon-purple-bg); color: var(--needs-icon-purple-fg); border-color: color-mix(in srgb, var(--needs-icon-purple-fg) 30%, transparent); }
+:root .material-icons.inbox-kind-icon[data-kind="run"] { background: color-mix(in srgb, var(--error) 15%, transparent); color: var(--error-text, var(--error)); border-color: color-mix(in srgb, var(--error) 32%, transparent); }
+:root .material-icons.inbox-kind-icon.inbox-artifact-thumbnail { padding: 0; overflow: hidden; background: var(--bg-tertiary); border-color: var(--border-light, var(--border)); }
+@media (min-width: 761px) { :root .material-icons.inbox-kind-icon { width: 32px; height: 32px; } } /* a phone keeps its 40 px target (#17453) */
+/* 2: three levels of button: the tonal main answer, hairline answers, then quiet utilities (Save, More, Star) with a hairline divider before them */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions { gap: 6px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > .btn { height: 30px; padding: 0 11px; border-radius: 6px; font-size: 0.78125rem; font-weight: var(--fw-medium); background: color-mix(in srgb, var(--text-primary) 4%, transparent); border: 1px solid var(--text-muted); color: var(--text-primary); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > .btn:hover { background: var(--bg-hover); border-color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > .inbox-main-action { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: color-mix(in srgb, var(--accent) 42%, transparent); color: var(--accent); font-weight: var(--fw-strong); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > .inbox-main-action:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); border-color: var(--accent); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions :is(.inbox-bookmark, .inbox-star, .inbox-row-more-toggle) { background: transparent; border-color: transparent; color: var(--text-secondary); padding: 0 8px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions :is(.inbox-bookmark, .inbox-star, .inbox-row-more-toggle):hover { background: var(--bg-hover); border-color: var(--border); color: var(--text-primary); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > .inbox-bookmark { position: relative; margin-inline-start: 8px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > .inbox-bookmark::before { content: ""; position: absolute; inset-inline-start: -7px; top: 7px; bottom: 7px; width: 1px; background: var(--border); }
+/* 6: the Goal and Task chips are small cohesive 5 px chips */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-pill { height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: 5px; font-size: 0.6875rem; font-weight: var(--fw-medium); background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
+/* 7: what a row closes or holds up is a tinted pill with its own mark, not bold white text louder than the name */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-blocks { display: inline-flex; align-items: center; gap: 5px; width: fit-content; max-width: 100%; padding: 3px 9px; border-radius: 6px; font-size: 0.75rem; line-height: 1.35; font-weight: var(--fw-regular); color: var(--warning-text, var(--text-primary)); background: color-mix(in srgb, var(--warning) 11%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 26%, transparent); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-blocks::before { content: "bolt"; font-family: "Material Icons"; font-size: 0.875rem; line-height: 1; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-blocks.inbox-blocks-closes { color: var(--success-text, var(--text-primary)); background: color-mix(in srgb, var(--success) 10%, transparent); border-color: color-mix(in srgb, var(--success) 24%, transparent); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-blocks.inbox-blocks-closes::before { content: "flag"; }
