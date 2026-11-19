@@ -37,6 +37,13 @@ export const loadFilters = () => ({ ...kept.load('inbox-needs', browserLocal), q
 export const saveFilters = f => kept.save('inbox-needs', { ...f, q: '' }, browserLocal);
 
 /** The leading icon of a Needs you row (#13144): one glyph per kind, drawn in a full-height gutter by css/data_table.css from data-kind (all from the icon subset, tests/frontend/fixtures/material-icons.names.txt), named by the kind's own word for a screen reader. The glyph is drawn by CSS (data-kind), so the row's text stays its words. */
+/** A file's tile: its type's mark, or its own picture when it is a stored image (the Activity thumbnail path), for the Saved and Starred rows (#19841). */
+export function fileTile(item, server) {
+    const i = document.createElement('span'), m = item.media_type || '';
+    i.className = 'material-icons inbox-kind-icon inbox-artifact-thumbnail'; i.dataset.kind = 'review'; i.dataset.type = /^video\//.test(m) ? 'video' : /html/.test(m) ? 'html' : /markdown/.test(m) ? 'md' : ''; i.setAttribute('aria-hidden', 'true');
+    i.append(artifactThumbnail(item, { size: 32, url: typeof server === 'string' && thumbnailPath(item) ? serverUrl(thumbnailPath(item), server) : '' }));
+    return i;
+}
 export function kindIcon(s) {
     const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // board questions share the Question chip (#16548)
     i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
