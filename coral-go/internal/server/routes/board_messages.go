@@ -257,6 +257,7 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 				inboxActioned(r, tracking.InboxAsk, "", "answer", inboxTime(asked.CreatedAt))
 				h.recordAskWords(r, board.ActAnswer, project, body.ReplyTo, msg.Content) // the Operator's typed answer is a row, as a button's click is (#13609); its title is the ask's line and the asker is kept beside it (#14422: it was the asker)
 				answeredAsk = true
+				h.wakeAskerForOperator(project, asked.SubscriberID) // the answer reaches an asker that was put to sleep after it asked (#19901)
 			}
 		}
 	}
