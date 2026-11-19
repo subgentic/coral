@@ -26,6 +26,8 @@ flags_of() {
       Version) out="$out -X $w=$VER" ;;
       PostHogKey) out="$out -X $w=$KEY" ;;
       DevBase) out="$out -X $w=$BASE" ;;
+      DevCommit) out="$out -X $w=ldtest0" ;;
+      DevDirty) out="$out -X $w=-ldtest" ;;
       # this function runs in a command substitution: a variable set here is lost with its subshell, so the failure is a file the end of the script reads
       *) echo "FAIL: $f: -X $w sets an unknown variable" >&2; : > "$work/unknown-variable" ;;
     esac
