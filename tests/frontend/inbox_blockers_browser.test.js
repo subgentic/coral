@@ -89,6 +89,10 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
             const rv = (await rowsOf()).find(r => r.text.includes('checkout-mockup.html'));
             check(!!rv && rv.text.includes('High priority: “Tag<U+202E> batch-88” waits on this') && !rv.text.includes('\u202e'), at + 'a for-review file says the one task it holds up, a high-priority one, with its title\'s hidden character written out, not drawn: ' + (rv && rv.text));
             check(await ev(`[...document.querySelectorAll('${T} tbody tr')].filter(tr => tr.textContent.includes('checkout-mockup.html')).some(tr => [...tr.querySelectorAll('.inbox-blocks')].some(e => e.getBoundingClientRect().width > 0 && e.offsetParent !== null && /wait/.test(e.textContent)))`), at + 'the phrase is on screen, not only in a hidden cell');
+            if (w === 1280) { // the approved Inbox design (#19812): the blocker is a pill with a bolt (amber), and "Closes goal" is the green one with a flag
+                const pill = await ev(`(() => { const e = [...document.querySelectorAll('${T} tbody tr')].find(tr => tr.textContent.includes('checkout-mockup.html'))?.querySelector('.inbox-blocks'); if (!e) return null; const cs = getComputedStyle(e), b = getComputedStyle(e, '::before'); return { text: e.textContent, closes: e.classList.contains('inbox-blocks-closes'), icon: b.content, radius: cs.borderTopLeftRadius, h: Math.round(e.getBoundingClientRect().height), border: cs.borderTopWidth }; })()`);
+                check(!!pill && /^Closes goal/.test(pill.text) === pill.closes && pill.icon === (pill.closes ? '"flag"' : '"bolt"') && pill.radius !== '0px' && pill.border === '1px' && pill.h <= 26, at + 'the blocker is a pill: bolt (amber) when it waits, flag and green when it closes a goal: ' + JSON.stringify(pill));
+            }
             await shot(`inbox-blockers-review-${w}`);
             check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'the review row: no sideways scroll');
         }
