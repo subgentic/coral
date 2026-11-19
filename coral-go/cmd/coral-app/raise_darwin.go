@@ -32,9 +32,9 @@ import (
 // raiseWindow brings the window to the front (#19789).
 func raiseWindow() { C.coralRaiseWindow() }
 
-// watchRaiseSignal makes SIGUSR1 (what the tray sends when the person clicks Open Coral, or opens the app again) raise the window. It is
-// installed first thing in main: SIGUSR1 ends a program that has no handler, and the tray can click while this one is still starting.
-func watchRaiseSignal() {
+// init makes SIGUSR1 (what the tray sends when the person clicks Open Coral, or opens the app again) raise the window. It is in init(), not main():
+// SIGUSR1 ends a program that has no handler, and the tray can click in the first moments of a start, before main has run its first line.
+func init() {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGUSR1)
 	go func() {

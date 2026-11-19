@@ -59,7 +59,6 @@ func init() {
 
 func main() {
 
-	watchRaiseSignal() // the tray's Open Coral click can come while this still starts: SIGUSR1 must never end the program (#19789)
 	cfg := parseAppFlags(flag.CommandLine, os.Args[1:])
 	// A sign-in link handed over by the tray (#3394), in the environment so no other user can
 	// read it with ps. Used once: drop it so nothing this window starts inherits it.
