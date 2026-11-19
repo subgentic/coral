@@ -65,7 +65,7 @@ export async function openVersionList(opts) {
         actions.append(open);
         if (i > 0 && !v.guess) {
             const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'btn btn-small version-list-compare';
-            compare.textContent = `Compare with v${versions[i - 1].n}`;
+            compare.textContent = pop ? 'Compare' : `Compare with v${versions[i - 1].n}`; compare.setAttribute('aria-label', `Compare v${v.n} with v${versions[i - 1].n}`);
             compare.addEventListener('click', async () => {
                 if (dlg.dataset.comparing) return;
                 dlg.dataset.comparing = '1'; compare.disabled = true;

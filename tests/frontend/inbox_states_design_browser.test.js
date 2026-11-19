@@ -63,8 +63,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`[...document.querySelectorAll('${T} tbody .inbox-review-earlier')].find(x => /^2 /.test(x.textContent)).scrollIntoView({ block: 'center' }); true`);
         await ev(`window.__earlierLink = [...document.querySelectorAll('${T} tbody .inbox-review-earlier')].find(x => /^2 /.test(x.textContent)); window.__earlierLink.click(); true`);
         await waitFor(`!!document.querySelector('.version-list-pop[open] .version-list-entry')`, 'the earlier versions popover', 10000);
-        const pop = await ev(`(() => { const d = document.querySelector('.version-list-pop'), a = window.__earlierLink.getBoundingClientRect(), b = d.getBoundingClientRect(); return { modal: d.matches(':modal'), head: d.querySelector('h2').textContent, shown: [...d.querySelectorAll('.version-list-entry')].filter(e => e.offsetParent).length, gap: Math.min(Math.abs(Math.round(b.top - a.bottom)), Math.abs(Math.round(a.top - b.bottom))), left: Math.round(b.left - a.left) }; })()`);
-        check(!pop.modal && pop.head === 'Earlier versions' && pop.shown === 2 && pop.gap >= 0 && pop.gap <= 12, `the earlier versions are a popover under the link, not a dialog: ${JSON.stringify(pop)}`);
+        const pop = await ev(`(() => { const d = document.querySelector('.version-list-pop'), a = window.__earlierLink.getBoundingClientRect(), b = d.getBoundingClientRect(); return { modal: d.matches(':modal'), head: d.querySelector('h2').textContent, shown: [...d.querySelectorAll('.version-list-entry')].filter(e => e.offsetParent).length, gap: Math.min(Math.abs(Math.round(b.top - a.bottom)), Math.abs(Math.round(a.top - b.bottom))), left: Math.round(b.left - a.left), compare: [...d.querySelectorAll('.version-list-compare')].filter(e => e.offsetParent).length }; })()`);
+        check(!pop.modal && pop.head === 'Earlier versions' && pop.shown === 3 && pop.compare === 2 && pop.gap >= 0 && pop.gap <= 12, `the earlier versions are a popover under the link, not a dialog: ${JSON.stringify(pop)}`);
         await shot('inbox-popover-1280-dark');
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
         check(!(await ev(`!!document.querySelector('.version-list-pop')`)), 'Escape closes the popover');
@@ -76,6 +76,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`!!document.querySelector('.inbox-saved-card .inbox-saved-message')`, 'the saved messages', 15000);
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the saved files fill in after the messages
         await ev(`window.scrollTo(0, 0); true`); await ev(framesJs(10));
+        const sv = await ev(`(() => { const on = document.querySelector('.inbox-folder-toolbar .goals-chip[aria-pressed="true"]'), cs = on && getComputedStyle(on); return { head: (document.querySelector('.inbox-folder-head .session-group-count') || {}).textContent, pill: on && on.textContent, bg: cs && cs.backgroundColor, border: cs && cs.borderTopWidth, tile: !!document.querySelector('.inbox-saved-card .inbox-kind-icon') }; })()`);
+        check(/^1 file \u00b7 \d+ messages?$/.test(sv.head || '') && /^Open/.test(sv.pill || '') && sv.border === '1px' && sv.tile, `the Saved page says what it holds and Open is an outlined pill: ${JSON.stringify(sv)}`);
         await shot('inbox-saved-1280-dark');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`document.querySelectorAll('${T} tbody tr.inbox-card-tr').length >= 6`, 'the rows again', 15000);
@@ -83,6 +85,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`(() => { for (const tr of [...document.querySelectorAll('${T} tbody tr.inbox-card-tr.inbox-file-row')].slice(0, 2)) tr.querySelector('input[type=checkbox]').click(); return true; })()`);
         await ev(framesJs(10)); await ev(`window.scrollTo(0, 0); true`);
         await shot('inbox-bulk-1280-light');
+        // the same states on a phone, for the review page (#19841)
+        if (process.env.CORAL_SCREENSHOT_DIR) {
+            await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+            await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await ev(framesJs(15)); await ev(`window.scrollTo(0, 0); true`);
+            await shot('inbox-states-390-light');
+            await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`); await new Promise(r => setTimeout(r, 800)); // sleep-ok: the saved files fill in after the messages
+            await shot('inbox-saved-390-light');
+        }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('PASS the other states of the Inbox list');

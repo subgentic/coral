@@ -62,6 +62,7 @@ function splitCommand(words) {
     const text = words.textContent, mk = (tag, cls, t) => { const n = document.createElement(tag); n.className = cls; n.textContent = t; return n; };
     words.classList.add('inbox-row-command');
     words.replaceChildren(mk('span', 'inbox-cmd-lead', 'Wants to run'), mk('span', 'inbox-cmd-colon', ': '), mk('span', 'inbox-cmd-code', text.slice(14)));
+    words.lastChild.title = text.slice(14); // a long command is cut to its first lines in the box: the whole of it is on the hover
     words.after(mk('span', 'inbox-cmd-note inbox-row-words', 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.'));
 }
 /** Reserve one full-height icon gutter without changing the table's data/action columns. */
