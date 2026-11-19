@@ -336,7 +336,7 @@ func (h *SessionsHandler) sendEditDiff(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 		}
-		if live && ls.IsSleeping == 1 && sleepReason(ls) == store.SleepReasonIdle && h.WakeIdleForDelivery(r.Context(), ls.SessionID) {
+		if live && ls.IsSleeping == 1 && ls.IsArchived == 0 && h.WakeForOperator(r.Context(), ls.SessionID) { // the Operator's own press wakes a sleeper whoever put it to sleep (#19897)
 			ls.IsSleeping = 0
 		}
 		switch {

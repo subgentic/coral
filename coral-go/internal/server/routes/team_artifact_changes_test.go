@@ -511,7 +511,7 @@ func TestASleepingUploaderIsToldAndTheAnswerSaysItWillReadItOnWaking(t *testing.
 		{"awake", func(*changesEnv) {}, true, false, "", 1, false},
 		{"sleeping", func(c *changesEnv) {
 			require.NoError(t, c.ss.SetSessionSleeping(context.Background(), sessAlice, true))
-		}, true, true, "", 1, true},
+		}, true, false, "", 1, false}, // the Operator's request for changes wakes a sleeping uploader, then tells it (#19897)
 		{"archived", func(c *changesEnv) {
 			require.NoError(t, c.ss.SetSessionArchived(context.Background(), sessAlice, true))
 		}, false, false, "asleep_or_gone", 0, false},

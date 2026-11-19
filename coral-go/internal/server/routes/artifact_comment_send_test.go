@@ -128,17 +128,18 @@ func TestSendRefusesWhatCannotBeDelivered(t *testing.T) {
 	rig := newCmtRig(t)
 	rig.agent(1, "Dev", false)
 	rig.agent(2, "Sleeper", true)
+	require.NoError(t, rig.ss.SetSessionArchived(context.Background(), sendSid(2), true)) // a sleeper is woken by the Operator's send (#19897); an archived agent is gone
 	cid := rig.ownerComment("hello")
 	code, out := rig.send(cid, "Sleeper", "Nobody", "Operator")
 	assert.Equal(t, http.StatusConflict, code, "nothing was sent")
-	assert.Equal(t, map[string]string{"Sleeper": "asleep", "Nobody": "not_on_board", "Operator": "not_on_board"}, states(out))
+	assert.Equal(t, map[string]string{"Sleeper": "unavailable", "Nobody": "not_on_board", "Operator": "not_on_board"}, states(out))
 	assert.Empty(t, rig.operatorMessages())
 	_, found, _ := rig.ss.GetArtifactAsk(context.Background(), cid, sendSid(2))
 	assert.False(t, found, "no ask for an agent that was not sent to")
 	// a mix: the one that can be reached is
 	code, out = rig.send(cid, "Dev", "Sleeper")
 	assert.Equal(t, 200, code)
-	assert.Equal(t, map[string]string{"Dev": "sent", "Sleeper": "asleep"}, states(out))
+	assert.Equal(t, map[string]string{"Dev": "sent", "Sleeper": "unavailable"}, states(out))
 
 	// a paused board
 	rig.h.boardHandler = &BoardHandler{paused: map[string]bool{"team-a": true}}

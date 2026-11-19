@@ -227,7 +227,7 @@ func TestSendingAnEditIsThePersonsAloneFromThePageAndOnlyToAgentsThatCanTakeIt(t
 	assert.Empty(t, rig.operatorMessages())
 	code, out = rig.editSend(editAsPage, "Dev", "Sleeper", "Nobody")
 	require.Equal(t, 200, code, out)
-	assert.Equal(t, map[string]string{"Dev": "sent", "Sleeper": "asleep", "Nobody": "not_on_board"}, states(out))
+	assert.Equal(t, map[string]string{"Dev": "sent", "Sleeper": "sent", "Nobody": "not_on_board"}, states(out))
 	// a paused board: nothing is sent to its agents
 	rig.h.boardHandler = &BoardHandler{paused: map[string]bool{"team-a": true}}
 	code, out = rig.editSend(editAsPage, "Dev")
