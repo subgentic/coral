@@ -16,7 +16,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
     let _fullOverlay = 0;       // its entry in overlay_history.js, while it is open
     let _fullOpener = null;     // what had focus when it opened
     let _fullOpenerPath = ''; // the file row to restore when the original opener was redrawn (#7652)
-    const _pathOf = el => (el && el.closest && el.closest('[data-path]') ? el.closest('[data-path]').dataset.path : '') || '';
+    const _pathOf = el => el?.closest?.('[data-path]')?.dataset.path || '';
     const _rowFor = p => (p ? document.querySelector(`.file-more-btn[data-path="${CSS.escape(p)}"]`) || document.querySelector(`[data-path="${CSS.escape(p)}"][tabindex]`) : null);
     let _taskExpanded = false; // a task the person expanded from the sidebar into the column: the room rule for a column preference does not send it back (#9076); ends at the next dock move
     let _maximised = false;    // the column covers Chat (#4931): not saved (a reload opens with Chat); ends when the pane is hidden, moves to the bottom, or another agent is shown
@@ -115,10 +115,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
                 },
                 onFlush: (v) => { column.style.width = v + 'px'; _syncColumnHandle(v); },
                 onEnd: (v) => {
-                    if (v != null) {
-                        _paneWidth = Math.round(v);
-                        browserLocal.set('coral-preview-column-width', _paneWidth);
-                    }
+                    if (v != null) browserLocal.set('coral-preview-column-width', _paneWidth = Math.round(v));
                 },
             });
             // The handle by keyboard (a separator with a value): Left widens, Right narrows, Home and End go to the ends; kept where the window has room.
@@ -128,13 +125,12 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
                 const next = e.key === 'ArrowLeft' ? now + step : e.key === 'ArrowRight' ? now - step : e.key === 'Home' ? COLUMN_MIN : e.key === 'End' ? _maxColumnWidth() : null;
                 if (next === null) return;
                 e.preventDefault();
-                _paneWidth = _clampColumnWidth(next);
-                browserLocal.set('coral-preview-column-width', _paneWidth);
+                browserLocal.set('coral-preview-column-width', _paneWidth = _clampColumnWidth(next));
                 _applyColumnWidth();
                 fitTerminal();
             });
             // The room changes with the window, the side panel opening or shutting, and the sidebar's width: the width shown is held to it again each time.
-            if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (getTabs().length && !_maximised) { _placePane(); } }).observe(liveBody);
+            if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (getTabs().length && !_maximised) _placePane(); }).observe(liveBody);
         }
 
         // A task's expand button, in the sidebar, does what a file's dock button does (#9076, the Operator): the preview goes to the full-height column beside the chat, with the column's handle and its width kept; one more press maximises it as for a file.
@@ -150,7 +146,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
             document.getElementById('preview-max-btn')?.focus();
         });
 
-        document.getElementById('preview-dock-btn')?.addEventListener('click', () => _toggleDock());
+        document.getElementById('preview-dock-btn')?.addEventListener('click', () => _toggleDock(!isTaskPreview())); // an artifact goes to the column whatever the room (#19788); a task keeps Chat's 420 px (#8905)
         window.addEventListener('resize', () => { if (getTabs().length) _placePane(); });
         _placePane();
         _setMaximised(false); // paints the toggle's icon and label
