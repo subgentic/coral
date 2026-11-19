@@ -275,7 +275,7 @@ export function attachReview(d, { reload }) {
         bar.hidden = !s || (slotted && form.hidden); // on the header row the strip under it is the change-request form: there only while it is open
         const rw = (s?.row?.tags || []).includes('read') ? 'Read, waiting for your decision' : 'Waiting for your review'; // an opened plan is read: the badge dropped, so the words say it is read and still waiting (#16670)
         stateEl.textContent = !s ? '' : s.newer && s.state !== 'approved' ? (s.state === 'changes' ? 'Changes were asked for on this one.' : '') : s.state === 'approved' && s.newer ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}.` : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'denied' ? 'Refused' : s.state === 'changes' ? `Changes requested${s.row.produced_by ? `: waiting for a new version from ${shown(s.row.produced_by)}` : ''}. Approving now approves this version as it is.` : waiting && !pending ? `${rw} Approve it on that computer's own dashboard.` : rw;
-        stateEl.hidden = !stateEl.textContent; // no status, no chip
+        stateEl.hidden = !stateEl.textContent; stateEl.title = stateEl.textContent; // no status, no chip; the whole words when the row cuts it
         newerHex = s && s.newer ? s.newer.hex : ''; newest.hidden = !newerHex; if (newerHex) newest.textContent = `Open v${s.newer.n}`; paintBanner();
     };
     const openForm = (on) => { form.hidden = !on; bar.hidden = !cur || (slotted && !on); changes.setAttribute('aria-expanded', String(on)); if (on) { error.textContent = ''; text.focus(); } };

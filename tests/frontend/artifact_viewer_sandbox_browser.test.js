@@ -31,7 +31,7 @@ const FROM = 'Writer A · launch-team · asks: Is the spring launch plan ready t
             await shot('sandbox-first-' + w);
             assert.ok(a.noteShown && a.chip, `${w}: the first time the banner is shown, and the Sandboxed chip is in the header: ` + JSON.stringify(a));
             assert.ok(/scripts/i.test(a.chipTitle), `${w}: the chip's tooltip carries the explanation: ${a.chipTitle}`);
-            assert.ok(a.fromLines <= 1 && a.fromCut && a.fromTitle.includes('budget lines') && a.fromTap === 'false', `${w}: the question is one cut line, its whole text in the tooltip and a tap away: ` + JSON.stringify({ lines: a.fromLines, cut: a.fromCut, tap: a.fromTap }));
+            assert.ok(a.fromH === 0 || a.fromLines === 0, `${w}: the question is not a line of the one-row header (it is in Details, #19771): ` + JSON.stringify({ h: a.fromH }));
             // the next time: the chip alone
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`); await open(); a = await read();
             console.log(`   ${w}: next open: ${a.above} px to the preview`);
@@ -43,11 +43,8 @@ const FROM = 'Writer A · launch-team · asks: Is the spring launch plan ready t
             assert.ok((await read()).noteShown, `${w}: a tap on the chip shows the banner`);
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-sandbox').click(); true`);
             assert.ok(!(await read()).noteShown, `${w}: and another hides it`);
-            // the question line: a tap shows all of it, another puts it back
-            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-from').click(); true`);
-            let f = await read(); assert.ok(f.fromLines >= 2 && f.fromTap === 'true' && !f.fromCut, `${w}: a tap shows the whole question: ` + JSON.stringify(f));
-            await ev(`document.querySelector('#artifact-viewer .artifact-viewer-from').click(); true`);
-            f = await read(); assert.ok(f.fromLines <= 1 && f.fromTap === 'false', `${w}: and another puts it back to one line`);
+            // the question line is in Details with all of its words (#19771)
+            assert.ok(await ev(`/budget lines/.test(document.querySelector('#artifact-viewer .artifact-viewer-readers .artifact-viewer-from')?.textContent || '')`), `${w}: Details carries the whole question`);
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
         }
     } finally { await client.close(); }

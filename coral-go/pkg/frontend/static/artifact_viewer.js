@@ -62,6 +62,7 @@ function paintSnapshot(dialog, at) {
 
 let _versions = null;    // the version bar of the viewer (#6472)
 let _fileNavigation = null;
+let _meta = null, _from = null, _lineEl = null; // the description and the version line live in Details with the file keys help (#19771): the header is one row
 let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
@@ -158,7 +159,6 @@ function _build() {
     d.innerHTML = `<div class="modal-content dlg-flow artifact-viewer-content">
         <div class="artifact-viewer-header">
             <h2 id="artifact-viewer-title" class="artifact-viewer-title"></h2>
-            <span class="artifact-viewer-from" hidden></span>
             <span class="artifact-viewer-chips"></span>
             <span class="artifact-viewer-actions"><button type="button" class="btn artifact-viewer-edit" hidden>Edit text</button><button type="button" class="btn artifact-viewer-markup" hidden>Mark up</button></span>
             <button type="button" class="btn btn-icon artifact-viewer-fullscreen" aria-label="Full screen" aria-pressed="false" title="Full screen">⤢</button>
@@ -180,7 +180,6 @@ function _build() {
             </span>
         </div>
         <div class="artifact-viewer-trail" hidden><button type="button" class="btn artifact-viewer-back"></button></div>
-        <p class="artifact-viewer-versionline" hidden></p>
         <p class="artifact-viewer-source" role="note" hidden></p>
         <div class="artifact-viewer-readers" hidden></div>
         <p class="artifact-edit-send-note" role="status" hidden></p>
@@ -191,7 +190,9 @@ function _build() {
     _details = makeDetails({ panel: d.querySelector('.artifact-viewer-readers'), remember: false, hide: true }); // closed on every open of the viewer: one open Details no longer fills the next file's screen (#12725)
     d.querySelector('.artifact-viewer-details-item').addEventListener('click', () => _details.button.click());
     { const toggleFocus = _details.button.focus.bind(_details.button); _details.button.focus = o => { toggleFocus(o); if (document.activeElement !== _details.button) d.querySelector('.artifact-viewer-more')?.focus(o); }; } // closed on a phone the button is out of the header: Hide details hands the keyboard to ⋯, where Details is (#15033) // a phone's Details is an item of the ⋯ menu (the header has no room for the button, #15033)
-    _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_details.button); // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
+    _details.button.classList.add('artifact-viewer-details'); d.querySelector('.artifact-viewer-morewrap').before(_fileNavigation.row, _details.button);
+    _meta = document.createElement('div'); _meta.className = 'artifact-viewer-meta'; _from = document.createElement('span'); _from.className = 'artifact-viewer-from'; _from.hidden = true; _lineEl = document.createElement('p'); _lineEl.className = 'artifact-viewer-versionline'; _lineEl.hidden = true; _meta.append(_from, _lineEl, _fileNavigation.helpWrap);
+     // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
     d.querySelector('.artifact-viewer-dropbox-share').addEventListener('click', e => { const b = e.currentTarget; importOnce('./dropbox_share.js').then(m => m.openShareDialog({ hex: b.dataset.hex, filename: b.dataset.name, opener: d.querySelector('.artifact-viewer-more') })).catch(() => {}); }); // Share via Dropbox (#14944): the dialog loads on the press
     d.querySelector('.artifact-viewer-copyid-item').addEventListener('click', e => { const id = e.currentTarget.dataset.fileId; copyFileId({ file_id: id }, showToast); }); // the menu closes itself on a choice // Copy file ID: the id alone; a failed copy says so (#14178)
@@ -202,11 +203,6 @@ function _build() {
     d.querySelector('.artifact-viewer-chips').append(onChip);
     d.querySelector('.artifact-viewer-scripts-item').addEventListener('click', () => { const body = d.querySelector('.artifact-viewer-body'); (body.querySelector('.artifact-scripts-off') || body.querySelector('.artifact-scripts-ask'))?.click(); }); // the same two buttons as the preview's own: one path, one confirmation
     chip.addEventListener('click', () => { const note = d.querySelector('.artifact-linked-notice'); if (!note) return; note.hidden = !note.hidden; chip.setAttribute('aria-expanded', String(!note.hidden)); });
-    // the line under the header (who sent it, what they ask) is one cut line; a tap, Enter or Space shows all of it
-    const fromEl = d.querySelector('.artifact-viewer-from'); fromEl.tabIndex = 0; fromEl.setAttribute('role', 'button'); fromEl.setAttribute('aria-expanded', 'false');
-    const flipFrom = () => { const on = !fromEl.classList.contains('is-open'); fromEl.classList.toggle('is-open', on); fromEl.setAttribute('aria-expanded', String(on)); };
-    new ResizeObserver(() => { if (!fromEl.hidden && !fromEl.classList.contains('is-open') && fromEl.clientWidth < 64) fromEl.classList.add('is-below'); }).observe(fromEl); // a line squeezed to a stub by the header's other controls takes a line of its own (#18778)
-    fromEl.addEventListener('click', flipFrom); fromEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipFrom(); } });
     d.querySelector('.artifact-viewer-download').addEventListener('click', e => { if (e.currentTarget.getAttribute('aria-disabled') !== 'true') showToast('Download started. It is saved in your Downloads folder.'); }); // a plain download says nothing on its own (#17676, walk 79)
     d.querySelector('.artifact-viewer-fullscreen').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
     d.querySelector('.artifact-viewer-fullscreen-item').addEventListener('click', () => setFullScreen(d, !d.classList.contains('av-fullscreen'), true));
@@ -396,12 +392,17 @@ function shownLine() {
     if (_line && _line.hex === _hex) return _line;
     return null;
 }
+/** The description, the version line and the file keys help sit in Details, which exists while one of them has something to say (#19771). */
+function syncMeta() {
+    const any = !_from.hidden || !_lineEl.hidden || _fileNavigation.shown;
+    if (any) { if (_meta.parentNode !== _details.panel) _details.add(_meta); } else if (_meta.parentNode === _details.panel) _details.remove(_meta);
+}
 /** Draw the version line in the header and in Details (with its Copy file ID button), or clear both when the shown version has none. */
 function paintLine(d) {
     const L = shownLine();
     const text = L ? versionLineOf({ file_id: L.fileId, version_line: L.versionLine }) : ''; // hidden characters of the name are written out by versionLineOf
-    const head = d.querySelector('.artifact-viewer-versionline');
-    head.textContent = text; head.hidden = !text; // the file id is in Details, not here (#15142); no tooltip repeating the text (title_repeats_census)
+    const head = _lineEl;
+    head.textContent = text; head.hidden = !text; syncMeta(); // the file id is in Details, not here (#15142); no tooltip repeating the text (title_repeats_census)
     const copyItem = d.querySelector('.artifact-viewer-copyid-item'); // Copy file ID is always reachable from the ⋯ menu: a file id and line never add a Details button of their own (#14178: it joined row one on a phone)
     copyItem.hidden = !text; copyItem.dataset.fileId = text ? L.fileId : '';
     if (!text) { if (_lineChip) _lineChip.hidden = true; return; }
@@ -482,7 +483,7 @@ export function openArtifactViewer(hex, opts = {}) {
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
     // A long name is cut with an ellipsis (#13979): the heading keeps its text; a name that is cut holds a button (focusable, aria-expanded, Enter, Space, a tap or a click) that shows it whole. A name that fits has no extra Tab stop.
     const nameEl = document.createElement('span'); nameEl.className = 'artifact-viewer-title-name'; nameEl.textContent = title.textContent; title.replaceChildren(nameEl); title.title = nameEl.textContent; title.classList.remove('is-open');
-    const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; fromLine.title = fromLine.textContent; fromLine.classList.remove('is-open', 'is-below'); fromLine.setAttribute('aria-expanded', 'false'); d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
+    const fromLine = _from; fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; d.querySelector('.artifact-viewer-sandbox').hidden = true; d._markUp.picture(false); d._markUp.write(false); // who uploaded a file opened for review (#11456), as text
     const sourceNote = d.querySelector('.artifact-viewer-source'); sourceNote.hidden = !!opts.sourceNamed; sourceNote.textContent = '';
     if (!opts.sourceNamed) { const computer = (state.servers || []).find(s => s.id === opts.server), name = opts.server === 'local' ? 'this computer' : (computer?.label || computer?.name || opts.server); sourceNote.textContent = `Viewing from ${markHidden(name, { strict: true })}. Source inferred; read only.`; }
     const dl = d.querySelector('.artifact-viewer-download');
@@ -543,7 +544,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _lineChip = null;
     // Every open sets the line afresh: a caller's valid id and line (bound to its hex, computer and team), else NONE. An earlier open's line never survives into one that carries none (the same digest from another team, a plain reopen).
     _line = !opts.openLatest && fileIdOf({ file_id: opts.fileId }) && opts.versionLine ? { hex: opts.lineHex, fileId: opts.fileId, versionLine: opts.versionLine } : null; // openLatest: the caller's line is for the row's version, not the newest; the bar will set _barLine with the shown version's line (#16737)
-    paintLine(d);
+    paintLine(d); syncMeta();
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); _details.add(dropboxBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     const scrollBack = _restore; _restore = null; // the scroll of the document we came Back to
