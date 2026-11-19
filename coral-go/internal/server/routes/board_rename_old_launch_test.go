@@ -162,7 +162,10 @@ func TestRenameOldBoardRefusesWhenAnAgentStartsDuringTheRename(t *testing.T) {
 	}
 	// The agent starts on the old team (by its id) just after the rename.
 	afterBoardRename = func() {
-		code, out := func() (int, map[string]any) { afterBoardRename = nil; return launch(map[string]any{"board_id": old.ID}) }()
+		code, out := func() (int, map[string]any) {
+			afterBoardRename = nil
+			return launch(map[string]any{"board_id": old.ID})
+		}()
 		require.Equal(t, http.StatusOK, code, out)
 	}
 	t.Cleanup(func() { afterBoardRename = nil })
