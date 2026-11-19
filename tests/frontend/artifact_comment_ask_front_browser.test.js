@@ -87,6 +87,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             check(`${tag}: the maker and the Orchestrator are shown, nobody else`, J(r.shown) === J(['QA Engineer', 'Orchestrator']), J(r.shown));
             check(`${tag}: the maker is ticked, the Orchestrator is not`, J(await ticked()) === J(['QA Engineer']), J(await ticked()));
             check(`${tag}: More agents holds the other 4 and is shut`, r.more === 'More agents (4)' && r.open === false && r.all === 6, J(r));
+            check(`${tag}: Deliver now sits on one row with its box, beside its words`, await ev(`(() => { const l = document.querySelector('.ac-ask-now'), b = l.querySelector('input').getBoundingClientRect(), t = l.querySelector('span').getBoundingClientRect(); return b.right <= t.left + 1 && b.top < t.top + t.height / 2 && b.bottom > t.top; })()`));
             await shot(`ask-front-${w}`);
             await ev(`document.querySelector('.ac-ask-rest summary').click(); true`); await sleep(200); // sleep-ok: the fold opens over a frame
             r = await rows();
