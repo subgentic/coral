@@ -9,6 +9,7 @@ const { loadStyles } = await importOnce('./lazy_styles.js');
 const shown = t => markHidden(String(t || ''), { strict: true }).trim();
 const when = iso => { const t = new Date(iso); return Number.isNaN(t.getTime()) ? '' : t.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }); };
 
+const ago = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); if (!(m >= 0)) return ''; if (m < 60) return `${Math.max(m, 1)} min ago`; if (m < 1440) return `${Math.round(m / 60)} h ago`; return m < 2880 ? 'Yesterday' : when(iso); }; // how long ago, for the popover's short lines
 const madeByYou = v => v.role === 'operator' || v.source === 'edit'; // the person's own: an upload as the Operator or an edit in the dashboard (#15329, #15369); one test for the series and the fallback list
 
 /** The versions of the file the row stands for, oldest first: [{ n, hex, at, who, note, current }]. The server's series when it has one, else the older uploads of the same name the row already holds (`earlier`) and itself, each marked `guess`: they are not a series (#18644). */
@@ -32,14 +33,14 @@ export async function openVersionList(opts) {
     await loadStyles('version_list.css');
     const versions = await versionsOf(opts);
     const dlg = document.createElement('dialog');
-    dlg.className = 'modal-content dlg-form version-list-dialog'; dlg.setAttribute('aria-labelledby', 'version-list-title');
+    dlg.className = 'modal-content dlg-form version-list-dialog'; const pop = !!opts.anchor; if (pop) dlg.classList.add('version-list-pop'); // from a row's "N earlier versions" link it is a popover under the link, as the approved design draws it (#19833); anywhere else, and once Compare opens, a dialog dlg.setAttribute('aria-labelledby', 'version-list-title');
     const title = document.createElement('h2'); title.id = 'version-list-title'; title.tabIndex = -1; const guess = versions.some(v => v.guess); // no series: uploads of the same name, not versions (#18644)
-    title.textContent = `${guess ? 'Uploads named' : 'Versions of'} ${shown(opts.name)}`;
+    title.textContent = pop && !guess ? 'Earlier versions' : `${guess ? 'Uploads named' : 'Versions of'} ${shown(opts.name)}`;
     const list = document.createElement('ul'); list.className = 'version-list';
     const aside = document.createElement('p'); aside.className = 'version-list-guess'; aside.hidden = !guess;
     if (guess) aside.textContent = 'Other uploads with the same name. They are not versions of one file, so there is no Restore or Compare here. To make a series, upload the next one with --new-version-of.';
     const status = document.createElement('p'); status.className = 'inbox-ask-error'; status.setAttribute('role', 'status');
-    const finish = () => { dlg.close(); dlg.remove(); };
+    let off = () => {}; const finish = () => { off(); dlg.close(); dlg.remove(); };
     const confirmRestore = (v, li) => {
         const sure = document.createElement('div'); sure.className = 'version-list-confirm';
         const q = document.createElement('p'); q.textContent = `Ask ${v.you ? 'the uploader' : shown(v.who) || 'the uploader'} to put v${v.n} back as the newest version? Nothing is changed until they do it.`;
@@ -55,8 +56,9 @@ export async function openVersionList(opts) {
     };
     for (const [i, v] of versions.entries()) {
         const li = document.createElement('li'); li.className = 'version-list-entry'; if (!v.guess) li.dataset.version = String(v.n); if (v.current) li.setAttribute('aria-current', 'true');
-        const name = document.createElement('span'); name.className = 'version-list-name'; name.textContent = `${v.guess ? 'Upload' : 'v' + v.n}${v.current ? ' (newest)' : ''}`;
-        const who = document.createElement('span'); who.className = 'version-list-who'; who.textContent = [when(v.at), v.you ? 'You' : shown(v.who) ? `${shown(v.who)}, an agent` : ''].filter(Boolean).join(' · '); // who made it: you (an edit in the dashboard) or an agent (#15329)
+        const name = document.createElement('span'); name.className = 'version-list-name'; name.textContent = `${v.guess ? 'Upload' : 'v' + v.n}${pop ? ` \u00b7 ${shown(v.note) || shown(opts.name)}` : ''}${v.current ? ' (newest)' : ''}`;
+        const who = document.createElement('span'); who.className = 'version-list-who'; if (pop) who.title = [when(v.at), v.you ? 'You' : shown(v.who) ? `${shown(v.who)}, an agent` : ''].filter(Boolean).join(' \u00b7 ');
+        who.textContent = pop ? ago(v.at) || when(v.at) : [when(v.at), v.you ? 'You' : shown(v.who) ? `${shown(v.who)}, an agent` : ''].filter(Boolean).join(' · '); // who made it: you (an edit in the dashboard) or an agent (#15329)
         const actions = document.createElement('span'); actions.className = 'version-list-actions';
         const open = document.createElement('button'); open.type = 'button'; open.className = 'btn btn-small version-list-open'; open.textContent = 'Open'; open.setAttribute('aria-label', v.guess ? `Open the upload of ${when(v.at)}` : `Open v${v.n}`);
         open.addEventListener('click', () => { finish(); opts.open(v); });
@@ -67,6 +69,7 @@ export async function openVersionList(opts) {
             compare.addEventListener('click', async () => {
                 if (dlg.dataset.comparing) return;
                 dlg.dataset.comparing = '1'; compare.disabled = true;
+                if (pop && dlg.classList.contains('version-list-pop')) { off(); dlg.classList.remove('version-list-pop'); dlg.style.cssText = ''; dlg.close(); dlg.showModal(); } // the comparison needs the room of a dialog
                 try { await (await importOnce('./artifact_list_compare.js')).showComparison(dlg, opts, versions[i - 1], v); }
                 catch (e) { status.textContent = e.message || 'Could not compare these versions.'; }
                 finally { delete dlg.dataset.comparing; compare.disabled = false; }
@@ -86,7 +89,15 @@ export async function openVersionList(opts) {
     buttons.append(close);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     dlg.append(title, aside, list, status, buttons);
-    document.body.append(dlg); dlg.showModal(); title.focus();
+    document.body.append(dlg);
+    if (pop) {
+        const place = () => { const a = opts.anchor.getBoundingClientRect(), w = Math.min(dlg.offsetWidth || 320, innerWidth - 24); dlg.style.top = `${a.bottom + 6 + dlg.offsetHeight <= innerHeight - 8 ? a.bottom + 6 : Math.max(8, a.top - dlg.offsetHeight - 6)}px`; dlg.style.left = `${Math.max(12, Math.min(a.left, innerWidth - w - 12))}px`; };
+        dlg.show(); place();
+        const away = e => { if (dlg.classList.contains('version-list-pop') && !dlg.contains(e.target) && !opts.anchor.contains(e.target)) finish(); }, key = e => { if (e.key === 'Escape' && dlg.classList.contains('version-list-pop')) { e.stopPropagation(); e.preventDefault(); finish(); opts.anchor.focus?.(); } };
+        document.addEventListener('pointerdown', away, true); document.addEventListener('keydown', key, true); addEventListener('resize', finish);
+        off = () => { document.removeEventListener('pointerdown', away, true); document.removeEventListener('keydown', key, true); removeEventListener('resize', finish); };
+        title.focus({ focusVisible: false });
+    } else { dlg.showModal(); title.focus(); }
     return dlg;
 }
 

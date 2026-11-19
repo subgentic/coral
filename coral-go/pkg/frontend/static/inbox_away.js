@@ -31,7 +31,9 @@ function draw(slot) {
     const box = el('div', 'inbox-away'); box.setAttribute('role', 'status');
     const close = el('button', 'btn btn-small inbox-away-dismiss', 'Dismiss'); close.type = 'button'; close.setAttribute('aria-label', 'Dismiss the while you were away line');
     close.addEventListener('click', () => { dismissed = result.from; for (const n of document.querySelectorAll('.inbox-away')) n.remove(); });
-    box.append(el('span', 'inbox-away-text', result.text), close);
+    const words = el('span', 'inbox-away-text'), cut = result.text.indexOf('):'); // the lead is strong, the counts plain: the approved strip (#19833); the text is the same words
+    if (cut > 0) words.append(el('strong', '', result.text.slice(0, cut + 2)), result.text.slice(cut + 2)); else words.textContent = result.text;
+    box.append(words, close);
     slot.replaceChildren(box);
 }
 
