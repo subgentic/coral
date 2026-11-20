@@ -56,8 +56,8 @@
 @media (min-width: 768px) { #group-table-view .inbox-folder-toolbar:not(:has(.team-toolbar-selecting)) { padding-bottom: calc(var(--tb-bar-h) + 10px); } } /* the actions line (--tb-bar-h, the row's 8 px gap and 2 px from the toggle's box: 50 px at the 40 px bar, #16792) is kept while nothing is selected, so ticking a row moves no row (#15339, #16792, #16967) */
 /* #15540: icon and star share a line at the row's top on a computer; a phone card keeps its star at the end of the button row (#15658) */
 @media (min-width: 768px) {
-    #group-table-view .inbox-needs-results  .inbox-review-star-anchor { position: static; }
-    #group-table-view .inbox-needs-results  .inbox-kind-row .inbox-review-item > .inbox-review-star { inset: 4px auto auto auto; inset-inline-end: 8px; }
+    :is(#group-table-view, .team-needs-list) .inbox-needs-results  .inbox-review-star-anchor { position: static; }
+    :is(#group-table-view, .team-needs-list) .inbox-needs-results  .inbox-kind-row .inbox-review-item > .inbox-review-star { inset: 4px auto auto auto; inset-inline-end: 8px; }
 }
 @media (max-width: 767px) { #group-table-view .list-bar-bar:has(> .tb-low) { top: calc(-1 * var(--sel-up, 0px) - var(--space-2xl)); } } /* the bar sticks (data_table.css) with its head, search and filters scrolled off above: only the actions line stays at the top of the screen (#15632; --sel-up is that line's offset in the bar, set by mountSelection) */
 @media (max-width: 767px) { #group-table-view .gt-toolbar.tb-low > :not(.btn-icon, .inbox-folder-head, .list-bar-count, .team-tb-selection) { display: revert; } #group-table-view .gt-toolbar.tb-low > .btn-icon { display: inline-flex; } #group-table-view .gt-toolbar.tb-low > .inbox-folder-head { display: flex; } } /* the phone's selecting row keeps its head, search and icons (#15540) */
