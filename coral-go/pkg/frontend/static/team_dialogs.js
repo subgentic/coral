@@ -1046,21 +1046,28 @@ function firstTaskTitle(text) {
 /** The first task as a task of the team, assigned to its lead (titled by its first sentence, the whole text the body), and, when asked, the team's goal with the task under it. A refusal is said in a toast and the board line still goes (#10007, #10279). */
 async function addFirstTask(key, lead, goal, saveGoal = false) {
     const title = firstTaskTitle(goal);
-    let goalId = null;
-    if (saveGoal) { // the first task is also the team's goal, and the task is listed under it (#10279)
+    const makeGoal = async () => { // the first task is also the team's goal, and the task is listed under it (#10279)
         try {
             const g = await goalWrite(key, 'goal_create', 0, '/goals', 'POST', { title, ...(goal !== title ? { outcome: goal } : {}), subscriber_id: OPERATOR_ID }); // previewed first when the Hub asks for it (#13503)
             if (!g.ok) throw new Error(String(g.status));
-            goalId = Number((await g.json()).id) || null;
-            if (goalId) showToast("Your first task is saved as the team's goal: it is on the Goals tab."); // the Goals 1 that appears says where it came from (#10532)
-        } catch { showToast('The team started, but its goal was not saved. Add it on the Goals tab.', true); }
-    }
+            const id = Number((await g.json()).id) || null;
+            if (id) showToast("Your first task is saved as the team's goal: it is on the Goals tab."); // the Goals 1 that appears says where it came from (#10532)
+            return id;
+        } catch { showToast('The team started, but its goal was not saved. Add it on the Goals tab.', true); return null; }
+    };
+    let goalId = saveGoal ? await makeGoal() : null;
+    const send = async () => boardFetch(key, '/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body: goal, assigned_to: lead, created_by: 'Operator', ...(goalId ? { goal_id: goalId } : {}) }),
+    });
     try {
-        const r = await boardFetch(key, '/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, body: goal, assigned_to: lead, created_by: 'Operator', ...(goalId ? { goal_id: goalId } : {}) }),
-        });
+        let r = await send();
+        if (r.status === 400 && !goalId && await r.clone().json().then(j => j && j.code === 'goal_required', () => false)) {
+            // The team requires a goal for every task (a planning-approval choice sets that) and the person did not ask to save this one as the goal: the goal is made after all, so the task is accepted (#20019)
+            goalId = await makeGoal();
+            if (goalId) r = await send();
+        }
         if (!r.ok) throw new Error(String(r.status));
     } catch { showToast('The team started, but the first task was not added to its Tasks tab.', true); }
 }
