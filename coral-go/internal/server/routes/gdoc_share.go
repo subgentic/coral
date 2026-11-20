@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/gdocsync"
 	setreg "github.com/subgentic/coral/internal/settings"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // gdocAccount is the keychain item the sign-in helper wrote (scope drive.file).
@@ -31,6 +33,9 @@ var gdocClientFor = func() (*gdocsync.Client, error) {
 
 // gdocMac says whether this computer can keep the sign-in (the macOS keychain): elsewhere the feature is unavailable. A test changes it.
 var gdocMac = func() bool { return runtime.GOOS == "darwin" }
+
+// gdocShareMu serialises shares, so two presses cannot make two Docs for one file.
+var gdocShareMu sync.Mutex
 
 const gdocMaxMarkdown = 1 << 20
 
@@ -61,25 +66,22 @@ func (h *SessionsHandler) RegisterGdocShare(r chi.Router) {
 }
 
 // gdocConnected says whether a Google sign-in is stored on this computer (no network call, nothing read out); a test replaces it.
-var gdocConnected = func() bool { _, err := gdocsync.LoadCreds(gdocAccount); return err == nil }
+var gdocConnected = func() bool { return gdocsync.HasCreds(gdocAccount) }
 
 // gdocStatus: GET /api/gdoc/status[?id=<artifact>]. Whether the switch is on and a sign-in is kept here, and, for the Operator alone and an artifact asked about, whether it is shared
 // and the address of its Doc. An agent's call gets neither: no agent learns which Doc a file is in.
 func (h *SessionsHandler) gdocStatus(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"enabled": h.gdocShareOn(r)}
-	if out["enabled"] == true {
+	if out["enabled"] == true && !isAgentCaller(r) { // an agent's call never touches the keychain and is told nothing about the sign-in or a Doc
 		out["connected"] = gdocMac() && gdocConnected()
-		if id := r.URL.Query().Get("id"); id != "" && validArtifactID(id) && !isAgentCaller(r) {
+		if id := r.URL.Query().Get("id"); id != "" && validArtifactID(id) {
 			key := id
 			if sid, _, in := callerSeries(r, h.cfg.CoralDir(), id); in {
 				key = sid
 			}
-			gdocLinksMu.Lock()
-			links, err := h.loadGdocLinks()
-			gdocLinksMu.Unlock()
-			if l, ok := links[key]; err == nil && ok {
+			if g, err := h.ss.GetGdocShare(r.Context(), key); err == nil && g != nil {
 				out["shared"] = true
-				out["url"] = "https://docs.google.com/document/d/" + l.DocID + "/edit"
+				out["url"] = "https://docs.google.com/document/d/" + g.DocID + "/edit"
 			}
 		}
 	}
@@ -134,9 +136,9 @@ func (h *SessionsHandler) shareToGdoc(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "gdoc_failed", "Google Docs is not signed in on this computer. Sign in and try again.")
 		return
 	}
-	gdocLinksMu.Lock()
-	defer gdocLinksMu.Unlock()
-	links, err := h.loadGdocLinks()
+	gdocShareMu.Lock()
+	defer gdocShareMu.Unlock()
+	existing, err := h.ss.GetGdocShare(r.Context(), key)
 	if err != nil {
 		errInternalServer(w, "could not read the list of shared files")
 		return
@@ -145,28 +147,26 @@ func (h *SessionsHandler) shareToGdoc(w http.ResponseWriter, r *http.Request) {
 	if title == "" {
 		title = "Coral artifact"
 	}
-	link, shared := links[key]
+	shared := existing != nil
+	docID := ""
 	patched := 0
 	if shared {
-		if patched, err = c.Patch(ctx, link.DocID, string(md)); err != nil {
+		docID = existing.DocID
+		if patched, err = c.Patch(ctx, docID, string(md)); err != nil {
 			h.gdocFail(w, err)
 			return
 		}
 	} else {
-		docID, err := c.Push(ctx, title, string(md))
-		if err != nil {
+		if docID, err = c.Push(ctx, title, string(md)); err != nil {
 			h.gdocFail(w, err)
 			return
 		}
-		link = gdocLink{DocID: docID, Name: title}
 	}
-	link.Digest = id
-	links[key] = link
-	if err := h.saveGdocLinks(links); err != nil {
+	if err := h.ss.SaveGdocShare(r.Context(), store.GdocShare{Key: key, DocID: docID, Digest: id, Name: title}, time.Now()); err != nil {
 		errInternalServer(w, "the Doc was updated but the link to it could not be saved")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"doc_id": link.DocID, "url": "https://docs.google.com/document/d/" + link.DocID + "/edit", "created": !shared, "requests": patched})
+	writeJSON(w, http.StatusOK, map[string]any{"doc_id": docID, "url": "https://docs.google.com/document/d/" + docID + "/edit", "created": !shared, "requests": patched})
 }
 
 // gdocFail answers a failed Google call in plain words; the error text never reaches the answer (it could carry a body), only the kind.

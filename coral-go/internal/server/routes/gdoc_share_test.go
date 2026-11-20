@@ -207,9 +207,8 @@ func TestSharingAMarkdownArtifactMakesADocAndAReshareChangesOnlyTheDifference(t 
 	require.Len(t, g.drive.uploads, 1)
 	assert.Equal(t, []string{"plan.md"}, g.drive.titles)
 	assert.NotContains(t, raw, "tok-SECRET-123", "the answer never carries the token")
-	info, err := os.Stat(g.h.gdocLinksPath())
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "the link file is the owner's alone")
+	_, err := g.h.ss.GetGdocShare(context.Background(), gdocV1)
+	require.NoError(t, err, "the share is in the store")
 
 	// the same artifact again, nothing changed: no second Doc, no change sent
 	status, out, raw = g.share(t, gdocV1)
@@ -242,8 +241,9 @@ func TestAGoogleFailureIsAnsweredInPlainWordsWithoutTheBodyAndLeavesNoLink(t *te
 		assert.NotContains(t, raw, "tok-SECRET-123", "neither the token nor Google's body is in the answer")
 		assert.NotContains(t, raw, "backend error")
 		assert.Equal(t, code, out["code"], "status %d", status)
-		_, err := os.Stat(g.h.gdocLinksPath())
-		assert.True(t, os.IsNotExist(err), "a failed share keeps no link")
+		row, err := g.h.ss.GetGdocShare(context.Background(), gdocV1)
+		require.NoError(t, err)
+		assert.Nil(t, row, "a failed share keeps no link")
 	}
 }
 
@@ -291,9 +291,10 @@ func TestANewVersionOfASharedSeriesPatchesTheSameDocWithOnlyTheChange(t *testing
 	assert.Equal(t, 1, g.drive.batches, "one batchUpdate")
 	assert.Greater(t, g.drive.requests, 0)
 	assert.Less(t, g.drive.requests, 6, "only the changed paragraph is sent, not the whole text")
-	links, err := g.h.loadGdocLinks()
+	row, err := g.h.ss.GetGdocShare(context.Background(), sid)
 	require.NoError(t, err)
-	assert.Equal(t, gdocV2, links[sid].Digest, "the link remembers the version last sent")
+	require.NotNil(t, row)
+	assert.Equal(t, gdocV2, row.Digest, "the share remembers the version last sent")
 }
 
 func (g *gdocRig) status(t *testing.T, id string, hdr map[string]string) map[string]any {
@@ -326,4 +327,5 @@ func TestTheStatusSaysIfAFileIsSharedAndWhereOnlyToTheOperator(t *testing.T) {
 	agent := g.status(t, gdocV1, map[string]string{"X-Coral-Session-Token": "an-agent-token"})
 	assert.Nil(t, agent["shared"], "an agent is not told which Doc a file is in")
 	assert.Nil(t, agent["url"])
+	assert.Nil(t, agent["connected"], "an agent never makes the keychain be asked")
 }

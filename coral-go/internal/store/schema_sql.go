@@ -746,6 +746,20 @@ CREATE TABLE IF NOT EXISTS dropbox_share_contacts (
     PRIMARY KEY (account_id, email)
 );
 
+-- Share to Google Docs (#19996, goal #265, slice B of #20010): one row per shared artifact series (key = the series id, or the digest of a file with no series). The Doc's
+-- id and the file it came from, whether the sync is live or paused (the owner's per-Doc stop), and what the automatic sync needs to never overwrite a Doc edit: the Doc's
+-- revision and the Markdown digest at the last sync. Never a token, never who the Doc is shared with (Google keeps that).
+CREATE TABLE IF NOT EXISTS gdoc_shares (
+    key          TEXT PRIMARY KEY,
+    doc_id       TEXT NOT NULL,
+    digest       TEXT NOT NULL DEFAULT '',     -- the artifact version last pushed to the Doc
+    name         TEXT NOT NULL DEFAULT '',
+    state        TEXT NOT NULL DEFAULT 'live', -- live or paused
+    doc_revision TEXT NOT NULL DEFAULT '',     -- the Doc's revision id at the last sync
+    created_at   TEXT NOT NULL,
+    synced_at    TEXT NOT NULL DEFAULT ''
+);
+
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is
 -- sealed like the server token. Kept across restarts so a restart loop reuses one code
 -- instead of asking the hub for a new one each time.

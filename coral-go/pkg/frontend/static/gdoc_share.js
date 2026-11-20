@@ -5,7 +5,6 @@
  * is not, the dialog says so. Google's own words never reach the page. */
 import { el as mk } from './dom_el.js';
 import { loadStyles } from './lazy_styles.js';
-import { serverUrl } from './server_base.js';
 
 const HEX_RE = /^[a-f0-9]{64}$/;
 const DOC_RE = /^https:\/\/docs\.google\.com\/document\/d\/[A-Za-z0-9_-]+\/edit$/;
@@ -22,7 +21,7 @@ async function call(method, url) {
 
 /** Whether the menu item is offered: the experimental switch is on (GET /api/gdoc/status). Any failure counts as off. */
 export async function gdocOffered() {
-    const r = await call('GET', serverUrl('/api/gdoc/status', 'local'));
+    const r = await call('GET', '/api/gdoc/status');
     return r.status === 200 && r.body.enabled === true;
 }
 
@@ -68,7 +67,7 @@ export async function openGdocDialog(opts) {
     f.acts.append(btn('Cancel', 'btn', close));
     dialog.showModal();
     if (!HEX_RE.test(hex)) { f.body.replaceChildren(mk('p', null, 'This file cannot be shared.')); return; }
-    const res = await call('GET', serverUrl('/api/gdoc/status', 'local') + '?id=' + hex);
+    const res = await call('GET', '/api/gdoc/status?id=' + hex);
     if (!dialog.open) return;
     f.body.replaceChildren();
     if (res.status !== 200 || res.body.enabled !== true) { f.body.append(mk('p', null, 'Sharing to Google Docs is turned off. Turn on “Share to Google (experimental)” in Settings to use it.')); return; }
@@ -81,7 +80,7 @@ export async function openGdocDialog(opts) {
     const url = DOC_RE.test(String(res.body.url || '')) ? res.body.url : '';
     const go = primary(res.body.shared ? 'Share this version again' : 'Share to Google Docs', async () => {
         sayIt(f.say, ''); go.disabled = true; note.textContent = 'Sharing…';
-        const r = await call('POST', serverUrl(`/api/artifacts/${hex}/gdoc/share`, 'local'));
+        const r = await call('POST', `/api/artifacts/${hex}/gdoc/share`);
         if (!f.body.isConnected) return;
         go.disabled = false; note.textContent = '';
         if (r.status === 200) { done(f, r.body); return; }

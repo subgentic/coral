@@ -43,6 +43,13 @@ func StoreCreds(account string, c Creds) error {
 	return nil
 }
 
+// HasCreds says whether a sign-in is stored for the account, without reading the secret out (no -w): the keychain is asked only whether the item exists.
+func HasCreds(account string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, "security", "find-generic-password", "-a", account, "-s", keychainService).Run() == nil
+}
+
 // LoadCreds reads them back.
 func LoadCreds(account string) (Creds, error) {
 	var c Creds
