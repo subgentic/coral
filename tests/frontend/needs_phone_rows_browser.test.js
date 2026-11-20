@@ -88,12 +88,13 @@ const { coralReady } = require('./helpers/wait');
                 const t = document.querySelector('#group-table-view .gt-toolbar'), box = e => { const r = e?.getBoundingClientRect(); return r && r.width > 0 && r.height > 2 ? { top: r.top, bottom: r.bottom } : null; };
                 const sel = box(t.querySelector(':scope > .team-tb-selection')), head = box(t.querySelector(':scope > .inbox-folder-head, :scope > .inbox-needs-tabs')), more = box(t.querySelector(':scope > .needs-more'));
                 const controls = [...t.children].filter(k => box(k) && !k.matches('.team-tb-selection,.inbox-folder-head,.inbox-needs-tabs,.needs-more'));
-                return { head, more, sel, controls: controls.map(k => ({ cls: String(k.className), ...box(k) })) };
+                return { tabs: !!t.querySelector(':scope > .inbox-needs-tabs'), head, more, sel, controls: controls.map(k => ({ cls: String(k.className), ...box(k) })) };
             })()`);
             assert.ok(tb.controls.every(c => /^(inbox-needs-tabs|list-bar-search-wrap|goals-chips|inbox-kind-control task-more|btn btn-quiet btn-icon sidebar-collapse-btn|btn btn-quiet btn-small)/.test(c.cls)), at + 'only search, kind filters and toolbar icons share the filter row: ' + JSON.stringify(tb));
             assert.ok(tb.head && tb.more && tb.sel && tb.controls.length, at + 'title, More, filters and selection are visible: ' + JSON.stringify(tb));
-            assert.ok(Math.max(tb.head.top, tb.more.top) < Math.min(tb.head.bottom, tb.more.bottom), at + 'title and More share header row one: ' + JSON.stringify(tb));
-            assert.ok(tb.controls.every(c => c.top >= Math.max(tb.head.bottom, tb.more.bottom) - 1 && c.bottom <= tb.sel.top + 1), at + 'filters sit below the title and above the selection: ' + JSON.stringify(tb));
+            if (tb.tabs) assert.ok(tb.more.top >= tb.head.bottom - 1 && Math.max(...tb.controls.map(c => c.top)) < tb.more.bottom, at + 'with the two tabs, the tabs have row one and More joins the filters under them (mock v3, #19904): ' + JSON.stringify(tb));
+            else assert.ok(Math.max(tb.head.top, tb.more.top) < Math.min(tb.head.bottom, tb.more.bottom), at + 'title and More share header row one: ' + JSON.stringify(tb));
+            assert.ok(tb.controls.every(c => c.top >= (tb.tabs ? tb.head.bottom : Math.max(tb.head.bottom, tb.more.bottom)) - 1 && c.bottom <= tb.sel.top + 1), at + 'filters sit below the title and above the selection: ' + JSON.stringify(tb));
             assert.ok(Math.max(...tb.controls.map(c => c.top)) < Math.min(...tb.controls.map(c => c.bottom)), at + 'all filter controls share one row, with no orphan control row: ' + JSON.stringify(tb));
             assert.ok(b.oneLine && b.h <= 64 && b.small.length === 0, at + 'the bar is one line, every target 44 px, each named (Gmail, #11707): ' + JSON.stringify({ h: b.h, oneLine: b.oneLine, small: b.small }));
             // the bar is the top row of the screen and stays there while the list scrolls (the operator, comment 28; #11707): this check was dropped by the rebase onto ux-details and is back

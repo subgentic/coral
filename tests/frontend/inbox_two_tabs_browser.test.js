@@ -142,6 +142,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].find(b => /^All/.test(b.textContent)).click(); true`);
                 await waitFor(`!!(${row('Awake file.txt')}) && !!(${row('landing-copy-v2.md')})`, 'All shows the five again', 8000);
                 await shot('agent-five');
+                if (width === 390) assert.match(await ev(`document.querySelector('.inbox-agent-status').innerText.trim()`), /^5 waiting · 3 inactive$/, 'a phone shows the mock’s one short count line, with no stray separators');
                 if (width === 1280) {
                     const tops = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => Math.round(r.getBoundingClientRect().top))`);
                     const before = await tops();
