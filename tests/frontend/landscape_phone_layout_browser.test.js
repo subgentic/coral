@@ -46,8 +46,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
                     continue;
                 }
                 assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, `${tag}: no Inbox strip in phone landscape`);
-                const title = await ev(`(() => { const e = document.getElementById('group-table-title'), r = e.getBoundingClientRect(); return { text: e.textContent, top: r.top, bottom: r.bottom, width: r.width }; })()`);
-                assert.ok(title.text === 'Needs you' && title.width > 20 && title.top >= 0 && title.bottom <= h, `${tag}: the current folder is visible inside the screen: ${JSON.stringify(title)}`);
+                const title = await ev(`(() => { const e = document.getElementById('group-table-title'), tab = document.querySelector('#group-table-view .inbox-needs-tab[aria-selected="true"]'), r = (tab || e).getBoundingClientRect(); return { text: e.textContent, top: r.top, bottom: r.bottom, width: r.width }; })()`);
+                assert.ok(title.text === 'Needs you' && /* the two tabs are the title on this screen (#19904): the tab is what must be on screen */ title.width > 20 && title.top >= 0 && title.bottom <= h, `${tag}: the current folder is visible inside the screen: ${JSON.stringify(title)}`);
                 await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
                 await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"]')`, `${tag}: current folder in menu`, 6000);
                 assert.equal(await ev(`document.querySelector('#nav-more-menu .nav-drawer-folder[aria-current="true"] .nav-drawer-label').textContent`), 'Needs you', `${tag}: menu marks the current folder`);

@@ -47,6 +47,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             // the three dots: Save for later
             if (!mobile) { // Save for later remains separate from the review pin.
                 check(await ev(`!!document.querySelector('${T} .dt-star') && !!document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]')`), at + 'the row has separate Save for later and review star controls');
+                { const order = await ev(`[...document.querySelector('${T} .inbox-review-actions').children].filter(e => e.getClientRects().length && e.matches('button, .inbox-row-more')).map(e => e.matches('.inbox-row-more') ? 'More' : e.classList.contains('dt-star') ? 'Star' : e.classList.contains('inbox-bookmark') ? 'Save' : e.textContent.trim() || e.getAttribute('aria-label'))`); check(order[order.length - 1] === 'More' && order.indexOf('Star') < order.indexOf('More'), at + 'More is the last button of the row (#19962): ' + JSON.stringify(order)); }
                 await ev(`document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]').click(); true`);
             } else { // a phone's row has it in the three dots
                 await dots('plan-1.md');

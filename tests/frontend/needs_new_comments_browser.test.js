@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
                 await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
                 assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`), 200);
                 await ev(`(() => {
-                    localStorage.removeItem('coral-inbox-needs-filters');
+                    localStorage.removeItem('coral-inbox-needs-filters'); localStorage.removeItem('coral-inbox-needs-tab');
                     const style = document.createElement('style'); style.textContent = '*,*::before,*::after{transition:none!important;animation:none!important}'; document.head.append(style);
                     window.__commentReads = [];
                     const mk = (i, name, tags, news) => ({ id: i.toString(16).padStart(64, '0'), name, media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - (10 - i) * 60000).toISOString(), task_id: 0, source: 'upload', available: true, session_id: 'writer-a', produced_by: 'Writer A', tags, ...(news ? { new_comments: news } : {}) });
@@ -54,7 +54,10 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.switchNavTab('hub-inbox');true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Replied file.txt')})&&!!(${row('Quiet file.txt')})&&!!(${row('Decided file.txt')})&&!!(${row('Changes file.txt')})`, 'the four files in Needs you', 15000);
-                assert.ok(await ev(`!!(${row('Waiting file.txt')}) && (${row('Waiting file.txt')}).classList.contains('dt-read')`), 'a sent-back file remains visible and uncounted while waiting on its agent');
+                assert.ok(await ev(`!${row('Waiting file.txt')}`), 'a sent-back file is not on Waiting on you');
+                await ev(`document.querySelector('[data-needs-tab="agent"]').click(); true`); await waitFor(`!!(${row('Waiting file.txt')})`, 'it is on Waiting on an agent', 8000);
+                assert.ok(await ev(`(${row('Waiting file.txt')}).classList.contains('dt-read')`), 'a sent-back file remains visible and uncounted while waiting on its agent');
+                await ev(`document.querySelector('[data-needs-tab="you"]').click(); true`); await waitFor(`!!(${row('Replied file.txt')})`, 'and back on Waiting on you', 8000);
                 assert.ok(await marker('Changes file.txt'), 'with changes requested AND an agent reply in the thread it is back, marked');
                 // the read file with news is unread again, as the same row: the marker, the unread look, and ONE number (3 = this row, the quiet one and the decided one)
                 assert.equal(await badge(), '4', 'the file with new comments counts again, once: ' + await badge());

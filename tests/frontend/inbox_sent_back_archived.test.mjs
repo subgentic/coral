@@ -5,7 +5,7 @@ installDom();
 const { sentBackChip, producerArchived } = await importUi('inbox_review_state');
 // #19897: a file sent back to an archived agent says so: "waiting on" an agent that is gone is not true, and the Operator reads it as "the agent is working on it".
 test('the chip of a sent-back file says the agent is archived, and otherwise waits on it', () => {
-  assert.equal(sentBackChip('Video Producer').textContent, 'Sent back · waiting on Video Producer');
+  assert.equal(sentBackChip('Video Producer').textContent, 'Sent back');
   const gone = sentBackChip('Video Producer', true);
   assert.equal(gone.textContent, 'Sent back · Video Producer is archived');
   assert.doesNotMatch(gone.textContent, /waiting on/);

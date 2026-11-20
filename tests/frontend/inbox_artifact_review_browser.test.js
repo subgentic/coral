@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`),200);
                 // Mock only artifact storage; the team exists through the real board API.
                 await ev(`(() => {
-                    localStorage.removeItem('coral-inbox-needs-filters');
+                    localStorage.removeItem('coral-inbox-needs-filters'); localStorage.removeItem('coral-inbox-needs-tab');
                     const style=document.createElement('style'); style.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(style);
                     window.__reviewWrites=[];window.__reviewFail=false;window.__decisions=[];window.__comments=[];
                     window.__reviewItems=Array.from({length:13},(_,i)=>({id:(i+1).toString(16).padStart(64,'0'),name:'Review file '+String(i+1).padStart(2,'0')+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(20-i)*60000).toISOString(),task_id:0,source:'upload',available:true,session_id:i<11?'writer-a':'writer-b',produced_by:i<11?'Writer A':'Writer B',tags:['for review','internal'],uri:'coral://artifacts/'+(i+1).toString(16).padStart(64,'0')}));
@@ -177,13 +177,15 @@ const { coralReady } = require('./helpers/wait');
                     assert.equal(await ev(`window.__comments.filter(c=>c.body).length`),1,'and made one comment');
                     // #13916: Request changes keeps the document visible, waiting on the agent and uncounted; a new version returns it to active review.
                     const needsCount = () => ev(`parseInt(document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count')?.textContent || '0', 10)`);
-                    await waitFor(`!!(${row('Review file 01.txt')}) && /Sent back · waiting on/.test((${row('Review file 01.txt')}).textContent) && (${row('Review file 01.txt')}).classList.contains('dt-read')`,'after Request changes the file remains visible and uncounted',8000);
+                    await ev(`document.querySelector('[data-needs-tab="agent"]').click(); true`); // the sent-back file is on Waiting on an agent (#19904)
+                    await waitFor(`!!(${row('Review file 01.txt')}) && /Sent back[\s\S]*Waiting on/.test((${row('Review file 01.txt')}).textContent) && (${row('Review file 01.txt')}).classList.contains('dt-read')`,'after Request changes the file remains visible and uncounted',8000);
                     // #11860 (Beta #8): the viewer reloads itself after the request, and that reload is not a new opening: the file is not marked read again
                     await require('./helpers/wait').settle(ev, 400, 300);
                     assert.equal(await ev(`window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}').tags.includes('read')`),false,'Request changes leaves the file unread: the viewer reloading does not read it again: ' + await ev(`JSON.stringify(window.__reviewWrites)`));
                     const gone = await needsCount();
                     await ev(`document.querySelector('.artifact-viewer-close').click();true`);
                     await ev(`(() => { const v1 = window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}'); window.__reviewItems.push({ ...v1, id: (0x62).toString(16).padStart(64,'0'), uri: 'coral://artifacts/' + (0x62).toString(16).padStart(64,'0'), tags: ['for review','internal'], created_at: new Date(Date.parse(v1.created_at) + 1000).toISOString() }); return import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`);
+                    await ev(`document.querySelector('[data-needs-tab="you"]').click(); true`);
                     await waitFor(`!!(${row('Review file 01.txt')})`,'the agent\'s next version comes back as a new Needs you item',8000);
                     assert.equal(await ev(`/, unread/.test((${row('Review file 01.txt')}).textContent)`),true,'the new version is unread');
                     assert.equal(await needsCount(),gone + 1,'and counted: the Needs you number goes up by one');

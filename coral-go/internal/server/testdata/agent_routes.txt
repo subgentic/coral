@@ -50,6 +50,7 @@ b DELETE /api/upload/{name}
 b DELETE /api/views/{id}
 b DELETE /api/workflows/{workflowID}
 b GET /api/activity
+b GET /api/waiting-on-agent
 c GET /api/agent-docs
 c GET /api/agent-docs/all
 c GET /api/agent-docs/{name}
