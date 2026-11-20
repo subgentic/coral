@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/subgentic/coral/internal/fsreplace"
 )
 
 const (
@@ -419,7 +421,7 @@ func (s State) Save(path string) error {
 		os.Remove(tmp)
 		return errors.Join(werr, cerr)
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := fsreplace.Rename(tmp, path); err != nil { // the module's one way to replace a file (TestNoBareRename, #9738)
 		os.Remove(tmp)
 		return err
 	}
