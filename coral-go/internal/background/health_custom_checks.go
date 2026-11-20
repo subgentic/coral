@@ -144,7 +144,7 @@ func (c *CustomChecks) runOne(ctx context.Context, hc board.HealthCheck) {
 	}
 	if say {
 		// A fixed phrase, never the script's own words.
-		c.send(ctx, agents, hc, orch, Notice(hc.Name, fmt.Sprintf("Check %s failed (%s)", hc.Name, res.FailureReason())))
+		c.send(ctx, agents, hc, orch, Notice(hc.Name, fmt.Sprintf("Check %s failed: %s", hc.Name, res.FailureReason())))
 	}
 	if paused {
 		c.send(ctx, agents, hc, orch, Notice(hc.Name, fmt.Sprintf("Check %s is paused after %d failures in a row", hc.Name, board.HealthCheckFailPause)))
