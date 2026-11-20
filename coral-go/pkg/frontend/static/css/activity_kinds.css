@@ -22,6 +22,6 @@
 .activity-check-partial .activity-check-tile { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.14); border-color: rgba(var(--warning-rgb), 0.3); } /* the mock's partial-view notice: the same card, an amber tile */
 .activity-check-tile::before { content: "warning"; }
 .activity-check-title { display: block; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-primary); }
-.activity-check-detail { color: var(--text-secondary); font-size: var(--fs-base); }
+.activity-check-detail { color: var(--text-secondary); font-size: calc((var(--fs-base) + var(--fs-md)) / 2); line-height: 1.45; } /* the mock's 12.5 px sentence at line height 1.45 (#19935) */
 #group-table-view:has(.inbox-activity-group-toggle) .empty-state { align-items: center; text-align: center; padding: var(--space-2xl) var(--space-xl); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 #group-table-view:has(.inbox-activity-group-toggle) .empty-state::before { content: "history"; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; aspect-ratio: 1; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-tertiary); font-family: "Material Icons"; font-size: var(--fs-2xl); font-feature-settings: "liga"; color: var(--text-secondary); }
