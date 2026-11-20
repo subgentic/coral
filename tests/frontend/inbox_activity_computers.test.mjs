@@ -64,8 +64,8 @@ reset([...online(['srv1', 'srv2']), { id: 'srv3', label: 'SRV3', status: 'offlin
 await AC.refresh();
 assert.deepEqual(asked.map(a => a.server).sort(), ['local', 'srv1', 'srv2'], 'an offline computer is not asked');
 assert.equal(AC.total(), 3);
-assert.deepEqual(AC.missingComputers(), [{ id: 'srv3', why: 'is offline' }], 'an offline computer is named as missing');
-assert.equal(AC.missingWords(AC.missingComputers()), 'Not in this list: SRV3 (is offline).');
+assert.deepEqual(AC.missingComputers(), [{ id: 'srv3', why: 'offline' }], 'an offline computer is named as missing');
+assert.equal(AC.missingWords(AC.missingComputers(), AC.shownComputers()), 'Not in this list: SRV3 (offline). Showing actions from This computer, SRV1, SRV2.'); // #19924: the approved mock's words ("Not in this list: Mac Mini (offline). Showing actions from Mac Studio.")
 // each row's From names its computer, and the Computer filter keeps one computer's rows
 assert.deepEqual(filt().map(r => AC.fromCell(r)).sort(), ['SRV1', 'SRV2', 'This computer']);
 const AFm = await import(pathToFileURL(path.join(dir, 'operator_activity_filters.js')).href);

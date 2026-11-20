@@ -27,6 +27,7 @@ if (!scenario) {
     // a board-wide lock is not undone by the artifact Unlock (setLocked deletes scope artifact only): the drawer draws no Unlock for it (source pin; the drawer itself is not mounted here)
     const { readFileSync } = await import('node:fs');
     const drawer = readFileSync(new URL('../../coral-go/pkg/frontend/static/artifact_comments.js', import.meta.url), 'utf8');
+    assert.match(drawer, /sendOffThroughHub\(c\)\) main\.append\(el\('p', 'ac-note ac-send-help ac-send-hub', api\.SEND_NOT_THROUGH_HUB\)\)/, '#19854: the drawer says Send to agent is not available through the Hub where it hides it');
     assert.match(drawer, /if \(d\.canLock && !\(d\.locked && d\.lockScope === 'board'\)\)/, 'no Unlock button for a board-scoped lock');
     assert.doesNotMatch(api.lockedWords({ locked: true, canLock: true, lockScope: 'board', lockBoard: 'team-a' }, 'file'), /unlock it any time/, 'the board-lock words never offer an unlock the button cannot do');
     const send = await importUi('artifact_comment_send');
@@ -52,9 +53,20 @@ if (!scenario) {
         assert.equal(d.canComment, true, 'the computer said the owner may comment');
         assert.equal(base.commentSendOn(), scenario === 'writes-and-send');
         assert.equal(d.canLock, scenario === 'writes-and-send', 'the lock (and with it Send to agent) is drawn only when the account says comment_send');
+        assert.equal(api.hubSendOff(), scenario === 'writes-on', '#19854: a Hub page that routes writes but not the send says so under the comment');
         assert.deepEqual(d.comments[0].can, { reply: true, edit: true, delete: true, resolve: true }, "each comment's can is the computer's");
+        // a refused send through the Hub is said in words, never as an HTTP code (#19854)
+        for (const [status, body] of [[404, {}], [405, {}], [403, {}], [501, {}]]) {
+            globalThis.fetch = window.fetch = async () => ({ ok: false, status, json: async () => body });
+            const r = await api.sendComment('a'.repeat(64), '', 1, ['Dev']);
+            assert.equal(r.ok, false);
+            assert.equal(r.error, api.SEND_NOT_THROUGH_HUB, `HTTP ${status} through the Hub`);
+        }
+        globalThis.fetch = window.fetch = async () => ({ ok: false, status: 403, json: async () => ({ error: 'This computer is view only.' }) });
+        assert.equal((await api.sendComment('a'.repeat(64), '', 1, ['Dev'])).error, 'This computer is view only.', "the computer's own words are kept");
     } else {
         assert.equal(base.commentWritesOn(), false);
+        assert.equal(api.hubSendOff(), false, 'read only: nothing to say about the send');
         assert.equal(d.canComment, false, 'the Hub does not say it routes writes: read only, as before');
         assert.equal(d.canLock, false);
         assert.match(d.reason, /Comments can be added on the computer itself/);

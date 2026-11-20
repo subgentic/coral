@@ -145,3 +145,32 @@ func TestStartCoralNeverActsOnAnotherComputerAndTheDaemonStartCommandIsTheFixedO
 	code, _ := me.do("POST", "/api/servers/provision/plan", map[string]any{"server_id": "ssh-box", "action": "start", "target": "evil@elsewhere.example.com"})
 	assert.Equal(t, 400, code)
 }
+
+// #19885 (the Operator): after Start Coral brought a computer back, the main window still said it was not running until they opened its card and pressed Test. A Start that ends with the computer answering
+// (started now, or already answering) must write the status online and tell the hub's remote workers at once, as an upgrade does, so the row, Last seen and the live list change with no Test and no reload.
+func TestStartCoralTellsTheHubAndWritesTheRowWhenTheComputerAnswers(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(me *manageEnv)
+	}{
+		{"started now", func(me *manageEnv) { me.stoppedUntilStarted() }},
+		{"already answering", func(me *manageEnv) { me.version = "2.0.10" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			me := newManageEnv(t)
+			tc.setup(me)
+			require.NoError(t, os.MkdirAll(filepath.Join(me.home, ".coral-server", "2.0.10", "root"), 0o755))
+			require.NoError(t, me.e.h.store.SetStatus(context.Background(), "ssh-box", store.RemoteStatusUnreachable, "connect failed"))
+			var told []string
+			var reconnected []string
+			me.p.SetStatusListener(func(id, status string) { told = append(told, id+":"+status) })
+			me.p.SetReconnector(func(id string) { reconnected = append(reconnected, id) })
+			me.runStart(t)
+			assert.Equal(t, []string{"ssh-box:online"}, told, "the hub's workers hear that the computer answers")
+			assert.Equal(t, []string{"ssh-box"}, reconnected, "and drop what the outage left behind")
+			rs, err := me.e.h.store.Get(context.Background(), "ssh-box")
+			require.NoError(t, err)
+			assert.Equal(t, store.RemoteStatusOnline, rs.Status, "the stored status is online, so the main window shows it")
+		})
+	}
+}

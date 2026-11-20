@@ -16,9 +16,9 @@ export function mount(node, pills) {
     group.classList.add('inbox-kind-strip');
     const fit = () => {
         if (!node.isConnected) { node._kindObserver?.disconnect(); return; }
-        // Measure the unwrapped strip against its search row, excluding the title and bulk-action rows.
+        // Measure the unwrapped strip against its search row, excluding the title, the two tabs (their own line) and bulk-action rows.
         setHidden(group, false); setHidden(menu, true);
-        const others = [...row.children].filter(e => e !== group && e !== menu && !e.matches('.inbox-folder-head,.needs-more,.team-tb-selection') && e.getClientRects().length);
+        const others = [...row.children].filter(e => e !== group && e !== menu && !e.matches('.inbox-folder-head,.inbox-needs-tabs,.needs-more,.team-tb-selection') && e.getClientRects().length);
         const needed = group.getBoundingClientRect().width + others.reduce((n, e) => n + (e.matches('.list-bar-search-wrap') ? parseFloat(getComputedStyle(e).minWidth) || 160 : e.getBoundingClientRect().width), 0) + (others.length * (parseFloat(getComputedStyle(row).columnGap) || 0));
         const compact = needed > row.clientWidth || innerWidth < 768;
         setHidden(group, compact); setHidden(menu, !compact);

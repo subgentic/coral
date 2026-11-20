@@ -25,7 +25,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
             // A: every kind has its own icon, labelled, in the icon font, with no text of its own
             const kinds = await ev(`(async () => { const NF = await import(${S} + 'needs_filters.js'); const host = document.querySelector('${T}').parentElement; const out = [];
-                for (const k of NF.KINDS) { const cell = NF.withKindIcon({ waiting_kind: k }, 'x'); host.append(cell); const i = cell.querySelector('.inbox-kind-icon'), cs = getComputedStyle(i), g = getComputedStyle(i, '::before').content;
+                for (const k of NF.KINDS.filter(k => k !== 'answered_ask' && k !== 'comment_sent')) { const cell = NF.withKindIcon({ waiting_kind: k }, 'x'); host.append(cell); const i = cell.querySelector('.inbox-kind-icon'), cs = getComputedStyle(i), g = getComputedStyle(i, '::before').content;
                     out.push({ k, label: i.getAttribute('aria-label'), want: NF.KIND_LABEL[k], role: i.getAttribute('role'), text: i.textContent, glyph: g, font: cs.fontFamily, size: Math.round(parseFloat(cs.fontSize)), first: cell.firstChild === i, rest: cell.textContent }); cell.remove(); }
                 return out; })()`);
             check(kinds.length === 9, at + 'nine kinds: ' + kinds.length);

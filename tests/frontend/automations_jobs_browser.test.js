@@ -27,6 +27,7 @@ const BASE = require('./test_base').BASE;
             const url = String(u), method = (o && o.method) || 'GET';
             if (method === 'GET' && /\\/api\\/scheduled\\/jobs$/.test(url)) return json({ jobs });
             const runs = /\\/api\\/scheduled\\/jobs\\/(\\d+)\\/runs/.exec(url); // job 2 has a passed and a failed run, each with its conversation (a one-line run list at 390 needs rows to measure)
+            if (runs && runs[1] === '3') return json({ error: 'refused' }, 403); // the Hub or a sign-in refuses the runs read (#19866)
             if (runs) return json(runs[1] === '2' ? { runs: [{ id: 102, job_id: 2, status: 'failed', exit_reason: 'agent_error', error_msg: 'the agent exited with 1', scheduled_at: ago(29), started_at: ago(29), finished_at: ago(28.9), session_id: 'aaaaaaaa-0000-4000-8000-000000000002' }, { id: 101, job_id: 2, status: 'completed', scheduled_at: ago(5), started_at: ago(5), finished_at: ago(4.8), session_id: 'aaaaaaaa-0000-4000-8000-000000000001' }], total: 2 } : { runs: [], total: 0 });
             if (method === 'GET' && /\\/api\\/workflows$/.test(url)) return json({ workflows: [{ id: 7, name: 'nightly-build', steps: [{ name: 'Install' }, { name: 'Test' }] }] });
             if (method === 'GET' && /\\/api\\/workflows\\/7\\/runs/.test(url)) return json({ runs: [], total: 0 });
@@ -113,6 +114,12 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 3 && document.getElementById('group-table-view').getClientRects().length > 0`, `${at}back at the folder's table`, 8000);
             assert.equal(await pathname(), '/automations/jobs', `${at}Back is the folder's address`);
             assert.equal(await ev(`document.activeElement && document.activeElement.textContent.trim()`), 'summarize-the-day', `${at}the keyboard is back on the row the job came from`);
+
+            // a refused runs read is not a job that never ran (#19866): the Runs box says it could not read them
+            await Page.navigate({ url: BASE + '/automations/jobs/3' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
+            await waitFor(`!!document.querySelector('#scheduler-detail #sched-run-history .empty-state-line')`, `${at}job 3's Runs box`, 10000);
+            assert.equal(await ev(`document.querySelector('#scheduler-detail #sched-run-history .empty-state-line').textContent`), 'Could not read the runs.', `${at}a refused read says so, not No runs yet`);
+            await themed('job-page-runs-refused', w);
 
             // addresses
             await Page.navigate({ url: BASE + '/automations/jobs/1' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');

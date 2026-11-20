@@ -516,6 +516,9 @@ func (m *BoardHealthMonitor) composeCheckBefore4599(ctx context.Context, project
 	// The third change made to this copy (#17832): a task in review nobody was asked to review, after ten minutes, is a line of its own (noReviewTaskItems).
 	items = append(items, m.noReviewTaskItems(ctx, project, now)...)
 
+	// The fourth change made to this copy (#19910): a review waiting 20 minutes with its reviewer idle is the orchestrator's item (idleReviewItems).
+	items = append(items, m.idleReviewItems(ctx, project, orch, subs, bySession, tasks, waits, now)...)
+
 	// 4. Queue problems (task numbers only).
 	issues, _, _ := taskQueueIssues(tasks)
 	for _, is := range issues {

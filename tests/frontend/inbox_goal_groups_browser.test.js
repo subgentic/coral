@@ -4,7 +4,7 @@ const {connect}=require('./agent_view_harness');const {coralReady,framesJs}=requ
 const {setupHubWorld}=require('./helpers/hub_world');
 const {removeBoards}=require('./helpers/board_cleanup');const BASE=require('./test_base').BASE;
 (async()=>{const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();const team='goal-groups-'+Date.now().toString(36);
-try{await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});await Page.addScriptToEvaluateOnNewDocument({source:"localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode');"});
+try{await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});await Page.addScriptToEvaluateOnNewDocument({source:"localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode');localStorage.removeItem('coral-inbox-needs-tab');"});
 for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'dark'],[390,'dark'],[320,'dark']]){
  await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width<=760});await Emulation.setTouchEmulationEnabled({enabled:width<=760});
  await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');await ev(`document.documentElement.setAttribute('data-theme',${JSON.stringify(theme)});true`);
@@ -26,9 +26,9 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'da
  assert.ok(/^Group by\s*None/.test(opt.text.replace(/\s+/g,' ')),width+': it is named');assert.ok(opt.inside,width+': inside the screen '+JSON.stringify(opt));assert.ok(opt.h>=44||width>760,width+': a phone tap target '+JSON.stringify(opt));
  await ev(`(()=>{const s=document.querySelector('.inbox-group-review-toggle select');s.value='task';s.dispatchEvent(new Event('change',{bubbles:true}))})();true`);
  await ev(`document.getElementById('inbox-needs-toggle').click();true`);
- await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length===5`,'pins plus two goals and No goal');
+ await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length===4`,'pins plus two goals and No goal');
  const headings=await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(r=>r.textContent)`);
- assert.match(headings[0],/Starred/);assert.match(headings[1],/Goal #1/);assert.match(headings[2],/Goal #2/);assert.match(headings[3],/No goal/);assert.match(headings[4],/Waiting on agent · 2 shown · 1 unread/);
+ assert.match(headings[0],/Starred/);assert.match(headings[1],/Goal #1/);assert.match(headings[2],/Goal #2/);assert.match(headings[3],/No goal/);assert.equal(headings.length,4,width+': the sent-back files are no divider here, they are the other tab (#19904): '+JSON.stringify(headings));
  const targets=await ev(`[...document.querySelectorAll('.inbox-review-star')].map(b=>{const r=b.getBoundingClientRect();return {width:r.width,height:r.height,pressed:b.getAttribute('aria-pressed'),pointer:getComputedStyle(b).pointerEvents};})`);
  assert.ok(targets.every(t=>t.width>=(width>760?32:44)&&t.height>=(width>760?32:44)&&t.pointer!=='none'),JSON.stringify(targets));
  const overlap=await ev(`(()=>{const intersect=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;return [...document.querySelectorAll('.inbox-review-star')].flatMap(b=>{const row=b.closest('tr'),icon=row.querySelector('.inbox-kind-icon'),text=row.querySelector('.inbox-review-name'),wait=row.querySelector('.inbox-review-wait');return [icon&&text&&intersect(icon.getBoundingClientRect(),text.getBoundingClientRect()),text&&intersect(b.getBoundingClientRect(),text.getBoundingClientRect()),wait&&getComputedStyle(wait).display!=='none'&&intersect(b.getBoundingClientRect(),wait.getBoundingClientRect())].filter(Boolean);});})()`);
@@ -58,12 +58,15 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'da
  }
  await ev(`document.documentElement.style.fontSize='16px';true`);await ev(framesJs(4));
 
+ await ev(`document.querySelector('[data-needs-tab="agent"]').click();true`);await waitFor(`!!document.querySelector('[data-review-artifact="${'e'.padStart(64,'0')}"]')`,'the sent-back file is on Waiting on an agent');
  const waitingId='e'.padStart(64,'0');assert.equal(await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').classList.contains('dt-read')`),true,'sent-back row without news is visible and uncounted');
+ await ev(`document.querySelector('[data-needs-tab="you"]').click();true`);await waitFor(`!document.querySelector('[data-review-artifact="${'e'.padStart(64,'0')}"]')`,'and back on Waiting on you');
  const versionId='3'.padStart(64,'0');assert.match(await ev(`document.querySelector('[data-review-artifact="${versionId}"]').getAttribute('aria-label')`),/New version v3/);
  await ev(`document.querySelector('[data-review-artifact="${versionId}"]').click();true`);
  await waitFor(`window.__openedCalls.length===1`,'successfully rendered version is recorded');
  await ev(`document.querySelector('.artifact-viewer-close').click();true`);
  await waitFor(`!document.querySelector('[data-review-artifact="${versionId}"]')?.getAttribute('aria-label').includes('New version v3')`,'new version mark clears after actual open');
+ await ev(`document.querySelector('[data-needs-tab="agent"]').click();true`);await waitFor(`!!document.querySelector('[data-review-artifact="${waitingId}"]')`,'the waiting file is on its tab again');
  await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').querySelector('.inbox-review-star').click();true`);
  await waitFor(`window.__groupCalls.length===2`,'waiting document can be starred too');
  assert.equal(await ev(`document.querySelector('[data-review-artifact="${waitingId}"]').closest('tr').classList.contains('dt-read')`),true,'pinning a waiting document does not count it');

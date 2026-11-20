@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/internal/store"
 )
 
 const taskNudge = "You have tasks available. Run 'coral-board task claim' to start."
@@ -120,6 +121,8 @@ type BoardHandler struct {
 	isArchivedSession func(ctx context.Context, sessionName string) bool
 	// idleWaker wakes an auto-asleep agent (sleep_reason idle) before Coral types something to it, and reports whether the agent is awake (#12111); nil: nothing is woken.
 	idleWaker func(ctx context.Context, sessionID string) bool
+	// operatorWaker wakes a sleeping agent, whoever put it to sleep, for the Operator's own answer to its question (#19901); an archived agent is not woken. nil: nothing is woken.
+	operatorWaker func(ctx context.Context, sessionID string) bool
 	// sessionThinking returns the thinking level a board session is set to, "" when it has none or is not known (#8915).
 	sessionThinking func(ctx context.Context, sessionName string) string
 	// liveSessionType is a live session's agent type by session id (ok false when it has none);
@@ -140,6 +143,8 @@ type BoardHandler struct {
 	needsYouAgents func(r *http.Request) ([]NeedsYouItem, error)
 	// agentAsks lists the open questions of single agents (no team) for GET /api/operator-asks and Needs you (#18106). Nil: none.
 	agentAsks func(r *http.Request) []operatorAskRow
+	// waitingComments lists the Operator's comments sent to an agent that it has not answered, for GET /api/waiting-on-agent (SetWaitingComments, #19916). Nil: none.
+	waitingComments func(ctx context.Context) ([]store.WaitingComment, error)
 	// needsYouRemotes: on a self-hosted Hub, how GET /api/needs-you reads its computers too (SetNeedsYouRemotes, #15380). Nil: this Coral's own answer alone.
 	needsYouRemotes *NeedsYouRemotes
 	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.
@@ -167,6 +172,11 @@ type BoardHandler struct {
 // Operator (CloudHandler.HubOperatorAllowed).
 func (h *BoardHandler) SetHubOperatorAllowed(fn func(*http.Request) bool) {
 	h.hubOperatorAllowed = fn
+}
+
+// SetOperatorWaker gives the board the way to wake a sleeping agent for the Operator's own answer to it (#19901).
+func (h *BoardHandler) SetOperatorWaker(fn func(ctx context.Context, sessionID string) bool) {
+	h.operatorWaker = fn
 }
 
 // SetIdleWaker gives the board the way to wake an auto-asleep agent for a delivery (#12111).

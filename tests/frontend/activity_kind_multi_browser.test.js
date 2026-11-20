@@ -31,9 +31,9 @@ const BASE = require('./test_base').BASE;
     const pick = async key => { assert.ok(await ev(`(() => { const b = document.querySelector('.team-tb-pills .goals-chip[data-filter="${key}"]'); if (!b || !b.getClientRects().length) return false; b.click(); return true; })()`), `the ${key} chip is there to press`); await ev(framesJs(4)); };
     // nothing the strip holds is cut: every pill and chip in it lies whole inside it (the strip may stand aside for the panel's check boxes instead)
     const clipped = () => ev(`(() => { const out = []; const strip = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); const sr = strip.getBoundingClientRect();
-        const pills = strip.querySelector('.team-tb-pills'); if (pills && pills.getClientRects().length) { const pr = pills.getBoundingClientRect(); if (pills.scrollWidth > pills.clientWidth + 1) out.push('pills scroll: ' + pills.scrollWidth + ' > ' + pills.clientWidth);
-            for (const b of pills.querySelectorAll('.goals-chip')) { const r = b.getBoundingClientRect(); if (r.left < pr.left - 1 || r.right > pr.right + 1) out.push('cut: ' + b.textContent.trim()); } }
-        for (const e of strip.querySelectorAll('.goals-chip, .list-bar-chip, .team-tb-chip')) if (e.getClientRects().length) { const r = e.getBoundingClientRect(); if (r.right > sr.right + 1) out.push('past the strip: ' + e.textContent.trim()); }
+        const pills = strip.querySelector('.team-tb-pills'); if (pills && pills.getClientRects().length) { const pr = pills.getBoundingClientRect(); const phone = innerWidth < 600; /* the mock's chip strip scrolls sideways on a phone (#19871) */ if (!phone && pills.scrollWidth > pills.clientWidth + 1) out.push('pills scroll: ' + pills.scrollWidth + ' > ' + pills.clientWidth);
+            for (const b of phone ? [] : pills.querySelectorAll('.goals-chip')) { const r = b.getBoundingClientRect(); if (r.left < pr.left - 1 || r.right > pr.right + 1) out.push('cut: ' + b.textContent.trim()); } }
+        for (const e of strip.querySelectorAll('.goals-chip, .list-bar-chip, .team-tb-chip')) if (e.getClientRects().length && !(innerWidth < 600 && e.closest('.team-tb-pills'))) { const r = e.getBoundingClientRect(); if (r.right > sr.right + 1) out.push('past the strip: ' + e.textContent.trim()); }
         return out; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

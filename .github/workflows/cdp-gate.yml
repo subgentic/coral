@@ -52,7 +52,7 @@ jobs:
     name: cdp (${{ matrix.name }})
     if: github.event_name != 'workflow_dispatch' || inputs.suites == ''
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 50 # was 40: part 2/6 on 74e537cfa8 hit it after two retries of a 200 s suite (#19012); --retry-max-secs below stops that
     strategy:
       fail-fast: false
       matrix:
@@ -105,7 +105,7 @@ jobs:
           # shellcheck disable=SC2086 # ARGS holds the runner's flags
           # --fail-on-leak: a suite that leaves the server's settings changed fails its part (exit 5), so a
           # leak is fixed where it starts instead of breaking a later suite on the same shard (#4849).
-          node run_cdp_suites.mjs --timeout 180 --keep --fail-on-leak $ARGS --results-out "$RUNNER_TEMP/results.json" 2>&1 | tee "$RUNNER_TEMP/run.log"
+          node run_cdp_suites.mjs --timeout 180 --retry-max-secs 120 --keep --fail-on-leak $ARGS --results-out "$RUNNER_TEMP/results.json" 2>&1 | tee "$RUNNER_TEMP/run.log"
       - name: collect logs
         if: always()
         run: |

@@ -29,6 +29,9 @@ func (r *RemoteResolver) SetFailureSink(s FailureSink) { r.failures = s }
 // Forget drops what the resolver keeps for a server that was deleted: its ssh stream target and the key in it (#11370).
 func (r *RemoteResolver) Forget(id string) { r.streams.forget(id) }
 
+// ResetConnections drops what the resolver keeps connected for a server: an ssh server's stream target, so its idle `ssh -W` streams are closed and the next request builds a new one (the hub's Reconnect, and a computer that woke from sleep).
+func (r *RemoteResolver) ResetConnections(id string) { r.streams.forget(id) }
+
 // NewRemoteResolver wraps the registry store for use by the proxy and poller.
 func NewRemoteResolver(s *store.RemoteServerStore) *RemoteResolver {
 	return &RemoteResolver{store: s}

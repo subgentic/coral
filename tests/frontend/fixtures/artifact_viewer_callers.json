@@ -38,5 +38,10 @@
     "calls": 2,
     "policy": "named",
     "note": "Call supplies the source computer, including local, from its own row/team"
+  },
+  "inbox_waiting_rows.js": {
+    "calls": 1,
+    "policy": "named",
+    "note": "Call supplies the source computer, including local, from its own row/team"
   }
 }

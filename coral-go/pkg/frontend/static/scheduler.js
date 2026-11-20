@@ -57,10 +57,10 @@ let runsPage = null; // the runs on screen for the open job: { jobId, workflowId
 async function fetchJobRuns(jobId) {
     try {
         const resp = await fetch(`/api/scheduled/jobs/${jobId}/runs?limit=${RUNS_PAGE}`);
+        if (!resp.ok) throw 0;
         const data = await resp.json();
         return { runs: data.runs || [], total: data.total };
     } catch (e) {
-        console.error(e);
         return { runs: [], total: 0, failed: true };
     }
 }
@@ -90,11 +90,11 @@ async function reloadJobDetail(job, { refresh = false } = {}) {
     const jobId = job.id;
     // A watch read takes the jobs again too: the job's own last result (its page's "waiting to start", the sidebar's Failed count) comes from the list, and read once it would stay as it was when the run began (#10104).
     const [jobRuns, , , workflowPage] = await Promise.all([fetchJobRuns(jobId), refresh ? fetchJobs() : null, job.workflow_id ? loadWorkflowsById() : null,
-        job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw new Error('Unable to load workflow runs'); return r.json(); }).then(data => ({ runs: data.runs || [], total: data.total })).catch(() => null) : null]);
+        job.workflow_id ? fetch(`/api/workflows/${Number(job.workflow_id)}/runs`).then(r => { if (!r.ok) throw 0; return r.json(); }).then(data => ({ runs: data.runs || [], total: data.total })).catch(() => null) : null]);
     if (selectedJobId !== jobId) return;
     if (refresh) job = scheduledJobs.find(j => j.id === jobId) || job;
     if (refresh && jobRuns.failed) { watchJobRuns(job, [{ status: 'pending' }]); return; } // a read that failed while watching: keep what is drawn and read again (an empty answer would have been drawn as no runs and ended the watch)
-    renderJobDetail(job, jobRuns.runs, workflowPage && workflowPage.runs, jobRuns.total, workflowPage && workflowPage.total);
+    renderJobDetail(job, jobRuns.runs, workflowPage && workflowPage.runs, jobRuns.total, workflowPage && workflowPage.total, jobRuns.failed);
     watchJobRuns(job, jobRuns.runs);
 }
 let _runsWatch = null;
@@ -149,7 +149,7 @@ export async function selectScheduledJob(jobId) {
     if (isPhoneLayout()) { document.getElementById('scheduler-view')?.setAttribute('data-phone-item', ''); document.getElementById('scheduler-detail')?.scrollIntoView({ block: 'start' }); } // a phone shows the job's page as its own screen (#7443); the list is the screen before it (#6139)
 }
 
-function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) {
+function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal, failed) {
     const container = document.getElementById('scheduler-detail');
     if (!container) return;
 
@@ -162,7 +162,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
 
     const workflowHistory = !!(isWorkflow && workflowRuns?.length);
     const history = workflowHistory ? workflowRuns : runs;
-    runsPage = { jobId: job.id, workflowId: workflowHistory ? Number(job.workflow_id) : 0, workflowHistory, rows: history, total: workflowHistory ? workflowRunsTotal : runsTotal, busy: false };
+    runsPage = { jobId: job.id, workflowId: workflowHistory ? Number(job.workflow_id) : 0, workflowHistory, rows: history, total: workflowHistory ? workflowRunsTotal : runsTotal, failed: failed && !history.length };
 
     // The failure comes first (#6521): a job that fires on schedule and fails every time otherwise looks fine until the run history is opened.
     const fails = job.consecutive_failures || 0;
@@ -270,7 +270,7 @@ function renderRunsTable(page) {
     const open = r => withId(r.id, id => window.selectWorkflowRun(id));
     const table = DT.dataTable({ label: 'Job runs', rows: runs, rowKey: r => r.id, bare: true, sortBar: false, oneLine: true, resize: true,
         footer: runs.length < page.total ? { text: `Showing the newest ${runs.length} of ${page.total} runs`, more: { label: 'Show older runs', busy: page.busy, run: () => readOlderRuns(page) } } : undefined,
-        open: workflowHistory ? open : undefined, empty: { line: 'No runs yet.', hint: 'Runs are listed here once the job has run.' },
+        open: workflowHistory ? open : undefined, empty: { line: page.failed ? 'Could not read the runs.' : 'No runs yet.', hint: page.failed ? '' : 'Runs are listed here once the job has run.' },
         columns: [
             { key: 'started', label: 'Started', primary: true, width: '9.5rem', cell: r => {
                 const time = DT.timeCell(workflowHistory ? r.started_at || r.created_at : r.scheduled_at || r.started_at);
