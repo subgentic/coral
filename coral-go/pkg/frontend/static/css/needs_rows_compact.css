@@ -237,7 +237,7 @@
 
 /* mock v3 (#19904): the tab counts are pills, blue on the open tab, with the amber dot inside the agent tab's */
 :root .inbox-folder-toolbar .inbox-needs-tab-count { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 1px 7px; border-radius: var(--radius-xl); font-size: var(--fs-sm); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; color: var(--text-secondary); background: var(--bg-tertiary); border: 1px solid var(--border); }
-:root .inbox-folder-toolbar .inbox-needs-tab.is-on .inbox-needs-tab-count { color: var(--accent); background: rgba(var(--accent-rgb), 0.16); border-color: rgba(var(--accent-rgb), 0.36); }
+:root .inbox-folder-toolbar .inbox-needs-tab.is-on .inbox-needs-tab-count { color: var(--link-text, var(--accent)); background: rgba(var(--accent-rgb), 0.16); border-color: rgba(var(--accent-rgb), 0.36); }
 :root .inbox-folder-toolbar .inbox-needs-tab-count > .inbox-needs-tab-dot { width: 6px; height: 6px; }
 /* a row on Waiting on an agent: the quote box with the actions beside it, then the meta line (mock v3) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="agent"] > .inbox-review-item { display: grid; grid-column: 3 / -1; grid-row: 1 / span 5; grid-template-columns: subgrid; grid-template-rows: subgrid; align-items: start; gap: 0 var(--space-md, 8px); }
