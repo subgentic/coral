@@ -226,8 +226,8 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 		takeBoardBack()
 		errBadRequest(w, msg)
 	}
-	if msg := checkTeamRequest(body); msg != "" {
-		refuse(tracking.FailInvalidRequest, msg)
+	if msg, category := checkTeamRequestFor(body); msg != "" {
+		refuse(category, msg)
 		return
 	}
 	if askAboutHomeFolder(w, r, body.WorkingDir, body.HomeFolderAsk, body.ConfirmHomeFolder) {
@@ -666,18 +666,27 @@ func teamMemberTypes(body launchTeamRequest) (types []string, skipped int) {
 // folder and the members required, and the team's type and every member's type and model valid. A team that
 // failed halfway would leave live agents behind.
 func checkTeamRequest(body launchTeamRequest) string {
+	msg, _ := checkTeamRequestFor(body)
+	return msg
+}
+
+// checkTeamRequestFor is checkTeamRequest with the closed telemetry category of the refusal (#19942), so the funnel can tell a missing folder, an unknown type and a bad model apart.
+func checkTeamRequestFor(body launchTeamRequest) (msg, category string) {
 	if body.BoardName == "" || body.WorkingDir == "" || len(body.Agents) == 0 {
-		return "board_name, working_dir, and agents required"
+		if body.WorkingDir == "" {
+			return "board_name, working_dir, and agents required", tracking.FailWorkdirMissing
+		}
+		return "board_name, working_dir, and agents required", tracking.FailInvalidRequest
 	}
 	if err := agent.ValidateAgentType(body.AgentType); err != nil {
-		return err.Error()
+		return err.Error(), tracking.FailAgentTypeInvalid
 	}
 	for _, a := range body.Agents {
 		if err := agent.ValidateAgentType(a.AgentType); err != nil {
-			return fmt.Sprintf("agent %q: %s", a.Name, err)
+			return fmt.Sprintf("agent %q: %s", a.Name, err), tracking.FailAgentTypeInvalid
 		}
 		if a.Model != "" && !agentmodels.ValidModelValue(a.Model) {
-			return fmt.Sprintf("agent %q: %s", a.Name, errInvalidModel)
+			return fmt.Sprintf("agent %q: %s", a.Name, errInvalidModel), tracking.FailInvalidModel
 		}
 		memberType := a.AgentType
 		if memberType == "" {
@@ -687,10 +696,10 @@ func checkTeamRequest(body launchTeamRequest) string {
 			memberType = at.Claude
 		}
 		if t := strings.TrimSpace(a.Thinking); t != "" && !agentmodels.ValidThinking(memberType, t) {
-			return fmt.Sprintf("agent %q: %s", a.Name, errInvalidThinking(memberType))
+			return fmt.Sprintf("agent %q: %s", a.Name, errInvalidThinking(memberType)), tracking.FailInvalidModel
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // recordWorktreeRow gives an agent launched into a team worktree (a team launch's member, a resurrected one) its git row at once (its branch, that it is a worktree, its commit), instead of after the git poller's next
@@ -886,7 +895,7 @@ func finishTeamLaunch(attempt *tracking.Attempt, launched []map[string]any, skip
 	}
 	failed += skipped
 	if skipped > 0 && firstFailure == "" {
-		firstFailure = tracking.FailInvalidRequest
+		firstFailure = tracking.FailMemberUnnamed
 	}
 	switch {
 	case failed == 0 && started > 0:

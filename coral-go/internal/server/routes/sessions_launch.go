@@ -99,7 +99,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	// categories only (never error text, paths, names or prompts).
 	attempt := tracking.StartLaunch(tracking.KindAgent, tracking.ProviderFor(body.AgentType), h.launchBackendLabel(body.Backend), 1, body.ResumeSessionID != "")
 	if body.WorkingDir == "" {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailWorkdirMissing, 0, 1)
 		errBadRequest(w, "working_dir is required")
 		return
 	}
@@ -120,23 +120,23 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.BoardName != "" && body.DisplayName != "" && (body.BoardServer == "" || body.BoardServer == "local") && !boardCreated && body.AgentType != at.Terminal {
 		if h.refuseMemberName(w, r.Context(), body.BoardName, naming.SubscriberID(body.DisplayName, body.AgentType), "") { // names are unique in a team, archived agents included (#19673)
-			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailNameTaken, 0, 1)
 			return
 		}
 	}
 	if h.refuseAgentLaunchWhileAccessOff(w, r, body.BoardName, body.BoardServer, boardCreated) {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailTeamAccessOff, 0, 1)
 		return
 	}
 	// An agent on a team whose grant is on starts agents in that team's folders, wherever the agent is placed (#13891, #13903).
 	if h.refuseAgentLaunchOutsideTeam(w, r, body.WorkingDir) {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailOutsideTeam, 0, 1)
 		return
 	}
 	// An unknown agent_type used to fall through to Claude and return 200
 	// ok:true, silently starting an agent the caller never asked for.
 	if err := agent.ValidateAgentType(body.AgentType); err != nil {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailAgentTypeInvalid, 0, 1)
 		errBadRequest(w, err.Error())
 		return
 	}
@@ -151,7 +151,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	if body.ResumeSessionID == "" && !body.KeepFullAccess && !customPick { // a custom mode is a mode the person named: no notice about the default
 		settings, _ := h.ss.GetSettings(r.Context())
 		if h.refuseUnseenDisclosure(w, r, launchDefaultSkips(body.AgentType, gateFlags, body.PermissionMode, settings)) {
-			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailDisclosureAsked, 0, 1)
 			return
 		}
 	}
@@ -240,7 +240,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 	effectiveModel := h.resolveModelFor(r.Context(), body.AgentType, body.Model, takesSeat)
 	if effectiveModel != "" && !agentmodels.ValidModelValue(effectiveModel) {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidModel, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": errInvalidModel, "field": "model"})
 		return
 	}
@@ -248,7 +248,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	// Thinking level: the request's, else the Settings default for the type.
 	effectiveThinking, thinkingErr := h.resolveThinkingFor(r.Context(), body.AgentType, body.Thinking, takesSeat)
 	if thinkingErr != "" {
-		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidModel, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": thinkingErr, "field": "thinking"})
 		return
 	}
