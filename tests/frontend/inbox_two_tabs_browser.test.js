@@ -177,6 +177,15 @@ const { coralReady } = require('./helpers/wait');
                     const g = await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].filter(h => /Copywriter/.test(h.textContent)).map(h => [...h.querySelectorAll('button')].map(b => b.textContent.trim()))`);
                     assert.deepEqual(g, [['Start agent']], 'an archived agent with only a comment row: the heading has Start agent: ' + JSON.stringify(g));
                     assert.equal(await ev(`!!(${row('landing-copy-v2.md')}).querySelector('.inbox-wake')`), false, 'the comment row does not repeat it');
+                    // #20123 (mock v3: Group by None / Agent / Goal on Waiting on an agent): a heading per goal, rows with no goal under one No goal heading
+                    assert.deepEqual(await ev(`[...document.querySelectorAll('.inbox-agent-group-field select option')].map(o => o.textContent)`), ['None', 'Agent', 'Goal'], 'Group by offers None, Agent and Goal');
+                    await grp('goal'); await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length >= 2`, 'grouped by goal', 8000);
+                    const gh2 = await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(h => h.textContent.replace(/\\s+/g, ' ').trim())`);
+                    assert.ok(gh2.some(t => /^Goal #250 · Release process · 1 waiting/.test(t)), 'a heading for the goal the answered ask serves: ' + JSON.stringify(gh2));
+                    assert.ok(gh2.some(t => /^No goal · \d+ waiting/.test(t)) && gh2.filter(t => /^No goal/.test(t)).length === 1, 'rows with no goal sit under one No goal heading: ' + JSON.stringify(gh2));
+                    assert.equal(await ev(`document.querySelectorAll('.inbox-needs-results .dt-group .inbox-wake').length`), 0, 'a goal heading has no Wake: that is the agent heading’s');
+                    assert.ok(await ev(`!!(${row('Awake file.txt')}).querySelector('.inbox-open-agent, .inbox-wake, button')`), 'grouped by goal the rows keep their own buttons');
+                    await shot('goal-grouped');
                     await grp('none'); await waitFor(`!document.querySelector('.inbox-needs-results .dt-group')`, 'ungrouped again', 8000);
                 }
                 if (width === 390) { const clash = await ev(`[...document.querySelectorAll('#group-table-view tr.inbox-kind-row')].map(tr => { const c = tr.querySelector('.inbox-wait-state'), m = tr.querySelector('.inbox-row-more-toggle, .dt-mail-more-toggle'); if (!c || !m || !c.getClientRects().length || !m.getClientRects().length) return null; const a = c.getBoundingClientRect(), b = m.getBoundingClientRect(); return a.right > b.left + 1 && a.left < b.right - 1 && a.bottom > b.top + 1 && a.top < b.bottom - 1; }).filter(x => x === true).length`); assert.equal(clash, 0, '390 px: no row\'s state chip lies under its more dots (#20066)'); }
