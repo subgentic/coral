@@ -2,8 +2,8 @@
 // It asks for the OAuth client (desktop app) id and secret, opens Google's own sign-in in the browser (the person types their password there, never here),
 // receives the code on a loopback port, and stores the client and the refresh token in the macOS keychain. It prints nothing secret.
 //
+//	gdoc-login                # drive.file only          (keychain account "file", the default)
 //	gdoc-login -scopes full   # drive.file + documents   (keychain account "full")
-//	gdoc-login -scopes file   # drive.file only          (keychain account "file", for check 5)
 package main
 
 import (
@@ -32,7 +32,7 @@ func rnd() string {
 }
 
 func main() {
-	scopes := flag.String("scopes", "full", "full (drive.file + documents) or file (drive.file only)")
+	scopes := flag.String("scopes", "file", "file (drive.file only, the default) or full (drive.file + documents)")
 	flag.Parse()
 	scope := "https://www.googleapis.com/auth/drive.file"
 	if *scopes == "full" {

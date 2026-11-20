@@ -1,11 +1,15 @@
 package gdocsync
 
 import (
+	"os"
 	"os/exec"
 	"testing"
 )
 
 func TestKeychainRoundTrip(t *testing.T) {
+	if os.Getenv("GDOC_KEYCHAIN_TEST") != "1" {
+		t.Skip("opt-in: set GDOC_KEYCHAIN_TEST=1 (it writes and deletes a real keychain item)")
+	}
 	if _, err := exec.LookPath("security"); err != nil {
 		t.Skip("no macOS keychain")
 	}
