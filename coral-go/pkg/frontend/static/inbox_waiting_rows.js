@@ -25,16 +25,17 @@ export function make(env) {
         const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = agentLink(who.trim() || 'sender unknown', { board: boardTeamKey(LOCAL_SERVER, it.board || ''), cls: 'inbox-review-from' });
         const pills = WA.pills(it, { openGoal: (team, id) => go({ ...env.folderRoute, id: team, item: String(id) }), openTask: (team, id) => env.openItemRoute('tasks', team, String(id), `${team}#${id}`) });
         const state = AW.stateNodes(s.agentRef, it.kind, isPhoneLayout()), chipNode = isPhoneLayout() ? null : AW.stateChip(s.agentRef), line = [WA.chip(it, who), ...state, WA.quote(it)];
+        const note = it.kind === 'answered_ask' ? DT.el('span', 'inbox-extra-meta', 'No reply or task update yet') : null; // the mock's line after the agent's state (walk #20067)
         if (isPhoneLayout()) { wrap.append(sender, name); if (pills.childNodes.length) wrap.append(pills); wrap.append(DT.el('span', 'sr-only', `Waiting on ${who}, waiting on agent, not counted`), ...line); return wrap; }
-        const meta = DT.el('span', 'inbox-meta'); meta.append(line[0], AW.waitTarget(sender), ...(chipNode ? [chipNode] : []), ...(pills.childNodes.length ? [pills] : []));
+        const meta = DT.el('span', 'inbox-meta'); meta.append(line[0], AW.waitTarget(sender), ...(chipNode ? [chipNode] : []), ...(note ? [note] : []), ...(pills.childNodes.length ? [pills] : []));
         wrap.append(name, line[line.length - 1], meta, ...line.slice(1, -1)); return wrap;
     }
     function waitItemActions(s) {
         const it = s.waitItem, ws = AW.agentWaitState(s.agentRef), title = markHidden(WA.titleOf(it), { strict: true }), team = boardTeamKey(LOCAL_SERVER, it.board || ''), box = DT.el('div', 'inbox-review-actions inbox-slots'), menu = [];
         const quiet = (text, slot, run) => { const b = DT.el('button', 'btn btn-quiet btn-small', text); b.type = 'button'; b.setAttribute('data-slot', slot); b.setAttribute('aria-label', `${text}: ${title}`); b.addEventListener('click', run); return b; };
-        const thing = it.artifact?.hex ? 'file' : it.goal?.id ? 'goal' : it.task?.id ? 'task' : '';
+        const thing = it.kind === 'comment_sent' && it.artifact?.hex ? 'thread' : ''; // the mock: an answered ask has Open agent and Nudge, a sent comment Open thread; the goal and the task are the chips on the line (walk #20067)
         const agent = ws.live ? agentLink(ws.who, { board: team, session: ws.live.session_id, cls: 'btn btn-quiet btn-small inbox-open-agent', text: 'Open agent', label: `Open ${markHidden(ws.who, { strict: true })}` }) : null;
-        const nudge = ws.state === 'awake' ? quiet('Nudge', 'nudge', () => AW.nudge(it, ws)) : null; nudge?.setAttribute('aria-label', `Nudge ${markHidden(ws.who || 'the agent', { strict: true })}: ${title}`); // the mock draws Nudge as a button beside Open agent, not only in More (walk #20067 row 15)
+        const nudge = ws.state === 'awake' ? quiet('Nudge', 'nudge', () => AW.nudge(it, ws)) : null; nudge?.classList.add('inbox-nudge'); nudge?.setAttribute('aria-label', `Nudge ${markHidden(ws.who || 'the agent', { strict: true })}: ${title}`); // the mock draws Nudge as a button beside Open agent, not only in More (walk #20067 row 15)
         box.append(...[AW.wakeButton(ws, it.kind), thing ? quiet(`Open ${thing}`, 'open-file', () => openWaitItem(s)) : null, agent, nudge].filter(Boolean));
         menu.push(...AW.menuItems(it, ws, { openBoard: () => go(keyRoute('team', team)) }).filter(m => !/^Nudge /.test(m.label)), { label: 'View on board', title: 'Open the team’s board', run: () => go(keyRoute('team', team)) }, { label: 'Stop waiting', title: 'Take it off this list; nobody is told', run: () => { WA.dismiss(it); env.redraw(); } });
         const more = env.moreMenu(menu, title); more.setAttribute('data-slot', 'dots'); box.append(more); return box;
