@@ -7,6 +7,7 @@ GET /api/artifacts redact
 GET /api/artifacts/resolve redact
 GET /api/artifacts/series/{series} redact
 GET /api/artifacts/series/{series}/versions redact
+GET /api/artifacts/{goal}/comments redact
 GET /api/artifacts/{hex64} exempt: byte-exact download: the id is the SHA-256 of the bytes, so any change breaks the link and its check
 GET /api/artifacts/{hex64}/comments redact
 GET /api/artifacts/{hex64}/meta redact
