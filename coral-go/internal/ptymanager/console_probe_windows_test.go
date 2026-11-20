@@ -4,6 +4,7 @@ package ptymanager
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -175,7 +176,10 @@ func TestShortLivedChildrenOfTheAgentNeverRefuseIt(t *testing.T) {
 	b := NewPTYBackend()
 	t.Cleanup(func() { _ = b.Close() })
 	name := "claude-0425-hooks"
-	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), "0425", `powershell.exe -NoProfile -Command "while ($true) { '' | cmd.exe /d /c exit }"`, 120, 40))
+	// The loop writes a marker once its first child has come and gone: the test waits for that file, which stays true, not for a child process, which lives a few ms and is never caught by a poll (#20103, QA on frontier).
+	marker := filepath.Join(t.TempDir(), "loop-ran")
+	loop := fmt.Sprintf(`powershell.exe -NoProfile -Command "while ($true) { '' | cmd.exe /d /c exit; if (-not (Test-Path '%s')) { New-Item -ItemType File '%s' | Out-Null } }"`, marker, marker)
+	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), "0425", loop, 120, 40))
 	b.mu.RLock()
 	p := b.sessions[name].proc.(*windowsPTY)
 	b.mu.RUnlock()
@@ -185,12 +189,7 @@ func TestShortLivedChildrenOfTheAgentNeverRefuseIt(t *testing.T) {
 	p.agent.mu.Lock()
 	p.agent.proc, p.agent.adopted = winProc{pid: root, start: start, known: true}, true
 	p.agent.mu.Unlock()
-	// The loop is running once a child of the shell has been seen, not after a fixed second: a cold PowerShell takes longer than that on a loaded box, and the sends then ran before any child existed (#20103).
-	seen := false
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && !seen; time.Sleep(10 * time.Millisecond) {
-		seen, _ = hasChildProcesses(root)
-	}
-	require.True(t, seen, "the loop's child process never showed up within 10 s")
+	require.Eventually(t, func() bool { _, err := os.Stat(marker); return err == nil }, 30*time.Second, 50*time.Millisecond, "the loop never ran its first child within 30 s")
 	refusals := 0
 	for i := 0; i < 100; i++ {
 		if refused, why, _ := b.AgentTextRefused(name); refused {
