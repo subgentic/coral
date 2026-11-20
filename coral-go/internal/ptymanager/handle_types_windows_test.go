@@ -55,14 +55,14 @@ func describeHandles() string {
 	return "handle types now: " + strings.Join(parts, " ")
 }
 
-// The helper itself: it sees a handle this test opens, by type, and the total is close to what the process reports.
+// The helper itself: it sees a handle this test opens, by type (the Go runtime opens and closes its own Events and Threads meanwhile, so the check is "at least one more"), and the total is close to what the process reports.
 func TestHandleTypesCountsAnOpenHandleByType(t *testing.T) {
 	before := handleTypes()
 	ev, err := windows.CreateEvent(nil, 0, 0, nil)
 	assert.NoError(t, err)
 	defer windows.CloseHandle(ev)
 	after := handleTypes()
-	assert.Equal(t, before["Event"]+1, after["Event"], "one more Event: %s", describeHandles())
+	assert.GreaterOrEqual(t, after["Event"], before["Event"]+1, "at least one more Event (the runtime may open its own too): %s", describeHandles())
 	total := 0
 	for _, n := range after {
 		total += n
