@@ -93,7 +93,7 @@ const (
 )
 
 // AgentTypes are the agent types a default or a per-type setting may name.
-var AgentTypes = []string{"claude", "codex", "agy", "antigravity", "gemini", "pi", "terminal"}
+var AgentTypes = []string{"claude", "codex", "agy", "antigravity", "gemini", "pi", "opencode", "terminal"}
 
 var permissionModes = []string{"default", "plan", "acceptEdits", "auto", "bypassPermissions", "dontAsk"}
 

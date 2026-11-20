@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings');
         const top = (id) => ev(`(() => { let e = document.getElementById(${JSON.stringify(id)}); if (e.classList.contains('seg-source') && e.nextElementSibling) e = e.nextElementSibling; return e.getBoundingClientRect().top; })()`); // a select drawn as segments
         const cards = await ev(`[...document.querySelectorAll('#settings-pane-providers .prov-card')].map(c => c.dataset.provider + '=' + c.querySelector('.prov-card-title').textContent)`);
-        assert.deepEqual(cards, ['claude=Claude', 'codex=Codex', 'agy=Antigravity', 'pi=Pi'], 'one card per provider, in order');
+        assert.deepEqual(cards, ['claude=Claude', 'codex=Codex', 'agy=Antigravity', 'pi=Pi', 'opencode=OpenCode'], 'one card per provider, in order');
         for (const t of ['claude', 'codex', 'agy', 'pi']) {
             const inCard = await ev(`['settings-default-model-${t}', 'settings-orchestrator-model-${t}', 'settings-cli-path-${t}'].every(id => document.getElementById(id).closest('.prov-card').dataset.provider === '${t}')`);
             assert.ok(inCard, `${t}: its model, Orchestrator model and CLI path are in its card`);

@@ -8,7 +8,7 @@ import { mountSettingsView } from './settings_view.js';
 import { el as mk } from './dom_el.js'; // the add and edit form (a startup module)
 
 const ROUTE = '/api/custom-models';
-const PROVIDERS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
+const PROVIDERS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode']];
 // the same rule as the server's agentmodels.ValidModelValue: one argument for --model, never flag-shaped, no spaces or control characters
 const VALID_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@[\]+-]{0,127}$/;
 const MAX_NAME = 80;

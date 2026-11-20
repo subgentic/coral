@@ -51,6 +51,7 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
         check('nothing is unsaved yet', (await ev(`document.querySelector('#settings-custom-models .cm-status').textContent`)) === '');
         // Codex takes no levels yet: the form says so and offers none
         await addFor('codex');
+        check('OpenCode is available for custom models', await ev(`!!document.querySelector('#cm-provider option[value=opencode]')`));
         check('the add form takes the keyboard on its provider box', (await focusId()) === 'cm-provider');
         check('Codex has no level boxes, and the form says why', (await ev(`[...document.querySelectorAll('#settings-custom-models .cm-form input[type=checkbox]')].filter(c => c.getClientRects().length).length`)) === 0 && /does not pass thinking levels to Codex yet/.test(await ev(`document.querySelector('#settings-custom-models .cm-form').textContent`)));
         const bad = [['', /Enter the model id/], ['-flag', /starting with a letter or number/], ['has space', /starting with a letter or number/], ['semi;colon', /starting with a letter or number/], ['x'.repeat(129), /up to 128 characters/]];

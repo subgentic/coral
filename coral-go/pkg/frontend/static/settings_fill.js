@@ -20,7 +20,7 @@ const { settingsAtOpen } = await importOnce('./settings_snapshots.js'); // lazy 
 // CLI path saved from another tab or client has outdated: a moment later the fields the person has not touched show the
 // server's value, and it becomes what Save compares with (so a path the person never edited is never written back).
 export const whenPaneShown = (id, key, fn) => { const pane = document.getElementById(id); if (!pane || typeof ResizeObserver !== 'function') return fn(); const mark = key + 'Wait'; if (pane.dataset[mark]) return; pane.dataset[mark] = '1'; const ro = new ResizeObserver(es => { if (es.some(e => e.contentRect.width > 0)) { ro.disconnect(); delete pane.dataset[mark]; fn(); } }); ro.observe(pane); }; // Storage and cleanup's modules load when that pane is first shown: opening Settings on another section does not fetch them (the 24-file budget). One observer per pane and key waits at a time: a Settings opened and closed again on another section must not add one each time (agent_switch_stable's live observers)
-export const CLI_PATH_FIELDS = { cli_path_claude: 'settings-cli-path-claude', cli_path_codex: 'settings-cli-path-codex', cli_path_pi: 'settings-cli-path-pi', cli_path_agy: 'settings-cli-path-agy' };
+export const CLI_PATH_FIELDS = { cli_path_opencode: 'settings-cli-path-opencode', cli_path_claude: 'settings-cli-path-claude', cli_path_codex: 'settings-cli-path-codex', cli_path_pi: 'settings-cli-path-pi', cli_path_agy: 'settings-cli-path-agy' };
 
 // The CLI path settings whose field the person typed in since the dialog opened.
 export function editedCLIPathKeys() {
@@ -275,6 +275,8 @@ export function _fillCliAndModels(s) {
     const agyCliPath = s.cli_path_agy || s.cli_path_gemini || "";
     if (cliAgy) cliAgy.value = agyCliPath;
     if (cliPi) cliPi.value = s.cli_path_pi || "";
+    const cliOpenCode = document.getElementById("settings-cli-path-opencode");
+    if (cliOpenCode) cliOpenCode.value = s.cli_path_opencode || "";
     for (const id of Object.values(CLI_PATH_FIELDS)) { const el = document.getElementById(id); if (el) el.dataset.filled = '1'; }
     refreshCLIPathFields();
     openCliPathsWhenMissing(s.default_agent_type || 'claude');

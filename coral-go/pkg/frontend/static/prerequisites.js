@@ -20,7 +20,7 @@ function blocksLaunch(element, on) {
     if (on) element.dataset.blocksLaunch = '1'; else delete element.dataset.blocksLaunch;
     element.dispatchEvent(new CustomEvent('cli-blocks-launch', { bubbles: true }));
 }
-const PATH_FIELD = { claude: 'claude', codex: 'codex', pi: 'pi', agy: 'agy', antigravity: 'agy', gemini: 'agy' }; // the Settings field of each CLI (one for Antigravity and Gemini)
+const PATH_FIELD = { claude: 'claude', codex: 'codex', pi: 'pi', opencode: 'opencode', agy: 'agy', antigravity: 'agy', gemini: 'agy' }; // the Settings field of each CLI (one for Antigravity and Gemini)
 /** A 'Set path' button for a launch that a missing CLI blocks (Mobile and Desktop testers, #10013): it opens Settings > Providers with that provider's card open and that CLI's field in it, and when Settings is closed again `onClosed` runs (the check again), so the person is back in the dialog with the blocker gone or still named. */
 export function cliPathButton(type, onClosed, stillBlocked = () => false) {
     const field = PATH_FIELD[String(type).toLowerCase()];

@@ -23,7 +23,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(labels.some(t => t === 'Coral API key'), 'the key is labelled Coral API key: ' + JSON.stringify(labels));
         assert.ok(labels.some(t => t === 'Accounts'), 'an Accounts row, one for Claude and Pi (#11320): ' + JSON.stringify(labels));
         assert.equal(await ev(`document.getElementById('settings-api-key').getAttribute('aria-label')`), 'Coral API key');
-        assert.equal(await ev(`document.getElementById('settings-accounts-check').getAttribute('aria-label')`), 'Check Claude and Pi sign-in');
+        assert.equal(await ev(`document.getElementById('settings-accounts-check').getAttribute('aria-label')`), 'Check provider sign-in');
         const more = await ev(`(() => { const a = document.getElementById('settings-accounts').closest('.sv-row').querySelector('a.sv-learn'); return a && {href:a.getAttribute('href'),label:a.getAttribute('aria-label')}; })()`);
         assert.deepEqual(more, {href:'/docs/settings-system',label:'Learn more about Accounts, in Docs'});
         assert.match(await ev(`fetch('/api/agent-docs/settings-system').then(r=>r.json()).then(d=>d.content)`), /each CLI's own login/, 'the complete account explanation is retained in Docs');
@@ -38,7 +38,7 @@ const BASE = require('./test_base').BASE;
         assert.ok((await ev(`window.__signins`))[0].includes('type=claude'), 'POST /api/system/cli-signin?type=claude called');
         assert.match(await ev(`document.getElementById('settings-claude-account-status').textContent`), /Sign-in started/, 'status says sign-in started');
         assert.match(await check({ found: true, signal: 1 }), /^Could not tell/);
-        assert.equal(await ev(`window.__asks.length`), 6, 'each Check asks both CLIs (Claude and Pi), three Checks');
+        assert.equal(await ev(`window.__asks.length`), 9, 'each Check asks all three CLIs, three Checks');
         assert.ok((await ev(`window.__asks`)).every(q => /source=settings_check/.test(q)), 'the Settings Check has its own analytics source');
         console.log('PASS Coral API key, the Claude account row and the Sign in button');
     } finally { await client.close(); }

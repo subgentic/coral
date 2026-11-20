@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, nextFrame } = require('./helpers/wait');
 
-const ANSWERS = { claude: { found: true }, codex: { found: false, install_url: 'https://example.com/install-codex' }, agy: { supported: false, message: 'Not offered here.' }, pi: 'fail' };
+const ANSWERS = { claude: { found: true }, codex: { found: false, install_url: 'https://example.com/install-codex' }, agy: { supported: false, message: 'Not offered here.' }, pi: 'fail', opencode: { found: true } };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -26,9 +26,9 @@ const ANSWERS = { claude: { found: true }, codex: { found: false, install_url: '
             assert.deepEqual(state.agy, { state: 'missing', status: 'Not offered on this computer', rows: false, setup: '', link: '' }, at + 'Antigravity is not offered, no setup: ' + JSON.stringify(state.agy));
             assert.deepEqual(state.pi, { state: '', status: '', rows: true, setup: '', link: '' }, at + 'Pi (no answer) stays open: ' + JSON.stringify(state.pi));
             const why = await ev(`(() => { const e = document.getElementById('settings-providers-no-default'); return e ? { text: e.textContent, plain: e.children.length === 0 && e.tagName === 'SPAN', visible: e.getClientRects().length > 0, cards: [...document.querySelectorAll('#settings-pane-providers .prov-card')].map(c => c.dataset.provider) } : null; })()`);
-            assert.ok(why && why.visible && /OpenCode and Hermes have no default model here/.test(why.text), at + 'the pane says why OpenCode and Hermes have no default model, the two New agent offers beyond the four cards (#16599): ' + JSON.stringify(why));
+            assert.ok(why && why.visible && /OpenCode and Hermes use the model set in their own configuration/.test(why.text), at + 'the pane says why OpenCode and Hermes have no default model, the two New agent offers beyond the four cards (#16599): ' + JSON.stringify(why));
             assert.ok(why.plain, at + 'the note is one span of plain text, set as text and never as markup (#18247): ' + JSON.stringify(why));
-            assert.deepEqual(why.cards, ['claude', 'codex', 'agy', 'pi'], at + 'the cards are the four providers with a default: ' + JSON.stringify(why.cards));
+            assert.deepEqual(why.cards, ['claude', 'codex', 'agy', 'pi', 'opencode'], at + 'all supported provider cards include OpenCode: ' + JSON.stringify(why.cards));
             assert.equal(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`), 0, at + 'no sideways scroll');
             const small = await ev(`[...document.querySelectorAll('#settings-pane-providers .prov-card button, #settings-pane-providers .prov-card input, #settings-pane-providers .prov-card select')].filter(e => e.getClientRects().length).map(e => Math.round(e.matches('.settings-reset .btn') ? parseFloat(getComputedStyle(e, '::after').height) : e.getBoundingClientRect().height)).filter(x => x < ${mobile ? 44 : 30})`);
             assert.deepEqual(small, [], at + 'controls are tall enough: ' + small);

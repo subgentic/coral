@@ -13,8 +13,8 @@ export const RUNS = ['workflow', 'prompt'];
 export const RUNS_LABEL = { workflow: 'A workflow', prompt: 'An agent prompt' };
 export const STEP_TYPES = ['shell', 'agent'];
 export const STEP_LABEL = { shell: 'Shell', agent: 'Agent' };
-export const AGENTS = ['claude', 'agy', 'codex', 'pi'];
-export const AGENT_LABEL = { claude: 'Claude', agy: 'Antigravity', codex: 'Codex', pi: 'Pi' };
+export const AGENTS = ['claude', 'agy', 'codex', 'pi', 'opencode'];
+export const AGENT_LABEL = { claude: 'Claude', agy: 'Antigravity', codex: 'Codex', pi: 'Pi', opencode: 'OpenCode' };
 export const SORTS = ['next', 'name', 'last'];
 export const SORT_LABEL = { next: 'Next run', name: 'Name', last: 'Last run' };
 
