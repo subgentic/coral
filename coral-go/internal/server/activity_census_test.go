@@ -177,6 +177,8 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/cloud/owner-label/arm":                                      "Coral Hub connection and Hub-to-computer calls",
 	"POST /api/cloud/redeem":                                               "Coral Hub connection and Hub-to-computer calls",
 	"POST /api/cloud/rekey":                                                "Coral Hub connection and Hub-to-computer calls",
+	"POST /api/google/connect":                                             "Google sign-in settings (#20022): the Operator's, on this computer only",
+	"POST /api/google/disconnect":                                          "Google sign-in settings (#20022): the Operator's, on this computer only",
 	"POST /api/dropbox/connect":                                            "Dropbox backup settings (#14609): the Operator's, on this computer only",
 	"POST /api/dropbox/disconnect":                                         "Dropbox backup settings (#14609): the Operator's, on this computer only",
 	"POST /api/dropbox/switch":                                             "Dropbox backup settings (#14609): the Operator's, on this computer only",

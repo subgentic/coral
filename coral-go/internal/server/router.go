@@ -521,6 +521,10 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Get("/api/dropbox/status", s.cloudHandler.DropboxStatus)
 	r.Post("/api/dropbox/connect", s.cloudHandler.DropboxConnect)
 	r.Post("/api/dropbox/disconnect", s.cloudHandler.DropboxDisconnect)
+	s.cloudHandler.SetGoogle(store.NewGoogleStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir()))) // the Google sign-in for Google Doc share (#20022): the Operator's only, never on the Hub
+	r.Get("/api/google/status", s.cloudHandler.GoogleStatus)
+	r.Post("/api/google/connect", s.cloudHandler.GoogleConnect)
+	r.Post("/api/google/disconnect", s.cloudHandler.GoogleDisconnect)
 	r.Post("/api/dropbox/switch", s.cloudHandler.DropboxConfirmSwitch)
 	r.Post("/api/dropbox/takeover", s.cloudHandler.DropboxTakeOver)
 	r.Put("/api/dropbox/app-key", s.cloudHandler.DropboxSetAppKey)                              // #15638: the person's own Dropbox app key

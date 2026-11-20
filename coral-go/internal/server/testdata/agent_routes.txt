@@ -620,6 +620,9 @@ b PUT /api/teams/detail/{name}/daily-knowledge/auto-apply
 b GET /api/dropbox/status
 b POST /api/dropbox/connect
 b POST /api/dropbox/disconnect
+b GET /api/google/status
+b POST /api/google/connect
+b POST /api/google/disconnect
 b POST /api/dropbox/switch
 b POST /api/dropbox/prepare
 b POST /api/dropbox/push
