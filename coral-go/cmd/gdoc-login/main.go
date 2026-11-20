@@ -89,9 +89,10 @@ func main() {
 		exec.Command("open", "-a", *browser, auth).Run()
 		fmt.Printf("Opened Google's sign-in in %s.\n", *browser)
 	} else if copied {
-		fmt.Println("Google's sign-in address is on your clipboard. Paste it into the browser where the throwaway account is signed in (or run again with -browser \"Google Chrome\").")
-	} else {
-		fmt.Println("Open this address in the browser where the throwaway account is signed in:\n" + auth)
+		fmt.Println("Google's sign-in address is on your clipboard (or run again with -browser \"Google Chrome\").")
+	}
+	if *browser == "" {
+		fmt.Println("Paste this into the browser where the spare account is signed in:\n" + auth)
 	}
 	var c string
 	select {
