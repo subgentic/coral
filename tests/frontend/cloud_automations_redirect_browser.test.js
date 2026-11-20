@@ -16,7 +16,8 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
         // the control: a local dashboard shows the screen for /jobs
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/jobs' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await waitFor(`location.pathname.startsWith('/automations')`, 'a local dashboard rewrites /jobs to Automations', 10000);
+        // the path is rewritten before the folders are drawn: wait for both, or a loaded machine reads the screen too early (#19967)
+        await waitFor(`location.pathname.startsWith('/automations') && [...document.querySelectorAll('#automations-nav-list .view-list-item')].some(b => b.getClientRects().length > 0)`, 'a local dashboard rewrites /jobs to Automations and draws its folders', 10000);
         let w = await where();
         assert.deepEqual([w.boot, w.tab, w.screen], ['local', 'automations', true], 'local: the Automations screen, its folders drawn (so the check that none is drawn on the Hub is not dead) ' + JSON.stringify(w));
         // the Hub
@@ -32,7 +33,9 @@ const { coralReady } = require('./helpers/wait');
         for (const url of ADDRESSES) {
             await Page.navigate({ url: process.env.CORAL_TEST_URL + url }); await Page.loadEventFired(); await install();
             await waitFor(`!!document.getElementById('coral-boot') && JSON.parse(document.getElementById('coral-boot').textContent).mode === 'cloud'`, `${url}: the Hub's boot flag`, 10000);
-            await waitFor(`!!document.body.getAttribute('data-nav-tab')`, `${url}: a tab is on screen`, 10000);
+            // wait for the state asserted below, not for "some tab": the startup default tab is set first and the route
+            // (its path rewrite and the folders drawn in the sidebar) a moment later, so a loaded machine read the default (#19967)
+            await waitFor(`document.body.getAttribute('data-nav-tab') === 'automations' && location.pathname.startsWith('/automations') && [...document.querySelectorAll('#automations-nav-list .view-list-item')].some(b => b.getClientRects().length > 0)`, `${url}: the Automations screen is on screen`, 10000);
             w = await where();
             assert.ok(w.tab === 'automations' && w.screen && w.path.startsWith('/automations'), `${url} opens read-only Automations in cloud: ` + JSON.stringify(w));
         }
