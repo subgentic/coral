@@ -114,6 +114,9 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 		}
 		return news, nil
 	})
+	boardHandler.SetWaitingComments(func(ctx context.Context) ([]store.WaitingComment, error) { // the Operator's comments sent to an agent that it has not answered (#19916)
+		return sessStore.WaitingComments(ctx, time.Now(), 7*24*time.Hour)
+	})
 	artifactNudger := routes.NewClaudeArtifactNudger(sessStore, s.terminal)
 	boardHandler.SetArtifactNudger(artifactNudger)
 	sessHandler.SetArtifactNudger(artifactNudger)
@@ -206,6 +209,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/board/{project}/messages", boardHandler.ReadMessages)
 	r.Post("/api/board/{project}/clashes", boardHandler.FileClash)   // #11457, S6: an agent files two people's different directions; Coral asks the Operator to decide
 	r.Get("/api/board/{project}/guide-asks", boardHandler.GuideAsks) // #11457: the questions put to a guide (the guide's own label, from the connector's stamp)
+	r.Get("/api/waiting-on-agent", boardHandler.WaitingOnAgent)      // what the Operator answered or commented that an agent has not acted on yet, for Inbox tab 2 (#19916): the Operator's alone, local, never through the Hub (not in the tunnel table)
 	r.Get("/api/operator-asks", boardHandler.OperatorAsks)           // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
 	// The thread reads filter operator_actions by (team, goal_id) and (team, task_id): both are indexed (idx_operator_actions_team_goal and _team_task in board/operator_actions.go, #14440, Security's INFO 4), so
 	// a thread never reads the whole record; a new filter on these routes needs its index too.

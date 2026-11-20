@@ -157,6 +157,7 @@ function _connectHtml() {
                     <button type="button" class="btn btn-icon editions-copy-code" data-cloud="copy-code" aria-label="Copy code" title="Copy code"><span class="material-icons" aria-hidden="true">content_copy</span></button>
                     <span class="sr-only" data-cloud="copy-code-said" role="status"></span>
                 </div>
+                <div class="settings-hint sv-help" data-cloud="computer-key-row" hidden>This computer's key: <code data-cloud="computer-key"></code>. The browser shows it too: if the two differ, do not approve.</div>
             </div>
             <div class="cloud-command-row" data-cloud="command-row" hidden><code data-cloud="command"></code><button type="button" class="btn btn-small" data-cloud="copy">Copy</button></div>
             <fieldset class="editions-ask" data-cloud="ask-row" hidden>

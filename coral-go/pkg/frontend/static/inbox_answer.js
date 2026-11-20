@@ -117,7 +117,8 @@ async function readAsk(s) {
     // The row draws ALL of it, wrapped, and a Yes is a button only while the drawn block is not clipped (measured after layout and on resize, in fill): a request the row cannot show whole is refused or opened in the agent, never allowed blind (#14173, UI Reviewer and Security).
     const autoBlockAt = permission && typeof po.auto_block_at === 'string' ? po.auto_block_at : ''; // when Claude Code's own timer blocks the request by itself (#15140)
     const targetNote = permission && typeof po.target_note === 'string' ? stepClean(po.target_note).slice(0, 240) : '';
-    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target, targetNote, autoBlockAt } : { ...none, target, targetNote, autoBlockAt };
+    const tool = permission && typeof po.title === 'string' ? (stepClean(po.title).match(/^(bash|shell|sh|zsh|powershell|pwsh|cmd|terminal) command$/i) || [])[1] || '' : ''; // the agent's own name for the tool ('Bash command'): the row's title echoes only a fixed list of shell words; any other name an MCP tool or a prompt chose is 'a command' (#20001, Security)
+    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target, targetNote, autoBlockAt, tool } : { ...none, target, targetNote, autoBlockAt, tool };
 }
 
 /** The agent's whole question for a row's Show all (#14637): what the chat card says, as one clean line, up to 4096 characters; '' when the read is refused or the agent asks nothing now. Read on the click only. */
@@ -253,12 +254,14 @@ function fill(s, cell, withDismiss = true, primaryOpen = false) {
     if (!fresh) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false, unreadable: false })).then(r => { lastRead.set(who, r); return r; }));
     const stale = fresh ? null : lastRead.get(who);
     const paint = r => { const sig = key + JSON.stringify(r); if (cell._sig === sig && cell._sigEl?.parentNode === cell) return; draw(r); cell._sig = sig; cell._sigEl = cell.firstChild; }; // the same reading for the same card leaves the choices as they are: a press on a Yes is not lost to a drawing under it (#15309)
-    const draw = ({ ask, picks, onlyReject, unreadable, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote, autoBlockAt }) => {
+    const draw = ({ ask, picks, onlyReject, unreadable, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote, autoBlockAt, tool }) => {
         cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
-        const said = norm => String(norm || '').replace(/[?\s]+$/, '');
+        const said = norm => String(norm || '').replace(/[?:\s]+$/, ''); // 'Pick a color:' is the row's 'Pick a color' (#19962)
         const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
         if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
+        { const title = cell.closest('tr')?.querySelector('td[data-key="agent"] > .inbox-row-words:not(.inbox-row-command)'); // the row's own title says what the card is about, in the DOM (#19941): the agent's 'Claude needs your permission' says nothing; not 'bash': a Codex shell or an MCP tool has a command too
+            if (title) { if (title.dataset.was === undefined && /needs your permission/i.test(title.textContent)) title.dataset.was = title.textContent; if (title.dataset.was !== undefined) title.textContent = target && target.trim() ? `Wants to run ${tool ? `${/^[aeiou]/i.test(tool) ? 'an' : 'a'} ${tool.toLowerCase()}` : 'a'} command` : title.dataset.was; } }
         const yesButtons = [];
         let gate = null;
         if (target && target.trim()) { // the command on the row, all of it wrapped in a code block (3 lines, 4 on a phone), then Claude's own line under it, then what Yes allows (#14173)
@@ -301,7 +304,7 @@ function fill(s, cell, withDismiss = true, primaryOpen = false) {
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
             b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
             const isYes = gateOpt => !REJECT_FORM.test(wholeLabel(String(gateOpt.label)));
-            if (typeof gate === 'object' && gate && isYes(o)) { yesButtons.push(b); b.hidden = true; } // hidden until measured: a Yes is never drawn before the block is known to be whole
+            if (typeof gate === 'object' && gate && isYes(o)) { yesButtons.push(b); b.hidden = true; b.title = `${o.label}: lets it run this once`; } // hidden until measured: a Yes is never drawn before the block is known to be whole
             const permissionYes = s.waiting_kind === 'permission' && isYes(o); if (permissionYes) b._armKey = `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}:${ask}:${o.label}`; if (permissionYes && !(gate && yesButtons.includes(b))) armYes(b); // a Yes of a permission is armed 400 ms after it is drawn (a gated one, when it is turned on)
             b.addEventListener('click', e => { e.stopPropagation(); if (permissionYes && stillArming(b)) return; if (gate && yesButtons.includes(b) && gate.clipped()) { gate.apply(); return; } if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else if (rateLimit && (o === rateLimit.switchTo || o === rateLimit.never)) confirmRateLimit(s, o, ask, cell, rateLimit); else answer(s, o, ask, cell, stepFull || ''); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });

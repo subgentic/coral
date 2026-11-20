@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`),200);
                 // Mock only artifact storage; the team exists through the real board API.
                 await ev(`(() => {
-                    localStorage.removeItem('coral-inbox-needs-filters');
+                    localStorage.removeItem('coral-inbox-needs-filters'); localStorage.removeItem('coral-inbox-needs-tab');
                     const style=document.createElement('style'); style.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(style);
                     window.__reviewWrites=[];window.__reviewFail=false;window.__decisions=[];window.__comments=[];
                     window.__reviewItems=Array.from({length:13},(_,i)=>({id:(i+1).toString(16).padStart(64,'0'),name:'Review file '+String(i+1).padStart(2,'0')+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(20-i)*60000).toISOString(),task_id:0,source:'upload',available:true,session_id:i<11?'writer-a':'writer-b',produced_by:i<11?'Writer A':'Writer B',tags:['for review','internal'],uri:'coral://artifacts/'+(i+1).toString(16).padStart(64,'0')}));
@@ -81,7 +81,7 @@ const { coralReady } = require('./helpers/wait');
                 }
                 assert.equal(await ev(`${rows}.length`),13,'the pinned Writer A file does not consume the ten-unstarred cap; all thirteen fit');
                 assert.equal(await ev(`document.querySelectorAll('.inbox-review-more').length`),0,'a pinned file does not create false producer overflow');
-                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');
+                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'13','all pending artifacts count: the pill reads the real number, as the sidebar does (#20017)');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 13 /,'and the tab\'s accessible name keeps the exact count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
                 if (width <= 390) { // a phone's row (#11414 item 1, QA Engineer's release review): the team's whole name is on the row, and Approve is a word, not a bare check
@@ -177,13 +177,15 @@ const { coralReady } = require('./helpers/wait');
                     assert.equal(await ev(`window.__comments.filter(c=>c.body).length`),1,'and made one comment');
                     // #13916: Request changes keeps the document visible, waiting on the agent and uncounted; a new version returns it to active review.
                     const needsCount = () => ev(`parseInt(document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count')?.textContent || '0', 10)`);
-                    await waitFor(`!!(${row('Review file 01.txt')}) && /Sent back · waiting on/.test((${row('Review file 01.txt')}).textContent) && (${row('Review file 01.txt')}).classList.contains('dt-read')`,'after Request changes the file remains visible and uncounted',8000);
+                    await ev(`document.querySelector('[data-needs-tab="agent"]').click(); true`); // the sent-back file is on Waiting on an agent (#19904)
+                    await waitFor(`!!(${row('Review file 01.txt')}) && /Sent back[\s\S]*Waiting on/.test((${row('Review file 01.txt')}).textContent) && (${row('Review file 01.txt')}).classList.contains('dt-read')`,'after Request changes the file remains visible and uncounted',8000);
                     // #11860 (Beta #8): the viewer reloads itself after the request, and that reload is not a new opening: the file is not marked read again
                     await require('./helpers/wait').settle(ev, 400, 300);
                     assert.equal(await ev(`window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}').tags.includes('read')`),false,'Request changes leaves the file unread: the viewer reloading does not read it again: ' + await ev(`JSON.stringify(window.__reviewWrites)`));
                     const gone = await needsCount();
                     await ev(`document.querySelector('.artifact-viewer-close').click();true`);
                     await ev(`(() => { const v1 = window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}'); window.__reviewItems.push({ ...v1, id: (0x62).toString(16).padStart(64,'0'), uri: 'coral://artifacts/' + (0x62).toString(16).padStart(64,'0'), tags: ['for review','internal'], created_at: new Date(Date.parse(v1.created_at) + 1000).toISOString() }); return import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true); })()`);
+                    await ev(`document.querySelector('[data-needs-tab="you"]').click(); true`);
                     await waitFor(`!!(${row('Review file 01.txt')})`,'the agent\'s next version comes back as a new Needs you item',8000);
                     assert.equal(await ev(`/, unread/.test((${row('Review file 01.txt')}).textContent)`),true,'the new version is unread');
                     assert.equal(await needsCount(),gone + 1,'and counted: the Needs you number goes up by one');
@@ -209,8 +211,8 @@ const { coralReady } = require('./helpers/wait');
                     await ev(`document.querySelector('.artifact-viewer-close').click();window.__twoVersions=false;true`);
                 }
                 assert.deepEqual(await ev(`window.__decisions.filter(d=>d.decision==='approve').map(d=>d.id)`),[width===1280?(0x62).toString(16).padStart(64,'0'):(1).toString(16).padStart(64,'0')],'one approve was sent: the failed press and the second one are not two');
-                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+');
-                assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 12 /,'twelve left: the pill says 9+, the name says 12');
+                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'12');
+                assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 12 /,'twelve left: the pill and the name both say 12');
                 assert.ok(await ev(`!!(${row('Review file 11.txt')})`),'overflow promotes next artifact');
                 assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12','heading and badge agree after review');
                 if(width===1280){

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -45,7 +46,7 @@ func TestEveryOwnerOnlyRouteOfTheTableRefusesANonOwnerOnTheRealRouter(t *testing
 		if !route.Mode.Refuses() {
 			continue
 		}
-		segs := strings.Split(strings.ReplaceAll(strings.ReplaceAll(route.Pattern, "{hex64}", strings.Repeat("a", 64)), "{hex32}", strings.Repeat("a", 32)), "/")
+		segs := strings.Split(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(route.Pattern, "{hex64}", strings.Repeat("a", 64)), "{goal}", "goal:team-a:1"), "{hex32}", strings.Repeat("a", 32)), "/")
 		for i, seg := range segs {
 			if strings.HasPrefix(seg, "{") {
 				segs[i] = "x"
@@ -96,7 +97,8 @@ func TestTheOwnerDecisionHasOneImplementation(t *testing.T) {
 // The set of owner routes is pinned here, so that a route cannot leave the table (and stop being stamped and refused) without this test saying so: a change to it is a reviewed act.
 func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 	want := map[string]string{
-		"GET /api/launch-disclosure": "owner-only", "GET /api/artifacts": "owner-only", "GET /api/artifacts/resolve": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/thumbnail": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
+		"GET /api/launch-disclosure": "owner-only", "GET /api/device-keys/list": "owner-only", // the trusted-device list, display only (#19971)
+		"GET /api/artifacts": "owner-only", "GET /api/artifacts/resolve": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/thumbnail": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{goal}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
 		"DELETE /api/artifacts/{hex64}": "owner-only", "PUT /api/artifacts/{hex64}/star": "owner-only", "DELETE /api/artifacts/{hex64}/star": "owner-only", "POST /api/artifacts/{hex64}/opened": "owner-only", // the star (#9819) and the opened version (#13910)
 		"GET /api/board/{project}/proposals":               "owner-only",
 		"GET /api/proposals":                               "owner-only",
@@ -207,6 +209,10 @@ func TestOwnerRouteCensus(t *testing.T) {
 		if _, mode := tunnel.OwnerRoute(method, concrete(route)); mode.Stamped() {
 			lines = append(lines, method+" "+route+" "+tunnel.Classify(method, concrete(route), "").String()+" "+mode.String())
 		}
+	}
+	// The goal thread's read (#20061) is the artifact comments route the server registers once ({id}), reached with a goal key: the table lists it as its own row.
+	if _, mode := tunnel.OwnerRoute("GET", "/api/artifacts/goal:team-a:1/comments"); mode.Stamped() && slices.Contains(registeredRoutes(t), "GET /api/artifacts/{id}/comments") {
+		lines = append(lines, "GET /api/artifacts/{goal}/comments "+tunnel.Classify("GET", "/api/artifacts/goal:team-a:1/comments", "").String()+" "+mode.String())
 	}
 	got := strings.Join(lines, "\n") + "\n"
 	if os.Getenv("OWNER_GOLDEN_UPDATE") == "1" {

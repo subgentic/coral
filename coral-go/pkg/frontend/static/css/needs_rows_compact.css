@@ -45,7 +45,6 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-ask-name { grid-column: 3 / -1; order: 7; min-width: 0; margin: 0; max-width: 74ch; font-size: var(--fs-copy); white-space: pre-line; overflow-wrap: anywhere; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-review-wait { display: none; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="agent"] > .inbox-row-words.inbox-kind-words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* still read out; the icon and the buttons say it to the eye */
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) .inbox-review-from::after { content: none; } /* the sender stands alone on the question's top line */
 /* line 1 is one 32 px band on every row, whatever the words do under it (a wrapped file name or a long question never moves the select box and the icon) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="team"], :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="waiting"] { min-height: 2rem; display: flex; align-items: center; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="agent"] > :is(.inbox-review-item):not(:has(.inbox-ask-name)), :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) .inbox-review-from { min-height: 2rem; display: flex; align-items: center; flex-wrap: wrap; column-gap: 0.4em; }
@@ -60,7 +59,7 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-file-question { color: var(--text-secondary); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta { color: var(--text-muted); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta :is(.inbox-review-from, .inbox-review-version, .inbox-kind) { font-weight: var(--fw-regular); }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta .inbox-review-from::after { content: none; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row .inbox-meta .inbox-review-from::after, :root #group-table-view .inbox-needs-results .inbox-wait-target .inbox-review-from::after { content: none; }
 @container (min-width: 50rem) { /* a wide card: line 1 is the name with its team and how long it has waited at the top right; the question and the meta line are the next two lines; the buttons stand at the right, level with the bottom of them (no row of their own, no empty area under the question; the Operator: buttons to the bottom, the waiting time top right) */
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row { grid-template-columns: auto auto minmax(0, 1fr) auto 5rem; }
   :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-file-row > td:first-child { grid-row: 1; }
@@ -98,7 +97,7 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-blocks.inbox-blocks-closes::before { content: 'flag'; }
 
 /* The meta strip (#19812): its pieces are told apart by a dot, the version is shown once, a report from Coral wears a tinted kind label; Save and Star carry a small mark; a file's tile shows its type. */
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta > :not(:first-child, .inbox-pills, .inbox-review-version)::before { content: '·'; margin-inline-end: 6px; color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta > :not(:first-child, .inbox-pills, .inbox-review-version, .inbox-wait-target, .inbox-wait-state)::before { content: '·'; margin-inline-end: 6px; color: var(--text-muted); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind { color: var(--text-secondary); font-weight: var(--fw-medium); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind:is(.inbox-kind-done, .inbox-kind-release, .inbox-kind-decided, .inbox-kind-digest) { padding: 0 7px; border-radius: var(--radius-sm); font-weight: var(--fw-strong); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind-done { background: var(--needs-icon-green-bg); color: var(--needs-icon-green-fg); }
@@ -113,7 +112,7 @@
 :root .material-icons.inbox-kind-icon[data-type="html"]:not(.inbox-artifact-thumbnail)::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14'/%3E%3C/svg%3E"); }
 :root .material-icons.inbox-kind-icon[data-type="video"] { background: var(--needs-icon-red-bg); color: var(--needs-icon-red-fg); border-color: color-mix(in srgb, var(--needs-icon-red-fg) 30%, transparent); }
 :root .material-icons.inbox-kind-icon[data-type="html"] { background: var(--needs-icon-amber-bg); color: var(--needs-icon-amber-fg); border-color: color-mix(in srgb, var(--needs-icon-amber-fg) 30%, transparent); }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="team"]:not(:empty)::after { content: '·'; margin-inline-start: 6px; font-weight: var(--fw-strong); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="team"]:not(:empty):has(~ td[data-key="goal"]:not(:empty))::after { content: '·'; margin-inline-start: 6px; font-weight: var(--fw-strong); }
 /* A selected row is a tinted surface with the accent rail, a pointed-at row lifts and its quiet buttons come up to full text (#19812, the mocks' states). */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 100vmax color-mix(in srgb, var(--accent) 12%, transparent); } /* ticked: the accent rail and a wash over the row, painted over the row's own lift (#19824) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:hover .inbox-review-actions :is(.inbox-bookmark, .inbox-star, .inbox-row-more-toggle) { color: var(--text-primary); }
@@ -165,16 +164,28 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta > .inbox-review-earlier::before { display: inline-block; text-decoration: none; }
 /* a permission whose command was read from the agent (the chat's own prompt) is the approved Permission row too (#19870, MUST-5): the command alone in its code box, Claude's line and what Yes allows under it, left-aligned, and Yes, No and More at the right of the meta line, the row about 170 px, not 297 */
 @media (min-width: 640px) {
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-cmd-block) { row-gap: 0; }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="review"]:has(.inbox-cmd-block) { grid-column: 3 / -1; order: 8; display: block; padding: 4px 0 0; text-align: start; }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="review"]:has(.inbox-cmd-block) .inbox-answers-with-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 4px 6px; text-align: start; }
+@container (min-width: 50rem) { /* beside the text only when the list is wide in its own text size: 200% text keeps the buttons on their own line (#20016) */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td:not([data-key="agent"], [data-key="team"], [data-key="waiting"], [data-key="review"]):not(:first-child) { grid-column: 3 / 5; grid-row: 3; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-ask-row .inbox-meta:has(> .inbox-kind:only-child) { display: none; } /* the pill in the name line says the kind: the grey word under the text said it twice (#20016) */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td[data-key="agent"] .inbox-ask-name { grid-column: 3 / 5; grid-row: 2; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td[data-key="review"] { grid-column: 5 / -1; grid-row: 2 / span 2; align-self: center; justify-content: flex-end; flex-wrap: nowrap; padding: 0; }
+}
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:is(:has(.inbox-cmd-block), .inbox-stack) { row-gap: 0; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="review"]:is(:has(.inbox-cmd-block), .inbox-stack > td) { grid-column: 3 / -1; order: 8; display: block; padding: 4px 0 0; text-align: start; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="review"]:is(:has(.inbox-cmd-block), .inbox-stack > td) .inbox-answers-with-more { display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, auto); align-items: center; gap: 4px 0; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers-with-more > .inbox-answers:has(.inbox-cmd-block) { display: contents; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers > :is(.inbox-cmd-note, .inbox-yes-note) { flex: 0 1 auto; text-align: start; font-size: var(--fs-sm); color: var(--text-muted); }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers > .inbox-cmd-block { flex: 0 1 auto; max-width: min(70ch, 100%); width: fit-content; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); max-height: calc(var(--cmd-lines) * 1lh + 16px); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers > .inbox-cmd-block { flex: 0 1 auto; max-width: min(64ch, 100%); width: fit-content; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); max-height: calc(var(--cmd-lines) * 1lh + 16px); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers > .inbox-answer:not(.inbox-answer ~ .inbox-answer) { margin-inline-start: auto; }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-cmd-block) > td[data-key="cli"] { display: flex; align-items: center; grid-column: 3 / -1; order: 9; padding: 4px 0 0; color: var(--text-muted); font-size: var(--fs-md); }
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-cmd-block) > td[data-key="cli"] .chip { display: inline; padding: 0; border: 0; background: none; color: inherit; font-size: inherit; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:is(:has(.inbox-cmd-block), .inbox-stack) > td[data-key="cli"] { display: flex; align-items: center; grid-column: 3; grid-row: 3; align-self: end; justify-self: start; width: fit-content; pointer-events: none; order: 9; padding: 0; color: var(--text-muted); font-size: var(--fs-md); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:is(:has(.inbox-cmd-block), .inbox-stack) > td[data-key="cli"] .chip { display: inline; padding: 0; border: 0; background: none; color: inherit; font-size: inherit; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-cmd-block) .inbox-row-command .inbox-cmd-code, :root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-cmd-block) > td[data-key="agent"] > .inbox-cmd-note { display: none; } /* the command the agent's own prompt gave is the one box (Yes is allowed only for a command shown whole); the summary's copy of it and of the Yes sentence are not drawn a second time */
+/* the approved Permission card, stacked (#19941): the command box, then the sentence, then the meta line (Claude, goal, task) at the left of Yes, No and More on the SAME line; the row's own cell holds the three lines, the meta cell is drawn over the last one, at the left */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:is(:has(.inbox-cmd-block), .inbox-stack) > td[data-key="review"] { grid-row: 3; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers > :is(.inbox-cmd-block, .inbox-yes-note, .inbox-cmd-more) { grid-column: 1 / -1; justify-self: start; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers > .inbox-answer:not([hidden]):not(.inbox-answer:not([hidden]) ~ .inbox-answer) { grid-column-start: 2; } /* the first button that is drawn goes to the right of the line (a Yes that is hidden until the command is whole is not a button yet) */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers-with-more:has(.inbox-cmd-block) > :not(.inbox-answers), :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers-with-more .inbox-answers > .inbox-answer { margin-inline-start: 6px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-answers-with-more > .inbox-answers:has(.inbox-cmd-block) ~ * { align-self: center; }
 }
 :root #group-table-view .inbox-needs-results .inbox-answers:has(.inbox-cmd-block) .inbox-answer-step { display: none; } /* the badge and the code box already say it is a command to approve */
 :root #group-table-view .inbox-needs-results .inbox-answers:has(.inbox-cmd-block) > .inbox-cmd-note { position: absolute; width: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the agent's own 'This command requires approval' line is not on the mock's card; a screen reader still gets it (#19929) */
@@ -182,3 +193,82 @@
 :root .inbox-folder-toolbar .list-bar-menu .list-bar-field:not(.list-bar-kept) { row-gap: 8px; }
 :root .inbox-folder-toolbar .list-bar-menu-grid { row-gap: 4px; } /* the 4 px the label gap added, taken from the gap between lines so the panel push stays within 150 */ /* a Filters label sits a clear 8 px over its select, as the mock draws it (#19870, MUST-8) */
 :root #group-table-view[data-group="hub-inbox:needs"] .empty-state > .empty-state-line + .empty-state-hint:has(> .btn)::before { content: "Try clearing the active Team, Goal, or Kind filter to see the remaining waiting items."; display: block; margin-bottom: 14px; } /* the filtered result's hint line, as the mock draws it (#19870, MUST-8): drawn here, the one button of the empty state sits in the hint's own paragraph */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="cli"] > .inbox-meta-dir::before { content: '·'; margin-inline: 6px; } /* "Claude · folder": the dot has its space on both sides, in a flex cell too (#19941) */
+/* Needs you's two tabs (#19904): Waiting on you, Waiting on an agent: underline tabs over the search row; only the first counts toward the badges. */
+:root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { display: flex; gap: 20px; order: 0; flex: 1 1 calc(100% - 5rem); min-width: 0; margin: 0; border-bottom: 1px solid var(--border); }
+:root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the tabs are the heading: it stays for a screen reader */
+:root .inbox-folder-toolbar .inbox-needs-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 2px 9px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; }
+:root .inbox-folder-toolbar .inbox-needs-tab.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
+:root .inbox-folder-toolbar .inbox-needs-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+/* Waiting on an agent rows (#19904): the agent's state after the chip; an asleep agent is amber with Wake, an archived one rose with Start agent; an awake one stays quiet. */
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: var(--radius-xl); font-size: var(--fs-sm); font-weight: var(--fw-strong); white-space: nowrap; color: var(--success-text); background: rgba(var(--success-rgb), 0.12); border: 1px solid rgba(var(--success-rgb), 0.28); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line { grid-column: 3 / -1; font-size: var(--fs-md); color: var(--text-secondary); display: block; white-space: normal; overflow: visible; text-overflow: clip; }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-asleep { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.14); border-color: rgba(var(--warning-rgb), 0.32); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-archived { color: var(--error-text); background: rgba(var(--error-rgb), 0.12); border-color: rgba(var(--error-rgb), 0.30); }
+:root .inbox-folder-toolbar .inbox-needs-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
+@media (max-width: 767px) { /* a phone: the tabs sit right under the search, More beside them, the words not broken */
+  :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { order: 0; flex: 1 1 100%; gap: 14px; }
+  :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .needs-more { order: 3; } /* the tabs have the top line to themselves; More joins Kind, the filters and Select under them, as the mock draws it (#19904) */
+  :root .inbox-folder-toolbar .inbox-needs-tab { font-size: var(--fs-sm); min-width: 0; max-width: 100%; text-align: left; } /* at 200% text a tab's words wrap inside the screen, never past it */
+  :root .inbox-folder-toolbar .inbox-needs-tabs { flex-wrap: wrap; row-gap: 0; }
+}
+:root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head { position: absolute; display: block; width: 1px; height: 1px; flex: none; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head > .session-group-count { display: none; }
+:root #group-table-view[data-group^="hub-inbox"] .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head { position: absolute; display: block; width: 1px; height: 1px; flex: none; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the phone rule gives the heading a whole line: the tabs are the heading, so it is out of the flow */
+@media (pointer: coarse) { :root .inbox-folder-toolbar .inbox-needs-tab { min-height: 44px; } } /* a touch target: 44 px high, the underline still sits on the tab bar's rule */
+@media (max-width: 767px) { :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line { grid-column: 1 / -1; } } /* a phone card: the whole sentence, across the card, never one cut line */
+/* the approved mock's rows (#19898 v3): the kind chips, the Operator's words in a box, a tinted row with a coloured edge for an asleep or an archived agent, its sentence in a box */
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-sent-back[data-wait-kind="answered_ask"] { color: var(--accent); border-color: rgba(var(--accent-rgb), .45); background: rgba(var(--accent-rgb), .1); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-sent-back[data-wait-kind="comment_sent"] { color: var(--text-primary); border-color: var(--border); background: var(--bg-tertiary); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-sent-back-ask { background: var(--bg-tertiary); border-left: 2px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; white-space: normal; }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row):has(.inbox-wait-line.inbox-wait-asleep) { background: rgba(var(--warning-rgb), .06); box-shadow: inset 3px 0 0 var(--warning); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row):has(.inbox-wait-line.inbox-wait-archived) { background: rgba(var(--error-rgb), .06); box-shadow: inset 3px 0 0 var(--error); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep, :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { padding: 8px 10px; border: 1px solid; border-radius: var(--radius-sm); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep { color: var(--warning-text); border-color: rgba(var(--warning-rgb), .5); background: rgba(var(--warning-rgb), .1); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { color: var(--error-text); border-color: rgba(var(--error-rgb), .5); background: rgba(var(--error-rgb), .1); }
+
+:root #group-table-view .inbox-needs-results .inbox-agent-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px var(--table-pad-x, 12px); font-size: var(--fs-sm); color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results .inbox-agent-status strong { color: var(--text); font-weight: var(--fw-strong); }
+:root #group-table-view .inbox-needs-results .inbox-st-chip { display: inline-flex; align-items: center; gap: 5px; font-weight: var(--fw-strong); }
+:root #group-table-view .inbox-needs-results .inbox-st-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+:root #group-table-view .inbox-needs-results .inbox-st-awake { color: var(--success-text); }
+:root #group-table-view .inbox-needs-results .inbox-st-asleep { color: var(--warning-text); }
+:root #group-table-view .inbox-needs-results .inbox-st-archived { color: var(--error-text); }
+:root #group-table-view .inbox-needs-results th.inbox-group-flex { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+:root #group-table-view .inbox-needs-results .inbox-group-right { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+:root #group-table-view .inbox-needs-results .inbox-group-meta { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-goal { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; padding: 4px 10px; border-radius: var(--radius-sm); background: rgba(var(--success-rgb), 0.1); border: 1px solid rgba(var(--success-rgb), 0.28); font-size: var(--fs-sm); white-space: normal; }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-label { font-weight: var(--fw-strong); color: var(--success-text); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-text { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+
+/* mock v3 (#19904): the tab counts are pills, blue on the open tab, with the amber dot inside the agent tab's */
+:root .inbox-folder-toolbar .inbox-needs-tab-count { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 1px 7px; border-radius: var(--radius-xl); font-size: var(--fs-sm); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; color: var(--text-secondary); background: var(--bg-tertiary); border: 1px solid var(--border); }
+:root .inbox-folder-toolbar .inbox-needs-tab.is-on .inbox-needs-tab-count { color: var(--link-text, var(--accent)); background: rgba(var(--accent-rgb), 0.16); border-color: rgba(var(--accent-rgb), 0.36); }
+:root .inbox-folder-toolbar .inbox-needs-tab-count > .inbox-needs-tab-dot { width: 6px; height: 6px; }
+/* a row on Waiting on an agent: the quote box with the actions beside it, then the meta line (mock v3) */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="agent"] > .inbox-review-item { display: grid; grid-column: 3 / -1; grid-row: 1 / span 5; grid-template-columns: subgrid; grid-template-rows: subgrid; align-items: start; gap: 0 var(--space-md, 8px); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-review-name { grid-column: 1 / 3; grid-row: 1; justify-self: start; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-sent-back-ask { grid-column: 1 / 3; grid-row: 2; margin-top: 4px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-meta { grid-column: 1 / 3; grid-row: 3; margin-top: 4px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-wait-line { grid-column: 1 / 3; grid-row: 4; margin-top: 6px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-closes-goal { grid-column: 1 / 3; grid-row: 5; justify-self: start; margin-top: 6px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="team"] { grid-row: 1; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="waiting"] { grid-row: 1; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="review"] { grid-column: 5 / -1; grid-row: 2; align-self: start; padding: 4px 0 0; justify-content: flex-end; flex-wrap: nowrap; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-wait-target { color: var(--text-muted); font-size: var(--fs-sm); white-space: nowrap; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-wait-target > * { color: var(--text-primary); font-weight: var(--fw-strong); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-open-agent { display: inline-flex; align-items: center; }
+/* the empty state of Waiting on an agent: a clock tile in the accent, as the mock draws it */
+:root #group-table-view[data-group="hub-inbox:needs"]:has(.inbox-needs-tab.is-on:last-of-type) .empty-state:has(> .empty-state-line + .empty-state-hint + .empty-state-hint > .btn)::before { background: rgba(var(--accent-rgb), 0.12); border-color: rgba(var(--accent-rgb), 0.26); }
+:root #group-table-view[data-group="hub-inbox:needs"]:has(.inbox-needs-tab.is-on:last-of-type) .empty-state:has(> .empty-state-line + .empty-state-hint + .empty-state-hint > .btn)::after { background: var(--accent); }
+:root #group-table-view[data-group="hub-inbox:needs"]:has(.inbox-needs-tab.is-on:last-of-type) .empty-state:has(> .empty-state-line + .empty-state-hint + .empty-state-hint > .btn) { --empty-ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='5.6'/%3E%3Cpath d='M8 4.9V8l2.1 1.3'/%3E%3C/svg%3E"); }
+@media (min-width: 768px) {
+  :root #group-table-view .inbox-folder-toolbar:has(.inbox-needs-tabs) { padding-bottom: 0; } /* no empty room is kept under the filters: the count line sits right under them as in the mock (#19904) */
+  :root #group-table-view .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .inbox-needs-tabs) { position: relative; }
+  :root #group-table-view .inbox-folder-toolbar .list-bar-search-row.gt-toolbar.tb-low:has(> .inbox-needs-tabs) > .team-tb-selection { position: absolute; inset-inline: 0; top: 100%; margin-top: 6px; z-index: 25; } /* a ticked row's bulk bar lies over the count line instead of taking room of its own, so ticking moves no row (#15339) */
+}
+:root #group-table-view .inbox-needs-results .inbox-agent-status .inbox-st-short { display: none; }
+@media (max-width: 639px) {
+  :root #group-table-view .inbox-needs-results .inbox-agent-status > :not(.inbox-st-short) { display: none; }
+  :root #group-table-view .inbox-needs-results .inbox-agent-status .inbox-st-short { display: inline; }
+}

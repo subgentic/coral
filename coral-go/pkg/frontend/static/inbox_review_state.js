@@ -21,7 +21,7 @@ export const decidedWord = row => (row?.tags?.includes('denied') ? 'Denied' : 'A
 export const sentBackSince = a => (waitingOnAgent(a) && a.review?.at) || a.created_at;
 /** The state chip of a sent-back row: it says the agent has it, in place of "For review". `who` is the agent's name, already made safe by the caller. */
 export function sentBackChip(who, archived = false) {
-    const chip = document.createElement('span'); chip.className = 'chip inbox-sent-back'; chip.textContent = archived ? `Sent back · ${who} is archived` : `Sent back · waiting on ${who}`;
+    const chip = document.createElement('span'); chip.className = 'chip inbox-sent-back'; chip.textContent = archived ? `Sent back · ${who} is archived` : 'Sent back'; // the agent is named after the chip, in "Waiting on X" (the mock)
     chip.title = archived ? 'You asked for changes, but this agent is archived, so nobody is working on it. Start the agent again, or send the file to another agent.' : 'You asked for changes. The row comes back to you when the agent uploads a new version.'; // an archived agent never reads the note (#19897)
     return chip;
 }

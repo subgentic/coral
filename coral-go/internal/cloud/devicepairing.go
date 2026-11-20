@@ -45,6 +45,14 @@ func (m *Manager) SetPairingSecret(s string) {
 	}
 }
 
+// DisplayFingerprint is this computer's key as the pairing browser shows it (XXXX-XXXX-XXXX-XXXX, #19969), so the person can compare both ends; empty when this computer has no key yet. It is a hash of a public key the Hub is sent anyway.
+func (m *Manager) DisplayFingerprint() string {
+	if m.o.ComputerKey == nil {
+		return ""
+	}
+	return devicekey.DisplayFingerprint(m.o.ComputerKey.Pub())
+}
+
 // PairingSecretHeld reports whether a live secret is held (tests and the start of a pairing; it says nothing of the value).
 func (m *Manager) PairingSecretHeld() bool {
 	m.pair.mu.Lock()

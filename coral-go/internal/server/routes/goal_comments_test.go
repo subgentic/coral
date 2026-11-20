@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #11955: comments on a goal are the document comments pointed at a goal: the same routes, storage, ask gate and reply command, with the subject key goal:<team>:<id> in the place of an artifact id.
@@ -175,4 +178,35 @@ func TestAGoalCommentCannotBeSentToOtherAgentsByHand(t *testing.T) {
 	_, out := rig.do("POST", path, cmtAsOwner, goalComment(nil))
 	code, _ := rig.do("POST", fmt.Sprintf("%s/%d/send", path, int64(out["id"].(float64))), cmtAsOwner, map[string]any{"agents": []string{"QA"}})
 	assert.Equal(t, http.StatusBadRequest, code)
+}
+
+// #20061 (coral-hub's #253742): through Coral Hub the stamped owner is the OWNER kind for the goal thread's read, and only that read of a goal key. A hub viewer (no owner marker, another user's marker) stays a hub caller and
+// is refused with owner_only by goalCommentSubject; a goal write is not a listed owner route, so the owner there is a plain hub caller too; and a diff key is never the owner's through the Hub.
+func TestAGoalThreadReadThroughTheHubIsTheOwnersAndNobodyElses(t *testing.T) {
+	rig := newCmtRig(t)
+	withLabel(t, cmtHubUser, nil)
+	call := func(method, path string, hdr map[string]string) commentCaller {
+		req := httptest.NewRequest(method, path, nil)
+		for k, v := range hdr {
+			if k != testDashboardHeader {
+				req.Header.Set(k, v)
+			}
+		}
+		c, status, code := rig.h.artifactCommentCaller(req)
+		require.Zero(t, status, code)
+		return c
+	}
+	noMarker := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: cmtHubUser}
+	otherUser := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "hub-user-9999ffff", tunnel.HubRoleHeader: "owner"}
+	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: cmtHubUser, tunnel.HubRoleHeader: "owner"}
+	read := "/api/artifacts/goal:team-a:3/comments"
+	assert.Equal(t, commentCallerOwner, call("GET", read, owner).Kind)
+	assert.Equal(t, commentCallerHub, call("GET", read, noMarker).Kind, "a hub viewer")
+	assert.Equal(t, commentCallerHub, call("GET", read, otherUser).Kind, "another hub user's marker")
+	for _, r := range []struct{ method, path string }{
+		{"POST", read}, {"PUT", read + "/lock"}, {"POST", read + "/1/resolve"}, {"DELETE", read + "/1"}, // no write is listed for a goal key
+		{"GET", "/api/artifacts/diff:team-a:3/comments"}, {"GET", "/api/artifacts/goal:team-a:3"}, {"GET", "/api/artifacts/goal:team-a:3/meta"},
+	} {
+		assert.Equal(t, commentCallerHub, call(r.method, r.path, owner).Kind, r.method+" "+r.path)
+	}
 }

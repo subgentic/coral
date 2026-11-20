@@ -66,6 +66,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/activity":                                 "read the Activity record of what the Operator did in Needs you (#12069)",
 	"GET /api/thread":                                   "read the story of one goal or task: its questions, files, replies and the Operator's decisions (#14440)",
 	"GET /api/threads":                                  "read one summary per task for the list pages (#14440)",
+	"GET /api/waiting-on-agent":                         "read what the Operator answered or commented that an agent has not acted on yet (their words)",
 	"GET /api/analytics/inbox-vs-chat":                  "read how much the Operator did in the Inbox and how much in a chat (counts only, #12158)",
 	"GET /api/analytics/resource-queue":                 "read how much the resource queue is used and whether it helps coordination (numbers only, #13671)",
 	"GET /api/chief":                                    "read which agent the Operator recorded as Chief (#11470)",
@@ -153,13 +154,14 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/system/terminal-backend/end-leftover": "end agents left in Coral's old tmux server",
 	"POST /api/system/terminal-backend/notice-seen":  "dismiss the line that agents now stop when Coral quits",
 	"PUT /api/cloud/max-mode":                        "change what Coral Hub may do",
-	"GET /api/cloud/devices":                         "list the browsers and passkeys Coral Hub's owner trusts on this computer", // #19669
-	"PUT /api/cloud/device-web-mode":                 "change the access a newly paired browser starts with",                     // #19669
-	"PUT /api/cloud/devices/{kid}/mode":              "change one paired device's access",                                        // #19669
-	"DELETE /api/cloud/devices/{kid}":                "remove one paired device",                                                 // #19669
-	"POST /api/cloud/devices/clear-clock":            "reset the clock mark for signed device messages",                          // #19669
-	"POST /api/device-keys/message":                  "send a signed device message (only a Hub-forwarded browser does)",         // #19669
-	"POST /api/device-keys/certificate":              "send a passkey certificate for a new device",                              // #19669
+	"GET /api/cloud/devices":                         "list the browsers and passkeys Coral Hub's owner trusts on this computer",  // #19669
+	"PUT /api/cloud/device-web-mode":                 "change the access a newly paired browser starts with",                      // #19669
+	"PUT /api/cloud/devices/{kid}/mode":              "change one paired device's access",                                         // #19669
+	"DELETE /api/cloud/devices/{kid}":                "remove one paired device",                                                  // #19669
+	"POST /api/cloud/devices/clear-clock":            "reset the clock mark for signed device messages",                           // #19669
+	"POST /api/device-keys/message":                  "send a signed device message (only a Hub-forwarded browser does)",          // #19669
+	"POST /api/device-keys/certificate":              "send a passkey certificate for a new device",                               // #19669
+	"GET /api/device-keys/list":                      "list the trusted browsers and passkeys for the Hub's owner (display only)", // #19971
 	"PUT /api/cloud/allow-auto-accept":               "change whether Coral Hub may turn on auto-accept",
 	"POST /api/hub-auto-accept":                      "change whether Coral Hub may turn on auto-accept (Coral Hub's owner)",      // #5840
 	"PUT /api/cloud/hub-dropbox-share":               "change whether Coral Hub may send files you share to its Dropbox",          // #16109

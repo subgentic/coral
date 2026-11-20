@@ -86,7 +86,7 @@ function installReviews() {
         await ev(`(async () => { window.__C = await import(${S} + 'review_counts.js'); await window.__C.refreshCounts(true); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
         await waitFor(`/33 need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'badge uses 33 server attention items, not loaded unread rows');
         assert.equal(await ev(`window.__R.unreadReviewItems().length`), 4, 'loaded page attention includes the new unopened version and news, excludes quiet changes requests');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 100+')`, 'For review pill marks its 100 loaded rows as a lower bound (#16619)');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 98+')`, 'For review pill marks its loaded rows as a lower bound (#16619): 100 loaded, 2 of them sent back for changes (one per computer), which wait on the other tab since #19904, so 98+');
         await ev(`window.__hiddenReviewTab = true; Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__hiddenReviewTab }); document.dispatchEvent(new Event('visibilitychange')); true`);
         await waitFor(`/^\\(33\\) /.test(document.title)`, 'background title uses the server total');
         await ev(`window.__hiddenReviewTab = false; document.dispatchEvent(new Event('visibilitychange')); true`);
@@ -98,15 +98,15 @@ function installReviews() {
         assert.ok(await ev('window.__failedCountResponses') > failedBefore, 'the pill assertion follows a real failed count response');
         assert.equal(await ev(`window.__R.reviewPages().find(p => p.server === 'box-b').loadedCount`), 49, 'failed-count source still supplies 49 review rows');
         await waitFor(`/18\\+ need your attention/.test(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label') || '')`, 'partial count adds only failed-source loaded rows');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 99+')`, 'partial-state pill counts 50 local plus 49 failed-count-source rows, with more pages still available, not stale 100+');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 97+')`, 'partial-state pill counts the 50 local plus 49 failed-count-source rows, less the two sent-back files that wait on the other tab (#19904), with more pages still available, not the stale 98+ of the full pages');
         await ev(`(async () => { window.__failReviewCount = false; window.__partialReviewPage = false; await refreshUntil(() => window.__R.reviewPages().find(p => p.server === 'box-b').loadedCount === 50); (await import(${S} + 'inbox_tab.js')).updateInboxTab(); })()`);
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 100+')`, 'restoring the complete first pages restores the pill to 100+');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 98+')`, 'restoring the complete first pages restores the pill to 98+ (100 loaded, 2 sent back)');
         await ev(`window.__failReviewMore = true; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
         await waitFor(`/Retry/.test(document.querySelector('[data-review-more="box-b"][data-review-stream="review"]')?.textContent || '')`, 'failed cursor offers Retry');
         assert.equal(await ev(`window.__R.reviewItems().length`), 100, 'append failure preserves loaded rows');
         await ev(`window.__failReviewMore = false; document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').focus(); document.querySelector('[data-review-more="box-b"][data-review-stream="review"]').click(); true`);
         await waitFor(`window.__R.reviewItems().length === 115`, 'only the selected computer appends its next page');
-        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 115+')`, 'Show more updates the pill to 115+ because the local computer still has another page');
+        await waitFor(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'For review 113+')`, 'Show more updates the pill to 113+ (115 loaded, 2 sent back) because the local computer still has another page');
         assert.equal(await ev(`window.__R.reviewPages().find(p => p.server === 'local').next_cursor`), 'local:50');
         assert.ok(await ev(`window.__reviewRequests.filter(r => r.cursor).every(r => r.server === 'box-b' && r.cursor === 'box-b:50')`), 'failure and retry reuse only the selected source cursor');
         await ev(framesJs(2));

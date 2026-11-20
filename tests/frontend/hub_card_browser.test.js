@@ -67,7 +67,10 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const p = document.getElementById('settings-cloud')._cloudPanel; window.__rf = []; const o = p.restoreFocus.bind(p); p.restoreFocus = (had, st) => { window.__rf.push([!!had, had && had.id, st.state, document.activeElement.id]); o(had, st); window.__rf.push(['after', document.activeElement.id]); }; return true; })()`);
             await ev(`document.getElementById('settings-cloud-connect').focus(); window.__rf0 = document.activeElement.id; document.getElementById('settings-cloud-connect').click(); true`);
             await waitFor(`window.__calls.some(c => c[0] === 'connect')`, 'Connect', 8000);
-            assert.deepEqual(await ev(`window.__calls.find(c => c[0] === 'connect')[1]`), { mode: 'launch', allow_auto_accept: false }, at + 'Connect carries the answer');
+            const sent = await ev(`window.__calls.find(c => c[0] === 'connect')[1]`);
+            assert.match(sent.pairing_secret, /^[A-Za-z0-9_-]{22}$/, at + 'Connect carries the pairing secret (#19970)');
+            delete sent.pairing_secret;
+            assert.deepEqual(sent, { mode: 'launch', allow_auto_accept: false }, at + 'Connect carries the answer');
 
             // C. waiting: the link, the code (said apart), Cancel; focus lands on Cancel
             await waitFor(`document.getElementById('settings-cloud-code') && !document.getElementById('settings-cloud-code').hidden`, 'the code', 8000);

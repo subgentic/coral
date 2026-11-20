@@ -48,6 +48,23 @@ func (h *CloudHandler) deviceList(r *http.Request) (deviceList, error) {
 	return out, nil
 }
 
+// TunnelDevices: GET /api/device-keys/list: the list Coral Hub's owner may see of the browsers and passkeys this computer trusts, for display only (#19971, coral-hub #252527, Security's ruling on #19959). It is in the tunnel table at Launch, owner only
+// (OwnerRefuse), GET only. Each row is kid, label, mode, origin, kind, created_at and last_used_at: no public key, no web_mode and no clock_notice (those stay on the local list above). A listed row grants nothing: the computer
+// verifies every signed message itself. A paired browser's own row is not answered here (it needs a caller stamp the tunnel does not give).
+func (h *CloudHandler) TunnelDevices(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) {
+		return
+	}
+	out, err := h.deviceList(r)
+	if err != nil {
+		errInternalServer(w, "Could not read the device list")
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Devices []deviceRow `json:"devices"`
+	}{out.Devices})
+}
+
 // sprintfClock is the notice for a clock behind the last accepted device message: it says what the clock was compared with and how to fix it.
 func sprintfClock(mark time.Time) string {
 	return "This computer's clock is behind the last time it accepted a device message (" + mark.Local().Format("2006-01-02 15:04") + "). Set the clock right. If the clock is right and the old time was wrong, run: coral cloud devices clear-clock"

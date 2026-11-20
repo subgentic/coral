@@ -3,7 +3,7 @@
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
 import { boardTeamKey } from './server_base.js';
-const { waitingOnAgent } = await importOnce('./inbox_review_state.js');
+const { stillWaitingOnAgent: waitingOnAgent } = await importOnce('./inbox_agent_wait.js');
 const { storyNode } = await importOnce('./thread_story.js'); // the story under a task (#14444)
 
 /** What a row is about, whichever kind it is: a file for review carries its goal and task, a question to the Operator its own (the asker's declared or claimed ones, #14441). null for any other row. */

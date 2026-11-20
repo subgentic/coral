@@ -71,6 +71,8 @@ EXTRA = {
     # listArtifactComments reads the thread state filter and the board a lock is read for, and series (#6459): with series=1 only, the earlier versions' comments marked with where their text stands in the version on show.
     # The shell's file viewer sends series=1 on every read (artifact_comments_api.js listComments), so through Coral Hub every Inbox click on a file was refused until it was listed (#13502).
     'GET /api/artifacts/{}/comments': {'state', 'board', 'series'},
+    # A goal's thread (#20061, coral-hub's #253742): the owner's read of goal:<team>:<n> through the Hub, its own shape ({goal}, pkg/tunnel shapeOf keeps the name): board and state only, never series (a goal has no versions).
+    'GET /api/artifacts/{goal}/comments': {'state', 'board'},
 }
 
 # Parameters a handler reads that Coral Hub never sends, refused through the tunnel (#3942, agreed with coral-hub):
