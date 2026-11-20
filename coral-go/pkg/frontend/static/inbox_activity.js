@@ -42,14 +42,16 @@ export const fromCell = r => M(multipleServers() ? [serverLabel(r.server || LOCA
 /** The computers whose record is not in the folder, each with why (#15730): the ones that are offline (never asked), the ones that refused (an older Coral that does not give its record to a Hub's owner yet, or a computer this person is only a guest of) and the ones that failed. Named, never left out silently. */
 export const missingComputers = () => {
     if (!appState.hub) return [];
-    const offline = (appState.servers || []).filter(s => s && s.id && s.id !== LOCAL_SERVER && s.status !== 'online').map(s => ({ id: s.id, why: 'is offline' }));
+    const offline = (appState.servers || []).filter(s => s && s.id && s.id !== LOCAL_SERVER && s.status !== 'online').map(s => ({ id: s.id, why: 'offline' }));
     return [...offline, ...unread];
 };
-export const missingWords = list => list.length ? `Not in this list: ${list.map(m => `${serverLabel(m.id)} (${m.why})`).join(', ')}.` : '';
+/** The computers whose actions ARE in the folder, by name (#19924: the mock says "Showing actions from Mac Studio" beside the ones that are missing). */
+export const shownComputers = () => { const gone = new Set(missingComputers().map(m => m.id)); return inboxSources().filter(id => !gone.has(id)).map(id => serverLabel(id)); };
+export const missingWords = (list, shown = []) => list.length ? `Not in this list: ${list.map(m => `${serverLabel(m.id)} (${m.why})`).join(', ')}.${shown.length ? ` Showing actions from ${shown.join(', ')}.` : ''}` : '';
 /** What the folder says above the list about the record's own check: a break is said plainly, an intact record says what the check can and cannot do. */
 export function checkWords(c) {
     if (!c) return '';
-    if (!c.intact) return `${c.machine ? `On ${c.machine}: t` : 'T'}he record was changed outside Coral${c.reason === 'edited' ? ': a row was edited' : c.reason === 'removed' ? ': a row was removed' : c.reason === 'cut_off' ? ': rows were cut off' : ''}. ${c.note || ''}`.trim();
+    if (!c.intact) return `${c.machine ? `On ${c.machine}: t` : 'T'}he record was changed outside Coral${c.reason === 'edited' ? ': a row was edited' : c.reason === 'removed' ? ': a row was removed' : c.reason === 'cut_off' ? ': rows were cut off' : ''}. Earlier entries remain readable.`; // the approved mock's words (#19924): said once; the server's own note repeated the first sentence
     return ''; // an intact record says nothing: the count and the check's own caveat were not words anyone could use (#18620)
 }
 
@@ -227,8 +229,12 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
             wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
-            const gaps = missingWords(missingComputers());
-            if (gaps) { const n = DT.el('p', 'activity-check', gaps); n.setAttribute('role', 'status'); wrap.prepend(n); }
+            const gaps = missingWords(missingComputers(), shownComputers());
+            if (gaps) { // the mock's "Partial multi-computer view" notice: the same icon, heading and sentence as the record check (#19924)
+                const n = DT.el('div', 'activity-check activity-check-partial'), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
+                tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', 'Partial multi-computer view'), DT.el('span', 'activity-check-detail', gaps));
+                n.append(tile, text); n.setAttribute('role', 'status'); wrap.prepend(n);
+            }
             if (more) { const b = DT.el('button', 'btn btn-small activity-more', 'Show older actions'); b.type = 'button'; b.addEventListener('click', () => refresh(null, { next: true })); wrap.append(b); }
             return wrap;
         } };

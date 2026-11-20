@@ -119,7 +119,7 @@ const HEX = 'c'.repeat(64);
             await load();
             await openFolder(false);
             await waitFor(`!!document.querySelector('.activity-check-broken')`, 'the broken record said', 10000);
-            assert.match(await ev(`document.querySelector('.activity-check-broken .activity-check-detail').textContent`), /^The record was changed outside Coral: a row was edited\. Edits made outside Coral are shown unless the whole record was rewritten\.$/);
+            assert.match(await ev(`document.querySelector('.activity-check-broken .activity-check-detail').textContent`), /^The record was changed outside Coral: a row was edited\. Earlier entries remain readable\.$/); // #19924 (MUST-13, the approved mock's words): said once, then what still works; the server's own note is not repeated
             assert.equal(await ev(`document.querySelector('.activity-check-broken').getAttribute('role')`), 'alert');
         } finally { putBack(); }
         console.log('   ✓');
