@@ -70,7 +70,7 @@ jobs:
       # v1.4.101 run, while the other shard's CPU-bound packages queued behind them (#4956). pkg/tunnel has its own
       # shard: its throughput tests measure bytes per second, and next to board and server on one runner one of them
       # fell under its floor (run 39212450911), while with the 80 other packages it took the packages shard to 409 s.
-      TIMING_PKGS: "internal/board internal/server"
+      TIMING_PKGS: "internal/board internal/ptymanager internal/server"
       TUNNEL_PKG: "pkg/tunnel"
     defaults:
       run:
