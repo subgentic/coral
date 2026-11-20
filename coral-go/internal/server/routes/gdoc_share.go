@@ -234,6 +234,8 @@ func (h *SessionsHandler) gdocFail(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusTooManyRequests, "gdoc_rate", "This Doc was changed 20 times in the last hour. Try again later.")
 	case errors.Is(err, errGdocPaused):
 		writeError(w, http.StatusConflict, "gdoc_paused", "Syncing this Doc is paused. Resume it to share again.")
+	case errors.Is(err, errGdocBusy):
+		writeError(w, http.StatusConflict, "gdoc_busy", "This file is being sent already. Wait a moment and look at the Doc.")
 	case errors.Is(err, errGdocRedact):
 		writeError(w, http.StatusInternalServerError, "gdoc_redact", "The file could not be checked for secrets, so nothing was sent.")
 	case errors.Is(err, gdocsync.ErrDocChanged):

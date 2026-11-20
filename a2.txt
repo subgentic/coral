@@ -1,9 +1,0 @@
-START 01:35:12
-ok  	github.com/subgentic/coral/internal/server/routes	2.056s
-        	Test:       	TestEveryNeverRouteTheShellCallsHasAListedBehaviour
-        	Messages:   	gdoc_share.js GET /api/gdoc/status: the text that carries its behaviour (hidden) is gone
-FAIL
-internal/server: peak held memory 570 MiB
-FAIL	github.com/subgentic/coral/internal/server	1.921s
-FAIL
-END 01:35:31

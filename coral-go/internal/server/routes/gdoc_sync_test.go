@@ -199,3 +199,61 @@ func TestPauseAndUnshareAreRefusedWhileTheSwitchIsOff(t *testing.T) {
 		assert.Equal(t, "gdoc_share_off", out["code"])
 	}
 }
+
+// Security MUST 1 on #20044: the loop never makes a Doc. A share stopped between the list and the push is not made again, and nothing is sent.
+func TestTheLoopNeverCreatesADocForAShareThatWasStopped(t *testing.T) {
+	g := syncRig(t)
+	_, derr := g.ss.DeleteGdocShare(context.Background(), gdocSid); require.NoError(t, derr) // the owner pressed Stop sharing after the pass listed the share
+	c, err := gdocClientFor()
+	require.NoError(t, err)
+	uploads, calls := len(g.drive.uploads), g.drive.calls
+	_, err = g.h.pushGdoc(context.Background(), c, gdocSid, []byte("# Plan\n\nNew.\n"), gdocV2, "plan.md", true)
+	require.ErrorIs(t, err, errGdocGone)
+	assert.Equal(t, uploads, len(g.drive.uploads), "no Doc was made")
+	assert.Equal(t, calls, g.drive.calls, "nothing was sent to Google")
+	row, _ := g.ss.GetGdocShare(context.Background(), gdocSid)
+	assert.Nil(t, row, "no share row came back")
+	g.pass(&gdocSyncState{}) // and a whole pass with no share does nothing
+	assert.Equal(t, calls, g.drive.calls)
+}
+
+// Security MUST 2: what the Doc says names the agent that wrote the version, redacted and cut; a version a person made says the Operator.
+func TestTheDocNamesTheAgentThatWroteTheVersionAndTheNameIsRedacted(t *testing.T) {
+	g := newGdocRig(t, true)
+	g.artifact(t, gdocV1, "plan.md", "text/markdown", "# Plan\n\nShip.\n")
+	g.writeSeriesVersionBy(t, gdocSid, gdocV1, 1, "Backend Dev")
+	status, _, raw := g.share(t, gdocV1)
+	require.Equal(t, 200, status, raw)
+	require.Len(t, g.drive.uploads, 1)
+	assert.True(t, strings.HasPrefix(g.drive.uploads[0], "Written by Backend Dev in Coral."), g.drive.uploads[0])
+
+	g.artifact(t, gdocV2, "plan.md", "text/markdown", "# Plan\n\nShip it.\n")
+	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	g.writeSeriesVersionBy(t, gdocSid, gdocV2, 2, "Agent "+secret+strings.Repeat("x", 200))
+	by, err := g.h.gdocWriter(gdocSid, gdocV2)
+	require.NoError(t, err)
+	assert.NotContains(t, by, secret, "a secret in a name never leaves")
+	assert.LessOrEqual(t, len([]rune(by)), 80)
+	g.pass(&gdocSyncState{})
+	require.Greater(t, g.drive.batches, 0)
+}
+
+// The Doc's title is redacted and cut like its text.
+func TestTheDocTitleIsRedactedAndCut(t *testing.T) {
+	g := newGdocRig(t, true)
+	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	g.artifact(t, gdocV3, secret+strings.Repeat("n", 300)+".md", "text/markdown", "# Notes\n")
+	status, _, raw := g.share(t, gdocV3)
+	require.Equal(t, 200, status, raw)
+	require.Len(t, g.drive.titles, 1)
+	assert.NotContains(t, g.drive.titles[0], secret)
+	assert.LessOrEqual(t, len([]rune(g.drive.titles[0])), 120)
+}
+
+// Security SHOULD 12: a revision that cannot be read after a write pauses the Doc (nothing to compare with next time).
+func TestAWriteWhoseRevisionCannotBeReadPausesTheDoc(t *testing.T) {
+	g := syncRig(t)
+	g.drive.noRev = true
+	g.pass(&gdocSyncState{})
+	assert.Equal(t, store.GdocSharePaused, g.share1(t).State)
+}

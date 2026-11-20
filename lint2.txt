@@ -1,3 +1,0 @@
-START 00:57:49
-ok  	github.com/subgentic/coral/internal/server/routes	1.458s
-END 00:57:54

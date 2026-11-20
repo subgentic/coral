@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,41 +67,126 @@ type gdocPushResult struct {
 	Kept     string // the earlier Doc, when the Doc had been edited in Google and the new version went to a new Doc
 }
 
-// pushGdoc is the only place a Doc is written. It redacts and caps the text, honours a pause (the loop's call; a press of Share is the owner resuming it only through Resume), keeps
-// the per-Doc hour bound, and on a Doc edited in Google since the last sync leaves it as it is and makes a new Doc from this version.
+// gdocWriter is who wrote the version, as the Doc says it: the agent that uploaded it (its name from the upload record), "the Operator" for a version a person made (the editor or a share), and plain
+// "Coral" when the record is gone. The text goes through the redactor and is cut, as everything outgoing is; if it cannot be checked nothing is sent.
+func (h *SessionsHandler) gdocWriter(key, digest string) (string, error) {
+	who := "Coral"
+	for _, m := range seriesMembers(h.cfg.CoralDir(), key) {
+		if m.Digest != digest {
+			continue
+		}
+		switch {
+		case m.Source == "edit" || m.Source == "share":
+			who = "the Operator"
+		case cleanAgentName(m.Uploader) != "":
+			who = cleanAgentName(m.Uploader)
+		}
+	}
+	return gdocSafeLine(who, 80)
+}
+
+// gdocSafeLine redacts and cuts a short outgoing text (a name, a title) and puts it on one line; it fails closed.
+func gdocSafeLine(s string, max int) (string, error) {
+	s = strings.Join(strings.Fields(s), " ")
+	out, err := secrets.Redactor().Text([]byte(s))
+	if err != nil {
+		return "", errGdocRedact
+	}
+	r := []rune(string(out))
+	if len(r) > max {
+		r = r[:max]
+	}
+	return string(r), nil
+}
+
+// gdocBusy keeps two pushes of one file from running at once without holding a lock across a Google call: the owner's Pause and Stop sharing only wait for a row read or write.
+var gdocBusy sync.Map
+
+var (
+	errGdocGone = errors.New("gdoc: the share was stopped")
+	errGdocBusy = errors.New("gdoc: this file is being sent already")
+)
+
+// pushGdoc is the only place a Doc is written. It redacts and caps the text and names the agent that wrote the version at the top of the Doc, honours a pause, keeps the per-Doc hour bound,
+// and on a Doc edited in Google since the last sync leaves it as it is and makes a new Doc from this version. Only a press (auto false) creates a Doc for a file with no share: the loop
+// never does, so a share stopped while a pass was running is not made again. A revision that cannot be read after a write pauses the Doc (the next sync would have nothing to compare with).
 func (h *SessionsHandler) pushGdoc(ctx context.Context, c *gdocsync.Client, key string, md []byte, digest, name string, auto bool) (gdocPushResult, error) {
 	if len(md) > gdocMaxMarkdown {
 		return gdocPushResult{}, errors.New("gdoc: the file is too large")
+	}
+	by, err := h.gdocWriter(key, digest)
+	if err != nil {
+		return gdocPushResult{}, err
+	}
+	title, err := gdocSafeLine(name, 120)
+	if err != nil {
+		return gdocPushResult{}, err
 	}
 	red, err := secrets.Redactor().Text(md)
 	if err != nil {
 		return gdocPushResult{}, errGdocRedact // fail closed: nothing unchecked leaves this computer
 	}
+	head := "Written by " + by + " in Coral."
+	if by == "Coral" {
+		head = "Written in Coral."
+	}
+	text := head + "\n\n" + string(red)
+	if _, busy := gdocBusy.LoadOrStore(key, true); busy {
+		return gdocPushResult{}, errGdocBusy
+	}
+	defer gdocBusy.Delete(key)
+
 	gdocShareMu.Lock()
-	defer gdocShareMu.Unlock()
 	existing, err := h.ss.GetGdocShare(ctx, key)
+	gdocShareMu.Unlock()
 	if err != nil {
 		return gdocPushResult{}, err
+	}
+	if existing == nil && auto {
+		return gdocPushResult{}, errGdocGone
 	}
 	if existing != nil && existing.State == store.GdocSharePaused {
 		return gdocPushResult{}, errGdocPaused
 	}
 	now := time.Now()
-	save := func(g store.GdocShare) error {
+	// save writes the row under the lock, and never brings back a share the owner stopped while the Google call ran.
+	save := func(g store.GdocShare, wasShared bool, pause bool) error {
+		gdocShareMu.Lock()
+		defer gdocShareMu.Unlock()
+		if wasShared {
+			if cur, err := h.ss.GetGdocShare(ctx, key); err != nil || cur == nil {
+				return err // stopped in the meantime (nil error: nothing to keep)
+			}
+		}
 		g.Key, g.Digest, g.Name, g.SyncedAt = key, digest, name, now.UTC().Format(time.RFC3339)
-		return h.ss.SaveGdocShare(ctx, g, now)
+		if err := h.ss.SaveGdocShare(ctx, g, now); err != nil {
+			return err
+		}
+		if pause {
+			_, err := h.ss.SetGdocShareState(ctx, key, store.GdocSharePaused)
+			return err
+		}
+		return nil
 	}
 	newDoc := func(kept string) (gdocPushResult, error) {
-		title := name
+		t := title
 		if kept != "" {
-			title = name + " (from Coral)"
+			t = title + " (from Coral)"
 		}
-		docID, err := c.Push(ctx, title, string(red))
+		if kept != "" { // a keep-both for the loop: the share must still be there right before the Doc is made
+			gdocShareMu.Lock()
+			cur, gerr := h.ss.GetGdocShare(ctx, key)
+			gdocShareMu.Unlock()
+			if gerr != nil || cur == nil || cur.State == store.GdocSharePaused {
+				return gdocPushResult{}, errGdocGone
+			}
+		}
+		docID, err := c.Push(ctx, t, text)
 		if err != nil {
 			return gdocPushResult{}, err
 		}
-		_, rev, _ := c.Read(ctx, docID) // the revision the next sync compares with; unknown is fine (the next sync takes the Doc as it is)
-		if err := save(store.GdocShare{DocID: docID, DocRevision: rev, ConflictDoc: kept}); err != nil {
+		_, rev, rerr := c.Read(ctx, docID)
+		if err := save(store.GdocShare{DocID: docID, DocRevision: rev, ConflictDoc: kept}, kept != "", rerr != nil || rev == ""); err != nil {
 			return gdocPushResult{}, err
 		}
 		return gdocPushResult{DocID: docID, Created: true, Kept: kept}, nil
@@ -111,10 +197,10 @@ func (h *SessionsHandler) pushGdoc(ctx context.Context, c *gdocsync.Client, key 
 	if !gdocWrites.allow(key, now) {
 		return gdocPushResult{}, errGdocRate
 	}
-	n, rev, err := c.PatchSince(ctx, existing.DocID, string(red), existing.DocRevision)
+	n, rev, err := c.PatchSince(ctx, existing.DocID, text, existing.DocRevision)
 	switch {
 	case err == nil:
-		if err := save(store.GdocShare{DocID: existing.DocID, DocRevision: rev, ConflictDoc: existing.ConflictDoc}); err != nil {
+		if err := save(store.GdocShare{DocID: existing.DocID, DocRevision: rev, ConflictDoc: existing.ConflictDoc}, true, rev == ""); err != nil {
 			return gdocPushResult{}, err
 		}
 		return gdocPushResult{DocID: existing.DocID, Requests: n}, nil
@@ -165,6 +251,9 @@ func (h *SessionsHandler) gdocSyncPass(ctx context.Context, st *gdocSyncState, n
 		if sh.State != store.GdocShareLive {
 			continue
 		}
+		if cur, err := h.ss.GetSettings(ctx); err != nil || !gdocSwitchOn(cur) {
+			return // switched off during the pass: nothing more is sent
+		}
 		members := seriesMembers(h.cfg.CoralDir(), sh.Key)
 		if len(members) == 0 || members[len(members)-1].Digest == sh.Digest {
 			continue // a file with no series, or nothing new
@@ -186,7 +275,7 @@ func (h *SessionsHandler) gdocSyncPass(ctx context.Context, st *gdocSyncState, n
 		_, err := h.pushGdoc(cctx, c, sh.Key, md, latest.Digest, name, true)
 		cancel()
 		switch {
-		case err == nil, errors.Is(err, errGdocPaused), errors.Is(err, errGdocRate):
+		case err == nil, errors.Is(err, errGdocPaused), errors.Is(err, errGdocRate), errors.Is(err, errGdocGone), errors.Is(err, errGdocBusy):
 		case gdocsync.IsRateLimited(err):
 			if st.wait == 0 {
 				st.wait = gdocBackoffFirst

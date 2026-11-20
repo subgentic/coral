@@ -83,6 +83,7 @@ type gdocStandIn struct {
 	requests       int
 	fail           int // answer this many requests with failStatus and a body that holds a secret
 	failStatus     int
+	noRev          bool // a Doc read answers with no revision id
 	failWritesOnly bool // fail only the POSTs (a write whose outcome is unknown), never a read
 }
 
@@ -138,6 +139,9 @@ func (g *gdocStandIn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rev := "rev1"
 		if r2, ok := g.revs[id]; ok {
 			rev = r2
+		}
+		if g.noRev {
+			rev = ""
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"revisionId": rev, "body": map[string]any{"content": content}})
 	case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/v1/documents/") && strings.HasSuffix(r.URL.Path, ":batchUpdate"):
@@ -278,9 +282,15 @@ func TestSharingIsUnavailableOffAMacAndWhileTheSwitchIsOff(t *testing.T) {
 // writeSeriesVersion records an artifact as version n of the series, the way an upload does, so the share finds the series.
 func (g *gdocRig) writeSeriesVersion(t *testing.T, sid, digest string, n int) {
 	t.Helper()
+	g.writeSeriesVersionBy(t, sid, digest, n, "")
+}
+
+// writeSeriesVersionBy is writeSeriesVersion with the agent that uploaded it.
+func (g *gdocRig) writeSeriesVersionBy(t *testing.T, sid, digest string, n int, uploader string) {
+	t.Helper()
 	dir := uploadsDir(g.h.cfg.CoralDir(), "s1")
 	require.NoError(t, os.MkdirAll(dir, 0o700))
-	rec := agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Digest: digest}, CreatedAt: "2026-11-20T00:00:00Z", SeriesID: sid, Version: n}
+	rec := agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Digest: digest}, CreatedAt: "2026-11-20T00:00:00Z", SeriesID: sid, Version: n, Uploader: uploader}
 	b, _ := json.Marshal(rec)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, digest+".json"), b, 0o600))
 }
