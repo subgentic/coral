@@ -382,6 +382,8 @@ var routeTable = cat(
 	service(rules(http.MethodPost, TierView, "/api/cloud/guide-revoked")),
 	// The device-signed routes (#19669 slice 7, wire format draft 11): what a trusted browser signed, forwarded by the Hub unstamped. View, so a computer in any mode takes it, and neither owner nor service: the signature is the only authority, the verifier decides, and no Hub user, owner or account header is read.
 	rules(http.MethodPost, TierView, "/api/device-keys/message", "/api/device-keys/certificate"),
+	// The trusted-device list for display (#19971, coral-hub #252527): the owner's alone through the Hub, read only, Launch. Fields kid, label, mode, origin, kind, created_at, last_used_at; no public key. Nothing listed grants anything: the signed message is the authority.
+	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/device-keys/list")),
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),

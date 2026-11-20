@@ -222,6 +222,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/trust-preview") {
 				continue
 			}
+			// The trusted-device list (#19971) is read through the hub by the owner alone: the old list never had it.
+			if m == http.MethodGet && p == "/api/device-keys/list" {
+				continue
+			}
 			// The first-launch notice (#14353, #14414) is read through the hub by the owner alone: the old list never had it.
 			if m == http.MethodGet && p == "/api/launch-disclosure" {
 				continue

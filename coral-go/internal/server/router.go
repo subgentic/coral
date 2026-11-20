@@ -600,6 +600,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// Device keys, slice 7 (#19669): what a trusted browser signed, forwarded by the Hub unstamped. The signature is the only authority; these routes read no Hub user, owner or account header.
 	r.Post("/api/device-keys/message", s.cloudHandler.DeviceKeyMessage)
 	r.Post("/api/device-keys/certificate", s.cloudHandler.DeviceKeyCertificate)
+	r.Get("/api/device-keys/list", s.cloudHandler.TunnelDevices)           // the owner's read-only display list through the Hub (#19971); owner only, Launch tier, in the tunnel table
 	r.Put("/api/cloud/hub-relaunch", s.cloudHandler.SetHubRelaunch)        // #5280
 	r.Put("/api/cloud/hub-cross-team", s.cloudHandler.SetHubCrossTeam)     // #5572
 	r.Get("/api/system/codex-trust-hooks", s.cloudHandler.CodexTrustHooks) // #153

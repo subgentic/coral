@@ -147,6 +147,7 @@ GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
 GET /api/custom-modes view
+GET /api/device-keys/list launch
 GET /api/dropbox/artifact/{digest} never
 GET /api/dropbox/removals never
 GET /api/dropbox/share-contacts never

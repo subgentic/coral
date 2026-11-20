@@ -541,6 +541,7 @@ b DELETE /api/cloud/devices/{kid}
 b POST /api/cloud/devices/clear-clock
 b POST /api/device-keys/message
 b POST /api/device-keys/certificate
+b GET /api/device-keys/list
 b PUT /api/custom-models
 b PUT /api/custom-modes
 b PUT /api/system/identity-actor

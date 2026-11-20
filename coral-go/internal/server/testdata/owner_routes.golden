@@ -37,6 +37,7 @@ GET /api/board/{project}/tasks/{taskID}/changes.diff view owner-only
 GET /api/chief view owner-only
 GET /api/custom-models view owner-only
 GET /api/custom-modes view owner-only
+GET /api/device-keys/list launch owner-only
 GET /api/goals view owner-sees
 GET /api/launch-disclosure view owner-only
 GET /api/needs-you view owner-only
