@@ -85,3 +85,31 @@ func (s *SessionStore) DeleteGdocShare(ctx context.Context, key string) (bool, e
 	n, _ := res.RowsAffected()
 	return n > 0, nil
 }
+
+// GdocCommentRow says that Coral comment CommentID mirrors the Google comment (or reply) RemoteID of a Doc.
+type GdocCommentRow struct {
+	DocID     string `db:"doc_id"`
+	RemoteID  string `db:"remote_id"`
+	CommentID int64  `db:"comment_id"`
+	Resolved  bool   `db:"resolved"`
+}
+
+// GdocCommentMap returns what is already mirrored for a Doc, by remote id.
+func (s *SessionStore) GdocCommentMap(ctx context.Context, docID string) (map[string]GdocCommentRow, error) {
+	var rows []GdocCommentRow
+	if err := s.reader().SelectContext(ctx, &rows, "SELECT doc_id, remote_id, comment_id, resolved FROM gdoc_comment_map WHERE doc_id = ?", docID); err != nil {
+		return nil, err
+	}
+	out := make(map[string]GdocCommentRow, len(rows))
+	for _, r := range rows {
+		out[r.RemoteID] = r
+	}
+	return out, nil
+}
+
+// SaveGdocComment records (or updates) the mirror of one Google comment or reply.
+func (s *SessionStore) SaveGdocComment(ctx context.Context, r GdocCommentRow) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO gdoc_comment_map (doc_id, remote_id, comment_id, resolved) VALUES (?, ?, ?, ?)
+		ON CONFLICT(doc_id, remote_id) DO UPDATE SET comment_id = excluded.comment_id, resolved = excluded.resolved`, r.DocID, r.RemoteID, r.CommentID, r.Resolved)
+	return err
+}

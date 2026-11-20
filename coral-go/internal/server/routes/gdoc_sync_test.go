@@ -52,9 +52,10 @@ func TestTheLoopPushesANewVersionToTheSameDocWithoutAPress(t *testing.T) {
 	assert.Equal(t, before+1, g.drive.batches, "one change sent")
 	assert.Len(t, g.drive.uploads, 1, "no second Doc")
 	assert.Equal(t, gdocV2, g.share1(t).Digest, "the share remembers the version in the Doc")
-	calls := g.drive.calls
+	batches, uploads := g.drive.batches, len(g.drive.uploads)
 	g.pass(&gdocSyncState{})
-	assert.Equal(t, calls, g.drive.calls, "nothing new: no Google call at all")
+	assert.Equal(t, batches, g.drive.batches, "nothing new: nothing written")
+	assert.Equal(t, uploads, len(g.drive.uploads))
 }
 
 // Turning the switch off stops all sync: a pass makes no Google call and never asks for the sign-in.

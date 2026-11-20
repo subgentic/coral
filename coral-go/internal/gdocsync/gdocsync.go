@@ -308,6 +308,9 @@ func ToCoral(c Comment, markdown string) CoralComment {
 
 // signed puts the Google author in front of the text as "[Name] text". Both are the reviewer's words and untrusted: the name loses its brackets, line breaks and control characters (and
 // is cut), and a bracket that starts a line of the text is escaped, so no text can pass as another author's "[Name]" line. Exactly one line of the result starts with a bracket.
+// Signed is a Google author's text as Coral stores it: "[Name] text", the name only.
+func Signed(a Author, text string) string { return signed(a, text) }
+
 func signed(a Author, text string) string {
 	return "[" + cleanName(a.DisplayName) + "] " + escapeLeadingBrackets(text)
 }

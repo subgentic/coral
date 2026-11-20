@@ -83,6 +83,7 @@ type gdocStandIn struct {
 	requests       int
 	fail           int // answer this many requests with failStatus and a body that holds a secret
 	failStatus     int
+	comments       map[string][]gdocsync.Comment // a Doc's Google comments, by id
 	noRev          bool // a Doc read answers with no revision id
 	failWritesOnly bool // fail only the POSTs (a write whose outcome is unknown), never a read
 }
@@ -152,6 +153,9 @@ func (g *gdocStandIn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		g.batches++
 		g.requests += len(in.Requests)
 		_, _ = w.Write([]byte(`{}`))
+	case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/drive/v3/files/") && strings.HasSuffix(r.URL.Path, "/comments"):
+		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/drive/v3/files/"), "/comments")
+		_ = json.NewEncoder(w).Encode(map[string]any{"comments": g.comments[id]})
 	default:
 		http.Error(w, "no route "+r.URL.Path, 404)
 	}

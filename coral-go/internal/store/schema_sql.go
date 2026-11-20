@@ -761,6 +761,16 @@ CREATE TABLE IF NOT EXISTS gdoc_shares (
     synced_at    TEXT NOT NULL DEFAULT ''
 );
 
+-- Share to Google Docs, slice D of #20010: which Coral comment mirrors which Google comment or reply, so a pull never adds one twice. remote_id is the Google comment's id, or
+-- "<comment id>/<reply id>" for a reply. Names and text only live in artifact_comments; nothing here is a person's email.
+CREATE TABLE IF NOT EXISTS gdoc_comment_map (
+    doc_id     TEXT NOT NULL,
+    remote_id  TEXT NOT NULL,
+    comment_id INTEGER NOT NULL,
+    resolved   INTEGER NOT NULL DEFAULT 0, -- the comment was resolved in Google when last pulled
+    PRIMARY KEY (doc_id, remote_id)
+);
+
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is
 -- sealed like the server token. Kept across restarts so a restart loop reuses one code
 -- instead of asking the hub for a new one each time.

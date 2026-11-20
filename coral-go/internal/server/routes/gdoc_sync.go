@@ -296,6 +296,57 @@ func (h *SessionsHandler) gdocSyncPass(ctx context.Context, st *gdocSyncState, n
 			st.wait = 0
 		}
 	}
+	h.gdocPullPass(ctx, st, now)
+}
+
+// gdocPullPass is the second half of a pass: the comments made in each live Doc come back. It re-reads the switch and the rows (a share stopped or paused during the pushes is skipped), makes
+// one Drive call per Doc, and a 429 waits like the pushes do.
+func (h *SessionsHandler) gdocPullPass(ctx context.Context, st *gdocSyncState, now time.Time) {
+	var c *gdocsync.Client
+	shares, err := h.ss.ListGdocShares(ctx)
+	if err != nil {
+		return
+	}
+	for _, sh := range shares {
+		if ctx.Err() != nil {
+			return
+		}
+		if cur, err := h.ss.GetSettings(ctx); err != nil || !gdocSwitchOn(cur) {
+			return
+		}
+		if live, err := h.ss.GetGdocShare(ctx, sh.Key); err != nil || live == nil || live.State != store.GdocShareLive {
+			continue
+		} else {
+			sh = *live
+		}
+		members := seriesMembers(h.cfg.CoralDir(), sh.Key)
+		if len(members) == 0 {
+			continue
+		}
+		if c == nil {
+			if c, err = gdocClientFor(); err != nil {
+				return
+			}
+			if _, err := c.TokenFunc(); err != nil {
+				return
+			}
+		}
+		cctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		err := h.gdocPullComments(cctx, c, sh, members[len(members)-1])
+		cancel()
+		if gdocsync.IsRateLimited(err) {
+			if st.wait == 0 {
+				st.wait = gdocBackoffFirst
+			} else if st.wait *= 2; st.wait > gdocBackoffMax {
+				st.wait = gdocBackoffMax
+			}
+			st.until = now.Add(st.wait)
+			slog.Warn("[gdoc] Google asked to slow down; the sync waits", "for", st.wait.String())
+			return
+		} else if err != nil {
+			slog.Warn("[gdoc] a Doc's comments could not be read", "kind", gdocErrKind(err))
+		}
+	}
 }
 
 // gdocErrKind names a failure for the log without its text (a Google body could carry something).
