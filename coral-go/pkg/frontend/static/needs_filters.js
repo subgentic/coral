@@ -10,8 +10,8 @@ import { defineFilters } from './filter_model.js';
 import { browserLocal } from './safe_storage.js';
 
 /** What an agent waits on, as the pills say it: its permission, its question, or anything else (an input request, a plan, a prompt only the screen showed). */
-export const KINDS = ['permission', 'question', 'other', 'review', 'run', 'proposal', 'goal_done', 'skill_review', 'welcome'];
-export const KIND_LABEL = { permission: 'Permission', question: 'Question', other: 'Needs input', review: 'For review', run: 'Failed run', proposal: 'To approve', goal_done: 'Goal looks done', skill_review: 'Skill to approve', welcome: 'Welcome', ask: 'Question' };
+export const KINDS = ['permission', 'question', 'other', 'review', 'run', 'proposal', 'goal_done', 'skill_review', 'welcome', 'answered_ask', 'comment_sent']; // the last two are the second tab's (#19904)
+export const KIND_LABEL = { permission: 'Permission', question: 'Question', other: 'Needs input', review: 'For review', run: 'Failed run', proposal: 'To approve', goal_done: 'Goal looks done', skill_review: 'Skill to approve', welcome: 'Welcome', ask: 'Question', answered_ask: 'Answered ask', comment_sent: 'Comment sent' }; // the last two are the second tab's own kinds, not pills of the first (#19904)
 /** How long it has waited, at least (minutes), as the Filters panel offers it. */
 export const LONGER = ['5', '15', '60', '240'];
 export const LONGER_LABEL = { 5: '5 minutes', 15: '15 minutes', 60: '1 hour', 240: '4 hours' };
@@ -46,7 +46,7 @@ export function fileTile(item, server) {
 }
 export function kindIcon(s) {
     const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // board questions share the Question chip (#16548)
-    i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
+    i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = k === 'answered_ask' ? 'ask' : k === 'comment_sent' ? 'review' : k; /* an answered ask is drawn as an ask, a sent comment as a file's row */ i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
     if (s?.review) i.dataset.type = /^video\//.test(s.review.media_type || '') ? 'video' : /html/.test(s.review.media_type || '') ? 'html' : /markdown/.test(s.review.media_type || '') ? 'md' : '';
     if (s?.review) { i.classList.add('inbox-artifact-thumbnail'); i.append(artifactThumbnail(s.review, { size: 32, url: typeof s.server === 'string' && thumbnailPath(s.review) ? serverUrl(thumbnailPath(s.review), s.server) : '' })); }
     return i;
@@ -83,7 +83,7 @@ export function decorateKindRow(tr) {
     column.className = 'inbox-kind-column'; column.append(icon); cell.append(column);
 }
 /** The kind of a waiting agent for the pills: `waiting_kind` permission or question, else other. */
-export const kindOf = s => s?.waiting_kind === 'ask' ? 'question' : (s && (s.waiting_kind === 'permission' || s.waiting_kind === 'question' || s.waiting_kind === 'review' || s.waiting_kind === 'run' || s.waiting_kind === 'proposal' || s.waiting_kind === 'goal_done' || s.waiting_kind === 'skill_review' || s.waiting_kind === 'welcome') ? s.waiting_kind : 'other');
+export const kindOf = s => s?.waiting_kind === 'ask' ? 'question' : (s && (s.waiting_kind === 'permission' || s.waiting_kind === 'question' || s.waiting_kind === 'review' || s.waiting_kind === 'run' || s.waiting_kind === 'proposal' || s.waiting_kind === 'goal_done' || s.waiting_kind === 'skill_review' || s.waiting_kind === 'welcome' || s.waiting_kind === 'answered_ask' || s.waiting_kind === 'comment_sent') ? s.waiting_kind : 'other');
 
 /** Whether a waiting agent passes the filters. ctx: { text(s) the words the search covers, teamOf(s), nameOf(s) }; `now` (ms) is the clock. The pill's kind is a filter here too. */
 export function matches(s, f, ctx, now = Date.now()) {
