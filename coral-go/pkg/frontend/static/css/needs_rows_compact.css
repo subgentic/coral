@@ -164,10 +164,12 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta > .inbox-review-earlier::before { display: inline-block; text-decoration: none; }
 /* a permission whose command was read from the agent (the chat's own prompt) is the approved Permission row too (#19870, MUST-5): the command alone in its code box, Claude's line and what Yes allows under it, left-aligned, and Yes, No and More at the right of the meta line, the row about 170 px, not 297 */
 @media (min-width: 640px) {
+@container (min-width: 50rem) { /* beside the text only when the list is wide in its own text size: 200% text keeps the buttons on their own line (#20016) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td:not([data-key="agent"], [data-key="team"], [data-key="waiting"], [data-key="review"]):not(:first-child) { grid-column: 3 / 5; grid-row: 3; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-ask-row .inbox-meta:has(> .inbox-kind:only-child) { display: none; } /* the pill in the name line says the kind: the grey word under the text said it twice (#20016) */
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td[data-key="agent"] .inbox-ask-name { grid-column: 3 / 5; grid-row: 2; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td[data-key="review"] { grid-column: 5 / -1; grid-row: 2 / span 2; align-self: center; justify-content: flex-end; flex-wrap: nowrap; padding: 0; }
+}
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr:is(:has(.inbox-cmd-block), .inbox-stack) { row-gap: 0; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="review"]:is(:has(.inbox-cmd-block), .inbox-stack > td) { grid-column: 3 / -1; order: 8; display: block; padding: 4px 0 0; text-align: start; }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr > td[data-key="review"]:is(:has(.inbox-cmd-block), .inbox-stack > td) .inbox-answers-with-more { display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, auto); align-items: center; gap: 4px 0; }
