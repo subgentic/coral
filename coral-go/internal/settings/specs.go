@@ -52,6 +52,7 @@ const (
 	AutoSleepIdleMinutes     = "auto_sleep_idle_minutes"
 	NudgeClaudeArtifacts     = "nudge_claude_artifacts"
 	LaunchInWorktree         = "launch_in_worktree"
+	GdocShare                = "gdoc_share"
 	InboxKindFile            = "inbox_kind_file"
 	InboxKindDone            = "inbox_kind_done"
 	InboxKindRelease         = "inbox_kind_release"
@@ -172,6 +173,7 @@ func init() {
 	register(Spec{Key: InboxIncludedTeams, Kind: KindText, Default: "all", Apply: ApplyLive, OwnCheck: true, MaxLen: 64 << 10, Doc: "The teams the Needs you switches apply to: the word all, or a JSON list of team ids. A team that is not on the list has its optional kinds muted; its questions and decisions still reach you."})
 	register(Spec{Key: InboxDigestTime, Kind: KindText, Default: "09:00", Apply: ApplyLive, OwnCheck: true, MaxLen: 5, Doc: "The time of day (HH:MM, 24 hours) the daily items are made."})
 	boolOff(LaunchInWorktree, ApplyLive, "Experimental: offer launching a team into its own git worktree, and accept a team launch that asks for one (#12746). Off by default for every install.")
+	boolOff(GdocShare, ApplyLive, "Experimental: share a Coral artifact to a Google Doc, bring its comments back to the agent and keep the Doc in step (#19996). Off by default for every install; needs a one-time Google sign-in (drive.file scope only).")
 	boolOn(NudgeClaudeArtifacts, ApplyLive, "Remind an agent that published a claude.ai artifact to make a Coral artifact instead (once per artifact).")
 	register(Spec{Key: UpdateChannel, Kind: KindEnum, Values: []string{"approved", "agentic"}, Default: "approved", Apply: ApplyLive, Doc: "Which releases the update notice and the tray offer: approved (the release marked latest) or agentic (every published release, approved or not). Notice only: the updater installs approved releases whatever this says (#5557)."})
 	register(Spec{Key: TurnEndHandoff, Kind: KindEnum, Values: []string{"off", "on"}, Default: "on", Apply: ApplyLive, Doc: "Hand the turn on at its end."})

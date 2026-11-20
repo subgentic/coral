@@ -437,6 +437,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	// Agent tasks
 	sessHandler.RegisterAgentArtifacts(r)
 	sessHandler.RegisterArtifactComments(r) // #5176
+	sessHandler.RegisterGdocShare(r)        // #19996
 	sessHandler.RegisterTerminalLogs(r)
 	r.Get("/api/sessions/live/{name}/tasks", sessHandler.ListTasks)
 	r.With(routes.RefuseSignInLink).Post("/api/sessions/live/{name}/tasks", sessHandler.CreateTask)
