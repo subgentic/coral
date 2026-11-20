@@ -52,7 +52,7 @@ var nanoWriters = map[string]nanoWriter{
 	"server/routes/dialog_team_line.go":      {calls: 1, why: "part of a dialog episode's id (the team line's once-per-episode key), compared for equality only, never ordered"},
 	"agent/opencode_history.go":              {calls: 1, why: "a message's time, parsed back by the History index (the first and last timestamp of a session row), never ordered as text"},
 	"server/routes/opencode_runtime.go":      {calls: 1, why: "an opencode message's time in a chat reply, parsed by the dashboard; never stored or ordered as text"},
-	"server/routes/needs_you.go":             {calls: 3, why: "response fields of GET /api/needs-you (an item's time and the cursor), parsed back by the same file and by the Hub's poller; never stored or ordered as text (the order is by the parsed time, then the id)"},
+	"server/routes/needs_you.go":             {calls: 4, why: "response fields of GET /api/needs-you (an item's time and the cursor), parsed back by the same file and by the Hub's poller; never stored or ordered as text (the order is by the parsed time, then the id)"},
 	"server/routes/waiting_line.go":          {calls: 1, why: "a field of the live row (waiting_since), parsed by Date.parse; held in memory, never stored or ordered as text"},
 	"server/routes/pending_sends.go":         {calls: 1, why: "a field of the live row (pending_sends.at), parsed by Date.parse; held in memory, never stored or ordered as text"},
 }

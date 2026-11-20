@@ -59,12 +59,12 @@ func TestAFilesDecisionKeepsItsQuestionAndTheChainHoldsAcrossAnOldAndANewRow(t *
 func TestAFilesQuestionIsCleanedAndCut(t *testing.T) {
 	s := activityStore(t)
 	m := opMeta
-	m.Title, m.Ask = "plan.md", "Ship‮ it?​ "+strings.Repeat("x", 400)
+	m.Title, m.Ask = "plan.md", "Ship\u202e it?\u200b "+strings.Repeat("x", 400)
 	require.NoError(t, s.RecordActivity(context.Background(), m, ActIgnore, "file", strings.Repeat("a", 64), "", "p"))
 	rows, _, err := s.ActivityPage(context.Background(), ActivityFilter{Limit: 5})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	assert.NotContains(t, rows[0].Ask, "‮")
-	assert.NotContains(t, rows[0].Ask, "​")
+	assert.NotContains(t, rows[0].Ask, "\u202e")
+	assert.NotContains(t, rows[0].Ask, "\u200b")
 	assert.LessOrEqual(t, len([]rune(rows[0].Ask)), activityAskCap+1)
 }
