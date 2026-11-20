@@ -628,33 +628,8 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     box.append(errorText); return box;
 }
 
-/** Waiting on an agent, an ask the Operator answered or a comment the Operator sent (#19904, #19916): what its row opens, says and does. */
-function openWaitItem(s) {
-    const it = s.waitItem, team = boardTeamKey(LOCAL_SERVER, it.board || '');
-    if (it.artifact?.hex) { importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(it.artifact.hex, { server: LOCAL_SERVER, board: it.board, filename: it.artifact.name })).catch(() => {}); return; }
-    if (it.goal?.id) { go({ ...folderRoute, id: team, item: String(it.goal.id) }); return; }
-    if (it.task?.id) { openItemRoute('tasks', team, String(it.task.id), `${team}#${it.task.id}`); return; }
-    go(keyRoute('team', team));
-}
-function waitItemCell(s) {
-    const it = s.waitItem, who = WA.whoOf(it), title = markTitle(WA.titleOf(it));
-    const name = DT.primaryButton(title, `Open ${title}`); name.classList.add('inbox-review-name'); name.setAttribute('aria-label', `Open ${title}, ${WA.KIND_WORD[it.kind]}, waiting on ${who}`);
-    const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = agentLink(who.trim() || 'sender unknown', { board: boardTeamKey(LOCAL_SERVER, it.board || ''), cls: 'inbox-review-from' });
-    const pills = WA.pills(it, { openGoal: (team, id) => go({ ...folderRoute, id: team, item: String(id) }), openTask: (team, id) => openItemRoute('tasks', team, String(id), `${team}#${id}`) });
-    const state = AW.stateNodes(s.agentRef, it.kind), line = [WA.chip(it, who), ...state, WA.quote(it)];
-    if (isPhoneLayout()) { wrap.append(sender, name); if (pills.childNodes.length) wrap.append(pills); wrap.append(DT.el('span', 'sr-only', ', waiting on agent, not counted'), ...line); return wrap; }
-    const meta = DT.el('span', 'inbox-meta'); meta.append(line[0], sender, ...(pills.childNodes.length ? [pills] : []));
-    wrap.append(name, meta, ...line.slice(1)); return wrap;
-}
-function waitItemActions(s) {
-    const it = s.waitItem, ws = AW.agentWaitState(s.agentRef), title = markHidden(WA.titleOf(it), { strict: true }), team = boardTeamKey(LOCAL_SERVER, it.board || ''), box = DT.el('div', 'inbox-review-actions inbox-slots'), menu = [];
-    const quiet = (text, slot, run) => { const b = DT.el('button', 'btn btn-quiet btn-small', text); b.type = 'button'; b.setAttribute('data-slot', slot); b.setAttribute('aria-label', `${text}: ${title}`); b.addEventListener('click', run); return b; };
-    const thing = it.artifact?.hex ? 'file' : it.goal?.id ? 'goal' : it.task?.id ? 'task' : '';
-    const agent = ws.live ? agentLink(ws.who, { board: team, session: ws.live.session_id, cls: 'btn btn-quiet btn-small inbox-open-agent', text: 'Open agent', label: `Open ${markHidden(ws.who, { strict: true })}` }) : null;
-    box.append(...[AW.wakeButton(ws), thing ? quiet(`Open ${thing}`, 'open-file', () => openWaitItem(s)) : null, agent].filter(Boolean));
-    menu.push(...AW.menuItems(it, ws, { openBoard: () => go(keyRoute('team', team)) }), { label: 'View on board', title: 'Open the team’s board', run: () => go(keyRoute('team', team)) }, { label: 'Stop waiting', title: 'Take it off this list; nobody is told', run: () => { WA.dismiss(it); renderInboxNav(true); } });
-    const more = moreMenu(menu, title); more.setAttribute('data-slot', 'dots'); box.append(more); return box;
-}
+/** Waiting on an agent, an ask the Operator answered or a comment the Operator sent (#19904, #19916): what its row opens, says and does; the code is a lazy module (the start path stays net zero). */
+const { openWaitItem, waitItemCell, waitItemActions } = (await importOnce('./inbox_waiting_rows.js')).make({ folderRoute, openItemRoute, moreMenu, redraw: () => renderInboxNav(true) });
 /** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */
 function openRun(run) { markSeen(run); go(runRoute(run)); }
 /** What a button an agent put on a question may open (#11643): the page runs these only after the server claimed the button and named its stored action. */

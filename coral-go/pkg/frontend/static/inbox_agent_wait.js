@@ -18,7 +18,7 @@ export function agentWaitState(review) {
 }
 export const STATE_WORD = { awake: 'Awake', asleep: 'Asleep', archived: 'Archived' };
 /** The one line that explains an inactive agent, as the approved mock words it. */
-export const stateLine = (who, st, kind = '') => st === 'asleep' ? `${who} is asleep — it won’t read your ${kind === 'answered_ask' ? 'answer' : kind === 'comment_sent' ? 'comment' : 'changes request'} until woken.` : st === 'archived' ? `${who} is archived — archived agents don’t wake automatically. Start it or hand this off on the board.` : '';
+export const stateLine = (who, st, kind = '') => st === 'asleep' ? `${who} is asleep — it won’t read ${{ answered_ask: 'your answer', comment_sent: 'your comment' }[kind] || 'your changes request'} until woken.` : st === 'archived' ? `${who} is archived — archived agents don’t wake automatically. Start it or hand this off on the board.` : '';
 
 /** The row's Wake (asleep) or Start agent (archived) button; null for an awake or unknown agent. */
 export function wakeButton(ws) {

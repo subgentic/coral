@@ -33,7 +33,7 @@ export function load({ force = false, onChange = null } = {}) {
     if (onChange) redraw = onChange;
     if (inflight || (!force && Date.now() - readAt < FRESH_MS)) return inflight;
     inflight = (isCloud() ? Promise.reject(new Error('hub')) : serverFetch(LOCAL_SERVER, '/api/waiting-on-agent')).then(async r => { if (!r.ok) throw new Error(String(r.status)); const d = await r.json(); return Array.isArray(d?.items) ? d.items : []; })
-        .then(list => { const was = JSON.stringify([items, failed]); items = list; failed = false; return was !== JSON.stringify([items, failed]); }, () => { const was = failed; failed = true; items = []; return !was; })
+        .then(got => { const was = JSON.stringify([items, failed]); items = got; failed = false; return was !== JSON.stringify([items, failed]); }, () => { const was = failed; failed = true; items = []; return !was; })
         .then(changed => { readAt = Date.now(); inflight = null; if (changed) redraw(); });
     return inflight;
 }
@@ -41,7 +41,7 @@ export const forget = () => { readAt = 0; };
 
 /** The chip: "Answered ask · waiting on X" / "Comment sent · waiting on X", in the sent-back chip's look. */
 export function chip(it, who) {
-    const c = document.createElement('span'); c.className = 'chip inbox-sent-back'; c.dataset.waitKind = it.kind; c.textContent = `${KIND_WORD[it.kind]} · waiting on ${who}`;
+    const c = document.createElement('span'); c.className = 'chip inbox-sent-back'; c.setAttribute('data-wait-kind', it.kind); c.textContent = `${KIND_WORD[it.kind]} · waiting on ${who}`;
     c.title = it.kind === 'answered_ask' ? 'You answered the agent. It has not acted or replied since.' : 'You commented. The agent has not replied since.';
     return c;
 }
