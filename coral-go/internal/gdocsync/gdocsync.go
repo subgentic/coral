@@ -82,6 +82,11 @@ type Comment struct {
 // NewClient returns a client for Production that asks tok for the token inside each request.
 func NewClient(tok func() (string, error)) *Client { return &Client{TokenFunc: tok} }
 
+// NewClientAt is a client for a Drive and Docs stand-in at base (another package's tests): it answers for both hosts and never sleeps between retries.
+func NewClientAt(base string, tok func() (string, error)) *Client {
+	return &Client{base: base, TokenFunc: tok, Sleep: func(time.Duration) {}}
+}
+
 // DocsProduction is the second and last host: Docs v1 is served from here, Drive v3 from Production (found live, #19953).
 const DocsProduction = "https://docs.googleapis.com"
 
