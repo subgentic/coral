@@ -31,6 +31,7 @@ const { coralReady } = require('./helpers/wait');
                     const original = window.fetch, json = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
                     window.fetch = (url, opts = {}) => {
                         const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': window.__reviewItems}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
+                        if (u.pathname === '/api/settings' && opts.method === 'PUT') return json({ ok: true }); // the page's own settings saves (Getting started's done list) never reach the server, so no run leaves a setting changed
                         if (u.pathname === '/api/waiting-on-agent') return window.__waitingFail ? json({ error: 'not available' }, 500) : json({ items: (window.__waiting || []) });
                         if (u.pathname === '/api/board/${team}/artifacts') {
                             const tag = u.searchParams.get('tag'); window.__tagReads.push(tag);
@@ -142,6 +143,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].find(b => /^All/.test(b.textContent)).click(); true`);
                 await waitFor(`!!(${row('Awake file.txt')}) && !!(${row('landing-copy-v2.md')})`, 'All shows the five again', 8000);
                 await shot('agent-five');
+                if (width === 390) assert.match(await ev(`document.querySelector('.inbox-agent-status').innerText.trim()`), /^5 waiting · 3 inactive$/, 'a phone shows the mock’s one short count line, with no stray separators');
                 if (width === 1280) {
                     const tops = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => Math.round(r.getBoundingClientRect().top))`);
                     const before = await tops();
@@ -152,6 +154,29 @@ const { coralReady } = require('./helpers/wait');
                     await shot('agent-ticked');
                     await ev(`(${row('Awake file.txt')}).querySelector('.dt-check input').click(); true`);
                     await waitFor(`!document.querySelector('.team-tb-selection')`, 'the bar goes when nothing is ticked', 8000);
+                }
+                if (width === 1280) { // walk #20009 item 5: Getting started shows on Waiting on you only, and that tab counts it
+                    const count = key => ev(`Number(document.querySelector('[data-needs-tab="${key}"] .inbox-needs-tab-count')?.textContent.replace(/[^0-9]/g, '') || -1)`);
+                    const tab = async key => { await ev(`document.querySelector('[data-needs-tab="${key}"]').click(); true`); await new Promise(r => setTimeout(r, 400)); }; // sleep-ok: let the tab redraw
+                    const welcome = () => ev(`document.querySelectorAll('#group-table-view .inbox-welcome-actions').length`);
+                    await tab('you'); const youBefore = await count('you');
+                    await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'on' }; return true; })()`);
+                    await tab('agent'); await tab('you');
+                    const shown = await welcome();
+                    assert.ok(shown >= 1, 'Getting started rows show on Waiting on you');
+                    assert.equal(await count('you'), youBefore + shown, 'Waiting on you counts the Getting started rows it shows');
+                    await tab('agent');
+                    assert.equal(await welcome(), 0, 'Getting started rows do not show on Waiting on an agent');
+                    await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'off' }; return true; })()`);
+                    await tab('you');
+                }
+                if (width === 1280) { // walk #20009 item 6: a file that was sent back stays one 'Sent back' row when a comment on it is also waiting
+                    await ev(`(async () => { window.__waiting = [...window.__waiting, { kind: 'comment_sent', id: 'cmt-99', board: '${team}', agent: { name: 'Writer A', role: 'Writer', session_id: 'sess-awake' }, since: new Date(Date.now() - 60000).toISOString(), title: 'A file', operator_words: 'Trim it', goal: null, task: null, artifact: { hex: (2).toString(16).padStart(64, '0'), name: 'Awake file.txt', version: 1 }, thread_id: null }]; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
+                    await ev(`document.querySelector('[data-needs-tab="you"]').click(); true`); await ev(`document.querySelector('[data-needs-tab="agent"]').click(); true`);
+                    await new Promise(r => setTimeout(r, 500)); // sleep-ok: let the list redraw
+                    assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes('Awake file.txt')).length`), 1, 'the sent-back file is one row');
+                    assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .inbox-sent-back')].filter(c => /^Comment sent$/.test(c.textContent) && c.closest('tr').textContent.includes('Awake file.txt')).length`), 0, 'it does not flip to Comment sent');
+                    await ev(`(async () => { window.__waiting = window.__waiting.filter(i => i.id !== 'cmt-99'); const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
                 }
                 // a computer that cannot answer: the sent-back files stay, and the list says some could not be read
                 await ev(`(async () => { window.__waitingFail = true; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);

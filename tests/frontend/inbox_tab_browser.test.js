@@ -97,7 +97,7 @@ const { settle } = require('./helpers/wait');
         await feed({ total: 5, waiting: 1 });
         b = await badge(); check('it follows the next message', b.text === '1' && !b.hidden, JSON.stringify(b));
         await feed({ total: 120, waiting: 105 });
-        b = await badge(); check('past 9 it says 9+', b.text === '9+', JSON.stringify(b));
+        b = await badge(); check('past 99 it says 99+', b.text === '99+', JSON.stringify(b));
         await feed({ total: 5, waiting: 0 });
         b = await badge(); check('none waiting: no badge and the plain name', b.hidden && b.text === '' && b.label === null, JSON.stringify(b));
         countUnknown = true;

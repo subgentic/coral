@@ -81,6 +81,7 @@ const CHIP = { awake: 'inbox-st-chip inbox-st-awake', asleep: 'inbox-st-chip inb
 export function statusNode(total, n) {
     const box = el('span', 'inbox-agent-status'), say = (cls, text) => el('span', cls, text), dot = () => say('inbox-st-dot', '');
     box.append(el('strong', null, `${total} waiting on an agent`));
+    const inactive = (n.asleep || 0) + (n.archived || 0); box.append(el('strong', 'inbox-st-short', `${total} waiting${inactive ? ` \u00b7 ${inactive} inactive` : ''}`)); // a phone's line, as the mock has it: one short line instead of the long one
     for (const k of ['awake', 'asleep', 'archived']) if (n[k]) { const chip = el('span', CHIP[k]); chip.append(dot(), `${n[k]} ${k}`); box.append(say('inbox-st-sep', '\u00b7'), chip); }
     box.append(say('inbox-st-sep', '\u00b7'), say('inbox-st-rest', 'Longest waiting first \u00b7 rows clear automatically once the agent acts'));
     return box;

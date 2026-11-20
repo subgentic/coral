@@ -83,7 +83,7 @@ export function updateInboxTab() {
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
     const reviewCount = reviewAttentionCount();
     const n = needsCount(reviewCount.value); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
-    const text = n > 9 ? '9+' : n > 0 ? `${n}${reviewCount.complete ? '' : '+'}` : ''; // "5", or "5+" when more are not read yet: the same number as the title, the strip and the sidebar (#17450) // two characters at most: the pill fits the tabs' own 24 px gap, so the gap after Inbox is the same as the others (#9821); the exact count is in the tab's name
+    const text = n > 99 ? '99+' : n > 0 ? `${n}${reviewCount.complete ? '' : '+'}` : ''; // "5", or "5+" when more are not read yet: the same number as the title, the strip and the sidebar (#17450)
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).
     if (badge.textContent !== text) badge.textContent = text;

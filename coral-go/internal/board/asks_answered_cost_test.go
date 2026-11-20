@@ -38,7 +38,7 @@ func TestAnsweredAsksOfCostIsIndependentOfTheNumberOfQuestions(t *testing.T) {
 		}
 		count := countQueries(t, s, path)
 		origRead := s.readDB
-		s.readDB = nil // reads go through the counted connection
+		s.readDB = nil                         // reads go through the counted connection
 		defer func() { s.readDB = origRead }() // so Close closes the pool it opened
 		before := count.Load()
 		got, err = s.AnsweredAsksOf(ctx, "team", OperatorName, time.Now(), limit)
