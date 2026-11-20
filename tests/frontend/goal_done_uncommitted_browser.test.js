@@ -47,9 +47,20 @@ const B = 'goal-done-unc-' + Date.now().toString(36);
         const rows = await doneRows();
         assert.match(rows[0].text, /3 files in shop not committed/, 'the row says the folder has files not committed: ' + rows[0].text);
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
-        await waitFor(`!!document.querySelector('.goal-uncommitted .team-uncommitted-words')`, 'the line on the goal page', 10000);
-        assert.equal(await ev(`document.querySelector('.goal-uncommitted .team-uncommitted-words').textContent`), 'Files changed in shop, not committed: 2 changed, 1 new');
-        assert.ok(await ev(`!!document.querySelector('.goal-uncommitted .team-uncommitted-review') && !!document.querySelector('.goal-uncommitted .team-uncommitted-commit')`), 'Review changes and Commit are there');
+        // Goal updates replace this box. Capture one complete render in the wait's
+        // evaluation, so a redraw cannot split the words from their buttons.
+        await waitFor(`(() => {
+            const box = document.querySelector('.goal-uncommitted');
+            const words = box?.querySelector('.team-uncommitted-words');
+            const review = box?.querySelector('.team-uncommitted-review');
+            const commit = box?.querySelector('.team-uncommitted-commit');
+            if (!words || !review || !commit) return false;
+            window.__goalUncommittedSnapshot = { words: words.textContent, review: !!review, commit: !!commit };
+            return true;
+        })()`, 'the goal page words and both uncommitted actions', 10000);
+        const uncommitted = await ev('window.__goalUncommittedSnapshot');
+        assert.equal(uncommitted.words, 'Files changed in shop, not committed: 2 changed, 1 new');
+        assert.ok(uncommitted.review && uncommitted.commit, 'Review changes and Commit are there');
         console.log('\nPASS a goal that looks done: the Needs you row and the goal page say work is left uncommitted, with Review changes and Commit');
     } finally { await guard.restore().catch(() => {}); await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
