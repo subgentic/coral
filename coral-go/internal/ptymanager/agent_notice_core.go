@@ -352,13 +352,14 @@ func decideWinText(src procSource, root int, rec winProc, recorded bool) (bool, 
 }
 
 // Reading the terminal's processes can fail for a moment while programs start and end below the agent (a snapshot taken mid-change, a handle
-// refused for an instant): one failed read is not "the processes cannot be read". textReadTries fresh reads are taken, textReadGap apart, and the
+// refused for an instant): one failed read is not "the processes cannot be read". textReadTries fresh reads are taken, textReadGaps apart, and the
 // text is refused as unreadable only when every one fails (#470).
-// Five reads 20 ms apart (80 ms), not three 10 ms apart: the fourth head of trial-250 on Windows got one "unreadable" in 100 sends from a runner that stalled the shell's handle for longer.
-const (
-	textReadTries = 5
-	textReadGap   = 20 * time.Millisecond
-)
+// The gaps grow (10 ms doubling to 320 ms, 630 ms in all, seven reads): a stall that is over in a few ms is retried at once, a longer one still gets read. Five reads 20 ms apart (80 ms) failed once in 100 sends on a
+// stalled runner, in trial-250 and again in windows-tests on f70a9052d5 (#20097). Only a failing read waits, so a healthy send costs nothing more; every read failing is still refused (fail closed).
+var textReadGaps = [...]time.Duration{10 * time.Millisecond, 20 * time.Millisecond, 40 * time.Millisecond, 80 * time.Millisecond, 160 * time.Millisecond, 320 * time.Millisecond}
+
+// textReadTries is the number of fresh reads: the first, then one after each gap.
+const textReadTries = len(textReadGaps) + 1
 
 // textRefusedWithRetry is decideWinText on a fresh read of the processes (newSrc), retried while the read fails or the terminal's own shell
 // cannot be read; any other answer stands at once. A refusal because a program below the agent reads the terminal is checked once more in a
@@ -367,7 +368,7 @@ func textRefusedWithRetry(newSrc func() (procSource, error), root int, rec winPr
 	var lastErr error
 	for try := 0; try < textReadTries; try++ {
 		if try > 0 {
-			time.Sleep(textReadGap)
+			time.Sleep(textReadGaps[try-1])
 		}
 		src, err := newSrc()
 		if err != nil {
