@@ -26,11 +26,13 @@ export const rows = (sentBack = new Set()) => items.filter(it => !dismissed.has(
 /** What the agent-state reader takes: the agent's name, its session and its team. */
 export const refOf = it => ({ produced_by: it.agent?.name || '', session_id: it.agent?.session_id || '', team: it.board || '' });
 export const failedToRead = () => failed;
+/** What the mock adds after the agent's state on a sent comment: the file's version and the thread's number ("Archived · version 2 · Thread #688"). */
+export const commentTail = it => it.kind === 'comment_sent' ? [it.artifact?.version ? `version ${it.artifact.version}` : '', Number.isInteger(it.thread_id) ? `Thread #${it.thread_id}` : ''].filter(Boolean).join(' \u00b7 ') : '';
 export const wordsOf = it => it.operator_words ? `${it.kind === 'answered_ask' ? 'Your answer' : 'You commented'}: “${String(it.operator_words).replace(/\s+/g, ' ').trim()}”` : '';
 // the second tab's own kinds: known to the filter (a pill, a saved choice), labelled, and drawn as an ask's and a file's icon
 KINDS.push('answered_ask', 'comment_sent'); Object.assign(KIND_LABEL, { answered_ask: 'Answered ask', comment_sent: 'Comment sent' }); Object.assign(KIND_ART, { answered_ask: 'ask', comment_sent: 'review' });
 /** The title line: the ask's question, or the file or goal the Operator commented on. */
-export const titleOf = it => String(it.title || (it.kind === 'comment_sent' && it.artifact && it.artifact.name ? `Comment on ${it.artifact.name}` : '') || (it.artifact && it.artifact.name) || (it.goal && it.goal.title) || (it.kind === 'answered_ask' ? 'A question' : 'A comment')); // the mock's title of a sent comment: Comment on <file> (walk #20067)
+export const titleOf = it => String(it.title || (it.kind === 'comment_sent' ? (it.artifact && it.artifact.name ? `Comment on ${it.artifact.name}` : it.goal && it.goal.title ? `Comment on ${it.goal.title}` : '') : '') || (it.artifact && it.artifact.name) || (it.goal && it.goal.title) || (it.kind === 'answered_ask' ? 'A question' : 'A comment')); // the mock's title of a sent comment: Comment on <file> (walk #20067)
 
 /** Read the list (at most every 30 seconds unless forced); `onChange` draws the Inbox again when the answer differs. A computer that cannot answer (a Hub-viewed Coral, an old server) is an error line, not an empty tab. */
 export function load({ force = false, onChange = null } = {}) {
