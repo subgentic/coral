@@ -13,6 +13,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// unicodeString is the native UNICODE_STRING; Go lays it out with the pointer at its own alignment (offset 8 on 64-bit, 4 on 32-bit), as the system does.
+type unicodeString struct {
+	Length, MaximumLength uint16
+	Buffer                uintptr
+}
+
 var procNtQueryObject = windows.NewLazySystemDLL("ntdll.dll").NewProc("NtQueryObject")
 
 // handleTypes counts this process's open handles by object type (Event, Thread, File, Process, Job, ...). It exists for a failing handle test:
@@ -29,13 +35,17 @@ func handleTypes() map[string]int {
 		if r != 0 { // an NTSTATUS that is not success: not a handle (or one that cannot be asked)
 			continue
 		}
-		// the answer starts with a UNICODE_STRING: Length, MaximumLength, then the pointer to the characters (inside buf)
-		length := *(*uint16)(unsafe.Pointer(&buf[0]))
-		ptr := *(*unsafe.Pointer)(unsafe.Pointer(&buf[8]))
-		if length == 0 || ptr == nil {
+		// the answer starts with a UNICODE_STRING (Length, MaximumLength, Buffer): its characters must lie inside buf, or the entry is skipped; they are read as bytes of buf, never through the pointer
+		us := (*unicodeString)(unsafe.Pointer(&buf[0]))
+		start := uintptr(unsafe.Pointer(&buf[0]))
+		if us.Length == 0 || us.Length%2 != 0 || us.Buffer < start+unsafe.Sizeof(*us) || us.Buffer-start > uintptr(len(buf)) || uintptr(us.Length) > uintptr(len(buf))-(us.Buffer-start) {
 			continue
 		}
-		out[windows.UTF16ToString(unsafe.Slice((*uint16)(ptr), length/2))]++
+		off, chars := int(us.Buffer-start), make([]uint16, us.Length/2)
+		for i := range chars {
+			chars[i] = uint16(buf[off+2*i]) | uint16(buf[off+2*i+1])<<8
+		}
+		out[windows.UTF16ToString(chars)]++
 	}
 	return out
 }
@@ -47,7 +57,9 @@ func describeHandles() string {
 	for k := range types {
 		names = append(names, k)
 	}
-	sort.Slice(names, func(i, j int) bool { return types[names[i]] > types[names[j]] || types[names[i]] == types[names[j]] && names[i] < names[j] })
+	sort.Slice(names, func(i, j int) bool {
+		return types[names[i]] > types[names[j]] || types[names[i]] == types[names[j]] && names[i] < names[j]
+	})
 	parts := make([]string, 0, len(names))
 	for _, k := range names {
 		parts = append(parts, fmt.Sprintf("%s=%d", k, types[k]))
@@ -62,7 +74,9 @@ func TestHandleTypesCountsAnOpenHandleByType(t *testing.T) {
 	assert.NoError(t, err)
 	defer windows.CloseHandle(ev)
 	after := handleTypes()
-	assert.GreaterOrEqual(t, after["Event"], before["Event"]+1, "at least one more Event (the runtime may open its own too): %s", describeHandles())
+	if after["Event"] < before["Event"]+1 { // the message scans the handles again, so it is built only on a failure
+		assert.Fail(t, "at least one more Event (the runtime may open its own too)", describeHandles())
+	}
 	total := 0
 	for _, n := range after {
 		total += n
