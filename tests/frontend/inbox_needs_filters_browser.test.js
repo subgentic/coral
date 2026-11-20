@@ -15,6 +15,8 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings');
             await ev(`localStorage.removeItem('coral-inbox-needs-filters'); true`);
+            // the stand-in agents would count as welcome steps done and the page would save that (inbox_welcome_done) to the shared server: this suite is about filters, so the welcome is off on this page only, nothing saved (#19980)
+            await ev(`import(${S} + 'state.js').then(({ state }) => { state.settings = { ...state.settings, inbox_welcome: 'off' }; return true; })`);
             await ev(`(async () => { window.__m.agents = {}; window.__m.add('perm-bot', 'A', 1, { sleeping: false, board_project: 'alpha-team' }); window.__m.add('ask-bot', 'B', 1, { sleeping: false, board_project: 'beta-team' }); const ws = await import(${S} + 'websocket.js'); const { state } = await import(${S} + 'state.js'); if (state.coralWs) { state.coralWs.onclose = null; state.coralWs.onmessage = null; try { state.coralWs.close(); } catch {} }
                 const sessions = Object.values(window.__m.agents).map(a => ({ ...window.__m.entry(a), waiting_for_input: true, waiting_kind: /perm/.test(a.name) ? 'permission' : 'question', waiting_summary: /perm/.test(a.name) ? 'Wants to use Bash' : 'Wants to know: Pick a color', waiting_since: new Date(Date.now() - 60000).toISOString() }));
                 ws.handleCoralMessage({ type: 'coral_update', servers: [], sessions }); return true; })()`);
