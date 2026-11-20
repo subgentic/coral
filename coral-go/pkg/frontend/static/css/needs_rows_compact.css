@@ -202,7 +202,8 @@
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-archived { color: var(--error-text); background: rgba(var(--error-rgb), 0.12); border-color: rgba(var(--error-rgb), 0.30); }
 :root .inbox-folder-toolbar .inbox-needs-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
 @media (max-width: 767px) { /* a phone: the tabs sit right under the search, More beside them, the words not broken */
-  :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { order: 0; flex: 1 1 calc(100% - 5rem); gap: 14px; }
+  :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { order: 0; flex: 1 1 100%; gap: 14px; }
+  :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .needs-more { order: 3; } /* the tabs have the top line to themselves; More joins Kind, the filters and Select under them, as the mock draws it (#19904) */
   :root .inbox-folder-toolbar .inbox-needs-tab { font-size: var(--fs-sm); min-width: 0; max-width: 100%; text-align: left; } /* at 200% text a tab's words wrap inside the screen, never past it */
   :root .inbox-folder-toolbar .inbox-needs-tabs { flex-wrap: wrap; row-gap: 0; }
 }
@@ -260,4 +261,9 @@
   :root #group-table-view .inbox-folder-toolbar:has(.inbox-needs-tabs) { padding-bottom: 0; } /* no empty room is kept under the filters: the count line sits right under them as in the mock (#19904) */
   :root #group-table-view .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .inbox-needs-tabs) { position: relative; }
   :root #group-table-view .inbox-folder-toolbar .list-bar-search-row.gt-toolbar.tb-low:has(> .inbox-needs-tabs) > .team-tb-selection { position: absolute; inset-inline: 0; top: 100%; margin-top: 6px; z-index: 25; } /* a ticked row's bulk bar lies over the count line instead of taking room of its own, so ticking moves no row (#15339) */
+}
+:root #group-table-view .inbox-needs-results .inbox-agent-status .inbox-st-short { display: none; }
+@media (max-width: 639px) {
+  :root #group-table-view .inbox-needs-results .inbox-agent-status > :not(.inbox-st-short) { display: none; }
+  :root #group-table-view .inbox-needs-results .inbox-agent-status .inbox-st-short { display: inline; }
 }
