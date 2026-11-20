@@ -29,6 +29,9 @@ import (
 func TestGdocShareIsOffByDefaultRefusesWhileOffAndReportsItsState(t *testing.T) {
 	cfg := config.Load(t.TempDir())
 	_, h, _, ss := setupSessionsTestServerWithConfig(t, cfg)
+	oldConn := gdocConnected
+	gdocConnected = func() bool { return false } // never the real keychain in a test
+	t.Cleanup(func() { gdocConnected = oldConn })
 	r := chi.NewRouter()
 	h.RegisterGdocShare(r)
 	srv := httptest.NewServer(r)
@@ -151,12 +154,13 @@ func newGdocRig(t *testing.T, on bool) *gdocRig {
 	drive := &gdocStandIn{}
 	ds := httptest.NewServer(drive)
 	t.Cleanup(ds.Close)
-	oldClient, oldMac := gdocClientFor, gdocMac
+	oldClient, oldMac, oldConn := gdocClientFor, gdocMac, gdocConnected
+	gdocConnected = func() bool { return true }
 	gdocClientFor = func() (*gdocsync.Client, error) {
 		return gdocsync.NewClientAt(ds.URL, func() (string, error) { return "tok-SECRET-123", nil }), nil
 	}
 	gdocMac = func() bool { return true }
-	t.Cleanup(func() { gdocClientFor, gdocMac = oldClient, oldMac })
+	t.Cleanup(func() { gdocClientFor, gdocMac, gdocConnected = oldClient, oldMac, oldConn })
 	if on {
 		require.NoError(t, ss.SetSetting(context.Background(), setreg.GdocShare, "true"))
 	}
@@ -290,4 +294,36 @@ func TestANewVersionOfASharedSeriesPatchesTheSameDocWithOnlyTheChange(t *testing
 	links, err := g.h.loadGdocLinks()
 	require.NoError(t, err)
 	assert.Equal(t, gdocV2, links[sid].Digest, "the link remembers the version last sent")
+}
+
+func (g *gdocRig) status(t *testing.T, id string, hdr map[string]string) map[string]any {
+	t.Helper()
+	req, _ := http.NewRequest("GET", g.srv.URL+"/api/gdoc/status?id="+id, nil)
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var out map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	return out
+}
+
+// Slice A (#20010): the share dialog asks the status for the file: switch, sign-in kept, and (the Operator's alone) whether it is shared and where.
+func TestTheStatusSaysIfAFileIsSharedAndWhereOnlyToTheOperator(t *testing.T) {
+	g := newGdocRig(t, true)
+	g.artifact(t, gdocV1, "plan.md", "text/markdown", "# Plan\n\nOne.\n")
+	out := g.status(t, gdocV1, nil)
+	assert.Equal(t, true, out["enabled"])
+	assert.Equal(t, true, out["connected"])
+	assert.Nil(t, out["shared"], "not shared yet")
+	status, shared, raw := g.share(t, gdocV1)
+	require.Equal(t, 200, status, raw)
+	out = g.status(t, gdocV1, nil)
+	assert.Equal(t, true, out["shared"])
+	assert.Equal(t, shared["url"], out["url"])
+	agent := g.status(t, gdocV1, map[string]string{"X-Coral-Session-Token": "an-agent-token"})
+	assert.Nil(t, agent["shared"], "an agent is not told which Doc a file is in")
+	assert.Nil(t, agent["url"])
 }

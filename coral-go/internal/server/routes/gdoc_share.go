@@ -56,10 +56,34 @@ func (h *SessionsHandler) requireGdocShare(next http.Handler) http.Handler {
 
 // RegisterGdocShare adds the Google Doc share routes (#19996). The status route answers either way; the rest sit behind the switch.
 func (h *SessionsHandler) RegisterGdocShare(r chi.Router) {
-	r.Get("/api/gdoc/status", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"enabled": h.gdocShareOn(r)})
-	})
+	r.Get("/api/gdoc/status", h.gdocStatus)
 	r.With(h.requireGdocShare).Post("/api/artifacts/{id}/gdoc/share", h.shareToGdoc)
+}
+
+// gdocConnected says whether a Google sign-in is stored on this computer (no network call, nothing read out); a test replaces it.
+var gdocConnected = func() bool { _, err := gdocsync.LoadCreds(gdocAccount); return err == nil }
+
+// gdocStatus: GET /api/gdoc/status[?id=<artifact>]. Whether the switch is on and a sign-in is kept here, and, for the Operator alone and an artifact asked about, whether it is shared
+// and the address of its Doc. An agent's call gets neither: no agent learns which Doc a file is in.
+func (h *SessionsHandler) gdocStatus(w http.ResponseWriter, r *http.Request) {
+	out := map[string]any{"enabled": h.gdocShareOn(r)}
+	if out["enabled"] == true {
+		out["connected"] = gdocMac() && gdocConnected()
+		if id := r.URL.Query().Get("id"); id != "" && validArtifactID(id) && !isAgentCaller(r) {
+			key := id
+			if sid, _, in := callerSeries(r, h.cfg.CoralDir(), id); in {
+				key = sid
+			}
+			gdocLinksMu.Lock()
+			links, err := h.loadGdocLinks()
+			gdocLinksMu.Unlock()
+			if l, ok := links[key]; err == nil && ok {
+				out["shared"] = true
+				out["url"] = "https://docs.google.com/document/d/" + l.DocID + "/edit"
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // shareToGdoc: POST /api/artifacts/{id}/gdoc/share (the owner's; flag-gated). The first share makes a Google Doc from the artifact's Markdown; sharing a later version of the same
@@ -106,6 +130,10 @@ func (h *SessionsHandler) shareToGdoc(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
+	if _, err := c.TokenFunc(); err != nil { // the keychain read (and a refresh) happens before the lock, so a slow one blocks no other share
+		writeError(w, http.StatusBadGateway, "gdoc_failed", "Google Docs is not signed in on this computer. Sign in and try again.")
+		return
+	}
 	gdocLinksMu.Lock()
 	defer gdocLinksMu.Unlock()
 	links, err := h.loadGdocLinks()

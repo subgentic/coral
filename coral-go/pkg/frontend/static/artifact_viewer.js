@@ -175,6 +175,7 @@ function _build() {
                     <button type="button" class="menu-item artifact-viewer-fullscreen-item" role="menuitem">Full screen</button>
                     <a class="menu-item artifact-viewer-newtab" role="menuitem" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
                     <button type="button" class="menu-item artifact-viewer-dropbox-share" role="menuitem" hidden>Share via Dropbox…</button>
+                    <button type="button" class="menu-item artifact-viewer-gdoc-share" role="menuitem" hidden>Share to Google Docs…</button>
                     <a class="menu-item artifact-viewer-download" role="menuitem" rel="noopener noreferrer" download>Download</a>
                 </div>
             </span>
@@ -195,6 +196,7 @@ function _build() {
      // Details is a button in the header row, beside ⋯: where a person looks to close it (#12725) header row (#12223)
     // the HTML preview's banner is said once; after that a "Sandboxed" chip in the header says it, and a tap shows or hides the banner (#12224)
     d.querySelector('.artifact-viewer-dropbox-share').addEventListener('click', e => { const b = e.currentTarget; importOnce('./dropbox_share.js').then(m => m.openShareDialog({ hex: b.dataset.hex, filename: b.dataset.name, opener: d.querySelector('.artifact-viewer-more') })).catch(() => {}); }); // Share via Dropbox (#14944): the dialog loads on the press
+    d.querySelector('.artifact-viewer-gdoc-share').addEventListener('click', e => { const b = e.currentTarget; importOnce('./gdoc_share.js').then(m => m.openGdocDialog({ hex: b.dataset.hex, filename: b.dataset.name, opener: d.querySelector('.artifact-viewer-more') })).catch(() => {}); }); // Share to Google Docs (#20010, A): next to Dropbox; the dialog loads on the press
     d.querySelector('.artifact-viewer-copyid-item').addEventListener('click', e => { const id = e.currentTarget.dataset.fileId; copyFileId({ file_id: id }, showToast); }); // the menu closes itself on a choice // Copy file ID: the id alone; a failed copy says so (#14178)
     const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
     chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
@@ -491,6 +493,8 @@ export function openArtifactViewer(hex, opts = {}) {
     newTab.hidden = true; newTab.removeAttribute('href');
     const share = d.querySelector('.artifact-viewer-dropbox-share'); share.hidden = true; share.dataset.hex = hex; share.dataset.name = opts.filename || '';
     if (opts.server === 'local' && !isCloud()) dropboxConnected().then(on => { if (on && share.dataset.hex === hex) share.hidden = false; }); // this computer's file, Dropbox connected (#14944) // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open
+    const gshare = d.querySelector('.artifact-viewer-gdoc-share'); gshare.hidden = true; gshare.dataset.hex = hex; gshare.dataset.name = opts.filename || '';
+    if (opts.server === 'local' && !isCloud() && (/^text\/markdown/.test(String(opts.mediaType || '')) || /\.md$/i.test(String(opts.filename || '')))) importOnce('./gdoc_share.js').then(m => m.gdocOffered()).then(on => { if (on && gshare.dataset.hex === hex) gshare.hidden = false; }).catch(() => {}); // the experimental switch is on, a Markdown file on this computer
     d.classList.remove('is-image');
     dl.href = url;
     dl.hidden = false; // a manifest may have hidden it (below): this artifact is not that one
@@ -545,7 +549,7 @@ export function openArtifactViewer(hex, opts = {}) {
     // Every open sets the line afresh: a caller's valid id and line (bound to its hex, computer and team), else NONE. An earlier open's line never survives into one that carries none (the same digest from another team, a plain reopen).
     _line = !opts.openLatest && fileIdOf({ file_id: opts.fileId }) && opts.versionLine ? { hex: opts.lineHex, fileId: opts.fileId, versionLine: opts.versionLine } : null; // openLatest: the caller's line is for the row's version, not the newest; the bar will set _barLine with the shown version's line (#16737)
     paintLine(d); syncMeta();
-    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); _details.add(dropboxBlock(hex, opts.server, _details)); importOnce('./artifact_gdoc.js').then(m => _details.add(m.gdocBlock(hex, opts.server, _details, { name: opts.filename || '', mediaType: opts.mediaType || '' }))).catch(() => {}); /* share to a Google Doc (#19996): the experimental switch, the owner's alone; lazy */ } }).catch(() => {});
+    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); if (opts.sourceNamed) _details.add(privateBlock(hex, opts.server, _details)); _details.add(dropboxBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     const scrollBack = _restore; _restore = null; // the scroll of the document we came Back to
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
@@ -599,7 +603,7 @@ export async function openBundledDocument({ title, url, name, onOpened }) {
     _hex = ''; _lastOpts = {}; _line = null; _barLine = null; _layoutType = null;
     leaveTrail(); showTrail(d);
     _versions?.close(); _review?.close(); _comments?.close(); _details.clear();
-    for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-dropbox-share', '.artifact-viewer-source', '.artifact-viewer-snapshot', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
+    for (const sel of ['.artifact-edit-send-action', '.artifact-viewer-edit', '.artifact-viewer-edit-item', '.artifact-viewer-markup', '.artifact-viewer-markup-item', '.artifact-viewer-newtab', '.artifact-viewer-dropbox-share', '.artifact-viewer-gdoc-share', '.artifact-viewer-source', '.artifact-viewer-snapshot', '.artifact-viewer-from']) { const el = d.querySelector(sel); if (el) el.hidden = true; }
     d.querySelector('.artifact-edit-send-note').hidden = true;
     setContentPending(d, false);
     d.classList.remove('is-image');

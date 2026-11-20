@@ -45,8 +45,18 @@ func (h *SessionsHandler) saveGdocLinks(links map[string]gdocLink) error {
 		return err
 	}
 	path := h.gdocLinksPath()
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	f, err := os.CreateTemp(filepath.Dir(path), "gdoc_links-*.tmp") // an unpredictable name, 0600
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
 		return err
 	}
 	return fsreplace.Rename(tmp, path)

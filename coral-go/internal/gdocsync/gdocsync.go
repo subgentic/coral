@@ -84,6 +84,9 @@ func NewClient(tok func() (string, error)) *Client { return &Client{TokenFunc: t
 
 // NewClientAt is a client for a Drive and Docs stand-in at base (another package's tests): it answers for both hosts and never sleeps between retries.
 func NewClientAt(base string, tok func() (string, error)) *Client {
+	if u, err := url.Parse(base); err != nil || (u.Hostname() != "127.0.0.1" && u.Hostname() != "localhost") {
+		panic("gdocsync: NewClientAt is for a stand-in on this computer (127.0.0.1 or localhost) only") // a token must never be sent to another host through this door
+	}
 	return &Client{base: base, TokenFunc: tok, Sleep: func(time.Duration) {}}
 }
 

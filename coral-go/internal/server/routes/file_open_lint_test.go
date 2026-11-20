@@ -28,7 +28,6 @@ var reviewedFileOpens = map[string]string{
 	"schedule_init_repo_files.go:indexSnapshot.restore:WriteFile":         "writes that same index back (the path git printed, 0644 as git makes it) when staging failed, so the folder is as it was (#17211, #17487); the person's own repository, not a name a request or an agent supplies",
 	"hub_dropbox.go:HubDropbox.readFile:OpenNoFollow":                     "the artifact the Hub asked to back up (#16109): <coral dir>/artifacts/objects/<digest>, the digest a 64-hex word checked before the path is made (never a request path), opened once without following a link, regular file, at most 64 MiB, and the bytes must hash to the digest before any is sent",
 	"gdoc_links.go:SessionsHandler.loadGdocLinks:ReadFile":                "<coral dir>/gdoc_links.json: a fixed name in the server's own data folder, the Doc links the owner's share wrote (#19996); no request path",
-	"gdoc_links.go:SessionsHandler.saveGdocLinks:WriteFile":               "that same fixed file's temp name in the server's data folder, 0600, then renamed over it (#19996); no request path",
 	"artifact_prune_diffs.go:SessionsHandler.shrinkDiffs:ReadFile":        "server data folder; object names match objectNameRe",
 	"artifact_prune_scan.go:recordTime:ReadFile":                          "server data folder (a sidecar the server wrote)",
 	"artifact_prune_scan.go:scanKnowledgeReferences:Open":                 "server data folder (agent_knowledge), regular files only",

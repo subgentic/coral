@@ -46,7 +46,9 @@ func StoreCreds(account string, c Creds) error {
 // LoadCreds reads them back.
 func LoadCreds(account string) (Creds, error) {
 	var c Creds
-	out, err := exec.Command("security", "find-generic-password", "-a", account, "-s", keychainService, "-w").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second) // a locked or stuck keychain must not hold a request for ever
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "security", "find-generic-password", "-a", account, "-s", keychainService, "-w").Output()
 	if err != nil {
 		return c, errors.New("gdocsync: no sign-in stored in the keychain for " + account)
 	}

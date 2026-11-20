@@ -91,6 +91,7 @@ GET /api/board/{project}/waits/poll | board-claims
 GET /api/board/{project}/working-mode | board-claims
 GET /api/board/{project}/working-mode/presets | board-claims
 GET /api/filesystem/trust-probe | token-session | operator-only
+GET /api/gdoc/status | token-session
 GET /api/goals | token-session | operator-only
 GET /api/launch-disclosure | token-session | operator-only
 GET /api/needs-you | token-session | operator-only

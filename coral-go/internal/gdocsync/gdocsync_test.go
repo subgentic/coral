@@ -362,3 +362,13 @@ func TestDocsCallsGoToTheDocsHostAndDriveCallsToTheDriveHost(t *testing.T) {
 	nc.base = "http://127.0.0.1:1" // a test server answers for both
 	assert.Equal(t, "http://127.0.0.1:1", nc.hostFor("/v1/documents/abc"))
 }
+
+// Security's SHOULD 6 on #20008: the stand-in door sends a token only to this computer.
+func TestNewClientAtRefusesAnyHostButThisComputer(t *testing.T) {
+	tok := func() (string, error) { return "t", nil }
+	assert.NotPanics(t, func() { NewClientAt("http://127.0.0.1:1234", tok) })
+	assert.NotPanics(t, func() { NewClientAt("http://localhost:1234", tok) })
+	for _, base := range []string{"https://docs.googleapis.com", "http://example.com", "http://127.0.0.1.evil.com", "::bad"} {
+		assert.Panics(t, func() { NewClientAt(base, tok) }, base)
+	}
+}
