@@ -178,7 +178,7 @@ const { coralReady } = require('./helpers/wait');
                     // #13916: Request changes keeps the document visible, waiting on the agent and uncounted; a new version returns it to active review.
                     const needsCount = () => ev(`parseInt(document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count')?.textContent || '0', 10)`);
                     await ev(`document.querySelector('[data-needs-tab="agent"]').click(); true`); // the sent-back file is on Waiting on an agent (#19904)
-                    await waitFor(`!!(${row('Review file 01.txt')}) && /Sent back · waiting on/.test((${row('Review file 01.txt')}).textContent) && (${row('Review file 01.txt')}).classList.contains('dt-read')`,'after Request changes the file remains visible and uncounted',8000);
+                    await waitFor(`!!(${row('Review file 01.txt')}) && /Sent back[\s\S]*Waiting on/.test((${row('Review file 01.txt')}).textContent) && (${row('Review file 01.txt')}).classList.contains('dt-read')`,'after Request changes the file remains visible and uncounted',8000);
                     // #11860 (Beta #8): the viewer reloads itself after the request, and that reload is not a new opening: the file is not marked read again
                     await require('./helpers/wait').settle(ev, 400, 300);
                     assert.equal(await ev(`window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}').tags.includes('read')`),false,'Request changes leaves the file unread: the viewer reloading does not read it again: ' + await ev(`JSON.stringify(window.__reviewWrites)`));

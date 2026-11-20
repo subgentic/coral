@@ -59,7 +59,7 @@ const { coralReady } = require('./helpers/wait');
                 await tab('agent'); await waitFor(`!!(${row('Sent back file.txt')})&&!${row('Quiet file.txt')}`, 'the sent-back file is on Waiting on an agent, the other is not', 15000);
                 await waitFor(`(${row('Sent back file.txt')}).querySelector('.inbox-sent-back-ask') && !(${row('Sent back file.txt')}).querySelector('.inbox-sent-back-ask').hidden`, 'the request is read from the thread', 8000);
                 const sent = await info('Sent back file.txt');
-                assert.match(sent.chip || '', /^Sent back · waiting on Writer A$/, 'the chip names the state and the agent: ' + JSON.stringify(sent));
+                assert.match(sent.chip || '', /^Sent back$/, 'the chip names the state: ' + JSON.stringify(sent)); assert.equal(await ev(`/Waiting on Writer A/.test((${row('Sent back file.txt')}).textContent)`), true, 'and the meta line names the agent: Waiting on Writer A');
                 assert.ok(sent.chipWhole, 'and is not cut off');
                 assert.ok(width !== 1280 || !sent.forReview, 'the row no longer says For review in its line: ' + JSON.stringify(sent));
                 assert.notEqual(sent.primary, true, 'Approve is not the blue main button on a sent-back row (on Waiting on an agent it has no Approve at all, #19904)');

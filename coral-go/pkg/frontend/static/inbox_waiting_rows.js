@@ -24,10 +24,10 @@ export function make(env) {
         const name = DT.primaryButton(title, `Open ${title}`); name.classList.add('inbox-review-name'); name.setAttribute('aria-label', `Open ${title}, ${WA.KIND_WORD[it.kind]}, waiting on ${who}`);
         const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = agentLink(who.trim() || 'sender unknown', { board: boardTeamKey(LOCAL_SERVER, it.board || ''), cls: 'inbox-review-from' });
         const pills = WA.pills(it, { openGoal: (team, id) => go({ ...env.folderRoute, id: team, item: String(id) }), openTask: (team, id) => env.openItemRoute('tasks', team, String(id), `${team}#${id}`) });
-        const state = AW.stateNodes(s.agentRef, it.kind), line = [WA.chip(it, who), ...state, WA.quote(it)];
-        if (isPhoneLayout()) { wrap.append(sender, name); if (pills.childNodes.length) wrap.append(pills); wrap.append(DT.el('span', 'sr-only', ', waiting on agent, not counted'), ...line); return wrap; }
-        const meta = DT.el('span', 'inbox-meta'); meta.append(line[0], sender, ...(pills.childNodes.length ? [pills] : []));
-        wrap.append(name, meta, ...line.slice(1)); return wrap;
+        const state = AW.stateNodes(s.agentRef, it.kind, isPhoneLayout()), chipNode = isPhoneLayout() ? null : AW.stateChip(s.agentRef), line = [WA.chip(it, who), ...state, WA.quote(it)];
+        if (isPhoneLayout()) { wrap.append(sender, name); if (pills.childNodes.length) wrap.append(pills); wrap.append(DT.el('span', 'sr-only', `Waiting on ${who}, waiting on agent, not counted`), ...line); return wrap; }
+        const meta = DT.el('span', 'inbox-meta'); meta.append(line[0], AW.waitTarget(sender), ...(chipNode ? [chipNode] : []), ...(pills.childNodes.length ? [pills] : []));
+        wrap.append(name, line[line.length - 1], meta, ...line.slice(1, -1)); return wrap;
     }
     function waitItemActions(s) {
         const it = s.waitItem, ws = AW.agentWaitState(s.agentRef), title = markHidden(WA.titleOf(it), { strict: true }), team = boardTeamKey(LOCAL_SERVER, it.board || ''), box = DT.el('div', 'inbox-review-actions inbox-slots'), menu = [];

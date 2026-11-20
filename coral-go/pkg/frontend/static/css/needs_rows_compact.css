@@ -98,7 +98,7 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-blocks.inbox-blocks-closes::before { content: 'flag'; }
 
 /* The meta strip (#19812): its pieces are told apart by a dot, the version is shown once, a report from Coral wears a tinted kind label; Save and Star carry a small mark; a file's tile shows its type. */
-:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta > :not(:first-child, .inbox-pills, .inbox-review-version)::before { content: '·'; margin-inline-end: 6px; color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta > :not(:first-child, .inbox-pills, .inbox-review-version, .inbox-wait-target, .inbox-wait-state)::before { content: '·'; margin-inline-end: 6px; color: var(--text-muted); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind { color: var(--text-secondary); font-weight: var(--fw-medium); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind:is(.inbox-kind-done, .inbox-kind-release, .inbox-kind-decided, .inbox-kind-digest) { padding: 0 7px; border-radius: var(--radius-sm); font-weight: var(--fw-strong); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind-done { background: var(--needs-icon-green-bg); color: var(--needs-icon-green-fg); }
@@ -189,10 +189,12 @@
 :root .inbox-folder-toolbar .inbox-needs-tab.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
 :root .inbox-folder-toolbar .inbox-needs-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 /* Waiting on an agent rows (#19904): the agent's state after the chip; an asleep agent is amber with Wake, an archived one rose with Start agent; an awake one stays quiet. */
-:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state { font-size: var(--fs-sm); color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-xs, 0.72rem); font-weight: var(--fw-strong); white-space: nowrap; color: var(--success-text); background: rgba(var(--success-rgb), 0.12); border: 1px solid rgba(var(--success-rgb), 0.28); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line { grid-column: 3 / -1; font-size: var(--fs-md); color: var(--text-secondary); display: block; white-space: normal; overflow: visible; text-overflow: clip; }
-:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-asleep, :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep { color: var(--warning-text); }
-:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-archived, :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { color: var(--error-text); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep { color: var(--warning-text); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-asleep { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.14); border-color: rgba(var(--warning-rgb), 0.32); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { color: var(--error-text); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-archived { color: var(--error-text); background: rgba(var(--error-rgb), 0.12); border-color: rgba(var(--error-rgb), 0.30); }
 :root .inbox-folder-toolbar .inbox-needs-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
 @media (max-width: 767px) { /* a phone: the tabs sit right under the search, More beside them, the words not broken */
   :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { order: 0; flex: 1 1 calc(100% - 5rem); gap: 14px; }
@@ -227,3 +229,25 @@
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-goal { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; padding: 4px 10px; border-radius: var(--radius-sm); background: rgba(var(--success-rgb), 0.1); border: 1px solid rgba(var(--success-rgb), 0.28); font-size: var(--fs-sm); white-space: normal; }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-label { font-weight: var(--fw-strong); color: var(--success-text); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-text { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+
+/* mock v3 (#19904): the tab counts are pills, blue on the open tab, with the amber dot inside the agent tab's */
+:root .inbox-folder-toolbar .inbox-needs-tab-count { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-sm); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; color: var(--text-secondary); background: var(--bg-tertiary); border: 1px solid var(--border); }
+:root .inbox-folder-toolbar .inbox-needs-tab.is-on .inbox-needs-tab-count { color: var(--accent); background: rgba(var(--accent-rgb), 0.16); border-color: rgba(var(--accent-rgb), 0.36); }
+:root .inbox-folder-toolbar .inbox-needs-tab-count > .inbox-needs-tab-dot { width: 6px; height: 6px; }
+/* a row on Waiting on an agent: the quote box with the actions beside it, then the meta line (mock v3) */
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="agent"] > .inbox-review-item { display: grid; grid-column: 3 / -1; grid-row: 1 / span 5; grid-template-columns: subgrid; grid-template-rows: subgrid; align-items: start; gap: 0 var(--space-md, 8px); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-review-name { grid-column: 1 / 3; grid-row: 1; justify-self: start; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-sent-back-ask { grid-column: 1 / 3; grid-row: 2; margin-top: 4px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-meta { grid-column: 1 / 3; grid-row: 3; margin-top: 4px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-wait-line { grid-column: 1 / 3; grid-row: 4; margin-top: 6px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-review-item > .inbox-closes-goal { grid-column: 1 / 3; grid-row: 5; justify-self: start; margin-top: 6px; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="team"] { grid-row: 1; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="waiting"] { grid-row: 1; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) > td[data-key="review"] { grid-column: 5 / -1; grid-row: 2; align-self: start; padding: 4px 0 0; justify-content: flex-end; flex-wrap: nowrap; }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-wait-target { color: var(--text-secondary); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-wait-target > * { color: var(--text-primary); font-weight: var(--fw-strong); }
+:root #group-table-view .inbox-needs-results tr.inbox-card-tr:has(.inbox-sent-back) .inbox-open-agent { display: inline-flex; align-items: center; }
+/* the empty state of Waiting on an agent: a clock tile in the accent, as the mock draws it */
+:root #group-table-view[data-group="hub-inbox:needs"]:has(.inbox-needs-tab.is-on:last-of-type) .empty-state:has(> .empty-state-line + .empty-state-hint + .empty-state-hint > .btn)::before { background: rgba(var(--accent-rgb), 0.12); border-color: rgba(var(--accent-rgb), 0.26); }
+:root #group-table-view[data-group="hub-inbox:needs"]:has(.inbox-needs-tab.is-on:last-of-type) .empty-state:has(> .empty-state-line + .empty-state-hint + .empty-state-hint > .btn)::after { background: var(--accent); }
+:root #group-table-view[data-group="hub-inbox:needs"]:has(.inbox-needs-tab.is-on:last-of-type) .empty-state:has(> .empty-state-line + .empty-state-hint + .empty-state-hint > .btn) { --empty-ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='5.6'/%3E%3Cpath d='M8 4.9V8l2.1 1.3'/%3E%3C/svg%3E"); }

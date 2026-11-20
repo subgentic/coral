@@ -35,13 +35,23 @@ export function wakeButton(ws, kind = '') {
     return b;
 }
 
-/** What the row's line adds after "Sent back · waiting on X": the agent's state word, and for an inactive agent the sentence of what that means. */
-export function stateNodes(review, kind = '') {
+/** The agent's state as the mock's chip: a dot and "Awake · working", "Awake", "Asleep" or "Archived". null when Coral does not list the agent. */
+export function stateChip(review) {
     const ws = agentWaitState(review);
-    if (!ws.state) return [];
-    const word = el('span', `inbox-wait-state inbox-wait-${ws.state}`, STATE_WORD[ws.state]);
-    const line = stateLine(markHidden(ws.who || 'The agent', { strict: true }), ws.state, kind);
-    return line ? [word, el('span', `inbox-wait-line inbox-wait-${ws.state}`, line)] : [word];
+    if (!ws.state) return null;
+    const chip = el('span', `inbox-wait-state inbox-wait-${ws.state}`);
+    chip.append(el('span', 'inbox-st-dot', ''), STATE_WORD[ws.state] + (ws.state === 'awake' && ws.live?.working ? ' \u00b7 working' : ''));
+    return chip;
+}
+/** "Waiting on X": the words after the Sent back chip, the agent in bold (the mock's meta line). `agent` is the agent's name or link node. */
+export const waitTarget = agent => { const t = el('span', 'inbox-wait-target', 'Waiting on '); t.append(agent); return t; };
+
+/** What the row's line adds after the chip: the agent's state chip (unless the caller put it in the meta line) and, for an inactive agent, the sentence of what that means. */
+export function stateNodes(review, kind = '', withChip = true) {
+    const chip = stateChip(review);
+    if (!chip) return [];
+    const ws = agentWaitState(review), line = stateLine(markHidden(ws.who || 'The agent', { strict: true }), ws.state, kind);
+    return [...(withChip ? [chip] : []), ...(line ? [el('span', `inbox-wait-line inbox-wait-${ws.state}`, line)] : [])];
 }
 
 const cutName = s => { s = String(s); return s.length > 80 ? `${s.slice(0, 79)}\u2026` : s; }; // a long file name is cut at about 80 characters in the text sent to the agent

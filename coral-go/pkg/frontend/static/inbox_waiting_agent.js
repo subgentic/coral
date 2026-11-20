@@ -45,7 +45,7 @@ export const forget = () => { readAt = 0; };
 
 /** The chip: "Answered ask · waiting on X" / "Comment sent · waiting on X", in the sent-back chip's look. */
 export function chip(it, who) {
-    const c = document.createElement('span'); c.className = 'chip inbox-sent-back'; c.setAttribute('data-wait-kind', it.kind); c.textContent = `${KIND_WORD[it.kind]} · waiting on ${who}`;
+    const c = document.createElement('span'); c.className = 'chip inbox-sent-back'; c.setAttribute('data-wait-kind', it.kind); c.textContent = KIND_WORD[it.kind];
     c.title = it.kind === 'answered_ask' ? 'You answered the agent. It has not acted or replied since.' : 'You commented. The agent has not replied since.';
     return c;
 }
