@@ -191,6 +191,8 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
                 check((await ev(`document.querySelector('#group-table-view .inbox-answers').closest('tr').querySelector('td[data-key="agent"] > .inbox-row-words').textContent`)) === 'Wants to run a command', `${at}an unnamed tool: 'Wants to run a command'`);
                 await show(MENU({ target: ONE, title: 'PowerShell command' }), 2);
                 check((await ev(`document.querySelector('#group-table-view .inbox-answers').closest('tr').querySelector('td[data-key="agent"] > .inbox-row-words').textContent`)) === 'Wants to run a powershell command', `${at}a named tool is named`);
+                await show(MENU({ target: ONE, title: 'mcp__evil_server__run command' }), 2);
+                check((await ev(`document.querySelector('#group-table-view .inbox-answers').closest('tr').querySelector('td[data-key="agent"] > .inbox-row-words').textContent`)) === 'Wants to run a command', `${at}a name an MCP tool chose is not echoed (#20001)`);
                 await show(MENU({ target: ['npm run build', 'npm test -- --reporter=dot', 'git status --short'].join('\n') }), 2);
             }
             if (w >= 1000) { // #19941 (Operator, preview3): a 3-line command keeps Yes, No and More on ONE line with Claude's line at their left; 'Claude · folder' has its spaces; no dot after an empty field
