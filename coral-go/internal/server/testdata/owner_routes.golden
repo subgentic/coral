@@ -131,3 +131,4 @@ PUT /api/custom-models launch owner-only
 PUT /api/custom-modes launch owner-only
 PUT /api/teams/detail/{name}/daily-knowledge interact owner-only
 PUT /api/teams/detail/{name}/daily-knowledge/auto-apply interact owner-only
+GET /api/artifacts/{goal}/comments view owner-only

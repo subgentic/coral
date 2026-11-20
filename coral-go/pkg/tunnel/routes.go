@@ -270,6 +270,9 @@ var routeTable = cat(
 		"/api/artifacts/{hex64}/readers",
 		// The comments on an artifact (#5176): reads here; the owner's writes are the block below. Editing, deleting, the lock and sending a thread to an agent (#11354) are the owner's blocks further down; an agent's reply is unlisted (never).
 		"/api/artifacts/{hex64}/comments",
+		// A goal's thread (#20061, coral-hub's #253742): the same read for the key goal:<team>:<n> and no other ({goal} matches that shape only, never a digest or a diff: key). Its query is board and state, no series
+		// (routeQueries has its own shape). The stamped Hub owner is the owner kind for this read alone (ownerCommentRequest); a grantee, a viewer and the service stay refused. No write and no diff row are listed (never).
+		"/api/artifacts/{goal}/comments",
 		"/api/board/{project}/tasks/{id}/artifact-content",
 		"/api/board/{project}/artifacts",
 		"/api/session-artifacts",
@@ -632,7 +635,7 @@ var routeTable = cat(
 func shapeOf(method, pattern string) string {
 	segs := strings.Split(pattern, "/")
 	for i, sg := range segs {
-		if strings.HasPrefix(sg, "{") {
+		if strings.HasPrefix(sg, "{") && sg != "{goal}" { // {goal} keeps its name: the goal thread's read has its own query list (board and state, no series), not the artifact read's
 			segs[i] = "{}"
 		}
 	}
@@ -882,6 +885,9 @@ func RoutePatterns() []string {
 	return out
 }
 
+// goalKeyRe is a goal thread's subject key, goal:<team>:<n>, the shape the machine itself parses (goalSubjectRe in internal/server/routes): a team name as the board names have it, a positive number with no leading zero.
+var goalKeyRe = regexp.MustCompile(`^goal:[A-Za-z0-9][A-Za-z0-9_.-]{0,63}:[1-9][0-9]{0,9}$`)
+
 func splitSegments(p string) ([]string, bool) {
 	if !strings.HasPrefix(p, "/") || p == "/" {
 		return nil, false
@@ -903,6 +909,12 @@ func matchSegments(pattern string, segs []string) bool {
 	for i, ps := range pat {
 		if ps == "{hex64}" {
 			if !isHex64(segs[i]) {
+				return false
+			}
+			continue
+		}
+		if ps == "{goal}" {
+			if !goalKeyRe.MatchString(segs[i]) {
 				return false
 			}
 			continue
