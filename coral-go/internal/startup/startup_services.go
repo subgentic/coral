@@ -361,6 +361,15 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	})
 	safeGo(ctx, "task_reminders", func() { taskReminders.Run(ctx) })
 
+	// Custom health checks (#20137): only the ones the Operator approved run, each from its snapshot, and what they print reaches a member as Coral's notice.
+	customChecks := background.NewCustomChecks(srv.BoardStore(), agentRT, discoverFn)
+	customChecks.BoardURL = "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Port))
+	customChecks.Redact = func(s string) (string, bool) {
+		b, err := secrets.Redactor().Text([]byte(s))
+		return string(b), err == nil
+	}
+	safeGo(ctx, "custom_checks", func() { customChecks.Run(ctx) })
+
 	// Remote board poller
 	remotePoller := background.NewRemoteBoardPoller(rbStore, agentRT, 30*time.Second)
 	remotePoller.SetDiscoverFn(discoverFn)
