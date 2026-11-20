@@ -146,6 +146,7 @@ func (h *SessionsHandler) agentReplyArtifactComment(w http.ResponseWriter, r *ht
 		}
 		h.recordCommentActivity(r, caller.withName(name), id, t.Board, body) // the agent's reply is a row of Activity (#17360)
 		slog.Info("[artifact comments] agent replied into a thread", "via", map[bool]string{true: "no open ask (its own upload, or an ask the file's new version ended)", false: "an ask"}[viaUpload], "artifact", id, "comment", t.ID, "agent", name, "board", t.Board)
+		h.gdocSendBackLater(id, t, name, body, false, c.ID) // a thread that came from a shared Google Doc: the reply goes back to the Doc (#20012)
 		writeJSON(w, http.StatusCreated, h.commentView(caller, c, false, false))
 	}
 }

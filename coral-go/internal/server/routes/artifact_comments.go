@@ -924,6 +924,9 @@ func (h *SessionsHandler) resolveArtifactComment(resolved bool) http.HandlerFunc
 			}
 			if resolved {
 				_ = h.ss.CloseArtifactAsks(r.Context(), t.ID, time.Now()) // a resolved thread takes no more agent replies
+				if caller.Kind == commentCallerAgent {
+					h.gdocSendBackLater(id, t, caller.Name, "", true, 0)
+				}
 			}
 			writeJSON(w, http.StatusOK, h.commentView(caller, c, locked, hubWrite))
 		}
