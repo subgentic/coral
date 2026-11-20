@@ -94,3 +94,10 @@ func TestCloudDevicesCommands(t *testing.T) {
 		assert.Contains(t, errb.String(), "usage: coral cloud devices")
 	}
 }
+
+// #19969: the connect command tells the person which key to compare with the browser's.
+func TestFingerprintLineNamesTheKeyAndSaysWhenNotToApprove(t *testing.T) {
+	l := fingerprintLine("ABCD-EFGH-JKLM-NPQR")
+	assert.Contains(t, l, "ABCD-EFGH-JKLM-NPQR")
+	assert.Contains(t, l, "if the two differ, do not approve")
+}

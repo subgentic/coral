@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+// fingerprintLine tells the person which key to compare: the browser shows this computer's key at pairing (#19969).
+func fingerprintLine(fp string) string {
+	return "This computer's key is " + fp + ". The browser shows it too: if the two differ, do not approve."
+}
+
 // pairingPrompt is what the computer says, in plain words, before the person confirms a browser pairing: what that browser will be able to do, and how to lower it here first (coral-hub condition b). The words follow the mode the next pairing will get.
 func pairingPrompt(mode string) string {
 	var can string
