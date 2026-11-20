@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +84,7 @@ func TestAnEditMadeInTheDocBecomesTheNextVersionAndIsNotSentBack(t *testing.T) {
 	row := g.share1(t)
 	assert.Equal(t, got.Digest, row.Digest, "the share remembers it as the version in the Doc")
 	assert.Equal(t, "rev-google-2", row.DocRevision, "and the revision, so the push does not send it back")
+	assertNotTheOperators(t, g, got.Digest)
 	assert.Equal(t, batches, g.drive.batches, "nothing was written to the Doc")
 	assert.Len(t, g.drive.uploads, uploads, "no new Doc")
 
@@ -126,6 +129,7 @@ func TestAnEditInTheDocAndANewerVersionInCoralAreBothKept(t *testing.T) {
 	})
 	require.NotEmpty(t, sep, "the edit is kept as its own file")
 	assert.Contains(t, g.objectText(t, sep), "Sunday")
+	assertNotTheOperators(t, g, sep)
 	// and the Doc was not written over: the loop's keep-both put Coral's version in a new Doc and kept the edited one
 	assert.Equal(t, batches, g.drive.batches)
 	require.Len(t, g.drive.uploads, 2)
@@ -179,4 +183,36 @@ func TestADocThatCannotBeReadIsLeftAsItIs(t *testing.T) {
 	assert.Len(t, seriesMembers(g.h.cfg.CoralDir(), gdocSid), 1)
 	assert.Equal(t, "rev1", g.share1(t).DocRevision)
 	assert.Equal(t, 0, g.drive.batches, "and nothing was written over it")
+}
+
+// Security's MUST on #20047: a Google edit is never the Operator's upload and never the earlier uploader's: its record says "google", the list says it is an edit made in Google Docs.
+func assertNotTheOperators(t *testing.T, g *gdocRig, digest string) {
+	t.Helper()
+	rec, ok := readUploadRecord(g.h.cfg.CoralDir(), "s1", digest)
+	require.True(t, ok, "the record of %s", digest)
+	assert.Equal(t, "google", rec.UploadedBy)
+	assert.NotEqual(t, uploadedByOwner, rec.UploadedBy, "never what the list shows as the Operator")
+	assert.NotEqual(t, "Writer", rec.Uploader, "never the uploader of the earlier version")
+	assert.Equal(t, gdocEditUploader, rec.Uploader)
+	assert.Equal(t, "auto_sync", rec.PromotedBy)
+	assert.Equal(t, sourceGdocEdit, rec.Source)
+}
+
+func TestTheVersionListSaysAVersionWasEditedInGoogleDocsNotByTheOperator(t *testing.T) {
+	g := editRig(t)
+	g.editDoc("# Plan\n\nThe launch is on Sunday.\n\nShip the build.\n", "rev-google-2")
+	g.pass(&gdocSyncState{})
+	members := seriesMembers(g.h.cfg.CoralDir(), gdocSid)
+	require.Len(t, members, 2)
+	rec := httptest.NewRecorder()
+	g.h.versionsOf(rec, httptest.NewRequest(http.MethodGet, "/", nil), gdocSid)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	var rows []versionRow
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &rows))
+	require.Len(t, rows, 2)
+	assert.False(t, rows[0].EditedInGoogle)
+	assert.True(t, rows[1].EditedInGoogle, "the second version is an edit made in Google Docs")
+	assert.Equal(t, "unknown writer in Google Docs", rows[1].Uploader)
+	assert.False(t, rows[1].EditedInDropbox)
+	assert.NotContains(t, rec.Body.String(), `"owner"`)
 }

@@ -326,7 +326,7 @@ export function attachVersions(dialog, hooks) {
             draw();
             if (switched && !bar.hidden) {
                 const row = st.rows[cur()], w = whenOf(row.at);
-                say(`Showing v${row.version} of ${st.rows.length}, ${w.label} (${w.full}), ${row.edited_in_dropbox ? 'edited in Dropbox' : (row.role || row.uploader || 'unknown')}`); // an edit made in Dropbox is said as such (#14714)
+                say(`Showing v${row.version} of ${st.rows.length}, ${w.label} (${w.full}), ${row.edited_in_dropbox ? 'edited in Dropbox' : row.edited_in_google ? 'edited in Google Docs' : (row.role || row.uploader || 'unknown')}`); // an edit made in Dropbox is said as such (#14714)
                 bar.querySelector('.av-current')?.focus();
             }
         },

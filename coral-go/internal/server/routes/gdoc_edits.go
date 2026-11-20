@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	sourceGdocEdit   = "gdoc_edit"                     // a version made from an edit in a Google Doc, taken by the sync loop
-	gdocEditUploader = "unknown writer in Google Docs" // never the owner: anyone with access to the Doc could have written it
-	gdocSeparateTail = " (edited in Google)"
+	sourceGdocEdit     = "gdoc_edit"                     // a version made from an edit in a Google Doc, taken by the sync loop
+	gdocEditUploadedBy = "google"                        // the record\'s uploaded_by: a fixed value that is never "owner" (which the list shows as the Operator), as Dropbox\'s is "dropbox"
+	gdocEditUploader   = "unknown writer in Google Docs" // never the owner: anyone with access to the Doc could have written it
+	gdocSeparateTail   = " (edited in Google)"
 )
 
 var (
@@ -140,7 +141,7 @@ func (h *SessionsHandler) gdocStoreEdit(key string, latest seriesMember, body []
 	shape := func(rec *agentUploadRecord) {
 		rec.Board, rec.OwnerKind, rec.OwnerID = latest.Board, base.OwnerKind, base.OwnerID
 		rec.Uploader, rec.Role = gdocEditUploader, ""
-		rec.UploadedBy, rec.Source, rec.PromotedBy = "owner", sourceGdocEdit, "auto_sync"
+		rec.UploadedBy, rec.Source, rec.PromotedBy = gdocEditUploadedBy, sourceGdocEdit, "auto_sync" // never the Operator, never the original uploader
 		rec.TaskID = 0
 	}
 	if separate {
