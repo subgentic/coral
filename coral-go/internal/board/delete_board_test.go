@@ -17,7 +17,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_message_sessions", "project"}, {"chief_check_messages", "project"},
 	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_join_notices", "project"}, {"board_groups", "project"},
 	{"board_tasks", "board_id"}, {"board_settings", "project"}, {"board_waits", "project"}, {"board_working_modes", "board_id"},
-	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"boards", "id"},
+	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"health_checks", "project"}, {"boards", "id"},
 	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
 	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_opening_ask", "project"}, {"board_ask_reopened", "project"}, {"board_ask_links", "project"}, {"board_ask_buttons", "project"}, {"board_ask_subjects", "project"}, {"board_orch_grant", "project"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
@@ -96,6 +96,8 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 		{`INSERT INTO health_counters (project, rule, target, subject, count, last_at) VALUES (?, 'claim', 'Dev', '1', 1, '2026-10-19T00:00:00Z')`, []any{project}},
 		{`INSERT INTO health_items (project, item, state, shown_at) VALUES (?, 'stuck:Dev', 'open', '2026-10-19T00:00:00Z')`, []any{project}},
 		{`INSERT INTO health_goal_size (project, goal_id, said_level) VALUES (?, 1, 1)`, []any{project}},
+		{`INSERT INTO health_checks (project, name, created_at) VALUES (?, 'stale-prs', '2026-10-19T00:00:00Z')`, []any{project}},
+		{`INSERT INTO health_check_keys (check_id, key, said_at) SELECT id, 'k', '2026-10-19T00:00:00Z' FROM health_checks WHERE project = ?`, []any{project}},
 		{`INSERT INTO health_offbooks (project, kind, agent, ref, detail, at) VALUES (?, 'post', 'Dev', '1', 'posted a commit', '2026-10-19T00:00:00.000Z')`, []any{project}},
 		{`INSERT INTO hub_operator_actions (at, hub_user, method, path, project, status) VALUES ('2026-10-19T00:00:00Z', 'u', 'PUT', '/x', ?, 200)`, []any{project}},
 		{`INSERT INTO operator_actions (at, actor, action, item_kind, item_id, team, source, prev_hash, hash) VALUES ('2026-10-19T00:00:00Z', 'local', 'approve', 'file', 'x', ?, 'local', '', 'h')`, []any{project}}, // the Activity record stays: a record of what happened is not part of the board (#12069)

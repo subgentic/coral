@@ -433,6 +433,18 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_health_check_keys_1",
+      "sql": null,
+      "tbl_name": "health_check_keys",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_health_checks_1",
+      "sql": null,
+      "tbl_name": "health_checks",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_health_counters_1",
       "sql": null,
       "tbl_name": "health_counters",
@@ -790,6 +802,18 @@
       "name": "health_actions",
       "sql": "CREATE TABLE health_actions (\n\tproject TEXT NOT NULL,\n\trule    TEXT NOT NULL,\n\ttarget  TEXT NOT NULL,\n\tat      TEXT NOT NULL\n)",
       "tbl_name": "health_actions",
+      "type": "table"
+    },
+    {
+      "name": "health_check_keys",
+      "sql": "CREATE TABLE health_check_keys (\n\tcheck_id INTEGER NOT NULL,\n\tkey      TEXT NOT NULL,\n\tsaid_at  TEXT NOT NULL,\n\tpresent  INTEGER NOT NULL DEFAULT 1,\n\tPRIMARY KEY (check_id, key)\n)",
+      "tbl_name": "health_check_keys",
+      "type": "table"
+    },
+    {
+      "name": "health_checks",
+      "sql": "CREATE TABLE health_checks (\n\tid            INTEGER PRIMARY KEY AUTOINCREMENT,\n\tproject       TEXT NOT NULL,\n\tname          TEXT NOT NULL,\n\tscript_src    TEXT NOT NULL DEFAULT '',\n\tscript_hash   TEXT NOT NULL DEFAULT '',\n\tsnapshot      TEXT NOT NULL DEFAULT '',\n\targs          TEXT NOT NULL DEFAULT '[]',\n\tdir           TEXT NOT NULL DEFAULT '',\n\tevery_period  TEXT NOT NULL DEFAULT '',\n\tdaily_at      TEXT NOT NULL DEFAULT '',\n\ttz            TEXT NOT NULL DEFAULT '',\n\tto_member     TEXT NOT NULL DEFAULT '',\n\tacts_as       TEXT NOT NULL DEFAULT '',\n\tstate         TEXT NOT NULL DEFAULT 'pending',\n\tapproved_by   TEXT NOT NULL DEFAULT '',\n\tapproved_hash TEXT NOT NULL DEFAULT '',\n\tnext_run      TEXT NOT NULL DEFAULT '',\n\tlast_run      TEXT NOT NULL DEFAULT '',\n\tlast_exit     INTEGER NOT NULL DEFAULT 0,\n\tlast_output   TEXT NOT NULL DEFAULT '',\n\tbad_lines     INTEGER NOT NULL DEFAULT 0,\n\tdropped_to    INTEGER NOT NULL DEFAULT 0,\n\tfails         INTEGER NOT NULL DEFAULT 0,\n\tfail_said     INTEGER NOT NULL DEFAULT 0,\n\tcreated_at    TEXT NOT NULL,\n\tUNIQUE(project, name)\n)",
+      "tbl_name": "health_checks",
       "type": "table"
     },
     {
@@ -6708,6 +6732,345 @@
           "partial": 0,
           "seq": 0,
           "unique": 0
+        }
+      ]
+    },
+    "health_check_keys": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "check_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "key",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "said_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "1",
+          "hidden": 0,
+          "name": "present",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "check_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "key",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_health_check_keys_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "health_checks": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "name",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "script_src",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "script_hash",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "snapshot",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "'[]'",
+          "hidden": 0,
+          "name": "args",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "dir",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "every_period",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "daily_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "tz",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 11,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "to_member",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "acts_as",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
+          "dflt_value": "'pending'",
+          "hidden": 0,
+          "name": "state",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 14,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "approved_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 15,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "approved_hash",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 16,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "next_run",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 17,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "last_run",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 18,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "last_exit",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 19,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "last_output",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 20,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "bad_lines",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 21,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "dropped_to",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 22,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "fails",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 23,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "fail_said",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 24,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "name",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_health_checks_1",
+          "origin": "u",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
         }
       ]
     },
