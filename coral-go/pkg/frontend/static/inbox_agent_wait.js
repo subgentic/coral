@@ -97,3 +97,5 @@ export function decorateGroupHead(tr, info) {
     if (wake) { wake.textContent = info.ws.state === 'asleep' ? `Wake ${markHidden(info.ws.who, { strict: true })}` : 'Start agent'; right.append(wake); }
     th.classList.add('inbox-group-flex'); th.append(right);
 }
+/** The line under Waiting on you's filters: how many are unread, how many are listed, and how many wait on an agent on the other tab. */
+export const statusLine = (unread, listed) => listed ? `${unread} unread, ${listed} in the list` : '';
