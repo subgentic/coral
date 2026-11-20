@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"unicode"
 )
 
 // Pulled is the Doc read back: its Markdown, the revision it was read at, and what the Markdown could not carry.
@@ -112,7 +113,7 @@ func DocToMarkdown(d docRead) Pulled {
 				if strings.TrimSpace(text) == "" {
 					continue
 				}
-				list = append(list, strings.Repeat("  ", p.Bullet.NestingLevel)+listMarker(d, p.Bullet.ListID, p.Bullet.NestingLevel)+text)
+				list = append(list, strings.Repeat("  ", p.Bullet.NestingLevel)+listMarker(d, p.Bullet.ListID, p.Bullet.NestingLevel)+escapeLineStart(flatten(text)))
 				continue
 			}
 			flushList()
@@ -120,7 +121,11 @@ func DocToMarkdown(d docRead) Pulled {
 			if strings.TrimSpace(text) == "" {
 				continue // an empty paragraph is only spacing
 			}
-			blocks = append(blocks, headingPrefix(p.ParagraphStyle.NamedStyleType)+escapeLineStart(text))
+			if h := headingPrefix(p.ParagraphStyle.NamedStyleType); h != "" {
+				blocks = append(blocks, h+escapeLineStart(flatten(text))) // a heading is one line
+			} else {
+				blocks = append(blocks, escapeLineStart(text))
+			}
 		case e.Table != nil:
 			flushList()
 			lastList = ""
@@ -208,7 +213,7 @@ func runsToMarkdown(els []paraElem, n *notes) string {
 	}
 	var sb strings.Builder
 	for _, s := range spans {
-		sb.WriteString(renderSpan(s))
+		sb.WriteString(renderSpan(s, n))
 	}
 	return strings.ReplaceAll(sb.String(), "\u0000", "  \n")
 }
@@ -218,7 +223,7 @@ func sameStyle(a, b span) bool {
 }
 
 // renderSpan puts the marks around the span's words and leaves its edge spaces outside them (Markdown does not open emphasis next to a space).
-func renderSpan(s span) string {
+func renderSpan(s span, n *notes) string {
 	core := strings.TrimSpace(strings.ReplaceAll(s.text, "\u0000", "\v"))
 	if core == "" {
 		return s.text
@@ -244,9 +249,32 @@ func renderSpan(s span) string {
 		out = "*" + out + "*"
 	}
 	if s.link != "" {
-		out = "[" + out + "](" + strings.NewReplacer(" ", "%20", ")", "%29", "(", "%28").Replace(s.link) + ")"
+		if u, ok := safeLink(s.link); ok {
+			out = "[" + out + "](" + u + ")"
+		} else {
+			n.add("a link whose address is not http or https was kept as plain text")
+		}
 	}
 	return lead + out + trail
+}
+
+// safeLink is the one place a Doc's link address becomes Markdown (#20013, Security): only an absolute http or https address with a host is kept; anything else (javascript:, data:, vbscript:, file:,
+// //host, a relative path, an address with a control character or any whitespace in it) is refused, and the link's words stay as plain text. The characters that could end the link or open
+// markup (( ) < > \) are percent-encoded.
+func safeLink(raw string) (string, bool) {
+	u := strings.TrimSpace(raw)
+	for _, r := range u {
+		if r <= 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) || unicode.IsSpace(r) || unicode.Is(unicode.Cf, r) {
+			return "", false
+		}
+	}
+	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+		return "", false
+	}
+	if p, err := url.Parse(u); err != nil || p.Host == "" || (p.Scheme != "http" && p.Scheme != "https") {
+		return "", false
+	}
+	return strings.NewReplacer("(", "%28", ")", "%29", "<", "%3C", ">", "%3E", "\\", "%5C").Replace(u), true
 }
 
 // escapeInline keeps Markdown's own characters in the person's text from becoming marks.
@@ -254,11 +282,17 @@ func escapeInline(s string) string {
 	return strings.NewReplacer(`\`, `\\`, "*", `\*`, "_", `\_`, "`", "\\`", "[", `\[`, "]", `\]`, "<", `\<`, "~~", `\~~`).Replace(s)
 }
 
+// flatten puts a soft line break on one line (a list item and a heading are one line of Markdown).
+func flatten(s string) string { return strings.ReplaceAll(s, "  \n", " ") }
+
 // escapeLineStart stops a paragraph that starts like Markdown ("1. ", "- ", "> ", "#") from becoming a list, a quote or a heading.
 func escapeLineStart(s string) string {
 	t := strings.TrimLeft(s, " ")
 	if t == "" {
 		return s
+	}
+	if only(t, '-') || only(t, '=') {
+		return `\` + t // "---" would be a rule and "===" would turn the line above into a heading
 	}
 	switch {
 	case strings.HasPrefix(t, "#"), strings.HasPrefix(t, ">"), strings.HasPrefix(t, "+ "), strings.HasPrefix(t, "- "), strings.HasPrefix(t, "-\t"):
@@ -323,4 +357,19 @@ func tableToMarkdown(rows []struct {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// only is true when s is three or more of c and nothing else (spaces aside).
+func only(s string, c byte) bool {
+	n := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case c:
+			n++
+		case ' ', '\t':
+		default:
+			return false
+		}
+	}
+	return n >= 3
 }

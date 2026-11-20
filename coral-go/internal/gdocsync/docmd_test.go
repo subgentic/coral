@@ -48,7 +48,7 @@ func TestDocToMarkdownMapsWhatAPersonTypes(t *testing.T) {
 		map[string]any{"sectionBreak": map[string]any{}},
 		para("TITLE", run("The plan\n", nil)),
 		para("HEADING_2", run("Goals\n", nil)),
-		para("NORMAL_TEXT", run("We ship ", nil), run("on time", map[string]any{"bold": true}), run(" and ", nil), run("early", map[string]any{"italic": true}), run(", see ", nil), run("the spec", map[string]any{"link": map[string]any{"url": "https://example.com/a b"}}), run(".\n", nil)),
+		para("NORMAL_TEXT", run("We ship ", nil), run("on time", map[string]any{"bold": true}), run(" and ", nil), run("early", map[string]any{"italic": true}), run(", see ", nil), run("the spec", map[string]any{"link": map[string]any{"url": "https://example.com/a(b)"}}), run(".\n", nil)),
 		para("NORMAL_TEXT", run("\n", nil)),
 		bullet("ul", 0, run("first\n", nil)),
 		bullet("ul", 1, run("nested\n", nil)),
@@ -63,7 +63,7 @@ func TestDocToMarkdownMapsWhatAPersonTypes(t *testing.T) {
 	)
 	got := DocToMarkdown(d)
 	assert.Equal(t, "rev7", got.Revision)
-	assert.Equal(t, "# The plan\n\n## Goals\n\nWe ship **on time** and *early*, see [the spec](https://example.com/a%20b).\n\n- first\n  - nested\n- second\n\n1. one\n1. two\n\nrun `go test` and ~~gone~~\n\n| Name | Cost |\n| --- | --- |\n| a\\|b | $3 |\n", got.Markdown)
+	assert.Equal(t, "# The plan\n\n## Goals\n\nWe ship **on time** and *early*, see [the spec](https://example.com/a%28b%29).\n\n- first\n  - nested\n- second\n\n1. one\n1. two\n\nrun `go test` and ~~gone~~\n\n| Name | Cost |\n| --- | --- |\n| a\\|b | $3 |\n", got.Markdown)
 	assert.Empty(t, got.Notes)
 }
 
@@ -112,4 +112,33 @@ func TestPullKeepsAPersonsEditsMadeInTheDoc(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "# Plan\n\nEdited in the Doc by **Sam**\n", got.Markdown)
 	assert.Equal(t, "rev9", got.Revision)
+}
+
+func linkMD(t *testing.T, addr string) Pulled {
+	t.Helper()
+	return DocToMarkdown(docOf(t, nil, para("NORMAL_TEXT", run("click here", map[string]any{"link": map[string]any{"url": addr}}), run("\n", nil))))
+}
+
+func TestOnlyHttpAndHttpsLinksAreKept(t *testing.T) {
+	for _, bad := range []string{"javascript:alert(1)", "JaVa\tScript:alert(1)", "java\nscript:alert(1)", "data:text/html,<b>x</b>", "vbscript:x", "file:///etc/passwd", "//evil.example/x", "/relative/path", "relative", "HTTPS://example.com", "https://", "https://exa mple.com", "https://example.com/\nx", "https://example.com/\u2028x", "  javascript:x"} {
+		got := linkMD(t, bad)
+		assert.Equal(t, "click here\n", got.Markdown, "%q is not a link", bad)
+		assert.Equal(t, []string{"a link whose address is not http or https was kept as plain text"}, got.Notes, "%q says so", bad)
+	}
+	assert.Equal(t, "[click here](https://example.com/a)\n", linkMD(t, "  https://example.com/a  ").Markdown, "trimmed")
+	assert.Equal(t, "[click here](http://example.com/x?a=1&b=2)\n", linkMD(t, "http://example.com/x?a=1&b=2").Markdown)
+	assert.Equal(t, "[click here](https://example.com/%3Cb%3E%5Cx%29)\n", linkMD(t, "https://example.com/<b>\\x)").Markdown, "< > \\ and ) are encoded")
+}
+
+func TestListItemsHeadingsAndRulesAreNotTurnedIntoMarkdown(t *testing.T) {
+	ul := map[string]any{"ul": map[string]any{"listProperties": map[string]any{"nestingLevels": []any{map[string]any{}}}}}
+	d := docOf(t, ul,
+		bullet("ul", 0, run("- looks like a nested item\n", nil)),
+		bullet("ul", 0, run("# looks like a heading\n", nil)),
+		para("HEADING_2", run("# hash first\n", nil)),
+		para("NORMAL_TEXT", run("---\n", nil)),
+		para("NORMAL_TEXT", run("===\n", nil)),
+		para("NORMAL_TEXT", run("- - -\n", nil)),
+	)
+	assert.Equal(t, "- \\- looks like a nested item\n- \\# looks like a heading\n\n## \\# hash first\n\n\\---\n\n\\===\n\n\\- - -\n", DocToMarkdown(d).Markdown)
 }
