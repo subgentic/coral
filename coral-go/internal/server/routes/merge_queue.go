@@ -67,7 +67,7 @@ func (h *BoardHandler) AttachPatches(w http.ResponseWriter, r *http.Request) {
 		for _, rv := range reopened.Reviewers {
 			mentions = append(mentions, "@"+rv.Reviewer)
 		}
-		h.postNotice(r.Context(), project, fmt.Sprintf("%s [Task #%d has new patch revisions from %s, round %d] an approval of the earlier bytes does not carry over: review it again (coral-board task detail %d), then coral-board task approve %d --round %d or coral-board task reject %d --round %d --note \"...\"",
+		h.postWakingNotice(r.Context(), project, fmt.Sprintf("%s [Task #%d has new patch revisions from %s, round %d] an approval of the earlier bytes does not carry over: review it again (coral-board task detail %d), then coral-board task approve %d --round %d or coral-board task reject %d --round %d --note \"...\"",
 			strings.Join(mentions, " "), id, h.noticeText(r.Context(), project, body.SubscriberID), reopened.Round, id, id, reopened.Round, id, reopened.Round))
 	}
 	if h.notifyFn != nil {

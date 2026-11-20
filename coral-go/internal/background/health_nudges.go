@@ -194,8 +194,11 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 	}
 	waits, _ := h.store.ListActiveWaits(ctx, project)
 	waiting, onOperator := map[string]bool{}, map[string]bool{}
+	waitOf := map[string]*reviewWait{}
 	for _, w := range waits {
 		waiting[w.SubscriberID] = true
+		rw := &reviewWait{at: parseTaskTime(w.CreatedAt), operator: w.WaitType == board.WaitOperator}
+		waitOf[w.SubscriberID] = rw
 		if w.WaitType == board.WaitOperator {
 			onOperator[w.SubscriberID] = true
 		}
@@ -208,8 +211,9 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 		}
 		mine, pending := agentTasks(tasks, sub.SubscriberID, r.now)
 		sig, known := h.signal(ctx, a.SessionID)
-		r.claimNudge(ctx, sub, a, mine, pending, sig, known, waiting[sub.SubscriberID])
-		if !onOperator[sub.SubscriberID] { // its task waits on the Operator, not on the agent: silence is not a stall (#19614)
+		r.claimNudge(ctx, sub, a, mine, withoutReviews(pending), sig, known, waiting[sub.SubscriberID])
+		r.reviewNudge(ctx, sub, a, mine, pending, sig, known, waitOf[sub.SubscriberID]) // a review task in its queue, new or reopened (#19910)
+		if !onOperator[sub.SubscriberID] {                                              // its task waits on the Operator, not on the agent: silence is not a stall (#19614)
 			r.statusNudges(ctx, sub, a, mine, sig, known)
 		}
 	}
