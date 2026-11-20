@@ -20,7 +20,7 @@ export async function versionsOf({ hex, server, board, current, earlier }) {
             const d = await r.json();
             if (Array.isArray(d) && d.length > 1) {
                 const rows = d.slice().sort((a, b) => a.version - b.version);
-                return rows.map((v, i) => ({ n: v.version, hex: v.digest, at: v.at, who: v.edited_in_dropbox ? 'Edited in Dropbox' : v.role || v.uploader || '', you: madeByYou(v), note: v.note || '', current: i === rows.length - 1 }));
+                return rows.map((v, i) => ({ n: v.version, hex: v.digest, at: v.at, who: v.edited_in_dropbox ? 'Edited in Dropbox' : v.edited_in_google ? 'Edited in Google Docs' : v.role || v.uploader || '', you: madeByYou(v), note: v.note || '', current: i === rows.length - 1 }));
             }
         }
     } catch { /* no series: the row's own older uploads below */ }

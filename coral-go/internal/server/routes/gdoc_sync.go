@@ -218,6 +218,17 @@ type gdocSyncState struct {
 	wait  time.Duration
 }
 
+// backOff doubles the wait after Google asked to slow down (a 429), up to gdocBackoffMax.
+func (st *gdocSyncState) backOff(now time.Time) {
+	if st.wait == 0 {
+		st.wait = gdocBackoffFirst
+	} else if st.wait *= 2; st.wait > gdocBackoffMax {
+		st.wait = gdocBackoffMax
+	}
+	st.until = now.Add(st.wait)
+	slog.Warn("[gdoc] Google asked to slow down; the sync waits", "for", st.wait.String())
+}
+
 // GdocSyncRun is the one background loop for every shared Doc: a pass each interval (and none while the switch is off).
 func (h *SessionsHandler) GdocSyncRun(ctx context.Context, every time.Duration) {
 	st := &gdocSyncState{}
@@ -255,13 +266,8 @@ func (h *SessionsHandler) gdocSyncPass(ctx context.Context, st *gdocSyncState, n
 			return // switched off during the pass: nothing more is sent
 		}
 		members := seriesMembers(h.cfg.CoralDir(), sh.Key)
-		if len(members) == 0 || members[len(members)-1].Digest == sh.Digest {
-			continue // a file with no series, or nothing new
-		}
-		latest := members[len(members)-1]
-		md, name, ok := h.gdocReadVersion(latest.Digest)
-		if !ok {
-			continue
+		if len(members) == 0 {
+			continue // a file with no series
 		}
 		if c == nil {
 			if c, err = gdocClientFor(); err != nil {
@@ -271,19 +277,35 @@ func (h *SessionsHandler) gdocSyncPass(ctx context.Context, st *gdocSyncState, n
 				return // not signed in: nothing to do, and nothing is said every pass
 			}
 		}
+		// Slice E (#20047): an edit made in the Doc since the last sync comes first, so what Google has is never written over. One read of the Doc per share per pass.
+		ectx, ecancel := context.WithTimeout(ctx, 60*time.Second)
+		taken, eerr := h.gdocTakeEdits(ectx, c, sh, members)
+		ecancel()
+		if eerr != nil {
+			if gdocsync.IsRateLimited(eerr) {
+				st.backOff(now)
+				return
+			}
+			if !errors.Is(eerr, errGdocRate) {
+				slog.Warn("[gdoc] an edit in a shared Doc could not be read", "kind", gdocErrKind(eerr))
+			}
+			continue // not read, so not written over either
+		}
+		if taken || members[len(members)-1].Digest == sh.Digest {
+			continue // the Doc has the newest version (or took it): nothing to send
+		}
+		latest := members[len(members)-1]
+		md, name, ok := h.gdocReadVersion(latest.Digest)
+		if !ok {
+			continue
+		}
 		cctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		_, err := h.pushGdoc(cctx, c, sh.Key, md, latest.Digest, name, true)
 		cancel()
 		switch {
 		case err == nil, errors.Is(err, errGdocPaused), errors.Is(err, errGdocRate), errors.Is(err, errGdocGone), errors.Is(err, errGdocBusy):
 		case gdocsync.IsRateLimited(err):
-			if st.wait == 0 {
-				st.wait = gdocBackoffFirst
-			} else if st.wait *= 2; st.wait > gdocBackoffMax {
-				st.wait = gdocBackoffMax
-			}
-			st.until = now.Add(st.wait)
-			slog.Warn("[gdoc] Google asked to slow down; the sync waits", "for", st.wait.String())
+			st.backOff(now)
 			return
 		case errors.Is(err, gdocsync.ErrOutcomeUnknown):
 			// The change may or may not have been made: pause this Doc until the owner has looked at it, rather than send it again on a guess.
