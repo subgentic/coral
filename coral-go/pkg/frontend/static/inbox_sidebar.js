@@ -1509,9 +1509,14 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
             if (isPhoneLayout()) { const bar = (teamNeedsMount?.host || $('group-table-view'))?.querySelector('.gt-toolbar'); Toolbar.mountSelection(bar, needsState.selected.size ? table.bar : null); bar?.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (bar && table.selectButton && rows.some(table.eligible)) (bar.querySelector('.list-bar-search-row') || bar).append(table.selectButton); } // the bar takes the toolbar's line while rows are selected; a Select button (44 px) is the visible way in, the long press the quick one (#17128, walk 49)
             if (hidden > 0) {
                 const only = needsFilters.kind && !needsFilters.q && !needsFilters.team && !needsFilters.agent && !needsFilters.goal && !needsFilters.longer && !needsFilters.server;
-                const p = DT.el('p', 'goals-note inbox-filter-hidden', `${hidden} hidden by the ${only ? `${NF.KIND_LABEL[needsFilters.kind] || needsFilters.kind} filter` : 'filters'}. `);
-                p.append(DT.link('Show all', showAllNeeds));
-                wrap.prepend(p);
+                if (rows.some(r => !r.welcome)) { // some waiting rows remain: a line says how many the filters hide
+                    const p = DT.el('p', 'goals-note inbox-filter-hidden', `${hidden} hidden by the ${only ? `${NF.KIND_LABEL[needsFilters.kind] || needsFilters.kind} filter` : 'filters'}. `);
+                    p.append(DT.link('Show all', showAllNeeds));
+                    wrap.prepend(p);
+                } else { // only Getting started is left: the approved filtered result, the card with its icon, line and Show all, above those rows (#19919, MUST-8)
+                    const card = DT.el('div', 'empty-state'), hint = DT.el('p', 'empty-state-hint'), go = DT.el('button', 'btn', 'Show all'); go.type = 'button'; go.addEventListener('click', showAllNeeds); hint.append(go);
+                    card.append(DT.el('p', 'empty-state-line', 'Nothing that needs you matches the search and filters.'), hint); wrap.prepend(card);
+                }
             }
             for (const g of needsOverflow()) {
                 const p = DT.el('p', 'inbox-review-more', `${g.name}: ${g.more.length} more for review. `);
