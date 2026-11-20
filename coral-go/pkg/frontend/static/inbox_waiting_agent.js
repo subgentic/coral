@@ -4,6 +4,7 @@
 import { serverFetch, LOCAL_SERVER, boardTeamKey, isCloud } from './server_base.js';
 import { markHidden } from './visible_marks.js';
 import { el } from './dom_el.js';
+import { KINDS, KIND_LABEL, KIND_ART } from './needs_filters.js';
 import { browserLocal } from './safe_storage.js';
 
 export const KIND_WORD = { answered_ask: 'Answered ask', comment_sent: 'Comment sent' };
@@ -25,6 +26,8 @@ export const rows = () => items.filter(it => !dismissed.has(keyOf(it))).map(it =
 export const refOf = it => ({ produced_by: it.agent?.name || '', session_id: it.agent?.session_id || '', team: it.board || '' });
 export const failedToRead = () => failed;
 export const wordsOf = it => it.operator_words ? `${it.kind === 'answered_ask' ? 'Your answer' : 'You commented'}: “${String(it.operator_words).replace(/\s+/g, ' ').trim()}”` : '';
+// the second tab's own kinds: known to the filter (a pill, a saved choice), labelled, and drawn as an ask's and a file's icon
+KINDS.push('answered_ask', 'comment_sent'); Object.assign(KIND_LABEL, { answered_ask: 'Answered ask', comment_sent: 'Comment sent' }); Object.assign(KIND_ART, { answered_ask: 'ask', comment_sent: 'review' });
 /** The title line: the ask's question, or the file or goal the Operator commented on. */
 export const titleOf = it => String(it.title || (it.artifact && it.artifact.name) || (it.goal && it.goal.title) || (it.kind === 'answered_ask' ? 'A question' : 'A comment'));
 
