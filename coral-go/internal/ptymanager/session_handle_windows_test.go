@@ -85,7 +85,7 @@ func TestASecondBatchOfSessionsThatEndOnTheirOwnAddsNoHandles(t *testing.T) {
 		}
 	}
 	t.Logf("handles: baseline %d, after the second batch %d, added %d (%d sessions that ended on their own)", before, before+added, added, runs)
-	assert.True(t, settled, "a second batch of %d sessions that ended on their own still held %d more handles after 90 s: something is left open for each", runs, added)
+	assert.True(t, settled, "a second batch of %d sessions that ended on their own still held %d more handles after 90 s: something is left open for each%s", runs, added, whenNotSettled(settled))
 }
 
 // The shell exits but a program it started keeps running: the exit watcher still closes the pseudo console after the drain, while that program lives (a pseudo console's output pipe only ends when it is
@@ -103,4 +103,12 @@ func TestHandlesAreFreedWhenTheShellExitsButAChildRuns(t *testing.T) {
 	require.NoError(t, backend.Spawn("hd-child", "test", t.TempDir(), "sid-hd-child", cmd, 120, 40))
 	assert.Eventually(t, func() bool { return handleCount(t) <= before+4 }, 9*time.Second, 250*time.Millisecond,
 		"handles while the left-behind program still runs: %d (before %d)", handleCount(t), before)
+}
+
+// whenNotSettled is the handle types for a failure message, and nothing (no scan) when the test passed (#20081).
+func whenNotSettled(settled bool) string {
+	if settled {
+		return ""
+	}
+	return " (" + describeHandles() + ")"
 }
