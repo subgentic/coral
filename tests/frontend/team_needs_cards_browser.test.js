@@ -1,4 +1,4 @@
-// #20050 (walk #20009 item 1): the team's own Needs you page draws its rows as the Inbox does: the same cards, kind pill in the name line, the same buttons, More last. 1280 and 390 px, light and dark shots with CORAL_SCREENSHOT_DIR.
+// #20050 (walk #20009 item 1): the team's own Needs you page draws its rows as the Inbox does: the same cards, kind (a pill only for Yes / No, plain text for a question, #20066) in the name line, the same buttons, More last. 1280 and 390 px, light and dark shots with CORAL_SCREENSHOT_DIR.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { install: installTeam, seed } = require('./helpers/team_page');
@@ -33,11 +33,14 @@ const BASE = require('./test_base').BASE;
             const rows = await ev(`[...document.querySelectorAll('#team-panel-needs tbody tr.inbox-kind-row')].map(tr => { const vis = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden'; const act = [...tr.querySelectorAll('button, .inbox-row-more-toggle')].filter(vis).filter(b => !b.matches('input, [role=checkbox], .dt-star') && !b.closest('.inbox-kind-icon') && b.closest('.inbox-review-actions, .inbox-answers, .inbox-answers-with-more')).map(b => b.textContent.trim()); const pill = tr.querySelector('[data-badge]'); return { card: tr.classList.contains('inbox-card-tr'), words: act, pill: pill ? pill.getAttribute('data-badge') : '', pillShown: pill ? getComputedStyle(pill, '::after').content : '', radius: getComputedStyle(tr).borderLeftWidth }; })`);
             check(rows.length === 3, `${at}the team page lists its three asks as rows: ` + JSON.stringify(info));
             if (!mobile) check(rows.every(r => r.card), `${at}every row is an Inbox card (tr.inbox-card-tr): ` + JSON.stringify(rows));
-            if (!mobile) check(rows.every(r => r.pill && /Question|Yes/.test(r.pill) && r.pillShown !== 'none'), `${at}the kind is a pill in the name line, as in the Inbox: ` + JSON.stringify(rows));
+            if (!mobile) check(rows.every(r => (r.pill === '' || /Yes/.test(r.pill)) && rows.filter(x => x.pill).length === 1), `${at}a pill only on the Yes / No row, as in the Inbox: ` + JSON.stringify(rows));
             if (!mobile) {
                 check(rows.every(r => r.words[r.words.length - 1] === 'More'), `${at}More is the last button of every row: ` + JSON.stringify(rows.map(r => r.words)));
                 check(JSON.stringify(rows[0].words) === JSON.stringify(['Blue', 'Green', 'Red', 'Answer', 'Dismiss', 'More']), `${at}a button ask shows its buttons, then Answer, Dismiss, More: ` + JSON.stringify(rows[0].words));
             }
+            const geo = await ev(`(() => { const tabs = [...document.querySelectorAll('#team-panel-needs .inbox-needs-tab')].map(t => t.getBoundingClientRect()); const tr = document.querySelector('#team-panel-needs tbody tr.inbox-kind-row'); const av = tr.querySelector('.dt-mail-avatar, .inbox-kind-column, .dt-avatar, .inbox-kind-icon'); const nm = tr.querySelector('.dt-mail-title, td[data-key="agent"] .inbox-review-from, .inbox-row-words'); return { tabs: tabs.length, sameLine: tabs.length === 2 && Math.abs(tabs[0].top - tabs[1].top) < 6, gap: av && nm ? nm.getBoundingClientRect().left - av.getBoundingClientRect().right : null, rail: getComputedStyle(tr).boxShadow }; })()`);
+            check(geo.tabs === 2 && geo.sameLine, `${at}the two tabs are side by side on one line, as in the Inbox: ` + JSON.stringify(geo));
+            if (mobile) check(geo.gap !== null && geo.gap < 16, `${at}the name sits next to the avatar as on the Inbox card (4 px there), not 45 px away: ` + JSON.stringify(geo));
             for (const th of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme', '${th}'); true`); await shot(`team-${w}-${th}`); } await ev(`document.documentElement.removeAttribute('data-theme'); true`);
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }

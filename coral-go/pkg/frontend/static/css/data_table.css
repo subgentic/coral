@@ -506,7 +506,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: none; }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: color-mix(in srgb, var(--text-primary) 5%, var(--table-bg)); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { font-weight: var(--fw-regular); }
-#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread { box-shadow: inset 3px 0 0 var(--accent); } /* unread: a rail at the edge (#19812) */
+:is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-row.dt-unread { box-shadow: inset 3px 0 0 var(--accent); } /* unread: a rail at the edge (#19812) */
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-subtitle, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { color: var(--text-secondary); }
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: var(--table-bg); }
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td { background: color-mix(in srgb, var(--text-primary) 4%, var(--table-bg)); }
@@ -682,9 +682,9 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
    top-left corner, 12 px 16 px padding), 12 px apart, one short line of description, and the sort controls are two chips in one slim row ("Sort by" is read by a screen reader, not drawn). */
 @media (max-width: 760px) {
     .inbox-needs-results .dt-box.dt-folded tbody { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px 12px 0; }
-    #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row > td, #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row:hover > td { background: none; } /* the unread tint and the hover paint the cells; the card's colour is the row's */
-    :root #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row.dt-row { background: var(--chat-assistant-bg, var(--bg-tertiary)); border: 1px solid var(--border); border-radius: var(--radius-xl); border-top-left-radius: 2px; padding: 12px 16px; min-width: 0; }
-    :root #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded tbody tr.dt-row.dt-row.dt-read { background: var(--bg-secondary); } /* a read card is quieter than an unread one (the card keeps the unread signal the old row's tint gave: needs_read_state) */
+    :is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-box.dt-folded tbody tr.dt-row > td { background: none; } /* the unread tint and the hover paint the cells; the card's colour is the row's */
+    :root :is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-box.dt-folded tbody tr.dt-row.dt-row { background: var(--chat-assistant-bg, var(--bg-tertiary)); border: 1px solid var(--border); border-radius: var(--radius-xl); border-top-left-radius: 2px; padding: 12px 16px; min-width: 0; }
+    :root :is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-box.dt-folded tbody tr.dt-row.dt-row.dt-read { background: var(--bg-secondary); } /* a read card is quieter than an unread one (the card keeps the unread signal the old row's tint gave: needs_read_state) */
     .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row:last-child { border-bottom: 1px solid var(--border); }
     .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row { position: relative; }
     .inbox-needs-results .dt-box.dt-folded tbody tr.dt-row > td:has(> .inbox-kind-column) { padding-inline-start: calc(2rem + 12px); } /* the card's padding holds the glyph: the text starts after it (the glyph is 2 rem wide, so it grows with the text size) */
