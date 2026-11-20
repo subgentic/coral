@@ -47,7 +47,8 @@ export function fileTile(item, server) {
 }
 export function kindIcon(s) {
     const k = s && s.waiting_kind === 'ask' ? 'ask' : kindOf(s), i = document.createElement('span'); // board questions share the Question chip (#16548)
-    i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = KIND_ART[k] || k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', KIND_LABEL[k]); i.title = KIND_LABEL[k];
+    const word = s?.waitItem && KIND_LABEL[s.waitItem.kind] ? KIND_LABEL[s.waitItem.kind] : KIND_LABEL[k]; // an answered ask's icon is the question mark, but it is named for what the row is, not as a Question (walk #20067 row 14)
+    i.className = 'material-icons inbox-kind-icon'; i.dataset.kind = KIND_ART[k] || k; i.setAttribute('role', 'img'); i.setAttribute('aria-label', word); i.title = word;
     if (s?.review) i.dataset.type = /^video\//.test(s.review.media_type || '') ? 'video' : /html/.test(s.review.media_type || '') ? 'html' : /markdown/.test(s.review.media_type || '') ? 'md' : '';
     if (s?.review) { i.classList.add('inbox-artifact-thumbnail'); i.append(artifactThumbnail(s.review, { size: 32, url: typeof s.server === 'string' && thumbnailPath(s.review) ? serverUrl(thumbnailPath(s.review), s.server) : '' })); }
     return i;

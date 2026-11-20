@@ -129,6 +129,12 @@ const { coralReady } = require('./helpers/wait');
                 const btn = name => ev(`[...(${row(name)}).querySelectorAll('.inbox-review-actions button, .inbox-review-actions a')].map(b => b.textContent.trim())`);
                 const askBtns = await btn('Tag v2.1.1'), commentBtns = await btn('landing-copy-v2.md');
                 assert.ok(askBtns.includes('Open agent') && !askBtns.includes('Wake') && !askBtns.includes('Start agent'), 'an awake agent’s ask: Open agent, no Wake: ' + JSON.stringify(askBtns));
+                assert.ok(askBtns.includes('Nudge'), 'an awake agent’s ask has a Nudge button beside Open agent, as the mock draws it (#20067 row 15): ' + JSON.stringify(askBtns));
+                assert.ok(!commentBtns.includes('Nudge'), 'an archived agent is not nudged: ' + JSON.stringify(commentBtns));
+                assert.equal(await ev(`!!(${row('Tag v2.1.1')}).querySelector('.dt-check input')`), true, 'an answered ask has a checkbox like every Waiting on an agent row (#20067 row 13)');
+                assert.equal(await ev(`!!(${row('landing-copy-v2.md')}).querySelector('.dt-check input')`), true, 'a sent comment has a checkbox too');
+                assert.equal(await ev(`(${row('Tag v2.1.1')}).querySelector('.inbox-kind-icon').getAttribute('aria-label')`), 'Answered ask', 'the row’s icon is named for what the row is, not as a Question (#20067 row 14)');
+                await shot('answered');
                 assert.ok(commentBtns.includes('Start agent') && commentBtns.includes('Open file'), 'an archived agent’s comment: Start agent and Open file: ' + JSON.stringify(commentBtns));
                 // an answer or a comment wakes a sleeping agent that is not archived (#19897, #19901): the line says so and there is no Wake
                 await ev(`(async () => { const S = window.__coralStatic || '/static/', m = await import(S + 'state.js'); m.state.liveSessions = m.state.liveSessions.map(s => s.session_id === 'sess-devops' ? { ...s, sleeping: true } : s); const W = await import(S + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); document.dispatchEvent(new CustomEvent('coral:needs-updated')); document.querySelector('[data-needs-tab="you"]').click(); await new Promise(r => setTimeout(r, 200)); /* sleep-ok: the other tab draws first, then this one again */ document.querySelector('[data-needs-tab="agent"]').click(); return true; })()`);
