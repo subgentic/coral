@@ -391,7 +391,7 @@ const reviewSourceLabel = key => `${keyLabel(key)} · ${splitKey(key).server ===
 const goalLabel = s => (s.goal && s.goal.id && s.goal.title ? String(s.goal.title) : NO_GOAL); // the goal a row's task serves (a review's artifact roll-up, #8579; an agent's task, #7302), or the words for none
 const needsCtx = { text: needsText, teamOf, nameOf: needsAgentName, goalOf: goalLabel };
 const matchesNeeds = (s, filters) => NF.matches(s, s.queried ? { ...filters, q: '', team: '', agent: filters.agent === 'Unknown agent' ? filters.agent : '', longer: '', goal: reviewQueryState()?.goalFiltered ? '' : filters.goal } : filters, needsCtx) && serverMatches(s, filters);
-const orderedNeeds = () => NF.ordered(allNeeds().filter(s => inTab(s) && matchesNeeds(s, needsFilters)), needsFilters, s => (BL ? BL.weightOf(waitsOf(s)) : 0));
+const orderedNeeds = () => NF.ordered(allNeeds().filter(s => inTab(s) && matchesNeeds(s, needsFilters)), needsTab === 'agent' ? { ...needsFilters, sort: 'oldest' } : needsFilters, s => (BL ? BL.weightOf(waitsOf(s)) : 0));
 let needsOrder = null; // what the person has seen, in its order (#12636): a computer that answers late adds its rows at the end, it never moves the ones under the finger
 const needsKey = s => `${sessionServer(s)}:${s.session_id}`;
 const filteredNeeds = () => { const kept = NF.keepOrder(orderedNeeds(), needsKey, needsOrder, JSON.stringify([needsFilters, queries.needs])); needsOrder = kept.memory; return kept.rows; };
@@ -406,7 +406,7 @@ function inboxNeedsToolbar() {
     if (!needsBar) {
         needsBar = IT.folderToolbar({
             idp: 'inbox-needs', noun: 'agent', searchLabel: 'Search needs you',
-            sorts: { values: NF.SORTS, labels: NF.SORT_LABEL, aria: 'Sort by how long they have waited' },
+            ...(needsTab === 'agent' ? {} : { sorts: { values: NF.SORTS, labels: NF.SORT_LABEL, aria: 'Sort by how long they have waited' } }), // Waiting on an agent is always longest waiting first, as its line says (#20017)
             fields: [
                 { type: 'select', key: 'team', id: 'inbox-needs-team', label: 'Team', values: [], labels: {}, any: activeNeedsTeam ? `This team: ${keyLabel(activeNeedsTeam)}` : 'Any team' },
                 { type: 'select', key: 'agent', id: 'inbox-needs-agent', label: 'Agent', values: [], labels: {}, any: 'Any agent' },
@@ -686,8 +686,9 @@ function runActions(run) {
 
 /** The tab's badge counts the goal items too: told after every read of the goals and of what was hidden (#11825). */
 let quietTimer = 0;
+document.addEventListener('coral:welcome-changed', () => syncGoalDoneCount()); // a Getting started item done or dismissed lowers the number (#20017)
 function syncGoalDoneCount() {
-    setGoalDoneCount(goalDoneRows().filter(needsUnread).length); setClosedByAgentCount(closedByAgentRows().filter(needsUnread).length); updateInboxTab(); // a goal the person made that an agent closed counts until they dismiss or reopen it (#16753)
+    setGoalDoneCount(goalDoneRows().filter(needsUnread).length + welcomeRows().length); /* Getting started rows count in the badge too, as they do on the tab (#20017) */ setClosedByAgentCount(closedByAgentRows().filter(needsUnread).length); updateInboxTab(); // a goal the person made that an agent closed counts until they dismiss or reopen it (#16753)
     clearTimeout(quietTimer); // a goal still in its quiet period (#12161) is drawn when the period ends, with no refresh needed
     const due = nextQuietEnd(goals, goalTeamHere);
     if (due !== null) quietTimer = setTimeout(() => { syncGoalDoneCount(); renderInboxNav(true); }, Math.min(due, 2 ** 31 - 1) + 250);
@@ -1054,7 +1055,7 @@ const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission o
 // #13979 (Hub beta: "0 of 1" meant nothing to a person, and the Operator kept the unread number): the badge is the unread count alone; when the list holds more, its tooltip and its spoken name say "1 unread, 4 in the list".
 const agentStatusNode = () => { const rows = allNeeds().filter(isAgentRow); if (!rows.length) return null; const n = { awake: 0, asleep: 0, archived: 0 }; for (const r of rows) { const k = AW.agentWaitState(refOf(r)).state; if (k in n) n[k]++; } return AW.statusNode(rows.length, n); }; // the tab's one line above the list (#19904)
 const needsCountWords = () => { if (needsTab === 'agent' && !activeNeedsTeam) return ''; const unread = countOf('needs'), listed = allNeeds().filter(inTab).length; return listed > unread ? `${unread} unread, ${listed} in the list` : ''; };
-const needsStatusLine = () => { const unread = countOf('needs'), listed = allNeeds().filter(inTab).length, agent = allNeeds().filter(isAgentRow).length; return listed ? `${unread} unread, ${listed} in the list${agent ? ` (${agent} waiting on an agent ${agent === 1 ? 'is' : 'are'} on the other tab)` : ''}` : ''; }; // the line under the Waiting on you tab's filters (#19904)
+const needsStatusLine = () => AW.statusLine(countOf('needs'), allNeeds().filter(inTab).length + (activeNeedsTeam ? 0 : welcomeRows().length)); // the line under the Waiting on you tab's filters (#19904)
 /** The sidebar's groups, one list for this dashboard and the Hub-served one (#13256): Needs attention (Needs you, Tasks, Goals, Saved), Files (Artifacts), History (Activity), the same order and words. Under the Hub an entry shows only where the Hub serves it
  *  (a native group in GROUPS: Artifacts not for a grantee, Activity not served today) and a Hub-frame page keeps no number of its own (the page says it). */
 const folderSections = () => {

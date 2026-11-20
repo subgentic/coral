@@ -160,11 +160,15 @@ const { coralReady } = require('./helpers/wait');
                     const tab = async key => { await ev(`document.querySelector('[data-needs-tab="${key}"]').click(); true`); await new Promise(r => setTimeout(r, 400)); }; // sleep-ok: let the tab redraw
                     const welcome = () => ev(`document.querySelectorAll('#group-table-view .inbox-welcome-actions').length`);
                     await tab('you'); const youBefore = await count('you');
-                    await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'on' }; return true; })()`);
+                    await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'on' }; document.dispatchEvent(new CustomEvent('coral:welcome-changed')); return true; })()`);
                     await tab('agent'); await tab('you');
                     const shown = await welcome();
                     assert.ok(shown >= 1, 'Getting started rows show on Waiting on you');
                     assert.equal(await count('you'), youBefore + shown, 'Waiting on you counts the Getting started rows it shows');
+                    const nums = () => ev(`({ tab: Number(document.querySelector('[data-needs-tab="you"] .inbox-needs-tab-count')?.textContent.replace(/[^0-9]/g, '')), sidebar: Number(document.querySelector('#inbox-nav-list .view-list-item[data-key="needs"] .view-list-count')?.textContent.replace(/[^0-9]/g, '')), badge: Number(document.getElementById('nav-tab-hub-inbox-badge')?.textContent.replace(/[^0-9]/g, '')) })`);
+                    for (let i = 0; i < 20; i++) { const n = await nums(); if (n.tab === n.sidebar && n.sidebar === n.badge) break; await new Promise(r => setTimeout(r, 250)); } // sleep-ok: the counts settle after a redraw
+                    const n = await nums();
+                    assert.ok(n.tab >= shown && n.tab === n.sidebar && n.sidebar === n.badge, 'Waiting on you, the sidebar and the red Inbox badge show one number, Getting started rows included (#20017): ' + JSON.stringify(n));
                     await tab('agent');
                     assert.equal(await welcome(), 0, 'Getting started rows do not show on Waiting on an agent');
                     await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'off' }; return true; })()`);

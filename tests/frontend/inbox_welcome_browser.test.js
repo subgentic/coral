@@ -39,7 +39,7 @@ const { coralReady } = require('./helpers/wait');
             const want = mobile ? [['Open guide'], ['New agent'], ['Got it'], ['New team'], ['Read it']] : [['Open guide', 'Dismiss'], ['New agent', 'Dismiss'], ['Got it'], ['New team', 'Dismiss'], ['Read it', 'Dismiss']]; // a phone row has no Dismiss button: it is in the three-dot menu, or a swipe (#11642)
             check(JSON.stringify(acts) === JSON.stringify(want), `${tag}: each item's action, and Dismiss on all but the welcome (in the menu on a phone): ` + JSON.stringify(acts));
             check(await ev(`!document.querySelector('.inbox-getting-started') && !document.querySelector('button[aria-label="Dismiss Getting started"]')`), `${tag}: no separate block and no Dismiss all: the items are ordinary rows (#18764)`);
-            check(await ev(`['', '0'].includes(document.getElementById('nav-tab-hub-inbox-badge').textContent.trim())`), `${tag}: the five items are not counted in the Inbox badge (#19274)`);
+            await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent.trim() === '5'`, `${tag}: the five items are counted in the Inbox badge, as on the tab (#20017)`, 8000);
             if (mobile) check(await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions button:not(.menu-item)')].every(b => b.getBoundingClientRect().height >= 44)`), `${tag}: every action is a 44 px target`);
 
             // the actions do what they say
