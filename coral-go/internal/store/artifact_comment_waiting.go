@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -44,12 +45,32 @@ func (s *SessionStore) WaitingComments(ctx context.Context, now time.Time, maxAg
 	if len(rows) == 0 {
 		return nil, nil
 	}
+	// Only the replies in the threads of the asks above are read (#19923), so the scan is as wide as the window and no wider.
+	roots := map[int64]bool{}
+	for _, r := range rows {
+		roots[r.RootID] = true
+	}
 	var replies []struct {
 		ParentID  int64  `db:"parent_id"`
 		CreatedAt string `db:"created_at"`
 	}
-	if err := s.reader().SelectContext(ctx, &replies, `SELECT parent_id, created_at FROM artifact_comments WHERE author_kind = 'agent' AND deleted_at IS NULL AND parent_id IS NOT NULL`); err != nil {
-		return nil, err
+	ids := make([]any, 0, len(roots))
+	for id := range roots {
+		ids = append(ids, id)
+	}
+	for start := 0; start < len(ids); start += 500 { // SQLite's limit on variables in one statement
+		end := start + 500
+		if end > len(ids) {
+			end = len(ids)
+		}
+		var part []struct {
+			ParentID  int64  `db:"parent_id"`
+			CreatedAt string `db:"created_at"`
+		}
+		if err := s.reader().SelectContext(ctx, &part, `SELECT parent_id, created_at FROM artifact_comments WHERE author_kind = 'agent' AND deleted_at IS NULL AND parent_id IN (`+strings.TrimSuffix(strings.Repeat("?,", end-start), ",")+`)`, ids[start:end]...); err != nil {
+			return nil, err
+		}
+		replies = append(replies, part...)
 	}
 	lastReply := map[int64]time.Time{} // thread root -> newest agent reply
 	for _, r := range replies {

@@ -62,6 +62,13 @@ type waitingItem struct {
 	at            time.Time
 }
 
+// waitingCand is one candidate row before its lookups: the answer (1-based index into the answers) or the comment (1-based index into the comments), and when the Operator acted.
+type waitingCand struct {
+	at      time.Time
+	answer  int
+	comment int
+}
+
 // SetWaitingComments gives the board the Operator's comments that wait on an agent (SetWaitingComments, #19916). Nil: none.
 func (h *BoardHandler) SetWaitingComments(fn func(ctx context.Context) ([]store.WaitingComment, error)) {
 	h.waitingComments = fn
@@ -119,91 +126,116 @@ func (h *BoardHandler) WaitingOnAgent(w http.ResponseWriter, r *http.Request) {
 		}
 		return a
 	}
+	// The candidates first, with no lookup per item: each board reads at most the cap of its oldest answers, the comments are read as one list, and only the oldest waitingOnAgentMax of them all are then
+	// decorated (#19923), so the cost does not grow with the questions and comments a long-used Coral holds.
+	type answeredCand struct {
+		project string
+		a       board.AnsweredAsk
+	}
 	projects, err := h.bs.ListProjects(ctx)
 	if err != nil {
 		errInternalServer(w, "could not read the boards")
 		return
 	}
+	var cands []waitingCand
+	var answers []answeredCand
 	for _, p := range projects {
-		answered, err := h.bs.AnsweredAsksOf(ctx, p.Project, board.OperatorName, now)
-		if err != nil || len(answered) == 0 {
+		got, err := h.bs.AnsweredAsksOf(ctx, p.Project, board.OperatorName, now, waitingOnAgentMax)
+		if err != nil {
 			continue
 		}
-		ids := make([]int64, 0, len(answered))
-		for _, a := range answered {
-			ids = append(ids, a.MessageID)
-		}
-		subjects, links := h.askSubjects(ctx, p.Project, ids)
-		for _, a := range answered {
-			it := waitingItem{Kind: "answered_ask", ID: "ask-" + strconv.FormatInt(a.MessageID, 10), Board: p.Project, Agent: agentOf(p.Project, a.Asker), Since: a.AnsweredAt.UTC().Format(time.RFC3339),
-				Title: firstLine(a.Question, waitingTitleMax), OperatorWords: cutWords(a.Answer, waitingWordsMax), at: a.AnsweredAt}
-			if sj := subjects[a.MessageID]; sj.GoalID > 0 {
-				it.Goal = &waitingRef{ID: sj.GoalID, Title: links.goalTitle(ctx, sj.GoalID)}
-			}
-			if sj := subjects[a.MessageID]; sj.TaskID > 0 {
-				it.Task = &waitingRef{ID: sj.TaskID, Title: links.taskTitle(ctx, sj.TaskID)}
-			}
-			items = append(items, it)
+		for _, a := range got {
+			answers = append(answers, answeredCand{p.Project, a})
+			cands = append(cands, waitingCand{at: a.AnsweredAt, answer: len(answers)})
 		}
 	}
+	var comments []store.WaitingComment
 	if h.waitingComments != nil {
-		comments, err := h.waitingComments(ctx)
-		if err != nil {
+		if comments, err = h.waitingComments(ctx); err != nil {
 			errInternalServer(w, "could not read the comments")
 			return
 		}
-		files := map[string]map[string]teamArtifact{} // board -> store id -> file, read once per board that has a comment
-		for _, c := range comments {
-			it := waitingItem{Kind: "comment_sent", ID: "cmt-" + strconv.FormatInt(c.CommentID, 10), Board: c.Board, Agent: agentOf(c.Board, c.AgentName), Since: c.Since.UTC().Format(time.RFC3339),
-				Title: "A file", OperatorWords: cutWords(c.Body, waitingWordsMax), at: c.Since}
-			if it.Agent.Name == "" {
-				it.Agent.Name = clitext.CleanName(c.AgentName)
-			}
-			if it.Agent.SessionID == "" {
-				it.Agent.SessionID = c.AgentSession
-			}
-			if _, gid, ok := parseGoalSubject(c.ArtifactID); ok {
-				it.Title = "Goal #" + strconv.FormatInt(gid, 10)
-				if g, err := h.bs.GetGoal(ctx, c.Board, gid); err == nil && g != nil {
-					it.Title = clitext.CleanName(g.Title)
-					it.Goal = &waitingRef{ID: gid, Title: clitext.CleanName(g.Title)}
-				}
-			} else if _, _, _, ok := parseDiffSubject(c.ArtifactID); ok {
-				it.Title = "Changes by " + it.Agent.Name
-			} else if c.Board != "" {
-				byID, seen := files[c.Board]
-				if !seen {
-					byID = map[string]teamArtifact{}
-					if fs, _, ferr := h.projectArtifactItems(r, c.Board, ""); ferr == nil {
-						for _, f := range fs {
-							if id := artifactStoreID(f); id != "" {
-								byID[strings.ToLower(id)] = f
-							}
-						}
-					}
-					files[c.Board] = byID
-				}
-				if f, ok := byID[strings.ToLower(c.ArtifactID)]; ok {
-					v := f.Version
-					if v < 1 {
-						v = 1
-					}
-					it.Title = clitext.CleanName(f.Name)
-					it.Artifact = &waitingArtifact{Hex: strings.ToLower(c.ArtifactID), Name: clitext.CleanName(f.Name), Version: v}
-					if f.TaskID > 0 {
-						it.Task = &waitingRef{ID: f.TaskID, Title: clitext.CleanName(f.TaskTitle)}
-					}
-					if f.GoalID != nil && *f.GoalID > 0 {
-						it.Goal = &waitingRef{ID: *f.GoalID, Title: clitext.CleanName(f.GoalTitle)}
-					}
-				}
-			}
-			items = append(items, it)
+		for i, c := range comments {
+			cands = append(cands, waitingCand{at: c.Since, comment: i + 1})
 		}
 	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].at.Before(items[j].at) })
-	if len(items) > waitingOnAgentMax {
-		items = items[:waitingOnAgentMax]
+	sort.SliceStable(cands, func(i, j int) bool { return cands[i].at.Before(cands[j].at) })
+	if len(cands) > waitingOnAgentMax {
+		cands = cands[:waitingOnAgentMax]
 	}
+	subjectsOf := map[string]map[int64]board.AskSubject{}
+	linksOf := map[string]*askSubjectLinks{}
+	files := map[string]map[string]teamArtifact{} // board -> store id -> file, read once per board that has a comment
+	for _, cd := range cands {
+		if cd.answer > 0 {
+			p, a := answers[cd.answer-1].project, answers[cd.answer-1].a
+			if _, ok := linksOf[p]; !ok {
+				var ids []int64
+				for _, o := range answers {
+					if o.project == p {
+						ids = append(ids, o.a.MessageID)
+					}
+				}
+				subjectsOf[p], linksOf[p] = h.askSubjects(ctx, p, ids)
+			}
+			it := waitingItem{Kind: "answered_ask", ID: "ask-" + strconv.FormatInt(a.MessageID, 10), Board: p, Agent: agentOf(p, a.Asker), Since: a.AnsweredAt.UTC().Format(time.RFC3339),
+				Title: firstLine(a.Question, waitingTitleMax), OperatorWords: cutWords(a.Answer, waitingWordsMax), at: a.AnsweredAt}
+			if sj := subjectsOf[p][a.MessageID]; sj.GoalID > 0 {
+				it.Goal = &waitingRef{ID: sj.GoalID, Title: linksOf[p].goalTitle(ctx, sj.GoalID)}
+			}
+			if sj := subjectsOf[p][a.MessageID]; sj.TaskID > 0 {
+				it.Task = &waitingRef{ID: sj.TaskID, Title: linksOf[p].taskTitle(ctx, sj.TaskID)}
+			}
+			items = append(items, it)
+			continue
+		}
+		c := comments[cd.comment-1]
+		it := waitingItem{Kind: "comment_sent", ID: "cmt-" + strconv.FormatInt(c.CommentID, 10), Board: c.Board, Agent: agentOf(c.Board, c.AgentName), Since: c.Since.UTC().Format(time.RFC3339),
+			Title: "A file", OperatorWords: cutWords(c.Body, waitingWordsMax), at: c.Since}
+		if it.Agent.Name == "" {
+			it.Agent.Name = clitext.CleanName(c.AgentName)
+		}
+		if it.Agent.SessionID == "" {
+			it.Agent.SessionID = c.AgentSession
+		}
+		if _, gid, ok := parseGoalSubject(c.ArtifactID); ok {
+			it.Title = "Goal #" + strconv.FormatInt(gid, 10)
+			if g, err := h.bs.GetGoal(ctx, c.Board, gid); err == nil && g != nil {
+				it.Title = clitext.CleanName(g.Title)
+				it.Goal = &waitingRef{ID: gid, Title: clitext.CleanName(g.Title)}
+			}
+		} else if _, _, _, ok := parseDiffSubject(c.ArtifactID); ok {
+			it.Title = "Changes by " + it.Agent.Name
+		} else if c.Board != "" {
+			byID, seen := files[c.Board]
+			if !seen {
+				byID = map[string]teamArtifact{}
+				if fs, _, ferr := h.projectArtifactItems(r, c.Board, ""); ferr == nil {
+					for _, f := range fs {
+						if id := artifactStoreID(f); id != "" {
+							byID[strings.ToLower(id)] = f
+						}
+					}
+				}
+				files[c.Board] = byID
+			}
+			if f, ok := byID[strings.ToLower(c.ArtifactID)]; ok {
+				v := f.Version
+				if v < 1 {
+					v = 1
+				}
+				it.Title = clitext.CleanName(f.Name)
+				it.Artifact = &waitingArtifact{Hex: strings.ToLower(c.ArtifactID), Name: clitext.CleanName(f.Name), Version: v}
+				if f.TaskID > 0 {
+					it.Task = &waitingRef{ID: f.TaskID, Title: clitext.CleanName(f.TaskTitle)}
+				}
+				if f.GoalID != nil && *f.GoalID > 0 {
+					it.Goal = &waitingRef{ID: *f.GoalID, Title: clitext.CleanName(f.GoalTitle)}
+				}
+			}
+		}
+		items = append(items, it)
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].at.Before(items[j].at) })
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }

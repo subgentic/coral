@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -70,4 +71,33 @@ func TestWaitingCommentsAreTheOperatorsCommentsAnAgentHasNotAnsweredInTheThread(
 	got, err = s.WaitingComments(ctx, now, time.Hour*4)
 	require.NoError(t, err)
 	assert.Empty(t, got)
+}
+
+// #19923: the reply scan reads only the threads of the asks in the window, in chunks that fit SQLite's variable limit, so more than one chunk of waiting threads is still read right.
+func TestWaitingCommentsReadsMoreThreadsThanOneChunkAndSkipsOldThreadsReplies(t *testing.T) {
+	ctx := context.Background()
+	s := newCommentStore(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	const n = 1100
+	var answeredRoot int64
+	for i := 0; i < n; i++ {
+		art := fmt.Sprintf("%064x", i+1) // a file each: one file holds at most MaxArtifactComments comments
+		c, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: art, Board: "team-a", Body: "c", AuthorIssuer: "local", AuthorSubject: "u", AuthorKind: "owner"})
+		require.NoError(t, err)
+		_, _, err = s.CreateArtifactAsk(ctx, c.ID, art, "team-a", "sess-dev", "Dev", now.Add(-time.Hour+time.Duration(i)*time.Millisecond))
+		require.NoError(t, err)
+		if i == n-1 {
+			answeredRoot = c.ID
+			r, err := s.CreateArtifactComment(ctx, ArtifactComment{ArtifactID: art, Board: "team-a", ParentID: &c.ID, Body: "done", AuthorKind: "agent"})
+			require.NoError(t, err)
+			stamp(t, s, r.ID, now)
+		}
+	}
+	got, err := s.WaitingComments(ctx, now, 7*24*time.Hour)
+	require.NoError(t, err)
+	// one ask per (artifact, agent, thread): each of the 1100 comments is its own thread; the last one was answered, even though its thread is past the first chunk
+	require.Len(t, got, n-1)
+	for _, w := range got {
+		require.NotEqual(t, answeredRoot, w.CommentID)
+	}
 }

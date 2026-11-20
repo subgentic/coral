@@ -154,3 +154,31 @@ func TestWaitingOnAgentListsCommentsSentToAnAgentOldestFirstWithTheAnsweredAsks(
 	assert.LessOrEqual(t, len([]rune(items[0]["operator_words"].(string))), waitingWordsMax)
 	assert.Equal(t, "A file", items[0]["title"], "a file the team has no row for is still named")
 }
+
+// #19923: the list is capped at the oldest waitingOnAgentMax before any row is decorated, and a board with more answers than that reads only that many.
+func TestWaitingOnAgentCapsAtTheOldestBeforeTheLookups(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	for _, who := range []string{"Dev", "Operator"} {
+		_, err := bs.Subscribe(ctx, "team", who, "", "", nil, "all")
+		require.NoError(t, err)
+	}
+	var qs []*board.Message
+	for i := 0; i < waitingOnAgentMax+30; i++ { // every question first: the asker posting again would be the agent acting
+		q, err := bs.PostMessage(ctx, "team", "Dev", "@Operator question "+itoa(int64(i)), nil)
+		require.NoError(t, err)
+		to, _ := bs.AskTargets(ctx, "team", "Dev", q.Content)
+		require.NoError(t, bs.RecordAsk(ctx, "team", q, to))
+		qs = append(qs, q)
+	}
+	first := qs[0].ID
+	for _, q := range qs {
+		a, err := bs.PostMessage(ctx, "team", "Operator", "answer", nil)
+		require.NoError(t, err)
+		require.NoError(t, bs.RecordReply(ctx, "team", a.ID, q.ID))
+	}
+	code, items := readWaiting(t, h, true)
+	require.Equal(t, http.StatusOK, code)
+	require.Len(t, items, waitingOnAgentMax)
+	assert.Equal(t, "ask-"+itoa(first), items[0]["id"], "the oldest first")
+}
