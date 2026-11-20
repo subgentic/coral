@@ -142,6 +142,17 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].find(b => /^All/.test(b.textContent)).click(); true`);
                 await waitFor(`!!(${row('Awake file.txt')}) && !!(${row('landing-copy-v2.md')})`, 'All shows the five again', 8000);
                 await shot('agent-five');
+                if (width === 1280) {
+                    const tops = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].map(r => Math.round(r.getBoundingClientRect().top))`);
+                    const before = await tops();
+                    await ev(`(${row('Awake file.txt')}).querySelector('.dt-check input').click(); true`);
+                    await waitFor(`!!document.querySelector('.team-tb-selection')`, 'the bulk bar shows for a ticked row', 8000);
+                    await new Promise(r => setTimeout(r, 300)); // sleep-ok: let the bar settle
+                    assert.deepEqual(await tops(), before, 'ticking a row on the agent tab moves no row');
+                    await shot('agent-ticked');
+                    await ev(`(${row('Awake file.txt')}).querySelector('.dt-check input').click(); true`);
+                    await waitFor(`!document.querySelector('.team-tb-selection')`, 'the bar goes when nothing is ticked', 8000);
+                }
                 // a computer that cannot answer: the sent-back files stay, and the list says some could not be read
                 await ev(`(async () => { window.__waitingFail = true; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
                 await waitFor(`/Some waiting items could not be read/.test(document.getElementById('group-table-view').innerText) && !(${row('Tag v2.1.1')}) && !!(${row('Awake file.txt')})`, 'an unreadable list is said, and the files still show', 8000);
