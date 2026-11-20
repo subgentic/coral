@@ -61,9 +61,20 @@ const SERVERS = [{ id: 'srv1', label: 'Alpha', status: 'online' }, { id: 'srv2',
         check('every online computer\'s record is in the folder, newest first (Alpha 2 min, this computer 5, Beta 10, Alpha 30)', got.length === 4 && /Alpha report/.test(got[0]) && /Hub note/.test(got[1]) && /Beta report/.test(got[2]) && /Alpha plan/.test(got[3]), JSON.stringify(got));
         check('each row\'s From names its computer', /Alpha/.test(got[0]) && /This computer/.test(got[1]) && /Beta/.test(got[2]) && /Alpha/.test(got[3]), JSON.stringify(got));
         const gaps = await ev(`(document.querySelector('.activity-check') || {}).textContent || ''`);
-        check('the computers that are not in the list are named with why: Gamma offline, Delta refused', /Gamma \(is offline\)/.test(gaps) && /Delta \(refused to give its record/.test(gaps), gaps);
+        check('the computers that are not in the list are named with why: Gamma offline, Delta refused', /Gamma \(offline\)/.test(gaps) && /Partial multi-computer view/.test(gaps) && /Showing actions from /.test(gaps) && /Delta \(refused to give its record/.test(gaps), gaps);
         check('the offline computer is not asked, the refusing one is', !(await ev(`window.__asked`)).includes('srv3/api/activity') && (await ev(`window.__asked`)).includes('srv4/api/activity'), JSON.stringify(await ev(`window.__asked`)));
         await shot('activity-merged');
+        // #19924: the approved mock's "Partial multi-computer view" (a second computer that is offline), at both widths in both themes, for the paired shots
+        for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) for (const theme of ['light', 'dark']) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
+            await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); true`);
+            await waitFor(`!!document.querySelector('.activity-check-partial')`, `the partial-view notice at ${w} ${theme}`, 8000);
+            const note = await ev(`(() => { const n = document.querySelector('.activity-check-partial'), r = n.getBoundingClientRect(); return { title: n.querySelector('.activity-check-title').textContent, detail: n.querySelector('.activity-check-detail').textContent, inside: r.left >= 0 && r.right <= innerWidth + 1 }; })()`);
+            check(`${w} ${theme}: the notice says the mock's words and fits`, note.title === 'Partial multi-computer view' && /^Not in this list: Gamma \(offline\), Delta \(refused to give its record: an older Coral may need an update\)\. Showing actions from .+\.$/.test(note.detail) && note.inside, JSON.stringify(note));
+            await shot(`activity-partial-view-${w}-${theme}`);
+        }
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await ev(`document.documentElement.removeAttribute('data-theme'); true`);
         // the Computer filter keeps one computer's rows
         const filterId = await ev(`(() => { const s = [...document.querySelectorAll('select')].find(x => /server/.test(x.id) && x.closest('.inbox-folder-toolbar')); return s ? s.id : ''; })()`);
         check('the Computer filter is on the Activity toolbar', !!filterId, filterId);
