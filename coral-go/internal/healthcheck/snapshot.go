@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 // maxScript is the largest script Coral will snapshot.
@@ -84,4 +85,15 @@ func HashFile(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// SnapshotPath is where the snapshot of the script with this hash is, inside dir: derived from the hash, never from a stored path, so a row cannot make Coral run a file that is not in its own folder.
+// ok is false for a hash that is not 64 hex digits or an empty dir.
+func SnapshotPath(dir, hash string) (string, bool) {
+	if dir == "" || !hashRE.MatchString(hash) {
+		return "", false
+	}
+	return filepath.Join(dir, hash), true
 }

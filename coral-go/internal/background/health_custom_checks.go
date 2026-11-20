@@ -32,6 +32,8 @@ type CustomChecks struct {
 	// Redact clears a line's text of secrets: false means it could not be cleared and the line says it is withheld. nil withholds every line.
 	Redact   func(string) (string, bool)
 	BoardURL string // the loopback URL a script's coral-board talks to
+	// SnapDir is Coral's own folder of snapshots: a run's path is derived from the approved hash inside it, never read from the row (Security 4b).
+	SnapDir  string
 	Interval time.Duration
 	sem      chan struct{}
 	mu       sync.Mutex
@@ -104,6 +106,7 @@ func (c *CustomChecks) runOne(ctx context.Context, hc board.HealthCheck) {
 	agents := c.liveAgents(ctx)
 	orch, _ := c.store.TeamOrchestrator(ctx, hc.Project)
 	var out []string
+	held := 0
 	if !failed {
 		keys := make([]string, 0, len(res.Lines))
 		byKey := map[string]healthcheck.Line{}
@@ -131,6 +134,13 @@ func (c *CustomChecks) runOne(ctx context.Context, hc board.HealthCheck) {
 			if target == "" {
 				target = orch
 			}
+			if target == "" {
+				continue
+			}
+			if why, err := c.store.TakeCheckDelivery(ctx, hc.Project, hc.Name, target, now); err != nil || why != "" {
+				held++ // over the hour's or the day's limit: folded into one line to the Orchestrator below
+				continue
+			}
 			c.send(ctx, agents, hc, target, Notice(hc.Name, text))
 		}
 		for _, l := range res.Lines {
@@ -143,6 +153,9 @@ func (c *CustomChecks) runOne(ctx context.Context, hc board.HealthCheck) {
 		c.logger.Warn("custom check record", "check", hc.Name, "error", err)
 		return
 	}
+	if held > 0 {
+		c.send(ctx, agents, hc, orch, Notice(hc.Name, fmt.Sprintf("Check %s: %d more lines held", hc.Name, held)))
+	}
 	if say {
 		// A fixed phrase, never the script's own words.
 		c.send(ctx, agents, hc, orch, Notice(hc.Name, fmt.Sprintf("Check %s failed: %s", hc.Name, res.FailureReason())))
@@ -154,7 +167,11 @@ func (c *CustomChecks) runOne(ctx context.Context, hc board.HealthCheck) {
 
 // execute runs the snapshot after proving it is still the approved one.
 func (c *CustomChecks) execute(ctx context.Context, hc board.HealthCheck) healthcheck.Result {
-	if h, err := healthcheck.HashFile(hc.Snapshot); err != nil || h != hc.ScriptHash {
+	path, ok := healthcheck.SnapshotPath(c.SnapDir, hc.ScriptHash)
+	if !ok {
+		return healthcheck.Result{Err: fmt.Errorf("the snapshot is not the approved script")}
+	}
+	if h, err := healthcheck.HashFile(path); err != nil || h != hc.ScriptHash {
 		return healthcheck.Result{Err: fmt.Errorf("the snapshot is not the approved script")}
 	}
 	dir := hc.Dir
@@ -168,7 +185,7 @@ func (c *CustomChecks) execute(ctx context.Context, hc board.HealthCheck) health
 	} else {
 		dir = filepath.Clean(dir)
 	}
-	return c.run(ctx, healthcheck.Spec{Path: hc.Snapshot, Args: hc.Args, Dir: dir,
+	return c.run(ctx, healthcheck.Spec{Path: path, Args: hc.Args, Dir: dir,
 		Env: healthcheck.Env(healthcheck.EnvInput{BoardURL: c.BoardURL, Board: hc.Project})})
 }
 
