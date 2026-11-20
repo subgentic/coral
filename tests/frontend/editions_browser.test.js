@@ -183,8 +183,8 @@ async function run() {
             await click('#editions-modal [data-cloud="connect"]');
             await until(`!!document.querySelector('#editions-modal [data-cloud="code"]:not([hidden])')`, 'the code');
             s = await screen();
-            check(`${label}: Connect shows the hub's link (code prefilled) and the code, and waits`, !!s && s.code === 'ABCD-EFGH' && s.link === VERIFY && s.status === 'Waiting for you to approve…' && !s.connect && s.skip, JSON.stringify(s));
-            check(`${label}: Connect went to this server's /api/cloud/connect`, JSON.stringify(await ev('window.__cloudCalls')) === '["POST /api/cloud/connect {\\"mode\\":\\"view\\"}"]', JSON.stringify(await ev('window.__cloudCalls')));
+            check(`${label}: Connect shows the hub's link (code prefilled) and the code, and waits`, !!s && s.code === 'ABCD-EFGH' && /^[A-Za-z0-9_-]{22}$/.test(String(s.link).slice((VERIFY + '#p=').length)) && String(s.link).startsWith(VERIFY + '#p=') && s.status === 'Waiting for you to approve…' && !s.connect && s.skip, JSON.stringify(s));
+            check(`${label}: Connect went to this server's /api/cloud/connect`, /^\["POST \/api\/cloud\/connect \{\\"mode\\":\\"view\\",\\"pairing_secret\\":\\"[A-Za-z0-9_-]{22}\\"\}"\]$/.test(JSON.stringify(await ev('window.__cloudCalls'))), JSON.stringify(await ev('window.__cloudCalls')));
             check(`${label}: while the code is shown, Cancel is offered`, s.cancel, JSON.stringify(s));
             // Cancel (#3285): stops the enrollment; Connect comes back.
             await click('#editions-modal [data-cloud="cancel"]');
@@ -205,7 +205,7 @@ async function run() {
             check(`${label}: back on Launch the switch is there, still as it was (off)`, (await screen()).autoRow && !(await screen()).autoOn);
             check(`${label}: the auto-accept switch is held too`, (await ev('window.__cloudCalls')).length === 0 && !(await screen()).autoOn);
             await click('#editions-modal [data-cloud="connect"]');
-            check(`${label}: Connect carries the answer in the same call`, JSON.stringify(await ev('window.__cloudCalls')) === '["POST /api/cloud/connect {\\"mode\\":\\"launch\\",\\"allow_auto_accept\\":false}"]', JSON.stringify(await ev('window.__cloudCalls')));
+            check(`${label}: Connect carries the answer in the same call`, /^\["POST \/api\/cloud\/connect \{\\"mode\\":\\"launch\\",\\"allow_auto_accept\\":false,\\"pairing_secret\\":\\"[A-Za-z0-9_-]{22}\\"\}"\]$/.test(JSON.stringify(await ev('window.__cloudCalls'))), JSON.stringify(await ev('window.__cloudCalls')));
             await until(`!!document.querySelector('#editions-modal [data-cloud="code"]:not([hidden])')`, 'the code again');
             // The hub approves: the panel's own status poll picks it up.
             await ev(`Object.assign(window.__cloud, { state: 'connected', label: 'My Laptop', user_code: '', verification_url: '' }); true`);
