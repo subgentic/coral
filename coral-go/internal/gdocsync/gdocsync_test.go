@@ -351,3 +351,14 @@ func TestAReviewersTextCannotPassAsAnAuthor(t *testing.T) {
 	}
 	assert.Equal(t, "[unknown] hi", ToCoral(Comment{Content: "hi"}, v1).Body, "no name: still one prefix, never none")
 }
+
+// Found by the live run (#19953): Docs v1 is served from docs.googleapis.com, not www.googleapis.com, so every documents.get and batchUpdate was a 404. The fake served both paths from one host.
+func TestDocsCallsGoToTheDocsHostAndDriveCallsToTheDriveHost(t *testing.T) {
+	nc := NewClient(func() (string, error) { return "t", nil })
+	assert.Equal(t, "https://docs.googleapis.com", nc.hostFor("/v1/documents/abc"))
+	assert.Equal(t, "https://docs.googleapis.com", nc.hostFor("/v1/documents/abc:batchUpdate"))
+	assert.Equal(t, "https://www.googleapis.com", nc.hostFor("/drive/v3/files/abc/comments"))
+	assert.Equal(t, "https://www.googleapis.com", nc.hostFor("/upload/drive/v3/files"))
+	nc.base = "http://127.0.0.1:1" // a test server answers for both
+	assert.Equal(t, "http://127.0.0.1:1", nc.hostFor("/v1/documents/abc"))
+}
