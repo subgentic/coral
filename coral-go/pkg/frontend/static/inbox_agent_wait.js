@@ -56,11 +56,12 @@ export function stateNodes(review, kind = '', withChip = true) {
 
 const cutName = s => { s = String(s); return s.length > 80 ? `${s.slice(0, 79)}\u2026` : s; }; // a long file name is cut at about 80 characters in the text sent to the agent
 const NUDGE = file => `A reminder from the Operator: they are waiting on your new version of ${file}. Please upload it, or say on the board what is in the way.`;
+const NUDGE_KIND = { answered_ask: q => `A reminder from the Operator: they answered your question \u201c${q}\u201d and are waiting for you to act on it. Please carry on, or say on the board what is in the way.`, comment_sent: f => `A reminder from the Operator: they commented on ${f} and are waiting for your reply. Please answer, or say on the board what is in the way.` }; // an answered ask or a sent comment is not a request for a new version of a file (walk #20067 row 15)
 /** Send the awake agent the reminder, through its own send route (the one Continue uses); the Operator hears whether it went. */
 export async function nudge(row, ws) {
     const live = ws.live; if (!live) return;
     try {
-        const resp = await serverFetch(sessionServer(live), `/api/sessions/live/${encodeURIComponent(live.name)}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: NUDGE(cutName(row.name || row.title || (row.artifact && row.artifact.name) || 'what you asked')), agent_type: live.agent_type, session_id: live.session_id }) });
+        const resp = await serverFetch(sessionServer(live), `/api/sessions/live/${encodeURIComponent(live.name)}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: (NUDGE_KIND[row.kind] || NUDGE)(cutName(row.name || row.title || (row.artifact && row.artifact.name) || 'what you asked')), agent_type: live.agent_type, session_id: live.session_id }) });
         const result = resp.ok ? await resp.json().catch(() => ({})) : { error: 'not sent' };
         if (result.error) throw new Error(result.error);
         showToast(result.held ? 'Held until the agent\u2019s question is answered.' : `Nudge sent to ${ws.who}.`);
