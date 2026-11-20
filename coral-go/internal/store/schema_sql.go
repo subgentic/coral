@@ -768,6 +768,7 @@ CREATE TABLE IF NOT EXISTS gdoc_comment_map (
     remote_id  TEXT NOT NULL,
     comment_id INTEGER NOT NULL,
     resolved   INTEGER NOT NULL DEFAULT 0, -- the comment was resolved in Google when last pulled
+    seen       INTEGER NOT NULL DEFAULT 1, -- the last pull saw this comment in the Doc: an agent's reply goes only to a comment it saw (Security's condition)
     PRIMARY KEY (doc_id, remote_id)
 );
 

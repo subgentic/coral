@@ -265,8 +265,18 @@ func (c *Client) Comments(ctx context.Context, fileID string) ([]Comment, error)
 
 // Reply adds a reply to a comment; action "resolve" also resolves the comment, "reopen" reopens it, "" is a plain reply.
 func (c *Client) Reply(ctx context.Context, fileID, commentID, content, action string) error {
+	_, err := c.ReplyID(ctx, fileID, commentID, content, action)
+	return err
+}
+
+// ReplyID is Reply that also returns the new reply's id, so the sync can tell its own reply from a person's when it next pulls. One attempt only: a write is never sent again on a guess.
+func (c *Client) ReplyID(ctx context.Context, fileID, commentID, content, action string) (string, error) {
 	body, _ := json.Marshal(map[string]string{"content": content, "action": action})
-	return c.do(ctx, http.MethodPost, "/drive/v3/files/"+url.PathEscape(fileID)+"/comments/"+url.PathEscape(commentID)+"/replies", url.Values{"fields": {"id"}}, "application/json", body, nil)
+	var out struct {
+		ID string `json:"id"`
+	}
+	err := c.do(ctx, http.MethodPost, "/drive/v3/files/"+url.PathEscape(fileID)+"/comments/"+url.PathEscape(commentID)+"/replies", url.Values{"fields": {"id"}}, "application/json", body, &out)
+	return out.ID, err
 }
 
 // CoralAnchor is the shape of Coral's artifact comment anchor (routes.commentAnchor): the selected text with context, or the whole document.

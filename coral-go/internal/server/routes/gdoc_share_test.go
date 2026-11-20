@@ -71,6 +71,9 @@ func TestGdocShareIsOffByDefaultRefusesWhileOffAndReportsItsState(t *testing.T) 
 	}
 }
 
+// gdocReplyRec is one reply the stand-in received.
+type gdocReplyRec struct{ Doc, Comment, Content, Action string }
+
 // A stand-in for Drive and Docs: it records what the share sent and answers like the real one in shape only. No call leaves the test.
 type gdocStandIn struct {
 	mu             sync.Mutex
@@ -84,6 +87,7 @@ type gdocStandIn struct {
 	fail           int // answer this many requests with failStatus and a body that holds a secret
 	failStatus     int
 	comments       map[string][]gdocsync.Comment // a Doc's Google comments, by id
+	replies        []gdocReplyRec // each reply the sync sent
 	noRev          bool // a Doc read answers with no revision id
 	failWritesOnly bool // fail only the POSTs (a write whose outcome is unknown), never a read
 }
@@ -156,6 +160,12 @@ func (g *gdocStandIn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/drive/v3/files/") && strings.HasSuffix(r.URL.Path, "/comments"):
 		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/drive/v3/files/"), "/comments")
 		_ = json.NewEncoder(w).Encode(map[string]any{"comments": g.comments[id]})
+	case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/drive/v3/files/") && strings.HasSuffix(r.URL.Path, "/replies"):
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/drive/v3/files/"), "/")
+		var in map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		g.replies = append(g.replies, gdocReplyRec{Doc: parts[0], Comment: parts[2], Content: in["content"], Action: in["action"]})
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"id":"rr%d"}`, len(g.replies))))
 	default:
 		http.Error(w, "no route "+r.URL.Path, 404)
 	}

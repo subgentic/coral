@@ -92,12 +92,13 @@ type GdocCommentRow struct {
 	RemoteID  string `db:"remote_id"`
 	CommentID int64  `db:"comment_id"`
 	Resolved  bool   `db:"resolved"`
+	Seen      bool   `db:"seen"`
 }
 
 // GdocCommentMap returns what is already mirrored for a Doc, by remote id.
 func (s *SessionStore) GdocCommentMap(ctx context.Context, docID string) (map[string]GdocCommentRow, error) {
 	var rows []GdocCommentRow
-	if err := s.reader().SelectContext(ctx, &rows, "SELECT doc_id, remote_id, comment_id, resolved FROM gdoc_comment_map WHERE doc_id = ?", docID); err != nil {
+	if err := s.reader().SelectContext(ctx, &rows, "SELECT doc_id, remote_id, comment_id, resolved, seen FROM gdoc_comment_map WHERE doc_id = ?", docID); err != nil {
 		return nil, err
 	}
 	out := make(map[string]GdocCommentRow, len(rows))
@@ -112,4 +113,48 @@ func (s *SessionStore) SaveGdocComment(ctx context.Context, r GdocCommentRow) er
 	_, err := s.db.ExecContext(ctx, `INSERT INTO gdoc_comment_map (doc_id, remote_id, comment_id, resolved) VALUES (?, ?, ?, ?)
 		ON CONFLICT(doc_id, remote_id) DO UPDATE SET comment_id = excluded.comment_id, resolved = excluded.resolved`, r.DocID, r.RemoteID, r.CommentID, r.Resolved)
 	return err
+}
+
+// SetGdocCommentsSeen records what the last pull saw in a Doc: every mirrored comment is unseen, then the given remote ids are seen.
+func (s *SessionStore) SetGdocCommentsSeen(ctx context.Context, docID string, seen []string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // committed or nothing to undo
+	if _, err := tx.ExecContext(ctx, "UPDATE gdoc_comment_map SET seen = 0 WHERE doc_id = ?", docID); err != nil {
+		return err
+	}
+	for _, id := range seen {
+		if _, err := tx.ExecContext(ctx, "UPDATE gdoc_comment_map SET seen = 1 WHERE doc_id = ? AND remote_id = ?", docID, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// GdocCommentOf returns the mirror row of Coral comment commentID (a Google comment's thread root or a reply), if it has one.
+func (s *SessionStore) GdocCommentOf(ctx context.Context, commentID int64) (*GdocCommentRow, error) {
+	var r GdocCommentRow
+	err := s.reader().GetContext(ctx, &r, "SELECT doc_id, remote_id, comment_id, resolved, seen FROM gdoc_comment_map WHERE comment_id = ? AND remote_id NOT LIKE '%/%' LIMIT 1", commentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// GetGdocShareByDoc returns the share whose current Doc is docID (a Doc kept after a keep-both has no share), or (nil, nil).
+func (s *SessionStore) GetGdocShareByDoc(ctx context.Context, docID string) (*GdocShare, error) {
+	var g GdocShare
+	err := s.reader().GetContext(ctx, &g, "SELECT "+gdocShareCols+" FROM gdoc_shares WHERE doc_id = ?", docID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &g, nil
 }
