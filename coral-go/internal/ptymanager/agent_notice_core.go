@@ -355,8 +355,9 @@ func decideWinText(src procSource, root int, rec winProc, recorded bool) (bool, 
 // refused for an instant): one failed read is not "the processes cannot be read". textReadTries fresh reads are taken, textReadGap apart, and the
 // text is refused as unreadable only when every one fails (#470).
 // Five reads 20 ms apart (80 ms), not three 10 ms apart: the fourth head of trial-250 on Windows got one "unreadable" in 100 sends from a runner that stalled the shell's handle for longer.
+// Ten reads (180 ms) now: windows-tests on f70a9052d5 got one again in 100 sends (#20088, TestShortLivedChildrenOfTheAgentNeverRefuseIt). Only a failing read waits, so a healthy send costs nothing more.
 const (
-	textReadTries = 5
+	textReadTries = 10
 	textReadGap   = 20 * time.Millisecond
 )
 
