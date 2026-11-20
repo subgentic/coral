@@ -2,8 +2,6 @@ import { importOnce } from './import_once.js';
 /* Review attention and change labels use server facts, never a guessed age or
  * browser-global read tag as a per-person version baseline (#13916). */
 export const waitingOnAgent = row => !!row?.tags?.includes('changes requested');
-/** A sent-back file the agent has not answered: the one that waits on the agent. A reply (new comments) brings it back to the Operator, and to the Waiting on you tab (#19904). */
-export const stillWaitingOnAgent = row => waitingOnAgent(row) && !(row?.new_comments > 0);
 export const hasNewVersion = row => Number.isSafeInteger(row?.version) && Number.isSafeInteger(row?.opened_version) && row.opened_version > 0 && row.version > row.opened_version;
 export const needsReviewAttention = row => (row?.new_comments > 0) || (!waitingOnAgent(row) && (!row?.tags?.includes('read') || hasNewVersion(row)));
 export function reviewChangeLabels(row) {

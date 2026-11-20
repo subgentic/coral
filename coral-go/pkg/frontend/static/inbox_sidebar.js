@@ -52,7 +52,7 @@ import { onInboxHooks, setInboxCount, askOf, updateInboxTab, needsCount } from '
 const { coralInboxAdapter, savedExpandFor, listInboxGoals, goalsReadFailed, doneGoalsCapped, taskReadState } = await importOnce('./inbox_coral.js');
 const { closedGoalRows, madeByPerson } = await importOnce('./goal_closed_items.js'); // 'Goal closed as done by <agent>' with Reopen: listed, not counted (#15257)
 const WA = await importOnce('./inbox_waiting_agent.js'); // the Operator's answered asks and sent comments, still waiting on an agent (#19904, #19916)
-const AW = await importOnce('./inbox_agent_wait.js'); // what Waiting on an agent says of the agent (#19904)
+const AW = await importOnce('./inbox_agent_wait.js'), { stillWaitingOnAgent } = AW; // what Waiting on an agent says of the agent (#19904)
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
@@ -74,7 +74,7 @@ const GS = await importOnce('./goal_short.js'); // a goal's short name and #N (#
 const GW = await importOnce('./goal_words.js'); // a goal's state word, said in a phone row's button name (#9747)
 const { mountGoal } = await importOnce('./goal_view.js');
 const { arrangeReviewRows, reviewGroupLookup } = await importOnce('./inbox_review_groups.js');
-const { waitingOnAgent, stillWaitingOnAgent, needsReviewAttention, reviewChangeLabels, hasNewVersion, decidedWithNews, decidedWord, sentBackSince, sentBackChip, sentBackExcerpt } = await importOnce('./inbox_review_state.js');
+const { waitingOnAgent, needsReviewAttention, reviewChangeLabels, hasNewVersion, decidedWithNews, decidedWord, sentBackSince, sentBackChip, sentBackExcerpt } = await importOnce('./inbox_review_state.js');
 const { starControl } = await importOnce('./artifact_star.js');
 const { askSubjectLinks } = await importOnce('./ask_subject_links.js');
 const { mountInboxItem } = await importOnce('./inbox_item_page.js');

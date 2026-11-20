@@ -8,6 +8,9 @@ import { liveAgentOf } from './agent_live.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
 import { el } from './dom_el.js';
+const { waitingOnAgent } = await importOnce('./inbox_review_state.js');
+/** A sent-back file the agent has not answered: the one that waits on the agent. A reply (new comments) brings it back to the Operator, and to the Waiting on you tab (#19904). */
+export const stillWaitingOnAgent = row => waitingOnAgent(row) && !(row?.new_comments > 0);
 
 /** The agent a sent-back file waits on: its live row (by the file's session, else by name on its team) and its state: 'awake', 'asleep', 'archived', or '' when Coral does not list it. */
 export function agentWaitState(review) {
