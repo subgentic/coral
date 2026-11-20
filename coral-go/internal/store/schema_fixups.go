@@ -15,6 +15,7 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
+	{"gdoc_comment_map", "seen", "INTEGER NOT NULL DEFAULT 1"}, // the last pull saw this Google comment (#20012): an upgrade from a build that made the table without it
 	{"chief_checks", "origin", "TEXT NOT NULL DEFAULT 'chief'"}, // who set the check (#19162): 'chief' for Chief's own checks, else 'operator', 'agent' or 'orchestrator' for a reminder
 	{"chief_checks", "created_by", "TEXT NOT NULL DEFAULT ''"},  // the name of whoever set it, as the reminder's notice says it
 	{"chief_checks", "paused", "INTEGER NOT NULL DEFAULT 0"},    // the Operator switched this agent's reminders off (#19288): the row stays, nothing is delivered until it is switched back on

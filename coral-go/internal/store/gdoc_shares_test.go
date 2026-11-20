@@ -59,3 +59,23 @@ func TestGdocSharesAreKeptInTheStore(t *testing.T) {
 	g, _ = ss.GetGdocShare(ctx, "s1")
 	assert.Nil(t, g)
 }
+
+// An install that already has gdoc_comment_map without the seen column (an earlier build of this feature) gets it on start, every old row counted as seen.
+func TestGdocCommentMapGainsTheSeenColumnOnAnOlderDatabase(t *testing.T) {
+	path := t.TempDir() + "/s.db"
+	ctx := context.Background()
+	db, err := storetest.Open(t, path)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `DROP TABLE gdoc_comment_map`)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `CREATE TABLE gdoc_comment_map (doc_id TEXT NOT NULL, remote_id TEXT NOT NULL, comment_id INTEGER NOT NULL, resolved INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (doc_id, remote_id))`)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `INSERT INTO gdoc_comment_map (doc_id, remote_id, comment_id) VALUES ('d', 'c1', 7)`)
+	require.NoError(t, err)
+	db2, err := storetest.Open(t, path) // a start of the upgraded build
+	require.NoError(t, err)
+	got, err := store.NewSessionStore(db2).GdocCommentMap(ctx, "d")
+	require.NoError(t, err)
+	require.Contains(t, got, "c1")
+	assert.True(t, got["c1"].Seen)
+}
