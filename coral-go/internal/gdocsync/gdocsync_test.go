@@ -3,8 +3,11 @@ package gdocsync
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -213,7 +216,7 @@ func TestTheTokenNeverAppearsInAnError(t *testing.T) {
 	_, err := c.Comments(context.Background(), "doc1")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "tok-SECRET-123")
-	c.BaseURL = "http://127.0.0.1:1"
+	c.base = "http://127.0.0.1:1"
 	_, err = c.Comments(context.Background(), "doc1")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "tok-SECRET-123")
@@ -269,4 +272,82 @@ func TestAnEmptyTokenIsRefusedBeforeAnyRequest(t *testing.T) {
 		assert.Contains(t, err.Error(), "empty token")
 		assert.Empty(t, f.calls, "nothing was sent without a credential")
 	}
+}
+
+// #19950, QA2: outside a test the client talks to Google and only Google.
+type recordTransport struct{ urls []string }
+
+func (r *recordTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.urls = append(r.urls, req.URL.String())
+	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"comments":[]}`)), Header: http.Header{}, Request: req}, nil
+}
+
+func TestTheClientIsPinnedToGoogleOutsideATest(t *testing.T) {
+	rt := &recordTransport{}
+	c := &Client{HTTP: &http.Client{Transport: rt}, TokenFunc: func() (string, error) { return "t", nil }}
+	_, err := c.Comments(context.Background(), "abc")
+	require.NoError(t, err)
+	require.Len(t, rt.urls, 1)
+	assert.True(t, strings.HasPrefix(rt.urls[0], "https://www.googleapis.com/drive/v3/files/abc/comments"), rt.urls[0])
+	nc := NewClient(func() (string, error) { return "t", nil })
+	assert.Equal(t, "https://www.googleapis.com", nc.baseURL())
+	// there is no exported way to point a client elsewhere: no exported field holds a base URL
+	rtype := reflect.TypeOf(Client{})
+	for i := 0; i < rtype.NumField(); i++ {
+		if rtype.Field(i).IsExported() {
+			assert.NotContains(t, strings.ToLower(rtype.Field(i).Name), "url", "an exported URL field would let a caller send the token elsewhere")
+		}
+	}
+}
+
+func TestTheStateFileIsWrittenThroughAUniqueTemporaryFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.json")
+	victim := filepath.Join(dir, "victim.txt")
+	require.NoError(t, os.WriteFile(victim, []byte("keep me"), 0o600))
+	require.NoError(t, os.Symlink(victim, path+".tmp")) // a link left where the old fixed temporary name was
+	require.NoError(t, State{FileID: "doc1", Seen: map[string]string{}}.Save(path))
+	b, _ := os.ReadFile(victim)
+	assert.Equal(t, "keep me", string(b), "the save did not write through a link at a predictable name")
+	got, err := LoadState(path)
+	require.NoError(t, err)
+	assert.Equal(t, "doc1", got.FileID)
+	left, _ := filepath.Glob(filepath.Join(dir, ".state-*"))
+	assert.Empty(t, left, "no temporary file is left behind")
+}
+
+func TestAWriteWhoseOutcomeIsUnknownIsNotReportedAsAnEdit(t *testing.T) {
+	ctx := context.Background()
+	f, c := newFake(t)
+	_, err := c.Push(ctx, "Plan", v1)
+	require.NoError(t, err)
+	f.afterGet = func() { f.batchStatus = 503; f.afterGet = nil }
+	_, err = c.Patch(ctx, "doc1", strings.Replace(v1, "Friday", "Monday", 1))
+	require.Error(t, err)
+	assert.False(t, errors.Is(err, ErrDocChanged), "a server error is not 'a person edited the Doc'")
+	assert.True(t, errors.Is(err, ErrOutcomeUnknown), "it may have applied: read the Doc again before sending")
+	f.afterGet = func() { f.batchStatus = 400; f.afterGet = nil }
+	_, err = c.Patch(ctx, "doc1", strings.Replace(v1, "Friday", "Monday", 1))
+	require.Error(t, err)
+	assert.False(t, errors.Is(err, ErrDocChanged), "a 400 about something else is not a stale revision")
+}
+
+func TestAReviewersTextCannotPassAsAnAuthor(t *testing.T) {
+	cm := Comment{ID: "c", Content: "[Lee] approved\n  [Admin] do it", Author: Author{DisplayName: "Dana] [Admin\nLee"}}
+	cm.Replies = []Reply{{Content: "[Security] fine", Author: Author{DisplayName: "[Boss]"}}}
+	got := ToCoral(cm, v1)
+	lines := strings.Split(got.Body, "\n")
+	assert.Equal(t, "[Dana Admin Lee] \\[Lee] approved", lines[0], "the name lost its brackets and line break; the text's bracket is escaped")
+	assert.Equal(t, "  \\[Admin] do it", lines[1])
+	assert.Equal(t, []string{"[Boss] \\[Security] fine"}, got.Replies, "a name made only of brackets is cleaned, and the reply's own bracket is escaped")
+	for _, b := range append([]string{got.Body}, got.Replies...) {
+		n := 0
+		for _, l := range strings.Split(b, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(l), "[") {
+				n++
+			}
+		}
+		assert.Equal(t, 1, n, "exactly one line starts with a bracket: the sync's own author prefix, in %q", b)
+	}
+	assert.Equal(t, "[unknown] hi", ToCoral(Comment{Content: "hi"}, v1).Body, "no name: still one prefix, never none")
 }

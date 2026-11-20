@@ -20,24 +20,25 @@ import (
 )
 
 type fakeDrive struct {
-	mu       sync.Mutex
-	t        *testing.T
-	token    string
-	paras    []Para
-	rev      int
-	comments []*Comment
-	pageSize int
-	afterGet func() // run after a documents.get is answered: a person typing in the Doc
-	fail429  int    // answer this many requests with 429 first
-	calls    []string
-	requests [][]Request // every batchUpdate body, in order
+	mu          sync.Mutex
+	t           *testing.T
+	token       string
+	paras       []Para
+	rev         int
+	comments    []*Comment
+	pageSize    int
+	afterGet    func() // run after a documents.get is answered: a person typing in the Doc
+	batchStatus int    // answer the next batchUpdate with this status (a 5xx whose outcome the client cannot know)
+	fail429     int    // answer this many requests with 429 first
+	calls       []string
+	requests    [][]Request // every batchUpdate body, in order
 }
 
 func newFake(t *testing.T) (*fakeDrive, *Client) {
 	f := &fakeDrive{t: t, token: "tok-SECRET-123", pageSize: 2}
 	srv := httptest.NewServer(f)
 	t.Cleanup(srv.Close)
-	return f, &Client{BaseURL: srv.URL, TokenFunc: func() (string, error) { return "tok-SECRET-123", nil }, Sleep: func(d time.Duration) {}}
+	return f, &Client{base: srv.URL, TokenFunc: func() (string, error) { return "tok-SECRET-123", nil }, Sleep: func(d time.Duration) {}}
 }
 
 func (f *fakeDrive) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -123,6 +124,12 @@ func (f *fakeDrive) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			f.afterGet()
 		}
 	case r.Method == "POST" && p == "/v1/documents/doc1:batchUpdate":
+		if f.batchStatus != 0 {
+			st := f.batchStatus
+			f.batchStatus = 0
+			http.Error(w, "backend error", st)
+			return
+		}
 		var in struct {
 			Requests     []Request `json:"requests"`
 			WriteControl struct {

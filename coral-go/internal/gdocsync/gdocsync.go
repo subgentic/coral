@@ -36,9 +36,13 @@ const (
 	commentFields = "nextPageToken,comments(id,content,author(displayName),createdTime,modifiedTime,resolved,deleted,quotedFileContent(mimeType,value),anchor,replies(id,content,author(displayName),createdTime,action))"
 )
 
-// Client talks to Drive v3. BaseURL is "https://www.googleapis.com" in production and a test server's URL in a test.
+// Production is the only host the client talks to outside a test (#19950): the bearer token is sent there and nowhere else. There is no exported way to change it; this package's
+// own tests set the unexported base to a test server.
+const Production = "https://www.googleapis.com"
+
+// Client talks to Drive v3 and Docs v1. The zero value, or one from NewClient, talks to Production.
 type Client struct {
-	BaseURL   string
+	base      string // empty means Production; set only by this package's tests
 	HTTP      *http.Client
 	TokenFunc func() (string, error)
 	Sleep     func(time.Duration) // replaced in tests
@@ -75,11 +79,36 @@ type Comment struct {
 	Replies []Reply `json:"replies"`
 }
 
+// NewClient returns a client for Production that asks tok for the token inside each request.
+func NewClient(tok func() (string, error)) *Client { return &Client{TokenFunc: tok} }
+
+func (c *Client) baseURL() string {
+	if c.base != "" {
+		return c.base
+	}
+	return Production
+}
+
+// ErrOutcomeUnknown wraps the error of a write that may have been applied although it reported a failure (a server error or a lost connection): read the Doc or the comments again
+// before sending it a second time.
+var ErrOutcomeUnknown = errors.New("gdocsync: the request may have been applied; read again before sending it again")
+
+// httpError is a response that was not a success.
+type httpError struct {
+	Method, Path string
+	Status       int
+	Body         string
+}
+
+func (e *httpError) Error() string {
+	return fmt.Sprintf("gdocsync: %s %s: HTTP %d: %s", e.Method, e.Path, e.Status, e.Body)
+}
+
 func (c *Client) do(ctx context.Context, method, path string, q url.Values, contentType string, body []byte, out any) error {
 	if c.TokenFunc == nil {
 		return errors.New("gdocsync: no token source")
 	}
-	u := strings.TrimRight(c.BaseURL, "/") + path
+	u := c.baseURL() + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
@@ -109,6 +138,9 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, cont
 		}
 		resp, err := hc.Do(req)
 		if err != nil {
+			if method != http.MethodGet { // the request may have reached Google before the connection broke
+				return fmt.Errorf("%w: %v", ErrOutcomeUnknown, redact(err, tok))
+			}
 			return redact(err, tok)
 		}
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponse))
@@ -130,7 +162,11 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, cont
 			if len(msg) > maxErrBody {
 				msg = msg[:maxErrBody] + "..."
 			}
-			return fmt.Errorf("gdocsync: %s %s: HTTP %d: %s", method, path, resp.StatusCode, msg)
+			he := &httpError{Method: method, Path: path, Status: resp.StatusCode, Body: msg}
+			if method != http.MethodGet && resp.StatusCode >= 500 {
+				return fmt.Errorf("%w: %w", ErrOutcomeUnknown, he)
+			}
+			return he
 		}
 		if out != nil && len(data) > 0 {
 			return json.Unmarshal(data, out)
@@ -248,11 +284,41 @@ func ToCoral(c Comment, markdown string) CoralComment {
 	return out
 }
 
+// signed puts the Google author in front of the text as "[Name] text". Both are the reviewer's words and untrusted: the name loses its brackets, line breaks and control characters (and
+// is cut), and a bracket that starts a line of the text is escaped, so no text can pass as another author's "[Name]" line. Exactly one line of the result starts with a bracket.
 func signed(a Author, text string) string {
-	if a.DisplayName == "" {
-		return text
+	return "[" + cleanName(a.DisplayName) + "] " + escapeLeadingBrackets(text)
+}
+
+func cleanName(n string) string {
+	var sb strings.Builder
+	for _, r := range n {
+		switch {
+		case r == '[' || r == ']':
+		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) || r == '\u2028' || r == '\u2029':
+			sb.WriteRune(' ')
+		default:
+			sb.WriteRune(r)
+		}
 	}
-	return "[" + a.DisplayName + "] " + text
+	out := strings.Join(strings.Fields(sb.String()), " ")
+	if rs := []rune(out); len(rs) > 60 {
+		out = string(rs[:60])
+	}
+	if out == "" {
+		return "unknown"
+	}
+	return out
+}
+
+func escapeLeadingBrackets(text string) string {
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	for i, l := range lines {
+		if t := strings.TrimLeft(l, " \t"); strings.HasPrefix(t, "[") {
+			lines[i] = l[:len(l)-len(t)] + "\\" + t
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func tail(s string, n int) string {
@@ -341,11 +407,23 @@ func LoadState(path string) (State, error) {
 // Save writes the state file through a temporary file so a crash never leaves half of it.
 func (s State) Save(path string) error {
 	b, _ := json.MarshalIndent(s, "", "  ")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	// a unique temporary name made with O_EXCL (CreateTemp), never a fixed one a link could be planted at (#19950)
+	f, err := os.CreateTemp(filepath.Dir(path), ".state-*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmp := f.Name()
+	_, werr := f.Write(b)
+	cerr := f.Close()
+	if werr != nil || cerr != nil {
+		os.Remove(tmp)
+		return errors.Join(werr, cerr)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // New returns the comments not yet taken in (new, or modified since), and records them as seen in a copy of the state.

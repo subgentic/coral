@@ -352,7 +352,8 @@ func (c *Client) Patch(ctx context.Context, docID, revisedMarkdown string) (int,
 	}
 	body, _ := json.Marshal(map[string]any{"requests": reqs, "writeControl": map[string]any{"requiredRevisionId": rev}})
 	err = c.do(ctx, http.MethodPost, "/v1/documents/"+url.PathEscape(docID)+":batchUpdate", nil, "application/json", body, nil)
-	if err != nil && strings.Contains(err.Error(), "HTTP 400") && strings.Contains(err.Error(), "revision") {
+	var he *httpError
+	if errors.As(err, &he) && he.Status == http.StatusBadRequest && strings.Contains(strings.ToLower(he.Body), "revision") && !errors.Is(err, ErrOutcomeUnknown) {
 		return 0, ErrDocChanged
 	}
 	if err != nil {
