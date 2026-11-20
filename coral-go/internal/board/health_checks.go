@@ -292,25 +292,44 @@ type HealthCheckRun struct {
 	Failed    bool
 }
 
-// RecordHealthCheckRun saves a run and sets the next one. sayFailure is true the first time a check fails after it was well ("Check <name> failed" is said once until it recovers); paused is true when
-// the failures reached HealthCheckFailPause in a row and the check is now paused.
+// RecordHealthCheckRun saves a run and sets the next one. It decides from the row as it is NOW, in one transaction, never from the copy the run started with: a pause, a change or a removal made while
+// the run was going stays. sayFailure is true the first time a check fails after it was well ("Check <name> failed" is said once until it recovers); paused is true when the failures reached
+// HealthCheckFailPause in a row and this run paused the check (a check already paused or pending is not touched).
 func (s *Store) RecordHealthCheckRun(ctx context.Context, c HealthCheck, r HealthCheckRun) (sayFailure, paused bool, err error) {
-	at := r.At.UTC().Format(healthTimeFormat)
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return false, false, err
+	}
+	defer tx.Rollback()
+	var cur struct {
+		State string `db:"state"`
+		Fails int    `db:"fails"`
+		Said  bool   `db:"fail_said"`
+	}
+	if err := tx.GetContext(ctx, &cur, `SELECT state, fails, fail_said FROM health_checks WHERE id = ?`, c.ID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, false, nil // removed while it ran
+		}
+		return false, false, err
+	}
 	fails, said := 0, false
 	if r.Failed {
-		fails, said = c.Fails+1, c.FailSaid
+		fails, said = cur.Fails+1, cur.Said
 		if !said {
 			sayFailure, said = true, true
 		}
 	}
-	state := c.State
-	if fails >= HealthCheckFailPause {
+	state := cur.State
+	if fails >= HealthCheckFailPause && cur.State == CheckApproved {
 		state, paused = CheckPaused, true
 	}
+	at := r.At.UTC().Format(healthTimeFormat)
 	next := c.Schedule().Next(r.At).UTC().Format(healthTimeFormat)
-	_, err = s.db.ExecContext(ctx, `UPDATE health_checks SET last_run = ?, last_exit = ?, last_output = ?, bad_lines = ?, dropped_to = dropped_to + ?, fails = ?, fail_said = ?, state = ?, next_run = ? WHERE id = ?`,
-		at, r.Exit, r.Output, r.Bad, r.DroppedTo, fails, said, state, next, c.ID)
-	return sayFailure, paused, err
+	if _, err = tx.ExecContext(ctx, `UPDATE health_checks SET last_run = ?, last_exit = ?, last_output = ?, bad_lines = ?, dropped_to = dropped_to + ?, fails = ?, fail_said = ?, state = ?, next_run = CASE WHEN state = ? THEN ? ELSE next_run END WHERE id = ?`,
+		at, r.Exit, r.Output, r.Bad, r.DroppedTo, fails, said, state, CheckApproved, next, c.ID); err != nil {
+		return false, false, err
+	}
+	return sayFailure, paused, tx.Commit()
 }
 
 // NoteHealthCheckKeys is the once-per-key dedupe: it returns the keys to say now: those not said before, those that were absent from the last run and came back, and those last said over renag ago

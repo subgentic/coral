@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/healthcheck"
@@ -217,7 +218,10 @@ func (c *CustomChecks) send(ctx context.Context, agents map[string]AgentInfo, hc
 
 func capOutput(s string) string {
 	if len(s) > 2000 {
-		return s[:2000]
+		s = s[:2000]
+		for len(s) > 0 && !utf8.ValidString(s) {
+			s = s[:len(s)-1] // cut on a character boundary
+		}
 	}
 	return s
 }

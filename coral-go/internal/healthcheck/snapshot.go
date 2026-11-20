@@ -35,6 +35,9 @@ func Snapshot(src, dir string) (hash, path string, err error) {
 		return "", "", err
 	}
 	defer f.Close()
+	if ofi, serr := f.Stat(); serr != nil || !os.SameFile(fi, ofi) {
+		return "", "", errors.New("the script changed while it was being read")
+	}
 	b, err := io.ReadAll(io.LimitReader(f, maxScript+1))
 	if err != nil {
 		return "", "", err
