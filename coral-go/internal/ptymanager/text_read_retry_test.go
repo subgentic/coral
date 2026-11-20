@@ -3,6 +3,7 @@ package ptymanager
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -136,4 +137,34 @@ func TestTheShellUnreadableForAFewReadsInARowIsStillReadAgain(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, refused, "the shell unreadable for four reads, then read: not refused (%s)", why)
 	assert.Equal(t, 5, reads)
+}
+
+// #20097: the reads are a time budget with growing gaps, not a count: a stall of 300 ms (longer than the old 5 x 20 ms and 10 x 20 ms windows) is waited out, and reads that fail for the whole budget
+// are still not read as "no refusal" (the error stands and the backend refuses on it).
+func TestAProcessReadThatFailsFor300msIsWaitedOutAndOneThatAlwaysFailsStaysRefused(t *testing.T) {
+	const root = 10
+	good := newFake().add(1, root, 100, kindVerifiedShell)
+	failed := errors.New("snapshot failed")
+
+	start := time.Now()
+	reads := 0
+	stalled := func() (procSource, error) {
+		reads++
+		if time.Since(start) < 300*time.Millisecond {
+			return nil, failed
+		}
+		return good, nil
+	}
+	refused, why, err := textRefusedWithRetry(stalled, root, winProc{}, false)
+	assert.NoError(t, err)
+	assert.False(t, refused, "a stall of 300 ms that ends: not refused (%s, after %d reads)", why, reads)
+
+	start = time.Now()
+	reads = 0
+	never := func() (procSource, error) { reads++; return nil, failed }
+	_, _, err = textRefusedWithRetry(never, root, winProc{}, false)
+	assert.ErrorIs(t, err, failed, "a read that never works: the error stands")
+	assert.Equal(t, textReadTries, reads)
+	assert.GreaterOrEqual(t, time.Since(start), 500*time.Millisecond, "the budget is about 600 ms")
+	assert.Less(t, time.Since(start), 5*time.Second)
 }
