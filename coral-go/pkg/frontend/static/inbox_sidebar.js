@@ -646,8 +646,8 @@ function askActions(a) {
     const reply = DT.el('button', 'btn btn-small', 'Answer'); reply.type = 'button'; reply.setAttribute('data-slot', 'approve'); // Answer sits where Approve does (#11630); it is the row's main button
     reply.classList.add('inbox-main-action'); // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
     reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }), askRunners));
-    const offers = a.kind === 'ask' && !isPhoneLayout() && yesNoButtons(a) && !askIsLong(a) ? buttonsOffered(a) : [];
-    if (offers.length === 2) { // an explicit Yes / No question is answered from its row: Approve is Yes, Deny is No, through the same claim the dialog uses (#19833, the approved design)
+    const offers = a.kind === 'ask' && !isPhoneLayout() && !askIsLong(a) ? buttonsOffered(a) : [];
+    if (offers.length === 2 && yesNoButtons(a)) { // an explicit Yes / No question is answered from its row: Approve is Yes, Deny is No, through the same claim the dialog uses (#19833, the approved design)
         box.classList.remove('inbox-slots'); box.classList.add('inbox-yesno-actions'); reply.classList.remove('inbox-main-action'); reply.removeAttribute('data-slot');
         for (const b of [offers.find(o => o.label === 'Yes'), offers.find(o => o.label === 'No')]) {
             const yes = b.label === 'Yes', btn = DT.el('button', `btn btn-small ${yes ? 'inbox-main-action inbox-approve-action' : 'inbox-deny-action'}`, yes ? 'Approve' : 'Deny'); btn.type = 'button';
@@ -660,6 +660,20 @@ function askActions(a) {
             box.append(btn);
         }
     }
+    else if (offers.length >= 1 && offers.length <= 3 && !yesNoButtons(a)) { // a question with buttons shows them in its row (#20016, walk #20009): a reply is sent from here, any other action opens the question, where the dialog runs it
+        for (const b of offers) {
+            const btn = DT.el('button', 'btn btn-small inbox-offer', b.label.length > 40 ? `${b.label.slice(0, 39)}\u2026` : b.label); btn.type = 'button'; btn.title = b.label; btn.setAttribute('aria-label', `${b.label}, reply to the question of ${who}`);
+            btn.addEventListener('click', async e => {
+                e.stopPropagation();
+                if (!/^reply$/.test(b.action)) { reply.click(); return; }
+                btn.disabled = true;
+                try { const got = await claimButton(a, b); if (/^reply$/.test(got.action)) { await closeAnsweredDuplicates(a); forgetAsk(a); refreshOperatorAsks(true); showToast(`Sent: ${got.label}`); } else btn.disabled = false; }
+                catch (err) { btn.disabled = false; if (err && err.code === 'owner_only') { noteButtonsOwnerOnly(a.server); showToast('Only this computer\u2019s owner can use these buttons. Write a reply instead.', true); } else showToast((err && err.message) || 'Not sent.', true); }
+            });
+            box.append(btn);
+        }
+        box.classList.remove('inbox-slots'); box.classList.add('inbox-yesno-actions'); reply.classList.remove('inbox-main-action'); reply.removeAttribute('data-slot');
+    }
     box.append(reply);
     if (a.kind === 'ask' || a.kind === 'agent') { // a wait has no ask row to close: only a question is ignorable
         const failed = DT.el('span', 'inbox-review-error'); failed.setAttribute('role', 'alert');
@@ -667,7 +681,7 @@ function askActions(a) {
             return importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who, answered); sayLive(`${answered ? 'Marked answered in chat' : 'Dismissed'}: the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); };
         box._ignore = ignore;
         if (isPhoneLayout()) box.append(moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }, ...(a.kind === 'agent' ? [{ label: 'Answered in chat', title: 'Close it; the agent is not told it was dismissed', run: no => ignore(no, true) }] : [])], `the question of ${who}`), failed); // a phone row has no Dismiss button: the menu, or a swipe (#11642)
-        else { const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button'; no.setAttribute('data-slot', 'ignore'); no.setAttribute('aria-label', `Dismiss the question of ${who}`); no.addEventListener('click', () => ignore(no)); box.append(no, failed); if (a.kind === 'agent') { const chat = DT.el('button', 'btn btn-small btn-quiet', 'Answered in chat'); chat.type = 'button'; chat.setAttribute('data-slot', 'ignore'); chat.setAttribute('aria-label', `The question of ${who} was answered in its chat`); chat.title = 'Close it; the agent is not told it was dismissed'; chat.addEventListener('click', () => ignore(chat, true)); box.append(chat); } }
+        else { const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button'; no.setAttribute('data-slot', 'ignore'); no.setAttribute('aria-label', `Dismiss the question of ${who}`); no.addEventListener('click', () => ignore(no)); box.append(no, moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }, ...(a.kind === 'agent' ? [{ label: 'Answered in chat', title: 'Close it; the agent is not told it was dismissed', run: no => ignore(no, true) }] : [])], `the question of ${who}`), failed); } // Answer, Dismiss, then More last, as mock v3 draws it (#20016); Dismiss is in More too, as on a phone
     }
     return box;
 }
@@ -757,12 +771,7 @@ function welcomeActions(w) {
     box.append(go);
     if (w.dismiss) {
         const ignore = () => importOnce('./welcome_swipe.js').then(m => m.dismissWithUndo(w)).catch(() => sayLive('Not dismissed: try again.')); // says it, with Undo in the toast (#17410)
-        if (isPhoneLayout()) box.append(moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }], w.title)); // no Dismiss button on a phone row: the menu, or a swipe (#11642)
-        else {
-            const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button';
-            no.setAttribute('aria-label', `Dismiss: ${w.title}`); no.addEventListener('click', ignore);
-            box.append(no);
-        }
+        box.append(moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }], w.title)); // More is the last button of every row, Dismiss is in it; a phone has the menu or a swipe (#11642, #20016)
     }
     return box;
 }
