@@ -219,12 +219,54 @@ func TestTheTokenNeverAppearsInAnError(t *testing.T) {
 	assert.NotContains(t, err.Error(), "tok-SECRET-123")
 }
 
-func TestARateLimitIsRetriedThenSucceeds(t *testing.T) {
+func TestARateLimitedReadIsRetriedThenSucceeds(t *testing.T) {
 	f, c := newFake(t)
 	f.fail429 = 2
 	var slept int
 	c.Sleep = func(time.Duration) { slept++ }
-	_, err := c.Push(context.Background(), "Plan", v1)
+	_, err := c.Comments(context.Background(), "doc1")
 	require.NoError(t, err)
 	assert.Equal(t, 2, slept)
+}
+
+// #19947: a write is not retried. A lost response to Push or Reply would make a second Doc or a second reply if it were sent again; a read is safe to repeat.
+func TestAWriteIsNeverRetriedButAReadIs(t *testing.T) {
+	ctx := context.Background()
+	f, c := newFake(t)
+	f.comments = []*Comment{{ID: "a"}}
+
+	f.fail429 = 1
+	_, err := c.Push(ctx, "Plan", v1)
+	require.Error(t, err, "a refused Push is reported, not sent again")
+	assert.Equal(t, 1, f.countCalls("POST /upload/drive/v3/files"), "one request, so no second Doc")
+
+	f.fail429 = 1
+	err = c.Reply(ctx, "doc1", "a", "Done.", "resolve")
+	require.Error(t, err)
+	assert.Equal(t, 1, f.countCalls("POST /drive/v3/files/doc1/comments/a/replies"))
+	assert.Empty(t, f.comments[0].Replies, "and no reply was made")
+
+	_, err = c.Push(ctx, "Plan", v1)
+	require.NoError(t, err)
+	f.afterGet = func() { f.fail429 = 1 } // the read goes through; the write that follows is the one refused
+	n, err := c.Patch(ctx, "doc1", strings.Replace(v1, "Friday", "Monday", 1))
+	require.Error(t, err, "a refused batchUpdate is not sent again either")
+	assert.Zero(t, n)
+	assert.Equal(t, 1, f.countCalls("POST /v1/documents/doc1:batchUpdate"))
+
+	f.fail429 = 2
+	got, err := c.Comments(ctx, "doc1")
+	require.NoError(t, err, "a read is retried through the rate limit")
+	assert.Len(t, got, 1)
+}
+
+func TestAnEmptyTokenIsRefusedBeforeAnyRequest(t *testing.T) {
+	for _, tok := range []string{"", "  \n"} {
+		f, c := newFake(t)
+		c.TokenFunc = func() (string, error) { return tok, nil }
+		_, err := c.Comments(context.Background(), "doc1")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "empty token")
+		assert.Empty(t, f.calls, "nothing was sent without a credential")
+	}
 }

@@ -275,3 +275,15 @@ func (f *fakeDrive) eachPara(s, e int, fn func(*Para)) {
 		pos = end
 	}
 }
+
+func (f *fakeDrive) countCalls(call string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, c := range f.calls {
+		if c == call {
+			n++
+		}
+	}
+	return n
+}

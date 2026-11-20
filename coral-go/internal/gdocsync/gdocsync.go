@@ -96,6 +96,9 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, cont
 		if err != nil {
 			return errors.New("gdocsync: the token source failed")
 		}
+		if strings.TrimSpace(tok) == "" {
+			return errors.New("gdocsync: the token source gave an empty token; nothing was sent") // never send a request with no credential (#19947)
+		}
 		req, err := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(body))
 		if err != nil {
 			return err
@@ -110,7 +113,8 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, cont
 		}
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponse))
 		resp.Body.Close()
-		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && attempt < maxRetries {
+		// only a read is sent again: Push, Update, Reply and a batchUpdate are not idempotent, so a lost response must not make a second Doc, reply or edit (#19947)
+		if method == http.MethodGet && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && attempt < maxRetries {
 			wait := time.Duration(1<<attempt) * time.Second
 			if s, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && s >= 0 {
 				wait = time.Duration(s) * time.Second

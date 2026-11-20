@@ -355,5 +355,8 @@ func (c *Client) Patch(ctx context.Context, docID, revisedMarkdown string) (int,
 	if err != nil && strings.Contains(err.Error(), "HTTP 400") && strings.Contains(err.Error(), "revision") {
 		return 0, ErrDocChanged
 	}
-	return len(reqs), err
+	if err != nil {
+		return 0, err // nothing is known to have been applied: the count is of requests sent and accepted
+	}
+	return len(reqs), nil
 }
