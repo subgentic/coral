@@ -33,6 +33,7 @@ func rnd() string {
 
 func main() {
 	scopes := flag.String("scopes", "file", "file (drive.file only, the default) or full (drive.file + documents)")
+	browser := flag.String("browser", "", "open the sign-in in this app, e.g. \"Google Chrome\" (default: copy the address to the clipboard)")
 	flag.Parse()
 	scope := "https://www.googleapis.com/auth/drive.file"
 	if *scopes == "full" {
@@ -80,9 +81,17 @@ func main() {
 		default:
 		}
 	}))
-	fmt.Println("Opening Google's sign-in in your browser (sign in as the throwaway account).")
-	if exec.Command("open", auth).Run() != nil {
-		fmt.Println("Open this address yourself:\n" + auth)
+	// not opened for the person: the default browser is often not the one the throwaway account lives in. The address (no secret in it) is copied to the clipboard and printed.
+	cp := exec.Command("pbcopy")
+	cp.Stdin = strings.NewReader(auth)
+	copied := cp.Run() == nil
+	if *browser != "" {
+		exec.Command("open", "-a", *browser, auth).Run()
+		fmt.Printf("Opened Google's sign-in in %s.\n", *browser)
+	} else if copied {
+		fmt.Println("Google's sign-in address is on your clipboard. Paste it into the browser where the throwaway account is signed in (or run again with -browser \"Google Chrome\").")
+	} else {
+		fmt.Println("Open this address in the browser where the throwaway account is signed in:\n" + auth)
 	}
 	var c string
 	select {
