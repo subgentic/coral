@@ -189,11 +189,9 @@
 :root .inbox-folder-toolbar .inbox-needs-tab.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
 :root .inbox-folder-toolbar .inbox-needs-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 /* Waiting on an agent rows (#19904): the agent's state after the chip; an asleep agent is amber with Wake, an archived one rose with Start agent; an awake one stays quiet. */
-:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-xs, 0.72rem); font-weight: var(--fw-strong); white-space: nowrap; color: var(--success-text); background: rgba(var(--success-rgb), 0.12); border: 1px solid rgba(var(--success-rgb), 0.28); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: var(--radius-xl); font-size: var(--fs-sm); font-weight: var(--fw-strong); white-space: nowrap; color: var(--success-text); background: rgba(var(--success-rgb), 0.12); border: 1px solid rgba(var(--success-rgb), 0.28); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line { grid-column: 3 / -1; font-size: var(--fs-md); color: var(--text-secondary); display: block; white-space: normal; overflow: visible; text-overflow: clip; }
-:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep { color: var(--warning-text); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-asleep { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.14); border-color: rgba(var(--warning-rgb), 0.32); }
-:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { color: var(--error-text); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-state.inbox-wait-archived { color: var(--error-text); background: rgba(var(--error-rgb), 0.12); border-color: rgba(var(--error-rgb), 0.30); }
 :root .inbox-folder-toolbar .inbox-needs-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
 @media (max-width: 767px) { /* a phone: the tabs sit right under the search, More beside them, the words not broken */
@@ -213,8 +211,8 @@
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row):has(.inbox-wait-line.inbox-wait-asleep) { background: rgba(var(--warning-rgb), .06); box-shadow: inset 3px 0 0 var(--warning); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row):has(.inbox-wait-line.inbox-wait-archived) { background: rgba(var(--error-rgb), .06); box-shadow: inset 3px 0 0 var(--error); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep, :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { padding: 8px 10px; border: 1px solid; border-radius: var(--radius-sm); }
-:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep { border-color: rgba(var(--warning-rgb), .5); background: rgba(var(--warning-rgb), .1); }
-:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { border-color: rgba(var(--error-rgb), .5); background: rgba(var(--error-rgb), .1); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep { color: var(--warning-text); border-color: rgba(var(--warning-rgb), .5); background: rgba(var(--warning-rgb), .1); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { color: var(--error-text); border-color: rgba(var(--error-rgb), .5); background: rgba(var(--error-rgb), .1); }
 
 :root #group-table-view .inbox-needs-results .inbox-agent-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px var(--table-pad-x, 12px); font-size: var(--fs-sm); color: var(--text-muted); }
 :root #group-table-view .inbox-needs-results .inbox-agent-status strong { color: var(--text); font-weight: var(--fw-strong); }
@@ -231,7 +229,7 @@
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-text { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
 
 /* mock v3 (#19904): the tab counts are pills, blue on the open tab, with the amber dot inside the agent tab's */
-:root .inbox-folder-toolbar .inbox-needs-tab-count { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-sm); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; color: var(--text-secondary); background: var(--bg-tertiary); border: 1px solid var(--border); }
+:root .inbox-folder-toolbar .inbox-needs-tab-count { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 1px 7px; border-radius: var(--radius-xl); font-size: var(--fs-sm); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; color: var(--text-secondary); background: var(--bg-tertiary); border: 1px solid var(--border); }
 :root .inbox-folder-toolbar .inbox-needs-tab.is-on .inbox-needs-tab-count { color: var(--accent); background: rgba(var(--accent-rgb), 0.16); border-color: rgba(var(--accent-rgb), 0.36); }
 :root .inbox-folder-toolbar .inbox-needs-tab-count > .inbox-needs-tab-dot { width: 6px; height: 6px; }
 /* a row on Waiting on an agent: the quote box with the actions beside it, then the meta line (mock v3) */
