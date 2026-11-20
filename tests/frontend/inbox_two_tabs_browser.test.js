@@ -142,6 +142,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`!!(${row('Tag v2.1.1')}) && !(${row('landing-copy-v2.md')}) && !(${row('Awake file.txt')})`, 'the Answered ask pill shows only that kind', 8000);
                 await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].find(b => /^All/.test(b.textContent)).click(); true`);
                 await waitFor(`!!(${row('Awake file.txt')}) && !!(${row('landing-copy-v2.md')})`, 'All shows the five again', 8000);
+                if (width === 390) { const clash = await ev(`[...document.querySelectorAll('#group-table-view tr.inbox-kind-row')].map(tr => { const c = tr.querySelector('.inbox-wait-state'), m = tr.querySelector('.inbox-row-more-toggle, .dt-mail-more-toggle'); if (!c || !m || !c.getClientRects().length || !m.getClientRects().length) return null; const a = c.getBoundingClientRect(), b = m.getBoundingClientRect(); return a.right > b.left + 1 && a.left < b.right - 1 && a.bottom > b.top + 1 && a.top < b.bottom - 1; }).filter(x => x === true).length`); assert.equal(clash, 0, '390 px: no row\'s state chip lies under its more dots (#20066)'); }
                 await shot('agent-five');
                 if (width === 390) assert.match(await ev(`document.querySelector('.inbox-agent-status').innerText.trim()`), /^5 waiting · 3 inactive$/, 'a phone shows the mock’s one short count line, with no stray separators');
                 if (width === 1280) {

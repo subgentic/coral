@@ -38,6 +38,7 @@
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr .inbox-review-actions > .inbox-star.inbox-star-on { color: var(--accent); border-color: var(--accent); } /* a starred file: the accent, and aria-pressed says it */
 /* a question: the sender on the top line, its words (the asker's whole question) under it, across the row; the line that said 'Needs your answer' is the icon's name now */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] > .inbox-review-item { display: contents; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) .inbox-review-from:not([data-badge])::after { content: none; } /* the sender stands alone on the question's top line when no chip follows it */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-name) > td[data-key="agent"] .inbox-review-from { grid-column: 3 / 5; order: 3; font-size: var(--fs-title); font-weight: var(--fw-strong); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr:has(.inbox-ask-subject-links) > td[data-key="agent"] .inbox-review-from { grid-column: 3; }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr .inbox-ask-subject-links { display: inline-flex; gap: 6px; align-items: center; min-width: 0; color: transparent; text-decoration: none; } /* a question's goal and task are chips in its meta line, under the question (#19812, the approved list; #19425 had them on the title's line) */
@@ -166,7 +167,6 @@
 @media (min-width: 640px) {
 @container (min-width: 50rem) { /* beside the text only when the list is wide in its own text size: 200% text keeps the buttons on their own line (#20016) */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td:not([data-key="agent"], [data-key="team"], [data-key="waiting"], [data-key="review"]):not(:first-child) { grid-column: 3 / 5; grid-row: 3; }
-:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr.inbox-ask-row .inbox-meta:has(> .inbox-kind:only-child) { display: none; } /* the pill in the name line says the kind: the grey word under the text said it twice (#20016) */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td[data-key="agent"] .inbox-ask-name { grid-column: 3 / 5; grid-row: 2; }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr.inbox-ask-row > td[data-key="review"] { grid-column: 5 / -1; grid-row: 2 / span 2; align-self: center; justify-content: flex-end; flex-wrap: nowrap; padding: 0; }
 }
@@ -196,6 +196,7 @@
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr > td[data-key="cli"] > .inbox-meta-dir::before { content: '·'; margin-inline: 6px; } /* "Claude · folder": the dot has its space on both sides, in a flex cell too (#19941) */
 /* Needs you's two tabs (#19904): Waiting on you, Waiting on an agent: underline tabs over the search row; only the first counts toward the badges. */
 :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { display: flex; gap: 20px; order: 0; flex: 1 1 calc(100% - 5rem); min-width: 0; margin: 0; border-bottom: 1px solid var(--border); }
+:root .team-needs-list .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more) > .inbox-needs-tabs { display: flex; gap: 20px; order: 0; flex: 1 1 calc(100% - 5rem); min-width: 0; margin: 0; border-bottom: 1px solid var(--border); } /* the team page draws the two tabs as the Inbox does: side by side, underlined, on one line (#20050) */
 :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the tabs are the heading: it stays for a screen reader */
 :root .inbox-folder-toolbar .inbox-needs-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 2px 9px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; }
 :root .inbox-folder-toolbar .inbox-needs-tab.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
@@ -272,3 +273,5 @@
   :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-agent-status > :not(.inbox-st-short) { display: none; }
   :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-agent-status .inbox-st-short { display: inline; }
 }
+
+@media (max-width: 760px) { :root #group-table-view .inbox-needs-results tr.inbox-kind-row .inbox-agent-first:not(:has(> .inbox-review-wait)) > .inbox-wait-state { margin-inline-end: 46px; } } /* a row with no time: the state chip stops short of the row's ⋯ instead of lying under it (#20066, re-walk row 16) */
