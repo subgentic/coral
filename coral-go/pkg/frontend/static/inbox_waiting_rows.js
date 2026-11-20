@@ -24,11 +24,11 @@ export function make(env) {
         const name = DT.primaryButton(title, `Open ${title}`); name.classList.add('inbox-review-name'); name.setAttribute('aria-label', `Open ${title}, ${WA.KIND_WORD[it.kind]}, waiting on ${who}`);
         const wrap = DT.el('span', 'inbox-review-item inbox-agent-first'), sender = agentLink(who.trim() || 'sender unknown', { board: boardTeamKey(LOCAL_SERVER, it.board || ''), cls: 'inbox-review-from' });
         const pills = WA.pills(it, { openGoal: (team, id) => go({ ...env.folderRoute, id: team, item: String(id) }), openTask: (team, id) => env.openItemRoute('tasks', team, String(id), `${team}#${id}`) });
-        const state = AW.stateNodes(s.agentRef, it.kind, isPhoneLayout()), chipNode = isPhoneLayout() ? null : AW.stateChip(s.agentRef), tail = WA.commentTail(it); if (tail) for (const c of [chipNode, ...state].filter(n => n?.classList?.contains('inbox-wait-state'))) c.append(` \u00b7 ${tail}`); // the mock's line of a sent comment: Archived \u00b7 version 2 \u00b7 Thread #688
-        const line = [WA.chip(it, who), ...state, WA.quote(it)];
+        const grouped = env.grouped?.(), state = grouped ? [] : AW.stateNodes(s.agentRef, it.kind, isPhoneLayout()), chipNode = isPhoneLayout() || grouped ? null : AW.stateChip(s.agentRef), tail = WA.commentTail(it); if (tail) for (const c of [chipNode, ...state].filter(n => n?.classList?.contains('inbox-wait-state'))) c.append(` \u00b7 ${tail}`); // grouped by agent the heading has the state: the row keeps its kind chip and the thread (mock v3) // the mock's line of a sent comment: Archived \u00b7 version 2 \u00b7 Thread #688
+        const line = [WA.chip(it, who), ...state, WA.quote(it)]; if (grouped && tail) line[0].append(` \u00b7 ${tail}`);
         const note = it.kind === 'answered_ask' ? DT.el('span', 'inbox-extra-meta', 'No reply or task update yet') : null; // the mock's line after the agent's state (walk #20067)
         if (isPhoneLayout()) { wrap.append(sender, name); if (pills.childNodes.length) wrap.append(pills); wrap.append(DT.el('span', 'sr-only', `Waiting on ${who}, waiting on agent, not counted`), ...line); return wrap; }
-        const meta = DT.el('span', 'inbox-meta'); meta.append(line[0], AW.waitTarget(sender), ...(chipNode ? [chipNode] : []), ...(note ? [note] : []), ...(pills.childNodes.length ? [pills] : []));
+        const meta = DT.el('span', 'inbox-meta'); meta.append(line[0], ...(grouped ? [] : [AW.waitTarget(sender)]), ...(chipNode ? [chipNode] : []), ...(note ? [note] : []), ...(pills.childNodes.length ? [pills] : []));
         wrap.append(name, line[line.length - 1], meta, ...line.slice(1, -1)); return wrap;
     }
     function waitItemActions(s) {
