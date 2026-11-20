@@ -1,7 +1,7 @@
 /* Waiting on an agent: the two kinds that are not a file the Operator sent back (#19904, the approved two-tab mock, server side #19916): an ASK the Operator answered ("Your answer: ...") and a COMMENT the Operator sent
  * ("You commented: ..."), each still waiting on the agent. Read from GET /api/waiting-on-agent (the Operator's alone; oldest first, at most 100). The rows are never counted in a badge: only the tab says how many.
  * The words are the Operator's own, set with textContent only; the agent's name goes through the hidden-mark guard like every agent text. */
-import { serverFetch, LOCAL_SERVER, boardTeamKey } from './server_base.js';
+import { serverFetch, LOCAL_SERVER, boardTeamKey, isCloud } from './server_base.js';
 import { markHidden } from './visible_marks.js';
 import { el } from './dom_el.js';
 import { browserLocal } from './safe_storage.js';
@@ -32,7 +32,7 @@ export const titleOf = it => String(it.title || (it.artifact && it.artifact.name
 export function load({ force = false, onChange = null } = {}) {
     if (onChange) redraw = onChange;
     if (inflight || (!force && Date.now() - readAt < FRESH_MS)) return inflight;
-    inflight = serverFetch(LOCAL_SERVER, '/api/waiting-on-agent').then(async r => { if (!r.ok) throw new Error(String(r.status)); const d = await r.json(); return Array.isArray(d?.items) ? d.items : []; })
+    inflight = (isCloud() ? Promise.reject(new Error('hub')) : serverFetch(LOCAL_SERVER, '/api/waiting-on-agent')).then(async r => { if (!r.ok) throw new Error(String(r.status)); const d = await r.json(); return Array.isArray(d?.items) ? d.items : []; })
         .then(list => { const was = JSON.stringify([items, failed]); items = list; failed = false; return was !== JSON.stringify([items, failed]); }, () => { const was = failed; failed = true; items = []; return !was; })
         .then(changed => { readAt = Date.now(); inflight = null; if (changed) redraw(); });
     return inflight;
