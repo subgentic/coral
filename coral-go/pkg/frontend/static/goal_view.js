@@ -49,7 +49,7 @@ const PAGE = 50;
 export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals' }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
     const root = host;
     const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', tab: 'tasks', creating: false };
-    let current = goal;
+    let current = goal, uncommittedBox = null;
     let disposed = false, stopStartupWaits = null;
     const goalById = gid => current?.id === gid ? current : null;
     const doneOf = rollup => rollup.done, totalOf = rollup => W.allTasksOf(rollup);
@@ -206,7 +206,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (closedLine) { const c = el('p', `goals-note goals-closed-by${g.closedBy && g.closedBy !== 'Operator' ? ' goals-closed-by-agent' : ''}`, closedLine); c.setAttribute('role', 'note'); main.append(c); }
         const doneWords = doneNote(g);
         if (doneWords && !W.isClosedGoal(g)) { const note = el('p', 'goals-note goal-done-note', doneWords); if (W.isOpenGoal(g)) { const mark = btn('btn btn-small goal-done-mark', 'Mark done', () => openClose(g)); mark.setAttribute('aria-label', `Mark done: ${g.title}, all its tasks are done`); note.append(' ', mark); } main.append(note); } // an active goal with every task done says so, and when it reaches Needs you (#15166)
-        if ((looksDone(g) || (W.isClosedGoal(g) && C.closedRecently(g))) && sp.server === LOCAL_SERVER) { const un = el('div', 'team-uncommitted goal-uncommitted'); un.hidden = true; main.append(un); importOnce('./team_uncommitted.js').then(m => { m.refreshUncommitted(sp.name, un); }).catch(() => {}); } // work an agent left uncommitted in the team's folder, with Review changes and Commit (#17284)
+        if ((looksDone(g) || (W.isClosedGoal(g) && C.closedRecently(g))) && sp.server === LOCAL_SERVER) { if (!uncommittedBox) { uncommittedBox = el('div', 'team-uncommitted goal-uncommitted'); uncommittedBox.hidden = true; } main.append(uncommittedBox); importOnce('./team_uncommitted.js').then(m => { if (!disposed) m.refreshUncommitted(sp.name, uncommittedBox); }).catch(() => {}); } // Keep the last drawn box while the refresh answers, including across page redraws (#20167). The refresh's sequence guard keeps older replies out.
         if (g.movedOpen) main.append(el('p', 'goals-note', `${g.movedOpen} moved task${g.movedOpen === 1 ? ' is' : 's are'} unfinished or cannot be checked here. Check “Done when” before closing this goal.`));
         const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
         paintWaiting(g, waitNote);
