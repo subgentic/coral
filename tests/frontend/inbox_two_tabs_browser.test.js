@@ -195,6 +195,12 @@ const { coralReady } = require('./helpers/wait');
                     assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .inbox-sent-back')].filter(c => /^Comment sent$/.test(c.textContent) && c.closest('tr').textContent.includes('Awake file.txt')).length`), 0, 'it does not flip to Comment sent');
                     await ev(`(async () => { window.__waiting = window.__waiting.filter(i => i.id !== 'cmt-99'); const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
                 }
+                if (width === 1280) { // QA on #20075: a comment on a goal (no file) keeps Open thread, which opens the goal
+                    await ev(`(async () => { window.__waiting = [...window.__waiting, { kind: 'comment_sent', id: 'cmt-goal', board: '${team}', agent: { name: 'DevOps Engineer', role: 'DevOps', session_id: 'sess-devops' }, since: new Date(Date.now() - 120000).toISOString(), title: null, operator_words: 'Add the rollback step.', goal: { id: 250, title: 'Release plan note' }, task: null, artifact: null, thread_id: null }]; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
+                    await waitFor(`!!(${row('Release plan note')})`, 'the goal comment is a row', 8000);
+                    assert.ok((await btn('Release plan note')).includes('Open thread'), 'a sent comment on a goal has Open thread too (QA #20075): ' + JSON.stringify(await btn('Release plan note')));
+                    await ev(`(async () => { window.__waiting = window.__waiting.filter(i => i.id !== 'cmt-goal'); const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
+                }
                 // a computer that cannot answer: the sent-back files stay, and the list says some could not be read
                 await ev(`(async () => { window.__waitingFail = true; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
                 await waitFor(`/Some waiting items could not be read/.test(document.getElementById('group-table-view').innerText) && !(${row('Tag v2.1.1')}) && !!(${row('Awake file.txt')})`, 'an unreadable list is said, and the files still show', 8000);
