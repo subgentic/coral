@@ -117,7 +117,7 @@ async function readAsk(s) {
     // The row draws ALL of it, wrapped, and a Yes is a button only while the drawn block is not clipped (measured after layout and on resize, in fill): a request the row cannot show whole is refused or opened in the agent, never allowed blind (#14173, UI Reviewer and Security).
     const autoBlockAt = permission && typeof po.auto_block_at === 'string' ? po.auto_block_at : ''; // when Claude Code's own timer blocks the request by itself (#15140)
     const targetNote = permission && typeof po.target_note === 'string' ? stepClean(po.target_note).slice(0, 240) : '';
-    const tool = permission && typeof po.title === 'string' ? (stepClean(po.title).match(/^([A-Za-z][\w.-]{0,24}) command$/) || [])[1] || '' : ''; // the agent's own name for the tool ('Bash command'): the row's title names it, a tool it does not name is 'a command' (#19941)
+    const tool = permission && typeof po.title === 'string' ? (stepClean(po.title).match(/^(bash|shell|sh|zsh|powershell|pwsh|cmd|terminal) command$/i) || [])[1] || '' : ''; // the agent's own name for the tool ('Bash command'): the row's title echoes only a fixed list of shell words; any other name an MCP tool or a prompt chose is 'a command' (#20001, Security)
     return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject, held, question: stepClean(po.question).slice(0, 120), target, targetNote, autoBlockAt, tool } : { ...none, target, targetNote, autoBlockAt, tool };
 }
 
