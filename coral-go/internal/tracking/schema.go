@@ -102,6 +102,14 @@ const (
 	FailWorktreeFailed     = "worktree_failed"
 	FailInternal           = "internal"
 	FailHomeFolderAsked    = "home_folder_asked" // the dashboard asked about the home folder and nothing started: a question, not a failed launch (#13425)
+	FailDisclosureAsked    = "disclosure_asked"  // the dashboard showed the first-launch notice and nothing started: a question, not a failed launch (#19936)
+	// The request's own refusals, split out of invalid_request so the funnel can tell them apart (#19936). Each is a closed value, never text.
+	FailWorkdirMissing   = "workdir_missing"    // no working directory was named
+	FailTeamAccessOff    = "team_access_off"    // the team's access switch is off
+	FailNameTaken        = "name_taken"         // the name is already a member of the team
+	FailInvalidModel     = "invalid_model"      // a model or thinking level that is not valid
+	FailOutsideTeam      = "outside_team"       // the folder is outside the team's folders
+	FailAgentTypeInvalid = "agent_type_invalid" // an agent type Coral does not know
 )
 
 type propKind int
@@ -131,7 +139,8 @@ var (
 	backendEnu  = enum("tmux", "pty", "unknown")
 	kindEnu     = enum(KindAgent, KindTeam)
 	failureEnu  = enum(FailInvalidRequest, FailUnsupportedOption, FailLimitReached, FailWorkdirUnavailable,
-		FailBackendUnavailable, FailProviderMissing, FailProviderUnrunnable, FailSpawnFailed, FailWorktreeFailed, FailInternal, FailHomeFolderAsked)
+		FailBackendUnavailable, FailProviderMissing, FailProviderUnrunnable, FailSpawnFailed, FailWorktreeFailed, FailInternal, FailHomeFolderAsked,
+		FailDisclosureAsked, FailWorkdirMissing, FailTeamAccessOff, FailNameTaken, FailInvalidModel, FailOutsideTeam, FailAgentTypeInvalid)
 	agentCount = intRange(0, 64)
 )
 
@@ -278,9 +287,14 @@ func (a *Attempt) Finish(outcome, category string, started, failed int) {
 	p["started_agents"] = strconv.Itoa(started)
 	p["failed_agents"] = strconv.Itoa(failed)
 	TrackEvent(EventLaunchResult, p)
-	if outcome == OutcomeFailure && category != "" { // the funnel's first failed launch (#7455): the category only, from the closed list
+	if outcome == OutcomeFailure && category != "" && !isQuestion(category) { // a question the dashboard asked is not a failed launch (#19936); the funnel's first failed launch (#7455): the category only, from the closed list
 		TrackFunnelStep(EventFunnelLaunchFailed, map[string]string{"kind": a.kind, "provider": a.provider, "failure_category": category})
 	}
+}
+
+// isQuestion reports whether category is a question the dashboard asked before anything started (the home folder, the first-launch notice): it is recorded in launch_result and never counted as the funnel's failed launch.
+func isQuestion(category string) bool {
+	return category == FailHomeFolderAsked || category == FailDisclosureAsked
 }
 
 // ProviderFor maps an agent type to the closed provider enum. A blank type
