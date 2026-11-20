@@ -26,6 +26,8 @@ type cloudStatus struct {
 	AllowHubAutoAccept bool `json:"allow_hub_auto_accept"`
 	// DeviceWebMode is the mode a browser paired from the connect link starts at: this computer's own setting (#19669; beta default launch).
 	DeviceWebMode string `json:"device_web_mode"`
+	// ComputerFingerprint is this computer's key as the pairing browser shows it, while a connect waits for approval (#19969): the person compares the two. A hash of a public key; absent when not enrolling.
+	ComputerFingerprint string `json:"computer_fingerprint,omitempty"`
 	// MaxMode is the saved cap (the connector's own max_mode is what the tunnel enforces); MaxModeSaved says the owner chose it (Connect's question, or Settings): an unset cap reads as view, so without this an
 	// existing install and a new one look the same, and the Connect screen could not keep what an install has while offering Launch to a new one.
 	MaxModeSaved bool `json:"max_mode_saved"`
@@ -81,6 +83,9 @@ func (h *CloudHandler) status() cloudStatus {
 	}
 	out := cloudStatus{Status: st, DeviceWebMode: h.ss.DeviceWebMode(context.Background()), AllowHubAutoAccept: allow, MaxModeSaved: modeSaved, RedactTokens: redact, HubRelaunchUpdates: relaunch, HubRelaunchNeedsHere: relaunchNeedsLocalApproval, HubRelaunchAvailable: updateRelaunchFeature, HubCrossTeamSettings: crossTeam, AllowHubAutoAcceptChanged: changed, Bootstrap: boot, OfferAtLaunch: h.OfferAtLaunch}
 	out.HubRelaunchUpdatesAtLaunch = h.HubUpdateAtLaunch
+	if m := h.manager(); m != nil && st.State == cloud.StateEnrolling {
+		out.ComputerFingerprint = m.DisplayFingerprint()
+	}
 	if missing, known := h.ownerLabelState(context.Background()); known && missing {
 		out.OwnerLabelMissing = true
 	}

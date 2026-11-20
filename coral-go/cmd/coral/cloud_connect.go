@@ -219,6 +219,8 @@ type cloudStatusReply struct {
 	AllowHubAutoAccept bool `json:"allow_hub_auto_accept"`
 	// DeviceWebMode is the mode a browser paired from the link starts at, this computer's own setting.
 	DeviceWebMode string `json:"device_web_mode"`
+	// ComputerFingerprint is this computer's key as the browser shows it, while waiting for approval (#19969).
+	ComputerFingerprint string `json:"computer_fingerprint"`
 }
 
 func (c *cloudClient) status(ctx context.Context) (cloudStatusReply, int) {
@@ -338,6 +340,9 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 		if ui.ask {
 			fmt.Fprint(ui.out, pairingPrompt(st.DeviceWebMode))
 			fmt.Fprintf(ui.out, "\nOpen %s\nYour code %s should already be filled in. Approve it there (from any computer).\n", st.VerificationURL+frag, st.UserCode)
+			if st.ComputerFingerprint != "" {
+				fmt.Fprintf(ui.out, "%s\n", fingerprintLine(st.ComputerFingerprint))
+			}
 			fmt.Fprintln(ui.out, "\nWaiting for you to approve… (Ctrl-C to cancel)")
 		} else {
 			// One line, for a log or a script (#3285).

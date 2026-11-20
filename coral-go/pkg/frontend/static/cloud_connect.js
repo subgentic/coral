@@ -129,6 +129,8 @@ class CloudPanel {
         if (!enrolling) this.pairingSecret = null; // a secret is for one pairing: gone with it
         const code = this.part('code');
         if (code) code.hidden = !enrolling;
+        put(this.part('computer-key'), enrolling ? st.computer_fingerprint || '' : ''); // this computer's key as the browser shows it, to compare; gone with the pairing (#19969)
+        const fr = this.part('computer-key-row'); if (fr) fr.hidden = !(enrolling && st.computer_fingerprint);
         if (enrolling) {
             const href = safeHref(st.verification_url);
             const a = this.part('link');
