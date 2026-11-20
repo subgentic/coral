@@ -61,6 +61,27 @@ const B = 'goal-done-unc-' + Date.now().toString(36);
         const uncommitted = await ev('window.__goalUncommittedSnapshot');
         assert.equal(uncommitted.words, 'Files changed in shop, not committed: 2 changed, 1 new');
         assert.ok(uncommitted.review && uncommitted.commit, 'Review changes and Commit are there');
+        // Hold the refresh response so a redraw cannot hide behind a fast fetch (#20167).
+        await ev(`(async () => {
+            const gv = await import((window.__coralStatic || '/static/') + 'goal_view.js');
+            const host = document.createElement('div'); host.id = 'uncommitted-redraw'; document.body.append(host);
+            const real = window.fetch;
+            window.__uncPending = [];
+            window.fetch = (u, o) => /\\/uncommitted$/.test(String(u)) && window.__uncHold
+                ? new Promise(resolve => window.__uncPending.push(resolve)) : real(u, o);
+            window.__uncGoal = { id: 987, title: 'Redraw goal', state: 'active', images: [], updatedAt: new Date().toISOString(), rollup: { done: 1, active: 0, blocked: 0, queued: 0 } };
+            window.__uncView = gv.mountGoal(host, { team: '${B}', id: 987, back() {}, goal: window.__uncGoal, refresh() {}, status: () => ({}) });
+            return true;
+        })()`);
+        await waitFor(`!!document.querySelector('#uncommitted-redraw .team-uncommitted-commit')`, 'initial uncommitted box', 10000);
+        await ev(`window.__uncHold = true; window.__uncView.update({...window.__uncGoal, title: 'Updated goal'}); true`);
+        await waitFor(`window.__uncPending.length > 0`, 'refresh waiting for its response', 10000);
+        assert.deepEqual(await ev(`(() => { const box = document.querySelector('#uncommitted-redraw .goal-uncommitted'); return { visible: !box.hidden, words: box.querySelector('.team-uncommitted-words')?.textContent, review: !!box.querySelector('.team-uncommitted-review'), commit: !!box.querySelector('.team-uncommitted-commit') }; })()`), {
+            visible: true, words: 'Files changed in shop, not committed: 2 changed, 1 new', review: true, commit: true
+        }, 'redraw keeps the last words and both actions until the response arrives');
+        await ev(`window.__uncPending.splice(0).forEach(resolve => resolve(new Response(JSON.stringify({repos: []}), {status: 200, headers: {'Content-Type': 'application/json'}}))); true`);
+        await waitFor(`document.querySelector('#uncommitted-redraw .goal-uncommitted').hidden`, 'empty response hides the old box', 10000);
+        await ev(`window.__uncView.dispose(); document.getElementById('uncommitted-redraw').remove(); true`);
         console.log('\nPASS a goal that looks done: the Needs you row and the goal page say work is left uncommitted, with Review changes and Commit');
     } finally { await guard.restore().catch(() => {}); await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
