@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
                 await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await settle(500);
                 await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'zzz-no-such-item'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(600);
                 const card = await ev(`(() => { const v = document.getElementById('group-table-view'), e = v.querySelector('.empty-state'); return { card: e ? e.textContent.replace(/\\s+/g, ' ').trim() : null, note: !!v.querySelector('.inbox-filter-hidden'), rows: v.querySelectorAll('tbody tr:not(.dt-group)').length, above: !!e && [...v.querySelectorAll('tbody tr')].every(r => e.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
-                assert.ok(/Nothing that needs you matches the search and filters\./.test(card.card || '') && /Show all/.test(card.card) && !card.note && card.rows >= 1 && card.above, `${w}: the filtered result is the card above the Getting started rows: ` + JSON.stringify(card));
+                assert.ok(/Nothing waiting on you matches .+\./.test(card.card || "") && /Show all \(\d+\)/.test(card.card) && !card.note && card.rows >= 1 && card.above, `${w}: the filtered result is the card above the Getting started rows: ` + JSON.stringify(card));
                 { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { await ev(`document.querySelectorAll('.notification-toast').forEach(t => t.remove()); true`); require('node:fs').writeFileSync(`${d}/filtered-empty-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
                 await ev(`[...document.querySelectorAll('.empty-state button')].find(x => x.textContent.trim() === 'Show all').click(); true`); await settle(500);
                 await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'off' }; return true; })()`);
@@ -57,7 +57,7 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'zzz-no-such-item'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(500);
             const empty = () => ev(`(() => { const e = [...document.querySelectorAll('.empty-state')].find(x => /matches/.test(x.textContent)); const b = e && [...e.querySelectorAll('button')].find(x => x.textContent.trim() === 'Show all'); return { text: e ? e.textContent.replace(/\\s+/g, ' ').trim() : null, button: !!b }; })()`);
             const e1 = await empty();
-            assert.ok(/matches the search and filters/.test(e1.text || '') && e1.button, `${w}: the empty result has a Show all: ` + JSON.stringify(e1));
+            assert.ok(/Nothing waiting on you matches .+\./.test(e1.text || '') && e1.button, `${w}: the empty result has a Show all: ` + JSON.stringify(e1));
             await ev(`[...document.querySelectorAll('.empty-state button')].find(x => x.textContent.trim() === 'Show all').click(); true`); await settle(500);
             assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`), 2, `${w}: Show all brings both rows back`);
             assert.equal(await ev(`document.getElementById('inbox-search').value`), '', `${w}: and empties the search box`);
