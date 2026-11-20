@@ -36,7 +36,8 @@ func TestWindowsShellIdleTellsABarePromptFromARunningProgram(t *testing.T) {
 	}, 20*time.Second, 200*time.Millisecond, "a shell with nothing running in it is idle")
 
 	// A program in the shell, as an agent CLI is: busy, so notices are typed to it.
-	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("ping -n 6 127.0.0.1"+EnterKey)))
+	// A program that outlasts any plausible delay of the runner and then ends by itself: a 6 s ping could end before a loaded runner looked, so busy was never seen (#20081). Ctrl+C does not stop a ping through the test's SendInput (QA's run on frontier), so nothing is typed to stop it.
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("ping -n 30 127.0.0.1"+EnterKey)))
 	require.Eventually(t, func() bool {
 		idle, _, ok := b.ShellIdle(name)
 		return ok && !idle
@@ -46,7 +47,7 @@ func TestWindowsShellIdleTellsABarePromptFromARunningProgram(t *testing.T) {
 	require.Eventually(t, func() bool {
 		idle, _, ok := b.ShellIdle(name)
 		return ok && idle
-	}, 20*time.Second, 200*time.Millisecond, "the shell is idle again once the program has exited")
+	}, 60*time.Second, 200*time.Millisecond, "the shell is idle again once the program has exited")
 }
 
 // A program started directly as the terminal's root (an agent with no shell around it) is the agent itself: never idle.
@@ -83,9 +84,9 @@ func TestWindowsShellIdleANestedShellIsStillABarePrompt(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 
-	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("ping -n 6 127.0.0.1"+EnterKey)))
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("ping -n 30 127.0.0.1"+EnterKey))) // outlasts a loaded runner and ends by itself (#20081)
 	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && !idle }, 20*time.Second, 200*time.Millisecond, "a program in the nested shell is busy")
-	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 20*time.Second, 200*time.Millisecond, "and a bare prompt again once it ends")
+	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 60*time.Second, 200*time.Millisecond, "and a bare prompt again once it ends")
 }
 
 // #216 (the Orchestrator's narrower rule, after Security on #388): a shell of unknown contents covers what runs under it. A cmd.exe copied
