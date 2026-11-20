@@ -85,9 +85,9 @@ func TestTheOrchestratorMakesATaskForWhatAGoalNamesForTheirReview(t *testing.T) 
 	}
 }
 
-// #16703 (walk 31 F2): an Orchestrator closed a goal the person made before the person reviewed the code. The guide says a person's goal is closed by the person: ask in Needs you, leave it open.
-func TestTheOrchestratorAsksBeforeClosingAGoalThePersonMade(t *testing.T) {
-	const rule = "A goal the person made is closed by the person: when its work is finished, post `coral-board post --ask \"@Operator Goal #N looks done: close it?\"` and leave it open until they say so"
+// #16703 (walk 31 F2): an Orchestrator closed a goal the person made before the person reviewed the code. The guide says a person's goal is closed by the person; #20128: the agent posts nothing about it, Needs you shows "Goal looks done" by itself.
+func TestTheOrchestratorLeavesAGoalThePersonMadeToThemAndPostsNothing(t *testing.T) {
+	const rule = "A goal the person made is closed by the person: when its work is finished, do nothing more: it shows in their Needs you as \"Goal looks done\" by itself, and you post nothing about it"
 	if !strings.Contains(agent.DefaultOrchestratorSystemPrompt, rule) {
 		t.Errorf("the orchestrator's default prompt lacks %q", rule)
 	}

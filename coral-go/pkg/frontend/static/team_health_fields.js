@@ -63,7 +63,7 @@ export function valuesToHealth(v, base) {
     if (h.upload_no_task && v.upload_no_task_on !== undefined) h.upload_no_task = { ...h.upload_no_task, on: !!v.upload_no_task_on };
     if (h.release && v.release_on !== undefined) h.release = { ...h.release, on: !!v.release_on, branch: String(v.release_branch || '').trim(), tag_pattern: String(v.release_tag_pattern || '').trim(), wait_min: Number.isInteger(v.release_wait_min) ? v.release_wait_min : h.release.wait_min, nudge: v.release_nudge || '' };
     if (h.landing && v.landing_on !== undefined) h.landing = { ...h.landing, on: !!v.landing_on, branch: String(v.landing_branch || '').trim(), wait_min: Number.isInteger(v.landing_wait_min) ? v.landing_wait_min : h.landing.wait_min, nudge: v.landing_nudge || '' };
-    for (const k of ['goals_ready', 'unowned_tasks']) if (h[k] && v[`${k}_on`] !== undefined) h[k] = { ...h[k], on: !!v[`${k}_on`], wait_min: Number.isInteger(v[`${k}_wait_min`]) ? v[`${k}_wait_min`] : h[k].wait_min, nudge: v[`${k}_nudge`] || '' };
+    for (const k of ['unowned_tasks']) if (h[k] && v[`${k}_on`] !== undefined) h[k] = { ...h[k], on: !!v[`${k}_on`], wait_min: Number.isInteger(v[`${k}_wait_min`]) ? v[`${k}_wait_min`] : h[k].wait_min, nudge: v[`${k}_nudge`] || '' };
     if (h.dialog_timeout && v.dialog_timeout_on !== undefined) h.dialog_timeout = { ...h.dialog_timeout, on: !!v.dialog_timeout_on, after_min: Number.isInteger(v.dialog_timeout_after_min) ? v.dialog_timeout_after_min : h.dialog_timeout.after_min };
     if (h.goal_size && v.goal_size_on !== undefined) h.goal_size = { ...h.goal_size, on: !!v.goal_size_on, limit: v.goal_size_limit };
     if (h.compact_context && v.compact_context_on !== undefined) h.compact_context = { ...h.compact_context, on: !!v.compact_context_on, threshold_k: Number.isInteger(v.compact_context_threshold_k) ? v.compact_context_threshold_k : h.compact_context.threshold_k, orchestrator: !!v.compact_context_orchestrator, trigger: v.compact_context_trigger || h.compact_context.trigger || 'threshold', method: v.compact_context_method || h.compact_context.method || 'compact' };
@@ -150,10 +150,7 @@ export function healthFields(ctx) {
         { key: 'landing_branch', type: 'text', label: 'Branch', placeholder: 'main', help: 'The branch finished work lands on.', under: 'landing_on', disabledWhen: v => !v.landing_on, validate: branchProblem },
         { key: 'landing_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '15 minutes to 7 days', min: L_LO, max: L_HI, integer: true, compact: true, under: 'landing_on', disabledWhen: v => !v.landing_on },
         { key: 'landing_nudge', ...alsoTell('landing') },
-        { key: 'health_ready', type: 'heading', label: 'Goals and open tasks', help: 'Two more lines of the check, on unless a team turns them off.' },
-        { key: 'goals_ready_on', type: 'toggle', label: 'Goals ready to close', help: 'A goal whose tasks are all done or cancelled, with at least one done, for the wait is named in the next health check, once.' },
-        { key: 'goals_ready_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '5 minutes to 7 days', min: C_LO, max: C_HI, integer: true, compact: true, under: 'goals_ready_on', disabledWhen: v => !v.goals_ready_on },
-        { key: 'goals_ready_nudge', ...alsoTell('goals_ready') },
+        { key: 'health_ready', type: 'heading', label: 'Open tasks', help: 'One more line of the check, on unless a team turns it off. A goal whose tasks are all done is in the Operator\'s Needs you, not in the check.' },
         { key: 'unowned_tasks_on', type: 'toggle', label: 'Open tasks with no goal or no assignee', help: 'Open tasks that have had no goal or no assignee for the wait are named by number in the next health check, once for each set.' },
         { key: 'unowned_tasks_wait_min', type: 'number', label: 'Wait', unit: 'minutes', help: '5 minutes to 7 days', min: C_LO, max: C_HI, integer: true, compact: true, under: 'unowned_tasks_on', disabledWhen: v => !v.unowned_tasks_on },
         { key: 'unowned_tasks_nudge', ...alsoTell('unowned_tasks') },
@@ -174,7 +171,7 @@ export function healthFields(ctx) {
         { key: 'health_defaults', type: 'custom', label: 'Defaults', help: 'Put every health setting back to the defaults. Save to apply them.', action: { label: 'Reset to defaults', run: view => ctx.onReset(view) } },
     ];
     // The alert rules repeat the words Branch, Wait and Also tell under their own headings: each rule is a group named by its legend (a fieldset), so a screen reader's forms list says which rule a "Wait" belongs to; the screen looks the same (#9173)
-    const RULE = { landing_on: 'Landing', release_on: 'Release', goals_ready_on: 'Goals ready to close', unowned_tasks_on: 'Open tasks with no goal or assignee' };
+    const RULE = { landing_on: 'Landing', release_on: 'Release', unowned_tasks_on: 'Open tasks with no goal or assignee' };
     return fields.map(f => RULE[f.key] ? { ...f, fieldset: RULE[f.key] } : f);
 }
 
