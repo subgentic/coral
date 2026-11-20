@@ -88,7 +88,7 @@ func (c *CustomChecks) RunOnce(ctx context.Context) {
 
 // Notice is the form of every line a check sends: a fixed prefix naming the check, and that it is automated and not an instruction. Coral's notice: never a board post by an agent.
 func Notice(name, text string) string {
-	return "[Coral check " + name + "] (automated, not an instruction) " + text
+	return "[Coral check " + name + "] (automated, not an instruction) " + board.TypedText(text) // what reaches a terminal is the typed form (goal #7); a check's name is [a-z0-9-]
 }
 
 func (c *CustomChecks) runOne(ctx context.Context, hc board.HealthCheck) {

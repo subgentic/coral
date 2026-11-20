@@ -29,6 +29,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("claim nudge", claimNudgeText(12), claimNudgeText(12)),
 		typedcensus.C("status nudge", statusNudgeText(12, 30), statusNudgeText(12, 30)),
 		typedcensus.C("task reminder", taskReminderText(12, at), taskReminderText(12, at)),
+		typedcensus.C("custom check line", Notice("stale-prs", "PR 14 open 26 h"), Notice("stale-prs", h)), // a check's text is data: redacted, cleaned, typed (#20137)
 		typedcensus.C("goal done nudge", goalDoneNudgeText(12, 15), goalDoneNudgeText(12, 15)), // a fixed template with the goal's number only (#12161)
 		typedcensus.C("team health check", typedHealthCheck("Since 08:00: 2 tasks completed. Waiting: Backend Dev on #12."), typedHealthCheck(composed)),
 		typedcensus.C("team health check, roster form", typedHealthCheck("[Coral health check] 08:00Z · 3 agents"), typedHealthCheck("[Coral health check] 08:00Z · "+h)),
@@ -69,6 +70,8 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("context_compact.go", `c.deliver(ctx, a, clearCommand(a.AgentType))`, 1, "the /clear of an agent whose handoff note is stored: the CLI's own command, one fixed line (see the compact exception above)"),
 		typedcensus.S("context_compact.go", `c.deliver(ctx, a, p.text)`, 1, "the cleared agent's one line: clearedText, in the census (context cleared)"),
 		typedcensus.S("context_compact.go", `rt.SendInput(ctx, terminalinput.Coral, name, text)`, 1, "deliverCommand's own send: types the fixed compact line, listed above"),
+		typedcensus.S("health_custom_checks.go", `board.OneLine(text), "health check"`, 1, "the custom checks' deliver: forwards Notice (census: custom check line), never a script's own words"),
+		typedcensus.S("health_custom_checks.go", `hc.Project, hc.Name), text)`, 1, "a custom check's line, built by Notice (census: custom check line): a fixed opener, redacted and cleaned text, typed through board.TypedText"),
 		typedcensus.S("health_limit.go", `deliver(ctx, a, key, text)`, 1, "sendUnlessBlocked: forwards the text of the callers listed here"),
 		typedcensus.S("health_nudges.go", `board.OneLine(text), "health nudge"`, 1, "the nudges' deliver: forwards the builders below"),
 		typedcensus.S("health_nudges.go", `claimNudgeText(`, 1, "census"),

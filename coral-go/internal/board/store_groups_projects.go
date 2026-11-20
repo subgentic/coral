@@ -275,6 +275,8 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM health_items WHERE project = ?", 1},
 		{"DELETE FROM health_offbooks WHERE project = ?", 1},
 		{"DELETE FROM health_goal_size WHERE project = ?", 1},
+		{"DELETE FROM health_check_keys WHERE check_id IN (SELECT id FROM health_checks WHERE project = ?)", 1},
+		{"DELETE FROM health_checks WHERE project = ?", 1},
 		{"DELETE FROM boards WHERE id = ?", 1},
 	} {
 		args := make([]any, q.args)
