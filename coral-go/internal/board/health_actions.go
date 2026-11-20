@@ -222,6 +222,13 @@ func (s *Store) HealthActionTaken(ctx context.Context, project, rule, target str
 	return n > 0, err
 }
 
+// HealthActionSince is HealthActionTaken for an action recorded at or after since: a notice that is not repeated within a period (#20128).
+func (s *Store) HealthActionSince(ctx context.Context, project, rule, target string, since time.Time) (bool, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM health_actions WHERE project = ? AND rule = ? AND target = ? AND at >= ?`, project, rule, target, since.UTC().Format(healthTimeFormat))
+	return n > 0, err
+}
+
 // RecordHealthAction records an action outside the limits (a marker, such as a message that
 // was already the reason for a reminder).
 func (s *Store) RecordHealthAction(ctx context.Context, project, rule, target string, now time.Time) error {
