@@ -213,3 +213,17 @@
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep, :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { padding: 8px 10px; border: 1px solid; border-radius: var(--radius-sm); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-asleep { border-color: rgba(var(--warning-rgb), .5); background: rgba(var(--warning-rgb), .1); }
 :root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-wait-line.inbox-wait-archived { border-color: rgba(var(--error-rgb), .5); background: rgba(var(--error-rgb), .1); }
+
+:root #group-table-view .inbox-needs-results .inbox-agent-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px var(--table-pad-x, 12px); font-size: var(--fs-sm); color: var(--text-muted); }
+:root #group-table-view .inbox-needs-results .inbox-agent-status strong { color: var(--text); font-weight: 600; }
+:root #group-table-view .inbox-needs-results .inbox-st-chip { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+:root #group-table-view .inbox-needs-results .inbox-st-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+:root #group-table-view .inbox-needs-results .inbox-st-awake { color: var(--success-text); }
+:root #group-table-view .inbox-needs-results .inbox-st-asleep { color: var(--warning-text); }
+:root #group-table-view .inbox-needs-results .inbox-st-archived { color: var(--error-text); }
+:root #group-table-view .inbox-needs-results th.inbox-group-flex { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+:root #group-table-view .inbox-needs-results .inbox-group-right { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; font-weight: 400; }
+:root #group-table-view .inbox-needs-results .inbox-group-meta { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-goal { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; padding: 4px 10px; border-radius: var(--radius-sm); background: rgba(var(--success-rgb), 0.1); border: 1px solid rgba(var(--success-rgb), 0.28); font-size: var(--fs-sm); white-space: normal; }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-label { font-weight: 600; color: var(--success-text); }
+:root #group-table-view .inbox-needs-results :is(tr.inbox-card-tr, .inbox-kind-row) .inbox-closes-text { color: var(--text); min-width: 0; overflow-wrap: anywhere; }

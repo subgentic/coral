@@ -34,7 +34,7 @@ export function make(env) {
         const quiet = (text, slot, run) => { const b = DT.el('button', 'btn btn-quiet btn-small', text); b.type = 'button'; b.setAttribute('data-slot', slot); b.setAttribute('aria-label', `${text}: ${title}`); b.addEventListener('click', run); return b; };
         const thing = it.artifact?.hex ? 'file' : it.goal?.id ? 'goal' : it.task?.id ? 'task' : '';
         const agent = ws.live ? agentLink(ws.who, { board: team, session: ws.live.session_id, cls: 'btn btn-quiet btn-small inbox-open-agent', text: 'Open agent', label: `Open ${markHidden(ws.who, { strict: true })}` }) : null;
-        box.append(...[AW.wakeButton(ws), thing ? quiet(`Open ${thing}`, 'open-file', () => openWaitItem(s)) : null, agent].filter(Boolean));
+        box.append(...[AW.wakeButton(ws, it.kind), thing ? quiet(`Open ${thing}`, 'open-file', () => openWaitItem(s)) : null, agent].filter(Boolean));
         menu.push(...AW.menuItems(it, ws, { openBoard: () => go(keyRoute('team', team)) }), { label: 'View on board', title: 'Open the team’s board', run: () => go(keyRoute('team', team)) }, { label: 'Stop waiting', title: 'Take it off this list; nobody is told', run: () => { WA.dismiss(it); env.redraw(); } });
         const more = env.moreMenu(menu, title); more.setAttribute('data-slot', 'dots'); box.append(more); return box;
     }
