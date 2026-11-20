@@ -28,7 +28,7 @@ import (
 var primitives = map[string]bool{
 	"Spawn": true, "CreateSession": true, "RestartPane": true,
 	"KillAgent": true, "KillSession": true, "KillSessionOnly": true,
-	"LaunchAgent": true, "wakeExistingSession": true, "wakeSession": true, // wakeSession is the wake itself: wakeExistingSession forwards to it, and so does WakeIdleFor (an agent woken without its starting prompt, #12358)
+	"LaunchAgent": true, "wakeExistingSession": true, "wakeSession": true, // wakeSession is the wake itself: wakeExistingSession forwards to it, and so does wakeSleeperFor, the body of WakeIdleFor and WakeForOperator (an agent woken without its starting prompt, #12358)
 }
 
 // scanDirs are the folders the census reads (see SCOPE above).
@@ -68,8 +68,8 @@ var pinnedSites = map[string]string{
 	"wake_resume_gone.go SessionsHandler.watchResumeGone": background + ": starts a Claude agent fresh in its own terminal when the agent's own log says its conversation was not found; it is reached only from the success path of a wake (a person's Wake or a gated background wake), a few seconds after that wake, never from a request or an agent (#12714)",
 	"auto_wake.go SessionsHandler.autoWakeOne":            background + ": only reached from AutoWakeAfterRestart",
 	// auto-sleep (#12111): it ends a terminal by itself and a delivery wakes an agent by itself
-	"auto_sleep.go SessionsHandler.autoSleepOne":     background + ": only reached from autoSleepPass, which RunAutoSleep runs",
-	"auto_sleep_wake.go SessionsHandler.WakeIdleFor": background + ": an automated wake (a delivery's); a person's own Send is a person's action",
+	"auto_sleep.go SessionsHandler.autoSleepOne":        background + ": only reached from autoSleepPass, which RunAutoSleep runs",
+	"auto_sleep_wake.go SessionsHandler.wakeSleeperFor": background + ": the body of WakeIdleFor (an automated wake, a delivery's) and of WakeForOperator (the Operator's own message to a sleeper, #19897); a person's own Send is a person's action",
 }
 
 // backgroundEntries are the reviewed loop entries and functions that start or end agents on their own: the callers of the guarded helpers that are not handlers.
@@ -83,7 +83,7 @@ var backgroundEntries = []string{
 	"auto_sleep.go SessionsHandler.RunAutoSleep",
 	"auto_sleep.go SessionsHandler.autoSleepPass",
 	"auto_sleep.go SessionsHandler.autoSleepOne",
-	"auto_sleep_wake.go SessionsHandler.WakeIdleFor",
+	"auto_sleep_wake.go SessionsHandler.wakeSleeperFor",
 	"dialog_watch.go SessionsHandler.RunDialogWatch",
 	"auto_accept.go AutoAcceptor.Run",
 }
@@ -200,7 +200,7 @@ var pinnedCallers = map[string]string{
 	"sessions_launch_session.go SessionsHandler.LaunchSigninTerminal": "the OpenCode sign-in route (SetSigninTerminal, router.go): a person's Sign in click, with a command built from a fixed shape (#16716)",
 	"sessions_launch_team.go SessionsHandler.launchTeamMember":        "the team launch handlers",
 	"sessions_wake.go SessionsHandler.wakeExistingSession":            "the wake handlers; its two background callers are autoResume and autoWakeOne",
-	"sessions_wake.go SessionsHandler.wakeSession":                    "wakeExistingSession (the wake handlers and their background callers) and WakeIdleFor, a background entry",
+	"sessions_wake.go SessionsHandler.wakeSession":                    "wakeExistingSession (the wake handlers and their background callers) and wakeSleeperFor (the body of WakeIdleFor and WakeForOperator), a background entry",
 }
 
 func TestEveryCallerOfAPersonTriggeredFunctionIsAHandlerListedOrGated(t *testing.T) {

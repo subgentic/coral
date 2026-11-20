@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // The Operator's answer to an agent's question wakes the asker if it was put to sleep after it asked (#19901): the answer is a board post that tags the asker, and a post never wakes a manual sleeper, so the answer sat
@@ -24,6 +25,7 @@ func (h *BoardHandler) wakeAskerForOperator(project, asker string) {
 		return
 	}
 	go func() {
+		defer safego.Recover("ask-answer-wake")
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 		if !h.operatorWaker(ctx, sid) {
