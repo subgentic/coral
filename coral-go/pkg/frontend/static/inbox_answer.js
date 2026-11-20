@@ -252,7 +252,7 @@ function fill(s, cell, withDismiss = true, primaryOpen = false) {
     const draw = ({ ask, picks, onlyReject, unreadable, held, trustWhy, step, stepFull, question, later, lines, trust, rateLimit, browser, target, targetNote, autoBlockAt }) => {
         cell._cmdObserver?.disconnect(); cell._cmdObserver = null; // the earlier block's observer goes with the block (#14173)
         cell.replaceChildren();
-        const said = norm => String(norm || '').replace(/[?\s]+$/, '');
+        const said = norm => String(norm || '').replace(/[?:\s]+$/, ''); // 'Pick a color:' is the row's 'Pick a color' (#19962)
         const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
         if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
         const yesButtons = [];
