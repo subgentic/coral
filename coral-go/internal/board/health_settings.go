@@ -69,6 +69,11 @@ type HealthSettings struct {
 	// is marked "(Recommended)", Coral answers with that option and tells the agent so in one fixed line. The agent wrote the label, so this is the agent answering its own question: see
 	// routes/auto_recommend.go for what bounds it.
 	AutoRecommend HealthAutoRecommend `json:"auto_recommend"`
+	// OffBooks, PoolReview and WaitEscalate were fixed numbers in the check (#20136): the grace after a task completes, how many off-the-books lines one check says, how long a review waits in the pool, and how long an agent
+	// waits on someone before that someone is told.
+	OffBooks     HealthOffBooks     `json:"off_books"`
+	PoolReview   HealthPoolReview   `json:"pool_review"`
+	WaitEscalate HealthWaitEscalate `json:"wait_escalate"`
 }
 
 // HealthDialogTimeout: whether a dialog left unanswered is closed, and after how many minutes (DialogTimeoutMin to DialogTimeoutMax; 0 in a body is the default).
@@ -116,6 +121,7 @@ const (
 
 // HealthRelease: the branch and the tag pattern (a git glob, "v*" by default) to compare, how long the branch may be past the newest matching tag before Coral says so, and who else is told.
 type HealthRelease struct {
+	RuleRoute
 	On         bool   `json:"on"`
 	Branch     string `json:"branch"`
 	TagPattern string `json:"tag_pattern"`
@@ -158,8 +164,11 @@ func (r HealthRelease) Problem() string {
 
 // HealthWaitCheck is a check that waits: On, the wait in minutes, and the member also told when its line is new ("" tells nobody beyond the check's recipient).
 type HealthWaitCheck struct {
-	On      bool   `json:"on"`
-	WaitMin int    `json:"wait_min"`
+	RuleRoute
+	On      bool `json:"on"`
+	WaitMin int  `json:"wait_min"`
+	// MaxList is how many task numbers a line names before it says how many more there are (the unowned-tasks line; 0 is the default, 8).
+	MaxList int    `json:"max_list"`
 	Nudge   string `json:"nudge"`
 }
 
@@ -191,6 +200,7 @@ func (c HealthWaitCheck) clamp(def int) HealthWaitCheck {
 
 // HealthLanding: the branch to watch and how long it may stand still, with tasks finished, before Coral says so (again after each further WaitMin until it moves).
 type HealthLanding struct {
+	RuleRoute
 	On      bool   `json:"on"`
 	Branch  string `json:"branch"`
 	WaitMin int    `json:"wait_min"`
@@ -230,17 +240,20 @@ func LandingBranchValid(b string) bool {
 
 // HealthGoalSize: say it once a goal's tasks pass Limit (then again at 2 x Limit, 3 x Limit ...).
 type HealthGoalSize struct {
+	RuleRoute
 	On    bool `json:"on"`
 	Limit int  `json:"limit"`
 }
 
 // HealthRuleOn is a rule that is only on or off.
 type HealthRuleOn struct {
+	RuleRoute
 	On bool `json:"on"`
 }
 
 // HealthClaimNudge: nudge an idle agent to claim its work after AfterMin, escalate after Nudges.
 type HealthClaimNudge struct {
+	RuleRoute
 	On       bool `json:"on"`
 	AfterMin int  `json:"after_min"`
 	Nudges   int  `json:"nudges"`
@@ -248,6 +261,7 @@ type HealthClaimNudge struct {
 
 // HealthStatusNudge: ask for a status after AfterMin without activity, escalate EscalateAfterMin later.
 type HealthStatusNudge struct {
+	RuleRoute
 	On               bool `json:"on"`
 	AfterMin         int  `json:"after_min"`
 	EscalateAfterMin int  `json:"escalate_after_min"`
@@ -280,6 +294,7 @@ func (a HealthActionList) clamp() HealthActionList {
 
 // HealthMentionNudge: remind the orchestrator of a mention unanswered for AfterMin.
 type HealthMentionNudge struct {
+	RuleRoute
 	On       bool `json:"on"`
 	AfterMin int  `json:"after_min"`
 }
@@ -360,6 +375,9 @@ func DefaultHealthSettings() HealthSettings {
 		UnownedTasks:    HealthWaitCheck{On: true, WaitMin: UnownedTasksWaitMin},
 		DialogTimeout:   HealthDialogTimeout{On: false, AfterMin: DialogTimeoutDefault},
 		AutoRecommend:   HealthAutoRecommend{On: false, GraceMin: AutoRecommendGraceDefault},
+		OffBooks:        HealthOffBooks{PostGraceMin: OffBooksPostGraceDefault, MaxLines: OffBooksMaxLinesDefault},
+		PoolReview:      HealthPoolReview{On: true, AfterMin: PoolReviewAfterDefault},
+		WaitEscalate:    HealthWaitEscalate{AfterMin: WaitEscalateAfterDefault},
 	}
 }
 
@@ -430,6 +448,12 @@ func (h HealthSettings) Clamp() HealthSettings {
 		h.AutoRecommend.GraceMin = AutoRecommendGraceDefault
 	}
 	h.AutoRecommend.GraceMin = min(max(h.AutoRecommend.GraceMin, 1), AutoRecommendGraceMax)
+	h.UnownedTasks.MaxList = pickInt(h.UnownedTasks.MaxList, UnownedMaxListDefault, 1, 20)
+	h.OffBooks.PostGraceMin = pickInt(h.OffBooks.PostGraceMin, OffBooksPostGraceDefault, 1, 30)
+	h.OffBooks.MaxLines = pickInt(h.OffBooks.MaxLines, OffBooksMaxLinesDefault, 1, 20)
+	h.PoolReview.AfterMin = pickInt(h.PoolReview.AfterMin, PoolReviewAfterDefault, 5, 1440)
+	h.WaitEscalate.AfterMin = pickInt(h.WaitEscalate.AfterMin, WaitEscalateAfterDefault, 5, 1440)
+	h.clampRoutes()
 	h.Recipient = strings.TrimSpace(h.Recipient)
 	var revs []string
 	for _, r := range h.DefaultReviewers {

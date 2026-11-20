@@ -158,7 +158,7 @@ func TestOpenTasksWithNoGoalOrNoAssigneeAreListedByNumber(t *testing.T) {
 func TestTheNewWaitChecksHaveDefaultsAndLimits(t *testing.T) {
 	d := DefaultHealthSettings().Clamp()
 	assert.Equal(t, HealthWaitCheck{On: true, WaitMin: 30}, d.GoalsReady, "on by default, 30 minutes")
-	assert.Equal(t, HealthWaitCheck{On: true, WaitMin: 15}, d.UnownedTasks, "on by default, 15 minutes")
+	assert.Equal(t, HealthWaitCheck{On: true, WaitMin: 15, MaxList: 8}, d.UnownedTasks, "on by default, 15 minutes")
 	assert.False(t, DefaultHealthSettings().Landing.On, "the landing alert stays off by default")
 	zero := HealthSettings{}.Clamp()
 	assert.Equal(t, 30, zero.GoalsReady.WaitMin, "a body that carries no wait: the default wait")

@@ -347,6 +347,8 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Delete("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/release", boardHandler.ReleaseTaskByID) // "not now" work back to the queue (#11660)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/ack", boardHandler.AckHealthItem)
+	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/health/settings", boardHandler.GetHealthSettings)
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/settings", boardHandler.PutHealthSettings)
 	r.Get("/api/board/{project}/context-reset-status", boardHandler.GetContextResetStatus) // each agent's last compaction or skip reason, for Team settings (#15066)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)

@@ -279,78 +279,12 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		body.CrossTeamServers = &clean
 	}
 	if p := bytes.TrimSpace(body.HealthRaw); len(p) > 0 && !bytes.Equal(p, []byte("null")) {
-		// A health body is a patch: what it does not name keeps its stored value, at every depth (the store applies it in the same transaction as the rest). The checks below are of the
-		// settings it names, on what they would become.
-		merged := h.bs.GetHealthSettings(r.Context(), urlParam(r, "project"))
-		dec := json.NewDecoder(bytes.NewReader(p))
-		if viaHub {
-			dec.DisallowUnknownFields()
-		}
-		var named map[string]json.RawMessage
-		if err := dec.Decode(&merged); err != nil || json.Unmarshal(p, &named) != nil {
-			errBadRequest(w, "invalid JSON")
+		merged, ok := h.checkHealthPatch(w, r, urlParam(r, "project"), p, viaHub)
+		if !ok {
 			return
 		}
 		body.HealthPatch = p
 		body.Health = &merged
-		_, landing := named["landing"]
-		_, release := named["release"]
-		_, goalsReady := named["goals_ready"]
-		_, unowned := named["unowned_tasks"]
-		_, recipient := named["recipient"]
-		if msg := body.Health.Landing.Problem(); landing && msg != "" {
-			errBadRequest(w, msg)
-			return
-		}
-		if msg := body.Health.Release.Problem(); release && msg != "" {
-			errBadRequest(w, msg)
-			return
-		}
-		if _, dialog := named["dialog_timeout"]; dialog {
-			if msg := body.Health.DialogTimeout.Problem(); msg != "" {
-				errBadRequest(w, msg)
-				return
-			}
-		}
-		if _, recommend := named["auto_recommend"]; recommend {
-			if msg := body.Health.AutoRecommend.Problem(); msg != "" {
-				errBadRequest(w, msg)
-				return
-			}
-		}
-		for field, who := range map[string]string{"landing": body.Health.Landing.Nudge, "release": body.Health.Release.Nudge} {
-			if who = strings.TrimSpace(who); who != "" && (field == "landing" && landing || field == "release" && release) {
-				if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), who); err != nil || sub == nil {
-					errBadRequest(w, fmt.Sprintf("health.%s.nudge: %q is not a member of this team", field, board.OneLine(who)))
-					return
-				}
-			}
-		}
-		for _, wc := range []struct {
-			name string
-			c    board.HealthWaitCheck
-		}{{"goals_ready", body.Health.GoalsReady}, {"unowned_tasks", body.Health.UnownedTasks}} {
-			if wc.name == "goals_ready" && !goalsReady || wc.name == "unowned_tasks" && !unowned {
-				continue
-			}
-			if msg := wc.c.Problem(wc.name); msg != "" {
-				errBadRequest(w, msg)
-				return
-			}
-			if who := strings.TrimSpace(wc.c.Nudge); who != "" {
-				if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), who); err != nil || sub == nil {
-					errBadRequest(w, fmt.Sprintf("health.%s.nudge: %q is not a member of this team", wc.name, board.OneLine(who)))
-					return
-				}
-			}
-		}
-		// The check's recipient is a member of this team, never anyone else (#4176 rule 18).
-		if rcpt := strings.TrimSpace(body.Health.Recipient); recipient && rcpt != "" {
-			if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), rcpt); err != nil || sub == nil {
-				errBadRequest(w, fmt.Sprintf("health.recipient: %q is not a member of this team", board.OneLine(rcpt)))
-				return
-			}
-		}
 	}
 	project := urlParam(r, "project")
 	var before board.BoardSettings
@@ -972,4 +906,111 @@ func relayedTeamLabel(label, id string) string {
 		return l
 	}
 	return ""
+}
+
+// checkHealthPatch is every check a save of the health settings goes through, whoever makes it (the Operator's settings route, the Orchestrator's health settings route): a health body is a patch (what it
+// does not name keeps its stored value, at every depth), and the checks are of the settings it names, on what they would become. It writes the refusal and returns false, or returns the settings the patch makes.
+func (h *BoardHandler) checkHealthPatch(w http.ResponseWriter, r *http.Request, project string, p []byte, viaHub bool) (board.HealthSettings, bool) {
+	// A health body is a patch: what it does not name keeps its stored value, at every depth (the store applies it in the same transaction as the rest). The checks below are of the
+	// settings it names, on what they would become.
+	merged := h.bs.GetHealthSettings(r.Context(), project)
+	dec := json.NewDecoder(bytes.NewReader(p))
+	if viaHub {
+		dec.DisallowUnknownFields()
+	}
+	var named map[string]json.RawMessage
+	if err := dec.Decode(&merged); err != nil || json.Unmarshal(p, &named) != nil {
+		errBadRequest(w, "invalid JSON")
+		return merged, false
+	}
+	_, landing := named["landing"]
+	_, release := named["release"]
+	_, goalsReady := named["goals_ready"]
+	_, unowned := named["unowned_tasks"]
+	_, recipient := named["recipient"]
+	if msg := merged.Landing.Problem(); landing && msg != "" {
+		errBadRequest(w, msg)
+		return merged, false
+	}
+	if msg := merged.Release.Problem(); release && msg != "" {
+		errBadRequest(w, msg)
+		return merged, false
+	}
+	if _, dialog := named["dialog_timeout"]; dialog {
+		if msg := merged.DialogTimeout.Problem(); msg != "" {
+			errBadRequest(w, msg)
+			return merged, false
+		}
+	}
+	if _, recommend := named["auto_recommend"]; recommend {
+		if msg := merged.AutoRecommend.Problem(); msg != "" {
+			errBadRequest(w, msg)
+			return merged, false
+		}
+	}
+	for field, who := range map[string]string{"landing": merged.Landing.Nudge, "release": merged.Release.Nudge} {
+		if who = strings.TrimSpace(who); who != "" && (field == "landing" && landing || field == "release" && release) {
+			if sub, err := h.bs.GetProjectSubscription(r.Context(), project, who); err != nil || sub == nil {
+				errBadRequest(w, fmt.Sprintf("health.%s.nudge: %q is not a member of this team", field, board.OneLine(who)))
+				return merged, false
+			}
+		}
+	}
+	for _, wc := range []struct {
+		name string
+		c    board.HealthWaitCheck
+	}{{"goals_ready", merged.GoalsReady}, {"unowned_tasks", merged.UnownedTasks}} {
+		if wc.name == "goals_ready" && !goalsReady || wc.name == "unowned_tasks" && !unowned {
+			continue
+		}
+		if msg := wc.c.Problem(wc.name); msg != "" {
+			errBadRequest(w, msg)
+			return merged, false
+		}
+		if who := strings.TrimSpace(wc.c.Nudge); who != "" {
+			if sub, err := h.bs.GetProjectSubscription(r.Context(), project, who); err != nil || sub == nil {
+				errBadRequest(w, fmt.Sprintf("health.%s.nudge: %q is not a member of this team", wc.name, board.OneLine(who)))
+				return merged, false
+			}
+		}
+	}
+	// The check's recipient is a member of this team, never anyone else (#4176 rule 18).
+	if rcpt := strings.TrimSpace(merged.Recipient); recipient && rcpt != "" {
+		if sub, err := h.bs.GetProjectSubscription(r.Context(), project, rcpt); err != nil || sub == nil {
+			errBadRequest(w, fmt.Sprintf("health.recipient: %q is not a member of this team", board.OneLine(rcpt)))
+			return merged, false
+		}
+	}
+
+	// Each rule's recipient and text level (#20136): the levels are Coral's own, a recipient is a member of this team and never the Operator, and a rule that does not read one refuses it.
+	var rules map[string]map[string]json.RawMessage
+	_ = json.Unmarshal(p, &rules)
+	keys := map[string]map[string]bool{}
+	named2 := map[string]bool{}
+	for rule, fields := range rules {
+		keys[rule] = map[string]bool{}
+		for f := range fields {
+			keys[rule][f] = true
+		}
+		named2[rule] = true
+	}
+	if msg := merged.RouteProblems(named2); msg != "" {
+		errBadRequest(w, msg)
+		return merged, false
+	}
+	if msg := board.RouteKeyProblems(keys, merged); msg != "" {
+		errBadRequest(w, "health."+msg)
+		return merged, false
+	}
+	for key, who := range merged.RouteMembers() {
+		rule, field, _ := strings.Cut(key, ".")
+		if !keys[rule][field] {
+			continue
+		}
+		if sub, err := h.bs.GetProjectSubscription(r.Context(), project, who); err != nil || sub == nil {
+			errBadRequest(w, fmt.Sprintf("health.%s: %q is not a member of this team", key, board.OneLine(who)))
+			return merged, false
+		}
+	}
+	return merged, true
 }

@@ -24,10 +24,12 @@ const offBooksPostScan = 200
 
 // maxOffBooksPerCheck is how many off-the-books lines one check says (the oldest first; the rest wait for the next check): the check drops whole lines when it is over its size cap, so a flood
 // of occurrences must not push out the items that need the orchestrator.
-const maxOffBooksPerCheck = 5
+// It is the team's setting off_books.max_lines (#20136); this is its default.
+const maxOffBooksPerCheck = board.OffBooksMaxLinesDefault
 
 // postGrace is how long after a task is completed a post still counts as made on it.
-const postGrace = 2 * time.Minute
+// It is the team's setting off_books.post_grace_min (#20136); this is its default.
+const postGrace = board.OffBooksPostGraceDefault * time.Minute
 
 var (
 	shaTokenRe     = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
@@ -106,22 +108,22 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 		}
 	}
 	if hs.BusyNoTask.On {
-		m.noteBusyNoTask(ctx, project, orch, subs, bySession, inProgress, time.Duration(hs.BusyNoTask.AfterMin)*time.Minute, now)
+		m.noteBusyNoTask(ctx, project, orch, subs, bySession, inProgress, time.Duration(hs.BusyNoTask.AfterMin)*time.Minute, hs.BusyNoTask.RuleRoute, now)
 	}
-	m.scanOffBooksPosts(ctx, project, orch, subs, hs.PostNoTask.On, now)
+	m.scanOffBooksPosts(ctx, project, orch, subs, hs.PostNoTask.On, time.Duration(hs.OffBooks.PostGraceMin)*time.Minute, now)
 	m.noteOperatorWaits(ctx, project, orch, subs, bySession, now)     // a post that waits on the Operator and is not in their Needs you (#12138)
 	m.noteChatOperatorWaits(ctx, project, orch, subs, bySession, now) // and a chat reply that does (#12138 part 2)
 	if hs.GoalSize.On {
-		m.noteGoalSizes(ctx, project, hs.GoalSize.Limit, now)
+		m.noteGoalSizes(ctx, project, hs.GoalSize.Limit, hs.GoalSize.RuleRoute, now)
 	}
 	if hs.Landing.On && m.landing != nil {
 		for _, detail := range m.landing.note(ctx, project, hs.Landing, now) {
-			m.nudgeMember(ctx, project, orch, hs, hs.Landing.Nudge, "landing-alert:", detail, bySession, subs)
+			m.nudgeMember(ctx, project, orch, hs, hs.Landing.Member(hs.Landing.Nudge), "landing-alert:", detail, bySession, subs)
 		}
 	}
 	if hs.Release.On && m.landing != nil {
 		for _, detail := range m.landing.noteRelease(ctx, project, hs.Release, now) {
-			m.nudgeMember(ctx, project, orch, hs, hs.Release.Nudge, "release-alert:", detail, bySession, subs)
+			m.nudgeMember(ctx, project, orch, hs, hs.Release.Member(hs.Release.Nudge), "release-alert:", detail, bySession, subs)
 		}
 	}
 	if hs.GoalsReady.On {
@@ -134,8 +136,8 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 	if err != nil {
 		return nil
 	}
-	if len(pending) > maxOffBooksPerCheck {
-		pending = pending[:maxOffBooksPerCheck]
+	if len(pending) > hs.OffBooks.MaxLines {
+		pending = pending[:hs.OffBooks.MaxLines]
 	}
 	items := make([]teamhealth.Item, 0, len(pending))
 	var ids []offBooksShown
@@ -145,7 +147,8 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 			dropped = append(dropped, p.ID)
 			continue
 		}
-		if boardOwnLine(p.Kind) { // a line about the board's own goal, branch, release or tasks: no agent, and what to do is in it
+		m.nudgeRuleMember(ctx, project, orch, hs, p, bySession, subs, now) // the rule's own "to", once per occurrence (#20136)
+		if boardOwnLine(p.Kind) {                                          // a line about the board's own goal, branch, release or tasks: no agent, and what to do is in it
 			items = append(items, teamhealth.Item{Rank: 3, Agent: "Board", Problem: p.Detail})
 			ids = append(ids, offBooksShown{id: p.ID, needle: "Board: " + p.Detail})
 			continue
@@ -211,7 +214,7 @@ func (m *BoardHealthMonitor) markOffBooksShown(ctx context.Context, project, tex
 }
 
 // noteBusyNoTask (a): an agent in a turn, by its hook events, for at least after, with no task in progress. The turn's start is the occurrence, so a long turn is said once.
-func (m *BoardHealthMonitor) noteBusyNoTask(ctx context.Context, project, orch string, subs []board.Subscriber, bySession map[string]AgentInfo, inProgress map[string]bool, after time.Duration, now time.Time) {
+func (m *BoardHealthMonitor) noteBusyNoTask(ctx context.Context, project, orch string, subs []board.Subscriber, bySession map[string]AgentInfo, inProgress map[string]bool, after time.Duration, route board.RuleRoute, now time.Time) {
 	for _, sub := range subs {
 		a, live := bySession[sub.SessionName]
 		if !live || board.SameIdentity(sub.SubscriberID, orch) || inProgress[sub.SubscriberID] {
@@ -224,14 +227,14 @@ func (m *BoardHealthMonitor) noteBusyNoTask(ctx context.Context, project, orch s
 		if _, blocked := m.blockedByLimit(ctx, a); blocked {
 			continue // its turn was cut short by a usage limit: it is not working, the check says it is blocked (#9361)
 		}
-		detail := fmt.Sprintf("has been working for %s with no task in progress", teamhealth.Age(now.Sub(sig.Since)))
+		detail := fmt.Sprintf(route.Pick("working for %s with no task", "has been working for %s with no task in progress", "has been working for %s with no task in progress: ask what it is doing, or put it on a task"), teamhealth.Age(now.Sub(sig.Since)))
 		_ = m.store.AddOffBooks(ctx, project, board.OffBooksBusy, sub.SubscriberID, sub.SubscriberID+"|"+sig.Since.UTC().Format(time.RFC3339), detail, now)
 	}
 }
 
 // scanOffBooksPosts (b): the board's messages since the last scan (the first scan only marks where the board is: nothing before it is judged). A post by a member other than the
 // orchestrator, not Coral's, not a reply to a task, with no task number in it, that offers a commit or a patch, and whose author had no task in progress when it was posted.
-func (m *BoardHealthMonitor) scanOffBooksPosts(ctx context.Context, project, orch string, subs []board.Subscriber, on bool, now time.Time) {
+func (m *BoardHealthMonitor) scanOffBooksPosts(ctx context.Context, project, orch string, subs []board.Subscriber, on bool, grace time.Duration, now time.Time) {
 	cursor, known := m.store.OffBooksPostCursor(ctx, project)
 	if !known {
 		if latest, err := m.store.LatestMessageID(ctx, project); err == nil {
@@ -264,7 +267,7 @@ func (m *BoardHealthMonitor) scanOffBooksPosts(ctx context.Context, project, orc
 		if err != nil {
 			at = now
 		}
-		if had, err := m.store.HadTaskInProgress(ctx, project, msg.SubscriberID, at, postGrace); err != nil || had {
+		if had, err := m.store.HadTaskInProgress(ctx, project, msg.SubscriberID, at, grace); err != nil || had {
 			continue
 		}
 		_ = m.store.AddOffBooks(ctx, project, board.OffBooksPost, msg.SubscriberID, strconv.FormatInt(msg.ID, 10), "posted "+what+" with no task number and no task in progress", at)
@@ -274,7 +277,7 @@ func (m *BoardHealthMonitor) scanOffBooksPosts(ctx context.Context, project, orc
 
 // noteGoalSizes (#7808, goal #21 part 6): a goal that is not closed and has more than limit tasks, open and done together (a goal that has grown that big is the thing to split, and what is
 // done is what to close), is a line of the check once per crossing and again at each further limit. Goals that are done or dropped are not counted. The line is numbers only: never the goal's title.
-func (m *BoardHealthMonitor) noteGoalSizes(ctx context.Context, project string, limit int, now time.Time) {
+func (m *BoardHealthMonitor) noteGoalSizes(ctx context.Context, project string, limit int, route board.RuleRoute, now time.Time) {
 	sizes, err := m.store.OpenGoalSizes(ctx, project)
 	if err != nil {
 		return
@@ -284,7 +287,7 @@ func (m *BoardHealthMonitor) noteGoalSizes(ctx context.Context, project string, 
 		return
 	}
 	for _, g := range crossed {
-		detail := fmt.Sprintf("Goal #%d has %d tasks (limit %d): consider splitting it or closing what is done", g.ID, g.Total, limit)
+		detail := fmt.Sprintf(route.Pick("Goal #%d has %d tasks (limit %d)", "Goal #%d has %d tasks (limit %d): consider splitting it or closing what is done", "Goal #%d has %d tasks (limit %d): consider splitting it into goals of a few tasks each, or closing the tasks that are done"), g.ID, g.Total, limit)
 		_ = m.store.AddOffBooks(ctx, project, board.OffBooksGoalSize, "Board", fmt.Sprintf("%d|%d|%d", g.ID, g.Total/limit, now.UnixNano()), detail, now)
 	}
 }
@@ -317,4 +320,38 @@ func (m *BoardHealthMonitor) nudgeMember(ctx context.Context, project, orch stri
 			return
 		}
 	}
+}
+
+// offBooksRoute is the rule behind an off-the-books kind: whose "to" a line of that kind goes to (#20136). Landing, release and unowned tasks are told when they are noted, with their own gate.
+func offBooksRoute(hs board.HealthSettings, kind string) (board.RuleRoute, bool) {
+	switch kind {
+	case board.OffBooksBusy:
+		return hs.BusyNoTask.RuleRoute, true
+	case board.OffBooksPost:
+		return hs.PostNoTask.RuleRoute, true
+	case board.OffBooksUpload:
+		return hs.UploadNoTask.RuleRoute, true
+	case board.OffBooksGoalSize:
+		return hs.GoalSize.RuleRoute, true
+	}
+	return board.RuleRoute{}, false
+}
+
+// nudgeRuleMember tells the member the rule's "to" names a line of the check, once per occurrence, through the same gate as every nudge. A rule with no "to" tells nobody beyond the check's recipient.
+func (m *BoardHealthMonitor) nudgeRuleMember(ctx context.Context, project, orch string, hs board.HealthSettings, p board.OffBooks, bySession map[string]AgentInfo, subs []board.Subscriber, now time.Time) {
+	route, ok := offBooksRoute(hs, p.Kind)
+	who := strings.TrimSpace(route.To)
+	if !ok || who == "" {
+		return
+	}
+	target := strconv.FormatInt(p.ID, 10)
+	if done, err := m.store.HealthActionTaken(ctx, project, "to-offbooks", target); err != nil || done {
+		return
+	}
+	detail := p.Detail
+	if !boardOwnLine(p.Kind) {
+		detail = teamhealth.Name(p.Agent) + " " + detail
+	}
+	m.nudgeMember(ctx, project, orch, hs, who, "to-offbooks:"+target+":", detail, bySession, subs)
+	_ = m.store.RecordHealthAction(ctx, project, "to-offbooks", target, now)
 }

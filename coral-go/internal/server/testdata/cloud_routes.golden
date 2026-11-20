@@ -110,6 +110,7 @@ GET /api/board/{project}/groups never
 GET /api/board/{project}/groups/{groupID}/members never
 GET /api/board/{project}/guide-asks view
 GET /api/board/{project}/guide-roster launch
+GET /api/board/{project}/health/settings never
 GET /api/board/{project}/lifecycle-log launch
 GET /api/board/{project}/messages view
 GET /api/board/{project}/messages/all view
@@ -581,6 +582,7 @@ PUT /api/auth/hub-signin never
 PUT /api/board/{project}/artifacts/{id}/review interact
 PUT /api/board/{project}/artifacts/{id}/tags interact
 PUT /api/board/{project}/guide-roster launch
+PUT /api/board/{project}/health/settings never
 PUT /api/board/{project}/orchestrator-grant launch
 PUT /api/board/{project}/settings launch
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never
