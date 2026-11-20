@@ -31,7 +31,8 @@ type fakeDrive struct {
 	batchStatus int    // answer the next batchUpdate with this status (a 5xx whose outcome the client cannot know)
 	fail429     int    // answer this many requests with 429 first
 	calls       []string
-	requests    [][]Request // every batchUpdate body, in order
+	requests    [][]Request    // every batchUpdate body, in order
+	raw         map[string]any // when set, documents.get answers with this instead of the paragraphs (a Doc a person styled by hand)
 }
 
 func newFake(t *testing.T) (*fakeDrive, *Client) {
@@ -156,6 +157,9 @@ func (f *fakeDrive) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *fakeDrive) structure() map[string]any {
+	if f.raw != nil {
+		return f.raw
+	}
 	var content []map[string]any
 	pos := 1
 	for _, p := range f.paras {
