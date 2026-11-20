@@ -265,13 +265,13 @@ const ARTIFACT_REF = /(coral:\/\/artifacts\/[a-f0-9]{64})/i;
 /** A coral://artifacts link in a review's question is a link, not text (#15338, walk 23): it opens that file in the viewer. */
 const linkQuestion = (s, tr) => {
     const sub = s.review && tr.querySelector('.dt-subtitle'); if (!sub || !ARTIFACT_REF.test(sub.textContent)) return;
-    const parts = sub.textContent.split(ARTIFACT_REF), server = splitKey(s.review.team).server;
+    const parts = sub.textContent.split(ARTIFACT_REF), { server, name: board } = splitKey(s.review.team);
     sub.textContent = '';
     for (const part of parts) {
         const hex = ARTIFACT_REF.test(part) ? part.slice(-64).toLowerCase() : '';
         if (!hex) { sub.append(part); continue; }
         const b = DT.el('button', 'btn-link inbox-question-link', `file ${hex.slice(0, 8)}`); b.type = 'button'; b.title = part;
-        b.addEventListener('click', e => { e.stopPropagation(); importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server })).catch(() => {}); });
+        b.addEventListener('click', e => { e.stopPropagation(); importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server, board })).catch(() => {}); });
         sub.append(b);
     }
 };

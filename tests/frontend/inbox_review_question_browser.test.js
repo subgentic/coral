@@ -24,6 +24,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const item = (i, name, q) => ({ id: hex(i), name, media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(i), produced_by: 'Writer', session_id: 's' + i, ...(q ? { review_question: q } : {}) });
                 window.__items = [item(1, 'plan-a.md', 'Which port should the test server use?'), item(2, 'plan-b.md', 'Ship the second\\u202e design?'), item(3, 'plan-c.md', ''), item(4, 'plan-d.md', 'Read coral://artifacts/' + hex(9) + ' first')];
                 window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'qn': window.__items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
+                    if (u.pathname.endsWith('/comments')) return json({comments:[{id:9,parent_id:null,body:'Please add the table.',anchor:{whole:true},mine:true,author:{kind:'owner',name:'You'},created_at:new Date().toISOString(),can:{reply:true,resolve:true}}],you:{can_comment:true,can_lock:true},locked:false});
                     if (u.pathname.startsWith('/api/artifacts/')) return Promise.resolve(new Response('Review preview text', { headers: { 'Content-Type': 'text/plain' } }));
                     if (!/^\\/api\\/board\\/qn\\/artifacts$/.test(u.pathname)) return original(url, opts);
                     return json({ project: 'qn', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); }; return true; })()`);
@@ -46,6 +47,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 check(!!link && link.tag === 'BUTTON' && link.title === 'coral://artifacts/' + '0'.repeat(63) + '9' && /^Read file 0{8} first$/.test(link.sub), at + 'the question\'s coral://artifacts reference is a link: ' + JSON.stringify(link));
                 await ev(`[...document.querySelectorAll('${T} tbody tr')].find(x => x.textContent.includes('plan-d.md')).querySelector('.inbox-question-link').click(); true`);
                 await waitFor(`!!document.querySelector('.artifact-viewer-close')`, at + 'the link opens the file in the viewer', 8000);
+                await waitFor(`!!document.querySelector('.ac-card[data-id="9"]')`, at + 'linked file comment loaded', 8000);
+                check(await ev(`!!document.querySelector('.ac-card[data-id="9"] .ac-ask-open')`), at + 'the question file link keeps its team so Send to agent is offered');
                 await ev(`document.querySelector('.artifact-viewer-close')?.click(); true`);
             }
             // the viewer says it too
