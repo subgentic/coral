@@ -55,13 +55,14 @@ const MENU = (extra = {}) => ({ question: 'Bash command Do you want to proceed?'
             { const head = await ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tbody tr')].find(t => t.querySelector('.inbox-cmd-block')); const e = tr && tr.querySelector('td[data-key="agent"] > .inbox-row-words:not(.inbox-row-command), .dt-mail-snippet'); return e ? e.textContent.trim() : null; })()`); check(head === 'Wants to run a bash command', `${at}the permission row says the same words at every width (#20066): ` + JSON.stringify(head)); }
             if (!mobile) {
             check(rows.button && rows.button.words.slice(0, 3).join() === 'Blue,Green,Red', `${at}a button ask shows its buttons in the row: ` + JSON.stringify(rows.button));
-            for (const k of ['button', 'yesno', 'plain', 'permission', 'question']) check(rows[k] && rows[k].lastIsMore, `${at}${k}: More is the last button of the row: ` + JSON.stringify(rows[k]));
-            for (const k of ['permission', 'yesno']) check(rows[k] && rows[k].pill !== '', `${at}${k}: the kind is a chip in the name line, as mock v3 draws Permission: ` + JSON.stringify(rows[k]));
-            for (const k of ['button', 'plain', 'question']) check(rows[k] && rows[k].pill === '', `${at}${k}: a question's kind is plain text under its words, not a chip (mock v3, #20066): ` + JSON.stringify(rows[k]));
+            for (const k of ['button', 'yesno', 'plain', 'permission', 'question']) check(rows[k] && rows[k].lastIsMore, `${at}${k}: More is the last button of the row: ` + JSON.stringify(rows.permission));
+            check(rows.permission && rows.permission.pill !== '', `${at}permission: the kind is a chip in the name line, as mock v3 draws it: ` + JSON.stringify(rows.permission));
+            for (const k of ['button', 'plain', 'question', 'yesno']) check(rows[k] && rows[k].pill === '', `${at}${k}: a question's kind (and a Yes / No ask's) is plain text under its words, not a chip (mock v3, #20066, #20101): ` + JSON.stringify(rows.permission));
             check(rows.plain && rows.plain.h <= (w >= 1000 ? 120 : 130), `${at}a one-line ask is three short lines (name, words, kind) with its buttons beside the text, no gap of 60 px: row ${rows.plain && rows.plain.h} px`);
             if (rows.welcome && !mobile) check(rows.welcome.lastIsMore, `${at}the first welcome row has More last, as the others do (#20066): ` + JSON.stringify(rows.welcome));
             if (rows.welcome) { const bgs = await ev(`[...document.querySelectorAll('#group-table-view tbody tr.inbox-card-tr')].filter(tr => tr.querySelector('.inbox-welcome-name')).map(tr => getComputedStyle(tr).backgroundColor + '|' + getComputedStyle(tr).boxShadow)`); check(new Set(bgs).size === 1, `${at}the first welcome row is styled like the rest: ` + JSON.stringify(bgs)); }
             }
+            await ev(`(document.querySelector('#group-table-view tr .inbox-cmd-block') || document.body).closest('tr')?.scrollIntoView({ block: 'center' }); true`); // the permission row is in the shot
             for (const th of ['light', 'dark']) { await ev(`document.documentElement.setAttribute('data-theme', '${th}'); true`); await new Promise(r => setTimeout(r, 600)); await shot(`anatomy-${w}-${th}`); } await ev(`document.documentElement.removeAttribute('data-theme'); true`); // sleep-ok: the theme transition ends
         }
     } finally { await client.close(); }

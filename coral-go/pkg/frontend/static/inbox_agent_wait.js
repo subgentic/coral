@@ -28,7 +28,7 @@ export const stateLine = (who, st, kind = '') => st === 'asleep' ? (WAKES[kind] 
 
 /** The row's Wake (asleep) or Start agent (archived) button; null for an awake or unknown agent. */
 export function wakeButton(ws, kind = '') {
-    if ((ws.state !== 'asleep' || WAKES[kind]) && ws.state !== 'archived') return null; // an asleep agent that an answer or a comment wakes needs no button
+    if (ws.state !== 'asleep' && ws.state !== 'archived') return null; // an asleep agent gets the amber Wake on every row, an answer or a comment's too (mock S4, final walk #20101); the line still says the reply is waking it (#19897)
     const label = ws.state === 'asleep' ? 'Wake' : 'Start agent', b = el('button', `btn btn-small inbox-wake inbox-wake-${ws.state}`, label); b.type = 'button'; b.dataset.slot = 'wake';
     b.setAttribute('aria-label', `${label} ${markHidden(ws.who, { strict: true })}`);
     b.addEventListener('click', () => { b.disabled = true; Promise.resolve().then(() => (ws.state === 'asleep' ? toggleAgentSleep(ws.live.name, ws.live.agent_type, ws.live.session_id, 'wake') : toggleAgentArchive(ws.live.name, ws.live.agent_type, ws.live.session_id, 'unarchive'))).catch(() => {}).finally(() => { b.disabled = false; document.dispatchEvent(new CustomEvent('coral:needs-updated')); }); });

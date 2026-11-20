@@ -38,6 +38,6 @@ export function sentBackExcerpt(row, server, board) {
         const last = mine[mine.length - 1];
         return last ? last.body.replace(/^\s*Changes requested:\s*/i, '').replace(/\s+/g, ' ').trim() : '';
     }).catch(() => ''));
-    _asked.get(key).then(t => { if (t) { line.textContent = t.length > 140 ? `${t.slice(0, 139)}…` : t; line.title = t; line.hidden = false; } });
+    _asked.get(key).then(t => { if (t) { line.textContent = `You asked: “${t.length > 140 ? `${t.slice(0, 139)}…` : t}”`; /* the mock's quote, as a comment row says You commented (#20101) */ line.title = t; line.hidden = false; } });
     return line;
 }
