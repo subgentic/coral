@@ -241,6 +241,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/board/{project}/goal-images":                                "add a picture to a new goal as the Operator",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings":  "set an agent's Reviews only switch and review areas",
 	"PUT /api/artifacts/{id}/keep":                                         "keep an artifact",
+	"POST /api/artifacts/{id}/gdoc/share":                                  "share an artifact to a Google Doc with the owner's own Google sign-in (#19996)",
 	"GET /api/artifacts/{id}/trust-preview":                                "read whether the owner trusted an HTML file's preview to run scripts",
 	"PUT /api/artifacts/{id}/trust-preview":                                "trust an HTML file's preview to run its scripts",
 	"DELETE /api/artifacts/{id}/trust-preview":                             "turn scripts off for an HTML file's preview",
