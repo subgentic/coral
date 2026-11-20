@@ -185,7 +185,12 @@ func TestShortLivedChildrenOfTheAgentNeverRefuseIt(t *testing.T) {
 	p.agent.mu.Lock()
 	p.agent.proc, p.agent.adopted = winProc{pid: root, start: start, known: true}, true
 	p.agent.mu.Unlock()
-	time.Sleep(time.Second) // the loop is running
+	// The loop is running once a child of the shell has been seen, not after a fixed second: a cold PowerShell takes longer than that on a loaded box, and the sends then ran before any child existed (#20103).
+	seen := false
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && !seen; time.Sleep(10 * time.Millisecond) {
+		seen, _ = hasChildProcesses(root)
+	}
+	require.True(t, seen, "the loop's child process never showed up within 10 s")
 	refusals := 0
 	for i := 0; i < 100; i++ {
 		if refused, why, _ := b.AgentTextRefused(name); refused {
