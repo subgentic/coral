@@ -178,7 +178,9 @@ func TestShortLivedChildrenOfTheAgentNeverRefuseIt(t *testing.T) {
 	name := "claude-0425-hooks"
 	// The loop writes a marker once its first child has come and gone: the test waits for that file, which stays true, not for a child process, which lives a few ms and is never caught by a poll (#20103, QA on frontier).
 	marker := filepath.Join(t.TempDir(), "loop-ran")
-	loop := fmt.Sprintf(`powershell.exe -NoProfile -Command "while ($true) { '' | cmd.exe /d /c exit; if (-not (Test-Path '%s')) { New-Item -ItemType File '%s' | Out-Null } }"`, marker, marker)
+	// The command goes to Spawn as the loop itself: it holds shell syntax, so newSession wraps it as powershell -NoProfile -Command <loop> (parseCommand). The test's old line was a powershell.exe command inside that wrapper, whose
+	// outer PowerShell expanded "$true" in the double quotes to True before the inner one ran: the loop never started, and the zero refusals were vacuous (found by QA on frontier, #20103).
+	loop := fmt.Sprintf(`while ($true) { '' | cmd.exe /d /c exit; if (-not (Test-Path '%s')) { New-Item -ItemType File '%s' | Out-Null } }`, marker, marker)
 	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), "0425", loop, 120, 40))
 	b.mu.RLock()
 	p := b.sessions[name].proc.(*windowsPTY)
@@ -189,7 +191,12 @@ func TestShortLivedChildrenOfTheAgentNeverRefuseIt(t *testing.T) {
 	p.agent.mu.Lock()
 	p.agent.proc, p.agent.adopted = winProc{pid: root, start: start, known: true}, true
 	p.agent.mu.Unlock()
-	require.Eventually(t, func() bool { _, err := os.Stat(marker); return err == nil }, 30*time.Second, 50*time.Millisecond, "the loop never ran its first child within 30 s")
+	ran := func() bool { _, err := os.Stat(marker); return err == nil }
+	if !assert.Eventually(t, ran, 30*time.Second, 50*time.Millisecond, "the loop never ran its first child within 30 s") {
+		screen, _ := b.RenderedScreenText(name)
+		t.Logf("the session's screen (a PowerShell error shows here):\n%s", screen)
+		t.FailNow()
+	}
 	refusals := 0
 	for i := 0; i < 100; i++ {
 		if refused, why, _ := b.AgentTextRefused(name); refused {
