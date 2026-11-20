@@ -28,7 +28,7 @@ import (
 var primitives = map[string]bool{
 	"Spawn": true, "CreateSession": true, "RestartPane": true,
 	"KillAgent": true, "KillSession": true, "KillSessionOnly": true,
-	"LaunchAgent": true, "wakeExistingSession": true, "wakeSession": true, // wakeSession is the wake itself: wakeExistingSession forwards to it, and so does wakeSleeperFor, the body of WakeIdleFor and WakeForOperator (an agent woken without its starting prompt, #12358)
+	"LaunchAgent": true, "wakeExistingSession": true, "wakeSession": true, "WakeForOperator": true, // wakeSession is the wake itself: wakeExistingSession forwards to it, and so does wakeSleeperFor, the body of WakeIdleFor and WakeForOperator (an agent woken without its starting prompt, #12358)
 }
 
 // scanDirs are the folders the census reads (see SCOPE above).
@@ -68,8 +68,9 @@ var pinnedSites = map[string]string{
 	"wake_resume_gone.go SessionsHandler.watchResumeGone": background + ": starts a Claude agent fresh in its own terminal when the agent's own log says its conversation was not found; it is reached only from the success path of a wake (a person's Wake or a gated background wake), a few seconds after that wake, never from a request or an agent (#12714)",
 	"auto_wake.go SessionsHandler.autoWakeOne":            background + ": only reached from AutoWakeAfterRestart",
 	// auto-sleep (#12111): it ends a terminal by itself and a delivery wakes an agent by itself
-	"auto_sleep.go SessionsHandler.autoSleepOne":        background + ": only reached from autoSleepPass, which RunAutoSleep runs",
-	"auto_sleep_wake.go SessionsHandler.wakeSleeperFor": background + ": the body of WakeIdleFor (an automated wake, a delivery's) and of WakeForOperator (the Operator's own message to a sleeper, #19897); a person's own Send is a person's action",
+	"auto_sleep.go SessionsHandler.autoSleepOne":                      background + ": only reached from autoSleepPass, which RunAutoSleep runs",
+	"artifact_comment_auto.go SessionsHandler.deliverOperatorComment": person + ": the Operator's own comment on a file (the comment and Request changes handlers) wakes a sleeping uploader through WakeForOperator, first (#19897); it is reached only from those handlers, never from an agent or a loop",
+	"auto_sleep_wake.go SessionsHandler.wakeSleeperFor":               background + ": the body of WakeIdleFor (an automated wake, a delivery's) and of WakeForOperator (the Operator's own message to a sleeper, #19897); a person's own Send is a person's action",
 }
 
 // backgroundEntries are the reviewed loop entries and functions that start or end agents on their own: the callers of the guarded helpers that are not handlers.
