@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -206,8 +207,10 @@ func TestStateTakesInEachCommentOnceAndAgainWhenItChanges(t *testing.T) {
 	fresh, _ = s.New(all)
 	require.Len(t, fresh, 1)
 	assert.Equal(t, "b", fresh[0].ID, "a reply or an edit makes the comment new again")
-	info, _ := os.Stat(path)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	if runtime.GOOS != "windows" { // Windows has no Unix permission bits: Stat reports 0o666
+		info, _ := os.Stat(path)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
 }
 
 func TestTheTokenNeverAppearsInAnError(t *testing.T) {
