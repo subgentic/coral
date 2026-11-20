@@ -35,6 +35,13 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.querySelector('button[aria-label="Sign in to OpenCode"]').hidden`),true,'signed-in state hides Sign in');
             await ev(`window.hideSettingsModal(true)`);
         }
+        await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install(); await coralReady();
+        await ev(`(() => {const real=window.fetch;window.fetch=(u,o)=>{const p=new URL(String(u),location.href);if(p.pathname==='/api/system/cli-check')return Promise.resolve(new Response(JSON.stringify({found:p.searchParams.get('type')!=='opencode',install_url:'https://example.invalid/install/opencode'}),{headers:{'Content-Type':'application/json'}}));return real(u,o);};})()`);
+        await ev(`window.showSettingsModal('providers')`);
+        await waitFor(`document.querySelector('#settings-provider-opencode')?.dataset.state==='missing'`, 'OpenCode missing state');
+        assert.match(await ev(`document.getElementById('settings-providers-no-default').textContent`), /Set up OpenCode.*Install OpenCode.*Providers card.*first/, 'missing OpenCode points to its Settings setup actions before New agent');
+        assert.equal(await ev(`document.querySelector('#settings-provider-opencode .prov-card-setup button').textContent`), 'Set up OpenCode');
+        assert.equal(await ev(`document.querySelector('#settings-provider-opencode .prov-card-setup a').textContent`), 'Install OpenCode');
         console.log('PASS OpenCode Settings card, default agent choice, CLI path payload/verification and sign-in state at desktop and phone widths');
     } finally {await client.close();}
 })().catch(e=>{console.error(e);process.exit(1);});
