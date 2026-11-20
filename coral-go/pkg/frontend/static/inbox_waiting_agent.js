@@ -18,7 +18,7 @@ export const dismiss = it => { dismissed.add(keyOf(it)); browserLocal.set(DISMIS
 let items = [], failed = false, readAt = 0, inflight = null, redraw = () => {};
 
 /** The rows as the list holds them: a row that is not a file, an agent or an ask, with the fields the table reads. */
-export const rows = () => items.filter(it => !dismissed.has(keyOf(it))).map(it => ({
+export const rows = (sentBack = new Set()) => items.filter(it => !dismissed.has(keyOf(it)) && !(it.kind === 'comment_sent' && sentBack.has(String(it.artifact?.hex || '').toLowerCase()))).map(it => ({
     waitItem: it, session_id: `waiting-agent:${it.kind}:${it.id}`, display_name: it.agent?.name || 'Unknown agent', board_project: it.board || '', server: LOCAL_SERVER,
     waiting_kind: it.kind, waiting_summary: wordsOf(it), waiting_since: it.since, agentRef: refOf(it),
     goal: it.goal?.id ? { id: it.goal.id, title: String(it.goal.title || `Goal #${it.goal.id}`), board: it.board } : null, task: it.task?.id ? { id: it.task.id, title: String(it.task.title || '') } : null,
