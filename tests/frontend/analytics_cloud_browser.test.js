@@ -17,6 +17,11 @@ const { coralReady } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width: w, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await coralReady(ev, 'startup', 'liveList', 'settings');
+            // #19958: Analytics is a place in the Hub's own navigation: the top tab at desktop width, the bottom bar's slot on a phone (neither carries data-local-only, which cloud.css hides in cloud mode)
+            assert.equal(await ev(`document.body.classList.contains('cloud-mode')`), true, `${tag}: this is the Hub's page`);
+            const shown = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return 'missing'; const r = e.getBoundingClientRect(); return getComputedStyle(e).display !== 'none' && r.width > 0 && r.height > 0; })()`);
+            assert.equal(await shown(mobile ? '#phone-nav [data-phone-nav="nav-analytics"]' : '#nav-tab-tokens'), true, `${tag}: the Analytics ${mobile ? 'phone slot' : 'tab'} shows in cloud mode`);
+            assert.equal(await ev(`document.querySelectorAll('#nav-tab-tokens[data-local-only], [data-phone-nav="nav-analytics"][data-local-only]').length`), 0, `${tag}: no data-local-only on either Analytics entry`);
             // every request the page makes from here on is recorded, and the computers answer with figures
             await ev(`(() => { window.__seen = []; const R = window.fetch.bind(window);
                 const ok = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } }));
