@@ -6,7 +6,7 @@
 import { plural } from './format.js';
 import { state } from './state.js';
 import { isPhoneLayout } from './phone_layout.js';
-import { isCloud, serverFetch, spendTeamKeys, splitKey, noteBoardLabels, identityKey } from './server_base.js';
+import { isCloud, serverFetch, spendTeamKeys, normServer, sessionTeamKey, splitKey, noteBoardLabels, identityKey } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { browserLocal } from './safe_storage.js';
 import { loadStyles } from './lazy_styles.js';
@@ -47,7 +47,14 @@ async function readBoards() {
         boards.keys = [...new Set(lists.flat())].sort();
     } catch { /* the agents' teams are still listed */ }
 }
-const teams = () => spendTeamKeys(state.liveSessions, isCloud(), boards.keys).sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+/** The team keys on ONE computer (#20000): the agents' teams and the boards'. On Coral Hub's page every computer is remote, so spendTeamKeys drops them all; these tabs read the picked computer's teams (/api/analytics/activity goes through its tunnel), so they keep its own. */
+function teamKeysOnServer(sessions, boardKeys, server) {
+    const on = k => k && normServer(splitKey(k).server) === normServer(server), keys = new Set();
+    for (const s of sessions || []) { const key = sessionTeamKey(s); if (on(key)) keys.add(key); }
+    for (const key of boardKeys || []) if (on(key)) keys.add(String(key));
+    return [...keys];
+}
+const teams = () => (isCloud() ? teamKeysOnServer(state.liveSessions, boards.keys, machineNow()) : spendTeamKeys(state.liveSessions, false, boards.keys)).sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
 const todayUTC = () => new Date().toISOString().slice(0, 10);
 
 /** Opens one of the three tabs: draws what it has and reads again. `host` is the tab's section. */
@@ -324,4 +331,5 @@ document.addEventListener('cost-view-change', () => { for (const k of Object.key
 window.addEventListener('resize', () => { for (const k of Object.keys(tabs)) if (hosts[k] && hosts[k].isConnected && hosts[k].offsetParent) draw(k); });
 
 // A different computer was picked: what the three tabs hold belongs to the other one, so it is dropped and the open tabs read again (#15730).
-document.addEventListener(MACHINE_EVENT, () => { for (const key of MACHINE_TABS) { const m = tabs[key]; m.data = null; m.status = 'loading'; m.day = -1; m.turns = null; if (hosts[key]?.isConnected) { draw(key); load(key); } } });
+document.addEventListener(MACHINE_EVENT, () => { if (isCloud()) for (const key of ['operator', 'comm']) { const m = tabs[key], list = teams(); if (m.team && list.includes(m.team)) continue; m.team = list[0] || ''; m.data = null; m.status = 'loading'; if (hosts[key]?.isConnected) { draw(key); load(key); } } // on Coral Hub's page the team tabs follow the picked computer's teams (#20000)
+    for (const key of MACHINE_TABS) { const m = tabs[key]; m.data = null; m.status = 'loading'; m.day = -1; m.turns = null; if (hosts[key]?.isConnected) { draw(key); load(key); } } });
