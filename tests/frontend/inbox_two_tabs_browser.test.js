@@ -134,6 +134,16 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`(async () => { window.__waitingFail = true; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
                 await waitFor(`/Some waiting items could not be read/.test(document.getElementById('group-table-view').innerText) && !(${row('Tag v2.1.1')}) && !!(${row('Awake file.txt')})`, 'an unreadable list is said, and the files still show', 8000);
                 await ev(`(async () => { window.__waitingFail = false; window.__waiting = []; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
+                // the REAL route's own output (captured from the #19916/#19923 handler's test on 945c27a3ad): string ids, an ISO since, a cut Operator comment ending in an ellipsis, null goal/task/artifact
+                const real = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, 'waiting_on_agent_real.json'), 'utf8'));
+                await ev(`(async () => { window.__waiting = ${JSON.stringify(real.items)}; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
+                await waitFor(`!!(${row('pick one')}) && !!(${row('A file')})`, 'the real route\'s two rows draw', 8000);
+                const realText = await ev(`document.getElementById('group-table-view').innerText`);
+                assert.match(realText, /Answered ask/, 'real: the answered-ask chip'); assert.match(realText, /Comment sent/, 'real: the comment-sent chip');
+                assert.match(realText, /the first/, 'real: the Operator\'s answer'); assert.match(realText, /xxxx[^\n]*\u2026/, 'real: the cut comment keeps its ellipsis');
+                assert.equal(await ev(`(${row('pick one')}).classList.contains('dt-unread')`), false, 'real: a waiting row is not unread');
+                await shot('agent-real-route');
+                await ev(`(async () => { window.__waiting = []; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
                 // nothing waiting on an agent: the empty state
                 await ev(`window.__reviewItems = window.__reviewItems.filter(a => !a.tags.includes('changes requested')); import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
                 await waitFor(`/Nothing waiting on an agent/.test(document.getElementById('group-table-view').innerText)`, 'the empty state of the second tab', 8000);
