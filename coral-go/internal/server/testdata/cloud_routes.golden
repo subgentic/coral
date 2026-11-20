@@ -296,6 +296,7 @@ GET /api/token-usage/turns view
 GET /api/upload/{name} never
 GET /api/views view
 GET /api/views/{id} view
+GET /api/waiting-on-agent never
 GET /api/workflows interact
 GET /api/workflows/by-name/{name} interact
 GET /api/workflows/runs/recent interact

@@ -156,7 +156,7 @@ branch named `dryrun/<anything>`: the same job runs on a push there.
 Some steps run only in the tag's release run (the macOS and Windows smokes, the notices and bundle checks): a green gate and a green dry run have not run them, and v2.0.12 and v2.0.40 failed
 in one. `tests/release/pre_tag_steps.txt` lists every test, smoke and check script `release.yml` runs, and whether the dry run runs it (`dryrun`) or only the release does (`release-only`);
 `tests/release/pre_tag_census_test.py` fails when the workflow and the list disagree. Before the tag, run `tools/devops/pre-tag-steps.sh LAST_TAG HEAD`: it prints each release-only step
-with CHANGED or unchanged since the last release. The pre-tag post names every release-only step, says which I read against the diff (every CHANGED one, plus the smoke's
+with CHANGED or unchanged since the last release, then the release dry run's result for that commit (`NO-DRYRUN` means run `gh workflow run release-dryrun.yml --ref main` first: it runs every `dryrun` step, tests/release/ldflags_build_test.sh among them, and v2.1.1 was tagged without it, #19780). The pre-tag post names every release-only step, says which I read against the diff (every CHANGED one, plus the smoke's
 expectations for any CLI or route change) and what I found. A step I did not read is named as not read.
 
 ## Release provenance (#5550)
