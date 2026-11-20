@@ -204,7 +204,8 @@ func TestPauseAndUnshareAreRefusedWhileTheSwitchIsOff(t *testing.T) {
 // Security MUST 1 on #20044: the loop never makes a Doc. A share stopped between the list and the push is not made again, and nothing is sent.
 func TestTheLoopNeverCreatesADocForAShareThatWasStopped(t *testing.T) {
 	g := syncRig(t)
-	_, derr := g.ss.DeleteGdocShare(context.Background(), gdocSid); require.NoError(t, derr) // the owner pressed Stop sharing after the pass listed the share
+	_, derr := g.ss.DeleteGdocShare(context.Background(), gdocSid)
+	require.NoError(t, derr) // the owner pressed Stop sharing after the pass listed the share
 	c, err := gdocClientFor()
 	require.NoError(t, err)
 	uploads, calls := len(g.drive.uploads), g.drive.calls

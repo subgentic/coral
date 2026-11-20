@@ -87,9 +87,9 @@ type gdocStandIn struct {
 	fail           int // answer this many requests with failStatus and a body that holds a secret
 	failStatus     int
 	comments       map[string][]gdocsync.Comment // a Doc's Google comments, by id
-	replies        []gdocReplyRec // each reply the sync sent
-	noRev          bool // a Doc read answers with no revision id
-	failWritesOnly bool // fail only the POSTs (a write whose outcome is unknown), never a read
+	replies        []gdocReplyRec                // each reply the sync sent
+	noRev          bool                          // a Doc read answers with no revision id
+	failWritesOnly bool                          // fail only the POSTs (a write whose outcome is unknown), never a read
 }
 
 func (g *gdocStandIn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
