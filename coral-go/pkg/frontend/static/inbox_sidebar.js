@@ -772,7 +772,7 @@ function welcomeActions(w) {
     if (w.dismiss) {
         const ignore = () => importOnce('./welcome_swipe.js').then(m => m.dismissWithUndo(w)).catch(() => sayLive('Not dismissed: try again.')); // says it, with Undo in the toast (#17410)
         box.append(moreMenu([{ label: 'Dismiss', title: 'Take it out of Needs you; nobody is told', run: ignore }], w.title)); // More is the last button of every row, Dismiss is in it; a phone has the menu or a swipe (#11642, #20016)
-    }
+    } else box.append(moreMenu([{ label: w.go, title: 'The same as the button: this one has no Dismiss, it clears when you have done it', run: () => (w.run ? w.run() : runWelcome(w.id)) }], w.title)); // a row that is not dismissed still has More last, as mock v3 draws every row (#20066)
     return box;
 }
 
