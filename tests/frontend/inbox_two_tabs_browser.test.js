@@ -124,12 +124,22 @@ const { coralReady } = require('./helpers/wait');
                 const text = await ev(`document.getElementById('group-table-view').innerText.replace(/\\s+/g, ' ')`);
                 assert.ok(text.includes('Answered ask') && text.includes('Waiting on DevOps Engineer') && text.includes('Your answer: “Approved — tag v2.1.1 and post the release notes.”'), 'the answered ask says who it waits on and the Operator’s words: ' + text.slice(0, 900));
                 assert.ok(text.includes('Comment sent') && text.includes('Waiting on Copywriter') && text.includes('You commented: “Trim the hero subhead to one sentence.”') && /Copywriter is archived/.test(text), 'the sent comment and its archived agent: ' + text.slice(0, 900));
-                assert.ok(/landing-copy-v2\.md/.test(text), 'a comment on a file is titled with the file');
+                assert.ok(/Comment on landing-copy-v2\.md/.test(text), 'a comment on a file is titled Comment on <file>, as the mock has it (#20075)');
                 assert.match(await ev(`document.querySelector('[data-needs-tab="agent"]').textContent`), /5/, 'the tab counts the five items');
                 const btn = name => ev(`[...(${row(name)}).querySelectorAll('.inbox-review-actions button, .inbox-review-actions a')].map(b => b.textContent.trim())`);
                 const askBtns = await btn('Tag v2.1.1'), commentBtns = await btn('landing-copy-v2.md');
                 assert.ok(askBtns.includes('Open agent') && !askBtns.includes('Wake') && !askBtns.includes('Start agent'), 'an awake agent’s ask: Open agent, no Wake: ' + JSON.stringify(askBtns));
-                assert.ok(commentBtns.includes('Start agent') && commentBtns.includes('Open file'), 'an archived agent’s comment: Start agent and Open file: ' + JSON.stringify(commentBtns));
+                assert.ok(!askBtns.includes('Open goal') && !askBtns.includes('Open task'), 'an answered ask has no Open goal button: the goal and the task are chips (#20075): ' + JSON.stringify(askBtns));
+                if (width === 1280) assert.ok(/No reply or task update yet/.test(await ev(`(${row('Tag v2.1.1')}).textContent`)), 'an answered ask says No reply or task update yet (#20075)');
+                                if (width === 1280) assert.equal(await ev(`getComputedStyle((${row('Tag v2.1.1')}).querySelector('.inbox-nudge')).borderTopColor`), 'rgba(0, 0, 0, 0)', 'Nudge is quiet text, not a bordered button (#20075)');
+                assert.ok(askBtns.includes('Nudge'), 'an awake agent’s ask has a Nudge button beside Open agent, as the mock draws it (#20067 row 15): ' + JSON.stringify(askBtns));
+                assert.ok(!commentBtns.includes('Nudge'), 'an archived agent is not nudged: ' + JSON.stringify(commentBtns));
+                assert.equal(await ev(`!!(${row('Tag v2.1.1')}).querySelector('.dt-check input')`), true, 'an answered ask has a checkbox like every Waiting on an agent row (#20067 row 13)');
+                assert.equal(await ev(`!!(${row('landing-copy-v2.md')}).querySelector('.dt-check input')`), true, 'a sent comment has a checkbox too');
+                assert.equal(await ev(`(${row('Tag v2.1.1')}).querySelector('.inbox-kind-icon').getAttribute('aria-label')`), 'Answered ask', 'the row’s icon is named for what the row is, not as a Question (#20067 row 14)');
+                assert.equal(await ev(`(() => { const a = (${row('landing-copy-v2.md')}).querySelector('.inbox-review-actions'), edge = a.getBoundingClientRect().right + 1; return [...a.children].filter(c => getComputedStyle(c).position !== 'absolute').every(c => c.getBoundingClientRect().right <= edge && c.scrollWidth <= c.clientWidth + 1); })()`), true, width + ': every action stays inside the card, Open agent is not cut (#20075)');
+                await shot('answered');
+                assert.ok(commentBtns.includes('Start agent') && commentBtns.includes('Open thread'), 'an archived agent’s comment: Start agent and Open thread: ' + JSON.stringify(commentBtns));
                 // an answer or a comment wakes a sleeping agent that is not archived (#19897, #19901): the line says so and there is no Wake
                 await ev(`(async () => { const S = window.__coralStatic || '/static/', m = await import(S + 'state.js'); m.state.liveSessions = m.state.liveSessions.map(s => s.session_id === 'sess-devops' ? { ...s, sleeping: true } : s); const W = await import(S + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); document.dispatchEvent(new CustomEvent('coral:needs-updated')); document.querySelector('[data-needs-tab="you"]').click(); await new Promise(r => setTimeout(r, 200)); /* sleep-ok: the other tab draws first, then this one again */ document.querySelector('[data-needs-tab="agent"]').click(); return true; })()`);
                 await waitFor(`/DevOps Engineer is asleep/.test(document.getElementById('group-table-view').innerText)`, 'a sleeping agent with an answered ask is said to be waking', 8000);
@@ -170,6 +180,8 @@ const { coralReady } = require('./helpers/wait');
                     for (let i = 0; i < 20; i++) { const n = await nums(); if (n.tab === n.sidebar && n.sidebar === n.badge) break; await new Promise(r => setTimeout(r, 250)); } // sleep-ok: the counts settle after a redraw
                     const n = await nums();
                     assert.ok(n.tab >= shown && n.tab === n.sidebar && n.sidebar === n.badge, 'Waiting on you, the sidebar and the red Inbox badge show one number, Getting started rows included (#20017): ' + JSON.stringify(n));
+                    const allChip = await ev(`Number(document.querySelector('button.goals-chip[data-filter=all]')?.textContent.replace(/[^0-9]/g, '') || -1)`);
+                    assert.equal(allChip, n.tab, 'the All chip counts what the tab and the list line count, Getting started rows included (#20067 row 4): chip ' + allChip + ', tab ' + n.tab);
                     await tab('agent');
                     assert.equal(await welcome(), 0, 'Getting started rows do not show on Waiting on an agent');
                     await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'off' }; return true; })()`);
@@ -182,6 +194,12 @@ const { coralReady } = require('./helpers/wait');
                     assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes('Awake file.txt')).length`), 1, 'the sent-back file is one row');
                     assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .inbox-sent-back')].filter(c => /^Comment sent$/.test(c.textContent) && c.closest('tr').textContent.includes('Awake file.txt')).length`), 0, 'it does not flip to Comment sent');
                     await ev(`(async () => { window.__waiting = window.__waiting.filter(i => i.id !== 'cmt-99'); const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
+                }
+                if (width === 1280) { // QA on #20075: a comment on a goal (no file) keeps Open thread, which opens the goal
+                    await ev(`(async () => { window.__waiting = [...window.__waiting, { kind: 'comment_sent', id: 'cmt-goal', board: '${team}', agent: { name: 'DevOps Engineer', role: 'DevOps', session_id: 'sess-devops' }, since: new Date(Date.now() - 120000).toISOString(), title: null, operator_words: 'Add the rollback step.', goal: { id: 250, title: 'Release plan note' }, task: null, artifact: null, thread_id: null }]; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
+                    await waitFor(`!!(${row('Release plan note')})`, 'the goal comment is a row', 8000);
+                    assert.ok((await btn('Release plan note')).includes('Open thread'), 'a sent comment on a goal has Open thread too (QA #20075): ' + JSON.stringify(await btn('Release plan note')));
+                    await ev(`(async () => { window.__waiting = window.__waiting.filter(i => i.id !== 'cmt-goal'); const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
                 }
                 // a computer that cannot answer: the sent-back files stay, and the list says some could not be read
                 await ev(`(async () => { window.__waitingFail = true; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
