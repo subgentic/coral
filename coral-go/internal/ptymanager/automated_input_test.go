@@ -121,6 +121,7 @@ func TestAMidTurnAgentGetsTheText(t *testing.T) {
 
 // A readable screen Coral does not recognise gets the text: "ambiguous" is not a reason to skip.
 func TestAScreenCoralDoesNotRecogniseGetsTheText(t *testing.T) {
+	t.Cleanup(func() { ForgetSession("claude-t-unknown") }) // what Coral typed is kept per session: a second run (-count=2) must not find it
 	a := &fakeAgent{screen: "Some new CLI v9 :: type here\nstatus: working"}
 	assert.Equal(t, Sent, deliver(t, a, "claude-t-unknown", "hello"))
 	assert.Equal(t, []string{"hello"}, a.sent())
@@ -276,6 +277,10 @@ func TestAPromptOpeningBeforeTheEnterWithholdsIt(t *testing.T) {
 // to the usual look once the fallback time has passed.
 func TestAFirstPromptWaitsForTheInputBox(t *testing.T) {
 	quickLaunchWaits(t)
+	for _, s := range []string{"claude-t-launch", "claude-t-launch2", "claude-t-launch3"} {
+		s := s
+		t.Cleanup(func() { ForgetSession(s) }) // what Coral typed is kept per session: a second run (-count=2) must not find it
+	}
 	a := &fakeAgent{screen: ""}
 	n := "claude-t-launch"
 	done := make(chan Delivery, 1)
