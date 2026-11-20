@@ -589,6 +589,14 @@ CREATE TABLE IF NOT EXISTS cloud_connection (
 -- disconnect: server_id belongs to the database (a restored copy keeps it). refresh_token holds a "v1:" secretbox envelope bound to
 -- account_id as AAD, never plaintext; NULL when not connected. fingerprint is SHA-256 of fp_salt, the machine id and the data folder (never
 -- the machine id itself). last_account_id is the account of the last connection, so a connect to another account is a confirmed switch.
+CREATE TABLE IF NOT EXISTS google_connection (
+    id            INTEGER PRIMARY KEY CHECK (id = 1),
+    account_id    TEXT,
+    refresh_token TEXT,
+    state         TEXT NOT NULL DEFAULT 'disconnected',
+    connected_at  TEXT
+);
+
 CREATE TABLE IF NOT EXISTS dropbox_connection (
     id              INTEGER PRIMARY KEY CHECK (id = 1),
     server_id       TEXT NOT NULL,

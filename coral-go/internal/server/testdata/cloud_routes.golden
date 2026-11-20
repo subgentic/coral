@@ -163,6 +163,7 @@ GET /api/gdoc/status never
 GET /api/goal-links never
 GET /api/goals view
 GET /api/goals/metrics view
+GET /api/google/status never
 GET /api/health view
 GET /api/history-import never
 GET /api/launch-disclosure view
@@ -455,6 +456,8 @@ POST /api/dropbox/takeover never
 POST /api/dropbox/undo/{digest} never
 POST /api/dropbox/upload-anyway/{digest} never
 POST /api/folder-tags/{folderName} never
+POST /api/google/connect never
+POST /api/google/disconnect never
 POST /api/history-import never
 POST /api/hub-auto-accept launch
 POST /api/indexer/refresh never

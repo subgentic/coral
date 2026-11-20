@@ -120,6 +120,7 @@ func (s *RemoteServerStore) Rekey(ctx context.Context) error {
 		"DELETE FROM cloud_enrollment",
 		// The Dropbox sign-in (#14609) is discarded too; the row and its server id stay (they belong to the database).
 		"UPDATE dropbox_connection SET refresh_token = NULL, account_id = NULL, fingerprint = NULL, state = 'reconnect', retention_days = 0, retention_since = NULL, list_cursor = NULL, offload_days = 0, offload_since = NULL, autosync_paused = 'signin' WHERE refresh_token IS NOT NULL",
+		"UPDATE google_connection SET refresh_token = NULL, account_id = NULL, state = 'reconnect' WHERE refresh_token IS NOT NULL", // the Google sign-in (#20022): connect again
 	} {
 		if _, err := tx.ExecContext(ctx, q); err != nil {
 			abortKey()

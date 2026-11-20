@@ -450,6 +450,9 @@ func (s *RemoteServerStore) SetStatus(ctx context.Context, id, status, errMsg st
 
 // rotateUpdate and rotateID map a re-encrypted row back to its column and its server: an AAD that ends in the owner marker is an owner secret, any other an API key.
 func rotateUpdate(aad string) string {
+	if strings.HasPrefix(aad, googleAADPrefix) { // the Google refresh token (#20022)
+		return "UPDATE google_connection SET refresh_token = ? WHERE id = 1 AND account_id = ?"
+	}
 	if strings.HasPrefix(aad, dropboxAADPrefix) { // the Dropbox refresh token (#14609)
 		return "UPDATE dropbox_connection SET refresh_token = ? WHERE id = 1 AND account_id = ?"
 	}
@@ -460,6 +463,9 @@ func rotateUpdate(aad string) string {
 }
 
 func rotateID(aad string) string {
+	if strings.HasPrefix(aad, googleAADPrefix) {
+		return strings.TrimPrefix(aad, googleAADPrefix)
+	}
 	if strings.HasPrefix(aad, dropboxAADPrefix) {
 		return strings.TrimPrefix(aad, dropboxAADPrefix)
 	}
@@ -515,6 +521,15 @@ func (s *RemoteServerStore) RotateMasterKey(ctx context.Context) error {
 	}
 	if err := tx.GetContext(ctx, &dbx, "SELECT account_id, refresh_token FROM dropbox_connection WHERE id = 1"); err == nil && dbx.Token.Valid && dbx.Account.Valid {
 		in = append(in, secretbox.Row{AAD: dropboxAAD(dbx.Account.String), Envelope: dbx.Token.String}) // the Dropbox token moves with the key (#14609)
+	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	var gg struct {
+		Account sql.NullString `db:"account_id"`
+		Token   sql.NullString `db:"refresh_token"`
+	}
+	if err := tx.GetContext(ctx, &gg, "SELECT account_id, refresh_token FROM google_connection WHERE id = 1"); err == nil && gg.Token.Valid && gg.Account.Valid {
+		in = append(in, secretbox.Row{AAD: googleAAD(gg.Account.String), Envelope: gg.Token.String}) // the Google token moves with the key (#20022)
 	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
