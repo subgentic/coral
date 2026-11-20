@@ -297,7 +297,7 @@ function fill(s, cell, withDismiss = true, primaryOpen = false) {
             b.dataset.session = s.session_id; b.dataset.n = String(Number(o.n)); // what finds this choice again after a redraw keeps the keyboard on it (sidebar_groups.js)
             b.setAttribute('aria-label', `Answer ${o.label} for ${resolveSessionIdentity(s)}`);
             const isYes = gateOpt => !REJECT_FORM.test(wholeLabel(String(gateOpt.label)));
-            if (typeof gate === 'object' && gate && isYes(o)) { yesButtons.push(b); b.hidden = true; } // hidden until measured: a Yes is never drawn before the block is known to be whole
+            if (typeof gate === 'object' && gate && isYes(o)) { yesButtons.push(b); b.hidden = true; b.title = `${o.label}: lets it run this once`; } // hidden until measured: a Yes is never drawn before the block is known to be whole
             const permissionYes = s.waiting_kind === 'permission' && isYes(o); if (permissionYes) b._armKey = `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}:${ask}:${o.label}`; if (permissionYes && !(gate && yesButtons.includes(b))) armYes(b); // a Yes of a permission is armed 400 ms after it is drawn (a gated one, when it is turned on)
             b.addEventListener('click', e => { e.stopPropagation(); if (permissionYes && stillArming(b)) return; if (gate && yesButtons.includes(b) && gate.clipped()) { gate.apply(); return; } if (trust && o === trust.yes) confirmTrust(s, o, ask, cell, trust); else if (rateLimit && (o === rateLimit.switchTo || o === rateLimit.never)) confirmRateLimit(s, o, ask, cell, rateLimit); else answer(s, o, ask, cell, stepFull || ''); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
