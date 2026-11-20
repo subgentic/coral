@@ -10,7 +10,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
-    const ask = (id, asker, minutes) => ({ board: 'team-a', kind: 'ask', id, asker, text: 'Q-' + asker + '-end', at: new Date(Date.now() - minutes * 60000).toISOString() });
+    const ask = (id, asker, minutes, server) => ({ ...(server ? { server } : {}), board: 'team-a', kind: 'ask', id, asker, text: 'Q-' + asker + '-end', at: new Date(Date.now() - minutes * 60000).toISOString() });
     const order = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => (/Q-(\\w+)-end/.exec(r.textContent) || [])[1]).filter(Boolean)`);
     const refresh = () => ev(`import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`).then(() => ev(framesJs(10)));
     try {
@@ -28,12 +28,21 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await refresh();
             await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 2`, 'the two questions', 15000);
-            const first = await order();
+            let first = await order();
             assert.deepEqual([...first].sort(), ['Alpha', 'Bravo'], at + 'the two questions are shown: ' + JSON.stringify(first));
 
-            await ev(`window.__asks.push(${JSON.stringify(ask(3, 'Charlie', 7))}); true`); // a computer that answered late, with a question that would slot in between the two shown (the default sort puts the newest first: Bravo, Charlie, Alpha)
+            await ev(`window.__asks.push(${JSON.stringify(ask(6, 'Foxtrot', 7))}); true`); // a question from this computer that slots in between the two shown: it goes in at its sorted place, newest first (walk #20067 row 6)
             await refresh();
-            assert.deepEqual(await order(), [...first, 'Charlie'], at + 'the late question goes after the rows on screen, it does not slot in among them');
+            assert.deepEqual(await order(), [first[0], 'Foxtrot', first[1]], at + 'a question from this computer slots in newest first: ' + JSON.stringify(await order()));
+            first = await order();
+            for (const [id, name, minutes] of [[11, 'Golf', 8], [12, 'Hotel', 6.5], [13, 'India', 9]]) { await ev(`window.__asks.push(${JSON.stringify(ask(id, name, minutes))}); true`); await refresh(); } // a burst of questions from this computer over several redraws (walk #20067 row 6)
+            assert.deepEqual(await order(), [first[0], 'Hotel', 'Foxtrot', 'Golf', 'India', first[2]], at + 'a burst of local questions reads newest first, not in runs: ' + JSON.stringify(await order()));
+            await ev(`window.__asks = window.__asks.filter(a => !['Golf', 'Hotel', 'India'].includes(a.asker)); true`);
+            await refresh();
+            assert.deepEqual(await order(), first, at + 'the burst answered, the first rows are as they were');
+            await ev(`window.__asks.push(${JSON.stringify(ask(3, 'Charlie', 7, 'box-2'))}); true`); // ANOTHER computer that answered late, with a question that would slot in between the rows shown (the default sort puts the newest first: Bravo, Charlie, Alpha)
+            await refresh();
+            assert.deepEqual(await order(), [...first, 'Charlie'], at + 'the late question from another computer goes after the rows on screen, it does not slot in among them');
             await ev(`window.__asks.push(${JSON.stringify(ask(7, 'Delta', 0.5))}); true`); // a question newer than everything on screen is the freshest arrival: on top, and visible
             await refresh();
             assert.deepEqual(await order(), ['Delta', ...first, 'Charlie'], at + 'a question newer than everything shown goes on top');
@@ -41,19 +50,19 @@ const { coralReady, framesJs } = require('./helpers/wait');
             const gone = first[0]; // one is answered: the rest keep their order
             await ev(`window.__asks = window.__asks.filter(a => a.asker !== ${JSON.stringify(gone)}); true`);
             await refresh();
-            assert.deepEqual(await order(), ['Delta', first[1], 'Charlie'], at + 'an answered row leaves, the others stay in order');
+            assert.deepEqual(await order(), ['Delta', first[1], first[2], 'Charlie'], at + 'an answered row leaves, the others stay in order');
 
             await ev(`(async () => { const m = await import(${S} + 'inbox_tab.js'); m.selectInboxTab('tasks'); await new Promise(r => setTimeout(r, 50)); m.selectInboxTab('needs'); return true; })()`);
-            await ev(`window.__asks.push(${JSON.stringify(ask(4, 'Echo', 60))}); true`);
+            await ev(`window.__asks.push(${JSON.stringify(ask(4, 'Echo', 60, 'box-2'))}); true`);
             await refresh();
-            assert.deepEqual(await order(), ['Delta', first[1], 'Charlie', 'Echo'], at + 'switching folders keeps what the person saw too, until a filter changes');
+            assert.deepEqual(await order(), ['Delta', first[1], first[2], 'Charlie', 'Echo'], at + 'switching folders keeps what the person saw too, until a filter changes');
 
             // a column sort the person chose is kept the same way: Item ascending, then a late computer's row that sorts first goes after the rows shown (the table used to sort the whole list again)
             await ev(`(() => { const th = document.querySelector('${T} thead th[data-key=agent]'); (th.querySelector('button') || th).click(); return true; })()`);
             await ev(framesJs(6));
             const sorted = await order();
             assert.deepEqual(sorted, [...sorted].sort(), at + 'Item ascending sorts the rows shown: ' + JSON.stringify(sorted));
-            await ev(`window.__asks.push(${JSON.stringify(ask(5, 'Aardvark', 2))}); true`);
+            await ev(`window.__asks.push(${JSON.stringify(ask(5, 'Aardvark', 2, 'box-2'))}); true`);
             await refresh();
             assert.deepEqual(await order(), [...sorted, 'Aardvark'], at + 'under a column sort a late row sorting first still goes after the rows on screen');
 

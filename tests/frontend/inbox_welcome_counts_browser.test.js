@@ -51,11 +51,11 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '6'`, `${tag}: the badge says 6 (two waiting and the four Getting started items left once an agent exists, #20017)`, 8000);
             const mixedCounts = await folderCount();
             check(mixedCounts.length > 0 && mixedCounts.every(c => c === '6'), `${tag}: with two waiting the folder says 6, like the badge: ` + JSON.stringify(mixedCounts));
-            { // header = All = the kind pills: the Getting started items are in none of them (#19274, #18023)
+            { // All = the tab = the line: the Getting started rows are in All and in no kind pill, so All is the pills plus them (#20067 row 4)
                 const pill = await ev(`[...document.querySelectorAll('button.goals-chip')].map(e => e.textContent.trim().replace(/\\s+/g, ' '))`);
                 const num = re => { const m = pill.map(t => re.exec(t)).find(Boolean); return m ? Number(m[1]) : null; };
                 const kinds = pill.filter(t => !/^All\b/.test(t)).map(t => Number((/(\d+)\s*$/.exec(t) || [])[1] || 0)).reduce((a, b) => a + b, 0);
-                check(num(/^All (\d+)/) === 2 && kinds === 2, `${tag}: All is 2 and the kind pills add up to it: ` + JSON.stringify(pill));
+                check(num(/^All (\d+)/) === 6 && kinds === 2, `${tag}: All is 6 (the two waiting and the four Getting started rows) and the kind pills add up to the two: ` + JSON.stringify(pill));
                 check((await head()).some(h => /^Getting started \u00b7 4$/.test(h)), `${tag}: the four items are still under their heading: ` + JSON.stringify(await head()));
             }
             check(await ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs === 6)`), `${tag}: the drawer's count is 6 too`);

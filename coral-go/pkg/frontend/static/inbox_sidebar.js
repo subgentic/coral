@@ -394,7 +394,7 @@ const matchesNeeds = (s, filters) => NF.matches(s, s.queried ? { ...filters, q: 
 const orderedNeeds = () => NF.ordered(allNeeds().filter(s => inTab(s) && matchesNeeds(s, needsFilters)), needsTab === 'agent' ? { ...needsFilters, sort: 'oldest' } : needsFilters, s => (BL ? BL.weightOf(waitsOf(s)) : 0));
 let needsOrder = null; // what the person has seen, in its order (#12636): a computer that answers late adds its rows at the end, it never moves the ones under the finger
 const needsKey = s => `${sessionServer(s)}:${s.session_id}`;
-const filteredNeeds = () => { const kept = NF.keepOrder(orderedNeeds(), needsKey, needsOrder, JSON.stringify([needsFilters, queries.needs])); needsOrder = kept.memory; return kept.rows; };
+const filteredNeeds = () => { const kept = NF.keepOrder(orderedNeeds(), needsKey, needsOrder, JSON.stringify([needsFilters, queries.needs]), s => sessionServer(s) !== 'local'); needsOrder = kept.memory; return kept.rows; };
 const needsOverflow = () => reviewGroups(filteredNeeds().filter(s => s.review && !s.review.starred).map(s => s.review)).filter(g => g.more.length);
 const needsRows = () => {
     const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review && !s.review.starred).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
@@ -427,13 +427,14 @@ function inboxNeedsToolbar() {
     const rows = all.filter(s => inTab(s) && matchesNeeds(s, { ...needsFilters, kind: '' }));
     // Kind chips describe the rows selected, including read items.
     // Unread attention remains in the folder and Inbox notification badges.
+    const gettingStarted = needsTab === 'you' && !activeNeedsTeam ? welcomeRows().length : 0; // the rows Getting started draws on Waiting on you are in All, as in the tab and the line (walk #20067 row 4)
     const counts = needsKinds.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length);
     const moreReviews = reviewFilters() ? !!reviewQueryState()?.more : reviewPages().some(p => p.has_more); // the active window, not an unfinished page from another filter (#16619)
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: needsTab === 'you' && !activeNeedsTeam && !rows.length && !needsFilters.kind && welcomeRows().length ? null : { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: moreReviews ? `${rows.length}+` : rows.length }, ...(needsTab === 'agent' ? [['review', 'Sent back'], ['answered_ask', 'Answered ask'], ['comment_sent', 'Comment sent']].map(([k, label]) => ({ key: k, label, count: rows.filter(x => NF.kindOf(x) === k).length })) : needsKinds.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && moreReviews ? `${counts[i]}+` : counts[i] })))],
+            items: [{ key: 'all', label: 'All', count: moreReviews ? `${rows.length + gettingStarted}+` : rows.length + gettingStarted }, ...(needsTab === 'agent' ? [['review', 'Sent back'], ['answered_ask', 'Answered ask'], ['comment_sent', 'Comment sent']].map(([k, label]) => ({ key: k, label, count: rows.filter(x => NF.kindOf(x) === k).length })) : needsKinds.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && moreReviews ? `${counts[i]}+` : counts[i] })))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });
     // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.

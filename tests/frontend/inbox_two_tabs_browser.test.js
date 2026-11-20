@@ -169,6 +169,8 @@ const { coralReady } = require('./helpers/wait');
                     for (let i = 0; i < 20; i++) { const n = await nums(); if (n.tab === n.sidebar && n.sidebar === n.badge) break; await new Promise(r => setTimeout(r, 250)); } // sleep-ok: the counts settle after a redraw
                     const n = await nums();
                     assert.ok(n.tab >= shown && n.tab === n.sidebar && n.sidebar === n.badge, 'Waiting on you, the sidebar and the red Inbox badge show one number, Getting started rows included (#20017): ' + JSON.stringify(n));
+                    const allChip = await ev(`Number(document.querySelector('button.goals-chip[data-filter=all]')?.textContent.replace(/[^0-9]/g, '') || -1)`);
+                    assert.equal(allChip, n.tab, 'the All chip counts what the tab and the list line count, Getting started rows included (#20067 row 4): chip ' + allChip + ', tab ' + n.tab);
                     await tab('agent');
                     assert.equal(await welcome(), 0, 'Getting started rows do not show on Waiting on an agent');
                     await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'off' }; return true; })()`);
