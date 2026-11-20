@@ -66,7 +66,7 @@ const { coralReady } = require('./helpers/wait');
             // Inbox below 640 px: menu buttons replace hidden tabs and expose the current folder.
             await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox]').click(); true`);
             await waitFor(`document.getElementById('group-table-title')?.getClientRects().length > 0`, `${tag}: Inbox`, 10000);
-            assert.equal(await ev(`[...document.querySelectorAll('#group-table-view [role=tab]')].filter(e => e.getClientRects().length).length`), 0, `${tag}: no hidden-strip tab is visible`);
+            assert.equal(await ev(`[...document.querySelectorAll('#group-table-view [role=tab]:not(.inbox-needs-tab)')].filter(e => e.getClientRects().length).length`), 0, `${tag}: no hidden-strip tab is visible (the Inbox's own two tabs, #19904, are not that strip)`);
             await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
             await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"]')`, `${tag}: current folder in menu`, 6000);
             assert.equal(await ev(`document.querySelectorAll('#nav-more-menu .nav-drawer-folder[aria-current="true"]').length`), 1, `${tag}: one current menu folder`);

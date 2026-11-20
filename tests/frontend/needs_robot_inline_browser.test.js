@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length >= 4 && !!document.querySelector('#needs-more')`, `${label}: the list and More`, 10000);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: settle
             const g = await ev(`(() => { const rb = e => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; }; const row = document.querySelector('#group-table-view .list-bar-search-row'), robot = document.querySelector('#needs-more'), list = document.querySelector('#group-table-view .inbox-needs-results');
-                const head = row.querySelector('.inbox-folder-head'); return { row: rb(row), robot: rb(robot), list: rb(list), inRow: row.contains(robot), rightmost: rb(head).t >= rb(robot).t - 1 && rb(head).t <= rb(robot).b }; })()`);
+                const head = row.querySelector('.inbox-needs-tabs, .inbox-folder-head'); return { row: rb(row), robot: rb(robot), list: rb(list), inRow: row.contains(robot), rightmost: rb(head).t >= rb(robot).t - 1 && rb(head).t <= rb(robot).b }; })()`);
             assert.ok(g.inRow, `${label}: More (the robot is its item, #17450 N2) is in the header row: ${JSON.stringify(g)}`);
             assert.ok(g.robot.t >= g.row.t - 1 && g.robot.b <= g.row.b + 1, `${label}: inside the header: ${JSON.stringify(g)}`);
             assert.ok(g.rightmost && g.robot.r >= g.row.r - 14, `${label}: on the title's line (row one), at the far right: ${JSON.stringify(g)}`);

@@ -192,10 +192,14 @@
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-state.inbox-wait-asleep, :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-line.inbox-wait-asleep { color: var(--warning-text); }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-state.inbox-wait-archived, :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-line.inbox-wait-archived { color: var(--error-text); }
 :root .inbox-folder-toolbar .inbox-needs-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
-@media (max-width: 767px) { /* a phone: the tabs sit right under the search, on a line of their own, the words not broken */
-  :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { order: -1; flex: 1 1 100%; gap: 16px; }
-  :root .inbox-folder-toolbar .inbox-needs-tab { white-space: nowrap; font-size: var(--fs-sm); }
+@media (max-width: 767px) { /* a phone: the tabs sit right under the search, More beside them, the words not broken */
+  :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-needs-tabs { order: 0; flex: 1 1 calc(100% - 5rem); gap: 14px; }
+  :root .inbox-folder-toolbar .inbox-needs-tab { font-size: var(--fs-sm); }
+  :root .inbox-folder-toolbar .inbox-needs-tabs { flex-wrap: wrap; row-gap: 0; }
+  :root .inbox-folder-toolbar .inbox-needs-tab { min-width: 0; max-width: 100%; text-align: left; } /* at 200% text a tab's words wrap inside the screen, never past it */
 }
 :root #group-table-view .inbox-needs-results tr.inbox-card-tr .inbox-wait-line { display: block; white-space: normal; overflow: visible; text-overflow: clip; }
 :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head { position: absolute; display: block; width: 1px; height: 1px; flex: none; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 :root .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head > .session-group-count { display: none; }
+:root #group-table-view[data-group^="hub-inbox"] .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-needs-tabs) > .inbox-folder-head { position: absolute; display: block; width: 1px; height: 1px; flex: none; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the phone rule gives the heading a whole line: the tabs are the heading, so it is out of the flow */
+@media (pointer: coarse) { :root .inbox-folder-toolbar .inbox-needs-tab { min-height: 44px; } } /* a touch target: 44 px high, the underline still sits on the tab bar's rule */

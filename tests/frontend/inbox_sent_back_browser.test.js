@@ -62,7 +62,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.match(sent.chip || '', /^Sent back · waiting on Writer A$/, 'the chip names the state and the agent: ' + JSON.stringify(sent));
                 assert.ok(sent.chipWhole, 'and is not cut off');
                 assert.ok(width !== 1280 || !sent.forReview, 'the row no longer says For review in its line: ' + JSON.stringify(sent));
-                assert.equal(sent.primary, false, 'Approve is not the blue main button on a sent-back row');
+                assert.notEqual(sent.primary, true, 'Approve is not the blue main button on a sent-back row (on Waiting on an agent it has no Approve at all, #19904)');
                 assert.match(sent.ask || '', /^please add a summary table at the top/, 'one line of what was asked for, without the Changes requested: prefix: ' + JSON.stringify(sent));
                 assert.ok(!sent.slow, 'the grey Changes requested text after the title is gone (the chip says it)');
                 if (width === 1280) assert.ok(/inbox-age$/.test((sent.age || '').split('|')[0]) && /5 min|under 1 min/.test(sent.age), 'the time counts from the send-back (5 min), neutral, not amber for the 3 h upload: ' + sent.age);
