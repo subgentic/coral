@@ -394,3 +394,48 @@ func (s *Store) NoteHealthCheckKeys(ctx context.Context, checkID int64, keys []s
 	}
 	return fresh, nil
 }
+
+// Delivery limits of a custom check (Security on #20135, 4a): at most 6 lines to members per check per hour, counted across keys, and 20 a day to one member from all checks. The counts sit in
+// health_actions under a rule that ends in -msg, so they never use up the budgets of the built-in rules.
+const (
+	CheckLinesPerHour = 6
+	CheckLinesPerDay  = 20
+)
+
+// Why a delivery of a check's line was refused.
+const (
+	CheckRefusedHour = "check hourly limit"
+	CheckRefusedDay  = "member daily limit"
+)
+
+func checkActionRule(name string) string { return "check:" + name + "-msg" }
+
+// TakeCheckDelivery counts one line of the check to member and says why it may not go ("" when it may). A refused line is not counted.
+func (s *Store) TakeCheckDelivery(ctx context.Context, project, check, member string, now time.Time) (string, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	rule := checkActionRule(check)
+	var n int
+	if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM health_actions WHERE project = ? AND rule = ? AND at > ?`, project, rule, now.Add(-time.Hour).UTC().Format(healthTimeFormat)); err != nil {
+		return "", err
+	}
+	if n >= CheckLinesPerHour {
+		return CheckRefusedHour, nil
+	}
+	if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM health_actions WHERE project = ? AND rule LIKE 'check:%-msg' AND target = ? AND at > ?`, project, member, now.Add(-24*time.Hour).UTC().Format(healthTimeFormat)); err != nil {
+		return "", err
+	}
+	if n >= CheckLinesPerDay {
+		return CheckRefusedDay, nil
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO health_actions(project, rule, target, at) VALUES (?, ?, ?, ?)`, project, rule, member, now.UTC().Format(healthTimeFormat)); err != nil {
+		return "", err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM health_actions WHERE project = ? AND at < ?`, project, now.Add(-24*time.Hour).UTC().Format(healthTimeFormat)); err != nil {
+		return "", err
+	}
+	return "", tx.Commit()
+}

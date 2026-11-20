@@ -44,6 +44,7 @@ func newCheckEnv(t *testing.T) *checkEnv {
 	}
 	e.c = NewCustomChecks(s, nil, func(context.Context) ([]AgentInfo, error) { return agents, nil })
 	e.c.now = func() time.Time { return e.now }
+	e.c.SnapDir = filepath.Join(e.dir, "snaps")
 	e.c.Redact = func(s string) (string, bool) { return strings.ReplaceAll(s, "sk-live-123", "[redacted]"), true }
 	e.c.deliver = func(_ context.Context, a AgentInfo, _ string, text string) error {
 		e.mu.Lock()
@@ -174,4 +175,66 @@ func TestACheckNeverRunsTwiceAtOnce(t *testing.T) {
 	e.c.mu.Unlock()
 	e.c.RunOnce(context.Background())
 	assert.Zero(t, atomic.LoadInt32(&e.runs))
+}
+
+func TestARowCannotPointRunAtAnotherFile(t *testing.T) {
+	e := newCheckEnv(t)
+	hc := e.add(t, "path", "", true)
+	outside := filepath.Join(t.TempDir(), "evil.sh")
+	require.NoError(t, os.WriteFile(outside, []byte("#!/bin/sh\nexit 0\n"), 0o700))
+	// The stored path is changed to a file outside Coral's folder; the run uses the folder and the hash only.
+	_, err := e.s.ChangeHealthCheck(context.Background(), "team", "path", func(c *board.HealthCheck) { c.Snapshot = outside })
+	require.NoError(t, err)
+	require.NoError(t, e.s.ApproveHealthCheck(context.Background(), "team", "path", "Operator", mustHash(t, e.s, "path"), e.now))
+	var used string
+	e.c.run = func(_ context.Context, sp healthcheck.Spec) healthcheck.Result {
+		used = sp.Path
+		return healthcheck.Result{}
+	}
+	e.c.RunOnce(context.Background())
+	assert.Equal(t, filepath.Join(e.dir, "snaps", hc.ScriptHash), used)
+	// With no snapshot folder, nothing runs.
+	e.c.SnapDir = ""
+	used = ""
+	e.now = e.now.Add(time.Hour)
+	e.c.RunOnce(context.Background())
+	assert.Empty(t, used)
+}
+
+func mustHash(t *testing.T, s *board.Store, name string) string {
+	c, err := s.GetHealthCheck(context.Background(), "team", name)
+	require.NoError(t, err)
+	return c.RecordHash()
+}
+
+func TestDeliveryLimitsFoldTheRestIntoOneLine(t *testing.T) {
+	e := newCheckEnv(t)
+	e.add(t, "noisy", "Dev", true)
+	var ls []healthcheck.Line
+	for i := 0; i < 10; i++ {
+		ls = append(ls, healthcheck.Line{Key: fmt.Sprintf("k%d", i), Text: fmt.Sprintf("line %d", i), Level: "info"})
+	}
+	e.res = healthcheck.Result{Lines: ls}
+	e.c.RunOnce(context.Background())
+	assert.Len(t, e.sent["Dev"], board.CheckLinesPerHour, "6 an hour to a member from one check")
+	require.Len(t, e.sent["Orchestrator"], 1)
+	assert.Contains(t, e.sent["Orchestrator"][0], "4 more lines held")
+}
+
+func TestOneMemberGetsAtMost20CheckLinesADay(t *testing.T) {
+	e := newCheckEnv(t)
+	for i := 0; i < 5; i++ {
+		e.add(t, fmt.Sprintf("c%d", i), "Dev", true)
+	}
+	n := 0
+	e.c.run = func(_ context.Context, sp healthcheck.Spec) healthcheck.Result {
+		var ls []healthcheck.Line
+		for i := 0; i < 5; i++ {
+			n++
+			ls = append(ls, healthcheck.Line{Key: fmt.Sprintf("u%d", n), Text: "x", Level: "info"})
+		}
+		return healthcheck.Result{Lines: ls}
+	}
+	e.c.RunOnce(context.Background())
+	assert.Len(t, e.sent["Dev"], board.CheckLinesPerDay, "25 lines from five checks: 20 reach the member in a day")
 }
