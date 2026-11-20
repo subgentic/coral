@@ -55,6 +55,12 @@ function safeHref(u) {
     } catch { return ''; }
 }
 
+/** The pairing secret `coral cloud connect` makes (wire format section 3): 16 random bytes, 22 base64url characters. It goes in the link's fragment (a browser never sends that to the Hub) and in the one local Connect call; it is kept in this panel's memory only, never stored or shown (#19970). */
+function newPairingSecret() {
+    const b = crypto.getRandomValues(new Uint8Array(16));
+    return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 /** One connect panel: `root` holds the data-cloud parts; onState(st) follows every status. */
 class CloudPanel {
     constructor(root, onState) {
@@ -120,14 +126,15 @@ class CloudPanel {
         this.say(describe(st));
         if (codeExpired(st)) this.sayExpired();
         const enrolling = st.state === 'enrolling';
+        if (!enrolling) this.pairingSecret = null; // a secret is for one pairing: gone with it
         const code = this.part('code');
         if (code) code.hidden = !enrolling;
         if (enrolling) {
             const href = safeHref(st.verification_url);
             const a = this.part('link');
             if (a) {
-                put(a, href || st.hub_url);
-                if (href) a.setAttribute('href', href); else a.removeAttribute('href');
+                put(a, href || st.hub_url); // the text never carries the secret
+                if (href) a.setAttribute('href', this.pairingSecret ? href.split('#')[0] + '#p=' + this.pairingSecret : href); else a.removeAttribute('href'); // the link does, like the one `coral cloud connect` prints
             }
             const uc = this.part('usercode');
             put(uc, st.user_code || '');
@@ -472,7 +479,8 @@ class CloudPanel {
             const ask = this.part('ask-row'), allow = this.part('allow-auto-accept');
             const answer = ((ask && !ask.hidden) || this.askBySelect) && this.pick ? { mode: this.pick, ...(this.pick === 'launch' && allow ? { allow_auto_accept: allow.checked } : {}) } : undefined;
             this.pickAuto = undefined;
-            this.act('POST', '/api/cloud/connect', answer);
+            this.pairingSecret = newPairingSecret(); // the same secret `coral cloud connect` makes, in the link and in this one call
+            this.act('POST', '/api/cloud/connect', { ...(answer || {}), pairing_secret: this.pairingSecret });
         });
         this.part('ask-row')?.addEventListener('change', e => {
             const r = e.target && e.target.closest && e.target.closest('input[data-cloud-mode]');
