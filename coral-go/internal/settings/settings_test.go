@@ -120,3 +120,9 @@ func TestArtifactPreviewBudget(t *testing.T) {
 		}
 	}
 }
+
+func TestOpenCodeCanBeTheDefaultAgentType(t *testing.T) {
+	if got := Enum(map[string]string{DefaultAgentType: "opencode"}, DefaultAgentType); got != "opencode" {
+		t.Fatalf("OpenCode is supported; default agent type read as %q", got)
+	}
+}

@@ -65,3 +65,6 @@ AF.saveFilters('jobs', { ...AF.EMPTY, result: 'failed', q: 'gone' });
 assert.deepEqual(AF.loadFilters('jobs'), { ...AF.EMPTY, result: 'failed' }, 'what is chosen is kept for the folder; the search words are not');
 assert.deepEqual(AF.loadFilters('workflows'), AF.EMPTY, 'another folder has its own');
 console.log('automation_filters: ok');
+
+assert.equal(AF.clean({ agent: 'opencode' }).agent, 'opencode');
+assert.equal(AF.chips({ ...AF.EMPTY, agent: 'opencode' })[0].label, 'Agent: OpenCode');

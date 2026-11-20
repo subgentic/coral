@@ -11,7 +11,7 @@ const ROWS = {
     default_orchestrator_model_claude: ['Orchestrator defaults'], default_orchestrator_model_codex: ['Orchestrator defaults'], default_orchestrator_model_agy: ['Orchestrator defaults'], default_orchestrator_model_pi: ['Orchestrator defaults'],
     default_orchestrator_thinking_claude: ['Orchestrator defaults'], default_orchestrator_thinking_codex: ['Orchestrator defaults'], default_orchestrator_thinking_agy: ['Orchestrator defaults'], default_orchestrator_thinking_pi: ['Orchestrator defaults'],
     default_model_claude: ['Default models'], default_model_codex: ['Default models'], default_model_agy: ['Default models'], default_model_gemini: ['Default models'], default_model_pi: ['Default models'],
-    cli_path_claude: ['CLI paths'], cli_path_codex: ['CLI paths'], cli_path_agy: ['CLI paths'], cli_path_gemini: ['CLI paths'], cli_path_pi: ['CLI paths'],
+    cli_path_claude: ['CLI paths'], cli_path_codex: ['CLI paths'], cli_path_agy: ['CLI paths'], cli_path_gemini: ['CLI paths'], cli_path_pi: ['CLI paths'], cli_path_opencode: ['CLI paths'],
     fit_pane_width: ['Fit pane width', 'switch'], notify_needs_input: ['Notifications', 'switch'], show_scrollbars: ['Show scrollbars', 'switch'],
     terminal_font_size: ['Terminal font size'], terminal_scrollback: ['Terminal scrollback'],
     artifact_preview_max_mb: ['Largest artifact to preview'], file_search_mode: ['File search mode'], file_search_limit: ['File search limit'], git_diff_mode: ['Git diff mode'], git_poll_interval_s: ['Git scan interval'],

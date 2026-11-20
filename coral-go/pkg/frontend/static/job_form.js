@@ -257,7 +257,7 @@ function jobFields(host) {
         },
         {
             key: 'agent_type', type: 'select', id: 'job-modal-agent', label: 'Agent', default: 'claude', visibleWhen: prompt,
-            options: [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }],
+            options: [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }, { value: 'opencode', label: 'OpenCode' }],
             setup: e => e.setAttribute('data-on-change', 'flag-agent-change'),
         },
         { key: 'prompt', type: 'textarea', id: 'job-modal-prompt', label: 'Prompt', required: true, requiredMessage: 'Write the prompt the agent runs.', rows: 4, placeholder: 'Run the full test suite and report failures...', visibleWhen: prompt },

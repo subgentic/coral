@@ -48,7 +48,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         assert.deepEqual(results, [['2.1.0', 'cli-verify-ok', ''], ['Found', 'cli-verify-ok', ''], ['Not installed', 'cli-verify-none', ''], ['Not allowed', 'cli-verify-fail', '']]);
         assert.equal(await ev(`document.getElementById('cli-result-pi-why').textContent`), 'Not allowed here. Empty the field to use PATH.', 'the reason and the fix are written under the result');
         assert.equal(await ev(`document.getElementById('cli-result-agy-why').hidden`), true, 'a neutral result has no line under it');
-        assert.deepEqual((await ev(`window.__checks.slice().sort()`)), ['agy', 'claude', 'codex', 'pi'], 'each CLI was asked once');
+        assert.deepEqual((await ev(`window.__checks.slice().sort()`)), ['agy', 'claude', 'codex', 'opencode', 'pi'], 'each CLI was asked once');
         // a path the person typed that is not there is a mistake: red, with the way out under it (#10083)
         await ev(`{ const input = document.getElementById('settings-cli-path-agy'); input.value = '/opt/tools/agy'; input.dispatchEvent(new Event('input', { bubbles: true })); } window._verifyAllCLIs(); true`);
         await waitFor(`document.getElementById('verify-all-btn').textContent === 'Verify All' && document.getElementById('verify-all-btn').getAttribute('aria-disabled') !== 'true'`, 'Verify All finished again');

@@ -8,7 +8,7 @@ export { TERMINAL_BACKEND_IDS, backendHint };
  * when its rows do: General first. */
 
 const THEME_OPTIONS = [{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }, { value: 'system', label: 'System' }];
-const AGENT_TYPE_OPTIONS = [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }];
+const AGENT_TYPE_OPTIONS = [{ value: 'claude', label: 'Claude' }, { value: 'agy', label: 'Antigravity (agy)' }, { value: 'codex', label: 'Codex' }, { value: 'pi', label: 'Pi' }, { value: 'opencode', label: 'OpenCode' }];
 
 const GENERAL_FIELDS = [
     { key: 'theme', type: 'select', id: 'settings-theme', labelId: 'settings-theme-label', label: 'Theme', options: THEME_OPTIONS,
@@ -122,20 +122,24 @@ const claudeThinking = { key: 'default_thinking_claude', type: 'select', id: 'se
     help: moreOnly('How hard Claude thinks before it answers, when a launch does not say.', 'How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.') };
 
 // Settings > Providers (ST4): one card per provider, the rows that used to be spread over Defaults. A provider that is not installed folds to one line, "Set up Codex" (settings_providers.js, which draws it after the check of that CLI answers); every row keeps its id.
-const PROVIDER_CARDS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
+const PROVIDER_CARDS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode']];
 const providerCard = (type, name) => [
     { key: `provider_${type}`, type: 'heading', card: true, provider: type, id: `settings-provider-${type}`, label: name },
-    { ...modelRow(type, name), label: 'Default model', help: moreOnly(type === 'claude' ? 'Pick one, or type any model id.' : 'Pick one, or type any model id; leave it blank for the CLI\'s own.') },
-    type === 'claude' ? { ...claudeThinking, label: 'Default thinking' } : { ...workersThinking(type, name), label: 'Default thinking', options: thinkingOptions(type, 'Default (recommended)') },
-    { key: `provider_advanced_${type}`, type: 'heading', fold: true, id: `settings-provider-advanced-${type}`, label: 'Advanced (3)' },
-    { ...orchestratorModel(type, name), label: 'Orchestrator model' },
-    { ...orchestratorThinking(type, name), label: 'Orchestrator thinking' },
+    ...(type === 'opencode' ? [] : [
+        { ...modelRow(type, name), label: 'Default model', help: moreOnly(type === 'claude' ? 'Pick one, or type any model id.' : 'Pick one, or type any model id; leave it blank for the CLI\'s own.') },
+        type === 'claude' ? { ...claudeThinking, label: 'Default thinking' } : { ...workersThinking(type, name), label: 'Default thinking', options: thinkingOptions(type, 'Default (recommended)') },
+    ]),
+    { key: `provider_advanced_${type}`, type: 'heading', fold: true, id: `settings-provider-advanced-${type}`, label: type === 'opencode' ? 'Advanced' : 'Advanced (3)' },
+    ...(type === 'opencode' ? [] : [
+        { ...orchestratorModel(type, name), label: 'Orchestrator model' },
+        { ...orchestratorThinking(type, name), label: 'Orchestrator thinking' },
+    ]),
     { ...cliPath(type, name), label: 'CLI path', attrs: { 'aria-label': `${name} CLI path` } },
 ];
 const PROVIDERS_FIELDS = [
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
     ...PROVIDER_CARDS.flatMap(([type, name]) => providerCard(type, name)),
-    { key: 'providers_no_default', type: 'notice', render: slot => { const n = document.createElement('span'); n.id = 'settings-providers-no-default'; n.className = 'sv-help'; n.textContent = 'OpenCode and Hermes have no default model here: each uses the model set in its own configuration.'; slot.append(n); } }, // New agent offers six providers; a default model is kept for four (#16599, walk 25 D10)
+    { key: 'providers_no_default', type: 'notice', render: slot => { const n = document.createElement('span'); n.id = 'settings-providers-no-default'; n.className = 'sv-help'; n.textContent = 'OpenCode and Hermes use the model set in their own configuration. Choose an OpenCode model in New agent or add a custom model below.'; slot.append(n); } }, // New agent offers six providers; a default model is kept for four (#16599, walk 25 D10)
     { key: 'providers_tools', type: 'heading', id: 'settings-providers-tools', label: 'Custom models' },
     { key: 'custom_models', type: 'custom', id: 'settings-custom-models', wide: true, label: 'Custom models', help: moreOnly('Model ids are passed to the CLI as they are written here.', "They appear in every model picker, including the one that switches a running agent's model."), // the list and its form: custom_models.js draws them and shows the row once the server has the route
         render: slot => slot.classList.add('settings-custom-models') },
@@ -213,7 +217,7 @@ const apiKeyLine = slot => {
 // (GET /api/system/cli-check?type=<cli>&signin=1) and each line says signed in, not signed in, or that it could not tell. A line per provider, one Check for all. Where the CLI
 // has a supported local login (Claude: claude auth login), a Sign in button starts it on this computer (POST /api/system/cli-signin?type=<cli>); through the Hub (isCloud) the
 // button is not shown and the text says to sign in on the computer. Pi's login is interactive (start pi and run /login), so it gets the instruction text, not a button.
-const ACCOUNTS = [{ cli: 'claude', name: 'Claude', canSignIn: true }, { cli: 'pi', name: 'Pi', canSignIn: false, notSignedIn: 'start pi and run /login' }];
+const ACCOUNTS = [{ cli: 'claude', name: 'Claude', canSignIn: true }, { cli: 'pi', name: 'Pi', canSignIn: false, notSignedIn: 'start pi and run /login' }, { cli: 'opencode', name: 'OpenCode', canSignIn: true }];
 const accountsLines = slot => {
     const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const cloud = isCloud();
@@ -236,7 +240,8 @@ const accountsLines = slot => {
             try {
                 const r = await fetch(`/api/system/cli-signin?type=${a.cli}`, { method: 'POST', cache: 'no-store' });
                 const j = r.ok ? await r.json() : {};
-                status.textContent = j.started ? 'Sign-in started: complete it in the browser that opened, then Check' : j.message || 'Could not start sign-in';
+                status.textContent = j.started ? (j.session_name ? 'Sign-in started: complete it in the terminal, then Check' : 'Sign-in started: complete it in the browser that opened, then Check') : j.message || 'Could not start sign-in';
+                if (j.started && j.session_name) { window.hideSettingsModal(true); (await importOnce('./sessions.js')).selectLiveSession(j.session_name, 'terminal', j.session_id).catch(() => {}); }
             } catch { status.textContent = 'Could not start sign-in'; }
             signIn.disabled = false;
         });
@@ -245,7 +250,7 @@ const accountsLines = slot => {
     });
     const last = kept(); for (const a of lines) { const k = last[a.cli]; if (k && typeof k.signedIn === 'boolean') paint(a, k.signedIn, k.provider || '', k.at || 0); }
     const row = mk('div', 'sv-ctl-line'), check = mk('button', 'btn btn-small', 'Check');
-    check.type = 'button'; check.id = 'settings-accounts-check'; check.setAttribute('aria-label', 'Check Claude and Pi sign-in');
+    check.type = 'button'; check.id = 'settings-accounts-check'; check.setAttribute('aria-label', 'Check provider sign-in');
     let busy = false;
     check.addEventListener('click', async () => {
         if (busy) return;
@@ -303,7 +308,7 @@ const HELP_LINES = {
     launch_in_worktree: 'Uses an isolated checkout for each team. Experimental; off by default.',
     prune_days: 'Removes old saved diffs and unlinked artifacts after a preview.',
     retention_enabled: 'Deletes old saved diffs and unlinked artifacts automatically after a preview.',
-    accounts: 'Use CLI sign-in.',
+    accounts: 'CLI sign-in.',
     debug_input_log: 'Records everything Coral types, including secrets. For troubleshooting only.',
 };
 

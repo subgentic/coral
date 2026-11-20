@@ -3,7 +3,7 @@
  * the server could not answer for stays open, and a card never moves under a person: the state is set once, when the answer comes. Loaded when the section is first shown. */
 import { loadStyles } from './lazy_styles.js';
 
-const NAMES = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', pi: 'Pi' };
+const NAMES = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', pi: 'Pi', opencode: 'OpenCode' };
 
 async function probe(type) {
     try {

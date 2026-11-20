@@ -65,6 +65,7 @@ window._verifyAllCLIs = async function() {
         _checkOneCLI('settings-cli-path-codex', 'cli-result-codex'),
         _checkOneCLI('settings-cli-path-agy', 'cli-result-agy'),
         _checkOneCLI('settings-cli-path-pi', 'cli-result-pi'),
+        _checkOneCLI('settings-cli-path-opencode', 'cli-result-opencode'),
     ]);
     if (btn) { btn.removeAttribute('aria-disabled'); btn.textContent = 'Verify All'; }
 };

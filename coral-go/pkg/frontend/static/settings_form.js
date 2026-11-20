@@ -94,6 +94,7 @@ export function readSettingsForm(all = false) {
         cli_path_agy: cliPathAgy,
         cli_path_gemini: cliPathAgy,
         cli_path_pi: cliPathPi,
+        cli_path_opencode: document.getElementById("settings-cli-path-opencode")?.value.trim() || "",
         default_model_claude: defaultModelClaude,
         default_thinking_claude: defaultThinkingClaude,
         ...typedDefaults,
