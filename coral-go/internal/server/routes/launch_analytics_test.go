@@ -310,7 +310,7 @@ func TestTeamLaunchAccountsForSkippedUnnamedMembers(t *testing.T) {
 	assert.Equal(t, float64(1), r["started_agents"])
 	assert.Equal(t, float64(2), r["failed_agents"], "skipped members are failures, never starts")
 	assert.Equal(t, "partial", r["outcome"])
-	assert.Equal(t, "invalid_request", r["failure_category"])
+	assert.Equal(t, tracking.FailMemberUnnamed, r["failure_category"])
 	team := sink.wait(t, tracking.EventTeamLaunched, 1)[0]
 	assert.Equal(t, float64(1), team["agent_count"])
 	assert.Equal(t, float64(3), team["requested_agents"])

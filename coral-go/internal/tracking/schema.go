@@ -110,6 +110,7 @@ const (
 	FailInvalidModel     = "invalid_model"      // a model or thinking level that is not valid
 	FailOutsideTeam      = "outside_team"       // the folder is outside the team's folders
 	FailAgentTypeInvalid = "agent_type_invalid" // an agent type Coral does not know
+	FailMemberUnnamed    = "member_unnamed"     // a team member with no name: skipped, never launched (#19942)
 )
 
 type propKind int
@@ -140,7 +141,7 @@ var (
 	kindEnu     = enum(KindAgent, KindTeam)
 	failureEnu  = enum(FailInvalidRequest, FailUnsupportedOption, FailLimitReached, FailWorkdirUnavailable,
 		FailBackendUnavailable, FailProviderMissing, FailProviderUnrunnable, FailSpawnFailed, FailWorktreeFailed, FailInternal, FailHomeFolderAsked,
-		FailDisclosureAsked, FailWorkdirMissing, FailTeamAccessOff, FailNameTaken, FailInvalidModel, FailOutsideTeam, FailAgentTypeInvalid)
+		FailDisclosureAsked, FailWorkdirMissing, FailTeamAccessOff, FailNameTaken, FailInvalidModel, FailOutsideTeam, FailAgentTypeInvalid, FailMemberUnnamed)
 	agentCount = intRange(0, 64)
 )
 
