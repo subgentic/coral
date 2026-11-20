@@ -132,7 +132,10 @@ var (
 )
 
 // headerTimeout is how long a machine has to start its reply; a variable so a test can shorten it.
-var headerTimeout = 30 * time.Second
+var headerTimeout = defaultHeaderTimeout
+
+// defaultHeaderTimeout is the production header limit. Pinned at 30 s by timeouts_pin_test.go.
+const defaultHeaderTimeout = 30 * time.Second
 
 const (
 	connectTimeout = 5 * time.Second
