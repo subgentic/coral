@@ -43,7 +43,7 @@ func TestWaitChecksSettingsAreCheckedOnSave(t *testing.T) {
 	}
 	after := e.h.bs.GetHealthSettings(ctx, "beta")
 	assert.Equal(t, board.HealthWaitCheck{On: true, WaitMin: 30}, after.GoalsReady, "nothing was applied: the defaults (on, 30 minutes)")
-	assert.Equal(t, board.HealthWaitCheck{On: true, WaitMin: 15}, after.UnownedTasks, "nothing was applied: the defaults (on, 15 minutes)")
+	assert.Equal(t, board.HealthWaitCheck{On: true, WaitMin: 15, MaxList: 8}, after.UnownedTasks, "nothing was applied: the defaults (on, 15 minutes)")
 
 	code, out := save(func(hs *board.HealthSettings) {
 		hs.GoalsReady = board.HealthWaitCheck{On: true, WaitMin: 45, Nudge: "Orchestrator"}
@@ -52,5 +52,5 @@ func TestWaitChecksSettingsAreCheckedOnSave(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, out)
 	saved := e.h.bs.GetHealthSettings(ctx, "beta")
 	assert.Equal(t, board.HealthWaitCheck{On: true, WaitMin: 45, Nudge: "Orchestrator"}, saved.GoalsReady)
-	assert.Equal(t, board.HealthWaitCheck{On: false, WaitMin: 20}, saved.UnownedTasks)
+	assert.Equal(t, board.HealthWaitCheck{On: false, WaitMin: 20, MaxList: 8}, saved.UnownedTasks)
 }

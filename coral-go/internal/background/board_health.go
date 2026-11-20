@@ -606,8 +606,8 @@ func noReviewTaskItems(waits []board.ReviewWait, now time.Time) []teamhealth.Ite
 	return items
 }
 
-// PoolReviewWait is how long a review waits in the board's pool before the check says so (#8957, Goal #80).
-const PoolReviewWait = 15 * time.Minute
+// PoolReviewWait is how long a review waits in the board's pool before the check says so (#8957, Goal #80): the default of the team's pool_review.after_min (#20136).
+const PoolReviewWait = board.PoolReviewAfterDefault * time.Minute
 
 // poolReviewItems is a line of the check for each review that has waited in the pool for PoolReviewWait or more: how long, and the areas no review-only agent covers (or that the board has no reviewer for at
 // all), so the person knows whether to give an agent those areas or to name a reviewer with task review. Task numbers, areas and durations only: no title.
@@ -616,14 +616,27 @@ func (m *BoardHealthMonitor) poolReviewItems(ctx context.Context, project string
 	if err != nil {
 		return nil
 	}
-	return poolItems(waits, now)
+	ps := m.store.GetHealthSettings(ctx, project).PoolReview
+	if !ps.On {
+		return nil
+	}
+	return poolItemsFor(waits, now, ps)
 }
 
 // poolItems is poolReviewItems for the reviews already read.
 func poolItems(waits []board.PoolWait, now time.Time) []teamhealth.Item {
+	return poolItemsFor(waits, now, board.DefaultHealthSettings().PoolReview)
+}
+
+// poolItemsFor is poolItems for the team's pool_review setting: the wait, and how much each line says.
+func poolItemsFor(waits []board.PoolWait, now time.Time, ps board.HealthPoolReview) []teamhealth.Item {
 	var items []teamhealth.Item
+	wait := time.Duration(ps.AfterMin) * time.Minute
+	if wait <= 0 {
+		wait = PoolReviewWait
+	}
 	for _, w := range waits {
-		if w.PooledAt.IsZero() || now.Sub(w.PooledAt) < PoolReviewWait {
+		if w.PooledAt.IsZero() || now.Sub(w.PooledAt) < wait {
 			continue
 		}
 		mins := int(now.Sub(w.PooledAt) / time.Minute)
@@ -639,6 +652,9 @@ func poolItems(waits []board.PoolWait, now time.Time) []teamhealth.Item {
 			problem += "; no reviewer covers " + strings.Join(w.Uncovered, ", ")
 			suggest = fmt.Sprintf("give a Reviews only agent those areas (coral-board reviewer set), or name a reviewer: coral-board task review %d --to \"...\"", w.TaskID)
 			state = "uncovered:" + strings.Join(w.Uncovered, ",")
+		}
+		if ps.Level() == board.TextShort {
+			suggest = ""
 		}
 		items = append(items, teamhealth.Item{Rank: 2, Agent: "Board", Problem: problem, Suggest: suggest, Key: fmt.Sprintf("pool|%d", w.TaskID), State: state})
 	}

@@ -14,7 +14,8 @@ import (
 // The roster of the orchestrator's check (#4583): what each agent is doing, who waits on whom, who sleeps with a message for it unread, and the one escalation a long wait earns.
 
 // waitEscalateAfter is how long an agent waits on someone before that someone is told, once.
-const waitEscalateAfter = 10 * time.Minute
+// It is the default of the team's wait_escalate.after_min (#20136).
+const waitEscalateAfter = board.WaitEscalateAfterDefault * time.Minute
 
 // ruleWaitEscalation names the escalation in the store's counters: one per (awaited agent, wait id).
 const ruleWaitEscalation = "wait-escalation"
@@ -254,10 +255,11 @@ func (m *BoardHealthMonitor) escalateWaits(ctx context.Context, project string) 
 		}
 	}
 	now := m.now()
+	escalateAfter := time.Duration(m.store.GetHealthSettings(ctx, project).WaitEscalate.AfterMin) * time.Minute
 	sleeping, _ := m.store.SleepingSubscribers(ctx, project)
 	for _, w := range waits {
 		at, err := time.Parse(time.RFC3339, w.CreatedAt)
-		if err != nil || now.Sub(at) <= waitEscalateAfter {
+		if err != nil || now.Sub(at) <= escalateAfter {
 			continue
 		}
 		if sleeping[w.SubscriberID] {

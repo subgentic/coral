@@ -147,6 +147,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/board/{project}/goal-requests":                              "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/groups/{groupID}/members":                   "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/health/ack":                                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
+	"PUT /api/board/{project}/health/settings":                             "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/hub-notice":                                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/messages/mark-read":                         "read marks of a team's board made by agents and the command line; the dashboard never calls it (the Inbox's Mark read is a file tag, recorded by the tags handler)",
 	"POST /api/board/{project}/pause":                                      "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",

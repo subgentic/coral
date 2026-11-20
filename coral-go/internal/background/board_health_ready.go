@@ -15,7 +15,7 @@ import (
 // or no assignee after the wait are named by number. Both read the board's own tables only. The lines are numbers: never a goal's or a task's title (an agent wrote it).
 
 // unownedListMax is how many task numbers one line names before it says how many more there are.
-const unownedListMax = 8
+const unownedListMax = board.UnownedMaxListDefault
 
 // noteGoalsReady records, once per goal and per last-done moment, that the goal is ready to close. A goal that gets another task and finishes it again is a new occurrence.
 func (m *BoardHealthMonitor) noteGoalsReady(ctx context.Context, project, orch string, hs board.HealthSettings, bySession map[string]AgentInfo, subs []board.Subscriber, now time.Time) {
@@ -52,15 +52,15 @@ func (m *BoardHealthMonitor) noteUnownedTasks(ctx context.Context, project, orch
 	}
 	var parts []string
 	if len(noGoal) > 0 {
-		parts = append(parts, "with no goal: "+taskNumbers(noGoal))
+		parts = append(parts, "with no goal: "+taskNumbersMax(noGoal, hs.UnownedTasks.MaxList))
 	}
 	if len(noAssignee) > 0 {
-		parts = append(parts, "with no assignee: "+taskNumbers(noAssignee))
+		parts = append(parts, "with no assignee: "+taskNumbersMax(noAssignee, hs.UnownedTasks.MaxList))
 	}
-	detail := fmt.Sprintf("Open tasks %s (each older than %s)", strings.Join(parts, "; "), teamhealth.Age(wait))
+	detail := fmt.Sprintf(hs.UnownedTasks.Pick("Open tasks %s (older than %s)", "Open tasks %s (each older than %s)", "Open tasks %s (each older than %s): give each a goal and an assignee, or close it"), strings.Join(parts, "; "), teamhealth.Age(wait))
 	ref := "g" + joinIDs(noGoal) + "|a" + joinIDs(noAssignee)
 	if added, err := m.store.AddOffBooksOnce(ctx, project, board.OffBooksUnowned, "Board", ref, detail, now); err == nil && added {
-		m.nudgeMember(ctx, project, orch, hs, hs.UnownedTasks.Nudge, "unowned-tasks:", detail, bySession, subs)
+		m.nudgeMember(ctx, project, orch, hs, hs.UnownedTasks.Member(hs.UnownedTasks.Nudge), "unowned-tasks:", detail, bySession, subs)
 	}
 }
 
@@ -73,10 +73,13 @@ func joinIDs(ids []int64) string {
 }
 
 // taskNumbers is "#12, #15" for the first unownedListMax numbers, then "and N more".
-func taskNumbers(ids []int64) string {
+func taskNumbers(ids []int64) string { return taskNumbersMax(ids, unownedListMax) }
+
+// taskNumbersMax is taskNumbers naming at most max numbers (the team's unowned_tasks.max_list).
+func taskNumbersMax(ids []int64, max int) string {
 	shown := ids
-	if len(shown) > unownedListMax {
-		shown = shown[:unownedListMax]
+	if len(shown) > max {
+		shown = shown[:max]
 	}
 	parts := make([]string, len(shown))
 	for i, id := range shown {
