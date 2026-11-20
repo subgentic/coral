@@ -152,8 +152,8 @@ const $ = id => document.getElementById(id);
  *  the chat folders are native, and so are Goals (GET /api/goals, a View route of every online computer) and Artifacts (GET /api/team-artifacts: a View route the Hub answers owner_only for a grantee, who then has no Artifacts folder, #11071). */
 const HUB_FRAMES = { needs: '/inbox/hub/needs', tasks: '/inbox/hub/tasks', saved: '/inbox/hub/saved' };
 const hubFrame = key => (nativeInbox() && HUB_FRAMES[key] && !((key === 'needs' && nativeNeeds()) || (key === 'tasks' && nativeTasks()) || (key === 'saved' && nativeSaved())) ? HUB_FRAMES[key] : ''); // a Hub page's address, or '' when the folder is Coral's own (Needs you with the Hub's `needs: 'native'`, #13446)
-const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', ...(nativeNeeds() ? {} : { frame: HUB_FRAMES.needs }) }, { key: 'tasks', label: 'Tasks', ...(nativeTasks() ? {} : { frame: HUB_FRAMES.tasks }) }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved', ...(nativeSaved() ? {} : { frame: HUB_FRAMES.saved }) }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'needs' ? 'Search needs you' : g.key === 'goals' ? 'Search goals' : g.key === 'tasks' ? 'Search tasks' : g.key === 'saved' ? 'Search saved messages' : 'Search artifacts', short: 'Search' })) : [
-    { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
+const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', ...(nativeNeeds() ? {} : { frame: HUB_FRAMES.needs }) }, { key: 'tasks', label: 'Tasks', ...(nativeTasks() ? {} : { frame: HUB_FRAMES.tasks }) }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved', ...(nativeSaved() ? {} : { frame: HUB_FRAMES.saved }) }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'needs' ? 'Search waiting on you' : g.key === 'goals' ? 'Search goals' : g.key === 'tasks' ? 'Search tasks' : g.key === 'saved' ? 'Search saved messages' : 'Search artifacts', short: 'Search' })) : [
+    { key: 'needs', label: 'Needs you', search: 'Search waiting on you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
     { key: 'artifacts', label: 'Artifacts', search: 'Search artifacts', short: 'Search' }, // every team's artifacts (GET /api/team-artifacts): the team page's list plus a Team filter (Goal #62)
@@ -347,7 +347,7 @@ const allNeeds = () => { const rows = everyNeed().filter(row => !activeNeedsTeam
 const needsText = s => [s.waitItem ? `${WA.titleOf(s.waitItem)} ${s.waiting_summary} ${s.display_name}` : '', s.operatorAsk ? `${s.operatorAsk.asker} ${askLine(s.operatorAsk)}` : '', s.proposal ? `${s.proposal.title} ${s.proposal.proposer}` : '', s.goalDone ? `${s.goalDone.title} ${s.waiting_summary}` : '', s.skillReview ? `${skillName(s.skillReview)} ${s.waiting_summary}` : '', s.review?.name || '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
 if (needsFilters.kind === 'welcome') needsFilters = NF.clean({ ...needsFilters, kind: '' });
-const needsKinds = NF.KINDS.filter(k => k !== 'welcome' && k !== 'answered_ask' && k !== 'comment_sent'); // the pills of Waiting on you; the second tab names its own
+const needsKinds = ['review', 'permission', 'question', 'goal_done', ...NF.KINDS.filter(k => !['review', 'permission', 'question', 'goal_done', 'welcome', 'answered_ask', 'comment_sent'].includes(k))]; // the pills of Waiting on you; the second tab names its own
 // The two tabs of Needs you (#19904, the approved two-tab mock): Waiting on you (default) and Waiting on an agent (files the Operator sent back). Kept in this browser; a team's own page shows both together, as before.
 const NEEDS_TAB_KEY = 'coral-inbox-needs-tab';
 let needsTab = browserLocal.get(NEEDS_TAB_KEY) === 'agent' ? 'agent' : 'you';
@@ -401,12 +401,11 @@ const needsRows = () => {
     const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review && !s.review.starred).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
     return [...trustRows(arrangeReviewRows(all.filter(s => !s.review || s.review.starred || visible.has(s.review.reviewKey)), groupReviews), () => renderInboxNav(true)), ...(activeNeedsTeam || needsTab !== 'you' ? [] : welcomeRows())]; // Getting started: on Waiting on you only, last, untouched by search and filters (#19274); the tab counts them (walk #20009 item 5), the badges do not
 };
-const kindShown = k => (k !== 'review' || reviewItems().length || needsFilters.kind === 'review') && (k !== 'run' || failedUnread().length || needsFilters.kind === 'run') && (k !== 'proposal' || proposalItems().length || needsFilters.kind === 'proposal') && (k !== 'goal_done' || goalDoneRows().length || needsFilters.kind === 'goal_done') && (k !== 'skill_review' || skillRows().length || needsFilters.kind === 'skill_review') && (k !== 'welcome' || welcomeRows().length || needsFilters.kind === 'welcome'); // a pill for what is not there is not drawn, unless it is the one on
 /** The Needs you folder's toolbar (#8604): the search, the kind pills (All, Permission, Question, Needs input), the Filters icon (Team, Agent, Waiting longer than, Sort), the chips of what is on. */
 function inboxNeedsToolbar() {
     if (!needsBar) {
         needsBar = IT.folderToolbar({
-            idp: 'inbox-needs', noun: 'agent', searchLabel: 'Search needs you',
+            idp: 'inbox-needs', noun: 'agent', searchLabel: 'Search waiting on you',
             ...(needsTab === 'agent' ? {} : { sorts: { values: NF.SORTS, labels: NF.SORT_LABEL, aria: 'Sort by how long they have waited' } }), // Waiting on an agent is always longest waiting first, as its line says (#20017)
             fields: [
                 { type: 'select', key: 'team', id: 'inbox-needs-team', label: 'Team', values: [], labels: {}, any: activeNeedsTeam ? `This team: ${keyLabel(activeNeedsTeam)}` : 'Any team' },
@@ -430,13 +429,14 @@ function inboxNeedsToolbar() {
     // Kind chips describe the rows selected, including read items.
     // Unread attention remains in the folder and Inbox notification badges.
     const gettingStarted = needsTab === 'you' && !activeNeedsTeam ? welcomeRows().length : 0; // the rows Getting started draws on Waiting on you are in All, as in the tab and the line (walk #20067 row 4)
-    const counts = needsKinds.filter(kindShown).map(k => rows.filter(s => NF.kindOf(s) === k).length);
+    const shownKinds = needsKinds.filter(k => ['review', 'permission', 'question', 'goal_done'].includes(k) || rows.some(s => NF.kindOf(s) === k));
+    const counts = shownKinds.map(k => rows.filter(s => NF.kindOf(s) === k).length);
     const moreReviews = reviewFilters() ? !!reviewQueryState()?.more : reviewPages().some(p => p.has_more); // the active window, not an unfinished page from another filter (#16619)
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
         pills: needsTab === 'you' && !activeNeedsTeam && !rows.length && !needsFilters.kind && welcomeRows().length ? null : { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
-            items: [{ key: 'all', label: 'All', count: moreReviews ? `${rows.length + gettingStarted}+` : rows.length + gettingStarted }, ...(needsTab === 'agent' ? [['review', 'Sent back'], ['answered_ask', 'Answered ask'], ['comment_sent', 'Comment sent']].map(([k, label]) => ({ key: k, label, count: rows.filter(x => NF.kindOf(x) === k).length })) : needsKinds.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && moreReviews ? `${counts[i]}+` : counts[i] })))],
+            items: [{ key: 'all', label: 'All', count: moreReviews ? `${rows.length + gettingStarted}+` : rows.length + gettingStarted }, ...(needsTab === 'agent' ? [['review', 'Sent back'], ['answered_ask', 'Answered ask'], ['comment_sent', 'Comment sent']].map(([k, label]) => ({ key: k, label, count: rows.filter(x => NF.kindOf(x) === k).length })) : shownKinds.map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && moreReviews ? `${counts[i]}+` : counts[i] })))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });
     // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.
@@ -455,7 +455,7 @@ function inboxNeedsToolbar() {
     node.querySelectorAll('.skip-link, .inbox-filter-note').forEach(e => e.remove()); /* the bar is kept between draws: what was added to it last time goes first */
     const skip = DT.el('a', 'skip-link', 'Skip to the list'); skip.href = '#'; skip.addEventListener('click', e => { e.preventDefault(); document.querySelector('#group-table-view tbody tr:not(.dt-group) button, #group-table-view tbody tr:not(.dt-group) a')?.focus(); }); node.prepend(skip); // a keyboard user passes the search and filters (walk 7 M3)
     node.querySelectorAll('.inbox-needs-tabs').forEach(e => e.remove());
-    { const box = node.querySelector('input[type=search]'), words = needsTab === 'agent' ? 'Search waiting on an agent' : 'Search needs you'; if (box && box.getAttribute('aria-label') === (words === 'Search needs you' ? 'Search waiting on an agent' : 'Search needs you')) { box.setAttribute('aria-label', words); if (box.placeholder === (words === 'Search needs you' ? 'Search waiting on an agent' : 'Search needs you')) box.placeholder = words; } }
+    { const box = node.querySelector('input[type=search]'), words = needsTab === 'agent' ? 'Search waiting on an agent' : 'Search waiting on you'; if (box && box.getAttribute('aria-label') === (words === 'Search waiting on you' ? 'Search waiting on an agent' : 'Search waiting on you')) { box.setAttribute('aria-label', words); if (box.placeholder === (words === 'Search waiting on you' ? 'Search waiting on an agent' : 'Search waiting on you')) box.placeholder = words; } }
     { // the two tabs: what waits on the Operator, and what waits on an agent (the Operator's sent-back files); only the first counts toward the badges
         const mine = all.filter(s => !isAgentRow(s)).length + (activeNeedsTeam ? 0 : welcomeRows().length), theirs = all.filter(isAgentRow).length, inactive = all.some(s => isAgentRow(s) && ['asleep', 'archived'].includes(AW.agentWaitState(refOf(s)).state)), bar = DT.el('div', 'inbox-needs-tabs'); bar.setAttribute('role', 'tablist'); bar.setAttribute('aria-label', 'Needs you');
         for (const [key, label, n] of [['you', 'Waiting on you', mine], ['agent', 'Waiting on an agent', theirs]]) {
@@ -605,7 +605,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     const approveNote = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openApproveNoteDialog }) => openApproveNoteDialog(row.team, row, async () => { sayLive(`Approved ${file} with a note.`); await settle(); })).catch(error => failed(b, error)); }; // #11888: approved with one short comment for the agent, not shown again
     const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${file}.`); await settle(); })).catch(error => failed(b, error)); };
     const ignore = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b);
-        return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { const out = await ignoreRow(row.team, row); sayIgnored(row.team, row, out); sayLive(`Dismissed ${file}.`); await settle(); }).catch(error => failed(b, error)); };
+        return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { const out = await ignoreRow(row.team, row); if (stillWaitingOnAgent(row)) WA.dismissArtifact(row.id); sayIgnored(row.team, row, out); sayLive(`Dismissed ${file}.`); await settle(); }).catch(error => failed(b, error)); };
     const save = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // Save for later (#11641): out of Needs you, kept in Saved, nobody told
         return importOnce('./artifact_review.js').then(async ({ saveRow, saySaved }) => { const out = await saveRow(row.team, row); saySaved(row.team, row, out); sayLive(`Saved ${file} for later.`); await settle(); }).catch(error => failed(b, error)); };
     const unsave = b => { b.disabled = true; errorText.textContent = '';

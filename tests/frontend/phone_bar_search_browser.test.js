@@ -1,5 +1,5 @@
 // A search field in the phone's top bar on every top-level screen that has a search (#11476, Gmail's "Search in mail"): at 390 px the bar's pill is a field whose placeholder says what it searches (Inbox, Chats, Automations,
-// Analytics, Docs); what is typed goes into that view's own search (the sidebar's, hidden on a phone); on the Inbox it is the open tab's own search (#13591, "Search needs you"), the page's box not drawn; each view keeps its own words; a screen with no search (Computers) keeps its title.
+// Analytics, Docs); what is typed goes into that view's own search (the sidebar's, hidden on a phone); on the Inbox it is the open tab's own search (#13591, "Search waiting on you"), the page's box not drawn; each view keeps its own words; a screen with no search (Computers) keeps its title.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -17,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
         // Inbox: the pill is the open tab's own search (#13591): its words, the page's box not drawn
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`!!document.querySelector('#inbox-needs-search')`, 'the Inbox page has its search', 8000);
-        await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && e.placeholder === 'Search needs you')`, 'the Inbox pill is the Needs you search', 8000);
+        await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && e.placeholder === 'Search waiting on you')`, 'the Inbox pill is the Needs you search', 8000);
         check(await ev(`document.querySelector('#inbox-needs-search').getClientRects().length === 0`), 'the Inbox page\'s own box is not drawn: the pill is the only search');
         // Automations: the pill is a search field with a name and a 44 px height
         await ev(`window.switchNavTab('automations'); true`);

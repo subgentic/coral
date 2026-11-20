@@ -17,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
         const tap = id => ev(`document.querySelector('[data-phone-nav="${id}"]').click(); true`);
         const drawerFolder = async label => { await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(b => b.getClientRects().length).click(); true`); await waitFor(`!!document.querySelector('#nav-more-menu.nav-drawer:not([hidden]) .nav-drawer-folder')`, 'the drawer opens', 6000); await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(b => b.querySelector('.nav-drawer-label').textContent === ${JSON.stringify(label)}).click(); true`); }; // Tasks is a row of the drawer now (#11535), the bar has none
         await tap('nav-inbox');
-        await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && e.placeholder === 'Search needs you')`, 'the top pill searches Needs you', 8000);
+        await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && e.placeholder === 'Search waiting on you')`, 'the top pill searches Needs you', 8000);
         await drawerFolder('Tasks');
         await waitFor(`!!document.querySelector('#group-table-view h2, #group-table-view .group-table-head h2')`, 'the Tasks table is open', 8000);
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table's heading is drawn after the view switches
@@ -33,7 +33,7 @@ const { coralReady } = require('./helpers/wait');
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the Tasks table again
         assert.equal(await title(), 'Tasks', 'Tasks again after the detour: ' + await title());
         await tap('nav-inbox');
-        await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && e.placeholder === 'Search needs you')`, 'the pill searches Needs you again', 8000);
+        await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && e.placeholder === 'Search waiting on you')`, 'the pill searches Needs you again', 8000);
         assert.equal(await lit(), 'nav-inbox', 'and Inbox lights Inbox: ' + await lit());
         await drawerFolder('Tasks');
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the second visit to the table

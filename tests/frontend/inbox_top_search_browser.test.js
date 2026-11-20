@@ -1,10 +1,10 @@
 // The Inbox's search on a phone is the top pill (#13591, the Operator's screenshot): under 640 px, on an Inbox page with a search box (Needs you, Tasks, Goals) the pill at the top is that page's search
-// field, named for the open tab ("Search needs you", "Search tasks", ...), and the box under the tabs is not drawn; the Filters icon stays in the page, and the hamburger still opens the views.
+// field, named for the open tab ("Search waiting on you", "Search tasks", ...), and the box under the tabs is not drawn; the Filters icon stays in the page, and the hamburger still opens the views.
 // What is typed there filters the page as the old box did. At 1280 nothing changes: the page keeps its own box and the top bar has no search field. Drives Chrome over CDP on the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goals', 'Search goals']];
+const FOLDERS = [['needs', 'Search waiting on you'], ['tasks', 'Search tasks'], ['goals', 'Search goals']];
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -45,7 +45,7 @@ const FOLDERS = [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['goa
             if (mobile && w === 390) {
                 // typing in the top field reaches the page's search: a word that matches nothing shows the page's empty state, and clearing it brings the page back
                 await ev(`(() => { const d = [...document.querySelectorAll('.view-list-item[data-key="needs"]')]; (d.find(b => b.getClientRects().length > 0) || d[0]).click(); return true; })()`);
-                await waitFor(`(document.querySelector('header.top-bar .phone-bar-search') || {}).placeholder === 'Search needs you'`, 'back on Needs you', 5000);
+                await waitFor(`(document.querySelector('header.top-bar .phone-bar-search') || {}).placeholder === 'Search waiting on you'`, 'back on Needs you', 5000);
                 await ev(`window.__seen = []; document.querySelector('#group-table-view .list-bar-search').addEventListener('input', e => window.__seen.push(e.target.value)); document.querySelector('header.top-bar .phone-bar-search').focus(); true`);
                 await client.Input.insertText({ text: 'zzqq' }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the page debounces typing
                 check(`390: typing in the top field reaches the page's search box`, JSON.stringify(await ev(`window.__seen`)).includes('zzqq') && (await ev(`document.querySelector('#group-table-view .list-bar-search').value`)) === 'zzqq', JSON.stringify(await ev(`window.__seen`)));
