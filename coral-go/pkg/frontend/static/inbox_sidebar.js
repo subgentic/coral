@@ -432,7 +432,7 @@ function inboxNeedsToolbar() {
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
-        pills: { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
+        pills: needsTab === 'you' && !activeNeedsTeam && !rows.length && !needsFilters.kind && welcomeRows().length ? null : { label: 'Show agents waiting on', current: needsFilters.kind || 'all',
             items: [{ key: 'all', label: 'All', count: moreReviews ? `${rows.length}+` : rows.length }, ...(needsTab === 'agent' ? [['review', 'Sent back'], ['answered_ask', 'Answered ask'], ['comment_sent', 'Comment sent']].map(([k, label]) => ({ key: k, label, count: rows.filter(x => NF.kindOf(x) === k).length })) : needsKinds.filter(kindShown).map((k, i) => ({ key: k, label: NF.KIND_LABEL[k], count: k === 'review' && moreReviews ? `${counts[i]}+` : counts[i] })))],
             onPick: key => { needsFilters = { ...needsFilters, kind: key === 'all' ? '' : key }; persistNeedsFilters(); renderInboxNav(true); } },
     });

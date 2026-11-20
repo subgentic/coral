@@ -34,6 +34,7 @@ const { coralReady } = require('./helpers/wait');
             /* the kind icon is the name's first child since #13144: the title is its first node that is not the icon */ const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => { const t = [...e.childNodes].find(n => !(n.nodeType === 1 && n.classList.contains('inbox-kind-icon'))); return t ? t.textContent : ''; })`);
             await open();
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, `${tag}: five welcome items`, 8000);
+            check(await ev(`document.querySelectorAll('button.goals-chip').length`) === 0, `${tag}: only Getting started rows are listed, so no kind filter reading All 0 / Permission 0 over them (#20063)`);
             check(JSON.stringify(await titles()) === JSON.stringify(TITLES), `${tag}: the five items in order: ` + JSON.stringify(await titles()));
             const acts = await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions')].map(b => [...b.querySelectorAll('button:not(.menu-item):not(.inbox-row-more-toggle)')].map(x => x.textContent))`);
             const want = mobile ? [['Open guide'], ['New agent'], ['Got it'], ['New team'], ['Read it']] : [['Open guide', 'Dismiss'], ['New agent', 'Dismiss'], ['Got it'], ['New team', 'Dismiss'], ['Read it', 'Dismiss']]; // a phone row has no Dismiss button: it is in the three-dot menu, or a swipe (#11642)
