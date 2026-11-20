@@ -24,6 +24,8 @@ const DOC = 'https://docs.google.com/document/d/abc123/edit';
         window.fetch = (u, o) => { const p = new URL(String(u), location.origin).pathname, m = (o && o.method) || 'GET';
             if (p === '/api/gdoc/status') return json(st);
             if (p === '/api/artifacts/${H3}/gdoc/share' && m === 'POST') { window.__gdocPosts++; return json({ doc_id: 'abc123', url: '${DOC}', created: true, requests: 0 }); }
+            if (p === '/api/artifacts/${H3}/gdoc/sync' && m === 'POST') { window.__gdocSync = JSON.parse(o.body); return json({ paused: JSON.parse(o.body).paused }); }
+            if (p === '/api/artifacts/${H3}/gdoc/share' && m === 'DELETE') { window.__gdocStopped = true; return json({ unshared: true }); }
             if (p === '/api/dropbox/status') return json({ connected: false, state: 'disconnected' });
             return inner(u, o); }; return true; })()`);
     try {
@@ -71,7 +73,25 @@ const DOC = 'https://docs.google.com/document/d/abc123/edit';
         await open('plan.md', 'text/markdown');
         await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); document.querySelector('#artifact-viewer .artifact-viewer-gdoc-share').click(); true`);
         await waitFor(`!!document.querySelector('#gdoc-share-dialog[open] .modal-footer a[href="${DOC}"]')`, 'the link to the existing Doc', 8000);
-        check(/again/.test(await ev(`document.querySelector('#gdoc-share-dialog .modal-footer .btn-primary').textContent`)), 'a shared file offers Share this version again');
+        check(/now/.test(await ev(`document.querySelector('#gdoc-share-dialog .modal-footer .btn-primary').textContent`)), 'a shared file offers Share this version now');
+        const foot = () => ev(`[...document.querySelectorAll('#gdoc-share-dialog .modal-footer button')].filter(b => !b.hidden).map(b => b.textContent)`);
+        const names = await foot();
+        check(names.includes('Pause syncing') && names.includes('Stop sharing'), 'a shared file offers Pause syncing and Stop sharing: ' + names.join('|'));
+        await ev(`[...document.querySelectorAll('#gdoc-share-dialog .modal-footer button')].find(b => b.textContent === 'Pause syncing').click(); true`);
+        await waitFor(`window.__gdocSync && window.__gdocSync.paused === true`, 'Pause sends paused true', 4000).catch(() => check(false, 'Pause did not send the pause'));
+        await ev(`[...document.querySelectorAll('#gdoc-share-dialog .modal-footer button')].find(b => b.textContent === 'Stop sharing').click(); true`);
+        await waitFor(`window.__gdocStopped === true && /Sharing stopped/.test(document.querySelector('#gdoc-share-dialog .modal-body').textContent)`, 'Stop sharing says it stopped', 4000).catch(() => check(false, 'Stop sharing did not stop and say so'));
+
+        // phone width: the dialog fits 390 px and every footer button is reachable
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 800, deviceScaleFactor: 1, mobile: true });
+        await stub({ enabled: true, connected: true, shared: true, url: DOC });
+        await open('plan.md', 'text/markdown');
+        await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); document.querySelector('#artifact-viewer .artifact-viewer-gdoc-share').click(); true`);
+        await waitFor(`!!document.querySelector('#gdoc-share-dialog[open] .modal-footer a[href="${DOC}"]')`, 'the dialog at 390 px', 8000);
+        const fit = await ev(`(() => { const d = document.querySelector('#gdoc-share-dialog'); const r = d.getBoundingClientRect(); const out = [...d.querySelectorAll('.modal-footer button, .modal-footer a')].filter(e => !e.hidden).filter(e => { const b = e.getBoundingClientRect(); return b.left < -0.5 || b.right > 390.5; }).length; return { left: r.left, right: r.right, out }; })()`);
+        check(fit.left >= -0.5 && fit.right <= 390.5, 'the dialog fits a 390 px screen: ' + JSON.stringify(fit));
+        check(fit.out === 0, 'every footer button is inside a 390 px screen: ' + JSON.stringify(fit));
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
 
         if (found.length) { console.log(found.map(f => 'FAIL ' + f).join('\n')); throw new Error('gdoc share checks failed:\n' + found.join('\n')); }
         console.log('PASS gdoc share: item next to Dropbox, hidden when off or not Markdown, not connected, one press makes the Doc, an existing Doc is linked');

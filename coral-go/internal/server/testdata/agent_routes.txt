@@ -2,6 +2,8 @@
 b DELETE /api/artifacts/{id}/trust-preview
 b GET /api/artifacts/{id}/trust-preview
 b POST /api/artifacts/{id}/gdoc/share
+b DELETE /api/artifacts/{id}/gdoc/share
+b POST /api/artifacts/{id}/gdoc/sync
 c GET /api/board/{project}/context-reset-status
 b PUT /api/artifacts/{id}/trust-preview
 # session token may do there. a: agent-needed (coral-board, coral-agent, the hooks); b: the

@@ -45,8 +45,10 @@ const GdocShareOffMessage = "Sharing to Google Docs is turned off. Turn on \"Sha
 // gdocShareOn reads the switch; an unreadable store counts as off.
 func (h *SessionsHandler) gdocShareOn(r *http.Request) bool {
 	st, err := h.ss.GetSettings(r.Context())
-	return err == nil && setreg.Bool(st, setreg.GdocShare)
+	return err == nil && gdocSwitchOn(st)
 }
+
+func gdocSwitchOn(settings map[string]string) bool { return setreg.Bool(settings, setreg.GdocShare) }
 
 // requireGdocShare refuses a request while the switch is off, before anything is read or written.
 func (h *SessionsHandler) requireGdocShare(next http.Handler) http.Handler {
@@ -63,6 +65,8 @@ func (h *SessionsHandler) requireGdocShare(next http.Handler) http.Handler {
 func (h *SessionsHandler) RegisterGdocShare(r chi.Router) {
 	r.Get("/api/gdoc/status", h.gdocStatus)
 	r.With(h.requireGdocShare).Post("/api/artifacts/{id}/gdoc/share", h.shareToGdoc)
+	r.With(h.requireGdocShare).Delete("/api/artifacts/{id}/gdoc/share", h.unshareGdoc)
+	r.With(h.requireGdocShare).Post("/api/artifacts/{id}/gdoc/sync", h.pauseGdoc)
 }
 
 // gdocConnected says whether a Google sign-in is stored on this computer (no network call, nothing read out); a test replaces it.
@@ -81,7 +85,11 @@ func (h *SessionsHandler) gdocStatus(w http.ResponseWriter, r *http.Request) {
 			}
 			if g, err := h.ss.GetGdocShare(r.Context(), key); err == nil && g != nil {
 				out["shared"] = true
-				out["url"] = "https://docs.google.com/document/d/" + g.DocID + "/edit"
+				out["url"] = gdocURL(g.DocID)
+				out["paused"] = g.State == store.GdocSharePaused
+				if g.ConflictDoc != "" {
+					out["kept_url"] = gdocURL(g.ConflictDoc) // the earlier Doc that still has the edits made in Google
+				}
 			}
 		}
 	}
@@ -136,42 +144,98 @@ func (h *SessionsHandler) shareToGdoc(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "gdoc_failed", "Google Docs is not signed in on this computer. Sign in and try again.")
 		return
 	}
-	gdocShareMu.Lock()
-	defer gdocShareMu.Unlock()
-	existing, err := h.ss.GetGdocShare(r.Context(), key)
-	if err != nil {
-		errInternalServer(w, "could not read the list of shared files")
-		return
-	}
 	title := meta.Name
 	if title == "" {
 		title = "Coral artifact"
 	}
-	shared := existing != nil
-	docID := ""
-	patched := 0
-	if shared {
-		docID = existing.DocID
-		if patched, err = c.Patch(ctx, docID, string(md)); err != nil {
-			h.gdocFail(w, err)
-			return
-		}
-	} else {
-		if docID, err = c.Push(ctx, title, string(md)); err != nil {
-			h.gdocFail(w, err)
-			return
-		}
-	}
-	if err := h.ss.SaveGdocShare(r.Context(), store.GdocShare{Key: key, DocID: docID, Digest: id, Name: title}, time.Now()); err != nil {
-		errInternalServer(w, "the Doc was updated but the link to it could not be saved")
+	res, err := h.pushGdoc(ctx, c, key, md, id, title, false)
+	if err != nil {
+		h.gdocFail(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"doc_id": docID, "url": "https://docs.google.com/document/d/" + docID + "/edit", "created": !shared, "requests": patched})
+	out := map[string]any{"doc_id": res.DocID, "url": gdocURL(res.DocID), "created": res.Created, "requests": res.Requests}
+	if res.Kept != "" {
+		out["kept_url"] = gdocURL(res.Kept) // the Doc that still has the person's edits
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// gdocKey is the share's key for an artifact: its series id, or its digest when it has no series.
+func (h *SessionsHandler) gdocKey(r *http.Request, id string) string {
+	if sid, _, in := callerSeries(r, h.cfg.CoralDir(), id); in {
+		return sid
+	}
+	return id
+}
+
+// unshareGdoc: DELETE /api/artifacts/{id}/gdoc/share (the owner's). Coral forgets the Doc and stops syncing it; the Doc stays in Google, as it is.
+func (h *SessionsHandler) unshareGdoc(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !validArtifactID(id) {
+		errBadRequest(w, "invalid artifact id")
+		return
+	}
+	gdocShareMu.Lock()
+	defer gdocShareMu.Unlock()
+	ok, err := h.ss.DeleteGdocShare(r.Context(), h.gdocKey(r, id))
+	if err != nil {
+		errInternalServer(w, "could not stop sharing")
+		return
+	}
+	if !ok {
+		errNotFound(w, "This file is not shared to a Google Doc.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"unshared": true})
+}
+
+// pauseGdoc: POST /api/artifacts/{id}/gdoc/sync {"paused": true|false} (the owner's): a paused Doc is not synced by the loop, and a press of Share is refused, until it is resumed.
+func (h *SessionsHandler) pauseGdoc(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !validArtifactID(id) {
+		errBadRequest(w, "invalid artifact id")
+		return
+	}
+	var body struct {
+		Paused bool `json:"paused"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		errBadRequest(w, "invalid JSON")
+		return
+	}
+	state := store.GdocShareLive
+	if body.Paused {
+		state = store.GdocSharePaused
+	}
+	gdocShareMu.Lock()
+	defer gdocShareMu.Unlock()
+	ok, err := h.ss.SetGdocShareState(r.Context(), h.gdocKey(r, id), state)
+	if err != nil {
+		errInternalServer(w, "could not change the sync")
+		return
+	}
+	if !ok {
+		errNotFound(w, "This file is not shared to a Google Doc.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"paused": body.Paused})
 }
 
 // gdocFail answers a failed Google call in plain words; the error text never reaches the answer (it could carry a body), only the kind.
 func (h *SessionsHandler) gdocFail(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, errGdocRate):
+		writeError(w, http.StatusTooManyRequests, "gdoc_rate", "This Doc was changed 20 times in the last hour. Try again later.")
+	case errors.Is(err, errGdocPaused):
+		writeError(w, http.StatusConflict, "gdoc_paused", "Syncing this Doc is paused. Resume it to share again.")
+	case errors.Is(err, errGdocRedact):
+		writeError(w, http.StatusInternalServerError, "gdoc_redact", "The file could not be checked for secrets, so nothing was sent.")
 	case errors.Is(err, gdocsync.ErrDocChanged):
 		writeError(w, http.StatusConflict, "gdoc_changed", "The Doc was edited while the update was prepared. Nothing was changed; share again.")
 	case errors.Is(err, gdocsync.ErrOutcomeUnknown):

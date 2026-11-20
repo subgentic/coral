@@ -339,25 +339,48 @@ func insertParas(at int, ps []Para, bodyEnd int) []Request {
 // ErrDocChanged is returned when the Doc moved since it was read: a person edited it, and Coral's patch was refused instead of overwriting them.
 var ErrDocChanged = errors.New("gdocsync: the Doc was edited while the patch was prepared; read it again and redo the patch")
 
-// Patch reads the Doc, builds the changed-ranges patch for the revised Markdown, and sends it with the revision it was built against. It returns the number of requests sent (0 when
-// the Doc already matches).
+// ErrEditedSinceSync: the Doc's revision is not the one Coral left it at, so someone edited it in Google since the last sync; nothing was sent.
+var ErrEditedSinceSync = errors.New("gdocsync: the Doc was edited in Google since the last sync; nothing was changed")
+
+// IsRateLimited says Google answered 429 (too many requests): the caller backs off.
+func IsRateLimited(err error) bool {
+	var he *httpError
+	return errors.As(err, &he) && he.Status == http.StatusTooManyRequests
+}
+
+// Patch changes the Doc to match revisedMarkdown, sending only the ranges that differ. It returns the number of requests sent; the Doc is read again just before, and a write
+// that finds the Doc changed meanwhile is refused (ErrDocChanged), never applied on top of someone's edit.
 func (c *Client) Patch(ctx context.Context, docID, revisedMarkdown string) (int, error) {
+	n, _, err := c.PatchSince(ctx, docID, revisedMarkdown, "")
+	return n, err
+}
+
+// PatchSince is Patch for the automatic sync: lastRev is the revision the Doc had when Coral last left it ("" for none known). When the Doc is at another revision, someone edited it
+// since, and ErrEditedSinceSync comes back with nothing sent. On success it returns the Doc's revision after the change (read again), to be kept for the next sync.
+func (c *Client) PatchSince(ctx context.Context, docID, revisedMarkdown, lastRev string) (int, string, error) {
 	cur, rev, err := c.Read(ctx, docID)
 	if err != nil {
-		return 0, err
+		return 0, "", err
+	}
+	if lastRev != "" && rev != lastRev {
+		return 0, "", ErrEditedSinceSync
 	}
 	reqs := BuildPatch(cur, ParseMarkdown(revisedMarkdown))
 	if len(reqs) == 0 {
-		return 0, nil
+		return 0, rev, nil
 	}
 	body, _ := json.Marshal(map[string]any{"requests": reqs, "writeControl": map[string]any{"requiredRevisionId": rev}})
 	err = c.do(ctx, http.MethodPost, "/v1/documents/"+url.PathEscape(docID)+":batchUpdate", nil, "application/json", body, nil)
 	var he *httpError
 	if errors.As(err, &he) && he.Status == http.StatusBadRequest && strings.Contains(strings.ToLower(he.Body), "revision") && !errors.Is(err, ErrOutcomeUnknown) {
-		return 0, ErrDocChanged
+		return 0, "", ErrDocChanged
 	}
 	if err != nil {
-		return 0, err // nothing is known to have been applied: the count is of requests sent and accepted
+		return 0, "", err // nothing is known to have been applied: the count is of requests sent and accepted
 	}
-	return len(reqs), nil
+	_, newRev, err := c.Read(ctx, docID)
+	if err != nil {
+		newRev = "" // the change was applied; the next sync has no revision to compare and takes the Doc as it is
+	}
+	return len(reqs), newRev, nil
 }

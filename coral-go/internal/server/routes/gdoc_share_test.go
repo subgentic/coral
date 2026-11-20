@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -72,20 +73,24 @@ func TestGdocShareIsOffByDefaultRefusesWhileOffAndReportsItsState(t *testing.T) 
 
 // A stand-in for Drive and Docs: it records what the share sent and answers like the real one in shape only. No call leaves the test.
 type gdocStandIn struct {
-	mu         sync.Mutex
-	uploads    []string // the Markdown of each files.create
-	titles     []string
-	paras      []gdocsync.Para
-	batches    int
-	requests   int
-	fail       int // answer this many requests with failStatus and a body that holds a secret
-	failStatus int
+	mu             sync.Mutex
+	uploads        []string // the Markdown of each files.create
+	titles         []string
+	docs           map[string][]gdocsync.Para // each Doc's paragraphs, by id (doc1, doc2, ...)
+	revs           map[string]string          // a Doc's revision id when a test sets one (an edit made in Google); rev1 otherwise
+	batches        int
+	calls          int // every request that reached the stand-in
+	requests       int
+	fail           int // answer this many requests with failStatus and a body that holds a secret
+	failStatus     int
+	failWritesOnly bool // fail only the POSTs (a write whose outcome is unknown), never a read
 }
 
 func (g *gdocStandIn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.fail > 0 {
+	g.calls++
+	if g.fail > 0 && (!g.failWritesOnly || r.Method == "POST") {
 		g.fail--
 		http.Error(w, "backend error tok-SECRET-123", g.failStatus)
 		return
@@ -110,14 +115,18 @@ func (g *gdocStandIn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				g.titles = append(g.titles, m["name"])
 			} else {
 				g.uploads = append(g.uploads, string(b))
-				g.paras = gdocsync.ParseMarkdown(string(b))
+				if g.docs == nil {
+					g.docs = map[string][]gdocsync.Para{}
+				}
+				g.docs[fmt.Sprintf("doc%d", len(g.uploads))] = gdocsync.ParseMarkdown(string(b))
 			}
 		}
-		_, _ = w.Write([]byte(`{"id":"doc1"}`))
-	case r.Method == "GET" && r.URL.Path == "/v1/documents/doc1":
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"id":"doc%d"}`, len(g.uploads))))
+	case r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/v1/documents/"):
+		id := strings.TrimPrefix(r.URL.Path, "/v1/documents/")
 		var content []map[string]any
 		pos := 1
-		for _, p := range g.paras {
+		for _, p := range g.docs[id] {
 			n := len(utf16.Encode([]rune(p.Text))) + 1
 			para := map[string]any{"elements": []map[string]any{{"textRun": map[string]any{"content": p.Text + "\n"}}}, "paragraphStyle": map[string]any{"namedStyleType": p.Style}}
 			if p.Bullet {
@@ -126,8 +135,12 @@ func (g *gdocStandIn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			content = append(content, map[string]any{"startIndex": pos, "endIndex": pos + n, "paragraph": para})
 			pos += n
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"revisionId": "rev1", "body": map[string]any{"content": content}})
-	case r.Method == "POST" && r.URL.Path == "/v1/documents/doc1:batchUpdate":
+		rev := "rev1"
+		if r2, ok := g.revs[id]; ok {
+			rev = r2
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"revisionId": rev, "body": map[string]any{"content": content}})
+	case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/v1/documents/") && strings.HasSuffix(r.URL.Path, ":batchUpdate"):
 		var in struct {
 			Requests []map[string]any `json:"requests"`
 		}

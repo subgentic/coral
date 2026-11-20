@@ -1,0 +1,17 @@
+START lint 00:23:09
+mac-heavy is busy: you are number 2 in line.
+  (no description yet: ask the Orchestrator to add one with resource define --description)
+You are number 1 in line.
+Your turn: you hold a slot of mac-heavy on mac. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release mac-heavy
+  (no description yet: ask the Orchestrator to add one with resource define --description)
+--- FAIL: TestRouteBindingsAreReviewed (0.25s)
+    identity_route_bindings_test.go:274: 
+        	Error Trace:	/private/tmp/claude-501/-Users-cknorowski-Software-coral-coral-go/3151a2e9-b0c5-46af-eced-207f94ca5f37/scratchpad/wt-s2/coral-go/internal/server/routes/identity_route_bindings_test.go:274
+        	Error:      	a route's binding changed or a route is new: read it, then regenerate testdata/identity_route_bindings.txt (UPDATE_GOLDEN=1)
+        	Test:       	TestRouteBindingsAreReviewed
+        	Messages:   	+ POST /api/artifacts/{id}/gdoc/share | token-session | operator-only
+FAIL
+FAIL	github.com/subgentic/coral/internal/server/routes	0.966s
+FAIL
+ok  	github.com/subgentic/coral/internal/server	1.022s
+END 00:29:42

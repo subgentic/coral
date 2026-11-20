@@ -23,11 +23,12 @@ type GdocShare struct {
 	Name        string `db:"name" json:"name"`
 	State       string `db:"state" json:"state"`
 	DocRevision string `db:"doc_revision" json:"-"`
+	ConflictDoc string `db:"conflict_doc_id" json:"conflict_doc_id,omitempty"`
 	CreatedAt   string `db:"created_at" json:"created_at"`
 	SyncedAt    string `db:"synced_at" json:"synced_at,omitempty"`
 }
 
-const gdocShareCols = "key, doc_id, digest, name, state, doc_revision, created_at, synced_at"
+const gdocShareCols = "key, doc_id, digest, name, state, doc_revision, conflict_doc_id, created_at, synced_at"
 
 // GetGdocShare returns the share for key, or (nil, nil) when there is none.
 func (s *SessionStore) GetGdocShare(ctx context.Context, key string) (*GdocShare, error) {
@@ -56,9 +57,9 @@ func (s *SessionStore) SaveGdocShare(ctx context.Context, g GdocShare, now time.
 	if g.Key == "" || g.DocID == "" {
 		return errors.New("a Google Doc share needs a key and a Doc")
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO gdoc_shares (key, doc_id, digest, name, state, doc_revision, created_at, synced_at) VALUES (?, ?, ?, ?, 'live', ?, ?, ?)
-		ON CONFLICT(key) DO UPDATE SET doc_id = excluded.doc_id, digest = excluded.digest, name = excluded.name, doc_revision = excluded.doc_revision, synced_at = excluded.synced_at`,
-		g.Key, g.DocID, g.Digest, g.Name, g.DocRevision, now.UTC().Format(time.RFC3339), g.SyncedAt)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO gdoc_shares (key, doc_id, digest, name, state, doc_revision, conflict_doc_id, created_at, synced_at) VALUES (?, ?, ?, ?, 'live', ?, ?, ?, ?)
+		ON CONFLICT(key) DO UPDATE SET doc_id = excluded.doc_id, digest = excluded.digest, name = excluded.name, doc_revision = excluded.doc_revision, conflict_doc_id = excluded.conflict_doc_id, synced_at = excluded.synced_at`,
+		g.Key, g.DocID, g.Digest, g.Name, g.DocRevision, g.ConflictDoc, now.UTC().Format(time.RFC3339), g.SyncedAt)
 	return err
 }
 

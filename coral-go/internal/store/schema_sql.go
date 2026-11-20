@@ -756,6 +756,7 @@ CREATE TABLE IF NOT EXISTS gdoc_shares (
     name         TEXT NOT NULL DEFAULT '',
     state        TEXT NOT NULL DEFAULT 'live', -- live or paused
     doc_revision TEXT NOT NULL DEFAULT '',     -- the Doc's revision id at the last sync
+    conflict_doc_id TEXT NOT NULL DEFAULT '',  -- the earlier Doc that kept a person's edits when the Doc was edited in Google since the last sync (keep both)
     created_at   TEXT NOT NULL,
     synced_at    TEXT NOT NULL DEFAULT ''
 );

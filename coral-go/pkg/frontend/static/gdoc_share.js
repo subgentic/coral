@@ -12,9 +12,9 @@ const DOC_RE = /^https:\/\/docs\.google\.com\/document\/d\/[A-Za-z0-9_-]+\/edit$
 let dialog = null;
 const close = () => { if (dialog && dialog.open) dialog.close(); };
 
-async function call(method, url) {
+async function call(method, url, body) {
     let r, j = {};
-    try { r = await fetch(url, { method, cache: 'no-store' }); } catch { return { status: 0, body: { error: "Couldn't reach Coral. Try again." } }; }
+    try { r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' }); } catch { return { status: 0, body: { error: "Couldn't reach Coral. Try again." } }; }
     try { j = await r.json(); } catch { /* no body */ }
     return { status: r.status, body: j || {} };
 }
@@ -78,7 +78,7 @@ export async function openGdocDialog(opts) {
     }
     f.body.append(mk('p', 'settings-hint dropbox-share-via', 'Through your Google account on this computer'));
     const url = DOC_RE.test(String(res.body.url || '')) ? res.body.url : '';
-    const go = primary(res.body.shared ? 'Share this version again' : 'Share to Google Docs', async () => {
+    const go = primary(res.body.shared ? 'Share this version now' : 'Share to Google Docs', async () => {
         sayIt(f.say, ''); go.disabled = true; note.textContent = 'Sharing…';
         const r = await call('POST', `/api/artifacts/${hex}/gdoc/share`);
         if (!f.body.isConnected) return;
@@ -88,10 +88,37 @@ export async function openGdocDialog(opts) {
     });
     const note = mk('p', 'settings-hint'); note.setAttribute('role', 'status');
     if (res.body.shared && url) {
-        f.body.append(mk('p', null, 'This file is shared to a Google Doc of yours. Share it again after a change and only the changed text is updated in the Doc.'));
-        f.acts.replaceChildren(btn('Close', 'btn', close), docLink(url), go);
+        const paused = res.body.paused === true;
+        f.body.append(mk('p', null, paused
+            ? 'This file is shared to a Google Doc of yours. Syncing is paused: new versions do not go to the Doc until you resume.'
+            : 'This file is shared to a Google Doc of yours and stays in step by itself: each new version goes to the Doc, changing only the text that differs.'));
+        const kept = DOC_RE.test(String(res.body.kept_url || '')) ? res.body.kept_url : '';
+        if (kept) {
+            const k = mk('p', 'settings-hint', 'The Doc was edited in Google, so it was kept as it is and the newer version went to a new Doc. '); const a = mk('a', null, 'Open the kept Doc');
+            a.href = kept; a.target = '_blank'; a.rel = 'noopener noreferrer'; k.append(a); f.body.append(k);
+        }
+        const pause = btn(paused ? 'Resume syncing' : 'Pause syncing', 'btn', async () => {
+            sayIt(f.say, ''); pause.disabled = true;
+            const r = await call('POST', `/api/artifacts/${hex}/gdoc/sync`, { paused: !paused });
+            if (!f.body.isConnected) return;
+            if (r.status === 200) { openGdocDialog(opts); return; }
+            pause.disabled = false; sayIt(f.say, String(r.body.error || 'Not changed. Try again.'));
+        });
+        const stop = btn('Stop sharing', 'btn', async () => {
+            sayIt(f.say, ''); stop.disabled = true;
+            const r = await call('DELETE', `/api/artifacts/${hex}/gdoc/share`);
+            if (!f.body.isConnected) return;
+            if (r.status === 200) {
+                f.body.replaceChildren(mk('p', null, 'Sharing stopped. Coral no longer updates the Doc; the Doc stays in Google as it is.'));
+                const d = primary('Done', close); f.acts.replaceChildren(d); d.focus();
+                return;
+            }
+            stop.disabled = false; sayIt(f.say, String(r.body.error || 'Not stopped. Try again.'));
+        });
+        f.acts.replaceChildren(btn('Close', 'btn', close), stop, pause, docLink(url), go);
+        go.hidden = paused; // a press of Share is refused while paused
     } else {
-        f.body.append(mk('p', null, 'Makes a Google Doc of yours from this file. Share it again after a change and only the changed text is updated in the Doc.'));
+        f.body.append(mk('p', null, 'Makes a Google Doc of yours from this file. After that each new version goes to the Doc by itself, changing only the text that differs.'));
         f.acts.replaceChildren(btn('Cancel', 'btn', close), go);
     }
     f.body.append(note);
