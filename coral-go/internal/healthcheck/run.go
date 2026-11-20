@@ -109,6 +109,7 @@ func Run(ctx context.Context, sp Spec) Result {
 		select {
 		case <-ctx.Done():
 			killGroup(cmd)
+			out.Close() // a child that left the group (setsid) still holds the pipe: closing it frees the read below
 		case <-done:
 		}
 	}()
@@ -123,13 +124,13 @@ func Run(ctx context.Context, sp Spec) Result {
 		if strings.TrimSpace(line) != "" && strings.Count(buf.String(), "\n") > MaxLines || n > MaxBytes {
 			res.Truncated = true
 			killGroup(cmd)
+			out.Close()
 			break
 		}
 		if rerr != nil {
 			break
 		}
 	}
-	_, _ = io.Copy(io.Discard, out)
 	werr := cmd.Wait()
 	close(done)
 	if ctx.Err() != nil && !res.Truncated {

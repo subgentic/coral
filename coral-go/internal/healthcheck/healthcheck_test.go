@@ -3,6 +3,7 @@ package healthcheck
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -195,4 +196,23 @@ func TestApprovedRecordChangesWithAnyField(t *testing.T) {
 		mut(&r)
 		assert.NotEqual(t, h0, r.Hash(), name)
 	}
+}
+
+func TestRunReturnsAtTheTimeoutEvenWhenAChildLeftTheGroup(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil || runtime.GOOS == "windows" {
+		t.Skip("needs python3 to start a child in its own session")
+	}
+	p := script(t, `python3 -c "import os,time; os.setsid(); time.sleep(30)" &`+"\nsleep 30")
+	start := time.Now()
+	r := Run(context.Background(), Spec{Path: p, Dir: t.TempDir(), Timeout: 500 * time.Millisecond})
+	assert.True(t, r.TimedOut)
+	assert.Less(t, time.Since(start), 5*time.Second, "the pipe is closed with the context, a setsid child cannot hold Run")
+}
+
+func TestSnapshotOfAMultibyteScriptKeepsItWhole(t *testing.T) {
+	src := script(t, "echo 'héllo'")
+	_, snap, err := Snapshot(src, t.TempDir())
+	require.NoError(t, err)
+	b, _ := os.ReadFile(snap)
+	assert.Contains(t, string(b), "héllo")
 }

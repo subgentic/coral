@@ -183,3 +183,25 @@ func TestRemoveDeletesTheCheckAndItsKeys(t *testing.T) {
 	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM health_check_keys WHERE check_id = ?`, c.ID))
 	assert.Zero(t, n)
 }
+
+func TestAPauseDuringARunStaysPaused(t *testing.T) {
+	s, ctx, now := testStore(t), context.Background(), time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	c, _ := s.AddHealthCheck(ctx, newCheck("race"), now)
+	require.NoError(t, s.ApproveHealthCheck(ctx, "team", "race", "Operator", c.RecordHash(), now))
+	inFlight := mustGet(t, s, "race") // the copy the run started with: approved
+	require.NoError(t, s.PauseHealthCheck(ctx, "team", "race", true, now))
+	_, _, err := s.RecordHealthCheckRun(ctx, inFlight, HealthCheckRun{At: now})
+	require.NoError(t, err)
+	assert.Equal(t, CheckPaused, mustGet(t, s, "race").State, "the run's stale copy did not put it back to approved")
+	// A change made during the run stays pending too, and a removed check is not brought back.
+	require.NoError(t, s.PauseHealthCheck(ctx, "team", "race", false, now))
+	inFlight = mustGet(t, s, "race")
+	_, _ = s.ChangeHealthCheck(ctx, "team", "race", func(c *HealthCheck) { c.ScriptHash = "h-new" })
+	_, _, _ = s.RecordHealthCheckRun(ctx, inFlight, HealthCheckRun{At: now, Failed: true})
+	assert.Equal(t, CheckPending, mustGet(t, s, "race").State)
+	require.NoError(t, s.RemoveHealthCheck(ctx, "team", "race"))
+	_, _, err = s.RecordHealthCheckRun(ctx, inFlight, HealthCheckRun{At: now})
+	assert.NoError(t, err)
+	_, err = s.GetHealthCheck(ctx, "team", "race")
+	assert.ErrorIs(t, err, ErrCheckMissing)
+}
