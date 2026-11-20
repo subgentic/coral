@@ -36,7 +36,7 @@ func TestAGoogleCommentComesBackOnTheArtifactOnce(t *testing.T) {
 	got := g.threads(t)
 	require.Len(t, got, 1, "added once, however many passes")
 	assert.Equal(t, "[Dana Reviewer] Is Monday firm?", got[0].Body)
-	assert.Equal(t, "Dana Reviewer", got[0].AuthorName)
+	assert.Equal(t, "Dana Reviewer via Google Docs", got[0].AuthorName)
 	assert.Equal(t, "google", got[0].AuthorKind)
 	var a map[string]any
 	require.NoError(t, json.Unmarshal([]byte(got[0].AnchorJSON), &a))

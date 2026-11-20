@@ -58,7 +58,7 @@ func (h *SessionsHandler) gdocPullComments(ctx context.Context, c *gdocsync.Clie
 			}
 			ab, _ := json.Marshal(anchor)
 			created, err := h.ss.CreateArtifactComment(ctx, store.ArtifactComment{ArtifactID: m.Digest, Board: m.Board, AnchorJSON: string(ab), Body: body,
-				AuthorIssuer: gdocAuthorIssuer, AuthorSubject: sh.DocID, AuthorName: gdocWho(cm.Author), AuthorKind: gdocAuthorKind})
+				AuthorIssuer: gdocAuthorIssuer, AuthorSubject: sh.DocID, AuthorName: gdocWho(cm.Author) + " via Google Docs", AuthorKind: gdocAuthorKind})
 			if err != nil {
 				slog.Warn("[gdoc] a Google comment could not be added", "error", err)
 				continue
@@ -85,7 +85,7 @@ func (h *SessionsHandler) gdocPullComments(ctx context.Context, c *gdocsync.Clie
 			}
 			parent := root.CommentID
 			created, err := h.ss.CreateArtifactComment(ctx, store.ArtifactComment{ArtifactID: m.Digest, Board: m.Board, ParentID: &parent, Body: body,
-				AuthorIssuer: gdocAuthorIssuer, AuthorSubject: sh.DocID, AuthorName: gdocWho(rp.Author), AuthorKind: gdocAuthorKind})
+				AuthorIssuer: gdocAuthorIssuer, AuthorSubject: sh.DocID, AuthorName: gdocWho(rp.Author) + " via Google Docs", AuthorKind: gdocAuthorKind})
 			if err != nil {
 				continue
 			}
