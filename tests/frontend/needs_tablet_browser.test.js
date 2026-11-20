@@ -1,5 +1,5 @@
 // Needs you on a tablet (#15259, walk 13 H2/M4/L15): at 820 px the table keeps a gutter on both sides, every chip is whole on the screen (they wrap onto their own line), Answer and Dismiss sit inside the card, an answer sent
-// from the dialog says 'Reply sent.', and once nothing is left the list says 'You are all caught up'. The asks and the board's message route are stubbed in the page; a real isolated server serves it.
+// from the dialog says 'Reply sent.', and once nothing is left the list says 'You’re all caught up'. The asks and the board's message route are stubbed in the page; a real isolated server serves it.
 
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -44,7 +44,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await waitFor(`[...document.querySelectorAll('.toast')].some(e => /Reply sent/.test(e.textContent))`, at + 'the toast says Reply sent', 6000).catch(() => check(at + 'the toast says Reply sent', false));
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'the dialog closes', 4000);
             await ev(`window.__asks = []; true`);
-            await waitFor(`/You are all caught up/.test(document.querySelector('#group-table-view').innerText) || /You are all caught up/.test(document.body.innerText)`, at + 'the empty list says it', 8000).catch(() => check(at + 'the empty list says You are all caught up', false));
+            await waitFor(`/You’re all caught up/.test(document.querySelector('#group-table-view').innerText) || /You’re all caught up/.test(document.body.innerText)`, at + 'the empty list says it', 8000).catch(() => check(at + 'the empty list says You’re all caught up', false));
         }
     } finally { await client.close(); }
     if (problems.length) { console.error('FAIL\n  ' + problems.join('\n  ')); process.exit(1); }

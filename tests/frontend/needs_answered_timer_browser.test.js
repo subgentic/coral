@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
         await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`/You are all caught up/.test(document.getElementById('group-table-view')?.innerText || '')`, 'the empty Needs you', 15000);
+        await waitFor(`/You’re all caught up/.test(document.getElementById('group-table-view')?.innerText || '')`, 'the empty Needs you', 15000);
 
         // The default hint
         const before = await ev(`document.querySelector('#group-table-view .empty-state-hint')?.textContent || ''`);

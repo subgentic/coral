@@ -93,7 +93,15 @@ const { coralReady } = require('./helpers/wait');
                 assert.deepEqual(m1.filter(t => /Nudge|note|board|anyway|Stop/.test(t)), ['Nudge Writer A', 'Add another note', 'Approve anyway', 'Stop waiting'], 'awake: Nudge and Add another note, then Approve anyway and Stop waiting: ' + JSON.stringify(m1));
                 assert.deepEqual(m2.filter(t => /Nudge|note|board|anyway|Stop/.test(t)), ['Reassign on board', 'Approve anyway', 'Stop waiting'], 'asleep: Reassign on board: ' + JSON.stringify(m2));
                 assert.deepEqual(m3.filter(t => /Nudge|note|board|anyway|Stop/.test(t)), ['Hand off on board', 'Approve anyway', 'Stop waiting'], 'archived: Hand off on board: ' + JSON.stringify(m3));
+                await ev(`document.querySelector('[aria-controls="inbox-needs-menu"]').click(); true`);
+                await waitFor(`!!document.querySelector('.inbox-filter-pop') && document.querySelector('.inbox-filter-pop').getClientRects().length > 0`, 'the Filters panel opens', 5000);
+                await new Promise(r => setTimeout(r, 300)); // sleep-ok: the panel settles
+                const pop = await ev(`(() => { const m = document.querySelector('.inbox-filter-pop'); const fs = [...m.querySelectorAll('.list-bar-field')].filter(f => f.getClientRects().length && f.querySelector('.list-bar-field-label')); const rows = fs.map(f => { const r = f.getBoundingClientRect(), l = f.querySelector('.list-bar-field-label').getBoundingClientRect(), c = f.querySelector('select').getBoundingClientRect(); return { left: Math.round(r.left), top: r.top, bottom: r.bottom, labelGap: Math.round(c.top - l.bottom) }; }); const under = rows.map((a, i) => { const next = rows.filter(b => b.left === a.left && b.top > a.top).sort((x, y) => x.top - y.top)[0]; return next ? Math.round(next.top - a.bottom) : null; }).filter(v => v !== null); return { n: rows.length, labelGaps: [...new Set(rows.map(r => r.labelGap))], under: [...new Set(under)] }; })()`);
+                assert.ok(pop.n >= 5 && pop.labelGaps.every(g => g >= 3 && g <= 5) && pop.under.length && pop.under.every(g => g >= 9 && g <= 11), 'the Filters panel spaces as mock v3: a label 4 px over its select, 10 px under the control above it (final walk: tight today): ' + JSON.stringify(pop));
+                await shot('agent-filters');
+                await ev(`document.querySelector('[aria-controls="inbox-needs-menu"]').click(); true`);
                 // the Filters panel of this tab: Agent state and Group by Agent (the other tab has neither)
+                assert.deepEqual(await ev(`(() => { const s = [...document.querySelectorAll('#inbox-needs-menu select')].find(x => [...x.options].some(o => o.value === 'blockers')); return s ? { value: s.value, shown: s.selectedOptions[0].textContent.trim(), disabled: s.disabled } : null; })()`), { value: 'oldest', shown: 'Waiting longest', disabled: true }, 'the Sort field says what the line says: longest waiting first, and is not a choice here (final walk S4)');
                 assert.equal(await ev(`!!document.querySelector('.inbox-agent-state-field select') && !!document.querySelector('.inbox-agent-group-field select') && (document.querySelector('.inbox-group-review-toggle') || { hidden: true }).hidden`), true, 'the panel has Agent state and its own Group by');
                 await ev(`(() => { const s = document.querySelector('.inbox-agent-state-field select'); s.value = 'asleep'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`!!(${row('Asleep file.txt')}) && !(${row('Awake file.txt')}) && !(${row('Archived file.txt')})`, 'Agent state: Asleep shows only the asleep agent’s file', 8000);
@@ -103,7 +111,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`(() => { const s = document.querySelector('.inbox-agent-group-field select'); s.value = 'agent'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length === 3`, 'Group by Agent: a heading for each of the three agents', 8000);
                 const heads = await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(g => g.textContent.replace(/\\s+/g, ' ').trim())`);
-                assert.ok(heads.some(t => /Writer A · Awake/.test(t)) && heads.some(t => /Writer B · Asleep/.test(t)) && heads.some(t => /Writer C · Archived/.test(t)), 'each heading names the agent and its state: ' + JSON.stringify(heads));
+                assert.ok(heads.some(t => /Writer A Awake/.test(t)) && heads.some(t => /Writer B Asleep/.test(t)) && heads.some(t => /Writer C Archived/.test(t)), 'each heading names the agent and its state: ' + JSON.stringify(heads));
                 const gh = await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].map(g => ({ t: g.textContent.replace(/\\s+/g, ' ').trim(), meta: g.querySelector('.inbox-group-meta')?.textContent || '', btn: [...g.querySelectorAll('button')].map(b => b.textContent.trim()) }))`);
                 const ghOf = n => gh.find(g => g.t.includes(n));
                 assert.match(ghOf('Writer B').meta, /^1 waiting · since .+ ago$/, 'the heading says how many wait and since when: ' + JSON.stringify(gh));
@@ -111,6 +119,17 @@ const { coralReady } = require('./helpers/wait');
                 assert.deepEqual(ghOf('Writer C').btn, ['Start agent'], 'an archived agent’s heading has Start agent: ' + JSON.stringify(gh));
                 assert.deepEqual(ghOf('Writer A').btn, [], 'an awake agent’s heading has no button: ' + JSON.stringify(gh));
                 assert.equal(await ev(`document.querySelectorAll('.inbox-agent-status .inbox-st-dot').length`), 3, 'the count line has a coloured dot for each of the three states');
+                assert.deepEqual(await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group th')].map(th => ({ chip: th.querySelector('.inbox-wait-state')?.textContent.trim(), plain: /\\u00b7 (Awake|Asleep|Archived)/.test([...th.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('')) }))`), [{ chip: 'Archived', plain: false }, { chip: 'Asleep', plain: false }, { chip: 'Awake', plain: false }], 'each heading says the state as the row’s own chip beside the name, not as plain text in the title (final gap walk)');
+                assert.equal(await ev(`document.querySelectorAll('.inbox-needs-results tr.dt-row .inbox-wake, .inbox-needs-results tr.dt-row .inbox-open-agent').length`), 0, 'grouped by agent, the rows do not repeat the heading’s Wake / Start agent, nor Open agent');
+                // a filter that hides everything: the empty result names the filters and Show all carries the count (the mock)
+                await ev(`(() => { const s = document.querySelector('.inbox-agent-state-field select'); s.value = 'archived'; s.dispatchEvent(new Event('change', { bubbles: true })); const q = document.getElementById('inbox-search'); q.value = 'zzzz'; q.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await waitFor(`/Nothing waiting on an agent matches/.test(document.getElementById('group-table-view').innerText)`, 'the filtered empty result of the second tab', 8000);
+                const fe = await ev(`(() => { const e = document.querySelector('.inbox-needs-results .empty-state, #group-table-view .empty-state'); return e ? { line: e.querySelector('.empty-state-line').textContent, buttons: [...e.querySelectorAll('button')].map(b => b.textContent.trim()) } : null; })()`);
+                assert.match(fe.line, /^Nothing waiting on an agent matches Agent state: Archived \+ Filtered by: zzzz\.$/, 'the filtered empty result names the filters: ' + JSON.stringify(fe)); assert.deepEqual(fe.buttons, ['Show all (3)'], 'Show all carries the count: ' + JSON.stringify(fe));
+                await ev(`[...document.querySelectorAll('.empty-state button')].find(b => /Show all/.test(b.textContent)).click(); true`);
+                await waitFor(`!!(${row('Awake file.txt')})`, 'Show all brings the rows back', 8000);
+                await ev(`(() => { const s = document.querySelector('.inbox-agent-group-field select'); s.value = 'agent'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length === 3`, 'Group by Agent is back for the next steps', 8000);
                 await shot('agent-grouped');
                 await ev(`(() => { const s = document.querySelector('.inbox-agent-group-field select'); s.value = 'none'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
                 await waitFor(`!document.querySelector('.inbox-needs-results .dt-group')`, 'None takes the headings away', 8000);
@@ -157,6 +176,14 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`!!(${row('Tag v2.1.1')}) && !(${row('landing-copy-v2.md')}) && !(${row('Awake file.txt')})`, 'the Answered ask pill shows only that kind', 8000);
                 await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].find(b => /^All/.test(b.textContent)).click(); true`);
                 await waitFor(`!!(${row('Awake file.txt')}) && !!(${row('landing-copy-v2.md')})`, 'All shows the five again', 8000);
+                { // an archived agent whose only row is a sent comment still has Start agent on its heading (the row does not carry it: grouped, the heading does)
+                    const grp = v => ev(`(() => { const s = document.querySelector('.inbox-agent-group-field select'); s.value = '${v}'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                    await grp('agent'); await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length >= 3`, 'grouped by agent again', 8000);
+                    const g = await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].filter(h => /Copywriter/.test(h.textContent)).map(h => [...h.querySelectorAll('button')].map(b => b.textContent.trim()))`);
+                    assert.deepEqual(g, [['Start agent']], 'an archived agent with only a comment row: the heading has Start agent: ' + JSON.stringify(g));
+                    assert.equal(await ev(`!!(${row('landing-copy-v2.md')}).querySelector('.inbox-wake')`), false, 'the comment row does not repeat it');
+                    await grp('none'); await waitFor(`!document.querySelector('.inbox-needs-results .dt-group')`, 'ungrouped again', 8000);
+                }
                 if (width === 390) { const clash = await ev(`[...document.querySelectorAll('#group-table-view tr.inbox-kind-row')].map(tr => { const c = tr.querySelector('.inbox-wait-state'), m = tr.querySelector('.inbox-row-more-toggle, .dt-mail-more-toggle'); if (!c || !m || !c.getClientRects().length || !m.getClientRects().length) return null; const a = c.getBoundingClientRect(), b = m.getBoundingClientRect(); return a.right > b.left + 1 && a.left < b.right - 1 && a.bottom > b.top + 1 && a.top < b.bottom - 1; }).filter(x => x === true).length`); assert.equal(clash, 0, '390 px: no row\'s state chip lies under its more dots (#20066)'); }
                 await shot('agent-five');
                 if (width === 390) assert.match(await ev(`document.querySelector('.inbox-agent-status').innerText.trim()`), /^5 waiting · 3 inactive$/, 'a phone shows the mock’s one short count line, with no stray separators');
@@ -221,6 +248,13 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`(${row('pick one')}).classList.contains('dt-unread')`), false, 'real: a waiting row is not unread');
                 await shot('agent-real-route');
                 await ev(`(async () => { window.__waiting = []; const W = await import((window.__coralStatic || '/static/') + 'inbox_waiting_agent.js'); W.forget(); await W.load({ force: true }); return true; })()`);
+                // nothing waits on the Operator but agents are waited on: the mock's empty result, with its two buttons (final gap walk)
+                await ev(`window.__keepItems = window.__reviewItems; window.__reviewItems = window.__reviewItems.filter(a => a.tags.includes('changes requested')); document.querySelector('[data-needs-tab="you"]').click(); import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
+                await waitFor(`/all caught up/.test(document.getElementById('group-table-view').innerText)`, 'Waiting on you is empty', 8000);
+                const caught = await ev(`(() => { const e = document.querySelector('#group-table-view .empty-state'); return { line: e.querySelector('.empty-state-line').textContent, buttons: [...e.querySelectorAll('button')].map(b => b.textContent.trim()) }; })()`);
+                assert.deepEqual(caught, { line: 'You\u2019re all caught up', buttons: ['View Waiting on an agent (3)', 'Go to Agents'] }, 'the empty result says it as the mock does, with its two buttons: ' + JSON.stringify(caught));
+                await ev(`window.__reviewItems = window.__keepItems; document.querySelector('[data-needs-tab="agent"]').click(); import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
+                await waitFor(`!!(${row('Awake file.txt')})`, 'the agent tab is back', 8000);
                 // nothing waiting on an agent: the empty state
                 await ev(`window.__reviewItems = window.__reviewItems.filter(a => !a.tags.includes('changes requested')); import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
                 await waitFor(`/Nothing waiting on an agent/.test(document.getElementById('group-table-view').innerText)`, 'the empty state of the second tab', 8000);

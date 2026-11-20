@@ -1,5 +1,5 @@
 // The Inbox's welcome items for a new install (#11443): with the server's inbox_welcome = on, Needs you holds five items, each a real action that marks itself done when its step is seen (an agent exists, a team
-// exists, a computer or the Hub is connected), read or dismissed; they are not in the Inbox badge; each is dismissed one at a time like any other item (no Hide all, #14742); an empty Needs you says "You are all caught up" with a way to Agents; an install
+// exists, a computer or the Hub is connected), read or dismissed; they are not in the Inbox badge; each is dismissed one at a time like any other item (no Hide all, #14742); an empty Needs you says "You’re all caught up" with a way to Agents; an install
 // without the setting never sees them. At 1280 and 390 px, through agent_view_harness.js against the isolated dev server (the settings the page keeps are put in its state; the PUTs are answered here).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -73,7 +73,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import(${S} + 'welcome_swipe.js').then(m => m.dismissQuietly('guide'))`); // explicit dismissal is covered through its real desktop button and phone menu in welcome_guide_dismiss_browser
             await waitFor(`!document.querySelector('#group-table-view tr[data-welcome-id="guide"]')`, `${tag}: explicitly dismissing the guide clears its row`, 6000);
             await press('Got it'); // the last one: the welcome's own button
-            await waitFor(`/You are all caught up(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the empty Needs you says You are all caught up`, 6000);
+            await waitFor(`/You’re all caught up(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the empty Needs you says You’re all caught up`, 6000);
             check(await ev(`window.__puts.some(p => String(p.inbox_welcome_done || '').split(',').length === 5)`), `${tag}: with every item done or dismissed, all five are remembered in the settings`);
             await press('Go to Agents');
             await waitFor(`(() => { const t = document.querySelector('.top-nav-tab.active'); if (t && t.dataset.arg === 'agents') return true; const m = document.getElementById('mobile-agent-list'); return !!m && getComputedStyle(m).display !== 'none'; })()`, `${tag}: Go to Agents`, 5000);
@@ -86,11 +86,11 @@ const { coralReady } = require('./helpers/wait');
             // an install that has run before: no setting, no items
             await ev(`T.state.settings = { ...T.state.settings, inbox_welcome: undefined, inbox_welcome_done: '' }; T.state.liveSessions = []; true`);
             await open();
-            await waitFor(`/You are all caught up(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: an existing install sees no welcome items`, 6000);
+            await waitFor(`/You’re all caught up(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: an existing install sees no welcome items`, 6000);
             // an install that chose Hide all before it was removed (inbox_welcome: 'off') keeps them hidden: nothing brings them back
             await ev(`T.state.settings = { ...T.state.settings, inbox_welcome: 'off', inbox_welcome_done: '' }; true`);
             await open();
-            await waitFor(`/You are all caught up(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: an install that hid them all earlier still sees none`, 6000);
+            await waitFor(`/You’re all caught up(?!r)/.test(document.getElementById('group-table-view').textContent)`, `${tag}: an install that hid them all earlier still sees none`, 6000);
             await ev(`window.fetch = window.__realFetch; true`);
         }
         assert.equal(found.length, 0, '\n' + found.join('\n'));

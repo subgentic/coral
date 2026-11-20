@@ -231,7 +231,7 @@ const AGENTS = (waiting) => waiting ? [
             await setAgents(false);
             await ev(`document.querySelector('${pane} .view-list-item[data-key="needs"]').click(); true`);
             await waitFor(`document.querySelector('#group-table-title').textContent === 'Needs you' && !!document.querySelector('#group-table-view .empty-state-line')`, at + 'the empty Needs you', 8000);
-            assert.deepEqual(await ev(`(() => { const l = document.querySelector('#group-table-view .empty-state-line'), c = getComputedStyle(l); return [l.textContent, c.fontSize, c.fontWeight]; })()`), ['You are all caught up', '15px', '600'], at + 'one empty line, 15/600 in the approved list (#19824: a centred card, the line strong)');
+            assert.deepEqual(await ev(`(() => { const l = document.querySelector('#group-table-view .empty-state-line'), c = getComputedStyle(l); return [l.textContent, c.fontSize, c.fontWeight]; })()`), ['You’re all caught up', '15px', '600'], at + 'one empty line, 15/600 in the approved list (#19824: a centred card, the line strong)');
             await shot(`inbox-one-empty-${w}`);
             await setAgents(true);
 

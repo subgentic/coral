@@ -33,7 +33,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         const gt = vis('group-table-view') && /^hub-inbox:/.test(document.getElementById('group-table-view').dataset.group); // a group's table or an item's page, both the Inbox's own
         return { dockHeading: (document.getElementById('saved-ui')?.getAttribute('aria-label') || ''), dockRows: [...document.querySelectorAll('#saved-table tbody .dt-primary')].map(r => r.textContent.replace(/^[^,]*, /, '')).sort(), inbox: vis('inbox-view') || gt, local: vis('inbox-local') || gt, frame: !!document.getElementById('inbox-frame'), saved: vis('group-table-view') && document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved', uiIn: ui && (ui.parentElement.id), heading: (document.getElementById('group-table-title') || {}).textContent,
             rows: document.getElementById('group-table-view').dataset.group === 'hub-inbox:saved' ? [...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(r => r.textContent).sort() : [],
-            needs: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' ? [...document.querySelectorAll('#group-table-view tbody tr')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()) : [], needsEmpty: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && /You are all caught up/.test(document.getElementById('group-table-view').textContent),
+            needs: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' ? [...document.querySelectorAll('#group-table-view tbody tr')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()) : [], needsEmpty: document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && /You’re all caught up/.test(document.getElementById('group-table-view').textContent),
             navActive: document.querySelector('.top-nav-tab.active') && document.querySelector('.top-nav-tab.active').dataset.arg, tabs, navBadge: (document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || '', navLabel: document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label'),
             dockShown: !!dock && getComputedStyle(dock).display !== 'none' && dock.getClientRects().length > 0 && !dock.classList.contains('collapsed') || (!!dock && dock.classList.contains('mobile-panel-overlay')), dockHasSavedTab: vis('agentic-tab-saved'),
             over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
@@ -192,14 +192,14 @@ const hex = i => i.toString(16).padStart(20, '0');
         await open(1280, false, []);
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         await ev(tabBtn('needs'));
-        await settle(`/You are all caught up/.test(document.getElementById('group-table-view').textContent) && document.getElementById('group-table-view').getClientRects().length > 0`, 'the empty line');
+        await settle(`/You’re all caught up/.test(document.getElementById('group-table-view').textContent) && document.getElementById('group-table-view').getClientRects().length > 0`, 'the empty line');
         await settle(`/permission prompts appear here\\. Tasks assigned to you live under Tasks\\./.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`, 'the hint under the empty line'); // the line is drawn first and the hint a frame later on a loaded machine (1 run in 30): wait for it, bounded, as for the line (#14786)
         check('and says what puts something there (a hint under the line, as Tasks and Saved have)', await ev(`/permission prompts appear here\. Tasks assigned to you live under Tasks\./.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`), await ev(`(document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || ''`));
         await ev(tabBtn('goals'));
         await settle(`/No open goals/.test(document.getElementById('group-table-view').textContent)`, 'the Goals empty line');
         check('an empty Goals says where one is made', await ev(`/Press New goal/.test((document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || '')`), await ev(`(document.querySelector('#group-table-view .empty-state-hint') || {}).textContent || ''`));
         await ev(tabBtn('needs'));
-        await settle(`/You are all caught up/.test(document.getElementById('group-table-view').textContent)`, 'Needs you again');
+        await settle(`/You’re all caught up/.test(document.getElementById('group-table-view').textContent)`, 'Needs you again');
         s = await state();
         check('with nothing waiting Needs you says so, the badge is empty, Saved for later still lists everything', s.needsEmpty && s.needs.length === 0 && s.navBadge === '' && s.navLabel === null, JSON.stringify([s.needsEmpty, s.needs, s.navBadge, s.navLabel]));
 
