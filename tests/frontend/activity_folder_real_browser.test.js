@@ -96,7 +96,7 @@ const HEX = 'c'.repeat(64);
         await ev(`document.querySelector('#group-table-view .al-row .al-title').click(); true`);
         // an approved file opens its decision dialog (#15792); Open file is the way to the viewer
         await waitFor(`!!document.querySelector('dialog.activity-file-dialog[open]')`, 'the file decision dialog', 10000);
-        await ev(`[...document.querySelectorAll('.activity-file-dialog .btn')].find(b => b.textContent.trim() === 'Open file').click(); true`);
+        await ev(`[...document.querySelectorAll('.activity-file-dialog .btn')].find(b => b.textContent.trim().endsWith('Open file')).click(); true`);
         await waitFor(`!!document.getElementById('artifact-viewer')`, 'the viewer', 10000);
         console.log('   ✓');
 
@@ -119,7 +119,7 @@ const HEX = 'c'.repeat(64);
             await load();
             await openFolder(false);
             await waitFor(`!!document.querySelector('.activity-check-broken')`, 'the broken record said', 10000);
-            assert.match(await ev(`document.querySelector('.activity-check-broken').textContent`), /^The record was changed outside Coral: a row was edited\. Edits made outside Coral are shown unless the whole record was rewritten\.$/);
+            assert.match(await ev(`document.querySelector('.activity-check-broken .activity-check-detail').textContent`), /^The record was changed outside Coral: a row was edited\. Earlier entries remain readable\.$/); // #19924 (MUST-13, the approved mock's words): said once, then what still works; the server's own note is not repeated
             assert.equal(await ev(`document.querySelector('.activity-check-broken').getAttribute('role')`), 'alert');
         } finally { putBack(); }
         console.log('   ✓');

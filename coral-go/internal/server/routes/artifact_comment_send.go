@@ -22,8 +22,8 @@ import (
 
 // Send to agent (#6357, #6443; the approved note, section 5): the owner picks one comment and the agents on its board to ask, and Coral posts ONE board message to each, from the Operator. This
 // is the prompt-injection path, so: one comment per request, an explicit list of agents (never "all"), the text is read from the stored comment on this computer (the request carries only the
-// agents), what is quoted is redacted, cleaned of control and ANSI characters and capped, and the message says plainly whose words they are and that they are untrusted. Local only for now:
-// never through Coral Hub (the route is "never" in the tunnel table until coral-hub's operator answers).
+// agents), what is quoted is redacted, cleaned of control and ANSI characters and capped, and the message says plainly whose words they are and that they are untrusted. Through Coral Hub it is the
+// OWNER's alone at the Launch tier (#11354; pkg/tunnel/routes.go), and the dashboard draws it there only when the Hub's account says comment_send (#14549).
 
 const (
 	sendMaxAgents    = 10      // agents in one request
@@ -390,7 +390,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 		if sub != nil {
 			ls, live = bySession[sub.SessionName]
 		}
-		if live && ls.IsSleeping == 1 && sleepReason(ls) == store.SleepReasonIdle && h.WakeIdleForDelivery(r.Context(), ls.SessionID) {
+		if live && ls.IsSleeping == 1 && ls.IsArchived == 0 && h.WakeForOperator(r.Context(), ls.SessionID) { // Send to agent is the Operator's own press: it wakes a sleeper whoever put it to sleep (#19897)
 			ls.IsSleeping = 0 // an auto-asleep agent was woken for the comment (#12111)
 		}
 		switch {

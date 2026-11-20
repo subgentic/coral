@@ -113,7 +113,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 			}
 			mentions = append(mentions, "@"+rv.Reviewer)
 		}
-		h.postNotice(ctx, project, fmt.Sprintf("%s [Task #%d resubmitted for review, round %d] %s submitted %s again (candidate: %s; %s). Review it again: coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". @%s the same reviewers have it; change them with coral-board task review %d --to \"...\"",
+		h.postWakingNotice(ctx, project, fmt.Sprintf("%s [Task #%d resubmitted for review, round %d] %s submitted %s again (candidate: %s; %s). Review it again: coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". @%s the same reviewers have it; change them with coral-board task review %d --to \"...\"",
 			strings.Join(mentions, " "), id, reopened.Round, h.noticeText(ctx, project, author), quoteNotice(h.noticeText(ctx, project, task.Title)), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, body.Reason), id, id, reopened.Round, id, reopened.Round, orch, id))
 	} else if h.autoDelegateReview(ctx, project, id, orch) { // #4175: Coral delegates to the named reviewers
 	} else if h.putReviewInPool(ctx, project, id, task.Title, author, areas, body.Reviewers, candidate, body.Reason) { // #8957: or the review waits in the board's pool for an agent that only reviews
@@ -175,7 +175,7 @@ func (h *BoardHandler) DelegateReview(w http.ResponseWriter, r *http.Request) {
 	}
 	h.postNotice(ctx, project, fmt.Sprintf("[Task #%d delegated for review by %s] %s", id, h.noticeText(ctx, project, body.SubscriberID), h.noticeText(ctx, project, strings.Join(names, ", "))))
 	for _, rt := range reviews {
-		h.postNotice(ctx, project, h.buildAssignmentNotification(ctx, project, rt, *rt.AssignedTo, false))
+		h.postWakingNotice(ctx, project, h.buildAssignmentNotification(ctx, project, rt, *rt.AssignedTo, false))
 	}
 	if h.notifyFn != nil {
 		h.notifyFn(project)
@@ -359,7 +359,7 @@ func (h *BoardHandler) submitNewRevisionInReview(w http.ResponseWriter, r *http.
 			}
 			mentions = append(mentions, "@"+rv.Reviewer)
 		}
-		h.postNotice(ctx, project, fmt.Sprintf("%s [Task #%d has a new revision, round %d] %s sent %s while it was in review (candidate: %s; %s). The previous revision is superseded: read it again with coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". Your review task is the same one. @%s",
+		h.postWakingNotice(ctx, project, fmt.Sprintf("%s [Task #%d has a new revision, round %d] %s sent %s while it was in review (candidate: %s; %s). The previous revision is superseded: read it again with coral-board task detail %d, then coral-board task approve %d --round %d, or reject %d --round %d --note \"why\". Your review task is the same one. @%s",
 			strings.Join(mentions, " "), id, reopened.Round, h.noticeText(ctx, project, author), quoteNotice(h.noticeText(ctx, project, title)), h.noticeText(ctx, project, candidate), h.noticeText(ctx, project, reason), id, id, reopened.Round, id, reopened.Round, orch))
 	} else {
 		h.postNotice(ctx, project, fmt.Sprintf("@%s [Task #%d has a new revision] %s sent %s while it was in review (candidate: %s; %s). The previous revision is superseded.",

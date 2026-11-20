@@ -41,13 +41,16 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-meta { min-width: 0; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font-size: var(--fs-base); color: var(--text-muted); }
 .al-author { color: var(--text-secondary); font-weight: var(--fw-medium); }
 .al-chip { max-width: 100%; overflow-wrap: anywhere; }
+.al-chip, .al-via { border: 1px solid var(--border); background: var(--bg-tertiary); } /* Goal and Task are chips with an edge, as the mock draws them (#19871) */
 .al-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; align-self: stretch; gap: var(--space-lg); }
 .al-right-meta { display: inline-flex; align-items: center; gap: var(--space-sm); font-size: var(--fs-base); color: var(--text-muted); white-space: nowrap; }
 .al-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
 @media (max-width: 599px) {
   .al-row { grid-template-columns: 2rem minmax(0, 1fr); padding: var(--space-lg); }
-  .al-right-meta { white-space: normal; flex-wrap: wrap; }
-  .al-right { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .al-right-meta { white-space: normal; flex-wrap: wrap; flex: 1 0 100%; }
+  .al-right { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; }
+  .al-actions { justify-content: flex-start; }
+  .al-actions .btn { margin: 0; }
 }
 .al-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
@@ -59,12 +62,14 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-versions { position: relative; }
 .al-versions > summary { list-style: none; cursor: pointer; }
 .al-versions > summary::-webkit-details-marker { display: none; }
-.al-pop { position: absolute; right: 0; top: 100%; z-index: 5; min-width: 16rem; max-width: calc(100vw - 2 * var(--space-xl)); margin-top: var(--space-xs); padding: var(--space-sm); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); box-shadow: var(--shadow-md); }
+.al-pop { position: absolute; right: 0; top: 100%; z-index: 5; width: max-content; min-width: 16rem; max-width: calc(100vw - 2 * var(--space-xl)); margin-top: var(--space-xs); padding: var(--space-sm); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); box-shadow: var(--shadow-md); }
 .al-pop-row { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-xs) var(--space-sm); }
 .al-pop-name { font-weight: var(--fw-strong); }
-.al-pop-state { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: anywhere; }
+.al-pop-state { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: break-word; }
 
 .al-vchip, .al-vnewer { display: inline-flex; align-items: center; padding: 1px var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); }
+.al-vchip-latest { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.14); } /* in a file's version list: the newest is blue, the one decided here is green (#19871) */
+.al-vchip-mine { color: var(--success-text); border-color: rgba(var(--success-rgb), 0.3); background: rgba(var(--success-rgb), 0.14); }
 .al-vnewer { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.14); }
 .al-ask { margin-top: var(--space-xs); font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); overflow-wrap: anywhere; }
 .al-glyph { font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: 0; }
@@ -77,7 +82,8 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-more > summary { list-style: none; cursor: pointer; }
 .al-more > summary::-webkit-details-marker { display: none; }
 .al-more .al-pop { min-width: 12rem; display: flex; flex-direction: column; gap: var(--space-xs); }
-.al-menu-item { justify-content: flex-start; width: 100%; }
+.al-menu-item { justify-content: flex-start; box-sizing: border-box; }
+@media (max-width: 767px) { .al-versions, .al-more { position: static; } .al-row { position: relative; } .al-pop { left: var(--space-md); right: var(--space-md); top: auto; width: auto; min-width: 0; max-width: none; } } /* a phone's popover is as wide as its row, under the buttons, not squeezed beside them */
 /* Activity has no selection bar, so its toolbar keeps no empty actions line under it (the 50 px band at 1280, QA's #19816 note) */
 #group-table-view .inbox-folder-toolbar.list-bar-bar:has(+ .activity-folder) { padding-bottom: var(--space-md); }
 .al-ans-label { font-weight: var(--fw-strong); color: var(--text-primary); }

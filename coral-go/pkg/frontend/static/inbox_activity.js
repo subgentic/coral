@@ -42,14 +42,16 @@ export const fromCell = r => M(multipleServers() ? [serverLabel(r.server || LOCA
 /** The computers whose record is not in the folder, each with why (#15730): the ones that are offline (never asked), the ones that refused (an older Coral that does not give its record to a Hub's owner yet, or a computer this person is only a guest of) and the ones that failed. Named, never left out silently. */
 export const missingComputers = () => {
     if (!appState.hub) return [];
-    const offline = (appState.servers || []).filter(s => s && s.id && s.id !== LOCAL_SERVER && s.status !== 'online').map(s => ({ id: s.id, why: 'is offline' }));
+    const offline = (appState.servers || []).filter(s => s && s.id && s.id !== LOCAL_SERVER && s.status !== 'online').map(s => ({ id: s.id, why: 'offline' }));
     return [...offline, ...unread];
 };
-export const missingWords = list => list.length ? `Not in this list: ${list.map(m => `${serverLabel(m.id)} (${m.why})`).join(', ')}.` : '';
+/** The computers whose actions ARE in the folder, by name (#19924: the mock says "Showing actions from Mac Studio" beside the ones that are missing). */
+export const shownComputers = () => { const gone = new Set(missingComputers().map(m => m.id)); return inboxSources().filter(id => !gone.has(id)).map(id => serverLabel(id)); };
+export const missingWords = (list, shown = []) => list.length ? `Not in this list: ${list.map(m => `${serverLabel(m.id)} (${m.why})`).join(', ')}.${shown.length ? ` Showing actions from ${shown.join(', ')}.` : ''}` : '';
 /** What the folder says above the list about the record's own check: a break is said plainly, an intact record says what the check can and cannot do. */
 export function checkWords(c) {
     if (!c) return '';
-    if (!c.intact) return `${c.machine ? `On ${c.machine}: t` : 'T'}he record was changed outside Coral${c.reason === 'edited' ? ': a row was edited' : c.reason === 'removed' ? ': a row was removed' : c.reason === 'cut_off' ? ': rows were cut off' : ''}. ${c.note || ''}`.trim();
+    if (!c.intact) return `${c.machine ? `On ${c.machine}: t` : 'T'}he record was changed outside Coral${c.reason === 'edited' ? ': a row was edited' : c.reason === 'removed' ? ': a row was removed' : c.reason === 'cut_off' ? ': rows were cut off' : ''}. Earlier entries remain readable.`; // the approved mock's words (#19924): said once; the server's own note repeated the first sentence
     return ''; // an intact record says nothing: the count and the check's own caveat were not words anyone could use (#18620)
 }
 
@@ -156,6 +158,21 @@ export const total = f => visible(f).length;
 export const countKind = (k, f) => visible(f).filter(r => AF.inKind(r, k)).length;
 /** The counts the Show pills draw, as one string for the toolbar's signature. */
 export const countsKey = f => JSON.stringify([total(f), AF.KINDS.map(k => countKind(k, f))]);
+/** Today, Last 7 days and Last 30 days beside the Since date (the mock, #19813 v1 section 3; #19871): each fills the date field, as typing the day would. */
+export const mountPresets = node => {
+    node.querySelector('.inbox-activity-group-toggle select')?.classList.add('field', 'list-bar-select'); // Group by is a field like the others: its label over a full-width select
+    const input = node.querySelector('#inbox-activity-from'), field = input && input.closest('.list-bar-field');
+    if (!field) return;
+    field.querySelector('.al-presets')?.remove();
+    const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const row = document.createElement('div'); row.className = 'al-presets'; row.setAttribute('role', 'group'); row.setAttribute('aria-label', 'Quick dates');
+    for (const [label, back] of [['Today', 0], ['Last 7 days', 6], ['Last 30 days', 29]]) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'goals-chip al-preset'; b.textContent = label; b.setAttribute('aria-pressed', String(input.value === day(back)));
+        b.addEventListener('click', () => { input.value = day(back); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); });
+        row.append(b);
+    }
+    field.append(row);
+};
 /** The Show pills (#16087, #19149): Important leaves out delivery bookkeeping and is on when nothing was chosen before; a kind chip toggles its kind; Everything clears Important and every kind, and the last kind off is Everything again. change(important, kinds) keeps the choice. */
 export const showPills = (f, change) => {
     const picked = AF.kindsOf(f.kind), imp = f.important === true;
@@ -176,7 +193,11 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
         node: () => {
             const wrap = DT.el('div', 'activity-folder');
             const words = checkWords(check);
-            if (words) { const n = DT.el('p', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`, words); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n); }
+            if (words) { // a notice with its icon, a heading and the sentence under it (the mock's record integrity notice, #19871)
+                const n = DT.el('div', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
+                tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', 'Activity record check warning'), DT.el('span', 'activity-check-detail', words));
+                n.append(tile, text); n.setAttribute('role', check && !check.intact ? 'alert' : 'status'); wrap.append(n);
+            }
             const openRow = r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); }
             // the row's More menu: what else can be done with this record, from the actions the dialogs already have (#19828). A file's decision: its details and comments, back to review, its link. An answered question: the thread, back to Needs you, its board message, its task.
             const threadFor = async r => { // the question's thread, read on demand for the row's Q&A preview
@@ -208,8 +229,12 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
             wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
-            const gaps = missingWords(missingComputers());
-            if (gaps) { const n = DT.el('p', 'activity-check', gaps); n.setAttribute('role', 'status'); wrap.prepend(n); }
+            const gaps = missingWords(missingComputers(), shownComputers());
+            if (gaps) { // the mock's "Partial multi-computer view" notice: the same icon, heading and sentence as the record check (#19924)
+                const n = DT.el('div', 'activity-check activity-check-partial'), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
+                tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', 'Partial multi-computer view'), DT.el('span', 'activity-check-detail', gaps));
+                n.append(tile, text); n.setAttribute('role', 'status'); wrap.prepend(n);
+            }
             if (more) { const b = DT.el('button', 'btn btn-small activity-more', 'Show older actions'); b.type = 'button'; b.addEventListener('click', () => refresh(null, { next: true })); wrap.append(b); }
             return wrap;
         } };

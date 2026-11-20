@@ -74,7 +74,7 @@ const GS = await importOnce('./goal_short.js'); // a goal's short name and #N (#
 const GW = await importOnce('./goal_words.js'); // a goal's state word, said in a phone row's button name (#9747)
 const { mountGoal } = await importOnce('./goal_view.js');
 const { arrangeReviewRows, reviewGroupLookup } = await importOnce('./inbox_review_groups.js');
-const { waitingOnAgent, needsReviewAttention, reviewChangeLabels, hasNewVersion, decidedWithNews, decidedWord, sentBackSince, sentBackChip, sentBackExcerpt } = await importOnce('./inbox_review_state.js');
+const { waitingOnAgent, needsReviewAttention, reviewChangeLabels, hasNewVersion, decidedWithNews, decidedWord, sentBackSince, sentBackChip, sentBackExcerpt, producerArchived } = await importOnce('./inbox_review_state.js');
 const { starControl } = await importOnce('./artifact_star.js');
 const { askSubjectLinks } = await importOnce('./ask_subject_links.js');
 const { mountInboxItem } = await importOnce('./inbox_item_page.js');
@@ -939,6 +939,7 @@ function inboxActivityToolbar() {
         const label = groupModeField('inbox-activity-group-mode', 'inbox-activity-group-toggle');
         menu.insertBefore(label, menu.querySelector(':scope > .list-bar-clear-all, :scope > .list-bar-done'));
     }
+    AC.mountPresets(node);
     return { node, signature: JSON.stringify([activityFilters, teams, AC.countsKey(activityFilters), groupMode, serverChoices()]) };
 }
 function refreshGoals(force = true) {
@@ -1514,11 +1515,11 @@ export function needsListSpec() {
 const tags = DT.el('span', 'inbox-review-tags');
 if (versionOf(s.review) > 1) { const version = DT.el('span', 'inbox-review-version', `v${versionOf(s.review)}`); version.title = hasNewVersion(s.review) ? `New version v${versionOf(s.review)}` : `Version ${versionOf(s.review)}`; version.setAttribute('aria-hidden', 'true'); tags.append(version); }
 wrap.append(sender, name); if (tags.childNodes.length) wrap.append(tags); if (pills.childNodes.length) wrap.append(pills);
-wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); if (waitingOnAgent(s.review)) wrap.append(sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true })), ...(!activeNeedsTeam ? AW.stateNodes(s.review) : []), sentBackExcerpt(s.review, splitKey(s.review.team).server, splitKey(s.review.team).name)); return wrap;
+wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWords(s.review)}` : ''}${readWords}`), ...waitMark(s)); if (waitingOnAgent(s.review)) wrap.append(sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true }), producerArchived(s.review, state.liveSessions)), ...(!activeNeedsTeam ? AW.stateNodes(s.review) : []), sentBackExcerpt(s.review, splitKey(s.review.team).server, splitKey(s.review.team).name)); return wrap;
     }
     const vn = versionOf(s.review), ver = DT.el('span', 'inbox-review-version', vn > 1 ? ` \u00b7 version ${vn}` : ''); ver.hidden = vn < 2;
     const meta = DT.el('span', 'inbox-meta');
-    meta.append(waitingOnAgent(s.review) ? sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true })) : DT.el('span', `inbox-kind inbox-kind-${kindWord(s.review.kind) ? s.review.kind : 'file'}`, (kindWord(s.review.kind) || 'For review')), sender, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), ...(pills.childNodes.length ? [pills] : []));
+    meta.append(waitingOnAgent(s.review) ? sentBackChip(markHidden(s.review.produced_by || 'the agent', { strict: true }), producerArchived(s.review, state.liveSessions)) : DT.el('span', `inbox-kind inbox-kind-${kindWord(s.review.kind) ? s.review.kind : 'file'}`, (kindWord(s.review.kind) || 'For review')), sender, ver, ...(earlierWords(s.review) ? [earlierLink(s)] : []), ...(pills.childNodes.length ? [pills] : []));
     wrap.append(name, meta, ...(waitingOnAgent(s.review) && !activeNeedsTeam ? AW.stateNodes(s.review) : []), ...(waitingOnAgent(s.review) ? [sentBackExcerpt(s.review, splitKey(s.review.team).server, splitKey(s.review.team).name)] : []), DT.el('span', 'sr-only', `${versionLineOf(s.review) ? `, ${versionLineOf(s.review)}` : ''}${readWords}`), ...waitMark(s)); return wrap;
 } if (isPhoneLayout()) { const f = DT.primaryButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); f.classList.add('inbox-review-from'); Object.assign(f.dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); const row = phoneRow(s, f, agentAskWords(s), [], true); if (agentAskIsLong(s)) row.append(...agentAskControls(s)); return row; }
   const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; })(s)) },
@@ -1554,9 +1555,14 @@ wrap.append(DT.el('span', 'sr-only', `${earlierWords(s.review) ? `, ${earlierWor
             if (isPhoneLayout()) { const bar = (teamNeedsMount?.host || $('group-table-view'))?.querySelector('.gt-toolbar'); Toolbar.mountSelection(bar, needsState.selected.size ? table.bar : null); bar?.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); if (bar && table.selectButton && rows.some(table.eligible)) (bar.querySelector('.list-bar-search-row') || bar).append(table.selectButton); } // the bar takes the toolbar's line while rows are selected; a Select button (44 px) is the visible way in, the long press the quick one (#17128, walk 49)
             if (hidden > 0) {
                 const only = needsFilters.kind && !needsFilters.q && !needsFilters.team && !needsFilters.agent && !needsFilters.goal && !needsFilters.longer && !needsFilters.server;
-                const p = DT.el('p', 'goals-note inbox-filter-hidden', `${hidden} hidden by the ${only ? `${NF.KIND_LABEL[needsFilters.kind] || needsFilters.kind} filter` : 'filters'}. `);
-                p.append(DT.link('Show all', showAllNeeds));
-                wrap.prepend(p);
+                if (rows.some(r => !r.welcome)) { // some waiting rows remain: a line says how many the filters hide
+                    const p = DT.el('p', 'goals-note inbox-filter-hidden', `${hidden} hidden by the ${only ? `${NF.KIND_LABEL[needsFilters.kind] || needsFilters.kind} filter` : 'filters'}. `);
+                    p.append(DT.link('Show all', showAllNeeds));
+                    wrap.prepend(p);
+                } else { // only Getting started is left: the approved filtered result, the card with its icon, line and Show all, above those rows (#19919, MUST-8)
+                    const card = DT.el('div', 'empty-state'), hint = DT.el('p', 'empty-state-hint'), go = DT.el('button', 'btn', 'Show all'); go.type = 'button'; go.addEventListener('click', showAllNeeds); hint.append(go);
+                    card.append(DT.el('p', 'empty-state-line', 'Nothing that needs you matches the search and filters.'), hint); wrap.prepend(card);
+                }
             }
             for (const g of needsOverflow()) {
                 const p = DT.el('p', 'inbox-review-more', `${g.name}: ${g.more.length} more for review. `);

@@ -135,6 +135,18 @@ func (h *BoardHandler) postNotice(ctx context.Context, project, content string, 
 	h.bs.PostSystemDefusedMessage(ctx, project, sender, content, nil)
 }
 
+// postWakingNotice is postNotice for a notice that asks the agents it names to act now: a review reopened for a new round, a review assigned. An agent parked in `coral-board wait` is inside a tool call with no end, so the line the
+// notifier types is not read until the wait ends, and a reviewer sat 80 minutes with two resubmissions naming it (#19910). The notice ends the wait of each agent it tags, as an agent's own post that names it does. Every other notice
+// leaves a wait alone: a `wait --task` or `--commit` is for something else, and an edit, a release or a goal notice that happens to tag its agent is no reason to cut it short (#19914).
+func (h *BoardHandler) postWakingNotice(ctx context.Context, project, content string, from ...string) {
+	h.postNotice(ctx, project, content, from...)
+	sender := "Coral Task Queue"
+	if len(from) > 0 && from[0] != "" {
+		sender = from[0]
+	}
+	h.goBG(func() { h.resolveMessageWaits(project, sender, content) })
+}
+
 // quoteNotice puts text already made by noticeText in double quotes, escaping a backslash and a quote as %q does but leaving every other character as it is: %q would write the zero-width
 // spaces that defuse a mention as the six characters \u200b.
 func quoteNotice(text string) string {

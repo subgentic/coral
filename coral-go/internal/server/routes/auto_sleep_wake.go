@@ -37,6 +37,18 @@ func (h *SessionsHandler) WakeIdleForDelivery(ctx context.Context, sessionID str
 // #12111): an agent that can assign tasks cannot wake every sleeper on its board, once each per idle period, without limit. A wake refused for the cap leaves the delivery where it was (unread,
 // queued) and logs one counter line; at most two wakes run at once and they start two seconds apart.
 func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fromPerson bool) bool {
+	return h.wakeSleeperFor(ctx, sessionID, fromPerson, false)
+}
+
+// WakeForOperator wakes a sleeping agent for something the Operator themself sent it (#19897): a send-back or Request changes on its file, their comment on it, Send to agent. Unlike a delivery from an agent or from
+// Coral, it wakes a MANUAL sleeper too: the person's own message to that agent is a later word than their Sleep, and a message to a sleeper that nobody reads is what the Operator reported ("It doesn't look like this agent got
+// the message"). It is exempt from the board's hourly cap (a person typed to that agent) and never wakes an archived agent: that one is gone, and the caller says so. Reports whether the agent is awake afterwards.
+func (h *SessionsHandler) WakeForOperator(ctx context.Context, sessionID string) bool {
+	return h.wakeSleeperFor(ctx, sessionID, true, true)
+}
+
+// wakeSleeperFor is the body of both: anyReason wakes a sleeper whatever put it to sleep (the Operator's own send), otherwise only an auto-asleep one (idle).
+func (h *SessionsHandler) wakeSleeperFor(ctx context.Context, sessionID string, fromPerson, anyReason bool) bool {
 	ls, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || ls == nil {
 		return false
@@ -44,7 +56,7 @@ func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fro
 	if ls.IsSleeping == 0 {
 		return true
 	}
-	if ls.IsArchived != 0 || sleepReason(*ls) != store.SleepReasonIdle {
+	if ls.IsArchived != 0 || (!anyReason && sleepReason(*ls) != store.SleepReasonIdle) {
 		return false
 	}
 	mu, _ := autoWakeLocks.LoadOrStore(sessionID, &sync.Mutex{})
@@ -56,7 +68,7 @@ func (h *SessionsHandler) WakeIdleFor(ctx context.Context, sessionID string, fro
 	if ls.IsSleeping == 0 { // another delivery woke it while this one waited
 		return true
 	}
-	if ls.IsArchived != 0 || sleepReason(*ls) != store.SleepReasonIdle {
+	if ls.IsArchived != 0 || (!anyReason && sleepReason(*ls) != store.SleepReasonIdle) {
 		return false
 	}
 	start := time.Now()

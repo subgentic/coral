@@ -572,3 +572,84 @@ func TestAMessageWithButtonsOrAQuestionAroundTheLinkIsNeverHiddenAsAFileLink(t *
 	assert.Equal(t, 3, n, "an ask word keeps it a question")
 	assert.Equal(t, 3, rows)
 }
+
+// #19864 (the Operator: "the hooks isn't in my inbox on CoralHub"): an agent that stands at a terminal dialog (Codex's "Hooks need review") is on the live row as at_dialog, which only the dashboard's JavaScript
+// turned into a Needs you item. The feed a Hub and the phone push read (needsYouAgentItems) must list it too, once the dialog has stood for its minutes, and not before, not when dismissed, not when the team
+// turned the notice off, not when asleep or archived.
+func TestNeedsYouListsAnAgentAtADialogOnceItIsDue(t *testing.T) {
+	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
+	row := func(sid string, dialog any, mod func(map[string]any)) map[string]any {
+		r := map[string]any{"session_id": sid, "display_name": "Agent " + sid, "waiting_for_input": false, "board_project": "team", "at_dialog": dialog}
+		if mod != nil {
+			mod(r)
+		}
+		return r
+	}
+	dlg := func(ago time.Duration, extra map[string]any) map[string]any {
+		d := map[string]any{"since": now.Add(-ago).Format(time.RFC3339), "after_min": 5, "notify": true}
+		for k, v := range extra {
+			d[k] = v
+		}
+		return d
+	}
+	got := needsYouAgentItems([]map[string]any{
+		row("due", dlg(6*time.Minute, nil), nil),
+		row("early", dlg(2*time.Minute, nil), nil),
+		row("dismissed", dlg(9*time.Minute, map[string]any{"dismissed": true}), nil),
+		row("muted", dlg(9*time.Minute, map[string]any{"notify": false}), nil),
+		row("asleep", dlg(9*time.Minute, nil), func(r map[string]any) { r["sleeping"] = true }),
+		row("archived", dlg(9*time.Minute, nil), func(r map[string]any) { r["archived"] = true }),
+		row("none", nil, nil),
+	}, now)
+	require.Len(t, got, 1, "only the agent whose dialog is due is waiting on the Operator: %v", got)
+	assert.Equal(t, "agent:due", got[0].ID)
+	assert.Equal(t, "agent", got[0].Kind)
+	assert.Equal(t, DialogWords, got[0].Line)
+	assert.Equal(t, now.Add(-6*time.Minute).Format(time.RFC3339Nano), got[0].At, "it began when the dialog was first seen")
+}
+
+// #19864 (QA): a page that reads only the needs-you feed gets the dialog's options too: numbers and cleaned, cut labels, at most four, none for an unnumbered menu or one seen once; a Hub keeps them through its merge.
+func TestNeedsYouDialogItemCarriesItsOptionsAsWords(t *testing.T) {
+	now := time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)
+	menu := promptScreen{Title: "Hooks need review", Options: []promptOption{{N: 1, Label: "Review hooks"}, {N: 2, Label: "Trust all and continue"}, {N: 3, Label: "Continue without trusting " + strings.Repeat("x", 200)}}}
+	var w dialogWatch
+	w.observe("s1", menu, true, now, 5, true)
+	assert.Nil(t, w.options("s1"), "seen once: not a dialog yet")
+	w.observe("s1", menu, true, now.Add(15*time.Second), 5, true)
+	opts := w.options("s1")
+	require.Len(t, opts, 3)
+	assert.Equal(t, NeedsYouOption{N: 1, Label: "Review hooks"}, opts[0])
+	assert.LessOrEqual(t, len([]rune(opts[2].Label)), needsYouOptionLabelMax, "a long label is cut")
+
+	many := promptScreen{Options: []promptOption{{N: 1, Label: "a"}, {N: 2, Label: "b"}, {N: 3, Label: "c"}, {N: 4, Label: "d"}, {N: 5, Label: "e"}}}
+	w.observe("s2", many, true, now, 5, true)
+	w.observe("s2", many, true, now.Add(15*time.Second), 5, true)
+	assert.Nil(t, w.options("s2"), "a menu with more than four options is named in none of it")
+	arrows := promptScreen{Unnumbered: true, Options: []promptOption{{N: 1, Label: "Yes"}, {N: 2, Label: "No"}}}
+	w.observe("s3", arrows, true, now, 5, true)
+	w.observe("s3", arrows, true, now.Add(15*time.Second), 5, true)
+	assert.Nil(t, w.options("s3"), "an arrow-and-Enter menu has no key to name")
+
+	item := needsYouAgentItems([]map[string]any{{"session_id": "s1", "display_name": "UI Reviewer", "board_project": "team",
+		"at_dialog": map[string]any{"since": now.Add(-6 * time.Minute).Format(time.RFC3339), "after_min": 5, "notify": true}}}, now)
+	require.Len(t, item, 1)
+	assert.True(t, item[0].Dialog)
+	item[0].Options = opts
+	body, err := json.Marshal(map[string]any{"counts": map[string]int{"agent": 1}, "items": item})
+	require.NoError(t, err)
+	got, _, ok := rebuildRemoteNeeds("m2", body)
+	require.True(t, ok)
+	require.Len(t, got, 1)
+	assert.True(t, got[0].Dialog)
+	assert.Equal(t, opts, got[0].Options, "a Hub keeps the options of a computer's dialog item")
+}
+
+// #19872 (QA's SHOULD): a computer's option whose number is above 9 is dropped by the Hub merge, never clamped to 9 (it would name another option's key); a menu with one dropped is named in none of it.
+func TestHubMergeDropsAnOptionNumberAboveNine(t *testing.T) {
+	body := []byte(`{"counts":{"agent":1},"items":[{"kind":"agent","id":"agent:s1","line":"x","dialog":true,"options":[{"n":1,"label":"Yes"},{"n":12,"label":"Twelve"}]},{"kind":"agent","id":"agent:s2","line":"y","dialog":true,"options":[{"n":1,"label":"Yes"},{"n":9,"label":"Nine"}]}]}`)
+	got, _, ok := rebuildRemoteNeeds("m2", body)
+	require.True(t, ok)
+	require.Len(t, got, 2)
+	assert.Nil(t, got[0].Options, "an option numbered 12 is dropped, and the partial menu is not offered")
+	assert.Equal(t, []NeedsYouOption{{N: 1, Label: "Yes"}, {N: 9, Label: "Nine"}}, got[1].Options, "9 is kept as 9")
+}

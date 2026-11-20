@@ -123,11 +123,13 @@ func TestLaunchFailuresUseControlledCategoriesAndNoRawText(t *testing.T) {
 	require.Equal(t, 400, postLaunch(t, server.URL, "/api/sessions/launch", map[string]any{"agent_type": "claude"}))
 	require.Equal(t, 400, postLaunch(t, server.URL, "/api/sessions/launch", map[string]any{"working_dir": t.TempDir(), "agent_type": "no-such-agent"}))
 	results := sink.wait(t, tracking.EventLaunchResult, 2)
+	var requestCats []any
 	for _, r := range results {
 		assert.Equal(t, "failure", r["outcome"])
-		assert.Equal(t, "invalid_request", r["failure_category"])
+		requestCats = append(requestCats, r["failure_category"])
 		assert.Equal(t, float64(0), r["started_agents"])
 	}
+	assert.ElementsMatch(t, []any{tracking.FailWorkdirMissing, tracking.FailAgentTypeInvalid}, requestCats, "each request refusal names its own category (#19936)")
 
 	// A terminal failure carrying a path and secret-looking text.
 	terminal.mu.Lock()
@@ -138,7 +140,7 @@ func TestLaunchFailuresUseControlledCategoriesAndNoRawText(t *testing.T) {
 	last := results[len(results)-1]
 	if last["failure_category"] == nil { // events can land out of order
 		for _, r := range results {
-			if r["failure_category"] != "invalid_request" {
+			if r["failure_category"] != tracking.FailWorkdirMissing && r["failure_category"] != tracking.FailAgentTypeInvalid {
 				last = r
 			}
 		}
@@ -308,7 +310,7 @@ func TestTeamLaunchAccountsForSkippedUnnamedMembers(t *testing.T) {
 	assert.Equal(t, float64(1), r["started_agents"])
 	assert.Equal(t, float64(2), r["failed_agents"], "skipped members are failures, never starts")
 	assert.Equal(t, "partial", r["outcome"])
-	assert.Equal(t, "invalid_request", r["failure_category"])
+	assert.Equal(t, tracking.FailMemberUnnamed, r["failure_category"])
 	team := sink.wait(t, tracking.EventTeamLaunched, 1)[0]
 	assert.Equal(t, float64(1), team["agent_count"])
 	assert.Equal(t, float64(3), team["requested_agents"])

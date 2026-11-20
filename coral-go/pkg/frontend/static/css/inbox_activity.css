@@ -4,4 +4,3 @@
 .activity-check-broken { border-color: var(--danger, var(--accent)); color: var(--text-primary); font-weight: var(--fw-strong); }
 .activity-more { align-self: flex-start; }
 .activity-kind { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; border-radius: var(--radius-md); font-size: var(--fs-sm); font-weight: var(--fw-strong); font-family: var(--font-mono); background: var(--bg-tertiary); color: var(--accent); }
-.activity-kind-code { color: var(--success, var(--accent)); }

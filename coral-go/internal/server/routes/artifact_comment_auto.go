@@ -98,6 +98,11 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 			reason = firstReason(reason, "no_uploader")
 			continue
 		}
+		if ls.IsSleeping == 1 && h.WakeForOperator(ctx, t.sessionID) { // the Operator's own word wakes a sleeping agent first, and the message is the first thing it reads (#19897)
+			if woke, gerr := h.ss.GetLiveSession(ctx, t.sessionID); gerr == nil && woke != nil {
+				ls = woke
+			}
+		}
 		// The ask lets the agent answer in this thread (replying is gated on it); an open one is kept as it is, so a second comment in the thread is one more message and no second ask.
 		if _, _, err := h.ss.CreateArtifactAsk(ctx, rootID, id, b, t.sessionID, title, time.Now()); err != nil {
 			slog.Warn("[artifact comments] ask not recorded", "error", err)
