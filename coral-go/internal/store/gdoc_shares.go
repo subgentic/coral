@@ -46,7 +46,7 @@ func (s *SessionStore) GetGdocShare(ctx context.Context, key string) (*GdocShare
 // ListGdocShares returns every share, oldest first (the sync loop's worklist).
 func (s *SessionStore) ListGdocShares(ctx context.Context) ([]GdocShare, error) {
 	var out []GdocShare
-	if err := s.reader().SelectContext(ctx, &out, "SELECT "+gdocShareCols+" FROM gdoc_shares ORDER BY created_at, key"); err != nil {
+	if err := s.reader().SelectContext(ctx, &out, "SELECT "+gdocShareCols+" FROM gdoc_shares ORDER BY created_at, key, rowid"); err != nil {
 		return nil, err
 	}
 	return out, nil
