@@ -18,3 +18,5 @@
     .team-tabs-row:has(.team-tabs[data-more="end"], .team-tabs[data-more="both"]) .team-strip-edge-end { display: none; } /* the button is the end cue while it shows */
 }
 .team-tabs-next { display: none; }
+@media (max-width: 767px) { :root .team-needs-list .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 1 1 100%; } } /* the team page's phone toolbar is the Inbox's: the search has its own line, then Kind, the filters, Select and More */
+.team-needs-list .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: none; } /* no unread dot before a name: the card's rail says unread, as in the Inbox (final walk) */

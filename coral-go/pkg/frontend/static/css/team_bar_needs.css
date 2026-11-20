@@ -2,6 +2,7 @@
 .team-bar-needs { display: none; }
 @media (max-width: 600px) {
     .team-bar-needs { display: inline-flex; align-items: center; justify-content: center; grid-column: 3; grid-row: 1 / span 2; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); padding: 0 12px; border: 0; border-radius: 22px; background: none; color: var(--accent); font: inherit; font-weight: var(--fw-strong); cursor: pointer; flex-direction: column; gap: 0; line-height: var(--lh-label); } /* the count is the accent's number at a 44 px target, beside the dots; it says what it counts under the digit (walk 49: a bare blue digit) */
+    .team-page-head:has(> #team-page-health:not([hidden])) > .team-bar-needs { display: none; } /* one count line: the header already says how many need attention (final walk) */
     .team-bar-needs::after { content: 'need you'; font-size: var(--fs-sm); font-weight: var(--fw-regular); }
     .team-page-head.has-needs { grid-template-columns: 44px minmax(0, 1fr) auto 44px; }
     .team-page-head.has-needs .team-page-actions { grid-column: 4; }

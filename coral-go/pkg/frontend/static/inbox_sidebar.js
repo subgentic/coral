@@ -439,6 +439,8 @@ function inboxNeedsToolbar() {
     });
     // Group by goal is an option of the Filters panel, with the other ways to show the list (#14378, the Operator): not a checkbox always on the page under the header. It is shut with the panel, so it takes no room until asked for.
     const menu = node.querySelector('.list-bar-menu'); menu?.classList.add('inbox-filter-pop');
+    const sortSel = menu && [...menu.querySelectorAll('select')].find(x => [...x.options].some(o => o.value === 'blockers')); // Waiting on an agent is always longest waiting first (its line says so), so the Sort field says that too and is not a choice there (final walk S4)
+    if (sortSel) { const fixed = needsTab === 'agent'; sortSel.value = fixed ? 'oldest' : needsFilters.sort; sortSel.disabled = fixed; sortSel.title = fixed ? 'Waiting on an agent is always longest waiting first' : ''; }
     if (menu && !menu.querySelector('.inbox-group-review-toggle')) {
         const label = groupModeField('inbox-needs-group-mode', 'inbox-group-review-toggle');
         menu.insertBefore(label, menu.querySelector(':scope > .list-bar-clear-all, :scope > .list-bar-done')); // before the panel's own buttons (a null reference appends)
