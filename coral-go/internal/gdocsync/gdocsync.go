@@ -33,7 +33,7 @@ const (
 	maxErrBody    = 300     // how much of an error body is quoted
 	maxRetries    = 3       // 429 and 5xx
 	maxRetryAfter = 30 * time.Second
-	commentFields = "nextPageToken,comments(id,content,author(displayName,emailAddress),createdTime,modifiedTime,resolved,deleted,quotedFileContent(mimeType,value),anchor,replies(id,content,author(displayName),createdTime,action))"
+	commentFields = "nextPageToken,comments(id,content,author(displayName),createdTime,modifiedTime,resolved,deleted,quotedFileContent(mimeType,value),anchor,replies(id,content,author(displayName),createdTime,action))"
 )
 
 // Client talks to Drive v3. BaseURL is "https://www.googleapis.com" in production and a test server's URL in a test.
@@ -46,8 +46,7 @@ type Client struct {
 
 // Author is who wrote a comment or reply on the Google side.
 type Author struct {
-	DisplayName  string `json:"displayName"`
-	EmailAddress string `json:"emailAddress"`
+	DisplayName string `json:"displayName"` // the name only: a reviewer's email address is not asked for and never reaches Coral
 }
 
 // Reply is one reply under a comment; Action is "resolve" or "reopen" when the reply did that.
