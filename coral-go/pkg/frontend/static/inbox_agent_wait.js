@@ -8,6 +8,7 @@ import { liveAgentOf } from './agent_live.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
 import { el } from './dom_el.js';
+import { isPhoneLayout } from './phone_layout.js';
 import { toggleAgentSleep, toggleAgentArchive } from './agent_actions.js';
 const { waitingOnAgent } = await importOnce('./inbox_review_state.js'), { shortWait } = await importOnce('./waiting_text.js');
 /** A sent-back file the agent has not answered: the one that waits on the agent. A reply (new comments) brings it back to the Operator, and to the Waiting on you tab (#19904). */
@@ -95,7 +96,7 @@ export function decorateGroupHead(tr, info) {
     const right = el('span', 'inbox-group-right'), since = shortWait(info.since);
     right.append(el('span', 'inbox-group-meta', `${info.count} waiting${since ? ` \u00b7 since ${since} ago` : ''}`));
     const wake = info.wake ? wakeButton(info.ws) : null;
-    if (wake) { wake.textContent = info.ws.state === 'asleep' ? `Wake ${markHidden(info.ws.who, { strict: true })}` : 'Start agent'; right.append(wake); }
+    if (wake) { wake.textContent = info.ws.state === 'asleep' ? (isPhoneLayout() ? 'Wake' : `Wake ${markHidden(info.ws.who, { strict: true })}`) : 'Start agent'; /* a phone's heading says Wake, as mock v3 draws it: the name is in the aria-label (#20130) */ right.append(wake); }
     const label = [...th.childNodes].find(n => n.nodeType === 3), chip = chipOf(info.ws); // the state is the row's own chip beside the name, "Awake · working" as the rows say it, not plain text in the title (final gap walk)
     if (label && chip) { label.textContent = String(label.textContent).replace(/ \u00b7 (Awake|Asleep|Archived)$/, '') + ' '; label.after(chip); }
     th.classList.add('inbox-group-flex'); th.append(right);
