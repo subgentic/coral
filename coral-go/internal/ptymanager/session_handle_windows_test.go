@@ -59,9 +59,17 @@ func TestASecondBatchOfSessionsThatEndOnTheirOwnAddsNoHandles(t *testing.T) {
 	batch("a") // the first batch pays the one-time cost
 	before := handleCount(t)
 	batch("b")
-	added := handleCount(t) - before
+	// The count is read until it settles, not once after the fixed sleep (#20081): on a loaded runner the second batch's exit watchers were still closing handles when the sleep ended (36 against the limit of 32 on one run, fine on the next).
+	// A leak never comes back down, so it still fails when the wait ends; the limit stays at four handles a session.
+	added, settled := 0, false
+	for deadline := time.Now().Add(90 * time.Second); time.Now().Before(deadline); time.Sleep(time.Second) {
+		if added = handleCount(t) - before; added <= runs*4 {
+			settled = true
+			break
+		}
+	}
 	t.Logf("handles added by a second batch of %d sessions that ended on their own: %d", runs, added)
-	assert.LessOrEqual(t, added, runs*4, "a second batch of %d sessions that ended on their own added %d handles: something is left open for each", runs, added)
+	assert.True(t, settled, "a second batch of %d sessions that ended on their own still held %d more handles after 90 s: something is left open for each", runs, added)
 }
 
 // The shell exits but a program it started keeps running: the exit watcher still closes the pseudo console after the drain, while that program lives (a pseudo console's output pipe only ends when it is
