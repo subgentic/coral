@@ -17,22 +17,6 @@ import (
 // unownedListMax is how many task numbers one line names before it says how many more there are.
 const unownedListMax = 8
 
-// noteGoalsReady records, once per goal and per last-done moment, that the goal is ready to close. A goal that gets another task and finishes it again is a new occurrence.
-func (m *BoardHealthMonitor) noteGoalsReady(ctx context.Context, project, orch string, hs board.HealthSettings, bySession map[string]AgentInfo, subs []board.Subscriber, now time.Time) {
-	wait := time.Duration(hs.GoalsReady.WaitMin) * time.Minute
-	ready, err := m.store.GoalsReadyToClose(ctx, project, now.Add(-wait))
-	if err != nil {
-		return
-	}
-	for _, g := range ready {
-		detail := fmt.Sprintf("Goal #%d: every task (%d) is done, the last %s ago: ready to close", g.ID, g.Tasks, teamhealth.Age(now.Sub(g.Done)))
-		ref := fmt.Sprintf("%d|%d|%s", g.ID, g.Tasks, g.Done.UTC().Format(time.RFC3339)) // the task count too: a task finished in the same second as the last is still a new occurrence
-		if added, err := m.store.AddOffBooksOnce(ctx, project, board.OffBooksGoalReady, "Board", ref, detail, now); err == nil && added {
-			m.nudgeMember(ctx, project, orch, hs, hs.GoalsReady.Nudge, "goals-ready:", detail, bySession, subs)
-		}
-	}
-}
-
 // noteUnownedTasks records, once per set of tasks, the open tasks that have no goal or no assignee after the wait: one line naming them by number. A set that changes (a task added, or one
 // given a goal) is a new occurrence; the same set is said once.
 func (m *BoardHealthMonitor) noteUnownedTasks(ctx context.Context, project, orch string, hs board.HealthSettings, bySession map[string]AgentInfo, subs []board.Subscriber, now time.Time) {

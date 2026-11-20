@@ -13,10 +13,13 @@ import (
 // or the Orchestrator when the goal has none, is told once so the next tasks can be added.
 const ruleGoalDoneNudge = "goal-done-nudge"
 
+// goalDoneNudgeEvery is how long one goal's driver is not told again (#20128: agents answered every notice, and a goal that finished again after a task was told twice in a day).
+const goalDoneNudgeEvery = 24 * time.Hour
+
 // goalDoneNudgeText is the notice: a fixed template with the goal's number and the quiet period's minutes (a number the setting goal_done_quiet_minutes gave, never text): no title, no name is typed (Security's rule 1
 // of the health nudges).
 func goalDoneNudgeText(goalID int64, minutes int) string {
-	return fmt.Sprintf("[Coral] Goal #%d's tasks are all done. Add the next tasks within %d minutes, or it goes to the Operator as done: coral-board task add \"...\" --goal %d", goalID, minutes, goalID)
+	return fmt.Sprintf("[Coral] Goal #%d's tasks are all done. If more work is planned, add it with coral-board task add \"...\" --goal %d; otherwise do nothing: it goes to the Operator in %d minutes.", goalID, goalID, minutes)
 }
 
 // quiet is the quiet period the notice names: the setting's, 15 minutes when it is not read.
@@ -57,6 +60,9 @@ func (h *HealthNudges) nudgeGoalDone(ctx context.Context, project string, bySess
 		if done, _ := h.store.HealthActionTaken(ctx, project, ruleGoalDoneNudge+"-goal", key); done {
 			continue // told once for this all-done state
 		}
+		if recent, _ := h.store.HealthActionSince(ctx, project, ruleGoalDoneNudge+"-goal-recent", fmt.Sprint(g.ID), now.Add(-goalDoneNudgeEvery)); recent {
+			continue // this goal's driver was told in the last 24 hours
+		}
 		who := g.Driver
 		var sub *board.Subscriber
 		for _, candidate := range []string{g.Driver, orch} { // the driver, else (or when the driver is not here) the Orchestrator
@@ -85,5 +91,6 @@ func (h *HealthNudges) nudgeGoalDone(ctx context.Context, project string, bySess
 			continue
 		}
 		_ = h.store.RecordHealthAction(ctx, project, ruleGoalDoneNudge+"-goal", key, now)
+		_ = h.store.RecordHealthAction(ctx, project, ruleGoalDoneNudge+"-goal-recent", fmt.Sprint(g.ID), now)
 	}
 }

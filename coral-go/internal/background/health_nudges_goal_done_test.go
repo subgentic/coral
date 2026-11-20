@@ -56,7 +56,9 @@ func TestAGoalWhoseTasksAreAllDoneTellsItsDriverOnce(t *testing.T) {
 	require.Len(t, orch, 1, "a goal with no driver is the Orchestrator's to hear")
 	assert.Contains(t, orch[0], fmt.Sprintf("Goal #%d", orphan.ID))
 	assert.Contains(t, orch[0], "[Coral]", "a typed notice opens with [Coral]")
-	assert.Contains(t, orch[0], "within 15 minutes", "the setting's number, 15 by default")
+	assert.Contains(t, orch[0], "in 15 minutes", "the setting's number, 15 by default")
+	assert.Contains(t, orch[0], "otherwise do nothing", "it asks for no reply (#20128)")
+	assert.NotContains(t, orch[0], "within", "no deadline to answer")
 	assert.Contains(t, orch[0], "Operator", "it says where the goal goes")
 	assert.NotContains(t, orch[0], "Owned by nobody", "no goal title is typed")
 
@@ -79,17 +81,17 @@ func TestAGoalWhoseTasksAreAllDoneTellsItsDriverOnce(t *testing.T) {
 	require.Len(t, dev, 1, "every task done: the driver is told")
 	assert.Contains(t, dev[0], fmt.Sprintf("Goal #%d", g.ID))
 
-	// more tasks, all done again: told again
+	// more tasks, all done again, within 24 hours: not told again (#20128)
 	task(g.ID, true)
 	n.now = time.Now().UTC().Add(5 * time.Minute) // after the cooldown of the earlier notice, inside the new window
 	n.run(0)
-	assert.Len(t, n.sentTo("Dev"), 2, "all done again, with more tasks: told again")
+	assert.Len(t, n.sentTo("Dev"), 1, "the same goal's driver is not told twice in 24 hours")
 
 	// and never once the 15 minutes are over: the goal is the Operator's then
 	task(orphan.ID, true)
 	n.run(30 * time.Minute)
 	assert.Len(t, n.sentTo("Lead"), 1, "nothing after the window")
-	assert.Len(t, n.sentTo("Dev"), 2)
+	assert.Len(t, n.sentTo("Dev"), 1)
 }
 
 // The notice says the minutes of the Operator's setting (goal_done_quiet_minutes), as a number only; with the setting at 0 there is no quiet period and nothing to tell.
@@ -112,7 +114,7 @@ func TestTheGoalDoneNudgeSaysTheSettingsMinutes(t *testing.T) {
 	n.run(time.Minute)
 	got := n.sentTo("Dev")
 	require.Len(t, got, 1)
-	assert.Contains(t, got[0], "within 40 minutes")
+	assert.Contains(t, got[0], "in 40 minutes")
 	assert.NotContains(t, got[0], "15 minutes")
 
 	// at 0 there is nothing to tell (the goal is the Operator's at once)

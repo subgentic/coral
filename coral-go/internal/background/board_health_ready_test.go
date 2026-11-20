@@ -62,50 +62,14 @@ func (r *readyRig) loose(n int) []int64 {
 	return ids
 }
 
-func TestAGoalWhoseTasksAreAllDoneIsOneLineAfterTheWait(t *testing.T) {
+// #20128: the Needs you "Goal looks done" row says it, and the 15-minute notice to the driver; the health check no longer says "ready to close" a third time, whatever the settings (an old saved goals_ready.on is still read and does nothing).
+func TestAGoalWhoseTasksAreAllDoneIsNotALineOfTheCheck(t *testing.T) {
 	r := newReadyRig(t)
-	g := r.goalDone("Secret goal title", 2)
-	assert.NotContains(t, r.checkTo("Orchestrator"), "ready to close", "the last task was just done: the wait is 30 minutes")
-	assert.NotContains(t, r.next(), "ready to close", "12 minutes")
-	assert.NotContains(t, r.next(), "ready to close", "23 minutes")
-	line := fmt.Sprintf("Board: Goal #%d: every task (2) is done", g)
-	out := r.next()
-	assert.Contains(t, out, line, "34 minutes: past the wait")
-	assert.Contains(t, out, "ready to close")
-	assert.NotContains(t, out, "off the board's tasks", "a line about the board itself, not an agent's")
-	assert.NotContains(t, outsideGoals(out), "Secret goal title", "the off-books line is numbers only, never the goal's title (the GOALS segment names goals, #11412)")
-	assert.NotContains(t, r.next(), "ready to close", "said once")
-	// Another task, finished: a new moment, a new line (the clock of the check is already past the wait of the new last task's time).
-	r.moreDone(g, 1)
-	assert.Contains(t, r.next(), fmt.Sprintf("Goal #%d: every task (3) is done", g), "the goal got another task and finished it: said again")
-}
-
-func TestAGoalWithAnOpenTaskOrAClosedGoalIsNotReady(t *testing.T) {
-	r := newReadyRig(t)
-	ctx := context.Background()
-	open := r.goalDone("open", 1)
-	_, err := r.s.CreateTaskWithOpts(ctx, "team", "still going", "", "medium", "Operator", &board.CreateTaskOpts{GoalID: &open}, "Dev")
-	require.NoError(t, err)
-	closed := r.goalDone("closed", 1)
-	_, _, err = r.s.CloseGoal(ctx, "team", closed, "met", board.GoalDone)
-	require.NoError(t, err)
-	for i := 0; i < 4; i++ {
-		assert.NotContains(t, r.next(), "ready to close")
+	r.goalDone("Secret goal title", 2)
+	for i := 0; i < 6; i++ {
+		assert.NotContains(t, r.next(), "ready to close", "well past the wait of 30 minutes, the check stays silent about a goal that looks done")
 	}
-}
-
-func TestTheGoalsReadySwitchAndWaitFollowTheSettings(t *testing.T) {
-	r := newReadyRig(t)
-	r.goalDone("g", 1)
-	r.settings(func(hs *board.HealthSettings) { hs.GoalsReady.On = false })
-	for i := 0; i < 4; i++ {
-		assert.NotContains(t, r.next(), "ready to close", "off means silent")
-	}
-	r.settings(func(hs *board.HealthSettings) { hs.GoalsReady = board.HealthWaitCheck{On: true, WaitMin: 600} })
-	assert.NotContains(t, r.next(), "ready to close", "a 10 hour wait")
-	r.settings(func(hs *board.HealthSettings) { hs.GoalsReady.WaitMin = 30 })
-	assert.Contains(t, r.next(), "ready to close", "turned on with a short wait: said once")
-	assert.NotContains(t, r.next(), "ready to close")
+	assert.NotContains(t, r.checkTo("Orchestrator"), "every task (2) is done")
 }
 
 func TestOpenTasksWithNoGoalOrNoAssigneeAreNamedByNumberOnceAfterTheWait(t *testing.T) {
@@ -153,11 +117,7 @@ func TestAnOwnedTaskOrAYoungOneIsNotNamed(t *testing.T) {
 
 func TestTheNamedMemberIsToldOnceThroughTheGate(t *testing.T) {
 	r := newReadyRig(t)
-	r.settings(func(hs *board.HealthSettings) {
-		hs.GoalsReady.Nudge = "Dev"
-		hs.UnownedTasks.Nudge = "Dev"
-	})
-	g := r.goalDone("g", 1)
+	r.settings(func(hs *board.HealthSettings) { hs.UnownedTasks.Nudge = "Dev" })
 	r.loose(1)
 	for i := 0; i < 4; i++ {
 		r.next()
@@ -165,19 +125,15 @@ func TestTheNamedMemberIsToldOnceThroughTheGate(t *testing.T) {
 	r.mu.Lock()
 	got := append([]string(nil), r.sent["Dev"]...)
 	r.mu.Unlock()
-	var ready, unowned int
+	var unowned int
 	for _, m := range got {
-		if strings.Contains(m, fmt.Sprintf("Goal #%d: every task (1) is done", g)) {
-			ready++
-		}
 		if strings.Contains(m, "Open tasks with no goal") {
 			unowned++
 		}
 	}
-	assert.Equal(t, 1, ready, "the goal line, once: %v", got)
 	assert.Equal(t, 1, unowned, "the tasks line, once: %v", got)
 	for _, m := range got {
-		if strings.Contains(m, "ready to close") || strings.Contains(m, "Open tasks") {
+		if strings.Contains(m, "Open tasks") {
 			assert.True(t, strings.HasPrefix(m, "[Coral health] "), m)
 		}
 	}
@@ -200,34 +156,10 @@ func TestAKeptLineOfTheseChecksIsSilentWhenTheirSwitchIsOff(t *testing.T) {
 		hs.UnownedTasks.On = true
 	})
 	on := r.next()
-	assert.Contains(t, on, "Board: Goal #7: every task (1) is done")
+	assert.NotContains(t, on, "Goal #7", "a goals-ready line kept from an earlier version is never said again (#20128)")
 	assert.Contains(t, on, "Board: Open tasks with no goal: #9")
 	assert.NotContains(t, on, "ready to close. Seen")
 	assert.NotContains(t, on, "older than 15 min). Seen")
-}
-
-func TestEachCheckNudgesItsOwnMember(t *testing.T) {
-	r := newReadyRig(t)
-	r.settings(func(hs *board.HealthSettings) { hs.GoalsReady.Nudge = "Dev" }) // the unowned-tasks check has no one to nudge
-	r.goalDone("g", 1)
-	r.loose(1)
-	for i := 0; i < 4; i++ {
-		r.next()
-	}
-	r.mu.Lock()
-	got := append([]string(nil), r.sent["Dev"]...)
-	r.mu.Unlock()
-	var ready, unowned int
-	for _, m := range got {
-		if strings.Contains(m, "ready to close") {
-			ready++
-		}
-		if strings.Contains(m, "Open tasks with no goal") {
-			unowned++
-		}
-	}
-	assert.Equal(t, 1, ready, "%v", got)
-	assert.Equal(t, 0, unowned, "the tasks line has no nudge member: %v", got)
 }
 
 func TestTheTwoChecksAreOnForATeamThatNeverSetThem(t *testing.T) {
@@ -236,13 +168,11 @@ func TestTheTwoChecksAreOnForATeamThatNeverSetThem(t *testing.T) {
 	h.member("Dev", "Developer", 2, 0)
 	h.settings(func(hs *board.HealthSettings) { hs.On = true }) // the check itself on, nothing else touched: the operator's call is that these two lines come with it
 	r := &readyRig{h}
-	g := r.goalDone("g", 1)
 	loose := r.loose(1)
 	var out string
 	for i := 0; i < 3; i++ {
 		out += r.next()
 	}
-	assert.Contains(t, out, fmt.Sprintf("Goal #%d: every task (1) is done", g))
 	assert.Contains(t, out, fmt.Sprintf("Open tasks with no goal: #%d", loose[0]))
 	assert.False(t, h.s.GetHealthSettings(context.Background(), "team").Landing.On, "the landing alert stays off")
 }

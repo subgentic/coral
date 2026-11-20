@@ -92,7 +92,7 @@ func commitMention(content string) (what string, ok bool) {
 
 // offBooksKinds is what the board's settings leave on.
 func offBooksKinds(hs board.HealthSettings) map[string]bool {
-	return map[string]bool{board.OffBooksBusy: hs.BusyNoTask.On, board.OffBooksPost: hs.PostNoTask.On, board.OffBooksUpload: hs.UploadNoTask.On, board.OffBooksGoalSize: hs.GoalSize.On, board.OffBooksLanding: hs.Landing.On, board.OffBooksRelease: hs.Release.On, board.OffBooksGoalReady: hs.GoalsReady.On, board.OffBooksUnowned: hs.UnownedTasks.On, board.OffBooksOperatorWait: true}
+	return map[string]bool{board.OffBooksBusy: hs.BusyNoTask.On, board.OffBooksPost: hs.PostNoTask.On, board.OffBooksUpload: hs.UploadNoTask.On, board.OffBooksGoalSize: hs.GoalSize.On, board.OffBooksLanding: hs.Landing.On, board.OffBooksRelease: hs.Release.On, board.OffBooksGoalReady: false /* #20128: said no more */, board.OffBooksUnowned: hs.UnownedTasks.On, board.OffBooksOperatorWait: true}
 }
 
 // offBooksItems notes what happened off the books since the last check and returns the lines for the check: the occurrences not said yet, of the signals that are on. The ids it
@@ -124,9 +124,7 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 			m.nudgeMember(ctx, project, orch, hs, hs.Release.Nudge, "release-alert:", detail, bySession, subs)
 		}
 	}
-	if hs.GoalsReady.On {
-		m.noteGoalsReady(ctx, project, orch, hs, bySession, subs, now)
-	}
+	// no goals_ready line (#20128): a goal whose tasks are all done is the Operator's "Goal looks done" row in Needs you, and its driver is told once; the setting is still read and does nothing
 	if hs.UnownedTasks.On {
 		m.noteUnownedTasks(ctx, project, orch, hs, bySession, subs, now)
 	}
