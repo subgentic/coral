@@ -8,6 +8,7 @@ import { liveAgentOf } from './agent_live.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
 import { el } from './dom_el.js';
+import { toggleAgentSleep, toggleAgentArchive } from './agent_actions.js';
 const { waitingOnAgent } = await importOnce('./inbox_review_state.js');
 /** A sent-back file the agent has not answered: the one that waits on the agent. A reply (new comments) brings it back to the Operator, and to the Waiting on you tab (#19904). */
 export const stillWaitingOnAgent = row => waitingOnAgent(row) && !(row?.new_comments > 0);
@@ -28,7 +29,7 @@ export function wakeButton(ws) {
     if (ws.state !== 'asleep' && ws.state !== 'archived') return null;
     const label = ws.state === 'asleep' ? 'Wake' : 'Start agent', b = el('button', `btn btn-small inbox-wake inbox-wake-${ws.state}`, label); b.type = 'button'; b.dataset.slot = 'wake';
     b.setAttribute('aria-label', `${label} ${markHidden(ws.who, { strict: true })}`);
-    b.addEventListener('click', () => { b.disabled = true; importOnce('./agent_actions.js').then(m => (ws.state === 'asleep' ? m.toggleAgentSleep(ws.live.name, ws.live.agent_type, ws.live.session_id, 'wake') : m.toggleAgentArchive(ws.live.name, ws.live.agent_type, ws.live.session_id, 'unarchive'))).catch(() => {}).finally(() => { b.disabled = false; document.dispatchEvent(new CustomEvent('coral:needs-updated')); }); });
+    b.addEventListener('click', () => { b.disabled = true; Promise.resolve().then(() => (ws.state === 'asleep' ? toggleAgentSleep(ws.live.name, ws.live.agent_type, ws.live.session_id, 'wake') : toggleAgentArchive(ws.live.name, ws.live.agent_type, ws.live.session_id, 'unarchive'))).catch(() => {}).finally(() => { b.disabled = false; document.dispatchEvent(new CustomEvent('coral:needs-updated')); }); });
     return b;
 }
 

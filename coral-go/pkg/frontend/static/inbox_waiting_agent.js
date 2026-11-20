@@ -4,7 +4,8 @@
 import { serverFetch, LOCAL_SERVER, boardTeamKey, isCloud } from './server_base.js';
 import { markHidden } from './visible_marks.js';
 import { el } from './dom_el.js';
-import { KINDS, KIND_LABEL, KIND_ART } from './needs_filters.js';
+import { importOnce } from './import_once.js';
+const { KINDS, KIND_LABEL, KIND_ART } = await importOnce('./needs_filters.js');
 import { browserLocal } from './safe_storage.js';
 
 export const KIND_WORD = { answered_ask: 'Answered ask', comment_sent: 'Comment sent' };
