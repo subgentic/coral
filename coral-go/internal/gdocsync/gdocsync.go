@@ -82,6 +82,20 @@ type Comment struct {
 // NewClient returns a client for Production that asks tok for the token inside each request.
 func NewClient(tok func() (string, error)) *Client { return &Client{TokenFunc: tok} }
 
+// DocsProduction is the second and last host: Docs v1 is served from here, Drive v3 from Production (found live, #19953).
+const DocsProduction = "https://docs.googleapis.com"
+
+// hostFor picks the host for a request path; a test server (the unexported base) answers for both.
+func (c *Client) hostFor(path string) string {
+	if c.base != "" {
+		return c.base
+	}
+	if strings.HasPrefix(path, "/v1/documents/") {
+		return DocsProduction
+	}
+	return Production
+}
+
 func (c *Client) baseURL() string {
 	if c.base != "" {
 		return c.base
@@ -108,7 +122,7 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, cont
 	if c.TokenFunc == nil {
 		return errors.New("gdocsync: no token source")
 	}
-	u := c.baseURL() + path
+	u := c.hostFor(path) + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
