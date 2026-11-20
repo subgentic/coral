@@ -22,7 +22,7 @@ export function agentWaitState(review) {
 }
 export const STATE_WORD = { awake: 'Awake', asleep: 'Asleep', archived: 'Archived' };
 /** An answer or a comment wakes a sleeping, not archived, agent (#19897, #19901): for those rows the line says it is being woken and there is no Wake button. */
-const WAKES = { answered_ask: 'your answer', comment_sent: 'your comment' };
+export const WAKES = { answered_ask: 'your answer', comment_sent: 'your comment' };
 /** The one line that explains an inactive agent, as the approved mock words it. */
 export const stateLine = (who, st, kind = '') => st === 'asleep' ? (WAKES[kind] ? `${who} is asleep — ${WAKES[kind]} is waking it.` : `${who} is asleep — it won’t read your changes request until woken.`) : st === 'archived' ? `${who} is archived — archived agents don’t wake automatically. Start it or hand this off on the board.` : '';
 

@@ -36,7 +36,8 @@ export function make(env) {
         const thing = it.kind === 'comment_sent' ? 'thread' : ''; // the mock: an answered ask has Open agent and Nudge, a sent comment Open thread (a file's, or the goal's when there is no file); the goal and the task are the chips on the line (walk #20067)
         const agent = ws.live ? agentLink(ws.who, { board: team, session: ws.live.session_id, cls: 'btn btn-quiet btn-small inbox-open-agent', text: 'Open agent', label: `Open ${markHidden(ws.who, { strict: true })}` }) : null;
         const nudge = ws.state === 'awake' ? quiet('Nudge', 'nudge', () => AW.nudge(it, ws)) : null; nudge?.classList.add('inbox-nudge'); nudge?.setAttribute('aria-label', `Nudge ${markHidden(ws.who || 'the agent', { strict: true })}: ${title}`); // the mock draws Nudge as a button beside Open agent, not only in More (walk #20067 row 15)
-        box.append(...[AW.wakeButton(ws, it.kind), thing ? quiet(`Open ${thing}`, 'open-file', () => openWaitItem(s)) : null, agent, nudge].filter(Boolean));
+        box.append(...[env.grouped?.() ? null : AW.wakeButton(ws, it.kind), // grouped by agent, the heading has Wake / Start agent
+    thing ? quiet(`Open ${thing}`, 'open-file', () => openWaitItem(s)) : null, agent, nudge].filter(Boolean));
         menu.push(...AW.menuItems(it, ws, { openBoard: () => go(keyRoute('team', team)) }).filter(m => !/^Nudge /.test(m.label)), { label: 'View on board', title: 'Open the team’s board', run: () => go(keyRoute('team', team)) }, { label: 'Stop waiting', title: 'Take it off this list; nobody is told', run: () => { WA.dismiss(it); env.redraw(); } });
         const more = env.moreMenu(menu, title); more.setAttribute('data-slot', 'dots'); box.append(more); return box;
     }

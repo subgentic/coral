@@ -171,6 +171,14 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`!!(${row('Tag v2.1.1')}) && !(${row('landing-copy-v2.md')}) && !(${row('Awake file.txt')})`, 'the Answered ask pill shows only that kind', 8000);
                 await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].find(b => /^All/.test(b.textContent)).click(); true`);
                 await waitFor(`!!(${row('Awake file.txt')}) && !!(${row('landing-copy-v2.md')})`, 'All shows the five again', 8000);
+                { // an archived agent whose only row is a sent comment still has Start agent on its heading (the row does not carry it: grouped, the heading does)
+                    const grp = v => ev(`(() => { const s = document.querySelector('.inbox-agent-group-field select'); s.value = '${v}'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                    await grp('agent'); await waitFor(`document.querySelectorAll('.inbox-needs-results .dt-group').length >= 3`, 'grouped by agent again', 8000);
+                    const g = await ev(`[...document.querySelectorAll('.inbox-needs-results .dt-group')].filter(h => /Copywriter/.test(h.textContent)).map(h => [...h.querySelectorAll('button')].map(b => b.textContent.trim()))`);
+                    assert.deepEqual(g, [['Start agent']], 'an archived agent with only a comment row: the heading has Start agent: ' + JSON.stringify(g));
+                    assert.equal(await ev(`!!(${row('landing-copy-v2.md')}).querySelector('.inbox-wake')`), false, 'the comment row does not repeat it');
+                    await grp('none'); await waitFor(`!document.querySelector('.inbox-needs-results .dt-group')`, 'ungrouped again', 8000);
+                }
                 if (width === 390) { const clash = await ev(`[...document.querySelectorAll('#group-table-view tr.inbox-kind-row')].map(tr => { const c = tr.querySelector('.inbox-wait-state'), m = tr.querySelector('.inbox-row-more-toggle, .dt-mail-more-toggle'); if (!c || !m || !c.getClientRects().length || !m.getClientRects().length) return null; const a = c.getBoundingClientRect(), b = m.getBoundingClientRect(); return a.right > b.left + 1 && a.left < b.right - 1 && a.bottom > b.top + 1 && a.top < b.bottom - 1; }).filter(x => x === true).length`); assert.equal(clash, 0, '390 px: no row\'s state chip lies under its more dots (#20066)'); }
                 await shot('agent-five');
                 if (width === 390) assert.match(await ev(`document.querySelector('.inbox-agent-status').innerText.trim()`), /^5 waiting · 3 inactive$/, 'a phone shows the mock’s one short count line, with no stray separators');

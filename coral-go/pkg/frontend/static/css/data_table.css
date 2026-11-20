@@ -503,7 +503,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: "" / "Unread"; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
 /* Needs you reads like a mailbox (#11668, the operator's Gmail shot): an unread row's name is bold on a slightly lighter row, a read row is regular and muted on the plain table; no dot, no pill (a screen reader hears "read" or "unread" in the row). The lighter row is a tint of the text colour on the table in the dark theme and the table's own white in the light one, where the read row is tinted instead. */
-#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: none; }
+:is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: none; }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: color-mix(in srgb, var(--text-primary) 5%, var(--table-bg)); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { font-weight: var(--fw-regular); }
 :is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-row.dt-unread { box-shadow: inset 3px 0 0 var(--accent); } /* unread: a rail at the edge (#19812) */
