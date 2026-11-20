@@ -39,6 +39,7 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
                 assert.equal(oc.missing, false); assert.match(oc.status || '', /^Installed( · default |$)/, 'the status line says installed and the default model: ' + oc.status);
                 await ev(`document.querySelector('#launch-agent-pick input[value="opencode"]').click(); true`);
                 await waitFor(`document.querySelector('.acf-agent-type').value === 'opencode' && document.querySelector('.provider-card-body[data-type="opencode"]:not([hidden]) .acf-model-select optgroup')`, 'the OpenCode models grouped', 8000);
+                assert.match(await ev(`document.getElementById('launch-recap').textContent`), /OpenCode,/, 'the New agent summary uses the OpenCode display name');
                 const g = await ev(`[...document.querySelectorAll('.provider-card-body:not([hidden]) .acf-model-select optgroup')].map(o => ({ label: o.label, values: [...o.querySelectorAll('option')].map(x => x.value) }))`);
                 assert.deepEqual(g.map(x => x.label), ['openai · signed in', 'anthropic'], 'the signed-in provider is listed first and says so: ' + JSON.stringify(g));
                 assert.deepEqual(g[0].values, ['openai/gpt-6', 'openai/gpt-6-mini'], 'a model\'s value is provider/model');

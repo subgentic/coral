@@ -7,7 +7,7 @@ import { showToast } from './notifications.js';
 
 await loadStyles('launch_recap_flags.css'); // the line's rules: not at start
 
-export const TYPE = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi' };
+export const TYPE = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', opencode: 'OpenCode' };
 const cache = new Map(); // request body -> the answer
 
 /** The server's answer for this body ({args, text, note}), or null when it has none (a failed call draws no line: the mode above still says it). Answers are kept by body. */
