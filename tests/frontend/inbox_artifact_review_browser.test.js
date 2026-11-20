@@ -81,7 +81,7 @@ const { coralReady } = require('./helpers/wait');
                 }
                 assert.equal(await ev(`${rows}.length`),13,'the pinned Writer A file does not consume the ten-unstarred cap; all thirteen fit');
                 assert.equal(await ev(`document.querySelectorAll('.inbox-review-more').length`),0,'a pinned file does not create false producer overflow');
-                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');
+                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'13','all pending artifacts count: the pill reads the real number, as the sidebar does (#20017)');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 13 /,'and the tab\'s accessible name keeps the exact count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
                 if (width <= 390) { // a phone's row (#11414 item 1, QA Engineer's release review): the team's whole name is on the row, and Approve is a word, not a bare check
@@ -211,8 +211,8 @@ const { coralReady } = require('./helpers/wait');
                     await ev(`document.querySelector('.artifact-viewer-close').click();window.__twoVersions=false;true`);
                 }
                 assert.deepEqual(await ev(`window.__decisions.filter(d=>d.decision==='approve').map(d=>d.id)`),[width===1280?(0x62).toString(16).padStart(64,'0'):(1).toString(16).padStart(64,'0')],'one approve was sent: the failed press and the second one are not two');
-                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+');
-                assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 12 /,'twelve left: the pill says 9+, the name says 12');
+                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'12');
+                assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 12 /,'twelve left: the pill and the name both say 12');
                 assert.ok(await ev(`!!(${row('Review file 11.txt')})`),'overflow promotes next artifact');
                 assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12','heading and badge agree after review');
                 if(width===1280){

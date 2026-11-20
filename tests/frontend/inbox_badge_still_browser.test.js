@@ -34,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
             for (const n of [3, 120]) {
                 await waiting(n);
                 await waitFor(`!document.getElementById('nav-tab-hub-inbox-badge').hidden`, at + 'the badge shows', 5000);
-                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), n > 9 ? '9+' : String(n));
+                assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), n > 99 ? '99+' : String(n));
                 await sameTabs(none, at + `every tab keeps its place with ${n} waiting`);
                 if (!mobile) {
                     const b = await ev(`(() => { const t = document.getElementById('nav-tab-hub-inbox'), e = document.getElementById('nav-tab-hub-inbox-badge'), tr = t.getBoundingClientRect(), r = e.getBoundingClientRect(); return { pos: getComputedStyle(e).position, h: Math.round(r.height), dTop: Math.round(r.top - tr.top), dLeft: Math.round(r.left - tr.right), label: t.getAttribute('aria-label'), wide: document.documentElement.scrollWidth <= innerWidth }; })()`);
