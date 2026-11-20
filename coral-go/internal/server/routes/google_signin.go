@@ -110,16 +110,18 @@ func (h *CloudHandler) GoogleConnect(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "", "could not start the sign-in")
 		return
 	}
-	redirect, err := googlesignin.ServeCallbackOnce(g.port, googlesignin.FlowTTL, g.finish)
+	cb, err := googlesignin.ReserveCallback(g.port)
 	if err != nil {
 		writeError(w, http.StatusConflict, "signin_busy", "Another Google sign-in is already waiting; finish or wait five minutes")
 		return
 	}
-	u, err := g.flows.Start(creds.ID, redirect, binding)
+	u, err := g.flows.Start(creds.ID, cb.Redirect, binding)
 	if err != nil {
+		cb.Close() // nothing answers on a sign-in that did not start
 		writeError(w, http.StatusInternalServerError, "", "could not start the sign-in")
 		return
 	}
+	cb.Serve(googlesignin.FlowTTL, g.finish)
 	http.SetCookie(w, &http.Cookie{Name: googlesignin.FlowCookie, Value: binding, Path: googlesignin.CallbackPath, MaxAge: int(googlesignin.FlowTTL / time.Second), HttpOnly: true, SameSite: http.SameSiteLaxMode})
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]string{"authorize_url": u})
@@ -149,6 +151,7 @@ func (g *googleRoutes) finish(res googlesignin.CallbackResult) string {
 	}
 	old, _ := g.store.RefreshToken(ctx) // the sign-in this one replaces, in memory until the new one is saved
 	if err := g.store.Save(ctx, account, tok.Refresh); err != nil {
+		g.revoke(ctx, tok.Refresh) // the new sign-in is not kept, so it does not stay alive at Google (#20022 INFO 9)
 		return didNotFinish
 	}
 	g.setAccess(tok.Access, time.Duration(tok.ExpiresIn)*time.Second)

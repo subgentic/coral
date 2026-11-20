@@ -192,6 +192,7 @@ export const CLEANUP_FIELDS = [
     { key: 'local_backup', type: 'heading', id: 'settings-local-backup-title', label: 'Local backup' },
     live('settings-local-backup'),
     { key: 'dropbox_backup', type: 'notice', render: slot => { slot.id = 'settings-dropbox-row'; const el = document.getElementById('settings-dropbox'); if (el) slot.append(el); } },
+    { key: 'google_signin', type: 'notice', render: slot => { slot.id = 'settings-google-row'; const el = document.getElementById('settings-google'); if (el) slot.append(el); } },
 ];
 
 // The API key's line (#8460): the key (masked, read only; security_settings.js and settings_machine.js fill it) with Show, Copy and the Mobile QR beside it (under it where the panel is narrow). Drawn here, with the component's own line class.

@@ -72,6 +72,7 @@ type googleEnv struct {
 	h    *CloudHandler
 	fake *fakeGoogleServer
 	host string
+	db   *store.DB
 }
 
 func newGoogleEnv(t *testing.T, clientBody string) *googleEnv {
@@ -83,7 +84,7 @@ func newGoogleEnv(t *testing.T, clientBody string) *googleEnv {
 	h := NewCloudHandler(store.NewSessionStore(db), dir)
 	h.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
 	h.SetGoogle(store.NewGoogleStore(db, store.NewRemoteServerStore(db, dir)))
-	e := &googleEnv{t: t, h: h, fake: newFakeGoogleServer(t), host: "127.0.0.1:8420"}
+	e := &googleEnv{t: t, h: h, fake: newFakeGoogleServer(t), host: "127.0.0.1:8420", db: db}
 	if clientBody != "" {
 		p := filepath.Join(dir, "client.json")
 		require.NoError(t, os.WriteFile(p, []byte(clientBody), 0o600))
@@ -260,4 +261,13 @@ func TestThereIsNoWayToChangeTheClientFilePath(t *testing.T) {
 	assert.Equal(t, "/first/path.json", h.ggl.clientFile)
 	t.Setenv(googleClientFileEnv, "/agent/chosen.json")
 	assert.Equal(t, "/first/path.json", h.ggl.clientFile)
+}
+
+// #20022 INFO 9: a new sign-in that cannot be saved is not left alive at Google.
+func TestASignInThatCannotBeSavedIsRevokedAtGoogle(t *testing.T) {
+	e := newGoogleEnv(t, goodClient)
+	_, err := e.db.Exec("DROP TABLE google_connection")
+	require.NoError(t, err)
+	assert.Contains(t, e.signIn(), "didn't finish")
+	assert.Equal(t, []string{"refresh-1"}, e.fake.revoked)
 }

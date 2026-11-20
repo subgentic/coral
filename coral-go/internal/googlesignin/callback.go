@@ -26,11 +26,36 @@ type CallbackResult struct {
 // ServeCallbackOnce listens on 127.0.0.1:port (0 is any free port; never another address, never Coral's own listener) for one request, hands it to handle,
 // answers its text as text/plain, and closes: after that first request, whatever its path, or after ttl. It returns once the listener is open.
 func ServeCallbackOnce(port int, ttl time.Duration, handle func(CallbackResult) string) (redirect string, err error) {
+	cb, err := ReserveCallback(port)
+	if err != nil {
+		return "", err
+	}
+	cb.Serve(ttl, handle)
+	return cb.Redirect, nil
+}
+
+// Callback is a port held on 127.0.0.1 that nothing answers yet: the sign-in's address is known (Start needs it) before the listener serves anything, so a sign-in
+// that cannot start never has a listener answering (#20022 INFO 10). Serve begins answering; Close gives the port back when it never will.
+type Callback struct {
+	Redirect string
+	ln       net.Listener
+}
+
+// ReserveCallback holds 127.0.0.1:port (0 is any free port) without answering.
+func ReserveCallback(port int) (*Callback, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
-		return "", fmt.Errorf("could not open the sign-in callback on 127.0.0.1: %w", err)
+		return nil, fmt.Errorf("could not open the sign-in callback on 127.0.0.1: %w", err)
 	}
-	redirect = fmt.Sprintf("http://127.0.0.1:%d%s", ln.Addr().(*net.TCPAddr).Port, CallbackPath)
+	return &Callback{Redirect: fmt.Sprintf("http://127.0.0.1:%d%s", ln.Addr().(*net.TCPAddr).Port, CallbackPath), ln: ln}, nil
+}
+
+// Close releases a reserved port that was never served.
+func (c *Callback) Close() { _ = c.ln.Close() }
+
+// Serve answers one request on the reserved port, as ServeCallbackOnce says.
+func (c *Callback) Serve(ttl time.Duration, handle func(CallbackResult) string) {
+	ln := c.ln
 	var once sync.Once
 	done := make(chan struct{})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -69,5 +94,4 @@ func ServeCallbackOnce(port int, ttl time.Duration, handle func(CallbackResult) 
 		defer cancel()
 		_ = srv.Shutdown(ctx)
 	}()
-	return redirect, nil
 }

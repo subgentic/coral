@@ -221,3 +221,24 @@ func TestTheCallbackListenerAnswersOneRequestOnTheLoopback(t *testing.T) {
 	}
 	assert.Empty(t, got, "the handler ran once")
 }
+
+// #20022 INFO 10: a reserved port answers nothing until Serve, and Close gives it back.
+func TestAReservedCallbackAnswersNothingUntilServedAndCloseFreesIt(t *testing.T) {
+	cb, err := ReserveCallback(0)
+	require.NoError(t, err)
+	hit := make(chan struct{}, 1)
+	client := &http.Client{Timeout: 300 * time.Millisecond}
+	_, err = client.Get(cb.Redirect)
+	assert.Error(t, err, "nothing answers before Serve")
+	cb.Serve(5*time.Second, func(CallbackResult) string { hit <- struct{}{}; return "ok" })
+	resp, err := http.Get(cb.Redirect + "?code=c&state=s")
+	require.NoError(t, err)
+	resp.Body.Close()
+	<-hit
+
+	cb2, err := ReserveCallback(0)
+	require.NoError(t, err)
+	cb2.Close()
+	_, err = client.Get(cb2.Redirect)
+	assert.Error(t, err, "a closed reservation is not listening")
+}
