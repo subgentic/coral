@@ -38,34 +38,45 @@ func TestAReleaseBuildHasNoHookToChangeTheLimits(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotContains(t, string(b), hook, "%s is in a release build and names the hook", f)
 	}
-	// nothing outside tests calls it, and no build script or workflow sets the tag
-	root := filepath.Join("..", "..")
-	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || strings.HasSuffix(p, "_test.go") || filepath.Base(p) == "timeouts_testhook.go" {
-			return nil
-		}
-		if ext := filepath.Ext(p); ext != ".go" && ext != ".sh" && ext != ".yml" && ext != ".yaml" && filepath.Base(p) != "Makefile" {
-			return nil
-		}
-		b, rerr := os.ReadFile(p)
-		if rerr == nil {
-			assert.NotContains(t, string(b), hook, p)
-			if filepath.Base(p) != "timeouts_pin_test.go" {
-				assert.NotContains(t, string(b), tag, p)
+	// nothing outside tests calls it, and no build script or workflow sets the tag. A scan that cannot walk, cannot read, or finds no file proves nothing, so each of these fails the test (Security's INFO on #20055).
+	scan := func(dir string, want func(p string) bool, visit func(p string, b []byte)) {
+		t.Helper()
+		seen := 0
+		walkErr := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
 			}
+			if d.IsDir() {
+				if d.Name() == "node_modules" || d.Name() == ".git" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !want(p) {
+				return nil
+			}
+			b, rerr := os.ReadFile(p)
+			if rerr != nil {
+				return rerr
+			}
+			seen++
+			visit(p, b)
+			return nil
+		})
+		require.NoError(t, walkErr, "the scan of %s could not finish", dir)
+		require.Positive(t, seen, "the scan of %s saw no file, so it checked nothing", dir)
+	}
+	scan(filepath.Join("..", ".."), func(p string) bool {
+		ext := filepath.Ext(p)
+		return !strings.HasSuffix(p, "_test.go") && filepath.Base(p) != "timeouts_testhook.go" && (ext == ".go" || ext == ".sh" || ext == ".yml" || ext == ".yaml" || filepath.Base(p) == "Makefile")
+	}, func(p string, b []byte) {
+		assert.NotContains(t, string(b), hook, p)
+		if filepath.Base(p) != "timeouts_pin_test.go" {
+			assert.NotContains(t, string(b), tag, p)
 		}
-		return nil
 	})
 	// the repo's own build scripts are one level above the Go module
 	for _, dir := range []string{"../../../installers", "../../../tools", "../../../.github/workflows"} {
-		_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return nil
-			}
-			if b, rerr := os.ReadFile(p); rerr == nil {
-				assert.NotContains(t, string(b), tag, p)
-			}
-			return nil
-		})
+		scan(dir, func(string) bool { return true }, func(p string, b []byte) { assert.NotContains(t, string(b), tag, p) })
 	}
 }
