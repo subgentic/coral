@@ -250,3 +250,31 @@ func TestAnUnconfirmedRemovalGivesUpAtSevenDaysAndABadRequestIsNotRetried(t *tes
 	h2.RetryRemovals(ctx, now.Add(30*time.Hour))
 	assert.Equal(t, 1, bad.calls, "400 is not retried")
 }
+
+// Security's MUST on #20346: while there is one link, the cap the list shows is the live one (the setting the checks read), however it was set: the max-mode route, the launch flag or Connect write only the setting.
+func TestTheLinkListShowsTheLiveCapHoweverItWasSet(t *testing.T) {
+	r, cs, _ := linkedRemote(t, &fakeRevoker{})
+	js := map[string]string{"Content-Type": "application/json"}
+	h := r.srv.Router()
+	listed := func() string {
+		rec := call(h, "GET", "/api/cloud/links", "", js)
+		require.Equal(t, 200, rec.Code, rec.Body.String())
+		var body struct {
+			Links []struct {
+				MaxMode string `json:"max_mode"`
+			} `json:"links"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		require.Len(t, body.Links, 1)
+		return body.Links[0].MaxMode
+	}
+	require.Equal(t, 200, call(h, "PUT", "/api/cloud/max-mode", `{"mode":"launch"}`, js).Code)
+	assert.Equal(t, "launch", listed(), "set through PUT /api/cloud/max-mode")
+	// The start-up flag writes the same setting directly.
+	_, err := r.db.ExecContext(context.Background(), "INSERT INTO user_settings (key, value) VALUES ('cloud_max_mode', 'interact') ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+	require.NoError(t, err)
+	assert.Equal(t, "interact", listed(), "set by the start-up flag")
+	ls, err := cs.ListLinks(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "interact", ls[0].MaxMode, "the store's own list agrees")
+}

@@ -148,7 +148,18 @@ func (s *CloudStore) ListLinks(ctx context.Context) ([]CloudLink, error) {
 	var out []CloudLink
 	err := s.db.SelectContext(ctx, &out, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error
 		FROM cloud_link ORDER BY created_at, rowid`)
+	if err == nil {
+		s.liveCap(ctx, out)
+	}
 	return out, err
+}
+
+// liveCap makes the cap a list shows the one the checks read: while there is one link, that is the setting cloud_max_mode (the max-mode route, the launch flag and Connect write only the setting), so there is one
+// source of truth and the list, CLI and Settings never disagree with it (Security's MUST on #20346). With several links each keeps its own.
+func (s *CloudStore) liveCap(ctx context.Context, ls []CloudLink) {
+	if len(ls) == 1 {
+		ls[0].MaxMode = s.settingMaxMode(ctx)
+	}
 }
 
 // LinkByOrigin returns the link for a Hub address (any spelling CanonicalHubOrigin accepts).
@@ -162,6 +173,12 @@ func (s *CloudStore) LinkByOrigin(ctx context.Context, hubURL string) (*CloudLin
 		FROM cloud_link WHERE hub_origin = ?`, origin)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoCloudLink
+	}
+	if err == nil {
+		var n int
+		if s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link") == nil && n == 1 {
+			l.MaxMode = s.settingMaxMode(ctx)
+		}
 	}
 	return &l, err
 }
