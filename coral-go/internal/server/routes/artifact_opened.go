@@ -29,6 +29,21 @@ func (h *SessionsHandler) openedArtifactRoute(w http.ResponseWriter, r *http.Req
 	}
 	dir := h.cfg.CoralDir()
 	sid, n, board, ok := digestSeriesBoard(dir, id)
+	if !ok && h.db != nil {
+		// A first upload is no series until its second version stamps it (#20200): the open is kept by the digest, as version 1, and counts for the series it becomes (openedWithPending).
+		if b, one := soleBoardOfSeriesless(dir, id); one {
+			if _, err := h.db.ExecContext(r.Context(), `INSERT INTO artifact_series_opened (person, board_id, series_id, version, opened_at) VALUES (?, ?, ?, 1, ?) ON CONFLICT(person, board_id, series_id) DO NOTHING`,
+				openedPersonKey(r), b, id, time.Now().UTC().Format(time.RFC3339)); err != nil {
+				errInternalServer(w, "could not record the opened version")
+				return
+			}
+			if h.bs != nil {
+				h.bs.NoteAllArtifactsChanged()
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"series_id": id, "opened_version": 1})
+			return
+		}
+	}
 	if !ok || h.db == nil {
 		errNotFound(w, "artifact not found")
 		return
@@ -98,4 +113,21 @@ func digestSeriesBoard(coralDir, digest string) (seriesID string, n int, board s
 		}
 	}
 	return "", 0, "", false
+}
+
+// soleBoardOfSeriesless is the team of a stored artifact that is in no series yet, when exactly one team holds it: a digest in a series, or in two teams, is not this case.
+func soleBoardOfSeriesless(coralDir, digest string) (board string, ok bool) {
+	for _, r := range recordsOfDigest(coralDir, digest) {
+		if seriesIDRe.MatchString(r.rec.SeriesID) {
+			return "", false
+		}
+		if r.rec.Board == "" {
+			continue
+		}
+		if ok && r.rec.Board != board {
+			return "", false
+		}
+		board, ok = r.rec.Board, true
+	}
+	return board, ok
 }
