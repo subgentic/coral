@@ -7,7 +7,10 @@ import { isCloud, serverFetch } from './server_base.js';
 let chosen = 'local';
 export const MACHINE_EVENT = 'analytics-machine-change';
 /** The computers that can be picked: this one (not on a Coral Hub's own page, which has none) and every linked one, offline ones too (they are named, not hidden). Empty off a Hub: nothing to pick. */
-export const machineChoices = () => state.hub ? [...(isCloud() ? [] : ['local']), ...new Set((state.servers || []).filter(s => s && s.id && s.id !== 'local').map(s => s.id))] : [];
+const seenAt = s => s.status === 'online' || s.online === true ? Number.MAX_SAFE_INTEGER : (Date.parse(s.last_seen) || 0);
+/** The linked computers in picker order (#20207): online first, then offline, each group most recently seen first (an online one counts as seen now); ties keep the Hub's order. */
+const linkedSorted = () => [...new Map((state.servers || []).filter(s => s && s.id && s.id !== 'local').map(s => [s.id, s])).values()].map((s, i) => [s, i]).sort(([a, i], [b, j]) => (machineOnline(b.id) - machineOnline(a.id)) || (seenAt(b) - seenAt(a)) || (i - j)).map(([s]) => s.id);
+export const machineChoices = () => state.hub ? [...(isCloud() ? [] : ['local']), ...linkedSorted()] : [];
 export const machineLabel = id => !id || id === 'local' ? 'This computer' : (state.servers || []).find(s => s.id === id)?.label || (state.servers || []).find(s => s.id === id)?.name || id;
 export const machineOnline = id => !id || id === 'local' || (state.servers || []).some(s => s.id === id && s.status === 'online');
 /** The computer being read: the choice if it is still on the list, else the first one on it (or this computer when there is no list). */
@@ -20,3 +23,6 @@ export const noComputerInCloud = () => isCloud() && machineChoices().length === 
 export const LINK_A_COMPUTER = 'Link a computer to see usage';
 /** One Analytics read: this computer's own route off a Hub's page, the chosen computer's through /api/remote/<id>/ in cloud, never the same origin there and never with no computer chosen (the read is refused, not sent). */
 export const readNow = (path, init) => !isCloud() ? fetch(path, init) : noComputerInCloud() ? Promise.reject(new Error(LINK_A_COMPUTER)) : serverFetch(machineNow(), path, init);
+
+/** When a linked computer was last seen, as the Hub reports it ('' for this computer or when unknown). */
+export const machineSeen = id => (state.servers || []).find(s => s && s.id === id)?.last_seen || '';

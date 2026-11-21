@@ -1,0 +1,26 @@
+/* The computer bar (#20207): sits under a page title; the list is a popover on a desktop and a bottom sheet on a phone. */
+.computer-bar { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.computer-bar-label { color: var(--text-muted); font-size: var(--fs-base); }
+.computer-bar-button { display: inline-flex; align-items: center; gap: 8px; max-width: min(22rem, 100%); min-height: 32px; padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); font: inherit; font-weight: var(--fw-medium); cursor: pointer; }
+.computer-bar-button:hover { background: var(--bg-hover); }
+.computer-bar-button:focus-visible, .computer-bar-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.computer-bar-name, .computer-bar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.computer-bar-caret { width: 0; height: 0; border-inline: 4px solid transparent; border-top: 5px solid var(--text-muted); }
+.computer-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+.computer-dot[data-computer-state="offline"] { background: var(--text-muted); }
+.computer-chip { flex: none; padding: 1px 8px; border-radius: 999px; background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+.computer-bar-list { position: absolute; z-index: 30; inset-block-start: calc(100% + 4px); inset-inline-start: 0; display: flex; flex-direction: column; width: min(24rem, 90vw); max-height: 60vh; overflow-y: auto; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-elevated); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+.computer-bar-list[hidden] { display: none; }
+.computer-bar-group { padding: 8px 8px 2px; color: var(--text-muted); font-size: var(--fs-sm); font-weight: var(--fw-medium); text-transform: uppercase; letter-spacing: 0.04em; }
+.computer-bar-divider { height: 1px; margin: 6px 4px; background: var(--border); }
+.computer-bar-option { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 8px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-primary); font: inherit; text-align: start; cursor: pointer; }
+.computer-bar-option:hover { background: var(--bg-hover); }
+.computer-bar-option[aria-selected="true"] { background: var(--bg-tertiary); }
+.computer-bar-option:has(.computer-dot[data-computer-state="offline"]) .computer-bar-title { color: var(--text-muted); }
+.computer-bar-text { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.computer-bar-sub { color: var(--text-muted); font-size: var(--fs-base); }
+@media (max-width: 600px) {
+    .computer-bar { flex-direction: column; align-items: stretch; gap: 4px; }
+    .computer-bar-button { width: 100%; max-width: none; min-height: 44px; }
+    .computer-bar-list { position: fixed; inset: auto 0 0 0; z-index: 60; width: auto; max-height: 70vh; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+}
