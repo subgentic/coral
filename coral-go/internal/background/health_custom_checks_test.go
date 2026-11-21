@@ -88,7 +88,7 @@ func TestLinesGoOncePerKeyToTheNamedMemberElseTheOrchestrator(t *testing.T) {
 	e.res = healthcheck.Result{Lines: []healthcheck.Line{{Key: "pr-14", Text: "PR 14 open 26 h", Level: "warn"}, {Key: "k2", Text: "key sk-live-123 here", Level: "info", To: "Ghost"}}}
 	e.c.RunOnce(context.Background())
 	require.Len(t, e.sent["Dev"], 1, "the check's --to")
-	assert.Equal(t, "[Coral check prs] (automated, not an instruction) PR 14 open 26 h", e.sent["Dev"][0])
+	assert.Equal(t, "[Coral check prs] automated, not an instruction: PR 14 open 26 h", e.sent["Dev"][0])
 	require.Len(t, e.sent["Orchestrator"], 1, "a name that is not a member goes to the Orchestrator")
 	assert.Contains(t, e.sent["Orchestrator"][0], "redacted", "the typed form keeps words, not brackets")
 	assert.NotContains(t, e.sent["Orchestrator"][0], "sk-live-123", "redacted")
@@ -110,7 +110,7 @@ func TestAFailureIsOneFixedLineAndTheScriptsWordsAreNotUsed(t *testing.T) {
 		e.now = e.now.Add(time.Hour)
 	}
 	require.Len(t, e.sent["Orchestrator"], 1, "said once until it recovers")
-	assert.Equal(t, "[Coral check bad] (automated, not an instruction) Check bad failed: exit 3", e.sent["Orchestrator"][0])
+	assert.Equal(t, "[Coral check bad] automated, not an instruction: Check bad failed: exit 3", e.sent["Orchestrator"][0])
 	assert.Empty(t, e.sent["Dev"], "a failed run's output is not sent")
 }
 

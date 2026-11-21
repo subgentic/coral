@@ -92,6 +92,9 @@ func TestPiExtensionEnvListIsGeneratedFromTheHookSources(t *testing.T) {
 	for _, n := range piRuntimeEnv {
 		want[n] = true
 	}
+	for n := range piNeverPassed {
+		delete(want, n) // a hook reads it, but the extension must not hand it over
+	}
 	var wantList []string
 	for n := range want {
 		wantList = append(wantList, n)
@@ -106,6 +109,11 @@ func TestPiExtensionEnvListIsGeneratedFromTheHookSources(t *testing.T) {
 }
 
 // No provider key, cloud credential or token of another service can ever be on the list.
+// piNeverPassed are names a hook program reads that the Pi extension must NOT pass on, with why. The generated list is what the hooks read minus these.
+var piNeverPassed = map[string]string{
+	"CORAL_CHECK_TOKEN": "a custom health check's run token (goal #268): the hook reads it only when there is no session token, and only a check script's own environment holds one; a Pi agent never gets one, and the session token is the only token the extension may pass",
+}
+
 func TestPiExtensionEnvListHasNoProviderSecrets(t *testing.T) {
 	secret := regexp.MustCompile(`(?i)(^|_)(API_?KEY|SECRET|PASSWORD|PASSWD)(_|$)|^(ANTHROPIC|OPENAI|GEMINI|GOOGLE|AWS|AZURE|GITHUB|GH|GITLAB|HF|HUGGINGFACE|OPENROUTER|MISTRAL|XAI|GROQ)_`)
 	for _, n := range piHookEnvNames {

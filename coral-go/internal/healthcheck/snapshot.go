@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+
+	"github.com/subgentic/coral/internal/fsreplace"
 )
 
 // maxScript is the largest script Coral will snapshot.
@@ -67,7 +69,7 @@ func Snapshot(src, dir string) (hash, path string, err error) {
 	if err := os.Chmod(tmp.Name(), 0o500); err != nil {
 		return "", "", err
 	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
+	if err := fsreplace.Rename(tmp.Name(), path); err != nil {
 		return "", "", err
 	}
 	return hash, path, nil

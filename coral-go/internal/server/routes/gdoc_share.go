@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/gdocsync"
+	"github.com/subgentic/coral/internal/httputil"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -247,7 +248,7 @@ func (h *SessionsHandler) pauseGdoc(w http.ResponseWriter, r *http.Request) {
 func (h *SessionsHandler) gdocFail(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, errGdocRate):
-		writeError(w, http.StatusTooManyRequests, "gdoc_rate", "This Doc was changed 20 times in the last hour. Try again later.")
+		httputil.WriteActionLimit(w, 0, "gdoc_rate", "This Doc was changed 20 times in the last hour. Try again later.")
 	case errors.Is(err, errGdocPaused):
 		writeError(w, http.StatusConflict, "gdoc_paused", "Syncing this Doc is paused. Resume it to share again.")
 	case errors.Is(err, errGdocBusy):

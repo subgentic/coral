@@ -102,7 +102,7 @@ func (h *SessionsHandler) deliverBoardComment(ctx context.Context, key string, c
 			reason = firstReason(reason, "no_uploader")
 			continue
 		}
-		if ls.IsSleeping == 1 && h.WakeForOperator(ctx, t.sessionID) { // the Operator's own word wakes a sleeping agent first, and the message is the first thing it reads (#19897)
+		if ls.IsSleeping == 1 && h.wakeForComment(ctx, t.sessionID, author) { // the Operator's own word wakes a sleeping agent first, and the message is the first thing it reads (#19897); a Doc commenter's does not (below)
 			if woke, gerr := h.ss.GetLiveSession(ctx, t.sessionID); gerr == nil && woke != nil {
 				ls = woke
 			}
@@ -236,4 +236,14 @@ func (h *SessionsHandler) operatorComment(r *http.Request, caller commentCaller)
 // sendMessage (cleanSendText), so it is stored as given; the message says who commented. The one place the comment messages are posted (the notice census allows it).
 func (h *SessionsHandler) postCommentMessage(ctx context.Context, project, msg string) (*board.Message, error) {
 	return h.bs.PostSystemDefusedMessage(ctx, project, board.CoralSender, msg, nil)
+}
+
+// wakeForComment wakes a sleeping agent for a comment on its file. Only the Operator's own comment (sendAuthorOperator) uses WakeForOperator, which wakes even an agent they put to sleep. A comment that came
+// from the shared Google Doc is somebody else's word (a name from Google, quoted as untrusted data): it wakes an agent only as any delivery from Coral does, an idle auto-sleeper within the board's cap, and a manual
+// sleeper finds the message unread when it wakes.
+func (h *SessionsHandler) wakeForComment(ctx context.Context, sessionID, author string) bool {
+	if author == sendAuthorOperator {
+		return h.WakeForOperator(ctx, sessionID)
+	}
+	return h.WakeIdleFor(ctx, sessionID, false)
 }

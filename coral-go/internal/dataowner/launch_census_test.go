@@ -68,9 +68,9 @@ var pinnedSites = map[string]string{
 	"wake_resume_gone.go SessionsHandler.watchResumeGone": background + ": starts a Claude agent fresh in its own terminal when the agent's own log says its conversation was not found; it is reached only from the success path of a wake (a person's Wake or a gated background wake), a few seconds after that wake, never from a request or an agent (#12714)",
 	"auto_wake.go SessionsHandler.autoWakeOne":            background + ": only reached from AutoWakeAfterRestart",
 	// auto-sleep (#12111): it ends a terminal by itself and a delivery wakes an agent by itself
-	"auto_sleep.go SessionsHandler.autoSleepOne":                      background + ": only reached from autoSleepPass, which RunAutoSleep runs",
-	"artifact_comment_auto.go SessionsHandler.deliverOperatorComment": person + ": the Operator's own comment on a file (the comment and Request changes handlers) wakes a sleeping uploader through WakeForOperator, first (#19897); it is reached only from those handlers, never from an agent or a loop",
-	"auto_sleep_wake.go SessionsHandler.wakeSleeperFor":               background + ": the body of WakeIdleFor (an automated wake, a delivery's) and of WakeForOperator (the Operator's own message to a sleeper, #19897); a person's own Send is a person's action",
+	"auto_sleep.go SessionsHandler.autoSleepOne":              background + ": only reached from autoSleepPass, which RunAutoSleep runs",
+	"artifact_comment_auto.go SessionsHandler.wakeForComment": person + ": the Operator's own comment on a file (the comment and Request changes handlers) wakes a sleeping uploader through WakeForOperator, first (#19897); a comment from the shared Google Doc (gdoc_comments.go, a background pull) is somebody else's word and wakes only as a delivery from Coral does (WakeIdleFor: an idle auto-sleeper, never a manual one); it is never reached from an agent or a loop",
+	"auto_sleep_wake.go SessionsHandler.wakeSleeperFor":       background + ": the body of WakeIdleFor (an automated wake, a delivery's) and of WakeForOperator (the Operator's own message to a sleeper, #19897); a person's own Send is a person's action",
 }
 
 // backgroundEntries are the reviewed loop entries and functions that start or end agents on their own: the callers of the guarded helpers that are not handlers.
