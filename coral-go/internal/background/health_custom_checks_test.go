@@ -208,7 +208,8 @@ func mustHash(t *testing.T, s *board.Store, name string) string {
 	return c.RecordHash()
 }
 
-func TestDeliveryLimitsFoldTheRestIntoOneLine(t *testing.T) {
+// The "held" line is a line: it counts against the check's hour. Here the hour is full when it would go, so it is not said (Security's SHOULD 7 on #20138).
+func TestTheHeldLineCountsAgainstTheHour(t *testing.T) {
 	e := newCheckEnv(t)
 	e.add(t, "noisy", "Dev", true)
 	var ls []healthcheck.Line
@@ -217,9 +218,8 @@ func TestDeliveryLimitsFoldTheRestIntoOneLine(t *testing.T) {
 	}
 	e.res = healthcheck.Result{Lines: ls}
 	e.c.RunOnce(context.Background())
-	assert.Len(t, e.sent["Dev"], board.CheckLinesPerHour, "6 an hour to a member from one check")
-	require.Len(t, e.sent["Orchestrator"], 1)
-	assert.Contains(t, e.sent["Orchestrator"][0], "4 more lines held")
+	assert.Len(t, e.sent["Dev"], board.CheckLinesPerHour)
+	assert.Empty(t, e.sent["Orchestrator"], "the hour is full: no seventh line, not even the held one")
 }
 
 func TestOneMemberGetsAtMost20CheckLinesADay(t *testing.T) {

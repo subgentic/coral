@@ -175,8 +175,11 @@ func (c *CustomChecks) runOne(ctx context.Context, hc board.HealthCheck) {
 		c.logger.Warn("custom check record", "check", hc.Name, "error", err)
 		return
 	}
-	if held > 0 {
-		c.send(ctx, agents, hc, orch, Notice(hc.Name, fmt.Sprintf("Check %s: %d more lines held", hc.Name, held)))
+	if held > 0 && orch != "" {
+		// The "held" line is a line too: it counts against the same hour and day limits (Security's SHOULD 7), and once the limit is reached it is not said.
+		if why, err := c.store.TakeCheckDelivery(ctx, hc.Project, hc.Name, orch, now); err == nil && why == "" {
+			c.send(ctx, agents, hc, orch, Notice(hc.Name, fmt.Sprintf("Check %s: %d more lines held", hc.Name, held)))
+		}
 	}
 	if say {
 		// A fixed phrase, never the script's own words.
