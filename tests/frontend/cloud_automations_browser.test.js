@@ -17,7 +17,7 @@ const STUB = `(() => {
   if(path==='/api/servers') return json({servers:window.__computers});
   if(path.includes('/api/scheduled') || path.includes('/api/workflows') || path.includes('/api/automations')) {
    window.__automationReads.push({path,method:o?.method || 'GET'});
-   if(window.__automationDeny) return Promise.resolve(new Response('{}',{status:window.__automationDeny}));
+   if(window.__automationDeny && (!window.__automationDenyServer || path.startsWith('/api/remote/'+window.__automationDenyServer+'/')) && (!window.__automationDenyPath || path.endsWith(window.__automationDenyPath))) return Promise.resolve(new Response(JSON.stringify(window.__automationErrorBody || {}),{status:window.__automationDeny}));
    const remote=path.startsWith('/api/remote/') ? path.split('/')[3] : ''; const api=remote ? path.slice(('/api/remote/'+remote).length) : path, who=remote || 'HUB';
    const run={id:9,kind:'job',job_name:who+' job',status:'completed',started_at:'2026-11-18T01:00:00Z',finished_at:'2026-11-18T01:01:00Z',duration_seconds:60};
    const job={id:1,name:who+' job <img src=x onerror=window.__pwn=1>',enabled:true,cron_expr:'0 * * * *',timezone:'UTC',last_run:run};
@@ -105,6 +105,44 @@ const STUB = `(() => {
    assert.ok(await ev(`!![...document.querySelectorAll('#scheduler-view .computer-card button')].find(b=>b.textContent===${JSON.stringify(button)})`), `${kind} offers ${button}`);
    assert.ok(await ev(`!![...document.querySelectorAll('#scheduler-view .computer-card button')].find(b=>b.textContent==='Switch computer')`), 'the card offers Switch computer');
   }
+  // #20185: only the Hub's explicit owner-only 409 contract proves an update is required.
+  for (const width of [1280,390]) for (const theme of ['light','dark']) {
+   await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
+   await Emulation.setTouchEmulationEnabled({enabled:width===390});
+   await ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'settings_core.js');m.clearCustomThemeVars();m.applyTheme('${theme}');window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:'9.7.3'};return true;})()`);
+   await route({view:'automations',folder:'jobs'});
+   await waitFor(`!!document.querySelector('#scheduler-view .computer-card') && !document.querySelector('#scheduler-view [aria-busy="true"]')`, 'the computer refusal card',10000);
+   assert.ok(await ev(`document.querySelector('#scheduler-view .computer-card-details').textContent.includes('409')`),'the current refusal is 409');
+   if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});await ev(framesJs(2));fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/update-required-'+width+'-'+theme+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),'Update Coral on Second computer (needs 9.7.3+)','name and minimum version come from the selected computer and Hub body');
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card').dataset.computerCard`),'update-required');
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-details').open`),false,'support details stay collapsed');
+   assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'the update card fits the phone or desktop');
+  }
+  const refused = [
+   [409,{},'no-answer'],[409,{error:'coral_too_old'},'no-answer'],[409,{error:'coral_too_old',min:0},'no-answer'],
+   [409,{error:'coral_too_old',min:''},'no-answer'],[409,{error:'coral_too_old',min:'  '},'no-answer'],[409,{error:'coral_too_old',min:'9.7.3',extra:true},'no-answer'],[409,{error:'other',min:'9.7.3'},'no-answer'],
+   [403,{error:'coral_too_old',min:'9.7.3'},'not-shared'],[404,{error:'coral_too_old',min:'9.7.3'},'old'],[500,{error:'coral_too_old',min:'9.7.3'},'no-answer']
+  ];
+  for(const [status,body,kind] of refused){
+   await ev(`window.__automationDeny=${status};window.__automationErrorBody=${JSON.stringify(body)};true`);
+   await route({view:'automations',folder:'jobs'});
+   await waitFor(`!!document.querySelector('#scheduler-view .computer-card') && !document.querySelector('#scheduler-view [aria-busy="true"]')`, 'fallback refusal card',10000);
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card').dataset.computerCard`),kind,'other statuses and malformed bodies preserve the existing card');
+   assert.ok(!(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`)).startsWith('Update Coral on '),'a grantee/stranger refusal or unknown failure never claims an update is known');
+  }
+  const unsafeName='<img src=x onerror="window.__updatePwn=1">', unsafeMin='<svg onload="window.__updatePwn=2">';
+  await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers.find(s=>s.id==='two').label=${JSON.stringify(unsafeName)};window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:${JSON.stringify(unsafeMin)}};return true;})`);
+  await route({view:'automations',folder:'jobs'}); await ready('Update Coral on ');
+  assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),`Update Coral on ${unsafeName} (needs ${unsafeMin}+)`,'computer name and minimum version are literal text');
+  assert.equal(await ev(`!!window.__updatePwn || !!document.querySelector('#scheduler-view .computer-card img, #scheduler-view .computer-card svg')`),false,'response and computer labels never become markup');
+  await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{delete state.servers.find(s=>s.id==='two').label;window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:'8.6.4'};window.__automationDenyServer='two';state.machineChosen='all';return true;})`);
+  await route({view:'automations',folder:'jobs'}); await ready('one job');
+  assert.ok((await ev(`document.querySelector('.computer-not-shown').textContent`)).includes('Update Coral on Second computer (needs 8.6.4+)'),'All computers names the unreadable computer and Hub minimum beside readable rows');
+  await ev(`import((window.__coralStatic||'/static/')+'analytics_machine.js').then(m=>{m.pickMachine('two');window.__automationDenyPath='/api/scheduled/jobs/1/runs';return true;})`);
+  await route({view:'automations',folder:'jobs',id:1}); await ready('Update Coral on Second computer (needs 8.6.4+)');
+  assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),'Update Coral on Second computer (needs 8.6.4+)','a nested run-history read keeps the minimum too');
+  await ev(`window.__automationDeny=0;delete window.__automationErrorBody;delete window.__automationDenyPath;delete window.__automationDenyServer;true`);
   await ev('window.__automationDeny=0;true');
   await ev(`window.__automationDeny=0;true`); await route({view:'automations',folder:'jobs'}); await ready('two job');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers.find(s=>s.id==='two').status='offline';window.__automationReads=[];return true;})`);
