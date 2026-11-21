@@ -96,7 +96,7 @@ const SERVERS = [{ id: 'srv1', label: 'Alpha', status: 'online' }, { id: 'srv2',
         await open('usage');
         await waitFor(`document.querySelectorAll('.atab-kpi').length >= 6`, 'Usage drawn', 10000);
         const choices = await ev(`[...document.querySelectorAll('.atab select[aria-label="Computer"] option')].map(o => o.textContent)`);
-        check('Usage has a Computer picker: this computer and each linked one, the offline one marked', JSON.stringify(choices) === JSON.stringify(['This computer', 'Alpha', 'Beta', 'Gamma (offline)', 'Delta']), JSON.stringify(choices));
+        check('Usage Computer picker keeps online computers first in stable Hub order, then the marked offline computer', JSON.stringify(choices) === JSON.stringify(['This computer', 'Alpha', 'Beta', 'Delta', 'Gamma (offline)']), JSON.stringify(choices));
         const first = await spend();
         await shot('analytics-usage-this-computer');
         await pick('srv2');
