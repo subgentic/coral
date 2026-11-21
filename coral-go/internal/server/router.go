@@ -69,7 +69,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	// every writer, and Allow (which allows everything in this build) is the one check point.
 	r.Use(cloud.LinkStamp(store.NewCloudStore(s.db, nil).LinkExists, cloud.AllowAll))
 	// A tunneled write on a route in pairRecordedRoutes leaves one Operator-actions row with the link and the Hub person, after its handler (#20369); the census (pair_census_test.go) proves each one.
-	r.Use(routes.RecordPairWrites(s.boardStore, pairRecordedRoutes))
+	r.Use(routes.RecordPairWrites(s.boardStore, pairRecordedRoutes, r))
 	// Through Coral Hub, no path under the home directory and no hidden file names (#3559).
 	r.Use(routes.HubPaths)
 	// NOTE: middleware.RealIP was intentionally removed. It rewrites r.RemoteAddr

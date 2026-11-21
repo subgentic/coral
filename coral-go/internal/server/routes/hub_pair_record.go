@@ -24,7 +24,7 @@ type PairRecorded map[string]bool
 // PATTERN (never the concrete path or query: they are the Hub's words), the status, and the pair, which is read only from the request context the connector stamp filled (cloud.LinkStamp), never from a
 // body or a header. A local request carries no pair and records nothing. A handler that already wrote the row itself (the identity guard, a switch change) marks the request, and nothing is written twice.
 // A refused write (status >= 400) is recorded too, up to RefusedRowsPerMinute per link.
-func RecordPairWrites(bs *board.Store, set PairRecorded) func(http.Handler) http.Handler {
+func RecordPairWrites(bs *board.Store, set PairRecorded, mux chi.Routes) func(http.Handler) http.Handler {
 	var mu sync.Mutex
 	window := map[string][]time.Time{}
 	allowRefused := func(link string, now time.Time) bool {
@@ -50,15 +50,16 @@ func RecordPairWrites(bs *board.Store, set PairRecorded) func(http.Handler) http
 				return
 			}
 			via, tunneled := board.ActionViaFrom(r.Context())
-			if !tunneled {
+			if !tunneled || via.HubUser == "" { // a pair is a link and a Hub person: a request with no person (refused for it) has no pair to record
 				next.ServeHTTP(w, r)
 				return
 			}
 			ctx, recorded := board.WithActionRecordFlag(r.Context())
 			rec := &statusRecorder{ResponseWriter: w}
 			next.ServeHTTP(rec, r.WithContext(ctx))
-			rc := chi.RouteContext(r.Context())
-			if rc == nil || recorded.Load() || !set[r.Method+" "+rc.RoutePattern()] {
+			// the pattern is found by matching the router itself: a guard that refuses a request answers before routing, when the request carries no pattern yet
+			rc := chi.NewRouteContext()
+			if recorded.Load() || mux == nil || !mux.Match(rc, r.Method, r.URL.Path) || !set[r.Method+" "+rc.RoutePattern()] {
 				return
 			}
 			status := rec.status
