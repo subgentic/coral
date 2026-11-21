@@ -160,3 +160,11 @@ var pairRecordedRoutes = routes.PairRecorded{
 	"PUT /api/teams/detail/{name}/daily-knowledge":            true,
 	"PUT /api/teams/detail/{name}/daily-knowledge/auto-apply": true,
 }
+
+// pairUpgradeRoutes are the WebSocket upgrade routes (GET + pattern) the Hub can open (#20405). A terminal stream carries input and agent control after the handshake, which no write route sees, so
+// routes.RecordPairWrites leaves a row at connect (method WS-OPEN) and one at close (WS-CLOSE) with the link and the Hub person. The census lists them as lines of their own; each is proven through the
+// real connector with a real stream.
+var pairUpgradeRoutes = routes.PairRecorded{
+	"GET /ws/coral":           true,
+	"GET /ws/terminal/{name}": true,
+}

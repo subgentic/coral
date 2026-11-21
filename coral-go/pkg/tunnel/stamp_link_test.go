@@ -109,3 +109,20 @@ func TestTheConnectionsLinkReachesTheServerAndAForgeryDoesNot(t *testing.T) {
 	assert.Empty(t, link, "no link id: no stamp and no forged copy; the server refuses it")
 	assert.Equal(t, []string{"hub-user-1234abcd"}, actor)
 }
+
+func TestAWebSocketUpgradeCarriesTheStreamsPersonAndNothingTheRequestSent(t *testing.T) {
+	for _, tc := range []struct{ hub, want string }{
+		{"hub-user-1234abcd", "hub-user-1234abcd"},
+		{"", ""},
+		{"Operator", ""},
+		{"hub-user-1234ABCD", ""},
+	} {
+		out := http.Header{ActorHeader: {"hub-user-ffffffff"}} // a copy the browser sent is removed first
+		stampActorWS(out, Header{HubUser: tc.hub})
+		if tc.want == "" {
+			assert.Empty(t, out.Values(ActorHeader), "%q", tc.hub)
+		} else {
+			assert.Equal(t, []string{tc.want}, out.Values(ActorHeader), "%q", tc.hub)
+		}
+	}
+}
