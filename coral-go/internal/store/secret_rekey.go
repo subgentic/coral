@@ -50,6 +50,7 @@ type SecretKeyState struct {
 	// What a re-key discards: the remote servers whose API keys are stored, and the Coral Hub
 	// enrollment (its hub URL), if there is one.
 	RemoteServerKeys int    `json:"remote_server_keys"`
+	AddedLinks       int    `json:"added_links"` // Coral Hubs added at this computer beside the enrollment (#20385): a re-key removes them, to be added again
 	HubURL           string `json:"hub_url,omitempty"`
 }
 
@@ -71,6 +72,9 @@ func (s *RemoteServerStore) KeyState(ctx context.Context) (SecretKeyState, error
 		st.State, st.Message = "unreadable", err.Error()
 	}
 	if err := s.db.GetContext(ctx, &st.RemoteServerKeys, "SELECT COUNT(*) FROM remote_servers WHERE api_key != ''"); err != nil {
+		return st, err
+	}
+	if err := s.db.GetContext(ctx, &st.AddedLinks, "SELECT COUNT(*) FROM cloud_link WHERE source = ?", LinkSourceAdded); err != nil {
 		return st, err
 	}
 	var hub []string

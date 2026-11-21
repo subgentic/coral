@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/cloud"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -107,7 +108,7 @@ func (h *CloudHandler) Links(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "Could not read the Hub links")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"links": out, "max_links": store.MaxCloudLinks})
+	writeJSON(w, http.StatusOK, map[string]any{"links": out, "max_links": store.MaxCloudLinks, "adding": h.addingList()})
 }
 
 func (h *CloudHandler) noLinkStore(w http.ResponseWriter) bool {
@@ -118,21 +119,100 @@ func (h *CloudHandler) noLinkStore(w http.ResponseWriter) bool {
 	return false
 }
 
-// AddLink: POST /api/cloud/links. A second link is refused while the store's switch is off (Security 1); the first link is made by Connect.
+// addingView is one Hub being added, as the person sees it: text only (the Hub's words go through cleanSavedField), never the device code or a token.
+type addingView struct {
+	Hub             string `json:"hub"`
+	Cap             string `json:"cap"`
+	State           string `json:"state"`
+	UserCode        string `json:"user_code,omitempty"`
+	VerificationURL string `json:"verification_url,omitempty"`
+	Note            string `json:"note,omitempty"`
+	Message         string `json:"message,omitempty"`
+	ExpiresAt       string `json:"expires_at,omitempty"`
+}
+
+func viewOfEnrollment(e cloud.LinkEnrollment) addingView {
+	v := addingView{Hub: e.Origin, Cap: e.Cap, State: e.State, UserCode: cleanSavedField(e.UserCode), VerificationURL: cleanSavedField(e.VerificationURL),
+		Note: cleanSavedField(e.Note), Message: cleanSavedField(e.Message)}
+	if !e.ExpiresAt.IsZero() {
+		v.ExpiresAt = e.ExpiresAt.UTC().Format(time.RFC3339)
+	}
+	return v
+}
+
+func (h *CloudHandler) addingList() []addingView {
+	out := []addingView{}
+	if m := h.manager(); m != nil {
+		for _, e := range m.LinkEnrollments() {
+			out = append(out, viewOfEnrollment(e))
+		}
+	}
+	return out
+}
+
+// AddLink: POST /api/cloud/links {"hub": address, "cap": "view"|"interact"|"launch"}. The person at this computer adds another Hub: Coral asks that Hub for a code and the person approves it there; nothing is stored
+// before that (#20385). The cap is chosen out loud, with no default. Refused first, before the Hub is asked: a bad address or cap, a Hub already linked, the switch still off and the cap on links. Never tunneled, never an agent's.
 func (h *CloudHandler) AddLink(w http.ResponseWriter, r *http.Request) {
 	if h.refuseCloud(w, r, allowDashboard|allowCLI) || !requireJSON(w, r) || h.noLinkStore(w) {
 		return
 	}
-	switch err := h.links.CheckCanAddLink(r.Context()); {
+	var body struct {
+		Hub string `json:"hub"`
+		Cap string `json:"cap"`
+	}
+	if err := decodeJSONLimit(r, &body, 4096); err != nil {
+		errBadRequest(w, "send {\"hub\": the Hub's address, \"cap\": \"view\", \"interact\" or \"launch\"}")
+		return
+	}
+	m := h.manager()
+	if m == nil {
+		errInternalServer(w, "The Coral Hub connector is not available")
+		return
+	}
+	pe, err := m.AddLinkByOrigin(r.Context(), body.Hub, body.Cap)
+	var rl *cloud.RateLimitedError
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]any{"enrollment": viewOfEnrollment(*pe)})
+	case errors.Is(err, store.ErrLinkExists):
+		writeError(w, http.StatusConflict, "already_linked", store.ErrLinkExists.Error())
 	case errors.Is(err, store.ErrSecondLinkNotYet):
 		writeError(w, http.StatusConflict, "second_link_not_yet", "This Coral links to one Hub for now. Remove that link first.")
 	case errors.Is(err, store.ErrTooManyLinks):
 		writeError(w, http.StatusConflict, "too_many_links", "This computer is linked to the most Hubs it can be.")
-	case err != nil:
-		errInternalServer(w, "Could not check the Hub links")
+	case errors.As(err, &rl):
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "That Hub is busy. Try again in a moment.")
+	case errors.Is(err, cloud.ErrHubUnavailable), errors.Is(err, cloud.ErrHubResponse):
+		writeError(w, http.StatusBadGateway, "hub_unreachable", "Coral could not get a code from that Hub. Check the address and try again.")
+	case errors.Is(err, cloud.ErrNotConfigured):
+		errInternalServer(w, "The Coral Hub connector is not available")
 	default:
-		errBadRequest(w, "To link the first Hub, use Connect")
+		errBadRequest(w, cleanSavedField(err.Error())) // an address or cap that is not valid, or a Hub that needs Connect: our own words
 	}
+}
+
+// CancelLinkEnrollment: POST /api/cloud/links/cancel {"hub": address}. Ends the Hub being added: an approval that comes later links nothing.
+func (h *CloudHandler) CancelLinkEnrollment(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || !requireJSON(w, r) || h.noLinkStore(w) {
+		return
+	}
+	var body struct {
+		Hub string `json:"hub"`
+	}
+	if err := decodeJSONLimit(r, &body, 4096); err != nil {
+		errBadRequest(w, `send {"hub": the Hub's address}`)
+		return
+	}
+	origin, err := store.CanonicalHubOrigin(body.Hub)
+	if err != nil {
+		errBadRequest(w, "That is not a Hub address")
+		return
+	}
+	cancelled := false
+	if m := h.manager(); m != nil {
+		cancelled = m.CancelLinkEnrollment(origin)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"cancelled": cancelled, "adding": h.addingList()})
 }
 
 // SetLinkCap: PUT /api/cloud/links/{id}/cap {"mode": "view"|"interact"|"launch"}. Lowering it ends what the old cap allowed at once.
@@ -208,7 +288,8 @@ func (h *CloudHandler) RemoveLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if m := h.manager(); m != nil {
-		m.StopLink(id) // this link's tunnel only
+		m.StopLink(id)                // this link's tunnel only
+		m.LinkRemoved(link.HubOrigin) // and a Hub still being added at that address
 	}
 	state, note, err := h.askAndSettle(ctx, *link, time.Now())
 	if err != nil {

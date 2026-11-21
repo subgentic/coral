@@ -129,6 +129,15 @@ type cloudClient struct {
 	// retryAfter is the last refusal's Retry-After (0 if none): the unattended startup
 	// step waits at least this long before asking again.
 	retryAfter time.Duration
+	// poll is how often `links add` asks whether the Hub approved (tests make it short); 0 is 2 s.
+	poll time.Duration
+}
+
+func (c *cloudClient) pollEvery() time.Duration {
+	if c.poll > 0 {
+		return c.poll
+	}
+	return 2 * time.Second
 }
 
 func newCloudClient(base, home, cmd string, stderr io.Writer) (*cloudClient, int) {

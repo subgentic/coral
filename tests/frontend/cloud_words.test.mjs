@@ -76,6 +76,8 @@ assert.equal(codeUncollected({ state: 'enrolling', last_error_code: 'code_uncoll
 assert.equal(codeExpired({ state: 'idle', last_error_code: 'code_uncollected' }), false, 'the access link is for the never-approved text only');
 
 assert.match(rekeyText({ hub_url: 'https://h.example', remote_server_keys: 2, exposed: true }), /^Other accounts on this computer could read the secret key file.*discards the Coral Hub connection to https:\/\/h\.example .* and 2 remote computers' API keys/s);
+assert.match(rekeyText({ hub_url: 'https://h.example', added_links: 2 }), /2 added Coral Hub links \(add them again afterwards\)/);
+assert.match(rekeyText({ added_links: 1 }), /1 added Coral Hub link \(add it again afterwards\)/);
 assert.match(rekeyText({ remote_server_keys: 1, message: 'bad file' }), /^Coral can't use its secret key file \(bad file\)\..*1 remote computer's API key/s);
 assert.match(rekeyText({}), /discards nothing stored yet\.$/);
 
