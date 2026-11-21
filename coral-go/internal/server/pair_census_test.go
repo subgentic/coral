@@ -152,7 +152,7 @@ func TestPairUpgradeRoutesRecordThePairAtConnectAndClose(t *testing.T) {
 		for _, a := range append(open, closed...) {
 			assert.Equal(t, testLinkID, a.ViaLink, route)
 			assert.Equal(t, integOwner, a.ViaHubUser, route)
-			assert.Equal(t, board.HubActionKindWrite, a.Kind, route)
+			assert.Equal(t, board.HubActionKindStream, a.Kind, route+": a stream's rows are their own kind")
 			assert.NotContains(t, a.Path+a.Project+a.HubUser, "SENTINEL", route)
 		}
 	}
@@ -315,4 +315,26 @@ func pairConcretePath(pattern string) string {
 		}
 	}
 	return strings.Join(segs, "/")
+}
+
+// #20405 SHOULD (QA): a stream whose row cannot be written is not opened (the handler answers 503, which the connector reports as a failed local websocket). The control: the same route opens while the record works.
+func TestAStreamWhoseRowCannotBeWrittenIsRefused(t *testing.T) {
+	g := newInteg(t)
+	ctx := tunnel.WithHubRole(tunnel.WithHubUser(context.Background(), integOwner), "owner")
+	route := ""
+	for r := range pairUpgradeRoutes {
+		_, pattern, _ := strings.Cut(r, " ")
+		if conn, err := g.sess.DialWS(ctx, pairConcretePath(pattern), "", nil); err == nil {
+			conn.CloseNow()
+			route = pattern
+			break
+		}
+	}
+	require.NotEmpty(t, route, "some upgrade route opens through the connector while the record works")
+	require.NoError(t, g.srv.boardStore.Close()) // every write of the Operator-actions record now fails
+	conn, err := g.sess.DialWS(ctx, pairConcretePath(route), "", nil)
+	if err == nil {
+		conn.CloseNow()
+	}
+	require.Error(t, err, "the open is refused when its row cannot be written")
 }
