@@ -196,12 +196,40 @@ func cleanSavedField(s string) string {
 			s = s[:len(s)-1]
 		}
 	}
-	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) { // control, and format (RTL override, zero width, BOM): as the Hub does (#20329)
-			return -1
+	return stripInvisible(s)
+}
+
+// joinerRun is the most joiners or tag characters kept in one run: a ZWJ family emoji and a flag with its tags fit, a hidden message does not.
+const joinerRun = 8
+
+// joinerRune is a character that is format (Cf) but has a visible use between two characters of a script: ZWJ and ZWNJ (emoji sequences, Persian and Indic words) and the emoji tag characters (flags).
+func joinerRune(r rune) bool { return r == 0x200C || r == 0x200D || r >= 0xE0020 && r <= 0xE007F }
+
+// stripInvisible drops control and format characters (RTL override, zero width space, BOM) as the Hub does (#20329), and keeps a run of joiners or tag characters only when the character
+// before and the one after it are both non-ASCII and visible: a family emoji and a Persian word keep theirs, "ad<ZWJ>min" and emoji-plus-hidden-tags lose them (#20333).
+func stripInvisible(s string) string {
+	rs := []rune(s)
+	out := make([]rune, 0, len(rs))
+	for i := 0; i < len(rs); i++ {
+		r := rs[i]
+		switch {
+		case joinerRune(r):
+			j := i
+			for j < len(rs) && joinerRune(rs[j]) {
+				j++
+			}
+			before := len(out) > 0 && out[len(out)-1] > unicode.MaxASCII
+			after := j < len(rs) && rs[j] > unicode.MaxASCII && !unicode.IsControl(rs[j]) && !unicode.Is(unicode.Cf, rs[j])
+			if before && after && j-i <= joinerRun {
+				out = append(out, rs[i:j]...)
+			}
+			i = j - 1
+		case unicode.IsControl(r) || unicode.Is(unicode.Cf, r):
+		default:
+			out = append(out, r)
 		}
-		return r
-	}, s)
+	}
+	return string(out)
 }
 
 // SavedAdd: POST /api/saved {kind, ref, key, agent_type, title, snippet, said_at, team, author}: team is the board an agent was on (a board message's is its board), author who wrote a board message. Saving a saved message again answers the bookmark that exists.
