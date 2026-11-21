@@ -7,15 +7,16 @@ import { showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { sendJson } from './api.js';
 import { el } from './dom_el.js';
+import { importOnce } from './import_once.js';
 
 
-async function hubSigninState() {
+async function hubSigninState(fresh) {
     try {
         // The Hub sign-in settings are for a browser signed in with a session (a link, the app, the tray or the password). A
         // dashboard reached with no cookie (strict off) or an API key is answered 401 dashboard_auth_required, which the page
         // treats as "signed out": so ask only when auth-status says this browser has a session.
-        const a = await fetch('/api/system/auth-status', { credentials: 'same-origin', cache: 'no-store' });
-        const st = a.ok ? await a.json() : null;
+        const { readAuthStatus } = await importOnce('./auth_status_read.js');
+        const st = await readAuthStatus({ fresh });
         if (!st || st.method !== 'session') return null;
         const r = await fetch('/api/auth/hub-signin', { credentials: 'same-origin', cache: 'no-store' });
         return r.ok ? await r.json() : null;
@@ -23,13 +24,13 @@ async function hubSigninState() {
 }
 
 /** Offer Hub sign-in once, after the set-a-password prompt (if there is one) has been answered. */
-export async function maybeOfferHubSignin() {
+export async function maybeOfferHubSignin({ reuse = false } = {}) {
     if (isCloud() || document.getElementById('hub-signin-notice')) return;
     if (document.getElementById('set-password-modal')) {   // one question at a time: wait for the password prompt to close
         document.addEventListener('coral:password-prompt-closed', () => maybeOfferHubSignin(), { once: true });
         return;
     }
-    const st = await hubSigninState();
+    const st = await hubSigninState(!reuse);
     if (!st || st.offer !== true || st.enabled === true) return;
     showHubNotice();
 }

@@ -62,6 +62,7 @@ const WORLD = `(() => {
             await ev(`window.switchNavTab('hub-inbox'); true`);
             if (!mobile) {
                 await waitFor(`!!document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]')`, 'the Artifacts folder in the sidebar', 10000);
+                await waitFor(`/Artifacts\\s*5/.test(document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]').textContent)`, 'the asynchronous Artifacts count', 10000);
                 const f = await ev(`(() => { const b = document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]'); let h = b.previousElementSibling; while (h && !h.matches('h2')) h = h.previousElementSibling; return { text: (${ROW_WORDS})(b), section: h ? h.textContent : '' }; })()`);
                 check('desktop: the sidebar has a Files section with the Artifacts folder and its count (5)', /Artifacts\s*5/.test(f.text) && f.section === 'Files', JSON.stringify(f));
                 await ev(`document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]').click(); true`);

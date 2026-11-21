@@ -78,17 +78,15 @@ export function errorText(res, fallback) {
 
 
 /** GET /api/system/auth-status, or null when it cannot be read. */
-async function authStatus() {
-    try {
-        const r = await fetch('/api/system/auth-status', { credentials: 'same-origin', cache: 'no-store' });
-        return r.ok ? await r.json() : null;
-    } catch { return null; }
+async function authStatus(fresh = false) {
+    const { readAuthStatus } = await importOnce('./auth_status_read.js');
+    return readAuthStatus({ fresh });
 }
 
 /** Ask a signed-in browser to set a password when none is set. There is no way past it: a password is always created (the Operator, #11892). */
-export async function maybePromptSetPassword() {
+export async function maybePromptSetPassword({ reuse = false } = {}) {
     if (document.getElementById('set-password-modal')) return;
-    const st = await authStatus();
+    const st = await authStatus(!reuse);
     if (!st || st.authenticated === false || st.password_set !== false) return;
     showSetPasswordModal({ required: true });
 }
@@ -144,7 +142,7 @@ export function showSetPasswordModal({ required = false } = {}) {
     let recheckTimer = null;
     const recheck = async () => {
         if (!modal.isConnected) return;
-        const st = await authStatus();
+        const st = await authStatus(true);
         if (!modal.isConnected || !st || st.password_set !== true) return;
         close();
         showToast('A password is already set. Change it in Settings, Security.');

@@ -87,7 +87,22 @@ const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on th
 const { agentCopyButton, copyForAgent } = await importOnce('./agent_copy_button.js');
 const NF = await importOnce('./needs_filters.js'); // the Needs you folder's search, pills and Filters (#8604)
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
-const AC = await importOnce('./inbox_activity.js'); // the Activity folder (#12070): what the Operator did in Needs you, from the server's record (this computer only)
+let AC = null, activityLoading = null, activityLoadError = false; // Activity's ledger and styles wait until its folder opens
+function ensureActivity() {
+    if (AC || activityLoading || activityLoadError) return;
+    activityLoading = importOnce('./inbox_activity.js').then(m => {
+        AC = m;
+        if (group === 'activity') { m.refresh(() => renderInboxNav(true)); renderInboxNav(true); }
+    }).catch(() => { activityLoading = null; activityLoadError = true; if (group === 'activity') renderInboxNav(true); });
+}
+function loadingActivity() {
+    ensureActivity();
+    return { title: 'Activity', rows: [], signature: String(activityLoadError), node: () => {
+        const node = DT.el('div', 'empty-state'); node.append(DT.el('p', '', activityLoadError ? 'Activity could not be loaded.' : 'Loading Activity…'));
+        if (activityLoadError) { const retry = DT.el('button', 'btn', 'Retry'); retry.addEventListener('click', () => { activityLoadError = false; ensureActivity(); renderInboxNav(true); }); node.append(retry); }
+        return node;
+    } };
+}
 const AF = await importOnce('./operator_activity_filters.js'); // its search and Filters
 const IA = await importOnce('./inbox_artifacts.js'); // the Artifacts folder (Goal #62): every team's files in one list
 const { answerCell: agentAnswerCell, rowActions, readWholeQuestion, promptCell, promptCanSelect, promptDismiss, waitingCell, goalTaskLine } = await importOnce('./inbox_answer.js');
@@ -372,7 +387,7 @@ const agentFields = () => {
     const field = (cls, label, value, options, onChange) => { const l = DT.el('label', `list-bar-field ${cls}`), sel = DT.el('select', 'field list-bar-select'); for (const [v, t] of options) { const o = DT.el('option', null, t); o.value = v; sel.append(o); } sel.value = value; sel.addEventListener('change', () => onChange(sel.value)); l.append(DT.el('span', 'list-bar-field-label', label), sel); return l; };
     return [field('inbox-agent-state-field', 'Agent state', agentState, [['', 'All'], ['awake', 'Awake'], ['asleep', 'Asleep'], ['archived', 'Archived']], setAgentState), field('inbox-agent-group-field', 'Group by', agentGroup ? 'agent' : agentGoal ? 'goal' : 'none', [['none', 'None'], ['agent', 'Agent'], ['goal', 'Goal']], setAgentGroup)];
 };
-const setNeedsTab = tab => { if (tab === needsTab) return; tabKinds[needsTab] = needsFilters.kind; needsTab = tab; browserLocal.set(NEEDS_TAB_KEY, tab); needsFilters = { ...needsFilters, kind: tabKinds[tab] || '' }; persistNeedsFilters(); needsOrder = null; needsState.shown = null; renderInboxNav(true); };
+const setNeedsTab = tab => { if (tab === needsTab) return; tabKinds[needsTab] = needsFilters.kind; needsTab = tab; browserLocal.set(NEEDS_TAB_KEY, tab); needsFilters = { ...needsFilters, kind: tabKinds[tab] || '' }; persistNeedsFilters(); needsOrder = null; needsState.shown = null; liveGoals(); renderInboxNav(true); };
 const GROUP_REVIEW_KEY = 'coral-inbox-group-review-goal';
 const GROUP_MODE_KEY = 'coral-inbox-group-mode';
 const GROUP_MODES = ['none', 'goal', 'task'], GROUP_MODE_LABEL = { none: 'None', goal: 'Goal', task: 'Goal and task' };
@@ -946,6 +961,7 @@ function inboxGoalsToolbar() {
 }
 /** The Activity folder's toolbar (#12070): the search, Filters (Team, Action, Since) and the order, on the shared list bar. The Computer field is offered only where a Hub-served dashboard reads several computers' records (#15730). */
 function inboxActivityToolbar() {
+    if (!AC) { ensureActivity(); return { node: DT.el('div'), signature: 'activity-loading' }; }
     if (!activityBar) {
         activityBar = IT.folderToolbar({
             idp: 'inbox-activity', noun: 'action', searchLabel: 'Search activity',
@@ -979,6 +995,9 @@ function inboxActivityToolbar() {
     AC.mountPresets(node);
     return { node, signature: JSON.stringify([activityFilters, teams, AC.countsKey(activityFilters), groupMode, serverChoices()]) };
 }
+// Only these visible lists render goals; the other folders keep their last count.
+const goalsVisible = () => $('inbox-local')?.hidden === false && (group === 'goals' || (group === 'needs' && needsTab !== 'agent') || page?.kind === 'goal');
+let goalSettingsAt = Date.now(); // startup already reads settings; recheck only with visible goals after the short TTL
 function refreshGoals(force = true) {
     if (_goalsReading) return _goalsReading; // one in flight: whoever asks during it gets it
     if (!force && (document.hidden || isPaused() || Date.now() - _goalsAt < goalsGap())) return null;
@@ -992,7 +1011,7 @@ document.addEventListener('coral:team-removed', e => { // Remove team: its close
     syncGoalDoneCount(); renderInboxNav(true);
 });
 let _goalsSeqTimer = 0;
-onGoalsSeq(() => { clearTimeout(_goalsSeqTimer); _goalsSeqTimer = setTimeout(() => { if (!document.hidden && !isPaused()) refreshGoals(true); }, 300); }); // a goal write anywhere moves the change counter: the Goals count and list read again at once, not on the next poll (#15229)
+onGoalsSeq(() => { _goalsAt = 0; clearTimeout(_goalsSeqTimer); _goalsSeqTimer = setTimeout(() => { if (goalsVisible() && !document.hidden && !isPaused()) refreshGoals(true); }, 300); }); // a goal write anywhere moves the change counter: the Goals count and list read again at once, not on the next poll (#15229)
 async function readGoals() {
     let ok = true, followWithDone = false;
     if (!isCloud() && Date.now() - closedReadAt > 60000) { // the goals an agent closed lately, for their row; its own read, before the main one so a failure here never marks that read failed
@@ -1007,7 +1026,8 @@ async function readGoals() {
         if (ok) { const isOf = k => g => String(g.state || '').toLowerCase() === k, isClosed = g => GF.CLOSED.includes(String(g.state || '').toLowerCase()); goals = kind ? [...goals.filter(g => !isOf(kind)(g)), ...read] : [...read, ...goals.filter(isClosed)]; } // one read per gap: the other kinds stay as the last read left them
         else if (!goals.length) goals = [];
     } catch { ok = false; } // a read that throws keeps the last open goals: the badge does not drop to 0 and come back (#16631)
-    if (!isCloud()) try { // Local hidden state lives in this computer's settings; Hub goals carry per-computer done_state.
+    if (!isCloud() && Date.now() - goalSettingsAt >= 30000) try { // Local hidden state lives in this computer's settings; Hub goals carry per-computer done_state.
+        goalSettingsAt = Date.now();
         const r = await fetch('/api/settings');
         if (r.ok) { const saved = (await r.json()).settings || {}; state.settings = { ...(state.settings || {}), [GOAL_DONE_SETTING]: saved[GOAL_DONE_SETTING] || '' }; }
     } catch { /* the list this page has stays */ }
@@ -1111,7 +1131,7 @@ let _navKey = null, _folders = null, _poll = 0;
 let _goalsAt = 0, _goalsFails = 0, _goalsReading = null;
 const goalsGap = () => { const base = Number(globalThis.__coralGoalsMs) || 30000; return _goalsFails ? Math.min(base * 2 ** _goalsFails, 600000) : base; };
 let needsBootCountsReady = false;
-const liveGoals = () => { if (isCloud() && group === 'needs' && !needsBootCountsReady) return; refreshGoals(false); };
+const liveGoals = () => { if (!goalsVisible()) return; if (isCloud() && group === 'needs' && !needsBootCountsReady) return; refreshGoals(false); };
 /** What the phone's ☰ drawer lists for the Inbox (#13596): every folder the sidebar has, with its count, the open one marked, and the pick. Read when the drawer opens. */
 state.inboxFolderRows = () => ({ sections: folderSections(), current: navCurrent(), pick: pickFolder });
 /** A folder was picked: a page that is open gives way, and the folder's table opens with the keyboard at its heading. */
@@ -1684,6 +1704,7 @@ registerGroupSource('hub-inbox', {
                     columns: GC.goalColumns({ teamOf: goalTeam }, ['goal', 'state', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }); if (phone) setTimeout(mountBar, 0); return table.el; } };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
+        if (key === 'activity' && !AC) return loadingActivity();
         if (key === 'activity') return AC.spec(activityFilters, { file: r => ['approve', 'changes', 'deny'].includes(r.action) ? importOnce('./activity_file_dialog.js').then(m => m.openFileDecision(r, { openFile: (r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(r.version || r.item_id, { server: splitKey(r.team).server, filename: r.title || 'file', board: splitKey(r.team).name }))) })) : (r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(r.version || r.item_id, { server: splitKey(r.team).server, filename: r.title || 'file', board: splitKey(r.team).name })))(r), viewer: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(r.version || r.item_id, { server: splitKey(r.team).server, filename: r.title || 'file', board: splitKey(r.team).name })), board: x => go(keyRoute('team', x.team, 'messages', Number(x.item_id))), taskOf: x => openItemRoute('tasks', x.team, Number(x.task_id), `${x.team}#${x.task_id}`), goal: r => go({ ...folderRoute, id: r.team, item: Number(r.item_id) }), question: r => (r.action === 'answer' || r.action === 'dismiss') ? importOnce('./activity_dialog.js').then(m => m.openThread(r, { openBoard: x => go(keyRoute('team', x.team, 'messages', Number(x.item_id))), openTask: x => openItemRoute('tasks', x.team, Number(x.task_id), `${x.team}#${x.task_id}`) })) : go(keyRoute('team', r.team, 'messages', Number(r.item_id))), task: r => openItemRoute('tasks', r.team, Number(r.item_id), `${r.team}#${r.item_id}`), agent: r => { const live = (state.liveSessions || []).find(s => s.name === r.item_id || s.session_id === r.item_id); if (live) openInAgents(live); else showToast('This agent is no longer available.'); }, message: async r => { if (r.action.startsWith('saved_')) { await saved.loadSaved(); const id = `${LOCAL_SERVER}:${r.item_id}`; if (saved.findSavedItem(id)) openSavedPage(id); else showToast('This saved message is no longer available.'); } else go(keyRoute('team', r.team, 'messages', Number(r.item_id))); }, chat: r => openChat({ session_id: r.item_id, server: LOCAL_SERVER, ...(r.item_id.startsWith('board:') ? { type: 'group', title: r.item_id.slice(6) } : {}) }), job: (r, target) => go(runRoute({ kind: 'job', parentId: target.jobId, runId: target.runId })), workflow: async r => { try { const { requestJson } = await importOnce('./request_json.js'); const run = await requestJson('GET', `/api/workflows/runs/${Number(r.item_id)}`); const id = Number(run.workflow_id); if (!Number.isSafeInteger(id) || id < 1) throw new Error('This workflow run has no available workflow.'); go({ view: 'automations', folder: 'workflows', id, run: Number(r.item_id) }); } catch (e) { showToast(e.message || 'This workflow run is no longer available.'); } } }, { grouped: groupReviews, byTask, tasks: taskHeads, taskSignature: JSON.stringify([groupMode, taskOpenState, [...storyOpenState]]) });
         if (key === 'saved') return savedListSpec();
         return null;
@@ -1700,9 +1721,10 @@ function setGroup(key, { auto = false } = {}) {
     const was = group;
     if (was && was !== key && (queries[was] || '') && !hubFrame(was)) filterInbox(''); // the sidebar's search is for the list on screen: it does not follow the person to another folder or wait for their next visit, hiding a real item with no word of why (#17020, walk 46)
     group = key;
+    liveGoals();
     if (key === 'tasks' && nativeTasks()) refreshTasks();
     if (key === 'saved' && !hubFrame(key)) { saved.loadSaved(); activateSavedReviews(); }
-    if (key === 'activity' && was !== 'activity') AC.refresh(() => renderInboxNav(true)); // the record is read when its folder is picked (#12070)
+    if (key === 'activity' && was !== 'activity') { if (AC) AC.refresh(() => renderInboxNav(true)); else ensureActivity(); } // the record is read when its folder is picked (#12070)
     if (!auto) { _autoFrom = ''; browserLocal.set(GROUP_KEY, key); } // a folder the person chose is the remembered one; Needs you opened for them (auto) is not (#10212)
     const input = $('inbox-search'), g = groupMeta(key);
     if (input) {
@@ -1891,16 +1913,16 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
         needsBootCountsReady = true;
         CH.loadChatCounts(() => renderInboxNav(true));
         refreshBoards();
-        refreshGoals();
+        liveGoals();
         IA.refreshArtifactCount(() => renderFolderCounts());
     };
     const attentionReads = [];
     if (!nativeInbox()) {
         refreshTasks(); refreshRuns(true);
-        if (group === 'activity') AC.refresh(() => renderInboxNav(true));
+        if (group === 'activity') { if (AC) AC.refresh(() => renderInboxNav(true)); else ensureActivity(); }
         if (!attentionFirst || group === 'saved') saved.loadSaved();
     }
-    if (!nativeInbox() || nativeNeeds()) attentionReads.push(refreshOperatorAsks(true), refreshReviews(true), refreshProposals(true));
+    if (!nativeInbox() || nativeNeeds()) attentionReads.push(refreshOperatorAsks(true), refreshReviews(true, { reuse: true }), refreshProposals(true));
     if (attentionFirst) {
         // Let attention rows paint before folder counts take the computer's six request lanes.
         Promise.allSettled(attentionReads).then(() => requestAnimationFrame(() => setTimeout(secondaryCounts, 0)));

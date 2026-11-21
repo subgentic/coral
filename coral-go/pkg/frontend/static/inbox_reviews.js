@@ -1,4 +1,4 @@
-import { artifactRevision, artifactsUnchanged, onArtifactsRev } from './artifacts_feed.js';
+import { artifactRevision, artifactsUnchanged, onArtifactsRev, invalidateArtifactReads } from './artifacts_feed.js';
 import { setReviewCacheReader } from './ask_filter.js';
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
@@ -111,7 +111,7 @@ export const unreadReviewItems = () => reviewItems().filter(needsReviewAttention
 export function reviewStarChanged(row, on) {
     const key = vkey(row);
     for (const a of [...items, ...saved, ...muted]) if (vkey(a) === key) a.starred = on;
-    row.starred = on; revision++;
+    row.starred = on; revision++; invalidateArtifactReads();
 }
 
 /** The kinds of a file for review, in the words of the quiet Muted line: a count and its noun, singular and plural (#12144). */
@@ -434,6 +434,7 @@ export function refreshReviews(force = false, { reuse = false } = {}) {
     const sources = sourcesKey();
     if (force && reuse && finishedAt && Date.now() - finishedAt < 30000 && finishedRev === revision && sources === lastSources) return Promise.resolve();
     if (!force && Date.now() - lastRead < 30000 && sources === lastSources) return null;
+    if (force && !reuse) invalidateArtifactReads(); // an explicit Refresh/Retry must observe permissions and data again
     const sourceSetChanged = sources !== lastSources;
     lastSources = sources; pendingStarted = revision; lastRead = Date.now();
     const started = revision;
@@ -465,7 +466,7 @@ export async function currentTags(row) {
 /** Add or remove the 'read' tag, keeping the other tags as they are now; the row stays in the list and the counts follow at once. Throws with the server's words when the save fails (the row keeps its tags). */
 export async function setReviewRead(row, read, { fresh = false, click = false } = {}) { // click: the Operator pressed Mark read or Mark unread (the server records it, #13609); opening a file marks it read with no click // fresh: the row's tags were read a moment ago from its own team (a file's open), so the list is not walked again before the write
     const current = fresh ? (row.tags || []) : await currentTags(row);
-    if (current === null) { revision++; items = items.filter(a => a.reviewKey !== row.reviewKey); changed(); return; } // someone settled it meanwhile: nothing to write
+    if (current === null) { revision++; invalidateArtifactReads(); items = items.filter(a => a.reviewKey !== row.reviewKey); changed(); return; } // someone settled it meanwhile: nothing to write
     const rest = current.filter(t => t !== 'read');
     const tags = read ? [...rest, 'read'] : rest;
     const r = await boardFetch(row.team, `/artifacts/${encodeURIComponent(row.id)}/tags`, {
@@ -475,7 +476,7 @@ export async function setReviewRead(row, read, { fresh = false, click = false } 
         const body = await r.json().catch(() => ({}));
         throw new Error(body.error || `Could not mark ${read ? 'read' : 'unread'} (HTTP ${r.status}).`);
     }
-    revision++;
+    revision++; invalidateArtifactReads();
     const hit = items.find(a => a.reviewKey === row.reviewKey);
     if (hit) hit.tags = tags;
     row.tags = tags;
@@ -484,11 +485,11 @@ export async function setReviewRead(row, read, { fresh = false, click = false } 
 }
 
 /** A decision put a row back (Undo of Dismiss, Move to Needs you): a read in flight took its lists before the write, so its answer is stale. Moving the revision makes that read be discarded, and the forced read that follows is a new one (#13601). */
-export function reviewsChangedOnServer() { revision++; reviewPager.remove(() => false); savedPager.remove(() => false); }
+export function reviewsChangedOnServer() { revision++; invalidateArtifactReads(); reviewPager.remove(() => false); savedPager.remove(() => false); }
 
 /** The Operator decided a review (Approve): the row is out of the list at once, and a read that was already in flight cannot put it back. */
 export function settleReview(row) {
-    revision++;
+    revision++; invalidateArtifactReads();
     const gone = new Set([row.reviewKey || `${row.team}:${row.id}`, ...earlierVersions(row).map(a => a.reviewKey)]); // the versions before it were settled with it (settleEarlierVersions)
     reviewPager.remove(a => gone.has(a.reviewKey)); savedPager.remove(a => gone.has(a.reviewKey));
     for (const k of gone) { settledAt.set(k, revision); linkedReviews.delete(k); }
@@ -526,7 +527,7 @@ export function markOpenedRead(hex, team = '') {
                 const { listComments } = await importOnce('./artifact_comments_api.js');
                 let seen = true;
                 await listComments(row.hex, splitKey(row.team).server, splitKey(row.team).name).catch(() => { seen = false; });
-                if (seen) { row.new_comments = 0; revision++; changed(); } // only a read that went through marks them seen on the server: a failed one leaves the marker, and it clears at the next open (Security's SHOULD on #12026)
+                if (seen) { row.new_comments = 0; revision++; invalidateArtifactReads(); changed(); } // only a read that went through marks them seen on the server: a failed one leaves the marker, and it clears at the next open (Security's SHOULD on #12026)
                 else if (!row.tags?.includes('for review')) return; // a decided file is in Needs you only for its news: with the news still unseen its row stays (the tag write below would drop it)
             }
             await setReviewRead(row, true, { fresh: !!own });
@@ -550,7 +551,7 @@ export function recordOpenedVersion(hex, { server, board = '' }) {
         if (!data.series_id || !Number.isSafeInteger(data.opened_version) || data.opened_version < 1) return false;
         const team = board ? identityKey(server, board) : '';
         for (const row of [...items, ...saved, ...muted]) if (row.series_id === data.series_id && splitKey(row.team).server === normServer(server) && (!team || row.team === team)) row.opened_version = Math.max(row.opened_version || 0, data.opened_version);
-        revision++;
+        revision++; invalidateArtifactReads();
         if (fview) { fview.invalidCounts = true; refreshActiveQuery().catch(() => {}); }
         changed(); return true;
     })().catch(() => false).finally(() => openingVersions.delete(key));

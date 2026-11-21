@@ -2,8 +2,12 @@
  * the existing timed reads; only an explicit matching token can skip a list. */
 import { boardFetch } from './server_base.js';
 const revisions = new Map(), listeners = new Set();
+let readEpoch = 0;
+export const artifactReadEpoch = () => readEpoch;
+export const invalidateArtifactReads = () => { readEpoch++; };
 export const artifactRevision = value => Number.isSafeInteger(value) && value > 0 ? value : null;
 export function publishArtifactsRev(brief, reconnect = false) {
+    if (reconnect) readEpoch++;
     if (reconnect) for (const fn of [...listeners]) fn(null, null, true);
     if (!brief || typeof brief !== 'object') return;
     for (const [team, raw] of Object.entries(brief)) {
@@ -12,6 +16,7 @@ export function publishArtifactsRev(brief, reconnect = false) {
         const before = revisions.get(team);
         revisions.set(team, rev);
         if (before === rev && !reconnect) continue;
+        readEpoch++;
         for (const fn of [...listeners]) fn(team, rev, reconnect);
     }
 }
@@ -37,6 +42,7 @@ export async function artifactsUnchanged(team, loaded, all = false) {
  * on an older server that has not returned an artifact revision yet. */
 export function invalidateArtifacts(team, savedEdit = null) {
     if (!team) return;
+    readEpoch++;
     revisions.delete(team);
     for (const fn of [...listeners]) fn(team, null, true, savedEdit || true);
 }
