@@ -274,6 +274,7 @@ type HealthActionList struct {
 	OverloadedTasks    int `json:"overloaded_tasks"`
 	OverloadedSleeping int `json:"overloaded_sleeping"`
 	StaleReviewHours   int `json:"stale_review_hours"`
+	MaxItems           int `json:"max_items"`   // the most action lines one check says (0: as many as fit): the rest are counted and listed by coral-board health list (#20398)
 	MentionMin         int `json:"mention_min"` // no mention has reached a member for this long while posts @-address a part of its name (default 30)
 }
 
@@ -289,6 +290,7 @@ func (a HealthActionList) clamp() HealthActionList {
 	a.OverloadedSleeping = pick(a.OverloadedSleeping, 1, 1, 50)
 	a.StaleReviewHours = pick(a.StaleReviewHours, 24, 1, 720)
 	a.MentionMin = pick(a.MentionMin, 30, 5, 1440)
+	a.MaxItems = min(max(a.MaxItems, 0), 50)
 	return a
 }
 

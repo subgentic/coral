@@ -27,7 +27,7 @@ var healthKeyRanges = map[string]string{
 	"claim_nudge.after_min": "5 to 1440 minutes", "claim_nudge.nudges": "1 to 5", "status_nudge.after_min": "5 to 1440 minutes", "status_nudge.escalate_after_min": "5 to 1440 minutes",
 	"mention_renudge.after_min": "5 to 1440 minutes", "held_notice.after_min": "5 to 1440 minutes", "busy_no_task.after_min": "5 to 1440 minutes", "ask_reminder.after_min": "5 to 1440 minutes",
 	"goal_size.limit": "5 to 500", "compact_context.threshold_k": "50 to 900 (thousand tokens)",
-	"action_list.stuck_wait_min": "5 to 1440 minutes", "action_list.overloaded_tasks": "1 to 100", "action_list.overloaded_sleeping": "1 to 50", "action_list.stale_review_hours": "1 to 720 hours", "action_list.mention_min": "5 to 1440 minutes",
+	"action_list.max_items": "0 (as many as fit) to 50", "action_list.stuck_wait_min": "5 to 1440 minutes", "action_list.overloaded_tasks": "1 to 100", "action_list.overloaded_sleeping": "1 to 50", "action_list.stale_review_hours": "1 to 720 hours", "action_list.mention_min": "5 to 1440 minutes",
 	"landing.wait_min": fmt.Sprintf("%d to %d minutes", LandingWaitMin, LandingWaitMax), "release.wait_min": fmt.Sprintf("%d to %d minutes", ReleaseWaitMin, ReleaseWaitMax),
 	"goals_ready.wait_min": fmt.Sprintf("%d to %d minutes", WaitCheckMin, WaitCheckMax), "unowned_tasks.wait_min": fmt.Sprintf("%d to %d minutes", WaitCheckMin, WaitCheckMax), "unowned_tasks.max_list": "1 to 20", "goals_ready.max_list": "(not used)",
 	"dialog_timeout.after_min": fmt.Sprintf("%d to %d minutes", DialogTimeoutMin, DialogTimeoutMax), "auto_recommend.grace_min": fmt.Sprintf("1 to %d minutes", AutoRecommendGraceMax),
