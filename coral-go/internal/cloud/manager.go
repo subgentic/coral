@@ -665,6 +665,29 @@ func (m *Manager) startTunnel(conn *store.CloudConnection) {
 	go func() { defer safego.Recover("cloud/manager:m.runTunnel"); m.runTunnel(tctx, gen) }()
 }
 
+// linkForTunnel is the link of the current enrollment: found by the configured Hub's origin and the enrollment's server id, made again once if it is missing (the mirror is retried before
+// refusing), and never a paused one (its token could not be read when it was made).
+func (m *Manager) linkForTunnel(ctx context.Context) (*store.CloudLink, error) {
+	conn, err := m.o.Store.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	find := func() (*store.CloudLink, bool) {
+		l, err := m.o.Store.LinkByOrigin(ctx, m.o.HubURL)
+		return l, err == nil && l.ServerID == conn.ServerID && l.State != store.LinkStatePaused
+	}
+	if l, ok := find(); ok {
+		return l, nil
+	}
+	if err := m.o.Store.MirrorLegacyLink(ctx); err != nil {
+		return nil, err
+	}
+	if l, ok := find(); ok {
+		return l, nil
+	}
+	return nil, store.ErrNoCloudLink
+}
+
 func (m *Manager) runTunnel(ctx context.Context, gen int) {
 	set := func(state, msg string) {
 		m.mu.Lock()
@@ -673,7 +696,14 @@ func (m *Manager) runTunnel(ctx context.Context, gen int) {
 			applyTunnelState(&m.st, state, msg, time.Now())
 		}
 	}
-	token, err := m.o.Store.Token(ctx)
+	// The link whose own token opens this tunnel (#20312, Security's conditions): its id is the connection's stamp on every request. No link, or one whose token cannot be read, means no dial,
+	// and Computers says why; the stamp is never taken from a stream, a header or the enrollment alone.
+	link, err := m.linkForTunnel(ctx)
+	if err != nil {
+		set(StateKeyUnreadable, "needs re-enrol: this computer has no usable Hub link record; disconnect and enroll again")
+		return
+	}
+	token, err := m.o.Store.LinkToken(ctx, link.LinkID)
 	if err != nil {
 		set(StateKeyUnreadable, "the stored token cannot be decrypted (master key missing or changed); disconnect and enroll again")
 		return
@@ -686,6 +716,7 @@ func (m *Manager) runTunnel(ctx context.Context, gen int) {
 		AllowRequest:  tunnel.AllowRequest(m.o.MaxMode), // read on every request: a change applies at once
 		MaxMode:       m.currentMode,                    // gates WebSocket input frame by frame
 		ViaValue:      ViaSecret(),                      // lets the server tell the connector from a forged stamp
+		LinkID:        link.LinkID,                      // stamped on every request: which Hub link it arrived on (#20312)
 		RedactTokens:  m.o.RedactTokens,                 // read on every reply: a change applies at once
 		Redactor:      m.o.Redactor,                     // betterleaks' rules (#3808)
 		HubLimitsFunc: m.o.HubLimits,                    // read on every request: a change applies at once

@@ -58,10 +58,16 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	r.Use(httputil.GzipAPI)     // /api/ JSON over 1 KB, gzipped for a client that accepts it (#3724)
 	r.Use(noStoreAPI)
 	r.Use(s.buildHeader)
+	if routerTestWrap != nil { // nil outside tests (router_link_test_seam.go)
+		r.Use(routerTestWrap(s.db))
+	}
 
 	// Requests that came through the Cloud Hub tunnel (marked by the connector) are
 	// re-checked against the connector's route policy before anything else sees them.
 	r.Use(cloud.Guard(routes.MaxModeFromSettings(store.NewSessionStore(s.db))))
+	// The connector's stamp of which Hub link a request arrived on and which Hub person is behind it (#20312): a request with no known link is refused, the pair goes in the context for
+	// every writer, and Allow (which allows everything in this build) is the one check point.
+	r.Use(cloud.LinkStamp(store.NewCloudStore(s.db, nil).LinkExists, cloud.AllowAll))
 	// Through Coral Hub, no path under the home directory and no hidden file names (#3559).
 	r.Use(routes.HubPaths)
 	// NOTE: middleware.RealIP was intentionally removed. It rewrites r.RemoteAddr
