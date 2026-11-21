@@ -91,6 +91,12 @@ func window(a Action) time.Duration {
 // Handle verifies one message and, only when every check has passed, records its nonce, touches the signer and applies it. The order is the cheap, secret-free checks first, the signature, then authority; a refusal at any step
 // changes nothing. sig is the P1363 signature, base64url without padding.
 func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string, now time.Time) (Message, error) {
+	return v.HandleOn(ctx, "", a, body, sig, now)
+}
+
+// HandleOn is Handle for a message that arrived on the Hub link arrivedLink, taken from this computer's own stamp ("" for one that came by no link). A signer whose row carries a link (M1, #20514) is held to it: the
+// message must have arrived on that link, and it acts only inside the signer's (link, Hub label) pair. A signer with no pair is the owner's own key, made at this computer, and is held to neither.
+func (v *Verifier) HandleOn(ctx context.Context, arrivedLink string, a Action, body []byte, sig string, now time.Time) (Message, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.Refuse != nil && v.Refuse() {
@@ -123,6 +129,9 @@ func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string
 	if !verifyP1363(signer.PK, SigningInput(a, body), sig) {
 		return Message{}, ErrBadSignature
 	}
+	if signer.Link != "" && arrivedLink != signer.Link {
+		return Message{}, ErrWrongLink
+	}
 	// The signature is good: from here the signer is who it says. A replay is answered nonce_repeat before anything about the list or the mode is said.
 	if err := v.Store.NonceSeen(ctx, m.Nonce, now); err != nil {
 		return Message{}, mapStoreErr(err)
@@ -138,7 +147,7 @@ func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string
 	if err := v.Store.TouchDeviceKey(ctx, m.KID, now); err != nil {
 		return Message{}, err
 	}
-	if err := v.apply(ctx, m, target, targetMode, now); err != nil {
+	if err := v.apply(ctx, m, signer, target, targetMode, now); err != nil {
 		return m, err
 	}
 	if m.Action == RemoveDevice && v.Audit != nil {
@@ -213,6 +222,9 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 			}
 			return none, 0, err
 		}
+		if signer.Link != "" && (target.Link != signer.Link || target.HubUser != signer.HubUser) { // acts only inside the signer's own pair
+			return none, 0, ErrOutsidePair
+		}
 		if m.Action == RemoveDevice && m.TargetKID != m.KID { // anyone may remove itself; another device only by a pairing signer at or above its mode
 			switch signer.Origin {
 			case store.DeviceOriginBootstrap:
@@ -244,16 +256,16 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 	return target, mode, nil
 }
 
-func (v *Verifier) apply(ctx context.Context, m Message, target store.DeviceKey, mode tunnel.Mode, now time.Time) error {
+func (v *Verifier) apply(ctx context.Context, m Message, signer, target store.DeviceKey, mode tunnel.Mode, now time.Time) error {
 	switch m.Action {
 	case ApproveDevice:
 		raw, _ := b64.DecodeString(m.TargetPK)
-		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: m.TargetKID, PK: raw, Label: m.Label, Mode: mode.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, now)
+		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: m.TargetKID, PK: raw, Label: m.Label, Mode: mode.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: signer.Link, HubUser: signer.HubUser}, now)
 		return mapStoreErr(err)
 	case TrustPasskey:
 		raw, _ := b64.DecodeString(m.PasskeyPK)
 		s := sha256.Sum256(raw)
-		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: base64.RawURLEncoding.EncodeToString(s[:]), PK: raw, Label: m.Label, Mode: tunnel.TierView.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindPasskey}, now)
+		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: base64.RawURLEncoding.EncodeToString(s[:]), PK: raw, Label: m.Label, Mode: tunnel.TierView.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindPasskey, Link: signer.Link, HubUser: signer.HubUser}, now)
 		return mapStoreErr(err)
 	case RaiseMode:
 		return mapStoreErr(v.Store.SetDeviceMode(ctx, m.TargetKID, mode.String(), now))

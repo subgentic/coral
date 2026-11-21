@@ -134,7 +134,7 @@ func (v *Verifier) HandleCertificate(ctx context.Context, c Certificate, now tim
 	if err := v.Store.TouchDeviceKey(ctx, pass.KID, now); err != nil {
 		return none, err
 	}
-	k := store.DeviceKey{KID: devKID, PK: devRaw, Label: c.Label, Mode: newMode.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}
+	k := store.DeviceKey{KID: devKID, PK: devRaw, Label: c.Label, Mode: newMode.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: pass.Link, HubUser: pass.HubUser}
 	if _, err := v.Store.AddDeviceKey(ctx, k, now); err != nil {
 		return none, mapStoreErr(err)
 	}

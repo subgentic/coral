@@ -19,11 +19,15 @@ import (
 // Device signing step 4(b) (#20513, coral-hub #260094, version 3 of the signed text). A relayed kind is a request the Hub carries from a person's signed-in device to this computer: a send to an agent, a board post, a roster or a
 // grant. Each carries a body, and the signature covers that body by hash, so the Hub (or anything between) cannot keep the signature and swap the words. The four step-2 actions are not touched: they keep the v2 label and their bytes.
 
-// Kind is a relayed kind. Every kind here carries a body.
+// Kind is a relayed kind. Every kind signs one text of one shape: a kind with no body (grant-member, input-grant, keep-full-access, hub-auto-accept) signs the hash of the empty body, and what it acts on is in the signed path.
 type Kind string
 
 const (
 	GuideRoster             Kind = "guide-roster"
+	GrantMember             Kind = "grant-member"
+	InputGrant              Kind = "input-grant"
+	KeepFullAccess          Kind = "keep-full-access"
+	HubAutoAccept           Kind = "hub-auto-accept"
 	OrchestratorGrant       Kind = "orchestrator-grant"
 	TrustPreview            Kind = "trust-preview"
 	DailyKnowledgeTeam      Kind = "daily-knowledge-team"
@@ -34,17 +38,32 @@ const (
 	BoardPost               Kind = "board-post"
 )
 
-// RelayedKinds is every kind with a body. A kind without one (grant-member, the input grant, keep-full-access, hub-auto-accept) has fields of its own and is added with its own slice.
-var RelayedKinds = []Kind{GuideRoster, OrchestratorGrant, TrustPreview, DailyKnowledgeTeam, DailyKnowledgeAutoApply, DailyKnowledgeAccept, DailyKnowledgeRevert, SendToAgent, BoardPost}
+// RelayedKinds is every relayed kind.
+var RelayedKinds = []Kind{GuideRoster, GrantMember, InputGrant, KeepFullAccess, HubAutoAccept, OrchestratorGrant, TrustPreview, DailyKnowledgeTeam, DailyKnowledgeAutoApply, DailyKnowledgeAccept, DailyKnowledgeRevert, SendToAgent, BoardPost}
 
 // relayedLabel starts every v3 signing input, so a v3 signature is never a v2 one and the reverse.
 const relayedLabel = "coral-hub/device-keys/3/"
+
+// RelayedBodyMax is the most body bytes a relayed request may carry: the hash is of the exact received bytes, so the computer reads at most this many before it hashes.
+const RelayedBodyMax = 1 << 20
 
 // relayedWindow is the one window of every relayed kind: five minutes.
 const relayedWindow = 5 * time.Minute
 
 // ErrBodyHash is code body_hash: the body that arrived is not the one whose SHA-256 the signer signed. It never carries either.
 var ErrBodyHash = errors.New("body_hash")
+
+// ErrBodyTooLarge is code body_too_large: the body is over RelayedBodyMax.
+var ErrBodyTooLarge = errors.New("body_too_large")
+
+// ErrWrongRequest is code wrong_request: the method or the path in the signed text is not the one the computer received.
+var ErrWrongRequest = errors.New("wrong_request")
+
+// ErrWrongLink is code wrong_link: the message arrived on another link than the one it names or than its signer's, or a key with a link came in on none.
+var ErrWrongLink = errors.New("wrong_link")
+
+// ErrOutsidePair is code outside_pair: the message acts on, or is made for, another (link, Hub label) pair than its signer's.
+var ErrOutsidePair = errors.New("outside_pair")
 
 // ErrNoAuthority is returned when HandleRelayed is called without the function that decides what the signer may do: a signature alone is never enough.
 var ErrNoAuthority = errors.New("no_authority")
@@ -58,11 +77,13 @@ type Relayed struct {
 	Nonce      string // 16 random bytes, 22 chars
 	Link       string // the Hub link the request came through, 1 to 64 of A-Z a-z 0-9 _ -
 	HubUser    string // hub-user- and 8 to 16 lower-case hex, an even count
+	Method     string // the HTTP method the Hub relays: GET, POST, PUT, PATCH or DELETE
+	Path       string // the request URI exactly as the computer received it: path and query, from /api/, printable ASCII, at most 512 bytes
 	BodySHA256 string // lower-case hex SHA-256 of the exact body bytes, 64 chars
 }
 
 // relayedKeys is the one order of every v3 body.
-var relayedKeys = []string{"kid", "computer", "ts", "nonce", "link", "hub_user", "body_sha256"}
+var relayedKeys = []string{"kid", "computer", "ts", "nonce", "link", "hub_user", "method", "path", "body_sha256"}
 
 // BodySHA256 is the lower-case hex SHA-256 of the exact body bytes, as the signed text carries it.
 func BodySHA256(body []byte) string {
@@ -111,6 +132,26 @@ func hubUserOK(s string) bool {
 	return lowerHex(s[len(p):], len(s)-len(p))
 }
 
+func methodOK(s string) bool {
+	switch s {
+	case "GET", "POST", "PUT", "PATCH", "DELETE":
+		return true
+	}
+	return false
+}
+
+func pathOK(s string) bool {
+	if len(s) < 6 || len(s) > 512 || s[:5] != "/api/" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x21 || s[i] > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
 func (m Relayed) validate() error {
 	if !relayedKnown(m.Kind) {
 		return ErrBadForm
@@ -125,6 +166,9 @@ func (m Relayed) validate() error {
 		return ErrBadForm
 	}
 	if m.Ts < 1 || m.Ts > 9_999_999_999_999_999 {
+		return ErrBadForm
+	}
+	if !methodOK(m.Method) || !pathOK(m.Path) {
 		return ErrBadForm
 	}
 	if !linkOK(m.Link) || !hubUserOK(m.HubUser) || !lowerHex(m.BodySHA256, 64) {
@@ -145,6 +189,10 @@ func (m *Relayed) strField(k string) *string {
 		return &m.Link
 	case "hub_user":
 		return &m.HubUser
+	case "method":
+		return &m.Method
+	case "path":
+		return &m.Path
 	case "body_sha256":
 		return &m.BodySHA256
 	}
@@ -230,10 +278,11 @@ func ParseRelayed(k Kind, raw []byte) (Relayed, error) {
 	return m, nil
 }
 
-// HandleRelayed verifies one relayed request and, only when every check has passed, spends its nonce. canonical is the signed text, body the exact bytes the Hub relays, sig the P1363 signature. The order is the one Handle
-// uses (cheap checks, the signature, then authority) with the body hash after the signature: a body that is not the signed one is refused as body_hash and spends nothing. authorize is required: it is given the parsed message and
-// the signer's row from this computer's own list, before the nonce is spent, and decides what that signer may do for the kind (the per-kind checks, #20514); a refusal spends nothing.
-func (v *Verifier) HandleRelayed(ctx context.Context, k Kind, canonical, body []byte, sig string, now time.Time, authorize func(Relayed, store.DeviceKey) error) (Relayed, error) {
+// HandleRelayedOn verifies one relayed request and, only when every check has passed, spends its nonce. arrivedLink, method and path are what this computer itself received (the link from its own stamp, the request's method and
+// URI): the signed text must equal them, and it must carry the signer's own pair. canonical is the signed text, body the exact bytes received, sig the P1363 signature. The order is the one Handle uses (cheap checks, the
+// signature, then authority) with the body hash after the signature: a body that is not the signed one is refused as body_hash and spends nothing. authorize is required: it is given the parsed message and the signer's row
+// from this computer's own list, before the nonce is spent, and decides what that signer may do for the kind (the per-kind checks, #20514); a refusal spends nothing.
+func (v *Verifier) HandleRelayedOn(ctx context.Context, arrivedLink, method, path string, k Kind, canonical, body []byte, sig string, now time.Time, authorize func(Relayed, store.DeviceKey) error) (Relayed, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if authorize == nil {
@@ -242,12 +291,21 @@ func (v *Verifier) HandleRelayed(ctx context.Context, k Kind, canonical, body []
 	if v.Refuse != nil && v.Refuse() {
 		return Relayed{}, ErrListUnavailable
 	}
+	if len(body) > RelayedBodyMax {
+		return Relayed{}, ErrBodyTooLarge
+	}
 	m, err := ParseRelayed(k, canonical)
 	if err != nil {
 		return Relayed{}, err
 	}
 	if m.Computer != v.Computer {
 		return Relayed{}, ErrWrongComputer
+	}
+	if m.Method != method || m.Path != path {
+		return Relayed{}, ErrWrongRequest
+	}
+	if m.Link != arrivedLink {
+		return Relayed{}, ErrWrongLink
 	}
 	ts := time.Unix(m.Ts, 0)
 	if ts.Before(now.Add(-relayedWindow)) || ts.After(now.Add(aheadSkew)) {
@@ -269,10 +327,15 @@ func (v *Verifier) HandleRelayed(ctx context.Context, k Kind, canonical, body []
 	if !verifyP1363(signer.PK, RelayedSigningInput(k, canonical), sig) {
 		return Relayed{}, ErrBadSignature
 	}
-	// The signature is good, so the hash in it is the signer's. The body must be exactly what it names.
-	want := BodySHA256(body)
-	if subtle.ConstantTimeCompare([]byte(want), []byte(m.BodySHA256)) != 1 {
+	// The signature is good, so what it covers is the signer's. The body must be exactly what it names, and the pair in it the signer's own.
+	if subtle.ConstantTimeCompare([]byte(BodySHA256(body)), []byte(m.BodySHA256)) != 1 {
 		return Relayed{}, ErrBodyHash
+	}
+	if signer.Link != "" && m.Link != signer.Link {
+		return Relayed{}, ErrWrongLink
+	}
+	if signer.HubUser != "" && m.HubUser != signer.HubUser {
+		return Relayed{}, ErrOutsidePair
 	}
 	if err := v.Store.NonceSeen(ctx, m.Nonce, now); err != nil {
 		return Relayed{}, mapStoreErr(err)

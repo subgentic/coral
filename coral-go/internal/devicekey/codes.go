@@ -28,7 +28,8 @@ func InReplyCodes(code string) bool {
 // ReplyCode is the code a reply carries for an error from the verifier.
 func ReplyCode(err error) string {
 	for _, e := range []error{ErrBadForm, ErrBadSignature, ErrBadMode, ErrTopMode, ErrAboveSigner, ErrSelfTarget, ErrUnknownTarget, ErrTargetBootstrap,
-		ErrSignerBootstrap, ErrSignerNoProof, ErrNonceRepeat, ErrNonceStoreFull, ErrListUnavailable, ErrKeyLimit, ErrTsWindow, ErrBeforeStart, ErrClockBack} {
+		ErrSignerBootstrap, ErrSignerNoProof, ErrNonceRepeat, ErrNonceStoreFull, ErrListUnavailable, ErrKeyLimit, ErrTsWindow, ErrBeforeStart, ErrClockBack,
+		ErrBodyHash, ErrBodyTooLarge, ErrWrongRequest, ErrWrongLink, ErrOutsidePair} {
 		if errors.Is(err, e) {
 			return e.Error()
 		}
