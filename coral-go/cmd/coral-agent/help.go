@@ -30,6 +30,15 @@ func handleHelp(args []string, w io.Writer) (bool, int) {
 		return false, 0
 	}
 	cmd, rest := args[0], args[1:]
+	usage := func(name string) string {
+		if commands[name] {
+			return commandUsage(name, nil)
+		}
+		return ""
+	}
+	if cmd == "help" && len(rest) > 0 && !clihelp.IsHelpArg(rest[0]) && clihelp.HelpAreas("coral-agent", agentOther, rest[0], agentAreas, usage, w) {
+		return true, 0
+	}
 	if cmd == "help" && len(rest) > 0 && !clihelp.IsHelpArg(rest[0]) {
 		return true, clihelp.HelpTopic("coral-agent", rest[0], w, func(name string) string {
 			if commands[name] {
@@ -39,7 +48,7 @@ func handleHelp(args []string, w io.Writer) (bool, int) {
 		})
 	}
 	if clihelp.IsHelpArg(cmd) || cmd == "help" {
-		fmt.Fprintln(w, agentUsageText)
+		fmt.Fprint(w, clihelp.Overview("coral-agent", agentOther, agentAreas), "\n", agentUsageText, "\n") // the overview first (#20399), then every command
 		return true, 0
 	}
 	subHelp := len(rest) > 0 && rest[0] == "help" && (cmd == "task" || cmd == "ui" || cmd == "history")

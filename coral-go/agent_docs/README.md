@@ -9,6 +9,8 @@ Coral exposes a REST API over HTTP. All endpoints are prefixed with `/api/` unle
 
 Run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read one (for example `coral-agent docs board`), and `coral-agent docs all` to print everything. The command sends your session token, so it works under strict local auth and from inside a sandbox that can run Coral's own tools; a plain `curl` of `/api/agent-docs` has no credential and is refused. The Docs tab in the dashboard has a **Copy docs line for agents** button that copies this instruction for a user to paste to an agent.
 
+Start with the two overviews: `coral-board help overview` (talking, questions to the Operator, tasks and goals, reviews and the merge queue, agents, resources, the health check, search, artifacts, cross-team, reminders, settings) and `coral-agent help overview` (your own tasks, launch, artifacts, history search, notify and ask, skills, docs, ui panels, checks). Each line ends with the command that opens its page (`coral-board help <area>`, `coral-agent help <area>`): what the area is for, its commands with one example each, the key rules, and a `more:` line naming the guide below.
+
 ## API Documentation
 
 ### Sessions & Real-Time
