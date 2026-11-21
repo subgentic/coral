@@ -4,6 +4,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { H3, STUB } = require('./helpers/artifact_versions_stub');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const team = 'sent-back-' + Date.now().toString(36), failures = [];
@@ -168,6 +169,13 @@ const { coralReady } = require('./helpers/wait');
                 const askBtns = await btn('Tag v2.1.1'), commentBtns = await btn('landing-copy-v2.md');
                 assert.ok(askBtns.includes('Open agent') && !askBtns.includes('Wake') && !askBtns.includes('Start agent'), 'an awake agent’s ask: Open agent, no Wake: ' + JSON.stringify(askBtns));
                 assert.ok(!askBtns.includes('Open goal') && !askBtns.includes('Open task'), 'an answered ask has no Open goal button: the goal and the task are chips (#20075): ' + JSON.stringify(askBtns));
+                if (width === 1280) {
+                    const dot = await ev(`(async () => { const tr = ${row('Tag v2.1.1')}, meta = tr.querySelector('.inbox-meta'), m = await import((window.__coralStatic || '/static/') + 'ask_subject_links.js'), links = m.askSubjectLinks({ board: '${team}', asker: 'DevOps Engineer' }, [{ kind: 'goal', id: 250 }, { kind: 'task', id: 19790 }], undefined, () => {}); meta.append(links); const before = getComputedStyle(links, '::before').content; links.remove(); return before; })()`);
+                    assert.ok(['none', 'normal', '""'].includes(dot), 'question Goal/Task chips have no leading generated separator (#20328): ' + dot);
+                    const clipped = await ev(`(() => { const n = (${row('Tag v2.1.1')}).querySelector('.inbox-review-name'); n.textContent = 'Which tone should the README use? '.repeat(12); const s = getComputedStyle(n); return { display: s.display, overflow: s.overflow, ellipsis: s.textOverflow, whiteSpace: s.whiteSpace, clipped: n.scrollWidth > n.clientWidth }; })()`);
+                    assert.deepEqual(clipped, { display: 'block', overflow: 'hidden', ellipsis: 'ellipsis', whiteSpace: 'nowrap', clipped: true }, 'a clipped waiting title has a block text line that can draw its ellipsis (#20328)');
+                    await ev(`(${row('Which tone')}).querySelector('.inbox-review-name').textContent = 'Tag v2.1.1 from 64e10a3604 once CDP is green?';true`);
+                }
                 if (width === 1280) assert.ok(/No reply or task update yet/.test(await ev(`(${row('Tag v2.1.1')}).textContent`)), 'an answered ask says No reply or task update yet (#20075)');
                                 if (width === 1280) assert.equal(await ev(`getComputedStyle((${row('Tag v2.1.1')}).querySelector('.inbox-nudge')).borderTopColor`), 'rgba(0, 0, 0, 0)', 'Nudge is quiet text, not a bordered button (#20075)');
                 assert.ok(askBtns.includes('Nudge'), 'an awake agent’s ask has a Nudge button beside Open agent, as the mock draws it (#20067 row 15): ' + JSON.stringify(askBtns));
@@ -293,6 +301,15 @@ const { coralReady } = require('./helpers/wait');
                 assert.match(await ev(`document.getElementById('group-table-view').innerText`), /View past actions in Activity/, 'with its way on: Open Activity');
                 await shot('agent-empty');
                 await ev(`document.querySelector('[data-needs-tab="you"]').click(); localStorage.removeItem('coral-inbox-agent-state'); localStorage.removeItem('coral-inbox-agent-group'); true`);
+                if (width === 1280) {
+                    await ev(STUB);
+                    await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(v => v.openArtifactViewer('${H3}', { filename: 'README-a.md', board: 'team-a' })).then(() => true)`);
+                    await waitFor(`!!document.querySelector('.artifact-review-state')`, 'viewer status available', 8000);
+                    const status = await ev(`(() => { const n = document.querySelector('.artifact-review-state'); n.hidden = false; n.closest('.artifact-viewer').removeAttribute('data-review-pending'); document.querySelector('.artifact-review-approve').hidden = true; document.querySelector('.artifact-review-changes').hidden = true; n.textContent = 'Approved Nov 21, 2026, 7:46 AM'; const s = getComputedStyle(n); return { display: s.display, overflow: s.overflow, ellipsis: s.textOverflow, fits: n.scrollWidth <= n.clientWidth }; })()`);
+                    assert.deepEqual(status, { display: 'block', overflow: 'hidden', ellipsis: 'ellipsis', fits: true }, 'the approved timestamp ends in an ellipsis instead of clipping its anonymous flex text (#20328)');
+                    await shot('approved-header');
+                    await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+                }
                 console.log('PASS two tabs ' + width);
             } catch (error) { failures.push(width + ': ' + error.message); console.error(failures.at(-1)); }
         }

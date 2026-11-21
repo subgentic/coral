@@ -182,3 +182,36 @@ func TestWaitingOnAgentCapsAtTheOldestBeforeTheLookups(t *testing.T) {
 	require.Len(t, items, waitingOnAgentMax)
 	assert.Equal(t, "ask-"+itoa(first), items[0]["id"], "the oldest first")
 }
+
+// #20328: task completion is a system event, not an asker reply. The read must
+// stop waiting immediately, without a background health sweep closing the ask.
+func TestWaitingOnAgentDropsAnAnsweredAskWhenItsLinkedTaskFinishes(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	for _, who := range []string{"Dev", "Operator"} {
+		_, err := bs.Subscribe(ctx, "team", who, who, "", nil, "all")
+		require.NoError(t, err)
+	}
+	task, err := bs.CreateTask(ctx, "team", "Write README", "", "medium", "Operator", "Dev")
+	require.NoError(t, err)
+	q, err := bs.PostMessage(ctx, "team", "Dev", "@Operator which tone?", nil)
+	require.NoError(t, err)
+	targets, err := bs.AskTargets(ctx, "team", "Dev", q.Content)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordAsk(ctx, "team", q, targets))
+	require.NoError(t, bs.RecordAskSubject(ctx, "team", q.ID, 0, task.ID, true))
+	a, err := bs.PostMessage(ctx, "team", "Operator", "Friendly", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordReply(ctx, "team", a.ID, q.ID))
+	_, items := readWaiting(t, h, true)
+	require.Len(t, items, 1)
+	_, err = bs.ClaimTask(ctx, "team", "Dev", task.ID)
+	require.NoError(t, err)
+	_, err = bs.CompleteTask(ctx, "team", task.ID, "Dev", nil)
+	require.NoError(t, err)
+	_, items = readWaiting(t, h, true)
+	require.Empty(t, items, "a completed task is agent action even without a board reply")
+	closed, err := bs.AskIsClosed(ctx, "team", q.ID)
+	require.NoError(t, err)
+	require.False(t, closed, "the projection stays read only")
+}
