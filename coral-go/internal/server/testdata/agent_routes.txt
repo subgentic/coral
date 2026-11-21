@@ -550,6 +550,10 @@ b GET /api/cloud/devices
 b PUT /api/cloud/device-web-mode
 b PUT /api/cloud/devices/{kid}/mode
 b DELETE /api/cloud/devices/{kid}
+b GET /api/cloud/links
+b POST /api/cloud/links
+b PUT /api/cloud/links/{id}/cap
+b DELETE /api/cloud/links/{id}
 b POST /api/cloud/devices/clear-clock
 b POST /api/device-keys/message
 b POST /api/device-keys/certificate
