@@ -298,7 +298,7 @@ func TestTeamMachineOffersNoOwnerConfirmation(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), `"label_missing":false`)
 
 	// Even armed (a second path to the same function), the personal marker with a valid user adopts nothing.
-	_, ok, _ := armOwnerAdoption(ownerNow())
+	_, ok, _ := armOwnerAdoption(ownerNow(), "")
 	require.True(t, ok)
 	// The personal marker, and a complete team stamp (which the owner check passes: the adoption's own guard is what stops it recording the person as the owner).
 	for name, hdr := range map[string]http.Header{
@@ -311,7 +311,7 @@ func TestTeamMachineOffersNoOwnerConfirmation(t *testing.T) {
 		}(),
 		"a complete team stamp": teamStamp(teamOrgA, "admin", teamUIDA, ownerLabel),
 	} {
-		_, ok, _ = armOwnerAdoption(ownerNow())
+		_, ok, _ = armOwnerAdoption(ownerNow(), "")
 		require.True(t, ok, name)
 		req := httptest.NewRequest(http.MethodGet, "/api/custom-models", nil)
 		req.Header = hdr
@@ -337,7 +337,7 @@ func TestUnreadableRecordAdoptsNothing(t *testing.T) {
 	t.Cleanup(func() { hubOwnerRecord = nil })
 	_, known := e.h.ownerLabelState(context.Background())
 	assert.False(t, known)
-	_, ok, _ := armOwnerAdoption(ownerNow())
+	_, ok, _ := armOwnerAdoption(ownerNow(), "")
 	require.True(t, ok)
 	req := httptest.NewRequest(http.MethodGet, "/api/custom-models", nil)
 	for k, v := range ownerHeaders(ownerLabel) {

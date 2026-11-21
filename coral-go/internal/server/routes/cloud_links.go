@@ -129,11 +129,12 @@ type addingView struct {
 	Note            string `json:"note,omitempty"`
 	Message         string `json:"message,omitempty"`
 	ExpiresAt       string `json:"expires_at,omitempty"`
+	OwnerCandidate  string `json:"owner_candidate,omitempty"` // the Hub person this Hub named as its owner, for the Operator to confirm (#20407)
 }
 
 func viewOfEnrollment(e cloud.LinkEnrollment) addingView {
 	v := addingView{Hub: e.Origin, Cap: e.Cap, State: e.State, UserCode: cleanSavedField(e.UserCode), VerificationURL: cleanSavedField(e.VerificationURL),
-		Note: cleanSavedField(e.Note), Message: cleanSavedField(e.Message)}
+		Note: cleanSavedField(e.Note), Message: cleanSavedField(e.Message), OwnerCandidate: cleanSavedField(e.OwnerCandidate)}
 	if !e.ExpiresAt.IsZero() {
 		v.ExpiresAt = e.ExpiresAt.UTC().Format(time.RFC3339)
 	}
@@ -225,6 +226,46 @@ func (h *CloudHandler) CancelLinkEnrollment(w http.ResponseWriter, r *http.Reque
 		cancelled = m.CancelLinkEnrollment(origin)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"cancelled": cancelled, "adding": h.addingList()})
+}
+
+// ConfirmLinkOwner: POST /api/cloud/links/confirm-owner {"hub": address, "candidate": the Hub person shown}. The Operator, at this computer, says the person the Hub named is this link's owner (#20407). The candidate in the
+// request must be exactly the one this computer holds for that Hub: the owner is never taken from the request. Never tunneled, never an agent's.
+func (h *CloudHandler) ConfirmLinkOwner(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || !requireJSON(w, r) || h.noLinkStore(w) {
+		return
+	}
+	var body struct {
+		Hub       string `json:"hub"`
+		Candidate string `json:"candidate"`
+	}
+	if err := decodeJSONLimit(r, &body, 4096); err != nil || body.Candidate == "" {
+		errBadRequest(w, `send {"hub": the Hub's address, "candidate": the name the Hub gave}`)
+		return
+	}
+	origin, err := store.CanonicalHubOrigin(body.Hub)
+	if err != nil {
+		errBadRequest(w, "That is not a Hub address")
+		return
+	}
+	m := h.manager()
+	if m == nil {
+		errInternalServer(w, "The Coral Hub connector is not available")
+		return
+	}
+	switch err := m.ConfirmLinkOwner(r.Context(), origin, body.Candidate); {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]any{"confirmed": true, "adding": h.addingList()})
+	case errors.Is(err, cloud.ErrNoOwnerCandidate):
+		writeError(w, http.StatusConflict, "no_owner_candidate", err.Error())
+	case errors.Is(err, cloud.ErrOwnerCandidateMismatch):
+		writeError(w, http.StatusConflict, "owner_candidate_mismatch", err.Error())
+	case errors.Is(err, store.ErrOwnerAlreadyConfirmed):
+		writeError(w, http.StatusConflict, "owner_already_confirmed", err.Error())
+	case errors.Is(err, store.ErrNoCloudLink), errors.Is(err, store.ErrBadLinkState):
+		errNotFound(w, "No Hub added at that address")
+	default:
+		errInternalServer(w, "Could not record the owner")
+	}
 }
 
 // SetLinkCap: PUT /api/cloud/links/{id}/cap {"mode": "view"|"interact"|"launch"}. Lowering it ends what the old cap allowed at once.

@@ -440,6 +440,7 @@ POST /api/cloud/disconnect never
 POST /api/cloud/guide-revoked never
 POST /api/cloud/links never
 POST /api/cloud/links/cancel never
+POST /api/cloud/links/confirm-owner never
 POST /api/cloud/owner-label/arm never
 POST /api/cloud/redeem never
 POST /api/cloud/rekey never

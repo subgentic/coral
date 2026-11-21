@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // Adding a Hub by its address (#20385, multi-Hub design v2). The person names the Hub and chooses its cap out loud; Coral asks that Hub for a device code, shows it, and polls until the person approves it in the Hub.
@@ -42,6 +44,8 @@ type LinkEnrollment struct {
 	Note            string    `json:"note,omitempty"`
 	Message         string    `json:"message,omitempty"`
 	ExpiresAt       time.Time `json:"expires_at,omitzero"`
+	// OwnerCandidate is the Hub person the Hub named as this link's owner, shown as text for the Operator to confirm at this computer (#20407). It is not the owner until ConfirmLinkOwner; it is memory only and goes with the entry.
+	OwnerCandidate string `json:"owner_candidate,omitempty"`
 }
 
 type linkPending struct {
@@ -49,7 +53,23 @@ type linkPending struct {
 	deviceCode string // never leaves this struct
 	cancel     context.CancelFunc
 	seq        int
+	candidate  candidateHeld // what the Hub named as the owner, until the Operator confirms it or it expires
 }
+
+// candidateHeld is the owner a Hub named at enrollment: held in memory only, with the entry, for linkCandidateTTL.
+type candidateHeld struct {
+	user, account string
+	until         time.Time
+}
+
+// linkCandidateTTL is how long a Hub-named owner candidate can be confirmed (Security, #20407).
+const linkCandidateTTL = 15 * time.Minute
+
+// Errors of ConfirmLinkOwner.
+var (
+	ErrNoOwnerCandidate       = errors.New("this Hub named no owner to confirm (or it was too long ago): use Confirm owner for this Hub instead")
+	ErrOwnerCandidateMismatch = errors.New("that is not the owner this Hub named: read the name again and confirm exactly that one")
+)
 
 // cleanLinkText keeps printable text only (no control, format or line characters) and at most max characters: a Hub's words are shown as text, never trusted.
 func cleanLinkText(s string, max int) string {
@@ -148,8 +168,13 @@ func (m *Manager) LinkEnrollments() []LinkEnrollment {
 	m.pmu.Lock()
 	defer m.pmu.Unlock()
 	out := make([]LinkEnrollment, 0, len(m.pending))
+	now := m.o.Now()
 	for _, p := range m.pending {
-		out = append(out, p.LinkEnrollment)
+		e := p.LinkEnrollment
+		if p.candidate.user != "" && now.Before(p.candidate.until) {
+			e.OwnerCandidate = p.candidate.user
+		}
+		out = append(out, e)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Origin < out[j].Origin })
 	return out
@@ -267,6 +292,7 @@ func (m *Manager) completeLinkEnroll(ctx context.Context, p *linkPending, en *En
 		m.undoCancelledLink(p.Origin)
 	case err == nil:
 		m.finishLinkEnroll(p, LinkEnrollLinked, "Linked.")
+		m.holdOwnerCandidate(p, en)
 		m.LinksChanged(ctx)
 	case errors.Is(err, store.ErrLinkExists):
 		m.finishLinkEnroll(p, LinkEnrollFailed, store.ErrLinkExists.Error())
@@ -289,4 +315,47 @@ func (m *Manager) undoCancelledLink(origin string) {
 	if m.o.Store.BeginRemoveLink(ctx, l.LinkID) == nil {
 		_ = m.o.Store.FinishRemoveLink(ctx, l.LinkID, store.LinkEventDropped)
 	}
+}
+
+// holdOwnerCandidate keeps the owner the Hub named, if it named one in the form Coral knows, for the Operator to confirm. It writes nothing to the store: a label a Hub sends is never recorded as the owner.
+func (m *Manager) holdOwnerCandidate(p *linkPending, en *Enrolled) {
+	if !tunnel.ValidHubUser(en.OwnerUser) || en.OwnerUser == "" || !ValidHubAccount(en.Account) {
+		return
+	}
+	m.pmu.Lock()
+	defer m.pmu.Unlock()
+	if m.pending[p.Origin] == p {
+		p.candidate = candidateHeld{user: en.OwnerUser, account: en.Account, until: m.o.Now().Add(linkCandidateTTL)}
+	}
+}
+
+// ConfirmLinkOwner is the Operator's own act at this computer (#20407): it records the Hub's candidate as the owner of the added link at origin, only when candidate is exactly the one this Manager holds for it
+// (never a value taken from the request alone), the entry is the linked one and the candidate has not expired. The store then records it only if the link has no owner.
+func (m *Manager) ConfirmLinkOwner(ctx context.Context, origin, candidate string) error {
+	m.pmu.Lock()
+	p := m.pending[origin]
+	var held candidateHeld
+	if p != nil && p.State == LinkEnrollLinked {
+		held = p.candidate
+	}
+	m.pmu.Unlock()
+	if held.user == "" || !m.o.Now().Before(held.until) {
+		return ErrNoOwnerCandidate
+	}
+	if subtle.ConstantTimeCompare([]byte(candidate), []byte(held.user)) != 1 {
+		return ErrOwnerCandidateMismatch
+	}
+	l, err := m.o.Store.LinkByOrigin(ctx, origin)
+	if err != nil || l == nil {
+		return store.ErrNoCloudLink
+	}
+	if err := m.o.Store.ConfirmLinkOwner(ctx, l.LinkID, held.account, held.user, "candidate"); err != nil {
+		return err
+	}
+	m.pmu.Lock()
+	if m.pending[origin] == p {
+		p.candidate = candidateHeld{}
+	}
+	m.pmu.Unlock()
+	return nil
 }
