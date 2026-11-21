@@ -85,6 +85,7 @@ func newGoogleEnv(t *testing.T, clientBody string) *googleEnv {
 	h := NewCloudHandler(store.NewSessionStore(db), dir)
 	h.SetPeerCheck(func(*http.Request) (bool, bool) { return true, true })
 	h.SetGoogle(store.NewGoogleStore(db, store.NewRemoteServerStore(db, dir)))
+	require.NoError(t, h.ss.SetSetting(context.Background(), setreg.GdocShare, "true")) // the switch is on unless a test turns it off
 	e := &googleEnv{t: t, h: h, fake: newFakeGoogleServer(t), host: "127.0.0.1:8420", db: db}
 	if clientBody != "" {
 		p := filepath.Join(dir, "client.json")
@@ -170,6 +171,7 @@ func TestConnectNeedsAClientFileAndNeverEchoesIt(t *testing.T) {
 	rec = bad.call(http.MethodPost, "/api/google/connect", true, nil)
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.NotContains(t, rec.Body.String(), googleSecretText)
+	require.NoError(t, bad.h.ss.SetSetting(context.Background(), setreg.GdocShare, "false"))
 	off := bad.call(http.MethodGet, "/api/google/status", true, nil)
 	assert.Contains(t, off.Body.String(), `"enabled":false`)
 	assert.NotContains(t, off.Body.String(), "client_file_ok", "while the switch is off the client file is not read, so the status says nothing of it (#20212)")
@@ -275,4 +277,41 @@ func TestASignInThatCannotBeSavedIsRevokedAtGoogle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, e.signIn(), "didn't finish")
 	assert.Equal(t, []string{"refresh-1"}, e.fake.revoked)
+}
+
+// Security's SHOULD on #20212: with "Share to Google" off, connecting starts nothing and the callback finishes nothing.
+func TestWithTheSwitchOffConnectStartsNoSignInAndTheCallbackFinishesNothing(t *testing.T) {
+	e := newGoogleEnv(t, goodClient)
+	require.NoError(t, e.h.ss.SetSetting(context.Background(), setreg.GdocShare, "false"))
+	rec := e.call(http.MethodPost, "/api/google/connect", true, nil)
+	assert.Equal(t, http.StatusConflict, rec.Code)
+	assert.Contains(t, rec.Body.String(), "gdoc_share_off")
+	assert.False(t, e.h.ggl.flows.Pending(), "no sign-in was started")
+	assert.Empty(t, rec.Result().Cookies(), "no flow cookie")
+
+	// a sign-in started while it was on, then the switch turned off before the browser came back
+	require.NoError(t, e.h.ss.SetSetting(context.Background(), setreg.GdocShare, "true"))
+	rec = e.call(http.MethodPost, "/api/google/connect", true, nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NoError(t, e.h.ss.SetSetting(context.Background(), setreg.GdocShare, "false"))
+	var out map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	u, _ := url.Parse(out["authorize_url"])
+	q := u.Query()
+	cookie := ""
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == googlesignin.FlowCookie {
+			cookie = c.Value
+		}
+	}
+	req, _ := http.NewRequest(http.MethodGet, q.Get("redirect_uri")+"?code=the-code&state="+url.QueryEscape(q.Get("state")), nil)
+	req.AddCookie(&http.Cookie{Name: googlesignin.FlowCookie, Value: cookie})
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	assert.NotContains(t, string(b), "Connected")
+	c, err := e.h.ggl.store.Get(context.Background())
+	require.NoError(t, err)
+	assert.False(t, c.Connected, "nothing was stored")
 }

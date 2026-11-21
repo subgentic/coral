@@ -35,6 +35,8 @@ type googleRoutes struct {
 	client     func(c googlesignin.ClientCreds) *googlesignin.Client // a test points it at a fake Google
 	port       int                                                   // 0 is any free port (Google accepts any loopback port for a desktop client)
 
+	switchOn func(context.Context) bool // "Share to Google" is on; set by SetGoogle from the settings
+
 	mu      sync.Mutex
 	access  string // in memory only
 	expires time.Time
@@ -43,6 +45,10 @@ type googleRoutes struct {
 // SetGoogle attaches the Google sign-in to the handler. The client file's path is read from the environment here, once.
 func (h *CloudHandler) SetGoogle(gs *store.GoogleStore) {
 	h.ggl = &googleRoutes{store: gs, flows: googlesignin.NewFlows(), clientFile: os.Getenv(googleClientFileEnv), client: googlesignin.NewClient}
+	h.ggl.switchOn = func(ctx context.Context) bool {
+		st, err := h.ss.GetSettings(ctx)
+		return err == nil && gdocSwitchOn(st)
+	}
 }
 
 // creds reads the client file now. Any problem is the one fixed sentence.
@@ -91,6 +97,10 @@ func (h *CloudHandler) GoogleConnect(w http.ResponseWriter, r *http.Request) {
 	if g == nil {
 		return
 	}
+	if !g.switchOn(r.Context()) { // nothing while the switch is off: no client file read, no sign-in started (#20212)
+		writeError(w, http.StatusConflict, "gdoc_share_off", GdocShareOffMessage)
+		return
+	}
 	if g.clientFile == "" {
 		writeError(w, http.StatusConflict, "no_client", "Google sign-in has no client file set up on this computer")
 		return
@@ -133,6 +143,10 @@ func (h *CloudHandler) GoogleConnect(w http.ResponseWriter, r *http.Request) {
 // finish handles the browser's return on the one-shot listener; its answer is the text the browser shows. A failure changes nothing stored.
 func (g *googleRoutes) finish(res googlesignin.CallbackResult) string {
 	const didNotFinish = "Google sign-in didn't finish. Go back to Coral and try again."
+	if !g.switchOn(context.Background()) { // turned off while the sign-in waited: nothing is read or stored
+		g.flows.Take(res.State, res.Binding)
+		return didNotFinish
+	}
 	verifier, redirect, ok := g.flows.Take(res.State, res.Binding)
 	if !ok || res.Error != "" || res.Code == "" {
 		return didNotFinish
