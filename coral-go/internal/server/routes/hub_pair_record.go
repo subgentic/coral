@@ -20,6 +20,9 @@ import (
 // UnmatchedPairPath is the row's path for a tunneled write that matched no route.
 const UnmatchedPairPath = "unmatched"
 
+// StreamOpensPerMinute bounds the served WebSocket opens one link may make in a minute; past it the open is refused with 429, never left without a row (#20405).
+var StreamOpensPerMinute = 600
+
 var RefusedRowsPerMinute = 30 // a variable only so a proof test that makes more than 30 refused calls can lift it for its own run
 
 // PairRecorded names the write routes (method + chi route pattern) whose tunneled calls RecordPairWrites records. It grows batch by batch with the pair census golden; a route listed here is
@@ -33,22 +36,26 @@ type PairRecorded map[string]bool
 func RecordPairWrites(bs *board.Store, set PairRecorded, upgrades PairRecorded, mux chi.Routes) func(http.Handler) http.Handler {
 	var mu sync.Mutex
 	window := map[string][]time.Time{}
-	allowRefused := func(link string, now time.Time) bool {
+	count := func(win map[string][]time.Time, limit int, link string, now time.Time) bool {
 		mu.Lock()
 		defer mu.Unlock()
-		kept := window[link][:0]
-		for _, t := range window[link] {
+		kept := win[link][:0]
+		for _, t := range win[link] {
 			if now.Sub(t) < time.Minute {
 				kept = append(kept, t)
 			}
 		}
-		if len(kept) >= RefusedRowsPerMinute {
-			window[link] = kept
+		if len(kept) >= limit {
+			win[link] = kept
 			return false
 		}
-		window[link] = append(kept, now)
+		win[link] = append(kept, now)
 		return true
 	}
+	allowRefused := func(link string, now time.Time) bool { return count(window, RefusedRowsPerMinute, link, now) }
+	// served streams have their own bound, apart from the refused-row cap: a refused flood can never hide a stream, and a flood of served opens is refused (never silent) once past it
+	opens := map[string][]time.Time{}
+	allowOpen := func(link string, now time.Time) bool { return count(opens, StreamOpensPerMinute, link, now) }
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if bs == nil || r.Method == http.MethodHead || r.Method == http.MethodOptions || (r.Method == http.MethodGet && !isUpgrade(r)) {
@@ -61,7 +68,7 @@ func RecordPairWrites(bs *board.Store, set PairRecorded, upgrades PairRecorded, 
 				return
 			}
 			if r.Method == http.MethodGet { // a WebSocket upgrade: a row at connect and one at close, with the pair and no body
-				serveUpgrade(bs, upgrades, mux, via, allowRefused, w, r, next)
+				serveUpgrade(bs, upgrades, mux, via, allowRefused, allowOpen, w, r, next)
 				return
 			}
 			ctx, recorded := board.WithActionRecordFlag(r.Context())
@@ -118,7 +125,7 @@ func isUpgrade(r *http.Request) bool {
 
 // serveUpgrade records an upgrade on a route in upgrades: a row before the handler runs (the stream may last hours) and a row after it returns, with the status a refusal answered, else 101.
 // The route is found by the router itself, on the path chi routes by; the pair is the one the connector stamped (a stream with no Hub person never gets here: wrapper's caller skips it).
-func serveUpgrade(bs *board.Store, upgrades PairRecorded, mux chi.Routes, via board.ActionVia, allow func(string, time.Time) bool, w http.ResponseWriter, r *http.Request, next http.Handler) {
+func serveUpgrade(bs *board.Store, upgrades PairRecorded, mux chi.Routes, via board.ActionVia, allowRefused, allowOpen func(string, time.Time) bool, w http.ResponseWriter, r *http.Request, next http.Handler) {
 	path := r.URL.Path
 	if r.URL.RawPath != "" {
 		path = r.URL.RawPath
@@ -136,24 +143,35 @@ func serveUpgrade(bs *board.Store, upgrades PairRecorded, mux chi.Routes, via bo
 		next.ServeHTTP(w, r)
 		return
 	}
-	record := func(method string, status int) {
-		if !allow(via.LinkID, time.Now()) {
-			return
-		}
-		if err := bs.RecordHubOperatorAction(context.WithoutCancel(r.Context()), board.HubOperatorAction{
+	record := func(method string, status int) error {
+		err := bs.RecordHubOperatorAction(context.WithoutCancel(r.Context()), board.HubOperatorAction{
 			HubUser: via.HubUser, Kind: board.HubActionKindWrite, Method: method, Path: pattern, Status: status,
-		}); err != nil {
+		})
+		if err != nil {
 			slog.Warn("[cloud] could not record a Coral Hub stream", "error", err)
 		}
+		return err
 	}
-	record(PairWSOpen, 0)
+	// the open row comes first and is never capped as a refusal: a stream that cannot leave its row is not opened (503), and one past the open bound is refused (429)
+	if !allowOpen(via.LinkID, time.Now()) {
+		http.Error(w, "too many streams opened through this link in a minute", http.StatusTooManyRequests)
+		return
+	}
+	if record(PairWSOpen, 0) != nil {
+		http.Error(w, "the stream could not be recorded", http.StatusServiceUnavailable)
+		return
+	}
 	rec := &upgradeRecorder{ResponseWriter: w}
 	next.ServeHTTP(rec, r)
 	status := rec.status
 	if status == 0 {
 		status = http.StatusSwitchingProtocols
 	}
-	record(PairWSClose, status)
+	// only a refused upgrade counts against the refused-row cap; the close of a served stream is always written, so no open is left without its end
+	if status >= 400 && !allowRefused(via.LinkID, time.Now()) {
+		return
+	}
+	_ = record(PairWSClose, status)
 }
 
 // upgradeRecorder remembers the status of an answer written before the upgrade (a refusal); it passes the connection takeover through, which a WebSocket upgrade needs.
