@@ -118,3 +118,25 @@ func TestLinksAddReportsADeniedCode(t *testing.T) {
 	assert.Equal(t, 4, code)
 	assert.Contains(t, errb, "denied in the Hub")
 }
+
+// #20407: the add flow says who the Hub named as its owner (cleaned) and how to confirm exactly that name; confirm-owner and arm-owner call this computer's own routes.
+func TestLinksAddShowsTheHubNamedOwnerAndConfirmOwnerSendsIt(t *testing.T) {
+	f := newFakeCoral(t, ready, enrolled)
+	f.linkReply = `{"links":[],"enrollment":{"hub":"https://hub-b.example.com","cap":"view","state":"pending","user_code":"ABCD-EFGH","verification_url":"https://hub-b.example.com/enroll"},` +
+		`"adding":[{"hub":"https://hub-b.example.com","cap":"view","state":"linked","owner_candidate":"hub-user-bbbb2222\u001b[31m"}]}`
+	code, out, errb := runLinks(t, f, "add", "https://hub-b.example.com", "view")
+	require.Equal(t, 0, code, out+errb)
+	assert.Contains(t, out, "coral cloud links confirm-owner https://hub-b.example.com hub-user-bbbb2222")
+	assert.NotContains(t, out, "\x1b")
+
+	g := newFakeCoral(t, ready, enrolled)
+	code, out, errb = runLinks(t, g, "confirm-owner", "https://hub-b.example.com", "hub-user-bbbb2222")
+	require.Equal(t, 0, code, out+errb)
+	assert.Equal(t, []string{`POST /api/cloud/links/confirm-owner {"candidate":"hub-user-bbbb2222","hub":"https://hub-b.example.com"}`}, mutating(g))
+
+	h := newFakeCoral(t, ready, enrolled)
+	code, _, errb = runLinks(t, h, "confirm-owner", "https://hub-b.example.com")
+	assert.Equal(t, 2, code, "the name is typed, never defaulted")
+	assert.Contains(t, errb, "usage:")
+	assert.Empty(t, mutating(h))
+}

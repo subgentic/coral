@@ -26,6 +26,7 @@ type addingRow struct {
 	VerificationURL string `json:"verification_url"`
 	Note            string `json:"note"`
 	Message         string `json:"message"`
+	OwnerCandidate  string `json:"owner_candidate"`
 }
 
 type linkReply struct {
@@ -50,7 +51,7 @@ func grantLine(mode string) string {
 // links is `coral cloud links`: list, cap and remove, all through this computer's own server and never the Hub (#20346). A link is named by its id or its full Hub address.
 func (c *cloudClient) links(ctx context.Context, words []string, out, errw io.Writer) int {
 	usage := func() int {
-		fmt.Fprintln(errw, "usage: coral cloud links [list | add <hub address> <view|interact|launch> | cap <link_id|hub address> <view|interact|launch> | remove <link_id|hub address>]")
+		fmt.Fprintln(errw, "usage: coral cloud links [list | add <hub address> <view|interact|launch> | cap <link_id|hub address> <view|interact|launch> | remove <link_id|hub address> | confirm-owner <hub address> <the name the Hub gave> | arm-owner <hub address>]")
 		return 2
 	}
 	if len(words) == 0 {
@@ -99,6 +100,23 @@ func (c *cloudClient) links(ctx context.Context, words []string, out, errw io.Wr
 			return code
 		}
 		fmt.Fprintf(out, "%s (%s) may now %s (access: %s).\n", l.HubOrigin, l.LinkID, grantLine(words[2]), words[2])
+		return 0
+	case words[0] == "confirm-owner" && len(words) == 3:
+		var reply linkReply
+		if code := c.call(ctx, http.MethodPost, "/api/cloud/links/confirm-owner", map[string]string{"hub": words[1], "candidate": words[2]}, nil, 15*time.Second, &reply); code >= 0 {
+			return code
+		}
+		fmt.Fprintf(out, "%s is now this Hub link's owner. It may do everything the link's access allows.\n", oneLine(words[2]))
+		return 0
+	case words[0] == "arm-owner" && len(words) == 2:
+		// The fallback when the Hub named no owner: for one minute, the first owner read through THAT Hub is recorded as its owner. Do the read as the Hub's owner now.
+		var reply struct {
+			Seconds int `json:"seconds"`
+		}
+		if code := c.call(ctx, http.MethodPost, "/api/cloud/owner-label/arm", map[string]string{"hub": words[1]}, nil, 15*time.Second, &reply); code >= 0 {
+			return code
+		}
+		fmt.Fprintf(out, "Ready for %d seconds: open this computer in Coral Hub as that Hub's owner now. The first owner read through that Hub is recorded as its owner.\n", reply.Seconds)
 		return 0
 	case words[0] == "remove" && len(words) == 2:
 		r, code := read()
@@ -176,6 +194,11 @@ func (c *cloudClient) addLink(ctx context.Context, hub, linkCap string, out, err
 			return 1
 		case row.State == "linked":
 			fmt.Fprintf(out, "Linked %s.\n", oneLine(e.Hub))
+			if row.OwnerCandidate != "" {
+				fmt.Fprintf(out, "That Hub says its owner is %s. If that is right, that person will have everything this link's access allows. Confirm with:\n  coral cloud links confirm-owner %s %s\n", oneLine(row.OwnerCandidate), oneLine(e.Hub), oneLine(row.OwnerCandidate))
+			} else {
+				fmt.Fprintf(out, "That Hub named no owner. Until you record one, its owner can't act here. When you are ready: coral cloud links arm-owner %s\n", oneLine(e.Hub))
+			}
 			return 0
 		case row.State != "pending":
 			fmt.Fprintln(errw, oneLine(row.Message))

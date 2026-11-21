@@ -134,7 +134,7 @@ func TestAnAddedHubsOwnerIsPinnedOnlyByTheOperatorAtThisComputer(t *testing.T) {
 	assert.Equal(t, 200, ownerCall(a.LinkID, personA).Code)
 
 	// 7. A stamped request with an id no link has is refused before any owner check; it never reaches the first link's label.
-	rec = ownerCall("lnk_00000000000000000000000000000000", personA)
+	rec = ownerCall("lnk-00000000", personA)
 	assert.Equal(t, 403, rec.Code)
 	assert.Contains(t, rec.Body.String(), cloud.LinkRefusedCode)
 
