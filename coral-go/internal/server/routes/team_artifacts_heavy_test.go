@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -90,5 +91,37 @@ func TestHeavyUserTeamArtifactsTiming(t *testing.T) {
 			warm := timeHeavy(t, srv, full)
 			t.Logf("%-16s team=%-14q cold %v warm %v", name, team, cold.Round(time.Millisecond), warm.Round(time.Millisecond))
 		}
+	}
+}
+
+// #20396: the version key is the same for the same file and different for two that a separator could confuse.
+func TestArtifactVersionKeyKeepsFilesApart(t *testing.T) {
+	s := func(v string) *string { return &v }
+	row := func(board, session, name string) *teamArtifact {
+		return &teamArtifact{managed: "m", BoardID: board, SessionID: s(session), Name: name}
+	}
+	a := artifactVersionKey(row("b", "s", "n.md"))
+	require.NotEmpty(t, a)
+	require.Equal(t, a, artifactVersionKey(row("b", "s", "n.md")))
+	for _, other := range []*teamArtifact{row("b", "s", "m.md"), row("c", "s", "n.md"), row("b", "t", "n.md"), row("bs", "", "n.md"), row("b", "s:n", ".md"), row("b|s", "", "n.md")} {
+		require.NotEqual(t, a, artifactVersionKey(other))
+	}
+	require.NotEqual(t, artifactVersionKey(row("1:x", "", "y")), artifactVersionKey(row("1", "x1:", "y")), "a length prefix cannot be forged by the next part")
+	require.Empty(t, artifactVersionKey(&teamArtifact{managed: "m", Name: "n.md"}), "no uploader, no file")
+	require.Empty(t, artifactVersionKey(&teamArtifact{BoardID: "b", SessionID: s("s"), Name: "n.md"}), "a link is no version")
+}
+
+// #20396: sorting with each key made once is the sort it replaced (the same order, ties kept in their place), for every order.
+func TestSortedByKeyIsTheStableKeyOfSort(t *testing.T) {
+	var rows []teamArtifact
+	for i := range 300 {
+		sid := fmt.Sprintf("s%d", i%7)
+		sz := int64(i % 5)
+		rows = append(rows, teamArtifact{ID: fmt.Sprintf("id%d", i%40), BoardID: fmt.Sprintf("b%d", i%3), Name: fmt.Sprintf("n%d.md", i%9), CreatedAt: fmt.Sprintf("2026-10-09T10:%02d:00Z", i%11), SessionID: &sid, Size: &sz, MediaType: []string{"text/markdown", "image/png"}[i%2], TaskID: int64(i % 4), index: i % 6})
+	}
+	for _, name := range teamArtifactSorts {
+		want := append([]teamArtifact(nil), rows...)
+		sort.SliceStable(want, func(i, j int) bool { return artifactAfter(name, keyOf(want[j]), keyOf(want[i])) })
+		require.Equal(t, want, sortedByKey(append([]teamArtifact(nil), rows...), name), name)
 	}
 }
