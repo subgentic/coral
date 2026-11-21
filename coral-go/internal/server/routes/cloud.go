@@ -53,7 +53,10 @@ type CloudHandler struct {
 	BackendRunning string
 	BackendForced  bool
 
-	ss       *store.SessionStore
+	ss *store.SessionStore
+	// links keeps the Hub links and revoker is the call that asks a Hub to remove this computer (#20346).
+	links    *store.CloudStore
+	revoker  HubRevoker
 	identity *IdentityObserver
 	// bs holds the record of Operator actions taken through Coral Hub (#3404).
 	bs *board.Store

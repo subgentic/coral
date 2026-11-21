@@ -793,6 +793,16 @@ func (m *Manager) Disconnect(ctx context.Context) error {
 	return m.o.Store.Delete(ctx)
 }
 
+// StopTunnel ends the live tunnel without forgetting the enrollment: a link being removed has no tunnel from the moment the person asks (#20346), while the token waits for the Hub's answer.
+func (m *Manager) StopTunnel() {
+	m.mu.Lock()
+	m.stopLocked()
+	if m.o.HubURL != "" {
+		m.st = Status{Configured: true, HubURL: m.o.HubURL, State: StateIdle}
+	}
+	m.mu.Unlock()
+}
+
 func (m *Manager) linkLost(ctx context.Context) {
 	m.wipePairing()
 	m.clearDeviceKeys(ctx)
