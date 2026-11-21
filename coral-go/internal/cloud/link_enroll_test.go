@@ -275,7 +275,10 @@ func TestAHubNamedOwnerIsACandidateUntilTheOperatorConfirmsIt(t *testing.T) {
 // A candidate in a form Coral does not know, or with no account, is never held (and so never confirmed).
 func TestAnUnformedOwnerCandidateIsNotHeld(t *testing.T) {
 	for name, set := range map[string]func(h *fakeHub){
-		"bad user":   func(h *fakeHub) { h.account.Store("11111111-2222-4333-8444-555555555555"); h.ownerUser.Store("Not A User!") },
+		"bad user": func(h *fakeHub) {
+			h.account.Store("11111111-2222-4333-8444-555555555555")
+			h.ownerUser.Store("Not A User!")
+		},
 		"no account": func(h *fakeHub) { h.ownerUser.Store("hub-user-bbbb2222") },
 	} {
 		t.Run(name, func(t *testing.T) {
