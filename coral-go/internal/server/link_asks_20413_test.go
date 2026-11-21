@@ -102,8 +102,10 @@ func TestOnlyThePersonAtThisComputerWritesTheAskList(t *testing.T) {
 			}
 		}
 	}
-	rec := call(h, "PUT", "/api/cloud/links/"+askAdded+"/asks", `{"kind":"agent_ask","allow":true}`, map[string]string{"Content-Type": "application/json", store.SessionTokenHeader: "x"})
-	assert.NotEqual(t, 200, rec.Code, "an agent's token is not the person")
+	agentTok, err := r.db.MintSessionToken(context.Background(), "sid-dev", "claude-dev")
+	require.NoError(t, err)
+	rec := call(h, "PUT", "/api/cloud/links/"+askAdded+"/asks", `{"kind":"agent_ask","allow":true}`, map[string]string{"Content-Type": "application/json", store.SessionTokenHeader: agentTok})
+	assert.Equal(t, 403, rec.Code, "an agent's token is not the person: "+rec.Body.String())
 	_, body := local("GET", "/api/cloud/links/"+askAdded+"/asks", "")
 	assert.Contains(t, body, `"allowed":[]`, "nothing was written")
 
