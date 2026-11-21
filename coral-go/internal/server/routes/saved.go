@@ -199,20 +199,43 @@ func cleanSavedField(s string) string {
 	return stripInvisible(s)
 }
 
-// joinerRun is the most joiners or tag characters kept in one run: a ZWJ family emoji and a flag with its tags fit, a hidden message does not.
-const joinerRun = 8
+// joinerRun is the most joiners kept in one run: one. Emoji sequences and Persian words put a single joiner between two characters; two or more in a row carry nothing visible (agreed with coral-hub, #20336).
+const joinerRun = 1
 
-// joinerRune is a character that is format (Cf) but has a visible use between two characters of a script: ZWJ and ZWNJ (emoji sequences, Persian and Indic words) and the emoji tag characters (flags).
-func joinerRune(r rune) bool { return r == 0x200C || r == 0x200D || r >= 0xE0020 && r <= 0xE007F }
+// joinerRune is a character that is format (Cf) but has a visible use between two characters of a script: ZWJ and ZWNJ (emoji sequences, Persian and Indic words).
+func joinerRune(r rune) bool { return r == 0x200C || r == 0x200D }
 
-// stripInvisible drops control and format characters (RTL override, zero width space, BOM) as the Hub does (#20329), and keeps a run of joiners or tag characters only when the character
-// before and the one after it are both non-ASCII and visible: a family emoji and a Persian word keep theirs, "ad<ZWJ>min" and emoji-plus-hidden-tags lose them (#20333).
+// flagBase is the black flag that starts a subdivision flag (England, Scotland, Wales): U+1F3F4, then 1 to 7 tag characters (U+E0020 to U+E007E), then the cancel tag U+E007F.
+const flagBase = 0x1F3F4
+
+// flagLen is how many runes from rs[i] make a well-formed flag sequence, or 0 when rs[i:] does not start with one.
+func flagLen(rs []rune, i int) int {
+	if rs[i] != flagBase {
+		return 0
+	}
+	j := i + 1
+	for j < len(rs) && rs[j] >= 0xE0020 && rs[j] <= 0xE007E {
+		j++
+	}
+	if n := j - i - 1; n < 1 || n > 7 || j >= len(rs) || rs[j] != 0xE007F {
+		return 0
+	}
+	return j - i + 1
+}
+
+// stripInvisible drops control and format characters (RTL override, zero width space, BOM) as the Hub does (#20329). Two kinds are kept: a run of ZWJ or ZWNJ when the character before
+// and the one after it are both non-ASCII and visible, and the run is a single joiner (a family emoji and a Persian word keep theirs, "ad<ZWJ>min" does not, #20333); and a tag character only inside a well-formed flag
+// sequence, wherever it stands (#20336): any other tag character, the channel for hiding ASCII text in a name, is dropped.
 func stripInvisible(s string) string {
 	rs := []rune(s)
 	out := make([]rune, 0, len(rs))
 	for i := 0; i < len(rs); i++ {
 		r := rs[i]
 		switch {
+		case flagLen(rs, i) > 0:
+			n := flagLen(rs, i)
+			out = append(out, rs[i:i+n]...)
+			i += n - 1
 		case joinerRune(r):
 			j := i
 			for j < len(rs) && joinerRune(rs[j]) {
