@@ -93,6 +93,7 @@ assert.deepEqual(longOut.earlier, { settled: 0, failed: 1, reason: 'The file nam
 assert.equal(requests.slice(longReadStart).some(r => new URLSearchParams(r.query).get('versions') === 'all'), false, 'an over-limit filename is never truncated or queried');
 assert.ok(files.get(hex(7)).tags.includes('for review'), 'an over-limit name does not mark any earlier version settled');
 actions.sayApproved(longName, longOut);
+await reviews.refreshReviews(true); // settle the approval's background refresh before asserting zero reads for invalid input
 assert.ok([...document.querySelectorAll('.toast')].some(t => t.textContent.includes('200-byte search limit') && t.textContent.includes('may remain in Needs you')), 'the successful approval still explains the incomplete earlier-version settlement');
 
 for (const [label, changes] of [

@@ -66,6 +66,18 @@ assert.equal(calls, 4, 'explicit refresh works while hidden');
 await settle(); await forcedHidden;
 hidden = false;
 
+// Inbox route startup precedes the active-tab attribute; both suppress hidden
+// Agents polls, while the ordinary route below retains change detection.
+const originalPath = location.pathname;
+const beforeInbox = calls;
+window.history.replaceState(null, '', '/inbox/needs');
+assert.equal(await refreshTeamAvailabilityIfChanged('alpha'), false);
+window.history.replaceState(null, '', originalPath);
+document.body.dataset.navTab = 'hub-inbox';
+assert.equal(await refreshTeamAvailabilityIfChanged('alpha'), false);
+delete document.body.dataset.navTab;
+assert.equal(calls, beforeInbox, 'Inbox route and active tab make no hidden availability read');
+
 // 5. Change detection for the sidebar re-render.
 now += 60_000;
 let changed = refreshTeamAvailabilityIfChanged('alpha');

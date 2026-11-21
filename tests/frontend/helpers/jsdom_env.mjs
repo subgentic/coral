@@ -28,6 +28,7 @@ export function installDom({ mode = 'cloud', boot: extraBoot = {} } = {}) {
         .replace(/<link\b[^>]*>/g, '');
     const dom = new JSDOM(html, { url: 'https://hub.example/', pretendToBeVisual: true, runScripts: 'outside-only' });
     const w = dom.window;
+    w.__coralNoFetchShare = true; // data fixtures replace replies without a real transport; the request-count browser suite opts into sharing
     w.matchMedia = w.matchMedia || (() => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }));
     w.requestAnimationFrame = w.requestAnimationFrame || (cb => setTimeout(cb, 0));
     w.ResizeObserver = w.ResizeObserver || class { observe() {} unobserve() {} disconnect() {} };

@@ -18,9 +18,8 @@ let read = false; // the first answer is in: what appears after it is a change
  *  rather than hiding a warning that is true. off: sign-in is off (strict_local_auth false); noPassword: password_set is false, which the page could not tell the person once Not now was pressed (#10061, D2). */
 async function authState() {
     try {
-        const r = await fetch('/api/system/auth-status', { credentials: 'same-origin', cache: 'no-store' });
-        if (!r.ok) return null;
-        const st = await r.json();
+        const { readAuthStatus } = await importOnce('./auth_status_read.js');
+        const st = await readAuthStatus();
         if (!st || typeof st !== 'object') return null;
         return { off: st.strict_local_auth === false, noPassword: st.password_set === false && st.authenticated !== false, local: st.local === true };
     } catch { return null; }
