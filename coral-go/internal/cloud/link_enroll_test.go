@@ -215,6 +215,6 @@ func TestAVerificationLinkOnAnotherSiteIsDropped(t *testing.T) {
 
 // The Hub's words are text only: control and format characters are dropped from what is shown.
 func TestEnrollmentTextIsCleaned(t *testing.T) {
-	assert.Equal(t, "Laptop", cleanLinkText("Lap‮top\x07", 40))
+	assert.Equal(t, "Laptop", cleanLinkText("Lap\u202etop\x07", 40))
 	assert.Equal(t, "abc", cleanLinkText("abcdef", 3))
 }
