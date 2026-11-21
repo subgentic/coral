@@ -115,6 +115,8 @@ type Status struct {
 	HubMoved bool `json:"hub_moved,omitempty"`
 	// DevicePairing is what the last browser pairing came to ("added", or why a device was not added): a sentence, never a key, a proof or the secret.
 	DevicePairing string `json:"device_pairing,omitempty"`
+	// HubAddressWarning is set while the enrollment's Hub address has a path, query or fragment (saved by an earlier release). It keeps dialing as enrolled; Settings says to enrol again with the site address only (#20312).
+	HubAddressWarning string `json:"hub_address_warning,omitempty"`
 }
 
 // applyTunnelState records a tunnel state change: ConnectedAt is set when the tunnel comes
@@ -170,6 +172,7 @@ type Manager struct {
 	root     context.Context
 	cancel   context.CancelFunc // current enrollment or tunnel goroutine
 	st       Status
+	addrWarn string    // Status.HubAddressWarning
 	hubMoved bool      // Status.HubMoved: enrolled with another hub than the configured one (#3546)
 	retryAt  time.Time // when Connect may ask Coral Hub again after a failed start (#5962); only read with the idle failure codes
 	gen      int       // bumped on every start/stop so stale goroutines cannot write state
@@ -359,6 +362,7 @@ func (m *Manager) Status() Status {
 	defer m.mu.Unlock()
 	s := m.st
 	s.HubMoved = m.hubMoved
+	s.HubAddressWarning = m.addrWarn
 	s.DevicePairing = m.pairNote()
 	s.MaxMode = m.currentMode().String()
 	s.Loading = !m.isLoaded()
@@ -660,6 +664,10 @@ func (m *Manager) startTunnel(conn *store.CloudConnection) {
 	tctx, cancel := context.WithCancel(m.root)
 	m.cancel = cancel
 	m.hubMoved = false // enrolled with the configured hub: it's where the tunnel goes
+	m.addrWarn = ""
+	if store.HubAddressHasPath(conn.HubURL) {
+		m.addrWarn = "This computer's Hub address has a path (" + conn.HubURL + "). It still works as it was saved; disconnect and enrol again with the site address only."
+	}
 	m.st = Status{Configured: true, HubURL: m.o.HubURL, State: StateConnecting, Label: conn.Label, ServerID: conn.ServerID}
 	m.mu.Unlock()
 	go func() { defer safego.Recover("cloud/manager:m.runTunnel"); m.runTunnel(tctx, gen) }()
@@ -781,6 +789,7 @@ func (m *Manager) Disconnect(ctx context.Context) error {
 	m.stopLocked()
 	m.st = Status{Configured: true, HubURL: m.o.HubURL, State: StateIdle}
 	m.hubMoved = false // the old enrollment is forgotten
+	m.addrWarn = ""
 	m.mu.Unlock()
 	m.linkLost(ctx)
 	_ = m.o.Store.ClearEnrollment(ctx)
