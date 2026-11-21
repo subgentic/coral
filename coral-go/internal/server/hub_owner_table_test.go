@@ -235,8 +235,8 @@ func TestOwnerRouteCensus(t *testing.T) {
 func TestBothOwnerChecksAreWiredToTheEnrolmentRecord(t *testing.T) {
 	router, err := os.ReadFile("router.go")
 	require.NoError(t, err)
-	assert.Contains(t, string(router), "routes.SetHubOwnerRecord(ownerCloud.OwnerRecord)")
+	assert.Contains(t, string(router), "routes.SetHubOwnerRecord(ownerRecordOf)")
 	wire, err := os.ReadFile(filepath.Join("routes", "system_update_relaunch_wire.go"))
 	require.NoError(t, err)
-	assert.Contains(t, string(wire), "OwnerRecord: cs.OwnerRecord")
+	assert.Contains(t, string(wire), "OwnerRecord: ownerRecordOf")
 }
