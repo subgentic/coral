@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -109,6 +111,83 @@ func TestPairRecordedRoutesRecordThePairThroughTheRealConnector(t *testing.T) {
 	require.NoError(t, err)
 	resp.Body.Close()
 	assert.Equal(t, before, len(count()), "a local write leaves no pair row")
+}
+
+// Security's MUST on batch 3 (#20369): the pattern is the one chi routed by (RawPath, the Hub's encoded path), never the decoded path, and a write that matches no route still leaves a row.
+func TestPairRowsFollowTheRoutedPatternAndNeverGoSilent(t *testing.T) {
+	g := newInteg(t)
+	ctx := context.Background()
+	last := func(before int) []board.HubOperatorAction {
+		acts, err := g.srv.boardStore.RecentHubOperatorActions(ctx, 1000)
+		require.NoError(t, err)
+		return acts[:len(acts)-before]
+	}
+	size := func() int {
+		acts, err := g.srv.boardStore.RecentHubOperatorActions(ctx, 1000)
+		require.NoError(t, err)
+		return len(acts)
+	}
+	for _, c := range []struct{ name, path, want string }{
+		{"an encoded letter", "/api/board/%70roj/messages", "/api/board/{project}/messages"},
+		{"a route no guard answers for", "/api/board/proj/tasks/1/nudge", "/api/board/{project}/tasks/{taskID}/nudge"},
+	} {
+		before := size()
+		code, body := g.hub("owner", integOwner, "POST", c.path, `{"secret":"SENTINEL"}`, nil)
+		rows := last(before)
+		require.Len(t, rows, 1, "%s: one row (answered %d %s; rows %+v)", c.name, code, body, rows)
+		assert.Equal(t, c.want, rows[0].Path, c.name)
+		assert.Equal(t, testLinkID, rows[0].ViaLink, c.name)
+		assert.Equal(t, integOwner, rows[0].ViaHubUser, c.name)
+		assert.Equal(t, code, rows[0].Status, c.name)
+		assert.NotContains(t, rows[0].Path+rows[0].Project, "SENTINEL", c.name)
+	}
+}
+
+// The connector refuses an encoded slash, but the wrapper must not depend on that: with the Hub's raw path set (%2F), chi routes by it, and so does the pattern lookup.
+func TestPairRowsUseRawPathWhenAGuardRefusesBeforeRouting(t *testing.T) {
+	g := newInteg(t)
+	ctx := context.Background()
+	mux := chi.NewRouter()
+	stamp := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(board.WithActionVia(r.Context(), board.ActionVia{LinkID: testLinkID, HubUser: integOwner})))
+		})
+	}
+	set := routes.PairRecorded{"POST /api/board/{project}/messages": true}
+	// a global guard that refuses before routing, with the wrapper in front of it as in the router
+	outer := chi.NewRouter()
+	outer.Use(stamp)
+	outer.Use(routes.RecordPairWrites(g.srv.boardStore, set, mux))
+	outer.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "no", http.StatusForbidden) })
+	})
+	outer.Get("/never", func(http.ResponseWriter, *http.Request) {}) // chi builds the middleware chain once a route exists
+	mux.Post("/api/board/{project}/messages", func(http.ResponseWriter, *http.Request) {})
+	before, err := g.srv.boardStore.RecentHubOperatorActions(ctx, 1000)
+	require.NoError(t, err)
+	req := httptest.NewRequest("POST", "/api/board/a/b/messages", nil) // Path decoded: no such route
+	req.URL.RawPath = "/api/board/a%2Fb/messages"                      // the path as the Hub sent it: the route with project a%2Fb
+	outer.ServeHTTP(httptest.NewRecorder(), req)
+	after, err := g.srv.boardStore.RecentHubOperatorActions(ctx, 1000)
+	require.NoError(t, err)
+	rows := after[:len(after)-len(before)]
+	require.Len(t, rows, 1, "%+v", rows)
+	assert.Equal(t, "/api/board/{project}/messages", rows[0].Path, "the pattern chi would route by, not the decoded path")
+	assert.Equal(t, 403, rows[0].Status)
+	assert.Equal(t, testLinkID, rows[0].ViaLink)
+	assert.Equal(t, integOwner, rows[0].ViaHubUser)
+
+	// a tunneled write that matches no route is never silent: a row with the method, the word unmatched and no path
+	before = after
+	outer.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/nosuch/SENTINEL", nil))
+	after, err = g.srv.boardStore.RecentHubOperatorActions(ctx, 1000)
+	require.NoError(t, err)
+	rows = after[:len(after)-len(before)]
+	require.Len(t, rows, 1, "%+v", rows)
+	assert.Equal(t, routes.UnmatchedPairPath, rows[0].Path)
+	assert.Equal(t, "POST", rows[0].Method)
+	assert.Equal(t, testLinkID, rows[0].ViaLink)
+	assert.Equal(t, integOwner, rows[0].ViaHubUser)
 }
 
 // A loop of refused writes cannot fill the table: past the per-link cap the rows stop, and a served write is still recorded.
