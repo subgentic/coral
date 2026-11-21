@@ -14,3 +14,5 @@
 body.cloud-mode #scheduler-view:not([data-phone-item]) #scheduler-detail { display: block; }
 body.cloud-mode[data-nav-tab="automations"] :is(#phone-fab, #phone-fab-menu) { display: none !important; }
 @media (min-width: 769px) { .cloud-automations > .view-list { display: none; } }
+.cloud-automation-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 12px; }
+.cloud-automation-bar .goals-note { margin: 0; }
