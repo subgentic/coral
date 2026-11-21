@@ -3,6 +3,8 @@
 .team-uncommitted { padding: 8px 0; display: flex; flex-direction: column; gap: 8px; }
 .team-uncommitted[hidden] { display: none; }
 .team-uncommitted-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.team-uncommitted-description { min-width: 0; flex: 1 1 16rem; overflow-wrap: anywhere; }
+.team-uncommitted-folder { display: block; color: var(--text-muted); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .team-uncommitted-words { font-size: var(--fs-md); }
 .team-uncommitted-files { margin: 6px 0 0; padding: 0 0 0 16px; max-height: 180px; overflow: auto; font-family: var(--font-mono); font-size: var(--fs-sm, 12px); white-space: pre; }
 .team-uncommitted-files[hidden], .team-uncommitted-form[hidden] { display: none; }

@@ -1,5 +1,5 @@
 /* The team page's line about work an agent left uncommitted (#17203): "Files changed in <folder>, not committed: N changed, M new" with Review changes (the list) and Commit (one local commit, never pushed). Lazy, loaded by the team page. */
-import { teamFetch, boardFetch, splitKey, isCloud } from './server_base.js';
+import { teamFetch, boardFetch, splitKey, isCloud, boardLabel, hasBoardLabel } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_uncommitted.css'); // the line's layout: not at start
 
@@ -39,11 +39,14 @@ function drawRepo(team, repo) {
     const row = mk('div', 'team-uncommitted-row');
     const folderName = repo.folder.split(/[\\/]/).filter(Boolean).pop() || repo.folder;
     const line = mk('div', 'team-uncommitted-line');
-    const words = mk('span', 'team-uncommitted-words', `Files changed in ${folderName}, not committed: ${countWords(repo)}${repo.truncated ? ' or more' : ''}`);
+    const label = hasBoardLabel(team) ? boardLabel(team) : folderName;
+    const description = mk('div', 'team-uncommitted-description');
+    const words = mk('span', 'team-uncommitted-words', `Files changed in ${label}, not committed: ${countWords(repo)}${repo.truncated ? ' or more' : ''}`);
     words.title = repo.folder;
     const review = mk('button', 'btn team-uncommitted-review', 'Review changes'); review.type = 'button'; review.setAttribute('aria-expanded', 'false');
     const commit = mk('button', 'btn btn-primary team-uncommitted-commit', 'Commit'); commit.type = 'button';
-    line.append(words, review, commit);
+    description.append(words, mk('span', 'team-uncommitted-folder', repo.folder));
+    line.append(description, review, commit);
     const list = mk('ul', 'team-uncommitted-files'); list.hidden = true;
     for (const f of repo.files) list.append(mk('li', 'team-uncommitted-file', `${f.status === 'new' ? 'new' : 'changed'}  ${f.path}`));
     const form = mk('div', 'team-uncommitted-form'); form.hidden = true;
