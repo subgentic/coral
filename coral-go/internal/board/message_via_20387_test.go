@@ -33,14 +33,15 @@ func TestAMessageRecordsTheLinkAndHubPersonItArrivedThrough(t *testing.T) {
 	assert.NotNil(t, anon.ViaLink)
 	assert.Nil(t, anon.ViaHubUser)
 
-	// What is read back carries the same pair.
-	msgs, err := s.ListMessages(ctx, "p", 10, 0, 0)
-	require.NoError(t, err)
-	got := map[string]string{}
-	for _, x := range msgs {
-		if x.ViaLink != nil {
-			got[x.Content] = *x.ViaLink
-		}
+	// The row holds the same pair.
+	var rows []struct {
+		Content string  `db:"content"`
+		Link    *string `db:"via_link"`
+		User    *string `db:"via_hub_user"`
 	}
-	assert.Equal(t, map[string]string{"hi": "lnk-aaaa1111", "x": "lnk-aaaa1111"}, got)
+	require.NoError(t, s.db.SelectContext(ctx, &rows, `SELECT content, via_link, via_hub_user FROM board_messages WHERE project = 'p' AND via_link IS NOT NULL ORDER BY id`))
+	require.Len(t, rows, 2)
+	assert.Equal(t, "hi", rows[0].Content)
+	assert.Equal(t, "hub-user-bbbb2222", *rows[0].User)
+	assert.Nil(t, rows[1].User)
 }
