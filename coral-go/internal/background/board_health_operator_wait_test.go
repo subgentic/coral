@@ -135,3 +135,47 @@ func TestAPostYoungerThanTheGraceIsJudgedLater(t *testing.T) {
 	scan(posted.Add(20 * time.Minute))
 	assert.Equal(t, 1, pending(posted.Add(20*time.Minute)), "and said once")
 }
+
+// #20398: the rule has a switch, a grace, and members it never judges; the defaults are what it always did, and the settings are clamped.
+func TestOperatorWaitSettingsSwitchGraceAndExemptAuthors(t *testing.T) {
+	run := func(t *testing.T, set func(*board.HealthSettings), at time.Duration) int {
+		t.Helper()
+		h := newCheckHarness(t)
+		ctx := context.Background()
+		h.member("Orchestrator", "Orchestrator", 1, 0)
+		h.member("Dev", "Developer", 2, 0)
+		h.member("Lead", "Orchestrator", 3, 0)
+		h.settings(set)
+		_, err := h.s.PostMessage(ctx, "team", "Dev", "marks the board", nil)
+		require.NoError(t, err)
+		subs, err := h.s.ListSubscribers(ctx, "team")
+		require.NoError(t, err)
+		posted := time.Now().UTC()
+		h.m.noteOperatorWaits(ctx, "team", "Orchestrator", subs, map[string]AgentInfo{}, posted)
+		for _, who := range []string{"Dev", "Lead"} {
+			_, err = h.s.PostMessage(ctx, "team", who, "@Operator a status that asks nothing", nil)
+			require.NoError(t, err)
+		}
+		h.m.noteOperatorWaits(ctx, "team", "Orchestrator", subs, map[string]AgentInfo{}, posted.Add(at))
+		got, err := h.s.PendingOffBooks(ctx, "team", posted.Add(at), map[string]bool{board.OffBooksOperatorWait: true})
+		require.NoError(t, err)
+		return len(got)
+	}
+	none := func(*board.HealthSettings) {}
+	assert.Equal(t, 2, run(t, none, 11*time.Minute), "by default as before: both are judged after ten minutes")
+	assert.Equal(t, 0, run(t, func(hs *board.HealthSettings) { hs.OperatorWait.On = false }, 11*time.Minute), "switched off")
+	assert.Equal(t, 0, run(t, func(hs *board.HealthSettings) { hs.OperatorWait.GraceMin = 30 }, 11*time.Minute), "a 30-minute grace: not yet")
+	assert.Equal(t, 2, run(t, func(hs *board.HealthSettings) { hs.OperatorWait.GraceMin = 30 }, 31*time.Minute), "and judged after it")
+	assert.Equal(t, 1, run(t, func(hs *board.HealthSettings) { hs.OperatorWait.AuthorsExempt = []string{"Lead"} }, 11*time.Minute), "an exempt member's post is never judged")
+
+	h := newCheckHarness(t)
+	h.settings(func(hs *board.HealthSettings) {
+		hs.OperatorWait.GraceMin, hs.OperatorWait.ChatMaxAgeMin = 5000, 1
+		hs.OperatorWait.AuthorsExempt = []string{" Lead ", "", "A", "B", "C", "D", "E", "F", "G", "H"}
+	})
+	ow := h.s.GetHealthSettings(context.Background(), "team").OperatorWait
+	assert.Equal(t, 120, ow.GraceMin)
+	assert.Equal(t, 5, ow.ChatMaxAgeMin)
+	assert.Len(t, ow.AuthorsExempt, 8)
+	assert.Equal(t, "Lead", ow.AuthorsExempt[0])
+}

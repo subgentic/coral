@@ -71,6 +71,11 @@ var artifactHexRe = regexp.MustCompile(`coral://artifacts/([0-9a-f]{64})`)
 // OperatorWaitCovered reports whether the author put the post in the Operator's Needs you within OperatorWaitGrace of it: the post itself or a later post of theirs inside the grace is an --ask to the Operator, or
 // links a file of the board tagged "for review". later are the board's messages from the post on (the post included), oldest first, with their asks filled (ListMessagesAfter); tags is ArtifactTags of the board.
 func OperatorWaitCovered(post Message, later []Message, tags map[string][]string) bool {
+	return OperatorWaitCoveredWithin(post, later, tags, OperatorWaitGrace)
+}
+
+// OperatorWaitCoveredWithin is OperatorWaitCovered with the team's own grace (#20398).
+func OperatorWaitCoveredWithin(post Message, later []Message, tags map[string][]string, grace time.Duration) bool {
 	at, err := time.Parse(time.RFC3339, post.CreatedAt)
 	if err != nil {
 		return false
@@ -80,7 +85,7 @@ func OperatorWaitCovered(post Message, later []Message, tags map[string][]string
 			continue
 		}
 		mt, err := time.Parse(time.RFC3339, m.CreatedAt)
-		if err != nil || mt.Before(at) || mt.After(at.Add(OperatorWaitGrace)) {
+		if err != nil || mt.Before(at) || mt.After(at.Add(grace)) {
 			continue
 		}
 		if m.Ask != nil {
