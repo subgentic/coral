@@ -259,6 +259,7 @@ type agentBody struct {
 	SubscriberID string `json:"subscriber_id"`
 	Note         string `json:"note"`
 	KeepPlace    bool   `json:"keep_place,omitempty"` // release: a wait that ended without a turn (the CLI's --timeout): the place in line is kept for a grace, not dropped (#13706)
+	PollEntry    int64  `json:"poll_entry,omitempty"` // a claim --wait looking again: the entry its first claim queued. If that entry is gone (released, kicked), the answer is "cancelled", not a new place in line (#20345)
 	ParentPID    int    `json:"parent_pid,omitempty"` // a claim by an agent: the shell that ran coral-board (a job in the background keeps the slot while it runs, #13718)
 }
 
@@ -289,6 +290,10 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 	}
 	h.reap()
 	name := chi.URLParam(r, "name")
+	if body.PollEntry > 0 && !h.M.Queue().HasEntry(name, who, body.PollEntry) {
+		writeError(w, http.StatusGone, "cancelled", "your place in line for "+cleanText(name, 80)+" was cancelled (released or removed): nothing was claimed")
+		return
+	}
 	res, err := h.M.ClaimPolling(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200))
 	if err != nil {
 		h.fail(w, err)
@@ -332,11 +337,13 @@ func (h *ResourcesHandler) Release(w http.ResponseWriter, r *http.Request) {
 	if body.KeepPlace {
 		release = func(key, agent string) error { return h.M.Queue().Leave(key, agent, resourcequeue.DefaultAwayGrace) }
 	}
-	if err := release(chi.URLParam(r, "name"), who); err != nil {
+	name := chi.URLParam(r, "name")
+	_, queued := h.M.Queue().WaitingFor(name, who) // a queued place that this release cancels is said so, and a wait still polling for it stops (#20345)
+	if err := release(name, who); err != nil {
 		h.fail(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "left_line": queued && !body.KeepPlace})
 }
 
 // Renew answers POST /api/resources/{name}/renew.

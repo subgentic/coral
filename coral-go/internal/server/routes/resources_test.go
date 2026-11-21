@@ -349,6 +349,57 @@ func TestAWaitThatTimedOutKeepsItsPlaceAndAPlainReleaseDropsIt(t *testing.T) {
 
 // #14262: a claim of a PLAIN slot resource (not a pool's member) says which machine it is on, in the reply: `heavy run` reads it to decide between the mini over ssh and this Mac, and a reply with no machine
 // made it run a mini claim on the Mac. A pool's grant still names its member's machine.
+// #20345: a release that cancels a queued place says so, and the wait that queued it (it looks again with the place it was given) is answered "cancelled" instead of being queued again and run later.
+func TestReleasingAQueuedPlaceCancelsItAndAWaitStillPollingStops(t *testing.T) {
+	g := newResRig(t)
+	for _, n := range []string{"Dev A", "Dev B", "Dev C"} {
+		g.subscribe("alpha", n, "Developer", false)
+	}
+	g.do("operator", "PUT", "/api/resources/mac-heavy", map[string]any{"slots": 1})
+	g.do("token:Dev A", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	_, b := g.do("token:Dev B", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	bid := b["entry"].(map[string]any)["id"]
+	poll := func(who string, id any) (int, map[string]any) {
+		return g.do("token:"+who, "POST", "/api/resources/mac-heavy/claim", map[string]any{"poll_entry": id})
+	}
+	code, _ := poll("Dev B", bid)
+	assert.Equal(t, 202, code, "a look while the place is there is the same place")
+
+	code, out := g.do("token:Dev B", "POST", "/api/resources/mac-heavy/release", map[string]any{})
+	assert.Equal(t, 200, code)
+	assert.Equal(t, true, out["left_line"], "the release says it cancelled a queued place")
+	code, out = poll("Dev B", bid)
+	assert.Equal(t, 410, code, "the wait that was still polling is told, not queued again")
+	assert.Equal(t, "cancelled", out["code"])
+	_, st := g.do("token:Dev B", "GET", "/api/resources/mac-heavy", nil)
+	assert.Empty(t, st["queue"], "nobody is queued: the cancelled wait did not join the line again")
+
+	// A new claim that names no place is a new claim.
+	code, _ = g.do("token:Dev B", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	assert.Equal(t, 202, code)
+
+	// A held slot is released as before, and a wait that keeps its place says nothing was cancelled.
+	code, out = g.do("token:Dev A", "POST", "/api/resources/mac-heavy/release", map[string]any{})
+	assert.Equal(t, 200, code)
+	assert.Equal(t, false, out["left_line"], "a held slot is not a queued place")
+	_, c := g.do("token:Dev C", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	cid := c["entry"].(map[string]any)["id"]
+	_, out = g.do("token:Dev C", "POST", "/api/resources/mac-heavy/release", map[string]any{"keep_place": true})
+	assert.Equal(t, false, out["left_line"], "keeping the place is not cancelling it")
+	code, _ = poll("Dev C", cid)
+	assert.Equal(t, 202, code, "a place kept for a grace is still the wait's own")
+
+	// A kick (the Orchestrator's) ends the wait too.
+	g.do("token:Dev B", "POST", "/api/resources/mac-heavy/release", map[string]any{})
+	_, b2 := g.do("token:Dev B", "POST", "/api/resources/mac-heavy/claim", map[string]any{})
+	b2id := b2["entry"].(map[string]any)["id"]
+	code, _ = g.do("operator", "DELETE", "/api/resources/entries/"+strconv.Itoa(int(b2id.(float64))), nil)
+	assert.Equal(t, 200, code)
+	code, out = poll("Dev B", b2id)
+	assert.Equal(t, 410, code)
+	assert.Equal(t, "cancelled", out["code"])
+}
+
 func TestAClaimOfAPlainSlotResourceNamesItsOwnMachine(t *testing.T) {
 	g := newResRig(t)
 	g.subscribe("alpha", "Dev", "Developer", false)
