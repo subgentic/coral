@@ -61,6 +61,7 @@ type BoardHandler struct {
 	coralDir                      string
 	checkSnapDir                  string            // where the approved scripts' snapshots live (custom checks, #20176)
 	checkTokens                   CheckTokenRevoker // ends a check's live run tokens
+	snapMu                        sync.Mutex        // a snapshot is taken and its check stored, or the unused ones dropped, one at a time (#20220)
 	alsoMu                        sync.Mutex        // serialises adding a later receipt to a received row (#4449)
 	autoAttach                    *AutoAttacher     // #3515: an agent's linked images and Markdown
 	writeTaskArtifact             func(context.Context, *board.Task, string) error

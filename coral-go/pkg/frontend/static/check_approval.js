@@ -37,4 +37,28 @@ export function addCheckButtons(a, box) {
         return btn;
     });
     box.prepend(...made);
+    box.append(...scriptToggle(a, check.approve.arg));
+}
+
+/** A "Script" button and the script text beside the hash (#20220): fetched when opened, shown escaped by the server, in a box that scrolls. It shows nothing if the check is no longer the one asked about. */
+function scriptToggle(a, arg) {
+    const at = String(arg || '').lastIndexOf(':'), name = at > 0 ? arg.slice(0, at) : '', hash = at > 0 ? arg.slice(at + 1) : '';
+    if (!name || !hash) return [];
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn btn-quiet btn-small'; btn.textContent = 'Script'; btn.setAttribute('data-check-script', '');
+    btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-label', 'Show the text of the script this check runs');
+    const pre = document.createElement('pre'); pre.hidden = true; pre.tabIndex = 0; pre.setAttribute('data-check-script-text', ''); pre.setAttribute('aria-label', 'The script text, special characters written as escapes');
+    Object.assign(pre.style, { flexBasis: '100%', width: '100%', maxHeight: '12em', overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', margin: '4px 0 0', fontSize: '0.85em', textAlign: 'left' });
+    let loaded = false;
+    btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        pre.hidden = !pre.hidden; btn.setAttribute('aria-expanded', String(!pre.hidden));
+        if (pre.hidden || loaded) return;
+        loaded = true; pre.textContent = 'Loading the script…';
+        try {
+            const r = await fetch(`/api/board/${encodeURIComponent(a.board)}/health/checks`, { cache: 'no-store' });
+            const c = r.ok ? ((await r.json()).checks || []).find(x => x.name === name) : null;
+            pre.textContent = c && c.record_hash === hash ? (c.script_text || 'The script text is not available.') : 'This check changed after the question was filed; look at the new question.';
+        } catch { loaded = false; pre.textContent = 'The script could not be loaded. Try again.'; }
+    });
+    return [btn, pre];
 }
