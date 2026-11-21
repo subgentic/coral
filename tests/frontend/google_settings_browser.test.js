@@ -23,6 +23,7 @@ const { coralReady } = require('./helpers/wait');
                     if (p === '/api/google/status' && m === 'GET') return window.__gstatus ? json(window.__gstatus.body, window.__gstatus.status) : json(window.__g);
                     if (p === '/api/google/connect' && m === 'POST') { window.__connects++; return json({ authorize_url: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=test' }); }
                     if (p === '/api/google/disconnect' && m === 'POST') { window.__disc++; window.__g = { client_file_set: true, client_file_ok: true, connected: false, state: 'disconnected' }; return json({ connected: false, revoked: true }); }
+                    if (p === '/api/settings' && m === 'PUT') return json({ ok: true }); // the switch's save is answered here: the test never changes the server's own setting
                     return real(u, o); };
                 return true; })()`);
             await ev(`window.showSettingsModal('cleanup'); true`);
@@ -55,6 +56,18 @@ const { coralReady } = require('./helpers/wait');
                 import((window.__coralStatic || '/static/') + 'google_settings.js').then(m => m.loadGoogle()).then(() => true)`);
             await waitFor(`/not through Coral Hub/.test(document.getElementById('settings-google-status').textContent)`, 'the Hub refusal text', 6000);
             check(`${tag}: through Coral Hub it says it is the computer's own, with no buttons`, !(await shown('settings-google-connect')));
+
+            // The switch is turned on in this same Settings session (#20286): the block appears without reopening Settings, and is hidden while it is off.
+            await ev(`window.__gstatus = null; window.__g = { enabled: false, client_file_set: true, client_file_ok: true, connected: false, state: 'disconnected' };
+                import((window.__coralStatic || '/static/') + 'google_settings.js').then(m => m.loadGoogle()).then(() => true)`);
+            await waitFor(`(() => { const el = document.getElementById('settings-google'); return !el || !!el.closest('[hidden]') || el.getClientRects().length === 0; })()`, 'the Google block to hide while the switch is off', 6000);
+            check(`${tag}: while the switch is off the Google block is hidden`, !(await shown('settings-google')));
+            await ev(`window.__g = { enabled: true, client_file_set: true, client_file_ok: true, connected: false, state: 'disconnected' }; (() => { const sw = document.getElementById('settings-gdoc-share'); sw.dispatchEvent(new Event('pointerdown', { bubbles: true })); sw.click(); })(); true`);
+            await waitFor(`(() => { const el = document.getElementById('settings-google'); return !!el && !el.closest('[hidden]') && el.getClientRects().length > 0; })()`, 'the Google block to appear when the switch is turned on', 8000);
+            check(`${tag}: turning the switch on shows the Google block in the same session`, await shown('settings-google') && await shown('settings-google-connect'));
+            await waitFor(`!document.getElementById('settings-gdoc-share').disabled`, 'the switch to finish saving', 6000);
+            await ev(`(() => { const sw = document.getElementById('settings-gdoc-share'); sw.dispatchEvent(new Event('pointerdown', { bubbles: true })); sw.click(); })(); true`); // put the setting back
+            await waitFor(`!document.getElementById('settings-gdoc-share').disabled`, 'the switch to finish saving back', 6000);
             await ev(`window.hideSettingsModal && window.hideSettingsModal(); true`);
         }
     } finally { await client.close(); }

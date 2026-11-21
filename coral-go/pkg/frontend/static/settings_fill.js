@@ -95,6 +95,8 @@ export async function _fillMachineSettings(s) {
         const worktreeLaunch = document.getElementById('settings-launch-in-worktree');
         // Off unless the Operator turned it on (#12746, experimental); an empty value is unset.
         if (worktreeLaunch) worktreeLaunch.checked = settingBool(s.launch_in_worktree || undefined, false);
+        const gdocShare = document.getElementById('settings-gdoc-share');
+        if (gdocShare) gdocShare.checked = settingBool(s.gdoc_share || undefined, false); // off unless the Operator turned it on (#19996); the switch showed off after a reload before it was read here (#20286)
         const nudgeArtifacts = document.getElementById('settings-nudge-claude-artifacts');
         // On unless the Operator turned it off (#6583); an empty value is unset.
         if (nudgeArtifacts) nudgeArtifacts.checked = settingBool(s.nudge_claude_artifacts || undefined, true);
