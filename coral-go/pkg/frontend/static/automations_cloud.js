@@ -8,6 +8,7 @@ import { go, currentRoute } from './nav.js';
 import { showView } from './utils.js';
 import { importOnce } from './import_once.js';
 const { machineOnline, machineLabel, machineChoices, machineNow, pickMachine } = await importOnce('./analytics_machine.js');
+const { computerCard, stateOfStatus } = await importOnce('./computer_card.js'); // one plain card for every cannot state (#20207)
 const { computerBar } = await importOnce('./computer_bar.js'); // the one computer bar under the title (#20207)
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
@@ -42,13 +43,16 @@ function shell() {
     host.replaceChildren(bar, nav(), panel);
     return panel;
 }
+/** A read that could not be answered carries the card it should draw (offline, not shared, no answer, key rejected, or the hedged "may need a newer Coral") and the support line. */
+class ReadError extends Error { constructor(server, state, detail) { super(`${machineLabel(server)}: ${state}`); this.server = server; this.state = state; this.detail = detail; } }
 async function read(server, path, signal) {
-    if (!machineOnline(server)) throw new Error(`${machineLabel(server)} is offline, so its automations can't be read now.`);
-    const response = await serverFetch(server, path, { signal });
+    if (!machineOnline(server)) throw new ReadError(server, 'offline', '');
+    let response;
+    try { response = await serverFetch(server, path, { signal }); } catch (e) { if (signal.aborted) throw e; throw new ReadError(server, 'no-answer', `${e.name || 'Error'}: ${e.message || 'the request failed'} (${path})`); }
     // Read error bodies too: failed reads must not leave streams in the pool.
     const data = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(`${machineLabel(server)} can't show automations here. It may need a newer Coral.`);
-    if (!data || typeof data !== 'object') throw new Error('Could not read automations.');
+    if (!response.ok) throw new ReadError(server, stateOfStatus(server, response.status), `${response.status} from ${path} (${machineLabel(server)})`);
+    if (!data || typeof data !== 'object') throw new ReadError(server, 'no-answer', `Unreadable reply from ${path} (${machineLabel(server)})`);
     return data;
 }
 function facts(rows) {
@@ -98,7 +102,7 @@ async function details(panel, server, request, signal, myGeneration) {
                 else { runsHost.replaceChildren(link('Back to runs', () => openAutomationsRoute(request)), el('h3', '', `Run ${word(r.id)}`), runFacts(r)); more.hidden = true; }
             }));
             more.hidden = !rows.length || !(data.has_more || Number(data.total) > offset);
-        } catch (e) { if (!signal.aborted && myGeneration === generation) runsHost.append(el('p', 'notice notice-error', e.message)); }
+        } catch (e) { if (!signal.aborted && myGeneration === generation) runsHost.append(e instanceof ReadError ? computerCard({ state: e.state, server: e.server, what: 'automations', detail: e.detail, barId: 'cloud-automation-computer' }) : el('p', 'notice notice-error', e.message)); }
         finally { loading = false; more.disabled = false; }
     }
     await loadRuns(); panel.append(more);
@@ -138,7 +142,7 @@ export async function openAutomationsRoute(request = {}) {
             }
         }
     } catch (e) {
-        if (!signal.aborted && myGeneration === generation) panel.replaceChildren(el('p', 'notice notice-error', e.message), link('Retry', () => openAutomationsRoute(route)));
+        if (!signal.aborted && myGeneration === generation) panel.replaceChildren(e instanceof ReadError ? computerCard({ state: e.state, server: e.server, what: 'automations', detail: e.detail, retry: () => openAutomationsRoute(route), barId: 'cloud-automation-computer' }) : el('p', 'notice notice-error', e.message), ...(e instanceof ReadError ? [] : [link('Retry', () => openAutomationsRoute(route))]));
     } finally { if (myGeneration === generation) panel.removeAttribute('aria-busy'); }
     return true;
 }
