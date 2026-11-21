@@ -82,9 +82,8 @@ func TestPairRecordedRoutesRecordThePairThroughTheRealConnector(t *testing.T) {
 	for route := range pairRecordedRoutes {
 		method, pattern, _ := strings.Cut(route, " ")
 		before := len(count())
-		path := strings.NewReplacer("{id}", map[bool]string{true: strings.Repeat("a", 64), false: "1"}[strings.HasPrefix(pattern, "/api/artifacts/")], "{cid}", "1").Replace(pattern)
+		path := pairConcretePath(pattern)
 		code, body := g.hub("owner", integOwner, method, path, `{"secret":"SENTINEL"}`, nil)
-		_ = body // any answer counts, a refusal too: the row is what is proven
 		acts := count()
 		rows := acts[:len(acts)-before]
 		var mine []board.HubOperatorAction
@@ -93,7 +92,7 @@ func TestPairRecordedRoutesRecordThePairThroughTheRealConnector(t *testing.T) {
 				mine = append(mine, a)
 			}
 		}
-		require.Len(t, mine, 1, "%s: one row for one tunneled write (rows added: %+v)", route, rows)
+		require.Len(t, mine, 1, "%s: one row for one tunneled write (answered %d %s; rows added: %+v)", route, code, body, rows)
 		if mine[0].Path == pattern {
 			assert.Equal(t, board.HubActionKindWrite, mine[0].Kind, route+": the wrapper's rows are their own kind")
 		}
@@ -126,4 +125,21 @@ func TestRefusedPairRowsAreCappedPerLink(t *testing.T) {
 	added := len(acts) - len(acts0)
 	assert.LessOrEqual(t, added, 30, "refused rows are capped per link per minute")
 	assert.Greater(t, added, 0, "refused rows are recorded")
+}
+
+// pairConcretePath gives a route pattern a path to call: a content digest (64 hex) where the route names an artifact, 1 for every other placeholder. A call that finds nothing (404) is as good as any
+// answer: the proof is the row.
+func pairConcretePath(pattern string) string {
+	segs := strings.Split(pattern, "/")
+	for i, s := range segs {
+		if !strings.HasPrefix(s, "{") {
+			continue
+		}
+		if s == "{digest}" || (s == "{id}" && i > 0 && segs[i-1] == "artifacts") {
+			segs[i] = strings.Repeat("a", 64)
+		} else {
+			segs[i] = "1"
+		}
+	}
+	return strings.Join(segs, "/")
 }
