@@ -27,8 +27,17 @@ type deviationSaid struct {
 
 // deviationItems returns the findings not said yet at their current level, and notes them to be marked said once a check has been delivered with them.
 func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string, rcpt *board.Subscriber, tasks []board.Task, parked map[string]bool, waits []board.RegisteredWait, subs []board.Subscriber, now time.Time) []teamhealth.Item {
-	if !m.store.GetHealthSettings(ctx, project).Deviations.On {
+	dev := m.store.GetHealthSettings(ctx, project).Deviations
+	if !dev.On {
 		return nil
+	}
+	minAge := time.Duration(dev.MinAgeMin) * time.Minute
+	scale := func(d time.Duration) time.Duration { return d * time.Duration(dev.FactorPct) / 100 } // 100 percent is the threshold the rule always used
+	level := func(age, threshold time.Duration) int {                                              // below the floor nothing is flagged, whatever the usual is (#20398)
+		if age < minAge {
+			return 0
+		}
+		return teamhealth.Level(age, scale(threshold))
 	}
 	hist, err := m.store.ClaimToDoneDurations(ctx, project)
 	if err != nil {
@@ -69,12 +78,12 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 		id := fmt.Sprint(t.ID)
 		age := now.Sub(claimed)
 		// A: longer than its owner's usual
-		if u, ok := teamhealth.UsualTaskTime(hist[agent], team); ok {
+		if u, ok := teamhealth.UsualTaskTime(hist[agent], team); ok && u.N >= dev.MinSamples {
 			whose := fmt.Sprintf("its last %d", u.N)
 			if u.Team {
 				whose = fmt.Sprintf("the team's last %d (it has under %d of its own)", u.N, teamhealth.MinOwnSamples)
 			}
-			flag("A", id, agent, teamhealth.Level(age, u.TaskOverdue()), teamhealth.Item{Agent: name, Age: age,
+			flag("A", id, agent, level(age, u.TaskOverdue()), teamhealth.Item{Agent: name, Age: age,
 				Problem: fmt.Sprintf("#%d has been in progress for %s; the usual is %s (median of %s, 90th percentile %s)", t.ID, teamhealth.Age(age), teamhealth.Age(u.Median), whose, teamhealth.Age(u.P90)),
 				Suggest: "check on it"})
 		}
@@ -87,10 +96,10 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 		for i := 1; i < len(events); i++ {
 			gaps = append(gaps, events[i].Sub(events[i-1]))
 		}
-		if len(gaps) >= teamhealth.MinGapSamples {
+		if len(gaps) >= max(teamhealth.MinGapSamples, dev.MinSamples) {
 			usual := teamhealth.Median(gaps)
 			silent := now.Sub(events[len(events)-1])
-			flag("B", id, agent, teamhealth.Level(silent, 3*usual), teamhealth.Item{Agent: name, Age: silent,
+			flag("B", id, agent, level(silent, 3*usual), teamhealth.Item{Agent: name, Age: silent,
 				Problem: fmt.Sprintf("silent on #%d for %s; its usual gap between posts on it is %s (median of %d)", t.ID, teamhealth.Age(silent), teamhealth.Age(usual), len(gaps)),
 				Suggest: "ask for a status"})
 		}
@@ -125,12 +134,12 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 			on = teamhealth.Name(target.sub.SubscriberID)
 		}
 		prior, err := m.store.ResolvedWaitDurations(ctx, project, w.SubscriberID, w.WaitType, w.TargetID, 30)
-		if err != nil || len(prior) < teamhealth.MinWaitSamples {
+		if err != nil || len(prior) < max(teamhealth.MinWaitSamples, dev.MinSamples) {
 			continue
 		}
 		usual := teamhealth.Median(prior)
 		age := now.Sub(at)
-		flag("C", fmt.Sprint(w.ID), w.SubscriberID, teamhealth.Level(age, 2*usual), teamhealth.Item{Agent: teamhealth.Name(w.SubscriberID), Age: age,
+		flag("C", fmt.Sprint(w.ID), w.SubscriberID, level(age, 2*usual), teamhealth.Item{Agent: teamhealth.Name(w.SubscriberID), Age: age,
 			Problem: fmt.Sprintf("has waited %s on %s; an answer usually takes %s (median of %d earlier waits)", teamhealth.Age(age), on, teamhealth.Age(usual), len(prior)),
 			Suggest: "ask who it waits on, or check on it"})
 	}
