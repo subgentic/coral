@@ -140,7 +140,7 @@
 }
 @media (min-width: 769px) { /* after Request changes the status is a long sentence (#16618, walk 26 L3): the chip wraps in at most 18rem and the name keeps at least 12rem (the controls wrap under it when the row is full), instead of a one-line chip crushing the name to a letter or running past the dialog */
     .artifact-viewer-chips { flex: 0 1 auto; min-width: 0; max-width: 100%; }
-    .artifact-viewer-chips > .artifact-review-state { flex: 0 1 auto; min-width: 0; max-width: 11rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: auto; padding-block: 2px; border-radius: var(--radius-xl); } /* one row (#19771): the status is cut with an ellipsis, its whole words in the title */
+    .artifact-viewer-chips > .artifact-review-state { display: block; flex: 0 1 auto; min-width: 0; max-width: 18rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: auto; padding-block: 2px; border-radius: var(--radius-xl); } /* one row (#19771): the status is cut with an ellipsis, its whole words in the title */
     .artifact-viewer-header > .artifact-viewer-title { flex: 1 1 0; min-width: min(12rem, 100%); }
 }
 @media (max-width: 768px) { .artifact-review-form > .artifact-review-cancel { order: 3; } .artifact-review-form > .btn { padding-inline: 10px; } .artifact-review > .artifact-review-form { padding-inline: 0; } .artifact-review-form textarea { min-height: 3.25em; } } /* #15545: on a phone the request and the approval are side by side, Cancel is under them */

@@ -98,7 +98,7 @@
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr .inbox-blocks.inbox-blocks-closes::before { content: 'flag'; }
 
 /* The meta strip (#19812): its pieces are told apart by a dot, the version is shown once, a report from Coral wears a tinted kind label; Save and Star carry a small mark; a file's tile shows its type. */
-:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr .inbox-meta > :not(:first-child, .inbox-pills, .inbox-review-version, .inbox-wait-target, .inbox-wait-state)::before { content: '·'; margin-inline-end: 6px; color: var(--text-muted); }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr .inbox-meta > :not(:first-child, .inbox-ask-subject-links, .inbox-pills, .inbox-review-version, .inbox-wait-target, .inbox-wait-state)::before { content: '·'; margin-inline-end: 6px; color: var(--text-muted); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind { color: var(--text-secondary); font-weight: var(--fw-medium); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind:is(.inbox-kind-done, .inbox-kind-release, .inbox-kind-decided, .inbox-kind-digest) { padding: 0 7px; border-radius: var(--radius-sm); font-weight: var(--fw-strong); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr .inbox-meta .inbox-kind-done { background: var(--needs-icon-green-bg); color: var(--needs-icon-green-fg); }
@@ -287,3 +287,8 @@
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results :is(tr.inbox-card-tr, tr) .inbox-wake.inbox-wake-archived:hover { background: color-mix(in srgb, var(--error) 24%, transparent); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results :is(tr.inbox-card-tr, tr) .inbox-wake:is(.inbox-wake-asleep, .inbox-wake-archived)::before { content: ""; display: inline-block; width: 11px; height: 11px; margin-inline-end: 5px; vertical-align: -1px; background: currentColor; -webkit-mask: var(--wk-ico) center / contain no-repeat; mask: var(--wk-ico) center / contain no-repeat; }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results :is(tr.inbox-card-tr, tr) .inbox-wake:is(.inbox-wake-asleep, .inbox-wake-archived) { white-space: nowrap; flex: 0 0 auto; } /* mock v3: Wake and Start agent read on one line, also at 390 where the row's buttons share 5rem (#20122) */
+
+/* #20328: ellipsis needs a block text line; a flex button clips its anonymous text. */
+@media (min-width: 768px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-card-tr:has([data-wait-kind]) .inbox-review-item > .inbox-review-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}

@@ -18,7 +18,7 @@ type AnsweredAsk struct {
 
 // AnsweredAsksOf are the questions of the board asked less than askMaxAge ago that member answered with a reply (reply_to) and whose asker has posted nothing since the answer, oldest answer first, at most limit
 // (#19923: the cap is applied in the query, so a board with thousands of old questions reads no more than limit rows and the cost does not grow with the questions). A question closed by hand is not listed, and neither is one whose
-// asker posted anything on the board after the answer (the agent acted); a question the Operator reopened counts from the reopening. Two queries per board, whatever the number of questions.
+// asker posted anything on the board after the answer (the agent acted), or whose linked task finished; a question the Operator reopened counts from the reopening. Two queries per board, whatever the number of questions.
 func (s *Store) AnsweredAsksOf(ctx context.Context, project, member string, now time.Time, limit int) ([]AnsweredAsk, error) {
 	if limit < 1 {
 		return nil, nil
@@ -40,6 +40,8 @@ func (s *Store) AnsweredAsksOf(ctx context.Context, project, member string, now 
 		  AND lower(a.asker) != lower(?)
 		  AND EXISTS (SELECT 1 FROM json_each(a.asked) j WHERE lower(j.value) = lower(?))
 		  AND NOT EXISTS (SELECT 1 FROM board_ask_closed c WHERE c.project = a.project AND c.message_id = a.message_id)
+          AND NOT EXISTS (SELECT 1 FROM board_ask_subjects sj JOIN board_tasks t ON t.board_id = sj.project AND t.id = sj.task_id
+                          WHERE sj.project = a.project AND sj.message_id = a.message_id AND t.status IN ('completed','skipped','cancelled'))
 		  AND m.id > COALESCE((SELECT o.after_id FROM board_ask_reopened o WHERE o.project = a.project AND o.message_id = a.message_id), 0)
 		  AND m.id = (SELECT MAX(m2.id) FROM board_replies r2 JOIN board_messages m2 ON m2.project = r2.project AND m2.id = r2.message_id
 		              WHERE r2.project = a.project AND r2.reply_to = a.message_id AND lower(m2.subscriber_id) = lower(?) AND COALESCE(m2.is_system, 0) = 0)
