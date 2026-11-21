@@ -51,6 +51,7 @@ var tooManyRequestsSites = map[string]struct {
 	"internal/server/routes/dropbox_share.go":           {3, "Share via Dropbox (#14944): the 20-shares-an-hour limit and Dropbox asking Coral to wait are per-action limits, returned as values; writeShareRefusal, the third mention, sends every 429 with WriteActionLimit (marked X-Coral-Limit: action, with Retry-After when Dropbox gave one)"},
 	"internal/server/routes/orchestrator_agents.go":     {1, "orchRefusal writes every 429 with WriteActionLimitBody (marked X-Coral-Limit: action): the orchestrator's per-hour lifecycle caps (#15112)"},
 	"internal/server/routes/orchestrator_restart.go":    {1, "a restart refused by the hourly cap is returned as a value; orchRefusal, the caller, sends every 429 marked with WriteActionLimitBody (#15112)"},
+	"internal/server/routes/hub_revoke.go":              {1, "client side: reads Coral Hub's 429 on a link's revoke as Retry, waiting what Retry-After says (at most hubRevokeMaxAfter); never writes one"},
 	"internal/server/routes/cross_team_send.go":         {2, "a relayed send's per-sender limit, and Coral Hub's 429 passed on: relayError writes every 429 with WriteActionLimitBody (marked), the other mention is that check (#3489)"},
 }
 

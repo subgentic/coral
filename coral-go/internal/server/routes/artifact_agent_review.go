@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
@@ -83,8 +84,7 @@ func (h *SessionsHandler) reviewAgentArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if !reviewResendAllowed(teamBoard+"/"+newest, time.Now()) {
-		w.Header().Set("Retry-After", "3600")
-		writeError(w, http.StatusTooManyRequests, "resend_limit", "this file was sent for review "+strconv.Itoa(reviewResendsPerHour)+" times in the last hour: the Operator has it; upload a changed version to ask again")
+		httputil.WriteActionLimit(w, 3600, "resend_limit", "this file was sent for review "+strconv.Itoa(reviewResendsPerHour)+" times in the last hour: the Operator has it; upload a changed version to ask again")
 		return
 	}
 	tags, decided, err := h.bs.StartArtifactReview(ctx, teamBoard, newest, time.Now())
