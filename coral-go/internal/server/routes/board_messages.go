@@ -1102,8 +1102,7 @@ func (h *BoardHandler) refuseUnallowedReply(w http.ResponseWriter, r *http.Reque
 	}
 	via, ok := cloud.ViaFrom(r.Context())
 	if !ok || via.LinkID == "" {
-		writeJSON(w, http.StatusForbidden, map[string]string{"code": cloud.LinkRefusedCode, "error": "this request did not come through a known Coral Hub link"})
-		return true
+		return false // no link in the context: only a handler called without the router's LinkStamp, which refuses a tunneled request with no known link before any handler (cloud/via.go, tested there and in link_asks_20413_test.go)
 	}
 	refuse := func(msg string) bool {
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": cloud.LinkRefusedCode, "error": msg})
