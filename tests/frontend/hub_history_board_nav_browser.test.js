@@ -76,7 +76,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
    await ev(`document.querySelector('#nav-more-menu [data-arg="history"]').click();true`);
    await waitFor(`document.getElementById('history-computer').checkVisibility() && document.getElementById('history-sessions-list').textContent.includes('Laptop conversation')`,'linked Laptop history');
    assert.ok(await ev(`location.pathname==='/chats/@m1'`),'source in list URL');
-   assert.ok(await ev(`document.getElementById('history-computer').getBoundingClientRect().height>=44`),'computer picker touch target');
+   assert.ok(await ev(`document.querySelector('#history-computer .computer-bar-button').getBoundingClientRect().height>=44`),'computer picker touch target');
    await shot(theme+'-390-chats');
    await ev(`document.querySelector('#history-sessions-list [data-on-click="history-open"]').click();true`);
    await waitFor(`document.getElementById('history-messages').textContent.includes('needle from m1')`,'Laptop transcript');
@@ -111,7 +111,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
    assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth`),'no sideways scroll');
    await menu();await ev(`document.querySelector('#nav-more-menu [data-arg="history"]').click();true`);
   }
-  await ev(`(()=>{const s=document.getElementById('history-computer');s.value='m2';s.dispatchEvent(new Event('change',{bubbles:true}));true;})()`);
+  await ev(`(()=>{const r=document.getElementById('history-computer');r.querySelector('.computer-bar-button').click();r.querySelector('.computer-bar-option[data-computer="m2"]').click();true;})()`);
   await waitFor(`document.getElementById('history-sessions-list').textContent.includes('Desktop conversation') && location.pathname==='/chats/@m2'`,'switch source');
   await ev(`document.querySelector('#history-sessions-list [data-on-click="history-open"]').click();true`);
   await waitFor(`document.getElementById('history-messages').textContent.includes('needle from m2')`,'same id on Desktop');
@@ -134,16 +134,16 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
   assert.equal(await ev(`window.__remoteRequests.length`),before,'hostile id sent no request');
   await ev(`document.querySelector('.mobile-history-back').click();true`);
   await waitFor(`document.getElementById('history-computer').checkVisibility()`,'source picker');
-  await ev(`(()=>{document.getElementById('history-search').value='';document.getElementById('history-search').dispatchEvent(new Event('input',{bubbles:true}));window.__holdHistory=true;const s=document.getElementById('history-computer');s.value='m1';s.dispatchEvent(new Event('change',{bubbles:true}));true;})()`);
+  await ev(`(()=>{document.getElementById('history-search').value='';document.getElementById('history-search').dispatchEvent(new Event('input',{bubbles:true}));window.__holdHistory=true;const r=document.getElementById('history-computer');r.querySelector('.computer-bar-button').click();r.querySelector('.computer-bar-option[data-computer="m1"]').click();true;})()`);
   await waitFor(`typeof window.__releaseHistory==='function'`,'held old computer request');
-  await ev(`(()=>{const s=document.getElementById('history-computer');s.value='m2';s.dispatchEvent(new Event('change',{bubbles:true}));true;})()`);
+  await ev(`(()=>{const r=document.getElementById('history-computer');r.querySelector('.computer-bar-button').click();r.querySelector('.computer-bar-option[data-computer="m2"]').click();true;})()`);
   await waitFor(`document.getElementById('history-sessions-list').textContent.includes('Desktop conversation')`,'new computer wins');
   await ev(`window.__releaseHistory();true`);await ev(framesJs(2));
   assert.ok(await ev(`document.getElementById('history-sessions-list').textContent.includes('Desktop conversation') && !document.getElementById('history-sessions-list').textContent.includes('OLD LAPTOP')`),'late old response does not overwrite the new computer');
   assert.deepEqual(errors,[],'no page exceptions');
   await Page.addScriptToEvaluateOnNewDocument({source:'window.__noComputers=true;'});
   await boot('/chats');
-  await waitFor(`document.getElementById('history-computer').disabled && document.getElementById('history-sessions-list').textContent.includes('No computers online')`,'empty linked-computer state');
+  await waitFor(`document.querySelector('#history-computer .computer-bar-button').disabled && document.getElementById('history-sessions-list').textContent.includes('No computers online')`,'empty linked-computer state');
   assert.ok(!(await ev(`window.__remoteRequests`)).some(x=>x.path.includes('/sessions/history')),'no history request without an online computer');
   await ev(framesJs(2));
   console.log('PASS 390px Hub nav, source-scoped History/Board, shared IDs, reload, search, Never controls, light/dark, and tiered subscribe');

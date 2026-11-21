@@ -303,5 +303,5 @@
 /* A named source for linked-computer history, including the phone sidebar. */
 .history-computer-row { display: flex; margin: 0; padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--border); } /* its own full-width row directly under the header, so the header's icons keep their places: whose chats the list shows is not behind Display options (#7443) */
 .history-computer-row[hidden] { display: none; }
-.history-computer-row select { width: 100%; min-width: 0; height: 36px; padding: 0 var(--space-md); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border); border-radius: var(--radius-lg); font: inherit; font-size: var(--fs-md); }
-@media (pointer: coarse) { .history-computer-row select { height: 44px; } }
+.history-computer-row .computer-bar { width: 100%; }
+.history-computer-row .computer-bar-button { flex: 1; max-width: none; }
