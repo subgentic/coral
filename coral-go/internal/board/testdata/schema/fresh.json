@@ -830,7 +830,7 @@
     },
     {
       "name": "health_items",
-      "sql": "CREATE TABLE health_items (\n\tproject     TEXT NOT NULL,\n\titem        TEXT NOT NULL,\n\tstate       TEXT NOT NULL,\n\tshown_at    TEXT NOT NULL,\n\tacked_state TEXT,\n\tacked_by    TEXT,\n\tacked_at    TEXT,\n\tPRIMARY KEY (project, item)\n)",
+      "sql": "CREATE TABLE health_items (\n\tproject     TEXT NOT NULL,\n\titem        TEXT NOT NULL,\n\tstate       TEXT NOT NULL,\n\tshown_at    TEXT NOT NULL,\n\tacked_state TEXT,\n\tacked_by    TEXT,\n\tacked_at    TEXT,\n\ttext        TEXT NOT NULL DEFAULT '',\n\tPRIMARY KEY (project, item)\n)",
       "tbl_name": "health_items",
       "type": "table"
     },
@@ -7338,6 +7338,15 @@
           "hidden": 0,
           "name": "acked_at",
           "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "text",
+          "notnull": 1,
           "pk": 0,
           "type": "TEXT"
         }
