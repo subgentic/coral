@@ -114,7 +114,9 @@ const STUB = `(() => {
    await waitFor(`!!document.querySelector('#scheduler-view .computer-card') && !document.querySelector('#scheduler-view [aria-busy="true"]')`, 'the computer refusal card',10000);
    assert.ok(await ev(`document.querySelector('#scheduler-view .computer-card-details').textContent.includes('409')`),'the current refusal is 409');
    if(process.env.CORAL_SCREENSHOT_DIR){fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});await ev(framesJs(2));fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/update-required-'+width+'-'+theme+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
-   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),'Update Coral on Second computer (needs 9.7.3+)','name and minimum version come from the selected computer and Hub body');
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),'Second computer needs an update to share its automations','name comes from the selected computer');
+   assert.ok((await ev(`document.querySelector('#scheduler-view .computer-card-why').textContent`)).includes('The Hub can read automations from Coral 9.7.3 on. Everything else about Second computer still works.'),'the minimum comes from the Hub body, in the mock\'s sentence');
+   assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-view .computer-card button')].map(b=>b.textContent)`),['Show how to update','Switch computer','Open Computers'],'the mock\'s three buttons');
    assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card').dataset.computerCard`),'update-required');
    assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-details').open`),false,'support details stay collapsed');
    assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'the update card fits the phone or desktop');
@@ -130,12 +132,13 @@ const STUB = `(() => {
    await route({view:'automations',folder:'jobs'});
    await waitFor(`!!document.querySelector('#scheduler-view .computer-card') && !document.querySelector('#scheduler-view [aria-busy="true"]')`, 'fallback refusal card',10000);
    assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card').dataset.computerCard`),kind,'other statuses and malformed bodies preserve the existing card');
-   assert.ok(!(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`)).startsWith('Update Coral on '),'a grantee/stranger refusal or unknown failure never claims an update is known');
+   assert.ok(!(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`)).includes('needs an update'),'a grantee/stranger refusal or unknown failure never claims an update is known');
   }
   for(const min of ['0.0.0','1234567890123456.1.1']){
    await ev(`window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:${JSON.stringify(min)}};true`);
-   await route({view:'automations',folder:'jobs'}); await ready('Update Coral on ');
-   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),`Update Coral on Second computer (needs ${min}+)`,'valid floors including the 20-character boundary are retained');
+   await route({view:'automations',folder:'jobs'}); await ready('needs an update to share its automations');
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),'Second computer needs an update to share its automations','an update card for a valid floor');
+   assert.ok((await ev(`document.querySelector('#scheduler-view .computer-card-why').textContent`)).includes(`from Coral ${min} on.`),'valid floors including the 20-character boundary are retained');
   }
   const unsafeName='<img src=x onerror="window.__updatePwn=1">', unsafeMin='<svg onload="window.__updatePwn=2">';
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers.find(s=>s.id==='two').label=${JSON.stringify(unsafeName)};window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:${JSON.stringify(unsafeMin)}};return true;})`);
@@ -145,10 +148,10 @@ const STUB = `(() => {
   assert.equal(await ev(`!!window.__updatePwn || !!document.querySelector('#scheduler-view .computer-card img, #scheduler-view .computer-card svg')`),false,'response and computer labels never become markup');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{delete state.servers.find(s=>s.id==='two').label;window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:'8.6.4'};window.__automationDenyServer='two';state.machineChosen='all';return true;})`);
   await route({view:'automations',folder:'jobs'}); await ready('one job');
-  assert.ok((await ev(`document.querySelector('.computer-not-shown').textContent`)).includes('Update Coral on Second computer (needs 8.6.4+)'),'All computers names the unreadable computer and Hub minimum beside readable rows');
+  assert.ok((await ev(`document.querySelector('.computer-not-shown').textContent`)).includes('Second computer needs an update to share automations'),'All computers names the unreadable computer beside readable rows');
   await ev(`import((window.__coralStatic||'/static/')+'analytics_machine.js').then(m=>{m.pickMachine('two');window.__automationDenyPath='/api/scheduled/jobs/1/runs';return true;})`);
-  await route({view:'automations',folder:'jobs',id:1}); await ready('Update Coral on Second computer (needs 8.6.4+)');
-  assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),'Update Coral on Second computer (needs 8.6.4+)','a nested run-history read keeps the minimum too');
+  await route({view:'automations',folder:'jobs',id:1}); await ready('Second computer needs an update to share its automations');
+  assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),'Second computer needs an update to share its automations','a nested run-history read keeps the update card too');
   await ev(`window.__automationDeny=0;delete window.__automationErrorBody;delete window.__automationDenyPath;delete window.__automationDenyServer;true`);
   await ev('window.__automationDeny=0;true');
   await ev(`window.__automationDeny=0;true`); await route({view:'automations',folder:'jobs'}); await ready('two job');

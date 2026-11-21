@@ -39,7 +39,7 @@ function shell(everyone) {
     heading.replaceChildren(el('h2', '', 'Automations'));
     const panel = el('div', 'cloud-automation-content'); panel.setAttribute('aria-busy', 'true');
     const choices = machineChoices(), server = everyone ? ALL_COMPUTERS : machineNow(), bar = el('div', 'cloud-automation-bar');
-    if (choices.length) bar.append(computerBar({ id: 'cloud-automation-computer', choices, all: true, current: server, onPick: id => { pickMachine(id); openAutomationsRoute({ view: 'automations', folder: route.folder }); } }), el('p', 'goals-note', everyone ? 'Read only here. Edit them in Coral on each computer.' : `Read only here. Edit them in Coral on ${machineLabel(server)}.`));
+    if (choices.length) bar.append(computerBar({ id: 'cloud-automation-computer', what: 'automations', choices, all: true, current: server, onPick: id => { pickMachine(id); openAutomationsRoute({ view: 'automations', folder: route.folder }); } }), el('p', 'goals-note', everyone ? 'Read only here. Edit them in Coral on each computer.' : `Read only here. Edit them in Coral on ${machineLabel(server)}.`));
     host.replaceChildren(bar, nav(), panel);
     return panel;
 }

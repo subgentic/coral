@@ -3,7 +3,8 @@
 import { importOnce } from './import_once.js';
 const { loadStyles } = await importOnce('./lazy_styles.js');
 await loadStyles('computer_card.css');
-const { machineLabel, machineOnline, machineSeen } = await importOnce('./analytics_machine.js');
+const { machineLabel, machineOnline, machineSeen, machineVersion, markTooOld, connectedWords } = await importOnce('./analytics_machine.js');
+const { DOWNLOAD_URL } = await importOnce('./server_status.js');
 const { go } = await importOnce('./nav.js');
 
 const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -12,16 +13,7 @@ const button = (text, onClick, primary) => { const b = node('button', primary ? 
 const switchComputer = barId => () => document.querySelector(`#${barId} .computer-bar-button`)?.click();
 const openComputers = id => () => go(id ? { view: 'servers', id } : { view: 'servers' });
 
-/** 'today at 09:12', 'yesterday at 18:40' or '3 Nov' (the mock's wording). */
-export function connectedWords(seen, now = new Date()) {
-    const d = new Date(typeof seen === 'number' && seen < 1e12 ? seen * 1000 : seen);
-    if (Number.isNaN(d.getTime())) return 'a while ago';
-    const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(), gap = Math.round((day(now) - day(d)) / 864e5);
-    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    if (gap === 0) return `today at ${hm}`;
-    if (gap === 1) return `yesterday at ${hm}`;
-    return `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}`;
-}
+export { connectedWords }; // the words live with the computer helpers: the list and the card say a time the same way (#20319)
 
 /** The card for one computer and one state. state: 'offline' | 'not-shared' | 'no-answer' | 'update-required' (the Hub's explicit minimum) | 'old' (the hedged 404 words until the Hub says why);
  *  what names the thing that could not be read ('automations'); detail is the support line; retry re-reads; barId is the page's computer bar. */
@@ -29,6 +21,7 @@ export function computerCard({ state, server, what, detail = '', min = '', retry
     const name = machineLabel(server), card = node('section', 'computer-card');
     card.setAttribute('data-computer-card', state); card.setAttribute('role', 'status');
     let headline, why, actions = [];
+    const steps = node('p', 'computer-card-steps'); steps.hidden = true; // the card's own 'Show how to update': what to do, and the one download page
     if (state === 'offline') {
         const seen = machineSeen(server);
         headline = `${name} is offline`;
@@ -43,9 +36,13 @@ export function computerCard({ state, server, what, detail = '', min = '', retry
         why = 'This is usually a short network gap. Nothing was changed.';
         actions = [retry && button('Try again', retry, true), button('Switch computer', switchComputer(barId))];
     } else if (state === 'update-required') {
-        headline = `Update Coral on ${name} (needs ${min}+)`;
-        why = 'Update Coral on that computer, then try again.';
-        actions = [retry && button('Retry', retry, true), button('Switch computer', switchComputer(barId))];
+        // The mock's card (#20178): the headline says what is true, the sentence the version the Hub's list carries (no line when it does not) and what it can read from, three buttons.
+        const ran = machineVersion(server), from = String(min || '').replace(/^v/, '');
+        headline = `${name} needs an update to share its ${what}`;
+        why = `${ran ? `It runs Coral ${ran}. ` : ''}${from ? `The Hub can read ${what} from Coral ${from} on. ` : ''}Everything else about ${name} still works.`;
+        const how = button('Show how to update', () => { steps.hidden = !steps.hidden; how.setAttribute('aria-expanded', String(!steps.hidden)); }, true); how.setAttribute('aria-expanded', 'false');
+        actions = [how, button('Switch computer', switchComputer(barId)), button('Open Computers', openComputers(server))];
+        markTooOld(server);
     } else {
         headline = `${name} can't show ${what} here`;
         why = 'It may need a newer Coral.';
@@ -55,6 +52,11 @@ export function computerCard({ state, server, what, detail = '', min = '', retry
     const body = node('div', 'computer-card-body');
     body.append(node('h3', 'computer-card-title', headline), node('p', 'computer-card-why', why));
     const row = node('div', 'computer-card-actions'); row.append(...actions.filter(Boolean)); body.append(row);
+    if (state === 'update-required') {
+        const link = node('a', '', 'the Coral download page'); link.href = DOWNLOAD_URL; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        steps.append(`On ${name}, install the latest Coral from `, link, `. It joins the Hub again by itself, then ${what} show here.`);
+        body.append(steps);
+    }
     if (detail) { const d = node('details', 'computer-card-details'); d.append(node('summary', '', 'Details for support'), node('p', '', detail)); body.append(d); }
     card.append(body);
     return card;
@@ -64,4 +66,4 @@ export function computerCard({ state, server, what, detail = '', min = '', retry
 export const stateOfStatus = (server, status) => !machineOnline(server) ? 'offline' : status === 403 ? 'not-shared' : status === 404 ? 'old' : 'no-answer';
 
 /** One short phrase for a computer whose rows are left out of a merged list ("lab-pc may need a newer Coral"). */
-export const notShownText = (e, what) => { const name = machineLabel(e.server); return e.state === 'update-required' ? `Update Coral on ${name} (needs ${e.min}+)` : e.state === 'offline' ? `${name} is offline` : e.state === 'not-shared' ? `${name} does not share ${what}` : e.state === 'old' ? `${name} may need a newer Coral` : `${name} did not answer`; };
+export const notShownText = (e, what) => { const name = machineLabel(e.server); return e.state === 'update-required' ? `${name} needs an update to share ${what}` : e.state === 'offline' ? `${name} is offline` : e.state === 'not-shared' ? `${name} does not share ${what}` : e.state === 'old' ? `${name} may need a newer Coral` : `${name} did not answer`; };

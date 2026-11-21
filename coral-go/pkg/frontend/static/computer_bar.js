@@ -4,17 +4,22 @@
 import { importOnce } from './import_once.js';
 const { loadStyles } = await importOnce('./lazy_styles.js');
 await loadStyles('computer_bar.css');
-const { machineLabel, machineOnline, machineSeen } = await importOnce('./analytics_machine.js');
-const { formatLastSeen } = await importOnce('./server_status.js');
+const { machineLabel, machineOnline, machineSeen, machineVersion, machineAccess, machineNeedsUpdate, connectedWords } = await importOnce('./analytics_machine.js');
 
 export const ALL_COMPUTERS = 'all';
 const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-const dotOf = id => { const d = node('span', 'computer-dot'); d.setAttribute('data-computer-state', machineOnline(id) ? 'online' : 'offline'); d.setAttribute('aria-hidden', 'true'); return d; };
+const dotOf = id => { const d = node('span', 'computer-dot'); d.setAttribute('data-computer-state', !machineOnline(id) ? 'offline' : machineNeedsUpdate(id) ? 'update' : 'online'); d.setAttribute('aria-hidden', 'true'); return d; }; // amber for an online computer that needs an update (#20319, the mock)
 const nameOf = id => id === ALL_COMPUTERS ? 'All computers' : !id ? '' : machineLabel(id);
-const seenText = id => machineOnline(id) ? 'Online' : `Offline · last seen ${formatLastSeen(machineSeen(id))}`;
+/** The list's second line (the mock #20178): offline says since when, in the card's words; an old computer says what an update shows; an online one says its Coral version and the Hub's access when the Hub's list carries them (a field it does not carry is left out, never guessed). */
+const seenText = (id, what) => {
+    if (!machineOnline(id)) { const seen = machineSeen(id); return seen ? `Offline since ${connectedWords(seen)}` : 'Offline'; }
+    const v = machineVersion(id), access = machineAccess(id);
+    if (machineNeedsUpdate(id)) return [v && `Coral ${v}`, `${v ? 'update' : 'Update'} to see ${what || 'everything'}`].filter(Boolean).join(' · ');
+    return [v && `Coral ${v}`, access && `Hub access: ${access[0].toUpperCase()}${access.slice(1)}`].filter(Boolean).join(' · ') || 'Online';
+};
 
 /** Build the bar. choices: ids in picker order; current: the id (or ALL_COMPUTERS) being read; all: offer "All computers"; onPick(id) is called with the chosen id. */
-export function computerBar({ choices, current, all = false, onPick, id = '', emptyText = 'No computers online' }) {
+export function computerBar({ choices, current, all = false, onPick, id = '', emptyText = 'No computers online', what = '' }) {
     const root = node('div', 'computer-bar');
     if (id) root.id = id;
     const label = node('span', 'computer-bar-label', 'Computer');
@@ -24,6 +29,7 @@ export function computerBar({ choices, current, all = false, onPick, id = '', em
     button.append(node('span', 'computer-bar-name', nameOf(current) || emptyText));
     if (!choices.some(machineOnline) && !current) button.disabled = true;
     if (current && current !== ALL_COMPUTERS && !machineOnline(current)) button.append(node('span', 'chip computer-chip', 'Offline'));
+    else if (current && current !== ALL_COMPUTERS && machineNeedsUpdate(current)) button.append(node('span', 'chip computer-chip computer-chip-update', 'Update needed'));
     button.append(node('span', 'computer-bar-caret'));
     const list = node('div', 'computer-bar-list'); list.setAttribute('role', 'listbox'); list.hidden = true;
     const online = choices.filter(machineOnline), offline = choices.filter(c => !machineOnline(c));
@@ -33,9 +39,10 @@ export function computerBar({ choices, current, all = false, onPick, id = '', em
         o.setAttribute('aria-selected', String(cid === current));
         if (cid !== ALL_COMPUTERS) o.append(dotOf(cid));
         const text = node('span', 'computer-bar-text'); text.append(node('span', 'computer-bar-title', nameOf(cid)));
-        text.append(node('span', 'computer-bar-sub', cid === ALL_COMPUTERS ? `${choices.length} linked · ${offline.length} offline` : seenText(cid)));
+        text.append(node('span', 'computer-bar-sub', cid === ALL_COMPUTERS ? `${choices.length} linked · ${offline.length} offline` : seenText(cid, what)));
         o.append(text);
         if (cid !== ALL_COMPUTERS && !machineOnline(cid)) o.append(node('span', 'chip computer-chip', 'Offline'));
+        else if (cid !== ALL_COMPUTERS && machineNeedsUpdate(cid)) o.append(node('span', 'chip computer-chip computer-chip-update', 'Update needed'));
         o.addEventListener('click', () => { close(); if (cid !== current) onPick(cid); });
         options.push(o); return o;
     };
