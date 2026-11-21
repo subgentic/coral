@@ -283,8 +283,8 @@ function fill(s, cell, withDismiss = true, primaryOpen = false) {
                 more.hidden = open || !c;
                 const ok = allowed();
                 yesButtons.forEach(b => { if (ok && b.hidden) { armYes(b, !!b._shownBefore); b._shownBefore = true; } b.hidden = !ok; }); // a Yes turned on for the first time in this drawing is armed as its ask is; one the gate turns off and on again is armed again from now
-                yes.hidden = onlyReject || !picks.length;
-                yes.textContent = ok ? 'Yes lets it run this once. No refuses it. Open the agent to read all of it or to allow more.' : open ? 'Read the whole command to allow it: scroll to the end of it.' : 'Read the whole command to allow it: press Show all. Or open the agent.';
+                yes.hidden = onlyReject || !picks.length || ok; /* mock v3: a permission row has no helper line once Yes is allowed (#20146) */
+                yes.textContent = ok ? '' : open ? 'Read the whole command to allow it: scroll to the end of it.' : 'Read the whole command to allow it: press Show all. Or open the agent.';
             };
             more.addEventListener('click', e => { e.stopPropagation(); open = true; block.classList.add('is-open'); apply(); block.focus({ preventScroll: true }); });
             block.addEventListener('scroll', apply, { passive: true });

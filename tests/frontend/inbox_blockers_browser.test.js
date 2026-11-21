@@ -9,7 +9,8 @@ const { coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 
 const iso = ms => new Date(Date.now() - ms).toISOString();
-const mk = (n, name, team, ageMs) => ({ name: n, session_id: `0000000${n.length}-0000-4000-8000-00000000000${n.length}`, agent_type: 'claude', server: 'local', status: 'idle', display_name: name, working_directory: '/repo/' + n, waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Wants to run: go test ./...', waiting_since: iso(ageMs), board_project: team, sleeping: false });
+// mock v3 (#20146): a permission row shows only its Task chip, no 'waits on this'; the agents here wait on a decision, which still says what it holds up
+const mk = (n, name, team, ageMs) => ({ name: n, session_id: `0000000${n.length}-0000-4000-8000-00000000000${n.length}`, agent_type: 'claude', server: 'local', status: 'idle', display_name: name, working_directory: '/repo/' + n, waiting_for_input: true, waiting_kind: 'other', waiting_summary: 'Needs a decision on the build', waiting_since: iso(ageMs), board_project: team, sleeping: false });
 const AGENTS = [mk('a', 'Backend Dev', 'team-a', 600000), mk('bb', 'Frontend Dev', 'team-a', 120000), mk('ccc', 'Docs Writer', 'team-b', 300000)]; // by age: Backend, Docs, Frontend; Frontend holds up three tasks
 for (const [i, a] of AGENTS.entries()) a.session_id = `0000000${i + 1}-0000-4000-8000-00000000000${i + 1}`;
 // the server's field (#11455), counted across every board: Frontend Dev holds up three tasks, one of them on another team's board; Backend Dev holds up two; Docs Writer has nothing in progress, so no field
