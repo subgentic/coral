@@ -21,7 +21,7 @@ import (
 // Device signing step 4(b) (#20513, coral-hub #260094): every relayed kind that carries a body signs the SHA-256 of the exact body bytes, and the computer checks it. The four step-2 actions stay byte for byte.
 
 func (f fx) relayed(k devicekey.Kind, body string) devicekey.Relayed {
-	return devicekey.Relayed{Kind: k, KID: f.signerKID, Computer: f.computer, Ts: 1800000000, Nonce: f.nonce, Link: "lnk_1", HubUser: "hub-user-0a1b2c3d", BodySHA256: devicekey.BodySHA256([]byte(body))}
+	return devicekey.Relayed{Kind: k, KID: f.signerKID, Computer: f.computer, Ts: 1800000000, Nonce: f.nonce, Link: "lnk_1", HubUser: "hub-user-0a1b2c3d", Method: "POST", Path: "/api/x", BodySHA256: devicekey.BodySHA256([]byte(body))}
 }
 
 func TestBodySHA256IsLowerCaseHexOfTheExactBytes(t *testing.T) {
@@ -38,7 +38,7 @@ func TestRelayedCanonicalFormByHand(t *testing.T) {
 	c, err := m.Canonical()
 	require.NoError(t, err)
 	want := `{"kid":"` + f.signerKID + `","computer":"` + f.computer + `","ts":1800000000,"nonce":"` + f.nonce +
-		`","link":"lnk_1","hub_user":"hub-user-0a1b2c3d","body_sha256":"` + devicekey.BodySHA256([]byte("BODY")) + `"}`
+		`","link":"lnk_1","hub_user":"hub-user-0a1b2c3d","method":"POST","path":"/api/x","body_sha256":"` + devicekey.BodySHA256([]byte("BODY")) + `"}`
 	assert.Equal(t, want, string(c))
 }
 
@@ -59,7 +59,7 @@ func TestEveryBodyKindParsesBackFromItsCanonicalForm(t *testing.T) {
 		require.NoError(t, err, k)
 		assert.Equal(t, f.relayed(k, "b"), m, k)
 	}
-	// the nine kinds the Hub named
+	// the kinds
 	got := map[devicekey.Kind]bool{}
 	for _, k := range devicekey.RelayedKinds {
 		got[k] = true
@@ -122,14 +122,14 @@ func (s signer) signRelayed(t *testing.T, k devicekey.Kind, canonical []byte) st
 }
 
 func (r *rig) relayedMsg(k devicekey.Kind, s signer, body []byte) devicekey.Relayed {
-	return devicekey.Relayed{Kind: k, KID: s.kid, Computer: r.computer, Ts: t0.Unix(), Nonce: r.nextNonce(), Link: "lnk_1", HubUser: "hub-user-0a1b2c3d", BodySHA256: devicekey.BodySHA256(body)}
+	return devicekey.Relayed{Kind: k, KID: s.kid, Computer: r.computer, Ts: t0.Unix(), Nonce: r.nextNonce(), Link: "lnk_1", HubUser: "hub-user-0a1b2c3d", Method: "POST", Path: "/api/x", BodySHA256: devicekey.BodySHA256(body)}
 }
 
 func (r *rig) handleRelayed(m devicekey.Relayed, s signer, body []byte, now time.Time, auth func(devicekey.Relayed, store.DeviceKey) error) (devicekey.Relayed, error) {
 	r.t.Helper()
 	c, err := m.Canonical()
 	require.NoError(r.t, err)
-	return r.v.HandleRelayed(context.Background(), m.Kind, c, body, s.signRelayed(r.t, m.Kind, c), now, auth)
+	return r.v.HandleRelayedOn(context.Background(), "lnk_1", "POST", "/api/x", m.Kind, c, body, s.signRelayed(r.t, m.Kind, c), now, auth)
 }
 
 func allow(devicekey.Relayed, store.DeviceKey) error { return nil }
@@ -173,7 +173,7 @@ func TestRelayedAuthorityRunsBeforeTheNonceIsSpentAndCanRefuse(t *testing.T) {
 	assert.Equal(t, r.signer.kid, seen.KID, "the signer row comes from the computer's own list")
 	_, err = r.handleRelayed(m, r.signer, body, t0, allow)
 	assert.NoError(t, err, "a refused message spent no nonce")
-	_, err = r.v.HandleRelayed(context.Background(), devicekey.BoardPost, nil, body, "", t0, nil)
+	_, err = r.v.HandleRelayedOn(context.Background(), "lnk_1", "POST", "/api/x", devicekey.BoardPost, nil, body, "", t0, nil)
 	assert.Error(t, err, "no authority function, no acceptance")
 }
 
@@ -191,7 +191,7 @@ func TestRelayedChecksComputerWindowSignerAndSignature(t *testing.T) {
 
 	forged := r.relayedMsg(devicekey.SendToAgent, r.signer, body)
 	c, _ := forged.Canonical()
-	_, err = r.v.HandleRelayed(context.Background(), forged.Kind, c, body, stranger.signRelayed(t, forged.Kind, c), t0, allow)
+	_, err = r.v.HandleRelayedOn(context.Background(), "lnk_1", "POST", "/api/x", forged.Kind, c, body, stranger.signRelayed(t, forged.Kind, c), t0, allow)
 	assert.ErrorIs(t, err, devicekey.ErrBadSignature)
 
 	// the clock only moves forward, so the window cases come last
@@ -208,10 +208,10 @@ func TestARelayedSignatureIsNotAnotherKindsAndNotAV2Actions(t *testing.T) {
 	m := r.relayedMsg(devicekey.SendToAgent, r.signer, body)
 	c, _ := m.Canonical()
 	// signed as board-post, presented as send-to-agent
-	_, err := r.v.HandleRelayed(context.Background(), devicekey.SendToAgent, c, body, r.signer.signRelayed(t, devicekey.BoardPost, c), t0, allow)
+	_, err := r.v.HandleRelayedOn(context.Background(), "lnk_1", "POST", "/api/x", devicekey.SendToAgent, c, body, r.signer.signRelayed(t, devicekey.BoardPost, c), t0, allow)
 	assert.ErrorIs(t, err, devicekey.ErrBadSignature)
 	// the same canonical bytes signed under the v2 label
-	_, err = r.v.HandleRelayed(context.Background(), devicekey.SendToAgent, c, body, r.signer.sign(t, devicekey.RaiseMode, c), t0, allow)
+	_, err = r.v.HandleRelayedOn(context.Background(), "lnk_1", "POST", "/api/x", devicekey.SendToAgent, c, body, r.signer.sign(t, devicekey.RaiseMode, c), t0, allow)
 	assert.ErrorIs(t, err, devicekey.ErrBadSignature)
 }
 
@@ -234,4 +234,35 @@ func TestRelayedHonoursRefuseAndBeforeStart(t *testing.T) {
 	r.v.SetRefuseBefore(t0.Add(time.Minute))
 	_, err = r.handleRelayed(r.relayedMsg(devicekey.SendToAgent, r.signer, body), r.signer, body, t0.Add(time.Second), allow)
 	assert.ErrorIs(t, err, devicekey.ErrBeforeStart)
+}
+
+func TestRelayedRefusesAnotherMethodOrPathThanTheOneReceived(t *testing.T) {
+	r := newRig(t)
+	body := []byte("b")
+	m := r.relayedMsg(devicekey.SendToAgent, r.signer, body)
+	c, _ := m.Canonical()
+	sig := r.signer.signRelayed(t, m.Kind, c)
+	for _, x := range []struct{ method, path string }{{"PUT", "/api/x"}, {"POST", "/api/y"}, {"POST", "/api/x?a=1"}} {
+		_, err := r.v.HandleRelayedOn(context.Background(), "lnk_1", x.method, x.path, m.Kind, c, body, sig, t0, allow)
+		assert.ErrorIs(t, err, devicekey.ErrWrongRequest, x.method+" "+x.path)
+	}
+	_, err := r.v.HandleRelayedOn(context.Background(), "lnk_1", "POST", "/api/x", m.Kind, c, body, sig, t0, allow)
+	assert.NoError(t, err, "nothing was spent by the refusals")
+}
+
+func TestRelayedBodiesAreCappedAndABodylessKindSignsTheEmptyHash(t *testing.T) {
+	r := newRig(t)
+	big := make([]byte, devicekey.RelayedBodyMax+1)
+	m := r.relayedMsg(devicekey.SendToAgent, r.signer, big)
+	_, err := r.handleRelayed(m, r.signer, big, t0, allow)
+	assert.ErrorIs(t, err, devicekey.ErrBodyTooLarge)
+	assert.Equal(t, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", devicekey.BodySHA256(nil))
+	for _, k := range []devicekey.Kind{devicekey.GrantMember, devicekey.InputGrant, devicekey.KeepFullAccess, devicekey.HubAutoAccept} {
+		m := r.relayedMsg(k, r.signer, nil)
+		_, err := r.handleRelayed(m, r.signer, nil, t0, allow)
+		assert.NoError(t, err, k)
+		m = r.relayedMsg(k, r.signer, nil)
+		_, err = r.handleRelayed(m, r.signer, []byte("x"), t0, allow)
+		assert.ErrorIs(t, err, devicekey.ErrBodyHash, "one byte where none was signed: %s", k)
+	}
 }

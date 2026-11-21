@@ -61,6 +61,9 @@ type DeviceKey struct {
 	LastUsedAt    int64 // 0 is never used
 	RemovedAt     int64 // 0 is active
 	RemovedReason string
+	// Link and HubUser are the pair the computer set when it made the row (M1, #20514): the Hub link and the Hub label of the person whose key this is. Both empty is the owner's own key, made at this computer.
+	Link    string
+	HubUser string
 }
 
 func (k DeviceKey) formOK() bool {
@@ -79,13 +82,13 @@ func (k DeviceKey) formOK() bool {
 	return k.Kind == DeviceKindDevice || k.Kind == DeviceKindPasskey
 }
 
-const deviceCols = `kid, pk, label, mode, origin, kind, created_at, last_used_at, removed_at, removed_reason`
+const deviceCols = `kid, pk, label, mode, origin, kind, created_at, last_used_at, removed_at, removed_reason, link, hub_user`
 
 func scanDeviceKey(row interface{ Scan(...any) error }) (DeviceKey, error) {
 	var k DeviceKey
 	var used, rem sql.NullInt64
 	var reason sql.NullString
-	if err := row.Scan(&k.KID, &k.PK, &k.Label, &k.Mode, &k.Origin, &k.Kind, &k.CreatedAt, &used, &rem, &reason); err != nil {
+	if err := row.Scan(&k.KID, &k.PK, &k.Label, &k.Mode, &k.Origin, &k.Kind, &k.CreatedAt, &used, &rem, &reason, &k.Link, &k.HubUser); err != nil {
 		return DeviceKey{}, err
 	}
 	k.LastUsedAt, k.RemovedAt, k.RemovedReason = used.Int64, rem.Int64, reason.String
@@ -142,7 +145,7 @@ func (s *SessionStore) AddDeviceKey(ctx context.Context, k DeviceKey, now time.T
 	if active >= max {
 		return false, ErrKeyLimit
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO device_keys (`+deviceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)`, k.KID, k.PK, k.Label, k.Mode, k.Origin, k.Kind, now.Unix()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO device_keys (`+deviceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)`, k.KID, k.PK, k.Label, k.Mode, k.Origin, k.Kind, now.Unix(), k.Link, k.HubUser); err != nil {
 		return false, err
 	}
 	return true, tx.Commit()
