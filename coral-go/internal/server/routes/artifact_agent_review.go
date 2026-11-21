@@ -66,6 +66,10 @@ func (h *SessionsHandler) reviewAgentArtifact(w http.ResponseWriter, r *http.Req
 			newest = ms[len(ms)-1].Digest
 		}
 	}
+	if !objectNameRe.MatchString(newest) { // the series index names the newest version: a digest from our own records, checked here before it is a file name
+		errNotFound(w, "this team has no such file")
+		return
+	}
 	meta, _ := readSidecar(filepath.Join(coralDir, "artifacts", "objects", newest+".json"))
 	name := meta.Name
 	if meta.Digest != "" && !mediatype.Viewable(meta.MediaType, name) {
