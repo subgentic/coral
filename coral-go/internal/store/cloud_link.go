@@ -128,6 +128,15 @@ func legacyHubOrigin(raw string) (string, bool, error) {
 	return o, true, nil
 }
 
+// HubAddressWarning is the sentence for an enrolled address that has a path, query or fragment, or "" when it has none. It names the cut origin only, never the saved address (a saved query could carry a value that must not be shown).
+func HubAddressWarning(raw string) string {
+	o, cut, err := legacyHubOrigin(raw)
+	if err != nil || !cut {
+		return ""
+	}
+	return "The saved Hub address (" + o + ") has extra parts. Links keep working as they are; a new link needs the bare address."
+}
+
 // HubAddressHasPath reports whether an enrolled Hub address is one only the legacy path accepts (it has a path, query or fragment): Settings and the log warn about it.
 func HubAddressHasPath(raw string) bool {
 	_, cut, err := legacyHubOrigin(raw)
@@ -224,7 +233,7 @@ func (s *CloudStore) MirrorLegacyLink(ctx context.Context) error {
 		return fmt.Errorf("the enrolled Hub address is not usable as a link: %w", err)
 	}
 	if cut {
-		log.Printf("WARNING: the enrolled Hub address %q has a path, query or fragment; it keeps working as enrolled (linked as %s), but enroll again with the site address only", row.HubURL, origin)
+		log.Printf("WARNING: the saved Hub address for %s has extra parts; it keeps working as saved, but enroll again with the bare address", origin)
 	}
 	var existing string
 	err = s.db.GetContext(ctx, &existing, "SELECT link_id FROM cloud_link WHERE hub_origin = ? AND server_id = ?", origin, row.ServerID)

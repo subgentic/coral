@@ -1,6 +1,6 @@
 // cloud_words.js: the closed permissions summary (permissive switches named, a protective one off marked), the Operator sentence and the spelled code.
 import assert from 'node:assert/strict';
-import { morePermsWords, operatorLine, spellCode, describe, enrolledRetrying, rekeyText, autoAcceptChangedText, severalAccountsText, codeExpired, codeUncollected, UNCOLLECTED_TEXT, OFF_TEXT, EXPIRED_TEXT, HUB_ACCESS_URL, LEVEL_NOW } from '../../coral-go/pkg/frontend/static/cloud_words.js';
+import { morePermsWords, operatorLine, hubAddressLine, spellCode, describe, enrolledRetrying, rekeyText, autoAcceptChangedText, severalAccountsText, codeExpired, codeUncollected, UNCOLLECTED_TEXT, OFF_TEXT, EXPIRED_TEXT, HUB_ACCESS_URL, LEVEL_NOW } from '../../coral-go/pkg/frontend/static/cloud_words.js';
 
 assert.deepEqual(morePermsWords({}, null), { text: 'More Coral Hub permissions: may change cross-team settings', warn: '' }, 'cross-team is on unless turned off');
 assert.equal(morePermsWords({ hub_cross_team_settings: false }, false).text, 'More Coral Hub permissions: none on');
@@ -14,6 +14,10 @@ assert.equal(morePermsWords({ redact_tokens: false }, null).warn, 'Tokens are vi
 assert.equal(operatorLine(true), 'Coral Hub may act as the Operator.');
 assert.equal(operatorLine(false), 'Coral Hub may not act as the Operator.');
 assert.equal(operatorLine(null), '');
+assert.equal(hubAddressLine({ hub_address_warning: 'The saved Hub address (https://h.example) has extra parts.' }), 'The saved Hub address (https://h.example) has extra parts.');
+assert.equal(hubAddressLine({}), '');
+assert.equal(hubAddressLine(null), '');
+assert.equal(hubAddressLine({ hub_address_warning: 5 }), '', 'only text is said');
 assert.equal(spellCode('WXYZ-1234'), 'W X Y Z, 1 2 3 4');
 assert.equal(spellCode('H2XR-HS16'), 'H 2 X R, H S 1 6');
 assert.equal(spellCode(''), '');

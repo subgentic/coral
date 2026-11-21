@@ -263,6 +263,12 @@ func TestAnEnrollmentWithAPathStillMirrorsAndDialsButANewLinkRefusesAPath(t *tes
 	found, err := cs.LinkByOrigin(ctx, enrolled)
 	require.NoError(t, err)
 	assert.Equal(t, links[0].LinkID, found.LinkID, "the enrolled address finds its link")
+	w := HubAddressWarning("https://hub.example.com/app?token=SECRET#frag")
+	assert.Contains(t, w, "https://hub.example.com")
+	assert.Contains(t, w, "extra parts")
+	assert.NotContains(t, w, "SECRET", "the warning never shows the saved address")
+	assert.NotContains(t, w, "/app")
+	assert.Equal(t, "", HubAddressWarning("https://hub.example.com"))
 	assert.True(t, HubAddressHasPath(enrolled))
 	assert.False(t, HubAddressHasPath("https://hub.example.com"))
 	var hubURL string

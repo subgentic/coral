@@ -664,10 +664,7 @@ func (m *Manager) startTunnel(conn *store.CloudConnection) {
 	tctx, cancel := context.WithCancel(m.root)
 	m.cancel = cancel
 	m.hubMoved = false // enrolled with the configured hub: it's where the tunnel goes
-	m.addrWarn = ""
-	if store.HubAddressHasPath(conn.HubURL) {
-		m.addrWarn = "This computer's Hub address has a path (" + conn.HubURL + "). It still works as it was saved; disconnect and enrol again with the site address only."
-	}
+	m.addrWarn = store.HubAddressWarning(conn.HubURL)
 	m.st = Status{Configured: true, HubURL: m.o.HubURL, State: StateConnecting, Label: conn.Label, ServerID: conn.ServerID}
 	m.mu.Unlock()
 	go func() { defer safego.Recover("cloud/manager:m.runTunnel"); m.runTunnel(tctx, gen) }()
