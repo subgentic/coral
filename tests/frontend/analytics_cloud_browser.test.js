@@ -37,7 +37,7 @@ const { coralReady } = require('./helpers/wait');
             // 7.2.4: By computer has loaded, and localStorage holds none of it
             assert.equal(await ev(`localStorage.getItem('coral-by-computer')`), null, `${tag}: no coral-by-computer key in cloud`);
             // the Computer picker is on the page, and a pick moves the reads to that computer
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-computer-pick option')].map(o => o.value)`), ['m1', 'm2'], `${tag}: the Computer picker names the linked computers`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-computer-pick .computer-bar-option')].map(o => o.dataset.computer)`), ['m1', 'm2'], `${tag}: the Computer picker names the linked computers`);
             await shot(`analytics-cloud-overview-${w}`);
             // 7.2.3: the four closed views are not listed, and their addresses open Overview
             const names = () => ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].map(b => b.textContent.trim())`);
@@ -58,7 +58,7 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(remote.some(p => /^\/api\/remote\/m1\/api\/token-usage\//.test(p)), `${tag}: the reads go to the first computer: ${JSON.stringify(remote.slice(0, 6))}`);
             // a pick of the other computer: the reads go to it
             await select('overview'); await ev(`window.__seen.length = 0; true`);
-            await ev(`(() => { const p = document.getElementById('cost-computer-pick'); p.value = 'm2'; p.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await ev(`(() => { const p = document.getElementById('cost-computer-pick'); p.querySelector('.computer-bar-button').click(); p.querySelector('.computer-bar-option[data-computer="m2"]').click(); return true; })()`);
             await waitFor(`window.__seen.some(p => /^\\/api\\/remote\\/m2\\/api\\/token-usage\\//.test(p))`, `${tag}: the pick moves the reads to the second computer`, 8000);
             assert.deepEqual(await ev(own), [], `${tag}: still nothing on this origin after a pick`);
             // 7.2.2: no computer linked: no request at all, and the line says what to do

@@ -18,6 +18,7 @@ const agentDetail = await importOnce('./analytics_agent.js'); // one agent over 
 const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
 const { syncEfficiency } = await importOnce('./analytics_efficiency.js'); // the Group by switch and the comparison of Tokens per commit and Task time (Goal #77)
 const { readCostTasks } = await importOnce('./analytics_cost_tasks.js');
+const { computerBar } = await importOnce('./computer_bar.js'); // the one computer bar under the title (#20207)
 const { readNow, noComputerInCloud, LINK_A_COMPUTER, machineChoices, machineLabel, machineOnline, machineNow, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // in cloud every read goes to the chosen computer, none with no computer linked (#19569)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
@@ -350,16 +351,12 @@ export async function _recheckTotals(view) {
 /** Coral Hub's own page (cloud, #19569): every number is one computer's, so the header has the Computer picker, and with no computer linked the page says so and reads nothing. True when there is nothing to read. */
 function _syncComputerBar() {
     const cloud = isCloud(), choices = cloud ? machineChoices() : [];
-    let pick = document.getElementById('cost-computer-pick'), line = document.getElementById('cost-no-computer');
+    let line = document.getElementById('cost-no-computer');
+    document.getElementById('cost-computer-pick')?.remove();
     if (cloud && choices.length > 1) {
-        if (!pick) {
-            pick = document.createElement('select'); pick.id = 'cost-computer-pick'; pick.className = 'field cost-time-select'; pick.setAttribute('aria-label', 'Computer');
-            pick.addEventListener('change', () => pickMachine(pick.value));
-            document.getElementById('cost-time-range')?.before(pick);
-        }
-        pick.replaceChildren(...choices.map(id => new Option(machineLabel(id) + (machineOnline(id) ? '' : ' (offline)'), id)));
-        pick.value = machineNow(); pick.hidden = false;
-    } else if (pick) pick.hidden = true;
+        const bar = computerBar({ id: 'cost-computer-pick', choices, current: machineNow(), onPick: pickMachine });
+        document.querySelector('#cost-page .cost-header')?.after(bar);
+    }
     const none = noComputerInCloud();
     if (none && !line) { line = document.createElement('p'); line.id = 'cost-no-computer'; line.className = 'cost-note'; line.setAttribute('role', 'status'); line.textContent = LINK_A_COMPUTER; document.querySelector('#cost-page .cost-header')?.after(line); }
     if (line) line.hidden = !none;
