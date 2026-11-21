@@ -514,7 +514,7 @@ Questions an agent asked the Operator (`coral-board wait --operator "question"`)
 the check under "Needs the Operator", with how long ago each was asked, until the Operator
 posts on the board. The question is shown as quoted, masked text like any agent words.
 
-Each item ends with `[ack <id>]`. The orchestrator (or the Operator) runs `coral-board health
+Each item starts with `[ack <id>]` (so a line cut short still has it), and `coral-board health list` prints every open item of the last check with its id, including any the check left out (`action_list.max_items`). The orchestrator (or the Operator) runs `coral-board health
 ack <id>` once it has handled the item, and it stays off the check until its state changes (the
 agent goes idle again later, another escalation, a different set of reviews waiting). A parked
 task (`coral-board task park`, see board.md) raises no item and gets no nudge or reminder at all;
