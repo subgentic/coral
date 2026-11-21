@@ -129,6 +129,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 		}
 		return c.ServerID, nil
 	})
+	boardHandler.SetCheckTokens(s.cfg.CoralDir(), s.db) // the snapshots of custom checks and the end of their run tokens (#20176)
 	boardHandler.SetAutoAttacher(routes.NewAutoAttacher(s.cfg.CoralDir(), routes.AutoAttachEnabled(sessStore), routes.SessionDirs(sessStore)))
 	s.goBackground(boardHandler.RecoverTaskNotifications)
 	s.goBackground(boardHandler.RunWaitTimeouts)
@@ -349,7 +350,12 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/ack", boardHandler.AckHealthItem)
 	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/health/settings", boardHandler.GetHealthSettings)
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/settings", boardHandler.PutHealthSettings)
-	r.Get("/api/board/{project}/context-reset-status", boardHandler.GetContextResetStatus) // each agent's last compaction or skip reason, for Team settings (#15066)
+	r.Get("/api/board/{project}/health/checks", boardHandler.ListHealthChecksRoute)                                             // a team's custom health checks (#20176)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/checks", boardHandler.AddHealthCheckRoute)                // pending until the Operator approves its record
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/checks/{name}", boardHandler.ChangeHealthCheckRoute)       // any change is pending again, live tokens end
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/checks/{name}/pause", boardHandler.PauseHealthCheckRoute) // {"paused": bool}
+	r.With(routes.RefuseSignInLink).Delete("/api/board/{project}/health/checks/{name}", boardHandler.RemoveHealthCheckRoute)    // live tokens end
+	r.Get("/api/board/{project}/context-reset-status", boardHandler.GetContextResetStatus)                                      // each agent's last compaction or skip reason, for Team settings (#15066)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/reminder", boardHandler.RemindSubscriber)

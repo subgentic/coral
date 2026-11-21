@@ -6,6 +6,7 @@ DELETE /api/board/{project} | board-claims | operator-only
 DELETE /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 DELETE /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | board-claims | operator-only
+DELETE /api/board/{project}/health/checks/{name} | board-claims +token-session
 DELETE /api/board/{project}/messages/{messageID} | board-claims | operator-only
 DELETE /api/board/{project}/reminder | board-claims
 DELETE /api/board/{project}/seats/{subscriberID} | board-claims | operator-only
@@ -63,6 +64,7 @@ GET /api/board/{project}/groups | board-claims
 GET /api/board/{project}/groups/{groupID}/members | board-claims
 GET /api/board/{project}/guide-asks | board-claims
 GET /api/board/{project}/guide-roster | board-claims | operator-only
+GET /api/board/{project}/health/checks | board-claims +token-session
 GET /api/board/{project}/health/settings | board-claims +token-session
 GET /api/board/{project}/lifecycle-log | board-claims | operator-only
 GET /api/board/{project}/messages | board-claims
@@ -213,6 +215,8 @@ POST /api/board/{project}/goals/{goalID}/driver | board-claims | operator-only
 POST /api/board/{project}/goals/{goalID}/move | board-claims | operator-only
 POST /api/board/{project}/groups/{groupID}/members | board-claims | operator-only
 POST /api/board/{project}/health/ack | board-claims +token-session
+POST /api/board/{project}/health/checks | board-claims +token-session
+POST /api/board/{project}/health/checks/{name}/pause | board-claims +token-session
 POST /api/board/{project}/hub-notice | board-claims
 POST /api/board/{project}/messages | board-claims +token-session
 POST /api/board/{project}/messages/mark-read | board-claims
@@ -309,6 +313,7 @@ PUT /api/agent/ui/{id} | token-bound
 PUT /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 PUT /api/board/{project}/artifacts/{id}/tags | board-claims | operator-only
 PUT /api/board/{project}/guide-roster | board-claims | operator-only
+PUT /api/board/{project}/health/checks/{name} | board-claims +token-session
 PUT /api/board/{project}/health/settings | board-claims +token-session
 PUT /api/board/{project}/orchestrator-grant | board-claims | operator-only
 PUT /api/board/{project}/settings | board-claims +token-session | operator-only

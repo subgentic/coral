@@ -59,8 +59,10 @@ type BoardHandler struct {
 	changeWords                   func(r *http.Request, project, hex, text string) (ChangeWords, error)      // the thread comment and the agent's notice of a Request changes with words (#13976)
 	reviewPost                    func(ctx context.Context, project, msg string) error                       // a test's replacement for posting the approval message (team_artifact_review.go)
 	coralDir                      string
-	alsoMu                        sync.Mutex    // serialises adding a later receipt to a received row (#4449)
-	autoAttach                    *AutoAttacher // #3515: an agent's linked images and Markdown
+	checkSnapDir                  string            // where the approved scripts' snapshots live (custom checks, #20176)
+	checkTokens                   CheckTokenRevoker // ends a check's live run tokens
+	alsoMu                        sync.Mutex        // serialises adding a later receipt to a received row (#4449)
+	autoAttach                    *AutoAttacher     // #3515: an agent's linked images and Markdown
 	writeTaskArtifact             func(context.Context, *board.Task, string) error
 	reminderMu                    sync.Mutex
 	reminders                     map[string]context.CancelFunc
