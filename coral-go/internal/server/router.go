@@ -650,6 +650,19 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		return ownerCloud.LinkAskAllowed(ctx, id, tunnel.AskKindMessageReply)
 	}) // a reply that answers an ask (#20413)
 	routes.SetHubOwnerRecord(ownerRecordOf)       // and what it is enrolled as: a person's or an organisation's (#7061)
+	routes.SetMemberLinkCap(func(ctx context.Context, id string) (tunnel.Mode, bool) { // the cap of an active link, for a member grant (#20387)
+		ls, err := ownerCloud.ListLinks(ctx)
+		if err != nil {
+			return tunnel.TierNever, false
+		}
+		for _, l := range ls {
+			if l.LinkID == id && l.State == store.LinkStateActive {
+				m, ok := tunnel.ParseMode(l.MaxMode)
+				return m, ok
+			}
+		}
+		return tunnel.TierNever, false
+	})
 	s.cloudHandler.SetOwnerLabelStore(ownerCloud) // and where the person at this computer records it when it is missing (#6108)
 	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), func() { s.endForUpdate(endThisServer) })
 	if s.sysHandler != nil {
