@@ -137,7 +137,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, s.SetChainNamedFile(ctx, project, first.ID, "README.md", strings.Repeat("a", 64), time.Now()))      // and its open file of a name (#15159)
 	_, err = s.db.ExecContext(ctx, `INSERT INTO board_opening_ask (project, message_id) VALUES (?, ?)`, project, first.ID) // and the first-goal marker (#19170)
 	require.NoError(t, err)
-	_, err = s.CreateMemberGrant(ctx, NewMemberGrant{LinkID: "lnk-aaaa1111", HubUser: "hub-user-bbbb2222", BoardID: project, Level: MemberLevelView, Label: "Ada"}) // and a Hub person's access (#20387)
+	_, err = s.CreateMemberGrant(ctx, signed(NewMemberGrant{LinkID: "lnk-aaaa1111", HubUser: "hub-user-bbbb2222", Level: MemberLevelView, ScopeKind: MemberScopeBoard, ScopeID: project, BoardID: project, Label: "Ada"})) // and a Hub person's access (#20387)
 	require.NoError(t, err)
 	return []int64{first.ID, second.ID}
 }
