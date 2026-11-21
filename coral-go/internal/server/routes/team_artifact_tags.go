@@ -92,12 +92,12 @@ func teamTagCountsByFile(items []teamArtifact) map[string]int {
 	type slot struct{ key, tag string }
 	counts := map[string]int{}
 	seen := map[slot]bool{}
-	for i, it := range items {
-		key := artifactVersionKey(it)
+	for i := range items {
+		key := artifactVersionKey(&items[i])
 		if key == "" {
 			key = "row:" + strconv.Itoa(i) // a row with no uploader is its own file
 		}
-		for _, t := range it.Tags {
+		for _, t := range items[i].Tags {
 			if !seen[slot{key, t}] {
 				seen[slot{key, t}] = true
 				counts[t]++

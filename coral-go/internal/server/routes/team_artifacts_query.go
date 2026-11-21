@@ -1069,17 +1069,21 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 }
 
 // artifactVersionKey names the file a row is a version of: the same team, the same uploader (session and producer) and the same name, as Needs you groups them (#11533, #11539). "" for a row that is
-// nobody's version: a link rather than an upload, one with no uploader, or one named by its digest (a name that says nothing, so two of them are not one file). A JSON array, so a '|' in a name or an
-// id can't make two keys one.
-func artifactVersionKey(it teamArtifact) string {
-	if it.managed == "" || it.Name == "" || digestLikeName.MatchString(it.Name) || (it.SessionID == nil && it.ProducedBy == nil) {
+// nobody's version: a link rather than an upload, one with no uploader, or one named by its digest (a name that says nothing, so two of them are not one file). Each part is written with its length, so a '|' in a name
+// or an id can't make two keys one. The row is read through a pointer: a row is large, and a list of 20,000 asks for a key of each of them several times (#20396).
+func artifactVersionKey(it *teamArtifact) string {
+	if it.managed == "" || it.Name == "" || (it.SessionID == nil && it.ProducedBy == nil) || digestLikeName.MatchString(it.Name) {
 		return ""
 	}
-	b, err := json.Marshal([]string{it.BoardID, ptrOr(it.SessionID), ptrOr(it.ProducedBy), it.Name})
-	if err != nil {
-		return ""
+	session, producer := ptrOr(it.SessionID), ptrOr(it.ProducedBy)
+	var b strings.Builder
+	b.Grow(len(it.BoardID) + len(session) + len(producer) + len(it.Name) + 24)
+	for _, part := range [4]string{it.BoardID, session, producer, it.Name} {
+		b.WriteString(strconv.Itoa(len(part)))
+		b.WriteByte(':')
+		b.WriteString(part)
 	}
-	return string(b)
+	return b.String()
 }
 
 // newerVersion: a is a later upload than b (by time, then id, so it is total).
@@ -1097,31 +1101,29 @@ func newerVersion(a, b teamArtifact) bool {
 
 // collapseVersions makes the versions of one file one row: the newest, with EarlierVersions the number it stands for (#11700). The rows keep the order they came in; items is not changed.
 func collapseVersions(items []teamArtifact) []teamArtifact {
+	keys := make([]string, len(items)) // each row's key, made once (it was made three times a row)
 	newest := map[string]int{}
 	count := map[string]int{}
-	for i, it := range items {
-		k := artifactVersionKey(it)
+	for i := range items {
+		k := artifactVersionKey(&items[i])
+		keys[i] = k
 		if k == "" {
 			continue
 		}
 		count[k]++
-		if j, ok := newest[k]; !ok || newerVersion(it, items[j]) {
+		if j, ok := newest[k]; !ok || newerVersion(items[i], items[j]) {
 			newest[k] = i
 		}
 	}
-	// The older versions' digests, oldest first and at most maxEarlierDigests (#14086): the same team, uploader and name the collapse uses, so they are the digests of rows this list would have shown for the same file. A
-	// decision on the newest version settles them (the client removes their review tags quietly), as it does for a starred series; without them an approved file's older legacy version, which has no series, stays for review and
-	// comes back in Needs you. A file with more than the cap says so by EarlierVersions (the whole count) being greater than the digests it carries; the rest follow once these are settled and the list is read again (the next
-	// read has the next oldest as its earlier digests), so there is no endpoint to page.
 	earlier := map[string][]teamArtifact{}
-	for i, it := range items {
-		if k := artifactVersionKey(it); k != "" && newest[k] != i {
-			earlier[k] = append(earlier[k], it)
+	for i, k := range keys {
+		if k != "" && newest[k] != i {
+			earlier[k] = append(earlier[k], items[i])
 		}
 	}
 	out := make([]teamArtifact, 0, len(items))
 	for i, it := range items {
-		if k := artifactVersionKey(it); k != "" {
+		if k := keys[i]; k != "" {
 			if newest[k] != i {
 				continue
 			}

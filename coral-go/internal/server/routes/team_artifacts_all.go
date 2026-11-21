@@ -175,7 +175,12 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 			items = append(items, rows...)
 		}
 	}
-	all := filesOrVersions(tq, items) // with versions=newest the unfiltered count is files, as the total and the team route's own all are (#11700, #13151)
+	// The key of a file names its team, so the files of the whole list are the files of each team's rows added up: the count is what the refs already hold, not a second collapse of every row (#20396).
+	all := 0
+	for _, ref := range refs {
+		all += ref.All
+	}
+	// with versions=newest the unfiltered count is files, as the total and the team route's own all are (#11700, #13151)
 	tq.crossTeam = true
 	if len(pool) > 0 { // facets=team with a team asked for: the rows of the other teams join the pass, the asked-for teams stay the list (the team= filter), and the team facet leaves that filter out (#13378)
 		items = append(items, pool...)
