@@ -116,6 +116,7 @@ func TestHealthCheckScenario(t *testing.T) {
 	r.Post("/api/board/{project}/waits", h.RegisterWait)
 	r.Post("/api/board/{project}/tasks/{taskID}/park", h.ParkTask)
 	r.Post("/api/board/{project}/health/ack", h.AckHealthItem)
+	r.Get("/api/board/{project}/health/items", h.ListHealthItems)
 	api := func(method, path string, body any, as string) (int, map[string]any) {
 		t.Helper()
 		b, _ := json.Marshal(body)
