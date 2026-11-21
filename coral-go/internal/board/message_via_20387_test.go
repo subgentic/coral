@@ -34,7 +34,7 @@ func TestAMessageRecordsTheLinkAndHubPersonItArrivedThrough(t *testing.T) {
 	assert.Nil(t, anon.ViaHubUser)
 
 	// What is read back carries the same pair.
-	msgs, err := s.ListMessages(ctx, "p", 10, nil)
+	msgs, err := s.ListMessages(ctx, "p", 10, 0, 0)
 	require.NoError(t, err)
 	got := map[string]string{}
 	for _, x := range msgs {
