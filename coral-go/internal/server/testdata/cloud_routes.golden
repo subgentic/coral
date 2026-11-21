@@ -331,6 +331,7 @@ POST /api/agent-asks/{id}/answer interact
 POST /api/agent-asks/{id}/dismiss interact
 POST /api/agent-asks/{id}/images interact
 POST /api/agent/artifacts never
+POST /api/agent/artifacts/{id}/review never
 POST /api/agent/skills never
 POST /api/agent/tasks never
 POST /api/agent/tasks/claim never

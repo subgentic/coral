@@ -113,6 +113,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/agent-asks/{id}/images":                                     "a picture for the answer being written: the answer itself (agent-asks answer) is the click",
 	"POST /api/agent-asks/{id}/answer":                                     "the Operator answers the agent in its conversation; the question leaves Needs you (#18106)",
 	"POST /api/agent/artifacts":                                            "an agent's own call: no person's click",
+	"POST /api/agent/artifacts/{id}/review":                                "an agent's own call: no person's click (the file reaches Needs you as an upload with the tag does)",
 	"POST /api/agent/skills":                                               "an agent's own call: no person's click",
 	"POST /api/agent/tasks":                                                "an agent's own call: no person's click",
 	"POST /api/agent/tasks/claim":                                          "an agent's own call: no person's click",

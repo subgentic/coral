@@ -142,3 +142,125 @@ func TestANewVersionOfAFileStillWaitingForReviewIsTheOneForReview(t *testing.T) 
 	require.NoError(t, err)
 	assert.NotContains(t, tags[p2], "for review", "a file that was not for review does not become so by a new version")
 }
+
+// #20401 (the Operator): promo-cut-1.mp4 v17 was approved, v18 was uploaded with --new-version-of and no --tag, and it never came back to Needs you. A new version of a file the Operator reviewed (approved or
+// sent back) is for review again, as a new version of the same row, with a question; the older version keeps its decision; --no-review opts out; and the upload's answer says whether it reached the Inbox.
+func TestANewVersionOfAnApprovedFileComesBackToTheInbox(t *testing.T) {
+	rig, _ := ownerRig(t)
+	_, bh := setupBoardTestServer(t)
+	rig.h.bs = bh.bs
+	bh.coralDir = rig.coralDir
+	ctx := context.Background()
+	up := func(text, ref, extra string) (string, map[string]any) {
+		url := rig.srv.URL + "/api/agent/artifacts?session_id=a1" + extra
+		req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(text))
+		require.NoError(t, err)
+		req.Header.Set("X-Artifact-Name", "mock.html")
+		req.Header.Set("X-Artifact-Media-Type", "text/plain")
+		if ref != "" {
+			req.Header.Set(seriesHeader, ref)
+		}
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Contains(t, []int{http.StatusOK, http.StatusCreated}, resp.StatusCode, text)
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return strings.TrimPrefix(out["uri"].(string), "coral://artifacts/"), out
+	}
+	v1, first := up("cut v1", "", "&tag=for+review&question=Approve+the+cut%3F")
+	assert.Equal(t, true, first["for_review"], "the answer says it is in the Inbox")
+	_, _, err := rig.h.bs.DecideArtifactReview(ctx, "team-a", v1, board.ReviewApproved, time.Now())
+	require.NoError(t, err)
+
+	v2, second := up("cut v2", "coral://artifacts/"+v1, "")
+	tags, err := rig.h.bs.ArtifactTags(ctx, "team-a")
+	require.NoError(t, err)
+	assert.Contains(t, tags[v2], "for review", "a new version of an approved file is for review again")
+	assert.Contains(t, tags[v1], "approved", "the approved version keeps its decision")
+	assert.NotContains(t, tags[v1], "for review")
+	qs, err := rig.h.bs.ArtifactQuestions(ctx, "team-a")
+	require.NoError(t, err)
+	assert.Equal(t, "Look at the new version of mock.html?", qs[v2].Question, "a decision clears the question: the returning version asks the plain ask (its note, when it has one)")
+	assert.Equal(t, true, second["for_review"])
+	assert.Contains(t, second["inbox"], "Inbox", "the answer says where it went")
+
+	// the opt-out: a version that is not for the Operator's eyes says so, and the answer says it did not reach them
+	_, _, err = rig.h.bs.DecideArtifactReview(ctx, "team-a", v2, board.ReviewApproved, time.Now())
+	require.NoError(t, err)
+	v3, third := up("cut v3", "coral://artifacts/"+v2, "&no_review=1")
+	tags, err = rig.h.bs.ArtifactTags(ctx, "team-a")
+	require.NoError(t, err)
+	assert.NotContains(t, tags[v3], "for review")
+	assert.Equal(t, false, third["for_review"])
+}
+
+// #20401: the newest version is sent for review WITHOUT new bytes (the upload refuses the same bytes), idempotently; a decided file starts a new round; only the owning team's agent may; and an older version's
+// digest names the file, the newest version is the one sent.
+func TestAnAgentSendsTheNewestVersionForReviewWithoutNewBytes(t *testing.T) {
+	rig, _ := ownerRig(t)
+	_, bh := setupBoardTestServer(t)
+	rig.h.bs = bh.bs
+	bh.coralDir = rig.coralDir
+	ctx := context.Background()
+	up := func(text, ref string) string {
+		req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/agent/artifacts?session_id=a1", strings.NewReader(text))
+		require.NoError(t, err)
+		req.Header.Set("X-Artifact-Name", "cut.html")
+		req.Header.Set("X-Artifact-Media-Type", "text/plain")
+		if ref != "" {
+			req.Header.Set(seriesHeader, ref)
+		}
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	}
+	review := func(session, id, body string) (int, map[string]any) {
+		req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/agent/artifacts/"+id+"/review?session_id="+session, strings.NewReader(body))
+		require.NoError(t, err)
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	v1 := up("cut v1", "")
+	v2 := up("cut v2", "coral://artifacts/"+v1)
+	tags, err := rig.h.bs.ArtifactTags(ctx, "team-a")
+	require.NoError(t, err)
+	assert.NotContains(t, tags[v2], "for review", "uploaded with no tag, as in the report")
+
+	code, out := review("a1", v1, `{"question":"Is the new cut good?"}`) // an older version's digest names the file
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, "coral://artifacts/"+v2, out["uri"], "the newest version is the one sent")
+	assert.Equal(t, true, out["for_review"])
+	tags, _ = rig.h.bs.ArtifactTags(ctx, "team-a")
+	assert.Contains(t, tags[v2], "for review")
+	qs, _ := rig.h.bs.ArtifactQuestions(ctx, "team-a")
+	assert.Equal(t, "Is the new cut good?", qs[v2].Question)
+
+	code, out = review("a1", v2, ``) // again: nothing changes, nothing is refused
+	require.Equal(t, http.StatusOK, code, out)
+	tags2, _ := rig.h.bs.ArtifactTags(ctx, "team-a")
+	assert.Equal(t, tags, tags2, "idempotent")
+
+	_, _, err = rig.h.bs.DecideArtifactReview(ctx, "team-a", v2, board.ReviewApproved, time.Now())
+	require.NoError(t, err)
+	code, out = review("a1", v2, ``) // a decided file starts a new round
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, "approved", out["again_after"])
+	tags, _ = rig.h.bs.ArtifactTags(ctx, "team-a")
+	assert.Contains(t, tags[v2], "for review")
+	assert.NotContains(t, tags[v2], "approved")
+
+	code, _ = review("b1", v2, ``) // another team's agent
+	assert.Equal(t, http.StatusNotFound, code, "another team's file is not found for it")
+	code, _ = review("n1", v2, ``) // an agent on no team
+	assert.Equal(t, http.StatusForbidden, code)
+	code, _ = review("a1", strings.Repeat("0", 64), ``)
+	assert.Equal(t, http.StatusNotFound, code)
+}

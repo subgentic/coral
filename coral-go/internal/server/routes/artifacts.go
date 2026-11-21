@@ -89,11 +89,12 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	st.mu.Unlock()
 	docIDMigrationStart(h.cfg.CoralDir()) // in the background: startup never waits for it (#14551)
 	r.Post("/api/agent/artifacts", h.uploadAgentArtifact)
-	r.Get("/api/artifacts", h.listAllArtifacts)                           // the machine-wide list, the owner's (#5575)
-	r.Get("/api/artifacts/resolve", h.resolveArtifactRefs)                // #9841: which artifact a shortened link in an old message means
-	r.Get("/api/artifacts/series/{series_id}", h.seriesRedirect)          // #6357: the newest version the caller can read (a redirect to its digest)
-	r.Get("/api/artifacts/series/{series_id}/versions", h.seriesVersions) // #6357
-	r.Delete("/api/artifacts/series/{series_id}", h.deleteSeries)         // #6357: the Operator's, every version
+	r.With(RefuseSignInLink).Post("/api/agent/artifacts/{id}/review", h.reviewAgentArtifact) // #20401: send the newest version for review without new bytes
+	r.Get("/api/artifacts", h.listAllArtifacts)                                              // the machine-wide list, the owner's (#5575)
+	r.Get("/api/artifacts/resolve", h.resolveArtifactRefs)                                   // #9841: which artifact a shortened link in an old message means
+	r.Get("/api/artifacts/series/{series_id}", h.seriesRedirect)                             // #6357: the newest version the caller can read (a redirect to its digest)
+	r.Get("/api/artifacts/series/{series_id}/versions", h.seriesVersions)                    // #6357
+	r.Delete("/api/artifacts/series/{series_id}", h.deleteSeries)                            // #6357: the Operator's, every version
 	r.Get("/api/artifacts/{id}", h.getAgentArtifact)
 	r.Get("/api/artifacts/{id}/thumbnail", h.artifactThumbnail)
 	r.Get("/api/artifacts/{id}/meta", h.getAgentArtifactMeta) // metadata only: do you have it (#5465)
@@ -480,21 +481,34 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			}
 		}
 	}
-	if plan != nil && h.bs != nil && !hasTag(tags, tagForReview) { // a version of a file still waiting for review, or whose changes the Operator asked for, is for review even when the agent forgot --tag (#14964: version 1 stayed the row to approve, and versions 2 to 4 were nowhere); under the rule that such a file leaves Needs you, it would otherwise vanish without a trace (#11985)
+	if plan != nil && h.bs != nil && !hasTag(tags, tagForReview) && r.URL.Query().Get("no_review") != "1" { // a version of a file still waiting for review, or whose changes the Operator asked for, is for review even when the agent forgot --tag (#14964: version 1 stayed the row to approve, and versions 2 to 4 were nowhere); under the rule that such a file leaves Needs you, it would otherwise vanish without a trace (#11985)
 		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && teamBoard == plan.board {
 			if byTag, terr := h.bs.ArtifactTags(r.Context(), teamBoard); terr == nil {
 				for _, m := range plan.rows {
-					if m.Digest != hexID && m.Board == teamBoard && (hasTag(byTag[m.Digest], board.ReviewChangesRequested) || hasTag(byTag[m.Digest], tagForReview)) {
+					if m.Digest != hexID && m.Board == teamBoard && (hasTag(byTag[m.Digest], board.ReviewChangesRequested) || hasTag(byTag[m.Digest], board.ReviewApproved) || hasTag(byTag[m.Digest], tagForReview)) {
 						if added, aerr := h.bs.AddArtifactTags(r.Context(), teamBoard, hexID, []string{tagForReview}); aerr == nil {
 							tags = added
 							if reviewQuestion == "" { // the question is read only with --tag, so here there is none of its own: the earlier version's still stands (#14969)
 								if qs, qerr := h.bs.ArtifactQuestions(r.Context(), teamBoard); qerr == nil {
+									carried := false
 									for i := len(plan.rows) - 1; i >= 0; i-- {
 										if q, ok := qs[plan.rows[i].Digest]; ok && plan.rows[i].Digest != hexID && q.Question != "" {
 											if _, qerr := h.bs.SetArtifactQuestion(r.Context(), teamBoard, hexID, q.Question, sid, time.Now()); qerr != nil {
 												slog.Warn("[artifacts] the question of the earlier version was not carried", "digest", hexID, "error", qerr)
 											}
+											carried = true
 											break
+										}
+									}
+									if !carried { // a decision clears the question: the new version asks with its own note, else with the plain ask (#20401)
+										ask := uploadNote
+										if ask == "" {
+											ask = "Look at the new version of " + meta.Name + "?"
+										}
+										if q, ok := board.CleanReviewQuestion(ask); ok {
+											if _, qerr := h.bs.SetArtifactQuestion(r.Context(), teamBoard, hexID, q, sid, time.Now()); qerr != nil {
+												slog.Warn("[artifacts] the question of a returning version was not recorded", "digest", hexID, "error", qerr)
+											}
 										}
 									}
 								}
@@ -528,6 +542,12 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		"size":       meta.Size, // the stored size: smaller than the file when metadata was removed
 		"digest":     meta.Digest,
 		"stripped":   stripped, // image metadata was removed: the id is the hash of the stored bytes
+	}
+	reply["for_review"] = hasTag(tags, tagForReview) // says whether the upload reached the Operator's Inbox (#20401): an agent that forgot the tag, or opted out, is told, not left to find out from the Operator
+	if hasTag(tags, tagForReview) {
+		reply["inbox"] = "In the Operator's Inbox (Needs you) for review."
+	} else {
+		reply["inbox"] = "Not in the Operator's Inbox: it is not tagged for review (upload it with --tag \"for review\" --question \"...\", or send it with coral-agent artifact review <uri>)."
 	}
 	fileID, fileVersion := "", 0 // the file's stable id and this version's number (#14145), told the same way everywhere by versionLine
 	if linkNote != "" {

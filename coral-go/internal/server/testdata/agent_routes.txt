@@ -310,6 +310,7 @@ b POST /api/agent-asks/{id}/answer
 b POST /api/agent-asks/{id}/dismiss
 b POST /api/agent-asks/{id}/images
 a POST /api/agent/artifacts
+a POST /api/agent/artifacts/{id}/review
 a POST /api/agent/tasks
 a POST /api/agent/tasks/claim
 a POST /api/agent/tasks/current
