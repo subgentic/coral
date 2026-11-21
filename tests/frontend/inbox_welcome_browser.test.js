@@ -37,7 +37,7 @@ const { coralReady } = require('./helpers/wait');
             check(await ev(`document.querySelectorAll('button.goals-chip').length`) === 0, `${tag}: only Getting started rows are listed, so no kind filter reading All 0 / Permission 0 over them (#20063)`);
             check(JSON.stringify(await titles()) === JSON.stringify(TITLES), `${tag}: the five items in order: ` + JSON.stringify(await titles()));
             const acts = await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions')].map(b => [...b.querySelectorAll('button:not(.menu-item):not(.inbox-row-more-toggle)')].map(x => x.textContent))`);
-            const want = mobile ? [['Open guide'], ['New agent'], ['Got it'], ['New team'], ['Read it']] : [['Open guide'], ['New agent'], ['Got it'], ['New team'], ['Read it']]; // no row has a Dismiss button: it is in the More menu on every card (#20016), or a swipe on a phone (#11642)
+            const want = [['Open guide','Dismiss'], ['New agent','Dismiss'], ['Got it'], ['New team','Dismiss'], ['Read it','Dismiss']]; // #20203: a sole Dismiss is direct; the non-dismissible Got it action is not repeated.
             check(JSON.stringify(acts) === JSON.stringify(want), `${tag}: each item's action, and Dismiss on all but the welcome (in the menu on a phone): ` + JSON.stringify(acts));
             check(await ev(`!document.querySelector('.inbox-getting-started') && !document.querySelector('button[aria-label="Dismiss Getting started"]')`), `${tag}: no separate block and no Dismiss all: the items are ordinary rows (#18764)`);
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent.trim() === '5'`, `${tag}: the five items are counted in the Inbox badge, as on the tab (#20017)`, 8000);

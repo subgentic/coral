@@ -53,14 +53,8 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelector('#team-panel-needs input[type=search]')?.value==='no matching agent'`,'team filter survives leaving and returning');
             await ev(`(()=>{const input=document.querySelector('#team-panel-needs input[type=search]');input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
             await waitFor(`!!document.querySelector('#team-panel-needs tr[data-key="local:team-wait-id"]')`,'cleared search restores team row');
-            if(width===390){
-                await ev(`document.querySelector('#team-panel-needs .dt-mail-more-toggle').click();true`);
-                await waitFor(`!![...document.querySelectorAll('#team-panel-needs [role=menuitem]')].find(item=>item.textContent.trim().startsWith('Remove from Needs you'))`,'shared phone Remove action');
-                await ev(`[...document.querySelectorAll('#team-panel-needs [role=menuitem]')].find(item=>item.textContent.trim().startsWith('Remove from Needs you')).click();true`);
-            }else{
-                await waitFor(`!!document.querySelector('#team-panel-needs .inbox-remove-wait')`,'shared desktop Remove action');
-                await ev(`document.querySelector('#team-panel-needs .inbox-remove-wait').click();true`);
-            }
+            await waitFor(`!!document.querySelector('#team-panel-needs .inbox-remove-wait')`,'shared direct Remove action');
+            await ev(`document.querySelector('#team-panel-needs .inbox-remove-wait').click();true`);
             await waitFor(`!document.querySelector('#team-panel-needs tr[data-key="local:team-wait-id"]')`,'shared removal updates team list');
             assert.deepEqual(await ev(`window.__teamWrites.map(write=>({path:write.path,remove:write.body.remove,session_id:write.body.session_id}))`),[{path:'/api/sessions/live/team-wait-agent/dismiss-wait',remove:true,session_id:'team-wait-id'}],'shared action posts only to the intended local agent');
             await waitFor(`document.querySelector('#team-tab-needs .team-tab-count')?.textContent===''`,'removal updates unfiltered team count');

@@ -30,16 +30,9 @@ const { installGuard, reached } = require('./helpers/silent_dismiss');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'three rows of Needs you', 10000);
             const ignores = await ev(`[...document.querySelectorAll('${T} button[aria-label^="Dismiss the question of"]')].map(b => b.getAttribute('aria-label'))`);
-            if (mobile) { // a phone row has no Dismiss button (#11642): Dismiss is in its three-dot menu, so the two asks have a menu and the wait has none
-                const menus = await ev(`[...document.querySelectorAll('${T} .inbox-row-more-toggle')].map(b => b.getAttribute('aria-label')).sort()`);
-                check(JSON.stringify(ignores) === '[]' && JSON.stringify(menus) === JSON.stringify(['More actions for the question of Docs', 'More actions for the question of Lead']), at + 'no Dismiss button; the two asks have a menu, the wait has none: ' + JSON.stringify({ ignores, menus }));
-                await ev(`document.querySelector('${T} .inbox-row-more-toggle[aria-label="More actions for the question of Lead"]').click(); true`);
-                await waitFor(`!!document.querySelector('${T} .inbox-row-more .menu:not([hidden]) .menu-item')`, at + 'the menu opens', 5000);
-                await ev(`document.querySelector('${T} .inbox-row-more .menu:not([hidden]) .menu-item').click(); true`);
-            } else {
-                check(JSON.stringify(ignores.sort()) === JSON.stringify(['Dismiss the question of Docs', 'Dismiss the question of Lead']), at + 'the two asks have an Dismiss, the wait has none: ' + JSON.stringify(ignores));
-                await ev(`document.querySelector('${T} button[aria-label="Dismiss the question of Lead"]').click(); true`);
-            }
+            check(JSON.stringify(ignores.sort()) === JSON.stringify(['Dismiss the question of Docs', 'Dismiss the question of Lead']), at + 'both asks have a direct Dismiss, the wait has none');
+            check(await ev(`!document.querySelector('${T} .inbox-row-more-toggle')`), at + 'no redundant single-item More');
+            await ev(`document.querySelector('${T} button[aria-label="Dismiss the question of Lead"]').click(); true`);
             await waitFor(`!document.querySelector('${T} button[aria-label="Answer the question of Lead"]')`, at + 'the ignored question leaves', 8000).catch(() => {});
             await ev(framesJs(6));
             const calls = await ev(`window.__calls`);

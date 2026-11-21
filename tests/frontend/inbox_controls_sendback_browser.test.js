@@ -63,7 +63,7 @@ const { coralReady } = require('./helpers/wait');
                 const check = (ok, why) => { if (!ok) failures.push(width + ': ' + why); };
                 check(await ev(`document.querySelector('.inbox-folder-toolbar input[type=search]').placeholder === 'Search waiting on you'`), 'item 3: search says Search waiting on you');
                 const kinds = await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].map(b=>b.textContent.trim().replace(/\\s+/g,' '))`);
-                check(JSON.stringify(kinds) === JSON.stringify(['All 1','For review 1','Permission 0','Question 0','Goal looks done 0']), 'item 4: mock kind order, no empty Needs input: '+JSON.stringify(kinds));
+                check(JSON.stringify(kinds) === JSON.stringify(['All 1','For review 1']), 'item 4: mock kind order, no empty Needs input: '+JSON.stringify(kinds));
                 await ev(`(async()=>{window.__waiting=[{kind:'comment_sent',id:${713+width},board:'${team}',agent:{name:'Writer A',session_id:'sess-awake'},since:new Date().toISOString(),operator_words:'Please add a summary table.',artifact:{hex:(2).toString(16).padStart(64,'0'),name:'Awake file.txt'},thread_id:713}];const W=await import((window.__coralStatic||'/static/')+'inbox_waiting_agent.js');await W.load({force:true});document.querySelector('[data-needs-tab="agent"]').click();})()`);
                 await waitFor(`!!(${row('Awake file.txt')})`, 'sent-back file before stopping');
                 check(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r=>r.textContent.includes('Awake file.txt')).length === 1`), 'item 8: request-changes comment initially shares its file row');

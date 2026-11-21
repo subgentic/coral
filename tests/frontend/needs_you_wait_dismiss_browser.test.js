@@ -28,11 +28,11 @@ const BASE = require('./test_base').BASE;
         await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')); true`);
         const rowOf = who => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(who)}))`;
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, 'the four rows', 10000);
-        const dismissVia = async words => { await ev(`(${rowOf(words)}).querySelector('.inbox-row-more-toggle').click(); true`); await waitFor(`!!(${rowOf(words)}).querySelector('.inbox-row-more [role=menuitem]:not([hidden])') && !(${rowOf(words)}).querySelector('.inbox-row-more .menu[hidden]')`, 'the row\'s menu opens', 4000); await ev(`[...(${rowOf(words)}).querySelectorAll('.inbox-row-more [role=menuitem]')].find(b => b.textContent.trim() === 'Dismiss').click(); true`); }; // N5 (#17451): Dismiss is in the kebab
+        const dismissVia = async words => ev(`(${rowOf(words)}).querySelector('.inbox-single-action .inbox-dismiss').click();true`); // #20203: the sole Dismiss is direct.
         const dismissOf = who => ev(`!!(${rowOf(who)} || document.body).querySelector('.inbox-dismiss')`);
         for (const [who, words] of [['inputter', 'Needs input: pick a colour'], ['signer', 'Sign in to continue'], ['sleeper', 'Wants to know: which font'], ['permit', 'Wants to run: npm test']]) {
             assert.ok(await ev(`!!(${rowOf(words)})`), `${who}: its row is listed`);
-            assert.ok(await ev(`!!(${rowOf(words)}).querySelector('.inbox-row-more-toggle')`), `${who}: its row has a Dismiss (in its kebab, #17451 N5)`);
+            assert.ok(await ev(`!!(${rowOf(words)}).querySelector('.inbox-single-action .inbox-dismiss')`), `${who}: its row has direct Dismiss (#20203)`);
         }
         // an input prompt: hidden here, nothing sent, the count follows, and it stays hidden when the list is drawn again
         await dismissVia('Needs input: pick a colour');

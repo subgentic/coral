@@ -55,7 +55,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.equal(rows.length, 1, 'one row: not the goal with an open task, nor the one with no tasks: ' + JSON.stringify(rows));
         assert.match(rows[0].text, new RegExp(`Goal #${gid} looks done: Ship the pilot`));
         assert.match(rows[0].text, /Done when: it is shipped/);
-        assert.deepEqual(rows[0].buttons.filter(b => /^(Mark done|Not yet|Dismiss)$/.test(b)), ['Mark done', 'Not yet', 'Dismiss']);
+        assert.deepEqual(rows[0].buttons.filter(b => /^(Close goal|Not yet|Dismiss)$/.test(b)), ['Close goal', 'Not yet', 'Dismiss']);
         // #13586 (the Operator: "buttons are somewhat offcenter. Dismiss is hard to see"): the actions are centred on the row, Close goal, Not yet, Dismiss and the three dots are on one line, and Dismiss is an outlined button with readable words, on both themes
         for (const theme of ['dark', 'light']) {
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
@@ -71,7 +71,7 @@ const B = 'goal-done-' + Date.now().toString(36);
                 d = btns.find(b => /^Dismiss$/.test(b.textContent.trim())), cs = d && getComputedStyle(d), bg = bgOf(td);
                 return { n: btns.length, names: btns.map(b => b.textContent.trim() || b.getAttribute('aria-label')), centres: btns.map(b => Math.round(c(b))), rowCentre: Math.round((tr_.top + tr_.bottom) / 2), tdAlign: getComputedStyle(td).verticalAlign,
                     border: cs && parseFloat(cs.borderTopWidth), text: cs && ratio(cs.color, bg), edge: cs && ratio(cs.borderTopColor, bg), rowH: Math.round(tr_.height), fits: box.scrollWidth <= box.clientWidth + 1 }; })()`);
-            assert.ok(g.n >= 3 && g.names.slice(0, 3).join() === 'Mark done,Not yet,Dismiss', `${theme}: the three buttons (an unread row has no three dots on a desktop: its menu is only Mark unread, for a row already read): ` + JSON.stringify(g));
+            assert.ok(g.n >= 3 && g.names.slice(0, 3).join() === 'Close goal,Not yet,Dismiss', `${theme}: the three buttons (an unread row has no three dots on a desktop: its menu is only Mark unread, for a row already read): ` + JSON.stringify(g));
             assert.ok(Math.max(...g.centres) - Math.min(...g.centres) <= 1, `${theme}: the buttons (and the three dots, when the row has them) are on one line (same centre): ` + JSON.stringify(g));
             assert.ok(g.centres[0] > g.rowCentre && g.centres[0] < g.rowCentre + g.rowH / 2, `${theme}: the actions are on the row's bottom line, under its text (#15162): ` + JSON.stringify(g));
             assert.ok(g.border >= 1 && g.edge >= 3 && g.text >= 4.5, `${theme}: Dismiss has an outline (3:1) and words at 4.5:1: ` + JSON.stringify(g));
@@ -155,7 +155,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'Undo brings it back', 8000);
 
         // Close goal: the goal's page with the Close dialog set to Done; closing it takes the item away
-        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Mark goal"]').click(); true`);
+        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Close goal"]').click(); true`);
         await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`, 'the Close dialog', 10000);
         assert.equal(await ev(`document.querySelector('dialog.goals-close-dialog input[name=goal-close-state]:checked')?.value`), 'done', 'set to Done');
         await ev(`[...document.querySelectorAll('dialog.goals-close-dialog button')].find(b => /^(Close goal|Close|Confirm)/.test(b.textContent.trim()) && b.type !== 'button' || /Close goal/.test(b.textContent)).click(); true`);

@@ -29,7 +29,7 @@ const WORDS = '@Operator [Coral] A custom check waits for your approval: stale-p
                     return orig(u, o); };
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'one row in Needs you', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && !!document.querySelector('[data-check-action=approve]') && !!document.querySelector('[data-check-action=deny]')`, at + 'one row with its lazy-loaded approval actions in Needs you', 10000);
             const row = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); return { text: r.textContent, approve: !!r.querySelector('[data-check-action=approve]'), deny: !!r.querySelector('[data-check-action=deny]'), more: !!r.querySelector('.inbox-ask-expand') }; })()`);
             assert.ok(row.text.includes('SHA-256 ' + 'ab12'.repeat(16)), at + 'the SHA-256 is on the row: ' + row.text.slice(0, 200));
             assert.ok(row.text.includes('"--days"') && row.text.includes('/Users/me/repo'), at + 'the arguments and the folder are on the row');

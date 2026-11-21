@@ -54,11 +54,11 @@ const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_not
             await ev(`document.getElementById('inbox-needs-toggle').click(); true`);
             await waitFor(`document.querySelectorAll('.dt-group-task').length === 2`, `${at}two task headings`, 10000);
             const heading = n => `[...document.querySelectorAll('.dt-group-task')].find(tr => tr.textContent.includes('Task #${n}'))`;
-            const place = async (n, which) => {
+            const place = async (n, which, pair = false) => {
                 const sel = which === 'story' ? '.dt-group-story' : '.dt-group-toggle';
                 await ev(`(() => { const h = ${heading(n)}, b = h && h.querySelector(${JSON.stringify(sel)}); if (!b) return false; b.scrollIntoView({ block: 'center', behavior: 'instant' });
                     // the two headings are measured with no scrolling between them, so centre the pair, not the one: with a few rows between them (a phone's cards are tall) the other would sit under the sticky header
-                    const o = ${heading(n === 11 ? 12 : 11)}, ob = o && o.querySelector(${JSON.stringify(sel)}); if (ob) { let sc = b.parentElement; while (sc && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement; sc = sc || document.scrollingElement;
+                    const o = ${heading(n === 11 ? 12 : 11)}, ob = o && o.querySelector(${JSON.stringify(sel)}); if (ob && ${pair}) { let sc = b.parentElement; while (sc && !(sc.scrollHeight > sc.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement; sc = sc || document.scrollingElement;
                         const top = Math.min(b.getBoundingClientRect().top, ob.getBoundingClientRect().top), bottom = Math.max(b.getBoundingClientRect().bottom, ob.getBoundingClientRect().bottom), head = (document.querySelector('.main-content') || document.body).getBoundingClientRect().top;
                         sc.scrollBy(0, (top + bottom) / 2 - (Math.max(head, 0) + innerHeight) / 2); }
                     return true; })()`);
@@ -106,10 +106,13 @@ const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_not
                 const after = JSON.stringify([await state(11, 'toggle'), await state(12, 'toggle'), await state(11, 'story'), await state(12, 'story')]);
                 check(before === after, `${at}${what}: nothing toggled (before ${before}, after ${after})`);
             };
+            // V4 message boxes make expanded phone groups taller than the viewport. Collapse the first group so both guard targets are genuinely visible.
+            if (mobile) check(await oneTap(11, 'toggle', ''), `${at}collapse Task #11 before the two-target gesture guards`);
             for (const which of ['toggle', 'story']) {
-                await unchanged(`a press on Task #11's ${which} control and a lift over Task #12's (the table swapped between)`, async () => { const a = await place(11, which); const b = await ev(`(() => { const h = ${heading(12)}, c = h && h.querySelector(${JSON.stringify(which === 'story' ? '.dt-group-story' : '.dt-group-toggle')}); const r = c.getBoundingClientRect(); return { x: r.left + (${JSON.stringify(which)} === 'story' ? r.width / 2 : 40), y: r.top + r.height / 2, onScreen: r.top > 0 && r.bottom < innerHeight }; })()`); check(b.onScreen, `${at}Task #12's ${which} control is on screen with Task #11's (no scrolling between the two measures)`); await press(a); await swapTable(); await moveTo(b); await lift(b); });
+                await unchanged(`a press on Task #11's ${which} control and a lift over Task #12's (the table swapped between)`, async () => { const a = await place(11, which, true); const b = await ev(`(() => { const h = ${heading(12)}, c = h && h.querySelector(${JSON.stringify(which === 'story' ? '.dt-group-story' : '.dt-group-toggle')}); const r = c.getBoundingClientRect(); return { x: r.left + (${JSON.stringify(which)} === 'story' ? r.width / 2 : 40), y: r.top + r.height / 2, onScreen: r.top > 0 && r.bottom < innerHeight }; })()`); check(b.onScreen, `${at}Task #12's ${which} control is on screen with Task #11's (no scrolling between the two measures)`); await press(a); await swapTable(); await moveTo(b); await lift(b); });
                 if (!mobile) await unchanged(`a drag of 40 px from Task #11's ${which} control before the lift (the table swapped between)`, async () => { const a = await place(11, which); await press(a); await swapTable(); const far = { x: a.x + 40, y: a.y }; await moveTo(far); await lift(far); });
             }
+            if (mobile) check(await oneTap(11, 'toggle', ''), `${at}restore Task #11 after the two-target gesture guards`);
             // (the id match in the pointer path is not separately observable: two controls are always more than the 12 px tap distance apart, so the distance guard already refuses a lift over another one; the mutant that drops only the id match is equivalent)
             // 2c) UI Reviewer's MUST: only the PRIMARY button taps (a right or middle click did not press the button before), and a gesture the pointer path refuses also loses the click the browser sends for it
             if (!mobile) {

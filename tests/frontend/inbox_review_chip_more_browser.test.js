@@ -10,7 +10,7 @@ const BOARD = 'qa-review-chip-more';
     const chips = `Object.fromEntries([...document.querySelectorAll('#group-table-view button.goals-chip')].map(b=>{const s=b.textContent.trim();return [s.replace(/ [0-9]+\\+?$/,''),s];}))`;
     const expect = async (n, label) => {
         await waitFor(`(${chips})['All'] === 'All ${n}' && (${chips})['For review'] === 'For review ${n}'`,label,8000,chips);
-        assert.equal(await ev(`(${chips})['Question']`),'Question 0','exact non-review counts have no plus');
+        assert.equal(await ev(`(${chips})['Question']`),undefined,'zero-count question pill is hidden');
     };
     const search = async q => {
         await ev(`(() => {const s=document.querySelector('#inbox-needs-search');s.value=${JSON.stringify(q)};s.dispatchEvent(new Event('input',{bubbles:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));})()`);

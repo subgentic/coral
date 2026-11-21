@@ -38,6 +38,14 @@ const SINCE = new Date(Date.now() - 120000).toISOString();
             const whole = () => ev(`/END-MARK/.test(document.getElementById('group-table-view').innerText)`);
             const onButton = txt => ev(`(() => { const b = document.activeElement; return !!b && b.classList.contains('inbox-ask-expand') && b.textContent === ${JSON.stringify(txt)}; })()`);
             const before = await buttons(), t0 = await rowText();
+            if (withAsk) {
+                const geometry = await ev(`(() => { const r=[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes('Ship tonight or wait?')); const box=r?.querySelector('.inbox-message'); return {box:box&&box.getBoundingClientRect().top, icon:r.querySelector('.inbox-kind-icon')?.getBoundingClientRect().bottom, labels:[...r.querySelectorAll('.inbox-author-kind,.inbox-computer-line,.inbox-computer-chip')].map(n=>({text:n.textContent,bottom:n.getBoundingClientRect().bottom,visible:!!n.getClientRects().length}))};})()`);
+                check(at+'mixed Hub question metadata stays above its message', !!geometry.box && (!mobile || geometry.box>=geometry.icon) && geometry.labels.some(n=>/Planner/.test(n.text)) && geometry.labels.filter(n=>n.visible).every(n=>n.bottom<=geometry.box+1), JSON.stringify(geometry));
+                const allRows = await ev(`(() => [...document.querySelectorAll('#group-table-view tbody tr.inbox-v4-row')].map(r=>{const box=r.querySelector('.inbox-message'),icon=r.querySelector('.inbox-kind-icon');return {text:r.textContent.slice(0,60),top:box?.getBoundingClientRect().top,icon:icon?.getBoundingClientRect().bottom,labels:[...r.querySelectorAll('.inbox-author-kind,.inbox-computer-line,.inbox-computer-chip')].filter(n=>n.getClientRects().length).map(n=>n.getBoundingClientRect().bottom)};}))()`);
+                check(at+'all mixed remote row metadata and phone icons clear their message boxes', allRows.length===3 && allRows.every(r=>r.top && r.labels.every(b=>b<=r.top+1) && (!mobile || r.icon<=r.top)), JSON.stringify(allRows));
+
+            }
+
             await shot(`needs-agent-ask-${withAsk ? 'mixed' : 'agents'}-${w}-before`);
             check(`${at}one Show all, on the cut question only (the short one has none)`, before.length === 1 && before[0].text === 'Show all' && before[0].expanded === 'false' && /Backend Dev/.test(before[0].label), JSON.stringify(before));
             check(`${at}the row says the server's cut line, not the whole question yet`, /…/.test(t0) && !/END-MARK/.test(t0), JSON.stringify(t0).slice(0, 240));

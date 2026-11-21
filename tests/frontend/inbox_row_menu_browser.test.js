@@ -1,4 +1,4 @@
-// The phone Inbox row's ⋯ menu (#137104): a Needs you row for a wait the Operator may dismiss (a permission, a question or a plan) has a 44 px ⋯ button at its right that opens the one menu, whose first action is
+// #20203: a sole Dismiss is a direct footer action; real multi-item menus retain refresh/focus guards. The earlier phone Inbox row's ⋯ menu (#137104): a Needs you row for a wait the Operator may dismiss (a permission, a question or a plan) has a 44 px ⋯ button at its right that opens the one menu, whose first action is
 // Dismiss (Lead's dismiss-wait route, #11352); the row stays one line at 56 px, the button is the row's own control (a press never opens the row), it has a name, opens with a tap or the keyboard, and Escape gives the
 // focus back to it. Every waiting row has a ⋯ (a sign-in's holds Dismiss, #11946), and a desktop keeps its table and its Dismiss button. 390 and 360 px with touch, light and dark; isolated dev server, the Inbox's census world.
 const assert = require('node:assert/strict');
@@ -42,9 +42,8 @@ const AGENTS = [
             await ev(`window.__rowChange = performance.now(); new MutationObserver(() => { window.__rowChange = performance.now(); }).observe(document.querySelector('${T}'), { childList: true, subtree: true }); true`);
             await waitFor(`performance.now() - window.__rowChange >= 300`, at + 'the list is still', 6000);
             if (!mobile) {
-                const deskState = () => ev(`({ more: document.querySelectorAll('${T} .dt-mail-more').length, dismiss: document.querySelectorAll('${T} .inbox-row-more-toggle').length, w: innerWidth })`);
-                await waitFor(`document.querySelectorAll('${T} .dt-mail-more').length === 0 && document.querySelectorAll('${T} .inbox-row-more-toggle').length >= 1`, at + 'the desktop rows settle: no table ⋯, the row\'s kebab holds Dismiss (#17451, N5)', 4000).catch(async e => { throw new Error(e.message + ' ' + JSON.stringify(await deskState())); });
-                check(at + 'a desktop has no table ⋯ and its Dismiss is in the row kebab', true);
+                await waitFor(`document.querySelectorAll('${T} .inbox-single-action .inbox-dismiss').length === 3`,at+'desktop single Dismiss actions');
+                check(at+'a desktop exposes each sole Dismiss directly',true);
                 await ev(`(async()=>{const S=window.__coralStatic||'/static/',DT=await import(S+'data_table.js'),G=await import(S+'sidebar_groups.js'),M=await import(S+'menu_button.js');window.__refreshRows=[{id:'same-row',waiting_since:'old'}];window.__chosen=[];const node=()=>DT.dataTable({label:'Refresh menu',rows:window.__refreshRows,rowKey:r=>r.id,columns:[{key:'name',label:'Agent',primary:true,cell:r=>r.id},{key:'action',label:'Actions',cell:r=>{const wrap=document.createElement('span'),t=document.createElement('button'),m=document.createElement('div');t.textContent='More';t.className='refresh-test-toggle';t.setAttribute('aria-haspopup','menu');t.setAttribute('aria-expanded','false');t.setAttribute('aria-controls','refresh-test-menu');m.id='refresh-test-menu';m.className='menu';m.hidden=true;for(const label of (r.actions||['First','Second'])){const b=document.createElement('button');b.textContent=label;b.setAttribute('role','menuitem');b.addEventListener('click',()=>window.__chosen.push(r.waiting_since+label));m.append(b)}t.addEventListener('click',()=>M.toggleMenu(t));wrap.append(t,m);return wrap}}],state:DT.tableState()}).el;G.registerGroupSource('refresh-menu-test',{keys:()=>['needs','other'],table:()=>({title:'Needs you refresh fixture',rows:window.__refreshRows,node,signature:JSON.stringify(window.__refreshRows)})});G.openGroupTable('refresh-menu-test','needs');window.__redrawMenu=()=>G.refreshGroupTable('refresh-menu-test');window.__renderMenuNode=node;document.querySelector('.refresh-test-toggle').click();return true})()`);
                 await waitFor(`document.querySelector('.refresh-test-toggle')?.getAttribute('aria-expanded')==='true'`,at+'desktop table menu open');
                 await ev(`document.querySelectorAll('#refresh-test-menu [role=menuitem]')[1].focus();window.__oldDesktopToggle=document.querySelector('.refresh-test-toggle');window.__refreshRows=[{id:'same-row',waiting_since:'new'}];window.__redrawMenu();true`);
@@ -64,64 +63,27 @@ const AGENTS = [
                 await waitFor(`!document.getElementById('refresh-test-menu')||document.getElementById('refresh-test-menu').hidden`,at+'removed row does not leave an orphan menu');
                 continue;
             }
-            const rows = await ev(`[...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const b = tr.querySelector('.dt-mail-more-toggle'), r = b && b.getBoundingClientRect(), box = tr.getBoundingClientRect(); return { title: tr.querySelector('.dt-mail-title').textContent, h: Math.round(box.height), more: !!b, w: r ? Math.round(r.width) : 0, bh: r ? Math.round(r.height) : 0, name: b && b.getAttribute('aria-label'), popup: b && b.getAttribute('aria-haspopup'), expanded: b && b.getAttribute('aria-expanded'), inline: !!tr.querySelector('.inbox-dismiss'), sameLine: Math.abs(tr.querySelector('.dt-mail-title').getBoundingClientRect().top - tr.querySelector('.dt-mail-snippet').getBoundingClientRect().top) < 4, inside: !!(b && !b.closest('.dt-mail-open')) }; })`);
-            const by = Object.fromEntries(rows.map(x => [x.title, x]));
-            check(at + 'a permission, a question and a sign-in row all have a ⋯ (every waiting row can be dismissed, #11946)', by['Agent One']?.more && by['Agent Two']?.more && by['Agent Three']?.more, JSON.stringify(rows));
-            check(at + 'a sign-in row\'s ⋯ holds Dismiss and nothing that answers it', await ev(`(() => { const tr = [...document.querySelectorAll('${T} tr.dt-mailed')].find(r => r.querySelector('.dt-mail-title').textContent === 'Agent Three'), items = tr ? [...tr.querySelectorAll('.menu [role=menuitem]')].map(i => i.textContent.trim()) : null; return !!items && items.length === 1 && /^Dismiss/.test(items[0]); })()`));
-            check(at + 'the ⋯ is a 44 px target, named for its row, a menu button, closed, and not inside the row button', [by['Agent One'], by['Agent Two']].every(x => x.w >= 44 && x.bh >= 44 && x.popup === 'menu' && x.expanded === 'false' && x.inside && /^More actions for Agent (One|Two)$/.test(x.name)), JSON.stringify(rows));
-            check(at + 'every row is still one line at 56 px', rows.every(x => x.h === 56 && x.sameLine), JSON.stringify(rows.map(x => [x.title, x.h, x.sameLine])));
-            check(at + 'the inline Dismiss under the line is gone on a phone (the menu holds it)', rows.every(x => !x.inline), JSON.stringify(rows.map(x => [x.title, x.inline])));
-            check(at + 'no sideways scroll', await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`));
-            const ax = await axName(client, `${T} tr.dt-mailed:nth-of-type(1) .dt-mail-more-toggle`).catch(() => null);
-            // The row can redraw while CDP awaits another answer: keep its identity, not a transient DOM marker.
-            const probeKey = await ev(`document.querySelector('${T} tr.dt-mailed').dataset.key`);
-            const probe = `[...document.querySelectorAll('${T} tr.dt-mailed')].find(r => r.dataset.key === ${JSON.stringify(probeKey)})?.querySelector('.dt-mail-more-toggle')`;
-            const clickCurrent = (expression, why) => waitFor(`(() => { const e = (${expression}); if (!e?.isConnected || !e.getClientRects().length) return false; e.click(); return true; })()`, at + why, 4000);
-            // a tap opens the menu: Dismiss first, on the screen, focused; the row itself did not open
-            const url0 = await ev(`location.href`);
-            // A redraw can replace the row between the tap and the menu opening (the open is after an awaited import), and the tap opens the menu of the button that is in the row now (data_table.js, #14757): nobody taps again. Once (390 dark) a redraw is forced in the same task as the first tap and the same tap must open the menu (taps === 1); the loop only guards a run where it did not (#14630).
-            const forced = w === 390 && theme === 'dark';
-            const opens = `!!(${probe}) && !(${probe}).parentElement.querySelector('.menu').hidden`;
-            let opened = false, replaced = null, taps = 0, lastDiagnostic = null;
-            for (let attempt = 1; attempt <= 5 && !opened; attempt++) {
-                taps = attempt;
-                if (forced && attempt === 1) replaced = await ev(`(() => { const t = (${probe}); window.__rowMenuClicked = t; t.click(); window.__state.liveSessions = window.__state.liveSessions.map(a => ({ ...a, waiting_since: new Date(Date.parse(a.waiting_since) - 1000).toISOString() })); window.__inboxTab.updateInboxTab(); return !t.isConnected; })()`);
-                else await clickCurrent(`(() => { const toggle = (${probe}); window.__rowMenuClicked = toggle; return toggle; })()`, 'tap the current row menu');
-                opened = await waitFor(opens, at + 'the menu opens', attempt === 5 ? 4000 : 1500).then(() => true, async error => {
-                    lastDiagnostic = error.message + ' row-menu diagnostic: ' + JSON.stringify(await ev(`(() => {
-                        const original = window.__rowMenuClicked, current = (${probe}), menu = current?.parentElement.querySelector('.menu');
-                        return { attempt: ${attempt}, originalConnected: original?.isConnected ?? false, currentConnected: current?.isConnected ?? false,
-                            expanded: current?.getAttribute('aria-expanded') ?? null, originalExpanded: original?.getAttribute('aria-expanded') ?? null,
-                            menuPresent: !!menu, menuConnected: menu?.isConnected ?? false, menuHidden: menu?.hidden ?? null,
-                            menuVisible: !!menu && !menu.hidden && menu.getClientRects().length > 0 && getComputedStyle(menu).visibility !== 'hidden',
-                            menuDisplay: menu ? getComputedStyle(menu).display : null, redraw: original !== current };
-                    })()`).catch(diagnosticError => ({ diagnosticError: String(diagnosticError) })));
-                    return false;
-                });
-            }
-            if (!opened) throw new Error(lastDiagnostic);
-            if (forced) check(at + 'a redraw right after the tap replaced the button, and the same tap still opened the menu (no second tap)', replaced === true && taps === 1, JSON.stringify({ replaced, taps }));
-            const menu = await ev(`(() => { const t = (${probe}), m = t.parentElement.querySelector('.menu'), r = m.getBoundingClientRect(), items = [...m.querySelectorAll('[role=menuitem]')]; return { expanded: t.getAttribute('aria-expanded'), items: items.map(i => i.textContent), focus: document.activeElement === items[0], role: m.getAttribute('role'), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), vw: innerWidth, vh: innerHeight, itemH: Math.round(items[0].getBoundingClientRect().height), url: location.href }; })()`);
-            check(at + 'the menu opens: Dismiss is its first action, focused, a 44 px row', menu.expanded === 'true' && menu.items[0] === 'Dismiss' && menu.focus && menu.role === 'menu' && menu.itemH >= 44, JSON.stringify(menu));
-            check(at + 'the menu is whole on the screen (not cut by the list)', menu.left >= 0 && menu.right <= menu.vw && menu.top >= 0 && menu.bottom <= menu.vh, JSON.stringify(menu));
-            check(at + 'the press on the ⋯ did not open the row', menu.url === url0);
-            await ev(`(async()=>{window.__beforeRefreshToggle=(${probe});const {state}=await import((window.__coralStatic||'/static/')+'state.js');state.liveSessions=state.liveSessions.map(s=>s.session_id===${JSON.stringify(AGENTS[0].session_id)}?{...s,waiting_since:new Date().toISOString()}:s);(await import((window.__coralStatic||'/static/')+'inbox_tab.js')).updateInboxTab();return true})()`);
-            await waitFor(`!window.__beforeRefreshToggle.isConnected`,at+'forced waiting_since update replaces the row');
-            await waitFor(`(${probe})?.getAttribute('aria-expanded')==='true'`,at+'same-row refresh keeps menu open');
-            check(at+'refreshed menu remains focused and on screen',await ev(`(()=>{const t=(${probe}),m=document.getElementById(t.getAttribute('aria-controls')),r=m.getBoundingClientRect();return m.contains(document.activeElement)&&!m.hidden&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()`));
-            await shot(`inbox-row-menu-${w}-${theme}`);
-            // Escape closes it and gives the focus back to the button
-            await key('Escape', 'Escape', 27);
-            await waitFor(`(${probe})?.getAttribute('aria-expanded') === 'false'`, at + 'Escape closes the menu', 4000);
-            check(at + 'Escape closes it and the focus is on the ⋯ again', await ev(`document.activeElement === (${probe})`));
-            // the keyboard opens it from the button (Enter), and Dismiss is a real press
-            await key('Enter', 'Enter', 13);
-            await waitFor(`(${probe})?.getAttribute('aria-expanded') === 'true'`, at + 'Enter opens the menu', 4000);
-            await clickCurrent(`(${probe})?.parentElement.querySelector('[role=menuitem]')`, 'press the current Dismiss action');
-            await waitFor(`window.__dismissed.length === 1`, at + 'Dismiss posts to the dismiss-wait route', 6000);
-            const sent = await ev(`window.__dismissed[0]`);
-            check(at + 'Dismiss asks the route for that agent only', /\/api\/sessions\/live\/ag-one\/dismiss-wait$/.test(sent.url) && sent.body.session_id === AGENTS[0].session_id, JSON.stringify(sent));
-            check(at + 'the menu is closed after the choice', await ev(`(${probe}) ? (${probe}).getAttribute('aria-expanded') === 'false' : true`));
+            const rows = await ev(`[...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const b=tr.querySelector('.inbox-single-action .inbox-dismiss'),r=b?.getBoundingClientRect(),box=tr.getBoundingClientRect(),title=tr.querySelector('.dt-mail-title');return{title:title.textContent,w:r?.width,h:r?.height,name:b?.getAttribute('aria-label'),popup:b?.getAttribute('aria-haspopup'),inside:!!b&&!b.closest('.dt-mail-open'),below:!!r&&r.top>=title.getBoundingClientRect().bottom,menu:!!tr.querySelector('.inbox-row-more-toggle'),answers:tr.querySelectorAll('.inbox-answer').length};})`);
+            check(at+'every waiting row exposes a named 44 px Dismiss in its footer, outside the row opener',rows.length===3&&rows.every(r=>r.w>=44&&r.h>=44&&r.inside&&r.below&&!r.popup&&!r.menu&&/^Dismiss: Agent/.test(r.name)),JSON.stringify(rows));
+            check(at+'sign-in has Dismiss without an answer control',rows.find(r=>r.title==='Agent Three')?.answers===0);
+            check(at+'no sideways scroll',await ev(`document.documentElement.scrollWidth<=document.documentElement.clientWidth`));
+            const probeKey=await ev(`document.querySelector('${T} tr.dt-mailed').dataset.key`),probe=`[...document.querySelectorAll('${T} tr.dt-mailed')].find(r=>r.dataset.key===${JSON.stringify(probeKey)})?.querySelector('.inbox-single-action .inbox-dismiss')`;
+            const url0=await ev('location.href');
+            const ax=await axName(client,`${T} tr.dt-mailed .inbox-single-action .inbox-dismiss`);
+            check(at+'Dismiss is named in the accessibility tree',!!ax);
+            // The direct action executes once even when its row is replaced immediately after the click.
+            await ev(`(()=>{const b=(${probe});b.click();window.__state.liveSessions=window.__state.liveSessions.map(a=>({...a,waiting_since:new Date(Date.parse(a.waiting_since)-1000).toISOString()}));window.__inboxTab.updateInboxTab();return true;})()`);
+            await waitFor('window.__dismissed.length===1',at+'one direct Dismiss request despite redraw',6000);
+            const sent=await ev('window.__dismissed[0]');
+            check(at+'Dismiss targets only Agent One',/\/api\/sessions\/live\/ag-one\/dismiss-wait$/.test(sent.url)&&sent.body.session_id===AGENTS[0].session_id,JSON.stringify(sent));
+            check(at+'Dismiss never opens the agent',await ev('location.href')===url0);
+            await ev(`window.__state.liveSessions=${JSON.stringify([AGENTS[1]])};window.__inboxTab.updateInboxTab();true`);
+            await waitFor(`!![...document.querySelectorAll('${T} tbody tr[data-key]')].find(r=>r.textContent.includes('Agent Two'))?.querySelector('.inbox-single-action .inbox-dismiss')`,at+'second agent action');
+            await ev(`[...document.querySelectorAll('${T} tbody tr[data-key]')].find(r=>r.textContent.includes('Agent Two')).querySelector('.inbox-single-action .inbox-dismiss').focus();true`);
+            await key('Enter','Enter',13);await waitFor('window.__dismissed.length===2',at+'keyboard Dismiss request',6000);
+            check(at+'keyboard Dismiss targets Agent Two once',await ev(`window.__dismissed[1].body.session_id===${JSON.stringify(AGENTS[1].session_id)}`));
+            await shot(`inbox-row-dismiss-${w}-${theme}`);
+
         }
     } catch (e) { console.log('ERROR ' + (e.stack || e)); failures.push('error'); }
     await client.close();

@@ -268,6 +268,20 @@ function fill(s, cell, withDismiss = true, primaryOpen = false) {
         if (target && target.trim()) { // the command on the row, all of it wrapped in a code block (3 lines, 4 on a phone), then Claude's own line under it, then what Yes allows (#14173)
             const block = document.createElement('pre'); block.className = 'inbox-cmd-block'; block.textContent = target.trim();
             block.setAttribute('aria-label', 'What it wants to run'); block.tabIndex = 0; // a keyboard can reach a block that scrolls
+            if (cell.closest('.inbox-v4-footer')) { // v4: keep real metadata outside the command text, in its header (#20203)
+                const head = cell._footerCommandMeta ||= document.createElement('div'); head.className = 'inbox-command-meta';
+                if (!head.childNodes.length) {
+                    const tr = cell.closest('tr'), context = document.createElement('span'), runtime = document.createElement('span');
+                    context.className = 'inbox-command-context'; runtime.className = 'inbox-command-runtime';
+                    for (const key of ['goal', 'task']) { const source = tr?.querySelector(`td[data-key="${key}"]`); if (source?.textContent.trim()) { context.append(...source.childNodes); source.hidden = true; } }
+                    const cli = tr?.querySelector('td[data-key="cli"]');
+                    if (cli) { runtime.append(...cli.childNodes); const dir = runtime.querySelector('.inbox-meta-dir'); if (dir) dir.before(document.createTextNode(' · ')); cli.hidden = true; }
+                    head.append(context, runtime);
+                }
+                cell.append(head);
+                const phoneWords = cell.closest('tr')?.querySelector('.inbox-whole-name');
+                if (phoneWords && /needs your permission/i.test(phoneWords.textContent)) phoneWords.textContent = 'Wants to run a command';
+            }
             cell.append(block);
             if (targetNote) { const nt = document.createElement('span'); nt.className = 'inbox-cmd-note'; nt.textContent = targetNote; cell.append(nt); }
             const yes = document.createElement('span'); yes.className = 'inbox-trust-note inbox-yes-note'; cell.append(yes);
@@ -398,10 +412,10 @@ export function answerCell(s, { dismiss = true, primaryOpen = false } = {}) {
     return cell;
 }
 
-/** N5 (#17451): an agent's prompt keeps its choices where Answer sits; Dismiss is in the row's kebab, like every other row's. answer, more and name are the list's own (the Inbox passes them in: this lazy file does not import the list). */
+/** An agent's choices stay left and its common action stays right. The Inbox renders a sole Dismiss directly (#20203); this module keeps the answer transport unchanged. */
 export function promptCell(s, answer, more, name, phone) {
     const acts = rowActions(s);
-    if (phone || !acts.length || acts[0].label !== 'Dismiss') return answer(s); // a phone has its own ⋯; Remove from Needs you (an ignored wait) stays a button
+    if (!acts.length || acts[0].label !== 'Dismiss') return answer(s); // a phone has its own ⋯; Remove from Needs you (an ignored wait) stays a button
     const cell = answer(s, { dismiss: false }), box = mk('span', 'inbox-answers-with-more'); box.append(...(cell ? [cell] : []), more(acts, name(s))); // beside the answers, not in them: they are drawn again when the choices are read
     return box;
 }

@@ -36,10 +36,9 @@ const { coralReady } = require('./helpers/wait');
 
             console.log(`${at}2. Needs you`);
             await load('/inbox/needs');
-            await has('#needs-more', at, 'More on the Needs you header (the robot is its item, #17450 N2)');
-            await ev(`document.getElementById('needs-more').click(); true`); await has('#needs-more-menu:not([hidden]) [role=menuitem]', at, 'the More menu');
-            assert.equal(await ev(`document.querySelector('#needs-more-menu [role=menuitem]').textContent`), 'Copy for an agent', at + 'More holds Copy for an agent');
-            assert.match(await press('#needs-more-menu [role=menuitem]', at, 'the Needs you line'), /Needs you[\s\S]*\nDocs: coral-agent docs artifacts, section “Answer a comment the Operator sent you”$/);
+            await has('.inbox-copy-for-agent', at, 'Copy beside Filters on Needs you');
+            assert.equal(await ev(`document.querySelector('.inbox-copy-for-agent').hasAttribute('aria-haspopup')`),false,at+'Copy is a plain button');
+            assert.match(await press('.inbox-copy-for-agent', at, 'the Needs you line'), /Needs you[\s\S]*\nDocs: coral-agent docs artifacts, section “Answer a comment the Operator sent you”$/);
 
             console.log(`${at}3. Saved`);
             await load('/inbox/saved');

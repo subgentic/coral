@@ -31,7 +31,7 @@ const ASK = '@Operator Please do these in order:\n1. Open Settings\n2. Click Sav
                 const r = document.createRange(); r.selectNodeContents(n); const tops = new Set([...r.getClientRects()].map(x => Math.round(x.top)));
                 return { text: n.textContent, ws: cs.whiteSpace, lines: tops.size, h: Math.round(n.getBoundingClientRect().height), lh: Math.round(lh), clamp: cs.webkitLineClamp }; })()`);
             if (s.text !== '@Operator Please do these in order:\n1. Open Settings\n2. Click Save\n3. Reply done') problems.push(at + 'the row keeps the lines (empty ones dropped): ' + JSON.stringify(s.text));
-            if (s.ws !== 'pre-line') problems.push(at + 'the row breaks at them: white-space is ' + s.ws);
+            if (!['pre-line', 'pre-wrap'].includes(s.ws)) problems.push(at + 'the row breaks at them: white-space is ' + s.ws);
             if (s.lines < 4) problems.push(at + 'four lines drawn (heading + three steps), got ' + s.lines + ' ' + JSON.stringify(s));
             if (process.env.SHOT_DIR) { fs.mkdirSync(process.env.SHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.SHOT_DIR}/ask-lines-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         }

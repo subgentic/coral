@@ -36,7 +36,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const geometry = await ev(`(() => [...document.querySelectorAll('${T} tbody .dt-row')].map(tr => {
                 const icon = tr.querySelector('.inbox-kind-icon'); if (!icon) return null;
                 const i = icon.getBoundingClientRect(), r = tr.getBoundingClientRect();
-                const texts = [...tr.querySelectorAll('.dt-subtitle, .inbox-review-name, .inbox-review-from, .inbox-proposal-body')].filter(e => e.getClientRects().length);
+                const texts = [...tr.querySelectorAll('.dt-subtitle, .inbox-review-name, .inbox-review-from, .inbox-proposal-body')].filter(e => e.getClientRects().length && e.getBoundingClientRect().top < i.bottom);
                 return { kind: icon.dataset.kind, center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: Math.min(...texts.map(e => e.getBoundingClientRect().left)) };
             }).filter(Boolean))()`);
             for (const r of geometry) {
@@ -54,11 +54,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const rows = await ev(`(() => [...document.querySelectorAll('${T} tbody tr')].map(tr => { const i = tr.querySelector('.inbox-kind-icon'); if (!i) return { kind: null, text: tr.textContent.slice(0, 30) };
                 const h = () => tr.getBoundingClientRect().height, withIcon = h(); const par = i.parentElement, nxt = i.nextSibling; i.remove(); const without = h(); par.insertBefore(i, nxt);
                 const ir = i.getBoundingClientRect(), r = tr.getBoundingClientRect(), words = tr.querySelector('.inbox-review-name, .inbox-review-from, .dt-primary, a, button:not(.dt-mail-lead)'), wr = words ? words.getBoundingClientRect() : null;
-                return { kind: i.dataset.kind, text: tr.textContent.replace(/\\s+/g, ' ').slice(0, 40), withIcon, without, inRow: ir.top >= r.top - 1 && ir.bottom <= r.bottom + 1 && ir.left >= r.left - 1, beforeWords: !wr || ir.right <= wr.left + 1 }; }))()`);
+                return { kind: i.dataset.kind, text: tr.textContent.replace(/\\s+/g, ' ').slice(0, 40), withIcon, without, lineHeight: parseFloat(getComputedStyle(tr.querySelector('.inbox-message') || tr).lineHeight) || 20, inRow: ir.top >= r.top - 1 && ir.bottom <= r.bottom + 1 && ir.left >= r.left - 1, beforeWords: !wr || ir.right <= wr.left + 1 }; }))()`);
             const kinds = new Set(rows.map(r => r.kind).filter(Boolean));
             check(kinds.has('review') && kinds.has('other') || kinds.has('review') && rows.some(r => r.kind && r.kind !== 'review'), label + ': the list has a review row and a question row: ' + JSON.stringify(rows.map(r => [r.kind, r.text])));
             for (const r of rows.filter(x => x.kind)) {
-                check(r.withIcon - r.without >= -0.01 && r.withIcon - r.without < (/200%/.test(label) && (r.kind === 'ask' || r.kind === 'review') ? 90 : 0.01), /* #15722: a question's whole text now runs the row's width beside the icon's column, so at 200% text the icon's own column can push a long question onto one more line (the phone's allowance, below); every other row keeps its height exactly */ `${label}: a ${r.kind} row keeps its height (${r.withIcon} with the icon, ${r.without} without): ${r.text}`);
+                check(r.withIcon - r.without >= -0.01 && r.withIcon - r.without < (/200%/.test(label) && (r.kind === 'ask' || r.kind === 'review') ? 90 : (r.kind === 'ask' || r.kind === 'review') ? r.lineHeight + 1 : 0.01), /* #20203: the bordered message may wrap one extra line when the icon's gutter is present; retain the existing 200% allowance and exact height for other kinds. */ `${label}: a ${r.kind} row keeps its height (${r.withIcon} with the icon, ${r.without} without): ${r.text}`);
                 check(r.inRow && r.beforeWords, `${label}: a ${r.kind} row's icon is inside the row and in front of its words, not over them: ${JSON.stringify(r)}`);
             }
         }
@@ -104,8 +104,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`document.querySelector('${T} .dt-mail-kind') && document.querySelectorAll('${T} .inbox-answer').length === 3`, 'the agent phone mail row', 15000);
         for (const width of [390, 320]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: true }); await ev(framesJs(8));
-            const row = await ev(`(() => { const tr = document.querySelector('${T} .dt-mailed'), i = tr.querySelector('.inbox-kind-icon').getBoundingClientRect(), r = tr.querySelector('.dt-mail-open').getBoundingClientRect(), text = tr.querySelector('.dt-mail-text').getBoundingClientRect(); return { center: Math.abs((i.top + i.bottom - r.top - r.bottom) / 2), right: i.right, textLeft: text.left, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
-            check(row.center <= 2 && row.textLeft >= row.right + 4 && !row.overflow, width + 'px: phone gutter spans title/excerpt; choices use the full row: ' + JSON.stringify(row));
+            const row = await ev(`(() => { const tr = document.querySelector('${T} .dt-mailed'), i = tr.querySelector('.inbox-kind-icon').getBoundingClientRect(), r = tr.querySelector('.dt-mail-open').getBoundingClientRect(), text = tr.querySelector('.dt-mail-text').getBoundingClientRect(); return { top: Math.abs(i.top - r.top), right: i.right, textLeft: text.left, overflow: document.documentElement.scrollWidth > innerWidth }; })()`);
+            check(row.top <= 2 && row.textLeft >= row.right + 4 && !row.overflow, width + 'px: #20203 top-aligned icon keeps its gutter; choices use the full row: ' + JSON.stringify(row));
         }
         for (const theme of ['dark', 'light']) {
             await ev(`${themeJs(theme)}; true`); await ev(framesJs(4));

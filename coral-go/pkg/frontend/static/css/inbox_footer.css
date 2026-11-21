@@ -1,0 +1,182 @@
+/* Approved Inbox v4: decisions under the content at left; common controls at right.
+   Lazy with the Inbox: no startup CSS growth. Existing action nodes/listeners stay intact. */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row > .inbox-v4-footer[data-key="review"] {
+    grid-column: 3 / -1; grid-row: auto; order: 30; align-self: stretch; justify-self: stretch;
+    display: block; flex: 1 1 100%; width: auto; min-width: 0; max-width: 100%;
+    position: static; height: auto; margin: 10px 0 0; padding: 10px 0 0;
+    overflow: visible; clip-path: none; text-align: start; border-top: 1px solid var(--border-subtle);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer .inbox-review-actions {
+    display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center;
+    width: 100%; min-width: 0; max-width: 100%; gap: 7px; opacity: 1;
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer .inbox-review-actions > .btn {
+    flex: 0 1 auto; width: auto; min-width: 0; max-width: 100%; position: static;
+    height: auto; clip-path: none; overflow-wrap: anywhere;
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer :is(.inbox-bookmark, .inbox-row-more, .inbox-review-star) {
+    position: relative !important; inset: auto; grid-column: auto; flex: none;
+    margin: 0; opacity: 1; visibility: visible; display: inline-flex; align-items: center;
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer .inbox-review-actions > :is(.inbox-bookmark, .inbox-row-more, .inbox-review-star):not(:is(.inbox-bookmark, .inbox-row-more, .inbox-review-star) ~ *) { margin-inline-start: auto; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer .inbox-review-star { min-width: 44px; min-height: 32px; width: auto; height: auto; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer .inbox-custom-answer {
+    background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: color-mix(in srgb, var(--accent) 42%, transparent); color: var(--accent);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-custom-answer::before { content: 'edit'; font-family: 'Material Icons'; margin-inline-end: 5px; }
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row > .inbox-v4-footer[data-key="review"] { padding-inline-end: 0; flex-basis: 100%; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer :is(.btn, .inbox-row-more-toggle, .inbox-review-star) { min-height: 44px; }
+}
+
+/* Round 2: metadata above the text's own bordered box. */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-message {
+    box-sizing: border-box; position: static; height: auto; clip-path: none; display: block; background: var(--field-fill); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 9px 12px; margin: 6px 0 0; min-width: 0; max-width: 100%;
+    white-space: pre-wrap; overflow-wrap: anywhere; overflow: visible; -webkit-line-clamp: unset;
+    font-size: var(--fs-copy); color: var(--text-primary);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-author-kind { display: block; color: var(--text-muted); font-size: var(--fs-sm); white-space: normal; }
+@media (min-width: 761px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row.inbox-card-tr:not(:has(.inbox-sent-back)) .inbox-meta { grid-column: 3 / -1; grid-row: 2; order: 5; margin-top: 0; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row.inbox-card-tr .inbox-message { grid-column: 3 / -1; grid-row: 3; order: 7; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row.inbox-card-tr.inbox-ask-row .inbox-ask-name { grid-column: 3 / -1; grid-row: 3; }
+}
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-review-item.inbox-agent-first { grid-template-areas: "from chip wait" "name name name" "meta meta meta" "more more more"; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-review-item > .inbox-meta { display: block; grid-area: meta; font-size: var(--fs-sm); color: var(--text-muted); }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-review-item > .inbox-ask-name.inbox-message { grid-area: more; margin-inline: 0; width: 100%; max-width: 100%; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-row-words.inbox-message { display: block; margin-inline: 0; width: 100%; max-width: 100%; }
+}
+
+/* Override the old per-kind side-action grids: metadata and message are separate tracks. */
+@media (min-width: 761px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row.inbox-card-tr:not(:has(.inbox-sent-back)) > [data-key="agent"] .inbox-meta { grid-column: 3 / -1; grid-row: 2; order: 5; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row.inbox-card-tr > [data-key="agent"] .inbox-message { grid-column: 3 / -1; grid-row: 3; order: 7; max-width: 100%; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row { position: relative; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-author-kind { position: static; white-space: normal; max-width: 100%; }
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row:has(.inbox-goaldone-actions) .inbox-message::after { content: none; }
+
+/* Keep commands above the action line, including asynchronous prompt redraws. */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row:has(.inbox-v4-footer) > .inbox-v4-footer[data-key="review"] .inbox-answers-with-more {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 7px; width: 100%;
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row:has(.inbox-v4-footer) .inbox-v4-footer .inbox-answers { display: contents; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row:has(.inbox-v4-footer) .inbox-v4-footer .inbox-answers > .inbox-answer { margin-inline-start: 0; flex: 0 1 auto; width: auto; min-width: 0; max-width: 100%; order: 2; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row:has(.inbox-v4-footer) .inbox-v4-footer .inbox-answers-with-more > .inbox-row-more { margin-inline-start: auto; order: 2; align-self: flex-end; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-v4-footer .inbox-answers > .inbox-cmd-block { width: 100%; max-width: 100%; flex-basis: 100%; box-sizing: border-box; border-radius: 0 0 var(--radius-lg) var(--radius-lg); border-top: 0; margin: -7px 0 0; background: var(--field-fill); }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row > .inbox-v4-footer[data-key="review"]:has(.inbox-cmd-block) { border-top: 0; padding-top: 0; margin-top: 6px; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-footer .inbox-answers-with-more:has(.inbox-cmd-block)::after { content: ''; order: 1; flex-basis: 100%; border-top: 1px solid var(--border-subtle); margin-top: 3px; }
+.inbox-command-meta { box-sizing: border-box; flex: 1 1 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-bottom-color: var(--border-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--field-fill); color: var(--text-muted); font-size: var(--fs-sm); }
+.inbox-command-context { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.inbox-command-context::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+.inbox-command-runtime { min-width: 0; overflow-wrap: anywhere; }
+
+/* The final 390 mock gives the message and Dismiss the full card width. */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row:has(.inbox-message) .inbox-meta { font-size: var(--fs-base); font-weight: var(--fw-regular); color: var(--text-secondary); line-height: var(--lh-body); }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-v4-footer .inbox-bookmark::after { content: none; }
+:is(.inbox-command-runtime, .inbox-question-runtime) .chip { padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row :is(.inbox-review-item > .inbox-ask-name.inbox-message, .inbox-review-item > .inbox-whole-name.inbox-message, .inbox-row-words.inbox-message) { width: calc(100% + 44px); max-width: calc(100% + 44px); margin-inline-start: -44px; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-v4-footer .inbox-review-actions:has(.inbox-custom-answer) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.8fr); gap: 7px; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-v4-footer .inbox-review-actions:has(.inbox-custom-answer) > [data-slot="ignore"] { grid-column: 1 / -1; width: 100%; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-v4-footer .inbox-review-actions:has(.inbox-custom-answer) > .inbox-row-more { grid-column: 4; grid-row: 1; }
+}
+
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer .inbox-review-actions { gap: 3px; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-footer :is(.btn-icon, .inbox-row-more-toggle, .inbox-review-star) { min-width: 44px; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-footer .inbox-custom-answer { white-space: normal; padding-inline: 6px; line-height: var(--lh-label); overflow-wrap: anywhere; }
+}
+
+/* An agent-only phone list keeps the shared mail renderer and the same footer contract. */
+.inbox-v4-row .inbox-mail-footer { grid-column: 1 / -1; display: block; min-width: 0; width: 100%; box-sizing: border-box; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.inbox-v4-mail-line { display: flex; flex-wrap: wrap; min-width: 0; white-space: normal; overflow: visible; gap: 6px; }
+.inbox-v4-row .inbox-v4-mail-message { flex: 1 1 100%; min-width: 0; white-space: normal; max-height: none; -webkit-line-clamp: unset; }
+
+/* Operator's full-width correction: sent-back content never shares a narrow column with actions. */
+@media (min-width: 761px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row:has(.inbox-sent-back) > [data-key="agent"] > .inbox-review-item { display: contents; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row:has(.inbox-sent-back) .inbox-review-item > .inbox-review-name { grid-column: 3 / 4; grid-row: 1; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row:has(.inbox-sent-back) .inbox-review-item > .inbox-sent-back-ask { grid-column: 3 / -1; grid-row: 2; order: 6; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row:has(.inbox-sent-back) .inbox-review-item > .inbox-meta { grid-column: 3 / -1; grid-row: 3; order: 7; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row:has(.inbox-sent-back) .inbox-review-item > .inbox-wait-line { grid-column: 3 / -1; grid-row: 4; order: 8; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row:has(.inbox-sent-back) .inbox-review-item > .inbox-closes-goal { grid-column: 3 / -1; grid-row: 5; order: 9; }
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row :is(.inbox-sent-back-ask, .inbox-wait-line, .inbox-closes-goal) { box-sizing: border-box; width: 100%; max-width: none; min-width: 0; white-space: normal; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-v4-footer.inbox-agent-footer .inbox-review-actions { justify-content: flex-end; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-v4-footer.inbox-agent-footer .inbox-review-actions > :is(.inbox-bookmark, .inbox-row-more, .inbox-review-star) { margin-inline-start: 0; }
+
+@media (max-width: 760px) {
+    /* More and Star moved out of the header: give their reserved width back to name/time/version. */
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first { grid-template-columns: minmax(max(2.5rem, 96px), 1fr) fit-content(min(9rem, 35%)) max-content; grid-template-areas: "from chip wait" "name name name" "meta meta meta" "pills pills pills" "more more more"; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first:has(> .inbox-review-tags .inbox-review-version) { grid-template-areas: "from chip wait" "name name pill" "meta meta meta" "pills pills pills" "more more more"; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first .inbox-computer-chip { grid-area: chip; max-width: 100%; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first :is(.inbox-review-wait, .inbox-review-version) { margin-inline-end: 0; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first > .inbox-review-name:not(.inbox-ask-name):not(.inbox-whole-name) { margin-inline-end: 0; width: auto; max-width: 100%; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first > :is(.inbox-ask-name, .inbox-whole-name)::before { content: none; }
+}
+
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-footer .inbox-answers > .btn:not(.inbox-cmd-more) { order: 2; flex: 0 1 auto; width: auto; min-width: 0; max-width: 100%; }
+
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-footer .inbox-answers > .inbox-dismiss { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first:has(.inbox-sent-back) { grid-template-areas: "from chip wait" "name name pill" "quote quote quote" "meta meta meta" "notice notice notice" "pills pills pills" "more more more"; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item > .inbox-sent-back-ask { grid-area: quote; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item > .inbox-wait-line { grid-area: notice; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-sent-back-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+}
+
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer .inbox-review-actions > .inbox-bookmark { min-width: 44px; }
+}
+
+@media (pointer: coarse) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-v4-footer .inbox-review-star { min-height: 44px; }
+}
+
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first > .inbox-review-tags { display: contents; }
+}
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row .inbox-mail-footer .inbox-row-more-toggle { min-height: 44px; min-width: 44px; height: auto; align-self: center; }
+}
+@media (max-width: 389px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-footer .inbox-review-actions:has(> .inbox-bookmark)::after { content: ''; flex-basis: 100%; order: 1; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-footer .inbox-review-actions:has(> .inbox-bookmark) > :is(.inbox-bookmark, .inbox-row-more, .inbox-review-star) { order: 2; }
+}
+
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-mail-footer.inbox-v4-footer .inbox-answers-with-more > .inbox-row-more { height: auto; min-height: 44px; align-self: center; }
+}
+
+/* Implied introductions remain in the accessible text without taking a visible row. */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-implied-intro { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-v4-heading { line-height: var(--lh-ui); align-self: start; align-items: flex-start; min-height: 0; margin-block-start: 0; padding-block-start: 0; }
+:root :is(#group-table-view, .team-needs-list) .inbox-folder-toolbar .list-bar-search-row:has(> .inbox-copy-for-agent) > .inbox-needs-tabs { flex-basis: 100%; }
+:root :is(#group-table-view, .team-needs-list) .inbox-folder-toolbar .list-bar-search-row:has(> .inbox-copy-for-agent) > .inbox-copy-for-agent { order: 2; margin-inline-start: 0; }
+
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row > .inbox-v4-content { padding-block-start: 0; align-self: start; align-items: flex-start; }
+}
+
+@media (max-width: 760px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-review-item > .inbox-whole-name.inbox-message { grid-area: more; }
+}
+
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-v4-heading-text { display: inline-flex; align-items: flex-start; height: auto; line-height: var(--lh-ui); padding-block-start: 0; }
+.inbox-v4-row .inbox-mail-footer .inbox-answers-with-more { display: flex; flex-wrap: wrap; align-items: center; width: 100%; max-width: 100%; min-width: 0; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-v4-footer .inbox-answer { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-leading { align-self: start; align-items: flex-start; }
+@media (pointer: coarse) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-v4-heading-text:is(button, a) { min-height: 44px; }
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-question-runtime > .inbox-meta-dir::before { content: none; }
+
+.inbox-v4-row :is(.inbox-author-kind, .inbox-computer-line) { display: block; flex-basis: 100%; width: 100%; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row :is(.inbox-question-runtime > *, .inbox-meta > .inbox-author-kind, .inbox-meta > .inbox-computer-line)::before { content: none; }
+
+.inbox-v4-row .inbox-question-runtime { display: block; white-space: nowrap; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-meta > .inbox-question-runtime::before { content: none; }

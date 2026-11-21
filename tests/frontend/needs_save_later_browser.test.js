@@ -45,14 +45,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(framesJs(3));
             const dots = file => ev(`(() => { document.querySelector('${T} button[aria-label="More actions for ${file}"]').click(); return true; })()`);
             // the three dots: Save for later
-            if (!mobile) { // Save for later remains separate from the review pin.
+            { // Save stays separate from the star at both widths (#20203).
                 check(await ev(`!!document.querySelector('${T} .dt-star') && !!document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]')`), at + 'the row has separate Save for later and review star controls');
                 { const order = await ev(`[...document.querySelector('${T} .inbox-review-actions').children].filter(e => e.getClientRects().length && e.matches('button, .inbox-row-more')).map(e => e.matches('.inbox-row-more') ? 'More' : e.classList.contains('dt-star') ? 'Star' : e.classList.contains('inbox-bookmark') ? 'Save' : e.textContent.trim() || e.getAttribute('aria-label'))`); check(order[order.length - 1] === 'Star' && order.indexOf('More') < order.indexOf('Star'), at + 'the row ends More, then the star (mock v3, #20146): ' + JSON.stringify(order)); }
                 await ev(`document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]').click(); true`);
-            } else { // a phone's row has it in the three dots
-                await dots('plan-1.md');
-                await waitFor(`!!document.querySelector('${T} .menu-item[aria-label="Save for later: plan-1.md"]')`, at + 'the dots have "Save for later"', 5000);
-                await ev(`document.querySelector('${T} .menu-item[aria-label="Save for later: plan-1.md"]').click(); true`);
             }
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 2`, at + 'the saved row leaves Needs you', 8000);
             check(JSON.stringify(await rowsOf()) === JSON.stringify(['plan-2', 'plan-3']), at + 'the others stay: ' + JSON.stringify(await rowsOf()));

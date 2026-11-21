@@ -25,7 +25,7 @@ const AGENTS = [
     const WHOLE = `(trs => trs.every(tr => ${JSON.stringify(PARTS)}.every(s => tr.querySelector(s))))`;
     const rows = () => ev(`(async () => { for (let k = 0; k < 250 && !${WHOLE}([...document.querySelectorAll('${T} tr.dt-mailed')]); k++) await new Promise(r => setTimeout(r, 20)); return [...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const r = e => e && e.getBoundingClientRect(), q = s => tr.querySelector(s), box = r(tr);
         return { h: Math.round(box.height), lead: Math.round(r(q('.dt-mail-lead')).height), leadW: Math.round(r(q('.dt-mail-lead')).width), avatar: Math.round(r(q('.dt-mail-avatar')).width), title: q('.dt-mail-title').textContent, snippet: q('.dt-mail-snippet').textContent, ask: q('.dt-mail-ask') && q('.dt-mail-ask').textContent,
-            more: !!q('.dt-mail-more'), time: q('.dt-mail-time').textContent, bold: getComputedStyle(q('.dt-mail-title')).fontWeight, dot: !!q('.dt-mail-dot'), sameLine: Math.abs(r(q('.dt-mail-title')).top - r(q('.dt-mail-snippet')).top) < 4, timeRight: Math.round(box.right - r(q('.dt-mail-time')).right), open: !!q('button.dt-mail-open') }; }); })()`);
+            dismiss:!!q('.inbox-single-action .inbox-dismiss'),footerBelow:!!q('.inbox-mail-footer')&&r(q('.inbox-mail-footer')).top>=r(q('.dt-mail-title')).bottom,more: !!q('.dt-mail-more'), time: q('.dt-mail-time').textContent, bold: getComputedStyle(q('.dt-mail-title')).fontWeight, dot: !!q('.dt-mail-dot'), sameLine: Math.abs(r(q('.dt-mail-title')).top - r(q('.dt-mail-snippet')).top) < 4, timeRight: Math.round(box.right - r(q('.dt-mail-time')).right), open: !!q('button.dt-mail-open') }; }); })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true], [360, 780, true]]) {
@@ -53,7 +53,7 @@ const AGENTS = [
             for (const x of r) {
                 assert.ok(x.leadW >= 44 && x.lead >= 44 && x.avatar === 40, at + 'a 44 px target around the shared 40 px Needs you kind icon (#17453) ' + JSON.stringify(x));
                 assert.ok(x.open && x.dot && x.bold >= 600, at + 'a button, the amber dot, the title bold ' + JSON.stringify(x));
-                assert.ok(x.h === 56 && x.sameLine && !x.ask && x.snippet.trim(), at + 'Needs you is one line, 56 px like Tasks and Saved: the agent, then what it asks (#9986, the operator: Gmail-like one-line rows) ' + JSON.stringify(x));
+                assert.ok(x.h >= 56 && x.footerBelow && x.dismiss && !x.more, at + 'Needs you keeps its content above a direct Dismiss footer (#20203) ' + JSON.stringify(x));
                 assert.ok(x.timeRight <= (x.more ? 16 + 44 : 16) && /ago|min|\d/.test(x.time), at + 'the time is at the right (a row with a ⋯ keeps its 44 px: #137104) ' + JSON.stringify(x));
             }
             assert.ok(r.some(x => /Wants to run: go test/.test(x.snippet)) && r.some(x => x.snippet.trim() && x.title === 'Agent Two'), at + 'the ask follows the name on its line, the state when there is none ' + JSON.stringify(r));
@@ -67,16 +67,16 @@ const AGENTS = [
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
             // #137104: a list with a ⋯ on any row reserves its 44 px on every row, so the times line up; a list with none reserves nothing
             const reseed = list => ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(list)}; m.updateInboxTab(); return true; })()`);
-            const rights = () => ev(`(async () => { for (let k = 0; k < 250 && !${WHOLE}([...document.querySelectorAll('${T} tr.dt-mailed')]); k++) await new Promise(r => setTimeout(r, 20)); return [...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => ({ title: tr.querySelector('.dt-mail-title').textContent, more: !!tr.querySelector('.dt-mail-more'), gap: !!tr.querySelector('.dt-mail-more-gap'), right: Math.round(tr.getBoundingClientRect().right - tr.querySelector('.dt-mail-time').getBoundingClientRect().right) })); })()`);
+            const rights = () => ev(`(async () => { for (let k = 0; k < 250 && !${WHOLE}([...document.querySelectorAll('${T} tr.dt-mailed')]); k++) await new Promise(r => setTimeout(r, 20)); return [...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => ({ title: tr.querySelector('.dt-mail-title').textContent, dismiss:!!tr.querySelector('.inbox-single-action .inbox-dismiss'),more: !!tr.querySelector('.dt-mail-more'), gap: !!tr.querySelector('.dt-mail-more-gap'), right: Math.round(tr.getBoundingClientRect().right - tr.querySelector('.dt-mail-time').getBoundingClientRect().right) })); })()`);
             const signIn = { ...AGENTS[1], name: 'ag-three', session_id: '00000003-0000-4000-8000-000000000003', display_name: 'Agent Three', waiting_kind: 'login', waiting_summary: 'Sign in', board_project: 'team-c' };
             await reseed([AGENTS[0], signIn]);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 2`, at + 'a permission row and a sign-in row', 8000);
             let al = await rights();
-            assert.ok(al.length === 2 && al.every(x => x.more) && !al.some(x => x.gap) && new Set(al.map(x => x.right)).size === 1, at + 'every waiting row has a ⋯ (a sign-in row too: its Dismiss, #11946), so the times line up: ' + JSON.stringify(al));
+            assert.ok(al.length === 2 && al.every(x => x.dismiss && !x.more) && !al.some(x => x.gap) && new Set(al.map(x => x.right)).size === 1, at + 'every waiting row has direct Dismiss, with aligned times (#20203): ' + JSON.stringify(al));
             await reseed([signIn]);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 1`, at + 'a list of one sign-in row', 8000);
             al = await rights();
-            assert.ok(al.length === 1 && al[0].more && !al[0].gap && al[0].right >= 44, at + 'a lone sign-in row has its ⋯ and the room for it: ' + JSON.stringify(al));
+            assert.ok(al.length === 1 && al[0].dismiss && !al[0].more && !al[0].gap && al[0].right <= 16, at + 'a lone sign-in row has direct Dismiss without reserving header menu space: ' + JSON.stringify(al));
             await reseed(AGENTS);
             await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 2`, at + 'the two waiting agents again', 8000);
             // the marker's `since` is in the future: every seeded task counts as read, so the plain row is measured

@@ -33,8 +33,8 @@ const BASE = require('./test_base').BASE;
             if (w >= 1000) assert.equal(new Set(g.name.filter(v => v !== null)).size, 1, `${w}: the name starts at the same x on every row: ${JSON.stringify(g.name)}`);
             if (w >= 1000) {
                 assert.ok(g.check.every(v => v !== null) && new Set(g.check).size === 1, `${w}: every row, an agent's prompt too, has a tick box at the same x: ${JSON.stringify(g.check)}`);
-                assert.deepEqual(g.dismissBtn, [false, false, false, false, false], `${w}: no Dismiss button at rest on an agent's prompt (N5)`);
-                assert.ok(g.kebab.every(Boolean), `${w}: Dismiss is in each row's kebab: ${JSON.stringify(g.kebab)}`);
+                assert.deepEqual(g.dismissBtn, [true, true, true, true, true], `${w}: Dismiss is direct at rest (#20203)`);
+                assert.ok(g.kebab.every(v=>!v), `${w}: no single-item kebab remains: ${JSON.stringify(g.kebab)}`);
                 assert.ok(g.ageWords.every(t => /^(<1 min|\d+ min|\d+ h|\d+ d)$/.test(t)), `${w}: the wait is short and has no word "waiting": ${JSON.stringify(g.ageWords)}`);
                 assert.deepEqual(g.flags, [false, false, false, false, true], `${w}: the amber triangle only on the wait past the limit: ${JSON.stringify(g.flags)}`);
             }

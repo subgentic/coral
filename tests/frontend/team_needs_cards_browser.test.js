@@ -35,8 +35,8 @@ const BASE = require('./test_base').BASE;
             if (!mobile) check(rows.every(r => r.card), `${at}every row is an Inbox card (tr.inbox-card-tr): ` + JSON.stringify(rows));
             if (!mobile) check(rows.every(r => r.pill === '' || /Permission/.test(r.pill)), `${at}no Yes / No chip, as in the Inbox (mock v3, #20101): ` + JSON.stringify(rows));
             if (!mobile) {
-                check(rows.every(r => r.words[r.words.length - 1] === 'More'), `${at}More is the last button of every row: ` + JSON.stringify(rows.map(r => r.words)));
-                check(JSON.stringify(rows[0].words) === JSON.stringify(['Blue', 'Green', 'Red', 'Answer', 'Dismiss', 'More']), `${at}a button ask shows its buttons, then Answer, Dismiss, More: ` + JSON.stringify(rows[0].words));
+                check(rows.every(r => r.words[r.words.length - 1] === 'Dismiss'), `${at}Dismiss is direct, with no redundant one-item More: ` + JSON.stringify(rows.map(r => r.words)));
+                check(JSON.stringify(rows[0].words) === JSON.stringify(['Blue', 'Green', 'Red', 'Custom answer', 'Dismiss']), `${at}a button ask shows its buttons, then Custom answer and Dismiss: ` + JSON.stringify(rows[0].words));
             }
             const geo = await ev(`(() => { const tabs = [...document.querySelectorAll('#team-panel-needs .inbox-needs-tab')].map(t => t.getBoundingClientRect()); const tr = document.querySelector('#team-panel-needs tbody tr.inbox-kind-row'); const av = tr.querySelector('.dt-mail-avatar, .inbox-kind-column, .dt-avatar, .inbox-kind-icon'); const nm = tr.querySelector('.dt-mail-title, td[data-key="agent"] .inbox-review-from, .inbox-row-words'); return { tabs: tabs.length, sameLine: tabs.length === 2 && Math.abs(tabs[0].top - tabs[1].top) < 6 && tabs.every(t => t.height < (innerWidth < 500 ? 50 : 40)),  gap: av && nm ? nm.getBoundingClientRect().left - av.getBoundingClientRect().right : null, rail: getComputedStyle(tr).boxShadow }; })()`);
             check(geo.tabs === 2 && geo.sameLine, `${at}the two tabs are side by side on one line, as in the Inbox: ` + JSON.stringify(geo));
