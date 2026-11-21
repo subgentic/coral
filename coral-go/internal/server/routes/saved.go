@@ -197,7 +197,7 @@ func cleanSavedField(s string) string {
 		}
 	}
 	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) { // control, and format (RTL override, zero width, BOM): as the Hub does (#20329)
 			return -1
 		}
 		return r
