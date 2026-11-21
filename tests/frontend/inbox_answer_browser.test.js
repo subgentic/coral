@@ -73,6 +73,47 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(said.toast, `${w}: the toast says Answered: Red and is on screen ${JSON.stringify(said)}`);
             assert.ok(said.list, `${w}: the empty list says what was answered, not only that nothing needs the person ${JSON.stringify(said)}`);
         }
+        // #20366: live prompt choices differ from board reply buttons. Hit-test and touch
+        // real controls in both the mail list and the mixed Inbox card layout.
+        for (const kind of ['question', 'permission']) {
+            for (const mixed of [false, true]) {
+                const at = `390 ${kind} ${mixed ? 'mixed cards' : 'mail list'}`;
+                const labels = kind === 'permission' ? ['Yes', 'No'] : ['Red', 'Blue', 'Green'];
+                await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+                await Emulation.setTouchEmulationEnabled({ enabled: false }); // Beta used mobile metrics without a touch override.
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+                await ev(`(() => {
+                    document.documentElement.setAttribute('data-theme','light');
+                    const real=window.fetch, json=b=>Promise.resolve(new Response(JSON.stringify(b),{headers:{'Content-Type':'application/json'}}));
+                    window.__answers=[];
+                    const card={ask_id:'native-${kind}',question:${JSON.stringify(kind === 'permission' ? 'Do you want to proceed?' : 'Pick a color:')},options:${JSON.stringify(labels.map((label, i) => ({n:i+1,label,action:'select'})))}};
+                    window.fetch=(u,o={})=>{
+                        const p=new URL(String(u),location.origin).pathname;
+                        if(p.endsWith('/answer-prompt') && o.method==='POST'){window.__answers.push(JSON.parse(o.body));return json({ok:true});}
+                        if(/\\/api\\/sessions\\/live\\/[^/]+\\/chat$/.test(p))return json({messages:[],total:0,prompt_options:card});
+                        if(p==='/api/operator-asks')return json(${JSON.stringify(mixed ? [{kind:'ask',id:42,board:'team-a',asker:'Writer',content:'@Operator Pick a release day',created_at:new Date().toISOString(),buttons:[{id:1,label:'Monday',action:'reply',state:'pending'},{id:2,label:'Friday',action:'reply',state:'pending'}]}] : [])});
+                        return real(u,o);
+                    };
+                    const entry=window.__m.entry.bind(window.__m);
+                    window.__m.entry=a=>({...entry(a),waiting_for_input:true,waiting_kind:'${kind}',waiting_summary:${JSON.stringify(kind === 'permission' ? 'Needs your permission' : 'Wants to know: Pick a color')},waiting_since:'2026-11-21T10:00:00Z'});
+                    window.__m.add('native','N',3,{sleeping:false,board_project:'team-a',session_id:'native-id'});
+                    return true;
+                })()`);
+                await ev(`import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>{window.switchNavTab('hub-inbox');return import((window.__coralStatic||'/static/')+'inbox_tab.js')}).then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+                await waitFor(`document.querySelectorAll('#group-table-view .inbox-answer').length===${labels.length}`, at+': all choices drawn',10000);
+                await waitFor(`(()=>{const b=document.querySelector('#group-table-view .inbox-answer');if(window.__nativeButton!==b){window.__nativeButton=b;window.__nativeAt=performance.now();return false;}return performance.now()-window.__nativeAt>500;})()`,at+': same choice armed and settled',8000);
+                const tap=await ev(`(()=>{const b=document.querySelector('#group-table-view .inbox-answer');b.scrollIntoView({block:'center',behavior:'instant'});const r=b.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,hit=document.elementFromPoint(x,y);return{x,y,hit:!!hit&&(hit===b||b.contains(hit)),html:hit?.outerHTML.slice(0,250)};})()`);
+                await shot(`inbox-native-${kind}-${mixed?'mixed':'mail'}-390`);
+                assert.ok(tap.hit,at+': choice receives its centre touch '+JSON.stringify(tap));
+                await Input.dispatchTouchEvent({type:'touchStart',touchPoints:[{x:tap.x,y:tap.y}]});
+                await Input.dispatchTouchEvent({type:'touchEnd',touchPoints:[]});
+                await waitFor(`window.__answers.length===1`,at+': single touch sends the answer',5000);
+                assert.deepEqual(await ev(`window.__answers`),[{session_id:'native-id',agent_type:'claude',n:1,label:labels[0],text:'',ask_id:'native-'+kind}],at+': exact choice sent once');
+                assert.equal(await ev(`document.body.dataset.navTab`),'hub-inbox',at+': stays in Inbox');
+                assert.equal(await ev(`!!document.querySelector('dialog.inbox-ask-dialog[open]')`),false,at+': no second permission sheet');
+                console.log('PASS '+at+' native touch sends '+labels[0]+' once');
+            }
+        }
         // a multi-select has no one-press answer: no buttons
         await ev(`window.__multi = true; window.__waiting = true; window.__answers = []; true`);
         console.log('\nPASS the Needs you row answers a question with the card\'s own choices, same route, keyboard and 44 px');
