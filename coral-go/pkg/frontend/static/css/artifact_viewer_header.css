@@ -192,7 +192,7 @@
     .artifact-viewer[data-review-pending="1"] .artifact-viewer-chips > .artifact-review-state { max-width: 13rem; }
     .artifact-viewer[data-review-pending="1"] .artifact-viewer-header > .artifact-viewer-title { min-width: min(9rem, 100%); }
 }
-@media (min-width: 769px) and (max-width: 1140px) { /* a narrower computer window (1024) with a decision waiting: the file arrows and Details are items of ⋯ as on a phone (Details comes back only while it is open, to close it) */
+@media (min-width: 769px) and (max-width: 1279px) { /* a narrower computer window (under 1280, 1024 and 1150 included) with a decision waiting: the file arrows and Details are items of ⋯ as on a phone (Details comes back only while it is open, to close it) */
     .artifact-viewer[data-review-pending="1"] .artifact-viewer-chips > .artifact-review-state { max-width: 8rem; }
     .artifact-viewer[data-review-pending="1"] .artifact-file-navigation { display: none; }
     .artifact-viewer[data-review-pending="1"] .artifact-file-prev-item:not([hidden]), .artifact-viewer[data-review-pending="1"] .artifact-file-next-item:not([hidden]), .artifact-viewer[data-review-pending="1"] .artifact-viewer-details-item { display: flex; }
