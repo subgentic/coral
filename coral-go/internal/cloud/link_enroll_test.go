@@ -241,3 +241,51 @@ func TestACancelDuringTheStoreRemovesTheStoredLink(t *testing.T) {
 	links, _ := e.cs.ListLinks(context.Background())
 	assert.Len(t, links, 1)
 }
+
+// #20407: the owner a Hub names at enrollment is a candidate in memory, not the owner; the Operator's confirm must name it exactly, and it expires.
+func TestAHubNamedOwnerIsACandidateUntilTheOperatorConfirmsIt(t *testing.T) {
+	e, m, hub2 := linkEnrollEnv(t)
+	hub2.account.Store("11111111-2222-4333-8444-555555555555")
+	hub2.ownerUser.Store("hub-user-bbbb2222")
+	var now atomic.Int64
+	base := time.Now()
+	m.o.Now = func() time.Time { return base.Add(time.Duration(now.Load())) }
+	pe, err := m.AddLinkByOrigin(context.Background(), hub2.srv.URL, "view")
+	require.NoError(t, err)
+	got := waitEnroll(t, m, pe.Origin, "linked")
+	assert.Equal(t, "hub-user-bbbb2222", got.OwnerCandidate)
+	b, err := e.cs.LinkByOrigin(context.Background(), hub2.srv.URL)
+	require.NoError(t, err)
+	assert.Empty(t, b.OwnerUser, "the Hub's word is not the owner")
+
+	assert.ErrorIs(t, m.ConfirmLinkOwner(context.Background(), pe.Origin, "hub-user-cccc3333"), ErrOwnerCandidateMismatch)
+	assert.ErrorIs(t, m.ConfirmLinkOwner(context.Background(), pe.Origin, ""), ErrOwnerCandidateMismatch)
+	b, _ = e.cs.LinkByOrigin(context.Background(), hub2.srv.URL)
+	assert.Empty(t, b.OwnerUser)
+
+	now.Store(int64(linkCandidateTTL + time.Second)) // it expires
+	assert.ErrorIs(t, m.ConfirmLinkOwner(context.Background(), pe.Origin, "hub-user-bbbb2222"), ErrNoOwnerCandidate)
+	for _, en := range m.LinkEnrollments() {
+		assert.Empty(t, en.OwnerCandidate, "an expired candidate is not shown")
+	}
+	b, _ = e.cs.LinkByOrigin(context.Background(), hub2.srv.URL)
+	assert.Empty(t, b.OwnerUser)
+}
+
+// A candidate in a form Coral does not know, or with no account, is never held (and so never confirmed).
+func TestAnUnformedOwnerCandidateIsNotHeld(t *testing.T) {
+	for name, set := range map[string]func(h *fakeHub){
+		"bad user":   func(h *fakeHub) { h.account.Store("11111111-2222-4333-8444-555555555555"); h.ownerUser.Store("Not A User!") },
+		"no account": func(h *fakeHub) { h.ownerUser.Store("hub-user-bbbb2222") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, m, hub2 := linkEnrollEnv(t)
+			set(hub2)
+			pe, err := m.AddLinkByOrigin(context.Background(), hub2.srv.URL, "view")
+			require.NoError(t, err)
+			got := waitEnroll(t, m, pe.Origin, "linked")
+			assert.Empty(t, got.OwnerCandidate)
+			assert.ErrorIs(t, m.ConfirmLinkOwner(context.Background(), pe.Origin, "hub-user-bbbb2222"), ErrNoOwnerCandidate)
+		})
+	}
+}

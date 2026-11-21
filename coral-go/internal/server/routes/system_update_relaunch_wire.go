@@ -19,13 +19,14 @@ import (
 // agents are restarted by a relaunch, a tmux agent survives it.
 func NewUpdateRelaunchHandler(ss *store.SessionStore, dataDir string, backend func() string, updater RelaunchUpdater) *UpdateRelaunchHandler {
 	cs := store.NewCloudStore(ss.DB(), store.NewRemoteServerStore(ss.DB(), dataDir))
+	ownerLabelOf, ownerRecordOf := LinkOwnerSources(cs) // by the link a request came through (#20407)
 	return &UpdateRelaunchHandler{
 		Enabled:     func() bool { return updateRelaunchFeature },
 		Updater:     updater,
 		Settings:    ss.GetSettings,
 		SetSetting:  ss.SetSetting,
-		OwnerUser:   cs.OwnerUser,
-		OwnerRecord: cs.OwnerRecord,
+		OwnerUser:   ownerLabelOf,
+		OwnerRecord: ownerRecordOf,
 		Feeds:       releaseFeeds,
 		Dir:         filepath.Join(dataDir, updatesDirName),
 		// Coral must be startable again before a relaunch is offered: this computer's own record of how it was started, or a service manager (#5419).

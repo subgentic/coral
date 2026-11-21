@@ -577,7 +577,8 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/cloud/disconnect", s.cloudHandler.Disconnect)
 	r.Get("/api/cloud/links", s.cloudHandler.Links) // #20346: link list, add (refused for now), cap and remove: this computer only
 	r.Post("/api/cloud/links", s.cloudHandler.AddLink)
-	r.Post("/api/cloud/links/cancel", s.cloudHandler.CancelLinkEnrollment) // #20385: end a Hub being added
+	r.Post("/api/cloud/links/cancel", s.cloudHandler.CancelLinkEnrollment)    // #20385: end a Hub being added
+	r.Post("/api/cloud/links/confirm-owner", s.cloudHandler.ConfirmLinkOwner) // #20407: the Operator names the owner of an added Hub, at this computer
 	r.Put("/api/cloud/links/{id}/cap", s.cloudHandler.SetLinkCap)
 	r.Delete("/api/cloud/links/{id}", s.cloudHandler.RemoveLink)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
@@ -626,7 +627,10 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// Coral Hub's relaunch into a staged update (#5280): 404 until the feature is switched on and the updater exists.
 	// Where the owner routes read the owner's label recorded at enrolment (#5307).
 	ownerCloud := store.NewCloudStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir()))
-	routes.SetHubOwnerLabel(ownerCloud.OwnerUser)
+	ownerLabelOf, ownerRecordOf := routes.LinkOwnerSources(ownerCloud) // by the link a request came through (#20407)
+	routes.SetHubOwnerLabel(ownerLabelOf)
+	routes.SetHubLinkAdded(ownerCloud)
+	routes.SetHubLinkAdopt(ownerCloud)
 	s.cloudHandler.SetLinkStore(ownerCloud)
 	hubDropbox.Enrolment = func(ctx context.Context) (string, string, error) { // the Hub's own Share page is opened at the enrolled address only (#16109)
 		c, err := ownerCloud.Get(ctx)
@@ -635,8 +639,8 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		}
 		return c.HubURL, c.ServerID, nil
 	}
-	routes.SetHubOwnerRecord(ownerCloud.OwnerRecord) // and what it is enrolled as: a person's or an organisation's (#7061)
-	s.cloudHandler.SetOwnerLabelStore(ownerCloud)    // and where the person at this computer records it when it is missing (#6108)
+	routes.SetHubOwnerRecord(ownerRecordOf)       // and what it is enrolled as: a person's or an organisation's (#7061)
+	s.cloudHandler.SetOwnerLabelStore(ownerCloud) // and where the person at this computer records it when it is missing (#6108)
 	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), func() { s.endForUpdate(endThisServer) })
 	if s.sysHandler != nil {
 		s.sysHandler.SetUpdaterRecord(updater.Record) // the update notice reads what the updater's last check found, and asks GitHub for nothing where the updater checks (#9726)
