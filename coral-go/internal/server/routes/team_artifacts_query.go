@@ -681,6 +681,25 @@ func keyOfP(it *teamArtifact) artifactSortKey {
 	return artifactSortKey{Uploader: clipKey(strings.ToLower(artifactUploaderLabel(*it)), cursorTextRunes), At: it.CreatedAt, Name: clipKey(strings.ToLower(it.Name), cursorTextRunes), Size: size, Type: strings.ToLower(strings.TrimSpace(it.MediaType)), Tags: clipKey(strings.Join(it.Tags, " "), 64), TaskID: it.TaskID, Source: it.Source, Index: it.index, ID: hex.EncodeToString(sum[:])}
 }
 
+// sortedByKey is set in the order of sortName with each row's key made once: the comparison made two keys (a hash, a lower-casing, a copy of two large rows) for every pair, 20,000 rows' worth of them for every
+// read of the cross-team list (#20396). The sort is stable, as it was.
+func sortedByKey(set []teamArtifact, sortName string) []teamArtifact {
+	type keyed struct {
+		key artifactSortKey
+		i   int
+	}
+	ks := make([]keyed, len(set))
+	for i := range set {
+		ks[i] = keyed{keyOfP(&set[i]), i}
+	}
+	sort.SliceStable(ks, func(a, b int) bool { return artifactAfter(sortName, ks[b].key, ks[a].key) })
+	out := make([]teamArtifact, len(set))
+	for n, k := range ks {
+		out[n] = set[k.i]
+	}
+	return out
+}
+
 // newestAfter: a comes after b in the plain list's order (newest first; ties by task id, source, position, then id, so it is total).
 func newestAfter(a, b artifactSortKey) bool {
 	switch {
@@ -942,7 +961,7 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		fast, idx = false, nil
 	}
 	if !inOrder {
-		sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
+		set = sortedByKey(set, q.sortName)
 	}
 	if !fast {
 		n = len(set)
