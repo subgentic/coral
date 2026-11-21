@@ -78,6 +78,7 @@ POST /api/hub-auto-accept pending
 POST /api/pinned-folders pending
 POST /api/saved pending
 POST /api/scheduled/runs/{runID}/seen pending
+POST /api/scheduled/validate-cron pending
 POST /api/sessions/launch pending
 POST /api/sessions/launch-team pending
 POST /api/sessions/live/sleep-all pending
