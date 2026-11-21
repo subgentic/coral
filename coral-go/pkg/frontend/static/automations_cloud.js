@@ -7,7 +7,8 @@ import { serverFetch, pathId } from './server_base.js';
 import { go, currentRoute } from './nav.js';
 import { showView } from './utils.js';
 import { importOnce } from './import_once.js';
-const { machineOnline, machineLabel } = await importOnce('./analytics_machine.js');
+const { machineOnline, machineLabel, machineChoices, machineNow, pickMachine } = await importOnce('./analytics_machine.js');
+const { computerBar } = await importOnce('./computer_bar.js'); // the one computer bar under the title (#20207)
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
 const VL = await importOnce('./view_list.js');
@@ -16,8 +17,7 @@ const { el } = DT;
 const OMITTED = 'Not shown through Coral Hub';
 const FOLDERS = [ ['jobs', 'Jobs'], ['workflows', 'Workflows'], ['recent', 'Recent runs'], ['running', 'Running now'], ['failed', 'Failed'] ];
 const names = new Map(FOLDERS);
-let chosen = '', route = { view: 'automations', folder: 'jobs' }, generation = 0, controller = null, query = '';
-const computers = () => [...new Map((state.servers || []).filter(s => s && s.id && s.id !== 'local').map(s => [s.id, s])).values()];
+let route = { view: 'automations', folder: 'jobs' }, generation = 0, controller = null, query = '';
 const word = x => x == null || x === '' ? '—' : String(x);
 const dateOf = x => x ? new Date(x).toLocaleString() : '—';
 const link = (text, onClick) => { const b = el('button', 'btn btn-small', text); b.type = 'button'; b.addEventListener('click', onClick); return b; };
@@ -36,14 +36,10 @@ function shell() {
     host.classList.add('cloud-automations');
     const heading = document.getElementById('sched-view-header');
     heading.replaceChildren(el('h2', '', 'Automations'));
-    const label = el('label', 'cloud-automation-picker', 'Computer '), picker = el('select', 'field');
-    picker.id = 'cloud-automation-computer';
-    for (const s of computers()) { const option = el('option', '', machineLabel(s.id) + (machineOnline(s.id) ? '' : ' (offline)')); option.value = s.id; picker.append(option); }
-    picker.value = chosen; label.append(picker);
-    picker.addEventListener('change', () => { chosen = picker.value; openAutomationsRoute({ view: 'automations', folder: route.folder }); });
-    heading.append(label);
     const panel = el('div', 'cloud-automation-content'); panel.setAttribute('aria-busy', 'true');
-    host.replaceChildren(nav(), el('p', 'goals-note', 'Read only. Manage automations in this computer’s Coral.'), panel);
+    const choices = machineChoices(), server = machineNow(), bar = el('div', 'cloud-automation-bar');
+    if (choices.length) bar.append(computerBar({ id: 'cloud-automation-computer', choices, current: server, onPick: id => { pickMachine(id); openAutomationsRoute({ view: 'automations', folder: route.folder }); } }), el('p', 'goals-note', `Read only here. Edit them in Coral on ${machineLabel(server)}.`));
+    host.replaceChildren(bar, nav(), panel);
     return panel;
 }
 async function read(server, path, signal) {
@@ -111,8 +107,7 @@ export async function openAutomationsRoute(request = {}) {
     route = { ...request, view: 'automations', folder: names.has(request.folder) ? request.folder : 'jobs' };
     controller?.abort(); controller = new AbortController();
     const { signal } = controller, myGeneration = ++generation;
-    const list = computers(); if (!list.some(s => s.id === chosen)) chosen = list[0]?.id || '';
-    const server = chosen, panel = shell();
+    const server = machineChoices().length ? machineNow() : '', panel = shell();
     if (!server) { panel.replaceChildren(el('p', 'empty-state-line', 'Link a computer to see automations.')); panel.removeAttribute('aria-busy'); return true; }
     panel.append(el('p', 'goals-note', 'Loading automations…'));
     try {

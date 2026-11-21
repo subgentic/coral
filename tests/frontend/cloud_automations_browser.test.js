@@ -8,7 +8,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const STUB = `(() => {
  const real = window.fetch, json = x => Promise.resolve(new Response(JSON.stringify(x), {headers:{'content-type':'application/json'}}));
- window.__automationReads=[]; window.__automationMutations=[]; window.__computers=[{id:'one',name:'First computer',status:'online'},{id:'two',name:'Second computer',status:'online'}];
+ window.__automationReads=[]; window.__automationMutations=[]; window.__computers=[{id:'three',name:'Third computer',status:'offline',last_seen:'2026-11-18T10:00:00Z'},{id:'one',name:'First computer',status:'online'},{id:'four',name:'Fourth computer',status:'offline',last_seen:'2026-11-20T10:00:00Z'},{id:'two',name:'Second computer',status:'online'}];
  window.fetch=(u,o) => {
   const p=new URL(String(u && u.url || u),location.origin), path=p.pathname;
   if(o?.method && ['POST','PUT','PATCH','DELETE'].includes(o.method.toUpperCase())) window.__automationMutations.push({path,method:o.method,origin:p.origin,event:path==='/api/tracking/event' ? JSON.parse(o.body||'{}').event : ''});
@@ -55,7 +55,11 @@ const STUB = `(() => {
   const route=async r=>{await ev(`import((window.__coralStatic||'/static/')+'nav.js').then(m=>m.go(${JSON.stringify(r)}))`);};
   const ready=async text=>waitFor(`document.querySelector('#scheduler-view')?.textContent.includes(${JSON.stringify(text)}) && !document.querySelector('#scheduler-view [aria-busy="true"]')`,text,10000);
   await route({view:'automations',folder:'jobs'}); await ready('one job');
-  assert.deepEqual(await ev(`[...document.querySelector('#cloud-automation-computer').options].map(o=>o.value)`),['one','two'],'linked computers only, no local choice');
+  assert.deepEqual(await ev(`[...document.querySelectorAll('#cloud-automation-computer .computer-bar-option')].map(o=>o.dataset.computer)`),['one','two','four','three'],'linked computers only, no local choice; online first, then offline, most recently seen first inside each group (#20207)');
+  assert.deepEqual(await ev(`[...document.querySelectorAll('#cloud-automation-computer .computer-bar-list > *')].map(n=>n.className.replace('computer-bar-','')+(n.dataset.computer?':'+n.dataset.computer:''))`),['group','option:one','option:two','divider','group','option:four','option:three'],'a divider bar sits between the online and the offline computers');
+  assert.equal(await ev(`document.querySelector('#cloud-automation-computer .computer-bar-button').textContent.trim()`),'First computer','the bar names the computer being read');
+  assert.equal(await ev(`getComputedStyle(document.querySelector('#cloud-automation-computer')).display`),'flex');
+  assert.equal(await ev(`document.querySelector('#scheduler-view').textContent.includes('Read only here. Edit them in Coral on First computer.')`),true,'the read-only fact is one quiet line beside the bar, with its next step');
   assert.equal(await ev(`document.getElementById('nav-tab-automations').hasAttribute('data-local-only')`),false);
   await route({view:'automations',folder:'jobs',id:1}); await ready('Not shown through Coral Hub');
   await ev(`document.querySelector('[data-cloud-run]').click();true`); await ready('Run 9');
@@ -63,7 +67,8 @@ const STUB = `(() => {
   await route({view:'automations',folder:'workflows',id:2}); await ready('3');
   await route({view:'automations',folder:'workflows',id:2,run:9}); await ready('Run 9');
   await route({view:'automations',folder:'recent'}); await ready('one job');
-  await ev(`document.querySelector('#cloud-automation-computer').value='two';document.querySelector('#cloud-automation-computer').dispatchEvent(new Event('change',{bubbles:true}));true`); await ready('two job');
+  await ev(`document.querySelector('#cloud-automation-computer .computer-bar-button').click();document.querySelector('#cloud-automation-computer .computer-bar-option[data-computer="two"]').click();true`); await ready('two job');
+  assert.equal(await ev(`document.querySelector('#cloud-automation-computer .computer-bar-list').hidden`),true,'picking closes the list');
   assert.equal(await ev('window.__pwn'),undefined,'remote labels are text, not markup');
   assert.equal(await ev(`!!document.querySelector('#scheduler-view img')`),false);
   const controls=await ev(`[...document.querySelectorAll('#scheduler-view button')].filter(e=>e.getClientRects().length).map(e=>e.textContent.trim())`);
@@ -96,7 +101,8 @@ const STUB = `(() => {
    await route({view:'automations',...request}); await ready("Second computer is offline, so its automations can't be read now.");
   }
   assert.deepEqual(await ev('window.__automationReads'),[],'an offline computer sends no list, detail, or run read');
-  assert.equal(await ev(`document.querySelector('#cloud-automation-computer option[value="two"]').textContent`),'Second computer (offline)','offline computers remain named in the picker');
+  assert.equal(await ev(`document.querySelector('#cloud-automation-computer .computer-chip').textContent`),'Offline','an offline computer shows the one-word chip on the bar');
+  assert.equal(await ev(`!!document.querySelector('#cloud-automation-computer .computer-bar-option[data-computer="two"]')`),true,'offline computers remain named and pickable in the list');
   await ev(`[...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Retry').click();true`);
   await ready("Second computer is offline, so its automations can't be read now.");
   assert.deepEqual(await ev('window.__automationReads'),[],'Retry while offline sends no read');
