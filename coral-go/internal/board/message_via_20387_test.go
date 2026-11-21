@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,11 @@ func TestAMessageRecordsTheLinkAndHubPersonItArrivedThrough(t *testing.T) {
 	require.NotNil(t, m.ViaLink)
 	assert.Equal(t, "lnk-aaaa1111", *m.ViaLink)
 	assert.Equal(t, "hub-user-bbbb2222", *m.ViaHubUser)
+
+	j, err := json.Marshal(m)
+	require.NoError(t, err)
+	assert.NotContains(t, string(j), "lnk-aaaa1111", "the pair is never in a message's JSON")
+	assert.NotContains(t, string(j), "via_")
 
 	local, err := s.PostMessage(ctx, "p", "Dev", "hello", nil)
 	require.NoError(t, err)
