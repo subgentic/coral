@@ -205,7 +205,11 @@ func Age(d time.Duration) string { return age(d) }
 func itemTexts(items []Item) []string {
 	var itemLines []string
 	for i, it := range items {
-		l := fmt.Sprintf("%d) %s: %s.", i+1, it.Agent, it.Problem)
+		l := fmt.Sprintf("%d) ", i+1)
+		if it.Key != "" {
+			l += "[ack " + ItemID(it.Key) + "] " // first, so a line cut short for the eye still has the id that acknowledges it (#20398)
+		}
+		l += fmt.Sprintf("%s: %s.", it.Agent, it.Problem)
 		if it.Evidence != "" {
 			l += " " + it.Evidence + "."
 		}
@@ -217,9 +221,6 @@ func itemTexts(items []Item) []string {
 		}
 		if it.Back {
 			l += " (back: changed since it was acknowledged)"
-		}
-		if it.Key != "" {
-			l += " [ack " + ItemID(it.Key) + "]"
 		}
 		itemLines = append(itemLines, l)
 	}

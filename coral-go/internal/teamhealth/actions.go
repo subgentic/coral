@@ -19,6 +19,7 @@ type Rules struct {
 	Sleeping    int           // ... while at least this many agents sleep (default 1)
 	StaleReview time.Duration // a task in review this long (default 24 h)
 	Mention     time.Duration // the window of the mentions-not-reaching rule (default 30 min); the roster builder reads it
+	MaxItems    int           // the most action lines one check says, the rest counted ("and N more"); 0 is as many as fit (#20398)
 }
 
 // DefaultRules are coral-hub's proposed defaults.
@@ -107,7 +108,11 @@ func (in CheckInput) actions(items []Item) []action {
 		}
 	}
 	for _, it := range items {
-		l := fmt.Sprintf("%s: %s.", it.Agent, it.Problem)
+		l := ""
+		if it.Key != "" {
+			l = "[ack " + ItemID(it.Key) + "] " // first, so a line cut short for the eye still has the id that acknowledges it (#20398)
+		}
+		l += fmt.Sprintf("%s: %s.", it.Agent, it.Problem)
 		if it.Evidence != "" {
 			l += " " + it.Evidence + "."
 		}
@@ -119,9 +124,6 @@ func (in CheckInput) actions(items []Item) []action {
 		}
 		if it.Back {
 			l += " (back: changed since it was acknowledged)"
-		}
-		if it.Key != "" {
-			l += " [ack " + ItemID(it.Key) + "]"
 		}
 		out = append(out, action{age: it.Age, rank: it.Rank, pinned: it.Rank == 0, text: l})
 	}
@@ -251,7 +253,11 @@ func composeActionList(in CheckInput) []string {
 		return append(ls, tail...)
 	}
 	// Within the cap, whole lines only: the operator's lines are trimmed after the actions' are, and counted.
-	for na := len(acts); na >= 0; na-- {
+	top := len(acts)
+	if in.Rules.MaxItems > 0 && in.Rules.MaxItems < top {
+		top = in.Rules.MaxItems
+	}
+	for na := top; na >= 0; na-- {
 		for no := len(op); no >= 0; no-- {
 			for _, withHint := range []bool{true, false} {
 				if ls := build(na, no, withHint); len(strings.Join(ls, " • ")) <= MaxCheck {
