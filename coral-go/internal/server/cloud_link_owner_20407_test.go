@@ -81,7 +81,8 @@ func TestAnAddedHubsOwnerIsPinnedOnlyByTheOperatorAtThisComputer(t *testing.T) {
 	// 2. Before the confirm Hub B's owner is refused on an owner-only route, in the words that say what to do; Hub A's owner still acts.
 	rec = ownerCall(b.LinkID, personB)
 	assert.Equal(t, 403, rec.Code, rec.Body.String())
-	assert.Equal(t, 200, ownerCall(a.LinkID, personA).Code, "Hub A's owner acts")
+	ra := ownerCall(a.LinkID, personA)
+	assert.Equal(t, 200, ra.Code, "Hub A's owner acts: "+ra.Body.String())
 
 	// 3. The confirm names the exact candidate: a different name, and a Hub that has none, are refused; the row is unchanged.
 	conf := func(hub, cand string) *httptest.ResponseRecorder {
