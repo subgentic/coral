@@ -7,9 +7,9 @@ import { serverFetch, pathId } from './server_base.js';
 import { go, currentRoute } from './nav.js';
 import { showView } from './utils.js';
 import { importOnce } from './import_once.js';
-const { machineOnline, machineLabel, machineChoices, machineNow, pickMachine } = await importOnce('./analytics_machine.js');
-const { computerCard, stateOfStatus } = await importOnce('./computer_card.js'); // one plain card for every cannot state (#20207)
-const { computerBar } = await importOnce('./computer_bar.js'); // the one computer bar under the title (#20207)
+const { machineOnline, machineLabel, machineChoices, machineNow, machineIsAll, pickMachine } = await importOnce('./analytics_machine.js');
+const { computerCard, stateOfStatus, notShownText } = await importOnce('./computer_card.js'); // one plain card for every cannot state (#20207)
+const { computerBar, ALL_COMPUTERS } = await importOnce('./computer_bar.js'); // the one computer bar under the title (#20207)
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
 const VL = await importOnce('./view_list.js');
@@ -30,7 +30,7 @@ function nav() {
     if (side) side.replaceChildren(VL.build({ id: 'cloud-automation-folders', label: 'Automations folders', ...spec }));
     return VL.build({ id: 'cloud-automation-page-folders', label: 'Automations views', tabs: true, ...spec });
 }
-function shell() {
+function shell(everyone) {
     showView('scheduler-view');
     document.getElementById('workflows-view')?.removeAttribute('data-phone-item');
     const host = document.getElementById('scheduler-detail');
@@ -38,8 +38,8 @@ function shell() {
     const heading = document.getElementById('sched-view-header');
     heading.replaceChildren(el('h2', '', 'Automations'));
     const panel = el('div', 'cloud-automation-content'); panel.setAttribute('aria-busy', 'true');
-    const choices = machineChoices(), server = machineNow(), bar = el('div', 'cloud-automation-bar');
-    if (choices.length) bar.append(computerBar({ id: 'cloud-automation-computer', choices, current: server, onPick: id => { pickMachine(id); openAutomationsRoute({ view: 'automations', folder: route.folder }); } }), el('p', 'goals-note', `Read only here. Edit them in Coral on ${machineLabel(server)}.`));
+    const choices = machineChoices(), server = everyone ? ALL_COMPUTERS : machineNow(), bar = el('div', 'cloud-automation-bar');
+    if (choices.length) bar.append(computerBar({ id: 'cloud-automation-computer', choices, all: true, current: server, onPick: id => { pickMachine(id); openAutomationsRoute({ view: 'automations', folder: route.folder }); } }), el('p', 'goals-note', everyone ? 'Read only here. Edit them in Coral on each computer.' : `Read only here. Edit them in Coral on ${machineLabel(server)}.`));
     host.replaceChildren(bar, nav(), panel);
     return panel;
 }
@@ -63,10 +63,11 @@ function facts(rows) {
 function runFacts(run) {
     return facts([['Status', run.status], ['Started', dateOf(run.started_at || run.scheduled_at)], ['Finished', dateOf(run.finished_at)], ['Duration', run.duration_seconds == null ? '—' : `${Number(run.duration_seconds)} s`], ['Error code', run.error_code], ['Failed step', run.failed_step?.number], ['Output and error details', OMITTED], ['Files and working folder', OMITTED]]);
 }
-function runTable(rows, kind, openRun) {
+function runTable(rows, kind, openRun, withComputer) {
     return DT.dataTable({ label: 'Runs', fold: 'labeled', rows, rowKey: r => `${r.kind || kind}-${r.id}`, rowName: r => itemName(r, kind), open: openRun,
         columns: [
             { key: 'name', label: 'Run', primary: true, width: 'grow', cell: r => { const b = primary(`Run ${word(r.id)} · ${itemName(r, r.kind || kind)}`, () => openRun(r)); b.dataset.cloudRun = ''; return b; } },
+            ...(withComputer ? [{ key: 'computer', label: 'Computer', width: '9rem', cell: r => machineLabel(r._server) }] : []),
             { key: 'status', label: 'Status', width: '8rem', cell: r => word(r.status) },
             { key: 'started', label: 'Started', width: '14rem', cell: r => dateOf(r.started_at || r.scheduled_at), dropAt: 28 },
         ], empty: 'No runs yet.' }).el;
@@ -111,7 +112,7 @@ export async function openAutomationsRoute(request = {}) {
     route = { ...request, view: 'automations', folder: names.has(request.folder) ? request.folder : 'jobs' };
     controller?.abort(); controller = new AbortController();
     const { signal } = controller, myGeneration = ++generation;
-    const server = machineChoices().length ? machineNow() : '', panel = shell();
+    const everyone = machineIsAll() && !(route.id && ['jobs', 'workflows'].includes(route.folder)), server = machineChoices().length ? machineNow() : '', panel = shell(everyone);
     if (!server) { panel.replaceChildren(el('p', 'empty-state-line', 'Link a computer to see automations.')); panel.removeAttribute('aria-busy'); return true; }
     panel.append(el('p', 'goals-note', 'Loading automations…'));
     try {
@@ -120,24 +121,35 @@ export async function openAutomationsRoute(request = {}) {
         } else {
             const folder = route.folder;
             const path = folder === 'jobs' ? '/api/scheduled/jobs' : folder === 'workflows' ? '/api/workflows' : `/api/automations/runs?limit=50${folder === 'running' ? '&result=running' : folder === 'failed' ? '&result=failed' : ''}`;
-            const data = await read(server, path, signal);
-            if (myGeneration !== generation) return true;
+            const targets = everyone ? machineChoices() : [server];
+            const settled = await Promise.allSettled(targets.map(t => read(t, path, signal)));
+            if (myGeneration !== generation || signal.aborted) return true;
+            const missing = settled.filter(r => r.status === 'rejected').map(r => r.reason);
+            if (!everyone && missing.length) throw missing[0];
+            const rowsOf = d => (folder === 'jobs' || folder === 'workflows' ? d[folder] : d.runs) || [];
+            const merged = settled.flatMap((r, i) => r.status === 'fulfilled' ? rowsOf(r.value).map(row => ({ ...row, _server: targets[i] })) : []);
+            if (everyone && folder !== 'jobs' && folder !== 'workflows') merged.sort((a, b) => String(b.started_at || b.scheduled_at || '').localeCompare(String(a.started_at || a.scheduled_at || '')));
+            const data = { [folder]: merged, runs: merged, has_more: settled.some(r => r.status === 'fulfilled' && r.value.has_more) };
+            if (everyone && missing.length) document.querySelector('.cloud-automation-bar')?.append(el('p', 'goals-note cloud-automation-count', `${targets.length} computers · ${missing.length} of them cannot be read`));
+            const notShown = () => { if (!missing.length || !everyone) return null; const box = el('div', 'computer-not-shown'); box.append(el('p', '', `Not shown: ${missing.map(e => notShownText(e, 'automations')).join(' · ')}.`)); const d = el('details'); d.append(el('summary', '', 'Show details'), ...missing.filter(e => e.detail).map(e => el('p', '', e.detail))); if (d.children.length > 1) box.append(d); return box; };
             panel.replaceChildren(el('h3', '', names.get(folder)));
             if (['jobs', 'workflows'].includes(folder)) {
                 const rows = (data[folder] || []).filter(r => !query || String(r.name || '').toLowerCase().includes(query));
-                const open = r => go({ view: 'automations', folder, id: pathId(r.id) });
+                const open = r => { if (everyone) pickMachine(r._server); go({ view: 'automations', folder, id: pathId(r.id) }); };
                 panel.append(DT.dataTable({ label: names.get(folder), fold: 'labeled', rows, rowKey: r => r.id, rowName: r => String(r.name || ''), open,
                     columns: [
                         { key: 'name', label: folder === 'jobs' ? 'Job' : 'Workflow', primary: true, width: 'grow', cell: r => primary(String(r.name || ''), () => open(r)) },
+                        ...(everyone ? [{ key: 'computer', label: 'Computer', width: '9rem', cell: r => machineLabel(r._server) }] : []),
                         { key: 'state', label: 'State', width: '7rem', cell: r => r.paused ? 'Paused' : r.enabled ? 'On' : 'Off' },
                         { key: 'last', label: 'Last run', width: '9rem', cell: r => word(r.last_run?.status) },
-                    ], empty: 'No automations found.' }).el);
+                    ], empty: 'No automations found.' }).el, ...[notShown()].filter(Boolean));
             } else {
                 const rows = (data.runs || []).filter(r => !query || itemName(r, r.kind).toLowerCase().includes(query));
                 panel.append(runTable(rows, '', async r => {
-                    const run = r.kind === 'workflow' ? await read(server, `/api/workflows/runs/${pathId(r.id)}`, signal).catch(() => null) : r;
+                    const run = r.kind === 'workflow' ? await read(r._server || server, `/api/workflows/runs/${pathId(r.id)}`, signal).catch(() => null) : r;
                     if (run && myGeneration === generation) panel.replaceChildren(link('Back to runs', () => openAutomationsRoute({ view: 'automations', folder })), el('h3', '', `Run ${word(run.id)}`), runFacts(run));
-                }));
+                }, everyone));
+                const shown = notShown(); if (shown) panel.append(shown);
                 if (data.has_more) panel.append(el('p', 'goals-note', 'Showing the latest 50 runs. Open a job or workflow for its earlier runs.'));
             }
         }

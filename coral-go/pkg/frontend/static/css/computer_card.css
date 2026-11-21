@@ -10,3 +10,5 @@
 .computer-card-details summary { cursor: pointer; }
 .computer-card-details p { margin: 6px 0 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .computer-card { padding: 12px; } .computer-card-actions .btn { flex: 1 1 auto; min-height: 44px; } }
+.computer-not-shown { margin-top: 12px; color: var(--text-muted); font-size: var(--fs-base); }
+.computer-not-shown p { margin: 0 0 4px; overflow-wrap: anywhere; }
