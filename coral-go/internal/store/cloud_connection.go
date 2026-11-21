@@ -80,6 +80,9 @@ func (s *CloudStore) SaveTeam(ctx context.Context, hubURL, serverID, label, toke
 }
 
 func (s *CloudStore) save(ctx context.Context, hubURL, serverID, label, token string, teamOrg *string) error {
+	if s.AddedLinkAt(ctx, hubURL) { // a link added here already has this Hub: nothing is written (#20368)
+		return ErrLinkExists
+	}
 	box, err := s.rs.getBox(ctx, true, false)
 	if err != nil {
 		return err

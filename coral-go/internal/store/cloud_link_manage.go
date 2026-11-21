@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -19,16 +20,20 @@ const SecondLinkOpen = false
 var secondLinkOpen = SecondLinkOpen
 
 // AllowSecondLinkForTest opens the second-link gate for one test and shuts it again when the test ends. It exists so the connector's tests can hold two links before the gate is lifted for real; nothing but a test calls it.
+// Tests that use it never run in parallel with each other: it takes a lock the test releases when it ends, so a second one waits, and none of them may call t.Parallel (the gate is one package variable).
 func AllowSecondLinkForTest(t interface{ Cleanup(func()) }) {
+	secondLinkMu.Lock()
 	secondLinkOpen = true
-	t.Cleanup(func() { secondLinkOpen = SecondLinkOpen })
+	t.Cleanup(func() { secondLinkOpen = SecondLinkOpen; secondLinkMu.Unlock() })
 }
+
+var secondLinkMu sync.Mutex
 
 // ErrSecondLinkNotYet is returned when a link is added while one exists and SecondLinkOpen is false.
 var ErrSecondLinkNotYet = errors.New("a second Coral Hub link is not available yet: every Hub action must be recorded with its Hub first")
 
 // ErrLinkExists is returned when a link to that Hub already exists.
-var ErrLinkExists = errors.New("this computer is already linked to that Hub")
+var ErrLinkExists = errors.New("this computer is already linked to that Hub; remove that link first, then connect again")
 
 // ErrTooManyLinks is returned when MaxCloudLinks links exist.
 var ErrTooManyLinks = fmt.Errorf("at most %d Coral Hubs can be linked", MaxCloudLinks)
@@ -346,4 +351,10 @@ func (s *CloudStore) MarkLinkRevoked(ctx context.Context, linkID, msg string) er
 func (s *CloudStore) linkIs(ctx context.Context, linkID string) bool {
 	var n int
 	return s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE link_id = ?", linkID) == nil && n == 1
+}
+
+// AddedLinkAt says whether a link added at this computer already has this Hub address (any spelling CanonicalHubOrigin accepts): an enrollment to it is refused before anything is asked of the Hub or written.
+func (s *CloudStore) AddedLinkAt(ctx context.Context, hubURL string) bool {
+	l, err := s.LinkByOrigin(ctx, hubURL)
+	return err == nil && l.Source == LinkSourceAdded
 }
