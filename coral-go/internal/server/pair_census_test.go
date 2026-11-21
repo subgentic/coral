@@ -161,6 +161,52 @@ func TestPairUpgradeRoutesRecordThePairAtConnectAndClose(t *testing.T) {
 	require.Error(t, err)
 }
 
+// Security's MUST on c8b6d5c312 (#20405): the refused-row cap (30 a minute per link) must not take a stream's rows. After a flood of refused writes has used it up, 40 opens through the connector in the
+// same minute each still leave a WS-OPEN row and a WS-CLOSE row; past the open bound an open is refused (429), never left without a row.
+func TestStreamRowsAreNotTakenByTheRefusedRowCap(t *testing.T) {
+	g := newInteg(t)
+	ctx := tunnel.WithHubRole(tunnel.WithHubUser(context.Background(), integOwner), "owner")
+	for i := 0; i < routes.RefusedRowsPerMinute+10; i++ { // refused writes: a pair on the link, a route that refuses
+		g.hub("owner", integOwner, "POST", "/api/board/proj/tasks/1/nudge", `{}`, nil)
+	}
+	var route string
+	for r := range pairUpgradeRoutes {
+		_, route, _ = strings.Cut(r, " ")
+		break
+	}
+	count := func(method string) int {
+		acts, err := g.srv.boardStore.RecentHubOperatorActions(context.Background(), 1000)
+		require.NoError(t, err)
+		n := 0
+		for _, a := range acts {
+			if a.Method == method && a.Path == route {
+				n++
+			}
+		}
+		return n
+	}
+	for i := 0; i < 40; i++ {
+		if conn, err := g.sess.DialWS(ctx, pairConcretePath(route), "", nil); err == nil {
+			conn.CloseNow()
+		}
+	}
+	require.Eventually(t, func() bool { return count(routes.PairWSClose) == 40 }, 10*time.Second, 20*time.Millisecond, "a close row for each of 40 opens (opens %d, closes %d)", count(routes.PairWSOpen), count(routes.PairWSClose))
+	assert.Equal(t, 40, count(routes.PairWSOpen), "a row at connect for each of 40 opens in a minute, past the refused-row cap")
+
+	old := routes.StreamOpensPerMinute
+	routes.StreamOpensPerMinute = 45 // the 40 above count: 5 more are served, the rest refused with no row
+	t.Cleanup(func() { routes.StreamOpensPerMinute = old })
+	for i := 0; i < 10; i++ {
+		if conn, err := g.sess.DialWS(ctx, pairConcretePath(route), "", nil); err == nil {
+			conn.CloseNow()
+		}
+	}
+	require.Eventually(t, func() bool { return count(routes.PairWSClose) == 45 }, 10*time.Second, 20*time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, 45, count(routes.PairWSOpen), "past the open bound a stream is refused and leaves no open row without a close")
+	assert.Equal(t, 45, count(routes.PairWSClose))
+}
+
 // Security's MUST on batch 3 (#20369): the pattern is the one chi routed by (RawPath, the Hub's encoded path), never the decoded path, and a write that matches no route still leaves a row.
 func TestPairRowsFollowTheRoutedPatternAndNeverGoSilent(t *testing.T) {
 	g := newInteg(t)
