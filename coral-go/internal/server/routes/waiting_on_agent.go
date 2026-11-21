@@ -96,6 +96,9 @@ func firstLine(s string, max int) string {
 
 // WaitingOnAgent answers GET /api/waiting-on-agent.
 func (h *BoardHandler) WaitingOnAgent(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	if !operatorOnlyRead(w, r) {
 		return
 	}

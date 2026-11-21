@@ -73,6 +73,9 @@ func (h *SessionsHandler) noticesPaused(ctx context.Context, ls *store.LiveSessi
 
 // AgentCandidate: GET /api/sessions/live/{sessionID}/agent-candidate (Operator only). Are this agent's notices paused, and which single program could be recorded as the agent.
 func (h *SessionsHandler) AgentCandidate(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	ls, name, ok := h.agentTarget(w, r)
 	if !ok {
 		return

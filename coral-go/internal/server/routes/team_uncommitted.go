@@ -129,6 +129,9 @@ func repoUncommitted(ctx context.Context, folder string) (uncommittedRepo, bool)
 // TeamUncommitted lists the team's folders that have work not yet committed.
 // GET /api/teams/detail/{name}/uncommitted
 func (h *SessionsHandler) TeamUncommitted(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	team, err := h.teamStore.GetTeam(r.Context(), chi.URLParam(r, "name"))
 	if err != nil || team == nil {
 		errNotFound(w, "team not found")

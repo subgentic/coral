@@ -81,6 +81,8 @@ func TestTheReminderInForceIsReadByAPersonAlone(t *testing.T) {
 		assert.NotContains(t, rec.Body.String(), "Check the board", name+": the instruction is not in the refusal")
 	}
 
-	// never through the Hub
-	assert.Equal(t, tunnel.TierNever, tunnel.Classify("GET", "/api/board/myproject/reminder", "subscriber_id=Orchestrator"))
+	// through the Hub it is the owner's alone, at the view tier (#20257): never an agent's or a guide's
+	assert.Equal(t, tunnel.TierView, tunnel.Classify("GET", "/api/board/myproject/reminder", "subscriber_id=Orchestrator"))
+	_, mode := tunnel.OwnerRoute("GET", "/api/board/myproject/reminder")
+	assert.Equal(t, tunnel.OwnerRefuse, mode)
 }

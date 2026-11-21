@@ -136,6 +136,9 @@ func oneLine(note string, max int) string {
 // approved, oldest approval first. A read of what the board holds, never in the tunnel (Security's decision, #5723).
 // GET /api/board/{project}/queue
 func (h *BoardHandler) MergeQueue(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	project := urlParam(r, "project")
 	h.setBoardIdentity(w, r, project)
 	q, err := h.bs.MergeQueue(r.Context(), project)

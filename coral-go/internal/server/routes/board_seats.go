@@ -12,6 +12,9 @@ import (
 
 // ListForeignSeats is GET /api/board-seats/foreign: every active seat whose session was launched on another board (board.ForeignSeat), by the board it sits on.
 func (h *BoardHandler) ListForeignSeats(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	seats, err := h.bs.ForeignSeats(r.Context())
 	if err != nil {
 		errInternalServer(w, "could not read the board seats")

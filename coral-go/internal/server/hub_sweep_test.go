@@ -155,6 +155,8 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/workflows": true, "/api/workflows/runs/recent": true, "/api/workflows/by-name/{name}": true, "/api/workflows/{workflowID}": true, "/api/workflows/{workflowID}/runs": true, "/api/workflows/runs/{runID}": true,
 		"/api/board/{project}/tasks/{taskID}/changes.diff": true, "/api/sessions/live/{name}/attachment/{ref}": true, // a task's diff and a chat's pasted image are the owner's alone through the hub (#19629)
 		"/api/skills": true, "/api/skills/{id}": true, // the Skills page's two reads are the owner's alone through the hub (#19627)
+		// Hub parity batch A (#20257): the class A reads are the owner's alone through the hub.
+		"/api/board-seats/foreign": true, "/api/board/{project}/goal-requests": true, "/api/board/{project}/groups": true, "/api/board/{project}/groups/{groupID}/members": true, "/api/board/{project}/messages/check": true, "/api/board/{project}/peek": true, "/api/board/{project}/queue": true, "/api/board/{project}/reminder": true, "/api/board/{project}/waits": true, "/api/board/{project}/waits/poll": true, "/api/resources/{name}": true, "/api/search-access/log": true, "/api/sessions/live/{name}/waiting": true, "/api/sessions/live/{sessionID}/agent-candidate": true, "/api/sessions/resolve": true, "/api/tasks/runs": true, "/api/tasks/runs/{runID}": true, "/api/teams/detail/{name}/uncommitted": true, "/api/waiting-on-agent": true,
 		"/api/resources": true} // the resource queue's list is the owner's alone through the hub, notes redacted (#16140)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
@@ -246,11 +248,13 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		thumbnailAbsent := f[1] == "/api/artifacts/{id}/thumbnail" && rec.Code == 404 && strings.Contains(rec.Body.String(), "thumbnail unavailable")
 		// The thread reads (#14440) need a team and a goal or task of it: the rig sends neither, so the owner's answer is the route's own 400 or 404 (the plain hub caller was refused above).
 		threadAbsent := (f[1] == "/api/thread" || f[1] == "/api/threads") && (rec.Code == 400 || rec.Code == 404)
-		if rec.Code == 200 || skillAbsent || attachmentAbsent || thumbnailAbsent || threadAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
+		// Hub parity batch A (#20257): a resource and a task run are named by the rig with placeholders that match none, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
+		batchAAbsent := (f[1] == "/api/resources/{name}" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no such resource")) || (f[1] == "/api/tasks/runs/{runID}" && rec.Code == 404 && strings.Contains(rec.Body.String(), "run not found"))
+		if rec.Code == 200 || batchAAbsent || skillAbsent || attachmentAbsent || thumbnailAbsent || threadAbsent || versionsAbsent || editAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
 			answered++
 		}
 		for _, home := range homes {
-			if strings.Contains(withoutTerminalScreen(rec.Body.String()), home) {
+			if strings.Contains(sweepScreenless(f[1], rec.Body.String()), home) {
 				leaks = append(leaks, f[1]+" ("+strings.Join(jsonFieldsHolding(rec.Body.String(), home), ", ")+")")
 				break
 			}
@@ -350,4 +354,19 @@ func jsonFieldsHolding(body, needle string) []string {
 	walk("", v)
 	sort.Strings(out)
 	return out
+}
+
+// sweepScreenless is withoutTerminalScreen for a route: GET /api/board/{project}/peek answers an agent's pane text in "output", a terminal screen as capture is, which shows the working folder wherever the agent's shell does (#20257).
+func sweepScreenless(route, body string) string {
+	body = withoutTerminalScreen(body)
+	if route != "/api/board/{project}/peek" {
+		return body
+	}
+	var m map[string]any
+	if json.Unmarshal([]byte(body), &m) != nil {
+		return body
+	}
+	delete(m, "output")
+	b, _ := json.Marshal(m)
+	return string(b)
 }

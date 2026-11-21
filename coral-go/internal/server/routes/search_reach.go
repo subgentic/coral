@@ -211,6 +211,9 @@ func (h *SessionsHandler) SetMemberSearchAccess(w http.ResponseWriter, r *http.R
 
 // SearchAccessLog is GET /api/search-access/log?limit=: the raises and the reads above own, newest first (no text). The Operator's.
 func (h *SessionsHandler) SearchAccessLog(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	limit := 200
 	if v := r.URL.Query().Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)

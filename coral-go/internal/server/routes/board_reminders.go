@@ -104,6 +104,9 @@ func (h *BoardHandler) RemindSubscriber(w http.ResponseWriter, r *http.Request) 
 // what is there (#6329). A person's alone: the text is the Operator's instruction to one agent, so an agent's session token is refused (it could read another agent's), and the route has no
 // rule in the tunnel table (never through Coral Hub) so a Hub viewer never sees it. Nothing is changed. It is not part of the availability read, which is shared and cached for every caller.
 func (h *BoardHandler) GetSubscriberReminder(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	if !humanInputCaller(r) {
 		writeError(w, http.StatusForbidden, "operator_only", "only the Operator can read a reminder's instruction")
 		return

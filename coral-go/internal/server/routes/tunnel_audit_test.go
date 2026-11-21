@@ -66,6 +66,7 @@ func TestPeekThroughTheTunnel(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/board/p/peek?"+query, nil)
 		if tunneled {
 			stamp(req)
+			setHubOwner(t, req) // the Hub's owner is the only one the computer answers on this route (#20257)
 		}
 		if site != "" {
 			req.Header.Set("Sec-Fetch-Site", site)

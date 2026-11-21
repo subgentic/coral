@@ -582,6 +582,9 @@ func (h *ScheduleHandler) MarkRunSeen(w http.ResponseWriter, r *http.Request) {
 // ValidateCron validates a cron expression and returns next fire times.
 // POST /api/scheduled/validate-cron
 func (h *ScheduleHandler) ValidateCron(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	var body struct {
 		CronExpr string `json:"cron_expr"`
 		Timezone string `json:"timezone"`

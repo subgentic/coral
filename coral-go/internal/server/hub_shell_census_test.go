@@ -53,7 +53,6 @@ type shellNever struct {
 var shellNeverRoutes = map[string]shellNever{
 	"permission_flags_line.js POST /api/launch/permission-args":  {bHidden, `if \(!answer\) return \[\]`, "the flags line (New agent's recap, Restart, Resume) asks this computer for the permission flags a launch would add; where that is refused through a Hub it draws no line and the mode sentence above it stays: a hidden line, not a wrong one (#15719)", 0},
 	"setup_agent.js PUT /api/settings":                           {bHidden, `default_agent_type: pick`, "the setup card remembers the agent type the person picked as the default; the write is a bare fetch whose failure is swallowed (.catch(() => {})), so where a Hub refuses it nothing is shown and the choice is simply not saved: a hidden failure, not a break", 0},
-	"team_uncommitted.js GET /api/teams/detail/{}/uncommitted":   {bHidden, `return r\.ok \? \(\(await r\.json\(\)\)`, "the line about work left uncommitted asks this computer; where that is refused through a Hub nothing is listed and the line is not drawn: a hidden line, not a broken page (#17203)", 0},
 	"team_uncommitted.js POST /api/teams/detail/{}/commit":       {bExplains, `The commit did not happen`, "Commit stays never through the Hub; a refused commit says it did not happen, with git's output when git said something, and nothing was committed (#17203)", 0},
 	"launch_disclosure.js POST /api/launch-disclosure/ack":       {bExplains, `Could not record that you have read this`, "acknowledgement stays never through the Hub; a refused acknowledgement says it could not be recorded and nothing was launched, with no retry; the Computers notice is information only (#14501)", 0},
 	"team_form.js GET /api/filesystem/trust-probe":               {bLocal, `isHub\(\) \|\| d\.dataset\.dirServer`, "only this computer’s folder choice is probed; Hub/remote inputs never request the default and the server rejects tunneled callers (#14090)", 0},
@@ -76,7 +75,6 @@ var shellNeverRoutes = map[string]shellNever{
 	"team_knowledge_note.js POST /api/teams/detail/{}/knowledge": {bExplains, `Could not save:`, "Add note stays never through the Hub like the PUT that edits an agent's notes; a refused save says it could not be saved with the reason, keeps the typed title and text, and writes nothing (#17485)", 0},
 	"team_linked_teams.js GET /api/cloud/status":                 {bHidden, `isCloud\(\) \|\| \(server && server !== 'local'\)`, "the team page's Linked teams section (#16011) asks this computer whether it is linked to a Coral Hub; through a Hub, or for a team on another computer, it sends nothing and draws nothing: a hidden section, not a wrong one", 0},
 	"launch_provider_cards.js POST /api/system/cli-signin":       {bHidden, `isLocalServer\(server\) && !isCloud\(\) && signinCommandIsSafe`, "the OpenCode card's Sign in button is drawn only for this computer's own Coral, outside a Hub and with the exact command shape; through a Hub the card says to sign in on the computer (#16716)", 0},
-	"inbox_waiting_agent.js GET /api/waiting-on-agent":           {bExplains, `isCloud\(\) \? Promise\.reject\(new Error\('hub'\)\)`, "Inbox's Waiting on an agent tab reads what the Operator answered or commented that an agent has not acted on, from this computer only; through a Hub no request is sent, the read counts as failed and the list says 'Some waiting items could not be read.' beside the files sent back (#19923, #19904)", 0},
 	"settings_fields.js POST /api/system/cli-signin":             {bHidden, `signIn\.hidden = cloud`, "the Sign in button is hidden through a Hub (cloud || !canSignIn); the POST is never sent and the text says to sign in on the computer (#16714)", 0},
 	"run_signin.js POST /api/system/cli-signin":                  {bExplains, `Sign in on the computer that runs Coral`, "through a Hub the POST is never sent: the notice says to sign in on the computer that runs Coral, then press Retry (#16715)", 0},
 }
@@ -113,7 +111,7 @@ var shellNeverFiles = map[string]shellNever{
 	"hub_notice.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 4},
 	"hub_pending.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"inbox_sidebar.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
-	"job_form.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
+	"job_form.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"launch_dialog.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"launch_models.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"list_display_settings.js":  {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
@@ -127,7 +125,7 @@ var shellNeverFiles = map[string]shellNever{
 	"received_cap_notice.js":    {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"registered_server_view.js": {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 7}, // 7: Reconnect (POST /api/servers/{id}/reconnect, a route that never goes through a Hub)
 	"scheduler.js":              {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 3},
-	"search_access.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
+	"search_access.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"security_settings.js":      {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 9},
 	"server_access.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"server_base.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},

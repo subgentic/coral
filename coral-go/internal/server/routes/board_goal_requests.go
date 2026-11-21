@@ -190,6 +190,9 @@ func (h *BoardHandler) wakeForGoalRequest(ctx context.Context, target string, re
 
 // ListGoalRequests: GET /api/board/{project}/goal-requests?status=pending|accepted|declined|expired (default: every status)
 func (h *BoardHandler) ListGoalRequests(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	project := urlParam(r, "project")
 	status := r.URL.Query().Get("status")
 	switch status {

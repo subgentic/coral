@@ -177,6 +177,9 @@ func (h *BoardHandler) ListSubscribers(w http.ResponseWriter, r *http.Request) {
 // PeekAgent captures terminal output of another agent on the same board.
 // GET /api/board/{project}/peek?target=<name>&subscriber_id=<caller>&lines=30
 func (h *BoardHandler) PeekAgent(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	project := urlParam(r, "project")
 	callerID := r.URL.Query().Get("subscriber_id")
 	if !cloud.Tunneled(r) { // through Coral Hub the caller is never read from the query
