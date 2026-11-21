@@ -27,6 +27,7 @@ DELETE /api/cloud/devices/{kid} never
 DELETE /api/cloud/links/{id} never
 DELETE /api/folder-tags/{folderName}/{tagID} never
 DELETE /api/launch-disclosure/ack never
+DELETE /api/member-grants/{id} never
 DELETE /api/pinned-folders launch
 DELETE /api/reminders/{reminderID} never
 DELETE /api/resources/entries/{id} never
@@ -175,6 +176,7 @@ GET /api/google/status never
 GET /api/health view
 GET /api/history-import never
 GET /api/launch-disclosure view
+GET /api/member-grants never
 GET /api/needs-you view
 GET /api/operator-asks view
 GET /api/pinned-folders view
@@ -479,6 +481,7 @@ POST /api/hub-auto-accept launch
 POST /api/indexer/refresh never
 POST /api/launch-disclosure/ack never
 POST /api/launch/permission-args never
+POST /api/member-grants never
 POST /api/notifications never
 POST /api/pinned-folders launch
 POST /api/reminders never
