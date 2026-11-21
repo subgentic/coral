@@ -76,7 +76,7 @@ func TestAnAddedHubsOwnerIsPinnedOnlyByTheOperatorAtThisComputer(t *testing.T) {
 			tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: person}
 	}
 	ownerCall := func(link, person string) *httptest.ResponseRecorder {
-		return call(h, "PUT", "/api/board/team/settings", `{"subscriber_id":"Operator","cross_team_messaging":true}`, via(link, person))
+		return call(h, "GET", "/api/activity", "", via(link, person))
 	}
 	// 2. Before the confirm Hub B's owner is refused on an owner-only route, in the words that say what to do; Hub A's owner still acts.
 	rec = ownerCall(b.LinkID, personB)
