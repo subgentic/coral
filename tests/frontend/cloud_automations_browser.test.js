@@ -17,7 +17,7 @@ const STUB = `(() => {
   if(path==='/api/servers') return json({servers:window.__computers});
   if(path.includes('/api/scheduled') || path.includes('/api/workflows') || path.includes('/api/automations')) {
    window.__automationReads.push({path,method:o?.method || 'GET'});
-   if(window.__automationDeny) return Promise.resolve(new Response('{}',{status:403}));
+   if(window.__automationDeny) return Promise.resolve(new Response('{}',{status:window.__automationDeny}));
    const remote=path.startsWith('/api/remote/') ? path.split('/')[3] : ''; const api=remote ? path.slice(('/api/remote/'+remote).length) : path, who=remote || 'HUB';
    const run={id:9,kind:'job',job_name:who+' job',status:'completed',started_at:'2026-11-18T01:00:00Z',finished_at:'2026-11-18T01:01:00Z',duration_seconds:60};
    const job={id:1,name:who+' job <img src=x onerror=window.__pwn=1>',enabled:true,cron_expr:'0 * * * *',timezone:'UTC',last_run:run};
@@ -83,7 +83,14 @@ const STUB = `(() => {
    assert.equal(await ev(`!!document.querySelector('#phone-fab')?.getClientRects().length`),false,'cloud Automations has no phone New button');
    fs.writeFileSync(dir+'/automations-phone.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));
   }
-  await ev('window.__automationDeny=true;true'); await route({view:'automations',folder:'jobs'}); await ready('Could not read');
+  for (const status of [403, 404, 500]) {
+   await ev(`window.__automationDeny=${status};true`); await route({view:'automations',folder:'jobs'});
+   await ready("Second computer can't show automations here. It may need a newer Coral.");
+   assert.equal(await ev(`document.querySelector('#scheduler-view .notice-error').textContent`), "Second computer can't show automations here. It may need a newer Coral.");
+   assert.ok(await ev(`!![...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Retry')`),'failed reads offer Retry');
+  }
+  await ev('window.__automationDeny=0;true');
+  await ev(`document.querySelector('#scheduler-view .notice-error').nextElementSibling.click();true`); await ready('two job');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers=[];window.__automationReads=[];return true;})`);
   await route({view:'automations',folder:'workflows'}); await ready('Link a computer');
   assert.deepEqual(await ev('window.__automationReads'),[],'no linked computer sends no request');
