@@ -84,12 +84,21 @@ func TestTwoHubsLinkedToOneCoralEndToEnd(t *testing.T) {
 	}
 	assert.Equal(t, 200, read(a.LinkID), "Hub A is served")
 	assert.Equal(t, 200, read(b.LinkID), "Hub B is served")
-	t.Logf("A settings write: %d, B settings write: %d", send(a.LinkID).Code, send(b.LinkID).Code)
+	// Each Hub sends an action as its owner. Hub A is the enrollment with a pinned owner, so it is served; Hub B is an added link with no pinned owner, so the guard refuses it. Both are in the Operator-actions
+	// log with their own link and their own Hub person, never each other's.
+	assert.Equal(t, 200, send(a.LinkID).Code, "Hub A's owner acts")
+	assert.Equal(t, 403, send(b.LinkID).Code, "an added Hub has no pinned owner here yet: refused")
 	acts, err := r.srv.boardStore.RecentHubOperatorActions(ctx, 50)
 	require.NoError(t, err)
+	rows := map[string][3]any{}
 	for _, x := range acts {
-		t.Logf("action: link=%s hubuser=%s path=%s status=%d", x.ViaLink, x.ViaHubUser, x.Path, x.Status)
+		if x.Path == "/api/board/team/settings" {
+			rows[x.ViaLink] = [3]any{x.ViaHubUser, x.Status, x.Method}
+		}
 	}
+	require.Len(t, rows, 2, "one row per Hub: %v", acts)
+	assert.Equal(t, [3]any{"hub-user-aaaa1111", 200, "PUT"}, rows[a.LinkID], "Hub A's row names Hub A and its person")
+	assert.Equal(t, [3]any{"hub-user-bbbb2222", 403, "PUT"}, rows[b.LinkID], "Hub B's row names Hub B and its person")
 
 	// A link that is not active is refused (403 hub_link_refused) before any handler.
 	for _, st := range []string{"paused", "revoked"} {
