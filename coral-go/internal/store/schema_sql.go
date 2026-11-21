@@ -602,7 +602,8 @@ CREATE TABLE IF NOT EXISTS cloud_link (
     owner_adopted_at TEXT,
     created_at       TEXT NOT NULL,
     last_seen        TEXT,
-    last_error       TEXT
+    last_error       TEXT,
+    source           TEXT NOT NULL DEFAULT 'enrollment'
 );
 
 -- What was done to links at this computer (#20346, design v2 1.7): who (always the computer), when, which link and origin, what. Never a token, a header or a name a Hub gave.

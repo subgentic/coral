@@ -174,7 +174,8 @@ func (h *CloudHandler) SetLinkCap(w http.ResponseWriter, r *http.Request) {
 		h.clearHubKeepFullAccess(r.Context(), "the hub's mode was lowered below Launch")
 	}
 	if m := h.manager(); m != nil {
-		m.ModeChanged(r.Context()) // a lowered cap closes what the old one allowed
+		m.ModeChanged(r.Context())  // a lowered cap closes what the old one allowed
+		m.LinksChanged(r.Context()) // a link added here is dialed again at its own new cap
 	}
 	out, err := h.linkList(r.Context())
 	if err != nil {
@@ -207,7 +208,7 @@ func (h *CloudHandler) RemoveLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if m := h.manager(); m != nil {
-		m.StopTunnel()
+		m.StopLink(id) // this link's tunnel only
 	}
 	state, note, err := h.askAndSettle(ctx, *link, time.Now())
 	if err != nil {
@@ -289,7 +290,11 @@ func (h *CloudHandler) askAndSettle(ctx context.Context, link store.CloudLink, n
 	h.setRetry(link.LinkID, removalRetry{})
 	h.linkAction(ctx, link.LinkID, how, note)
 	if m := h.manager(); m != nil {
-		_ = m.Disconnect(ctx) // forgets the enrollment the removed link mirrored
+		if link.Source == store.LinkSourceEnrollment {
+			_ = m.Disconnect(ctx) // forgets the enrollment the removed link mirrored
+		} else {
+			m.LinksChanged(ctx) // a link added here: the enrollment and every other link stay as they are
+		}
 	}
 	return removalDone, note, nil
 }

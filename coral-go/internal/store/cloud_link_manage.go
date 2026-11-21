@@ -15,8 +15,20 @@ import (
 // Manager is still one connector. Lifting it is its own reviewed change; a server test fails if it is true while a write is pending.
 const SecondLinkOpen = false
 
+// secondLinkOpen is what the store checks: the constant, unless a test opened it (AllowSecondLinkForTest).
+var secondLinkOpen = SecondLinkOpen
+
+// AllowSecondLinkForTest opens the second-link gate for one test and shuts it again when the test ends. It exists so the connector's tests can hold two links before the gate is lifted for real; nothing but a test calls it.
+func AllowSecondLinkForTest(t interface{ Cleanup(func()) }) {
+	secondLinkOpen = true
+	t.Cleanup(func() { secondLinkOpen = SecondLinkOpen })
+}
+
 // ErrSecondLinkNotYet is returned when a link is added while one exists and SecondLinkOpen is false.
 var ErrSecondLinkNotYet = errors.New("a second Coral Hub link is not available yet: every Hub action must be recorded with its Hub first")
+
+// ErrLinkExists is returned when a link to that Hub already exists.
+var ErrLinkExists = errors.New("this computer is already linked to that Hub")
 
 // ErrTooManyLinks is returned when MaxCloudLinks links exist.
 var ErrTooManyLinks = fmt.Errorf("at most %d Coral Hubs can be linked", MaxCloudLinks)
@@ -26,6 +38,7 @@ var ErrBadLinkState = errors.New("that link is not in a state that allows this")
 
 // Link event actions.
 const (
+	LinkEventAdded        = "added"
 	LinkEventCap          = "cap"
 	LinkEventRemoveBegin  = "remove-begin"
 	LinkEventRemoved      = "removed"
@@ -52,7 +65,7 @@ func (s *CloudStore) CheckCanAddLink(ctx context.Context) error {
 	if n >= MaxCloudLinks {
 		return ErrTooManyLinks
 	}
-	if n >= 1 && !SecondLinkOpen {
+	if n >= 1 && !secondLinkOpen {
 		return ErrSecondLinkNotYet
 	}
 	return nil
@@ -63,7 +76,7 @@ func logLinkEvent(ctx context.Context, tx execer, linkID, origin, action, detail
 	return err
 }
 
-// SetLinkCap sets one link's cap (view, interact or launch) and logs the change in the same transaction. The cap the live check reads (the setting cloud_max_mode) follows it while there is one link. It returns the
+// SetLinkCap sets one link's cap (view, interact or launch) and logs the change in the same transaction. The cap the live check reads for the enrollment's link (the setting cloud_max_mode) follows it. It returns the
 // cap the link had. An unknown link is ErrNoCloudLink and a bad mode changes nothing.
 func (s *CloudStore) SetLinkCap(ctx context.Context, linkID, mode string) (string, error) {
 	if !validMode(mode) {
@@ -90,11 +103,11 @@ func (s *CloudStore) SetLinkCap(ctx context.Context, linkID, mode string) (strin
 	if _, err := tx.ExecContext(ctx, "UPDATE cloud_link SET max_mode = ? WHERE link_id = ?", mode, linkID); err != nil {
 		return "", err
 	}
-	var n int
-	if err := tx.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link"); err != nil {
+	var src string
+	if err := tx.GetContext(ctx, &src, "SELECT source FROM cloud_link WHERE link_id = ?", linkID); err != nil {
 		return "", err
 	}
-	if n == 1 { // one link: the live check still reads the one setting, so it follows
+	if src == LinkSourceEnrollment { // the enrollment's link: the live check reads the one setting, so it follows
 		if _, err := tx.ExecContext(ctx, "INSERT INTO user_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", linkMaxModeKey, mode); err != nil {
 			return "", err
 		}
@@ -262,4 +275,75 @@ func (s *CloudStore) DeleteLinkToken(ctx context.Context, linkID string) error {
 func (s *CloudStore) RemovalPending(ctx context.Context, serverID string) bool {
 	var n int
 	return s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE server_id = ? AND state = ?", serverID, LinkStateRemoving) == nil && n > 0
+}
+
+// AddLink adds a link to a Hub at this computer (#20368): the gate (CheckCanAddLink) is checked here, in the store, so no caller can skip it. The address goes through CanonicalHubOrigin, the token is sealed under the link's own
+// AAD before anything is written, the cap is the one chosen (view, interact or launch), and the link is its own record: the enrollment's save, delete and mirror never touch it. The first link is made by the enrollment, not
+// here; this adds one beside it.
+func (s *CloudStore) AddLink(ctx context.Context, hub, serverID, label, token, cap string) (*CloudLink, error) {
+	if !validMode(cap) {
+		return nil, errors.New("the cap is view, interact or launch")
+	}
+	origin, err := CanonicalHubOrigin(hub)
+	if err != nil {
+		return nil, err
+	}
+	if serverID == "" || token == "" {
+		return nil, errors.New("a link needs the Hub's server id and token")
+	}
+	if err := s.CheckCanAddLink(ctx); err != nil {
+		return nil, err
+	}
+	id, err := NewLinkID()
+	if err != nil {
+		return nil, err
+	}
+	box, err := s.rs.getBox(ctx, true, false)
+	if err != nil {
+		return nil, err
+	}
+	env, err := box.Seal(linkAAD(id), []byte(token))
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var n int
+	if err := tx.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE hub_origin = ?", origin); err != nil {
+		return nil, err
+	}
+	if n > 0 {
+		return nil, ErrLinkExists
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, created_at, source) VALUES (?, ?, ?, ?, ?, ?, ?, 'all', ?, ?)`,
+		id, origin, serverID, label, env, LinkStateActive, cap, nowUTC(), LinkSourceAdded); err != nil {
+		return nil, err
+	}
+	if err := logLinkEvent(ctx, tx, id, origin, LinkEventAdded, "cap "+cap); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return s.LinkByOrigin(ctx, origin)
+}
+
+// MarkLinkRevoked records that the Hub refused this link's token: it stays listed (the person removes it), has no tunnel, and no other link is touched.
+func (s *CloudStore) MarkLinkRevoked(ctx context.Context, linkID, msg string) error {
+	res, err := s.db.ExecContext(ctx, "UPDATE cloud_link SET state = ?, last_error = ? WHERE link_id = ? AND state = ?", LinkStateRevoked, msg, linkID, LinkStateActive)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 && !s.linkIs(ctx, linkID) {
+		return ErrNoCloudLink
+	}
+	return nil
+}
+
+func (s *CloudStore) linkIs(ctx context.Context, linkID string) bool {
+	var n int
+	return s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE link_id = ?", linkID) == nil && n == 1
 }

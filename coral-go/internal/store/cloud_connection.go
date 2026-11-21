@@ -105,7 +105,7 @@ func (s *CloudStore) save(ctx context.Context, hubURL, serverID, label, token st
 		return err
 	}
 	// A new enrollment is a new link (its own id and sealed token), never the old one with a new token.
-	if _, derr := s.db.ExecContext(ctx, "DELETE FROM cloud_link"); derr == nil {
+	if _, derr := s.db.ExecContext(ctx, "DELETE FROM cloud_link WHERE source = 'enrollment'"); derr == nil {
 		s.mirror(ctx)
 	}
 	return nil
@@ -316,7 +316,7 @@ func (s *CloudStore) Delete(ctx context.Context) error {
 	if _, err := tx.ExecContext(ctx, "DELETE FROM cloud_connection WHERE id = 1"); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, "DELETE FROM cloud_link"); err != nil { // the link goes with the enrollment (slice 1: they are one)
+	if _, err := tx.ExecContext(ctx, "DELETE FROM cloud_link WHERE source = 'enrollment'"); err != nil { // the enrollment's link goes with it; a link added here stays
 		return err
 	}
 	return tx.Commit()
