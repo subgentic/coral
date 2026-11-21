@@ -20,13 +20,14 @@ import (
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
-const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT]
+const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT] [--no-review]
+       coral-agent artifact review <coral://artifacts/digest | file id> [--question TEXT]
        coral-agent artifact download <coral://artifacts/digest | file id | file id@version> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash> <comment-id> <text | ->
        coral-agent artifact comments <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash>
-Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.`
+Run coral-agent artifact upload --help, artifact review --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.`
 
-const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT]
+const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT] [--no-review]
 
 An upload is linked to the task you have in progress (the reply says task_id, and this prints
 "Attached to task #N <title>"); the task's page and the team's Artifacts tab then list it. --task N links it to
@@ -62,6 +63,9 @@ done needs --task N of an OPERATOR task assigned to you (the file that says it i
 decided is accepted only from the team's Orchestrator; a digest is written only by Coral. Anything else is refused in words. The kind belongs to the file's series: a new version
 carries the same kind (or none, and then has it), never another. A question you need answered is never a kind: ask it with coral-board post --ask or wait --operator.
 
+A new version of a file the Operator reviewed (approved or sent back) is for review again, as a new version of the same row; --no-review uploads it as a version the Operator need not look at.
+The reply says for_review and inbox (and this prints a line on stderr): whether the upload reached the Operator's Inbox.
+
 Upload long reports, logs, diffs and evidence instead of pasting them into posts.
 Link the returned coral://artifacts/<digest> in a short board post: a one-line
 summary, then numbered points, one per line; answer numbered posts by number.
@@ -80,6 +84,12 @@ reply is checked for secrets before it is kept. A refusal (not asked, the thread
 replies, the board paused or asleep) prints Coral's reason and exits non-zero. The options may
 stand before or after the link.`
 
+const artifactReviewUsageText = `Usage: coral-agent artifact review <coral://artifacts/digest | file id> [--question TEXT]
+
+Sends the NEWEST version of one of your team's files to the Operator's Inbox for review, with no new bytes (an upload of the same bytes is refused). Any version's link or the file id names the
+file. It is safe to run again: a file already waiting stays as it is, and a file the Operator decided starts a new round. --question is one line (140 characters at most): what the Operator is to
+decide; without one, an earlier question stands, or the plain "Look at the new version of <name>?". Only an agent of the team that owns the file can send it.`
+
 const artifactDownloadUsageText = `Usage: coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
 
 Downloads the artifact, checks its SHA-256 and prints the local path. The options
@@ -93,6 +103,8 @@ func artifactUsage(rest []string) string {
 			return artifactUploadUsageText
 		case "download":
 			return artifactDownloadUsageText
+		case "review":
+			return artifactReviewUsageText
 		case "reply":
 			return artifactReplyUsageText
 		case "comments":
@@ -109,6 +121,10 @@ func cmdArtifact(args []string) {
 	}
 	if len(args) >= 1 && args[0] == "comments" {
 		cmdArtifactComments(args[1:])
+		return
+	}
+	if len(args) >= 1 && args[0] == "review" {
+		cmdArtifactReview(args[1:])
 		return
 	}
 	if len(args) >= 1 && args[0] == "download" {
@@ -136,7 +152,7 @@ func cmdArtifact(args []string) {
 		fmt.Fprintln(os.Stderr, artifactUsageText)
 		clierr.Exit1()
 	}
-	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question", "kind", "note"}, []string{"no-task", "rename"})
+	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question", "kind", "note"}, []string{"no-task", "rename", "no-review"})
 	if err != nil || len(opts.Positional) != 1 {
 		if err == nil {
 			err = fmt.Errorf("upload needs exactly one file")
@@ -165,6 +181,7 @@ func cmdArtifact(args []string) {
 	}
 	name = mediatype.EnsureExtension(name, file)
 	mediaType := mediatype.Resolve(opts.Values["media-type"], file, name)
+	uploadNoReview = opts.Bools["no-review"]
 	if err := uploadArtifactFull(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], opts.Values["kind"], opts.Values["note"], opts.Bools["rename"], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
@@ -201,7 +218,7 @@ func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		return err
 	}
 	defer f.Close()
-	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question)+kindQuery(kind)+noteQuery(note), f)
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question)+kindQuery(kind)+noteQuery(note)+noReviewQuery(), f)
 	if err != nil {
 		return err
 	}
@@ -234,6 +251,7 @@ func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		Error    string `json:"error"`
 		Code     string `json:"code"`
 		Stripped bool   `json:"stripped"`
+		Inbox    string `json:"inbox"`
 	}
 	_ = json.Unmarshal(body, &reply)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -267,6 +285,9 @@ func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, tas
 	fmt.Fprintln(stdout, string(body))
 	if reply.Line != "" { // the same words the dashboard uses for a file and its version (#14145)
 		fmt.Fprintln(stderr, reply.Line)
+	}
+	if line := clitext.Clean(reply.Inbox); line != "" { // whether it reached the Operator's Inbox (#20401)
+		fmt.Fprintln(stderr, line)
 	}
 	if reply.TaskID > 0 { // the reply (stdout) is the JSON a script reads; the line for a person is on stderr (#7739)
 		if title := clitext.Clean(reply.Title); title != "" { // which task it went to, by name: a wrong target is seen at once (#16139)
@@ -389,4 +410,81 @@ func tagQuery(tags []string) string {
 		b.WriteString("&tag=" + url.QueryEscape(t))
 	}
 	return b.String()
+}
+
+// uploadNoReview is --no-review on this upload (#20401): a version the Operator need not look at, though an earlier version of the file was reviewed.
+var uploadNoReview bool
+
+// noReviewQuery is the no_review parameter of an upload: "&no_review=1", or nothing.
+func noReviewQuery() string {
+	if uploadNoReview {
+		return "&no_review=1"
+	}
+	return ""
+}
+
+// cmdArtifactReview is "coral-agent artifact review <link | file id> [--question TEXT]" (#20401): the newest version of the file goes to the Operator's Inbox for review with no new bytes.
+func cmdArtifactReview(args []string) {
+	opts, err := splitOptions(args, []string{"question"}, nil)
+	if err != nil || len(opts.Positional) != 1 {
+		if err == nil {
+			err = fmt.Errorf("review needs exactly one artifact link or file id")
+		}
+		fmt.Fprintf(os.Stderr, "Error: %v\n%s\n", err, artifactReviewUsageText)
+		os.Exit(2)
+	}
+	if err := sendForReview(serverURL, opts.Positional[0], opts.Values["question"], resolveSessionID(), os.Stdout); err != nil {
+		var ue usageError
+		if errors.As(err, &ue) {
+			failUsage(ue.msg, "artifact", append([]string{"review"}, args...))
+		}
+		fmt.Fprintln(os.Stderr, err)
+		clierr.Exit1()
+	}
+}
+
+// sendForReview asks the server to put the newest version of the file ref names in the Operator's Inbox; the reply's JSON is printed, and the line that says where it went.
+func sendForReview(serverURL, ref, question, sid string, stdout io.Writer) error {
+	if err := refuseSignInLinkIn("a question", question); err != nil {
+		return err
+	}
+	id, err := artifactDigest(serverURL, ref)
+	if err != nil {
+		return err
+	}
+	payload, _ := json.Marshal(map[string]string{"question": question})
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts/"+id+"/review?session_id="+url.QueryEscape(sid), bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	wait := clierr.Timeout(time.Minute)
+	resp, err := (&http.Client{Timeout: wait}).Do(req)
+	if err != nil {
+		return clierr.CannotReach(hooks.RedactedURL(serverURL), err, wait)
+	}
+	defer resp.Body.Close()
+	clierr.NoteStatus(resp.StatusCode)
+	body, _ := clitext.ReadReply(resp.Body, rawOutput)
+	var reply struct {
+		URI    string `json:"uri"`
+		Inbox  string `json:"inbox"`
+		Error  string `json:"error"`
+		Code   string `json:"code"`
+		Review bool   `json:"for_review"`
+	}
+	_ = json.Unmarshal(body, &reply)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 || !reply.Review {
+		reason := reply.Error
+		if reason == "" {
+			reason = strings.TrimSpace(string(body))
+		}
+		if reason == "" {
+			reason = resp.Status
+		}
+		return fmt.Errorf("send for review refused (HTTP %d): %s", resp.StatusCode, reason)
+	}
+	fmt.Fprintln(stdout, string(body))
+	fmt.Fprintln(os.Stderr, clitext.Clean(reply.Inbox))
+	return nil
 }

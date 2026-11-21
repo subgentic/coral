@@ -342,6 +342,7 @@ var queryIdentityReads = map[string]string{
 	"agent_tasks.go session_id":            queryAgent,
 	"agent_ui.go session_id":               queryAgent,
 	"artifacts.go session_id":              queryAgent,
+	"artifact_agent_review.go session_id":  queryAgent,
 	"sessions_tasks.go session_id":         queryAgent,
 	"agent_history.go session_id":          queryLookup,
 	"agent_ui_request.go session_id":       queryLookup,
