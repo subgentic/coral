@@ -44,7 +44,7 @@ func instances(pattern string) []string {
 	hex := strings.Repeat("a", 64)
 	var out []string
 	for _, id := range []string{"12", "x"} {
-		p := strings.NewReplacer("{hex64}", hex, "{hex32}", hex[:32]).Replace(pattern)
+		p := strings.NewReplacer("{hex64}", hex, "{hex32}", hex[:32], "{goal}", "goal:team-a:12").Replace(pattern)
 		segs := strings.Split(p, "/")
 		for i, s := range segs {
 			if strings.HasPrefix(s, "{") {
@@ -121,6 +121,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// The custom models (#5996) are the owner's alone through the hub: the old list never had them.
 			if (p == "/api/custom-models" || p == "/api/custom-modes") && (m == http.MethodGet || m == http.MethodPut) {
+				continue
+			}
+			// The goal thread's read (#20061) is the owner's alone through the hub, for that one key: the old list never had it.
+			if m == http.MethodGet && strings.HasPrefix(p, "/api/artifacts/goal:") && strings.HasSuffix(p, "/comments") {
 				continue
 			}
 			// Resolving a shortened artifact link (#9841) is the owner's alone through the hub: the old list never had it.
