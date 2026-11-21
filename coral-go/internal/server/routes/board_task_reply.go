@@ -38,6 +38,9 @@ func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "reply_to is not a message of this board") // before anything is posted
 		return
 	}
+	if derr == nil && h.refuseUnallowedReply(w, r, project, in.ReplyTo) { // a task reply that answers an ask is a message_reply through a Hub (#20413)
+		return
+	}
 	reply := &taskReply{taskID: taskID, creator: task.CreatedBy}
 	msg, ok := h.postMessageCore(w, r, project, derr, postMessageBody{Content: in.Content, ReplyTo: in.ReplyTo}, reply)
 	if !ok {

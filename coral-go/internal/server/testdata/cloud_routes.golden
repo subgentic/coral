@@ -149,6 +149,7 @@ GET /api/chief/checks/{checkID} never
 GET /api/chief/triggers never
 GET /api/cloud/devices never
 GET /api/cloud/links never
+GET /api/cloud/links/{id}/asks never
 GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
@@ -607,6 +608,7 @@ PUT /api/cloud/devices/{kid}/mode never
 PUT /api/cloud/hub-cross-team never
 PUT /api/cloud/hub-dropbox-share never
 PUT /api/cloud/hub-relaunch never
+PUT /api/cloud/links/{id}/asks never
 PUT /api/cloud/links/{id}/cap never
 PUT /api/cloud/max-mode never
 PUT /api/cloud/redact-tokens never

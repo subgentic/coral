@@ -89,6 +89,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		if body, ok = readGuideMessage(w, r); !ok {
 			return
 		}
+		if h.refuseUnallowedReply(w, r, project, body.ReplyTo) {
+			return
+		}
 		if h.refuseReplyToOperatorAsk(w, r, project, body.ReplyTo) { // a guide is no owner: an answer to the Operator's question is refused before anything else is said about it (#13491)
 			return
 		}
@@ -105,6 +108,9 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		derr = decodeJSON(r, &body)
+		if derr == nil && h.refuseUnallowedReply(w, r, project, body.ReplyTo) {
+			return
+		}
 		if derr == nil && h.refuseReplyToOperatorAsk(w, r, project, body.ReplyTo) {
 			return
 		}
@@ -1076,6 +1082,53 @@ func askedHas(to []string, who string) bool {
 		if strings.EqualFold(t, who) {
 			return true
 		}
+	}
+	return false
+}
+
+// replyAskers answers whether a link may answer an ask by reply (tunnel.AskKindMessageReply); nil until wired, which refuses.
+var replyAllowed func(ctx context.Context, linkID string) (bool, error)
+
+// SetReplyAllowed wires the link store's check for the message_reply kind.
+func SetReplyAllowed(f func(ctx context.Context, linkID string) (bool, error)) { replyAllowed = f }
+
+// refuseUnallowedReply is the message_reply half of #20413. POST /api/board/{project}/messages is an ordinary post unless reply_to makes it an answer, so the path cannot tell and this does, from the server's own
+// record of the message (never from a marker the client sends): for a request that came through a Hub link, a reply_to that resolves to an ask (open or closed) needs the link to be allowed message_reply, and
+// a reply_to that resolves to nothing is refused outright, never passed on. A plain post, a reply to a message that is no ask, and a request from this computer are not touched. A failed lookup refuses.
+// It reports whether it refused.
+func (h *BoardHandler) refuseUnallowedReply(w http.ResponseWriter, r *http.Request, project string, replyTo int64) bool {
+	if replyTo == 0 || !cloud.Tunneled(r) {
+		return false
+	}
+	via, ok := cloud.ViaFrom(r.Context())
+	if !ok || via.LinkID == "" {
+		writeJSON(w, http.StatusForbidden, map[string]string{"code": cloud.LinkRefusedCode, "error": "this request did not come through a known Coral Hub link"})
+		return true
+	}
+	refuse := func(msg string) bool {
+		writeJSON(w, http.StatusForbidden, map[string]string{"code": cloud.LinkRefusedCode, "error": msg})
+		return true
+	}
+	if replyTo < 0 {
+		return refuse("reply_to does not name a message of this team")
+	}
+	asked, err := h.bs.GetMessageByID(r.Context(), project, replyTo)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && asked == nil) {
+		return refuse("reply_to does not name a message of this team")
+	}
+	if err != nil {
+		errInternalServer(w, "could not check what this reply answers")
+		return true
+	}
+	if asked.Ask == nil {
+		return false // a reply to a plain message answers no ask
+	}
+	if replyAllowed == nil {
+		return refuse("this Hub may not answer your agents' questions through this link")
+	}
+	ok, err = replyAllowed(r.Context(), via.LinkID)
+	if err != nil || !ok {
+		return refuse("this Hub may not answer your agents' questions through this link")
 	}
 	return false
 }

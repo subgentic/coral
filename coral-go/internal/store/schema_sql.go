@@ -617,6 +617,14 @@ CREATE TABLE IF NOT EXISTS cloud_link_event (
     at         TEXT NOT NULL
 );
 
+-- Which kinds of ask a Hub may answer through one link added here (#20413): empty means none. Written only by the person at this computer; the kinds are the closed vocabulary of pkg/tunnel.
+CREATE TABLE IF NOT EXISTS link_ask_allow (
+    link_id    TEXT NOT NULL,
+    ask_kind   TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (link_id, ask_kind)
+);
+
 -- A person's own limit on one link (design v2 2.2): created now and empty; a missing row means the link's own value. Rows only ever lower access.
 CREATE TABLE IF NOT EXISTS cloud_link_user (
     link_id     TEXT NOT NULL,

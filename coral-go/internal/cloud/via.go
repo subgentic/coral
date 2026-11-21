@@ -83,3 +83,27 @@ func LinkStamp(known func(ctx context.Context, linkID string) bool, fn AllowFunc
 		})
 	}
 }
+
+// AskAnswerer is what AskAllow reads: whether a link may answer a kind of ask (store.CloudStore).
+type AskAnswerer interface {
+	LinkAskAllowed(ctx context.Context, linkID, kind string) (bool, error)
+}
+
+// AskAllow is the Allow of the link stamp (#20413): a request that answers an ask (the closed table of tunnel.AskRouteKind) is let through only when the link may answer that kind, read from the store on this
+// call. Every other request passes unchanged and keeps its own checks. A store error or a missing store refuses (allow turns a nil or panicking check into a refusal as well).
+func AskAllow(a AskAnswerer) AllowFunc {
+	return func(ctx context.Context, v Via, method, path string) (bool, string) {
+		kind := tunnel.AskRouteKind(method, path)
+		if kind == "" {
+			return true, ""
+		}
+		if a == nil {
+			return false, "no ask list"
+		}
+		ok, err := a.LinkAskAllowed(ctx, v.LinkID, kind)
+		if err != nil || !ok {
+			return false, "this Hub may not answer that kind of question through this link"
+		}
+		return true, ""
+	}
+}

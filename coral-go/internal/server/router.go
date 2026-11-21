@@ -33,6 +33,7 @@ import (
 	"github.com/subgentic/coral/internal/terminalinput"
 	"github.com/subgentic/coral/internal/tracking"
 	"github.com/subgentic/coral/pkg/hubowner"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // The router is built in this order; registration and wiring order are as they were in one
@@ -67,7 +68,8 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	r.Use(cloud.Guard(routes.MaxModeFromSettings(store.NewSessionStore(s.db))))
 	// The connector's stamp of which Hub link a request arrived on and which Hub person is behind it (#20312): a request with no known link is refused, the pair goes in the context for
 	// every writer, and Allow (which allows everything in this build) is the one check point.
-	r.Use(cloud.LinkStamp(store.NewCloudStore(s.db, nil).LinkExists, cloud.AllowAll))
+	linkStamps := store.NewCloudStore(s.db, nil)
+	r.Use(cloud.LinkStamp(linkStamps.LinkExists, cloud.AskAllow(linkStamps))) // a request that answers an ask passes only for a link that may answer that kind (#20413)
 	// A tunneled write on a route in pairRecordedRoutes leaves one Operator-actions row with the link and the Hub person, after its handler (#20369); the census (pair_census_test.go) proves each one.
 	r.Use(routes.RecordPairWrites(s.boardStore, pairRecordedRoutes, pairUpgradeRoutes, r))
 	// Through Coral Hub, no path under the home directory and no hidden file names (#3559).
@@ -582,6 +584,8 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/cloud/links/cancel", s.cloudHandler.CancelLinkEnrollment)    // #20385: end a Hub being added
 	r.Post("/api/cloud/links/confirm-owner", s.cloudHandler.ConfirmLinkOwner) // #20407: the Operator names the owner of an added Hub, at this computer
 	r.Put("/api/cloud/links/{id}/cap", s.cloudHandler.SetLinkCap)
+	r.Get("/api/cloud/links/{id}/asks", s.cloudHandler.LinkAsks) // which asks a Hub added here may answer (#20413): the person at this computer's, never tunneled
+	r.Put("/api/cloud/links/{id}/asks", s.cloudHandler.SetLinkAsk)
 	r.Delete("/api/cloud/links/{id}", s.cloudHandler.RemoveLink)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be
@@ -641,6 +645,9 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		}
 		return c.HubURL, c.ServerID, nil
 	}
+	routes.SetReplyAllowed(func(ctx context.Context, id string) (bool, error) {
+		return ownerCloud.LinkAskAllowed(ctx, id, tunnel.AskKindMessageReply)
+	}) // a reply that answers an ask (#20413)
 	routes.SetHubOwnerRecord(ownerRecordOf)       // and what it is enrolled as: a person's or an organisation's (#7061)
 	s.cloudHandler.SetOwnerLabelStore(ownerCloud) // and where the person at this computer records it when it is missing (#6108)
 	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), func() { s.endForUpdate(endThisServer) })
