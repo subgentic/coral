@@ -63,7 +63,7 @@ func (h *BoardHandler) newVersionUnopened(r *http.Request, board string, rows []
 	if len(cands) == 0 {
 		return nil
 	}
-	opened, err := h.bs.OpenedVersions(r.Context(), openedPersonKey(r), ids)
+	opened, err := h.openedWithPending(r, ids)
 	if err != nil {
 		return nil // what they opened cannot be read: the rule is the one without versions
 	}
