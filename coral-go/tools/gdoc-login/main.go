@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	coralauth "github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/gdocsync"
 )
 
@@ -69,7 +70,7 @@ func main() {
 		"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}, "code_challenge_method": {"S256"},
 	}.Encode()
 	code := make(chan string, 1)
-	go http.Serve(ln, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	go (&http.Server{ReadHeaderTimeout: 10 * time.Second, ConnContext: coralauth.ConnContext, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		if q.Get("state") != state || q.Get("code") == "" {
 			http.Error(w, "not the sign-in this tool started", 400)
@@ -80,7 +81,7 @@ func main() {
 		case code <- q.Get("code"):
 		default:
 		}
-	}))
+	})}).Serve(ln)
 	// not opened for the person: the default browser is often not the one the throwaway account lives in. The address (no secret in it) is copied to the clipboard and printed.
 	cp := exec.Command("pbcopy")
 	cp.Stdin = strings.NewReader(auth)

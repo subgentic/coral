@@ -27,6 +27,8 @@ var tooManyRequestsSites = map[string]struct {
 	"internal/cloud/enroll.go":                          {2, "client side: reads Coral Hub's 429, never writes one"},
 	"internal/hubdropbox/upload.go":                     {1, "client side: reads the Hub's 429 for an upload (RateLimited), never writes one"},
 	"internal/dropbox/upload.go":                        {1, "client side: reads Dropbox's 429 (and too_many_requests) as RateLimited with its Retry-After, never writes one (#14655)"},
+	"internal/gdocsync/patch.go":                        {1, "client side: IsRateLimited reads Google's 429 so a caller backs off; never writes one (goal #265)"},
+	"internal/server/routes/check_token_gate.go":        {1, "a check's write limit: marked by hand (X-Coral-Limit set just before refuse), JSON body with code check_write_limit (goal #268)"},
 	"internal/gdocsync/gdocsync.go":                     {1, "client side: reads Google's 429 on a GET (Drive or Docs) and retries it after its Retry-After, at most 30 s and 3 times; a write is never retried; never writes one (#19932)"},
 	"internal/cloud/redeem.go":                          {1, "client side: reads Coral Hub's 429"},
 	"internal/cloud/signin.go":                          {1, "client side: the Hub sign-in check reads Coral Hub's busy 429 as transient, like no answer (#3966)"},

@@ -106,6 +106,24 @@ func TestANewGoogleCommentIsPassedToTheUploadingAgent(t *testing.T) {
 	assert.Contains(t, msgs[0].Content, "coral-agent artifact reply")
 }
 
+// A comment typed in the shared Doc is somebody else's word, not the Operator's: it must not wake an agent the Operator put to sleep (WakeForOperator wakes a manual sleeper; a delivery from Coral never does).
+// The launch census names deliverBoardComment as the one place the Doc's text could reach a wake.
+func TestAGoogleCommentDoesNotWakeAManuallySleepingAgent(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", true)
+	rig.uploadedBy(1, "team-a")
+	c, err := rig.ss.CreateArtifactComment(context.Background(), store.ArtifactComment{ArtifactID: cmtDoc, Board: "team-a", Body: "[Dana] Wake up", AuthorIssuer: "google-docs", AuthorSubject: "doc1", AuthorName: "Dana", AuthorKind: "google"})
+	require.NoError(t, err)
+	before, err := rig.ss.GetLiveSession(context.Background(), sendSid(1))
+	require.NoError(t, err)
+	require.EqualValues(t, 1, before.IsSleeping)
+	rig.h.noteGdocComment(context.Background(), seriesMember{Digest: cmtDoc, Board: "team-a"}, c, c.Body, "Dana")
+	after, err := rig.ss.GetLiveSession(context.Background(), sendSid(1))
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, after.IsSleeping, "the agent is still asleep")
+	assert.Equal(t, *before, *after, "nothing about the sleeping row changed: no wake was tried for a Google commenter")
+}
+
 // pulled shares v2 to doc1, has Dana comment, and returns the Coral thread root.
 func (g *gdocRig) pulled(t *testing.T) store.ArtifactComment {
 	t.Helper()

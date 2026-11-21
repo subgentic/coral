@@ -15,6 +15,7 @@ import (
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -132,6 +133,8 @@ func (o *IdentityObserver) checkTokenGate(w http.ResponseWriter, r *http.Request
 		code := http.StatusTooManyRequests
 		if err != nil {
 			code = http.StatusServiceUnavailable
+		} else {
+			w.Header().Set(httputil.ActionLimitHeader, "action") // a limit on this check's writes, not a busy server: the dashboard must not pause its pollers
 		}
 		o.refuse(w, code, "check_write_limit", "A check may write "+strconv.Itoa(store.CheckWritesPerRun)+" times a run and "+strconv.Itoa(store.CheckWritesPerHour)+" times an hour")
 		return nil, r, false
