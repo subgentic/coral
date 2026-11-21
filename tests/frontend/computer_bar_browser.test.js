@@ -35,7 +35,7 @@ const STUB = `(() => {
   return real(u,o);
  };
 })();`;
-const setTheme=(ev,theme)=>ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'settings_core.js');m.clearCustomThemeVars();m.applyTheme(${JSON.stringify(theme)});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return true;})()`);
+const setTheme=(ev,theme)=>ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'settings_core.js');m.clearCustomThemeVars();m.applyTheme(${JSON.stringify(theme)});await ${framesJs(2)};return true;})()`);
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  const {Fetch,Network}=client;
