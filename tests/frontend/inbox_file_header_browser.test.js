@@ -55,6 +55,10 @@ const BASE = require('./test_base').BASE;
                         check(v.quoteWidth >= v.itemWidth - 2 && Math.abs(v.quoteLeft-v.itemLeft)<=1, '390 '+v.name+' full-width You asked: '+JSON.stringify(v));
                     }
                 }
+                if (width === 390) {
+                    const dotted = await ev(`(() => { const bad = []; for (const item of document.querySelectorAll('#group-table-view .inbox-review-item')) { const left = item.getBoundingClientRect().left; const children = [...item.children].flatMap(c => getComputedStyle(c).display === 'contents' ? [...c.children] : [c]); for (const c of children) { const r = c.getBoundingClientRect(); if (!r.width || !r.height || getComputedStyle(c).position === 'absolute' || Math.abs(r.left-left)>1) continue; const content = getComputedStyle(c,'::before').content, prefix = ['none','normal'].includes(content) ? '' : content.replaceAll(String.fromCharCode(34),'').replaceAll(String.fromCharCode(39),''); if ((prefix+c.textContent).trimStart().startsWith('·')) bad.push(c.className); } } return bad; })()`);
+                    check(!dotted.length, '390 '+tab+' no metadata row starts with a separator, including generated content (#20299): '+JSON.stringify(dotted));
+                }
                 if (width === 390 && tab === 'agent') check(info[1].text.includes('1 earlier version') && info[1].text.includes('v2'), 'two-version fixture actually renders v2 and 1 earlier version');
                 if (process.env.CORAL_SCREENSHOT_DIR) for (const theme of ['light','dark']) {
                     await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);
