@@ -1,5 +1,5 @@
 /* The plain card for a computer that cannot be read (#20207). */
-.computer-card { display: flex; gap: 12px; max-width: 40rem; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
+.computer-card { display: flex; gap: 12px; max-width: 40rem; padding: var(--card-pad); border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); }
 .computer-card-mark { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning-text); font-weight: var(--fw-strong); }
 .computer-card[data-computer-card="not-shared"] .computer-card-mark, .computer-card[data-computer-card="old"] .computer-card-mark { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .computer-card-body { min-width: 0; }
@@ -9,6 +9,6 @@
 .computer-card-details { margin-top: 12px; color: var(--text-muted); font-size: var(--fs-base); }
 .computer-card-details summary { cursor: pointer; }
 .computer-card-details p { margin: 6px 0 0; overflow-wrap: anywhere; }
-@media (max-width: 600px) { .computer-card { padding: 12px; } .computer-card-actions .btn { flex: 1 1 auto; min-height: 44px; } }
+@media (max-width: 600px) { .computer-card-actions .btn { flex: 1 1 auto; min-height: 44px; } }
 .computer-not-shown { margin-top: 12px; color: var(--text-muted); font-size: var(--fs-base); }
 .computer-not-shown p { margin: 0 0 4px; overflow-wrap: anywhere; }

@@ -18,7 +18,6 @@ const agentDetail = await importOnce('./analytics_agent.js'); // one agent over 
 const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
 const { syncEfficiency } = await importOnce('./analytics_efficiency.js'); // the Group by switch and the comparison of Tokens per commit and Task time (Goal #77)
 const { readCostTasks } = await importOnce('./analytics_cost_tasks.js');
-const { computerBar } = await importOnce('./computer_bar.js'); // the one computer bar under the title (#20207)
 const { readNow, noComputerInCloud, LINK_A_COMPUTER, machineChoices, machineLabel, machineOnline, machineNow, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // in cloud every read goes to the chosen computer, none with no computer linked (#19569)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
@@ -352,11 +351,9 @@ export async function _recheckTotals(view) {
 function _syncComputerBar() {
     const cloud = isCloud(), choices = cloud ? machineChoices() : [];
     let line = document.getElementById('cost-no-computer');
-    document.getElementById('cost-computer-pick')?.remove();
-    if (cloud && choices.length > 1) {
-        const bar = computerBar({ id: 'cost-computer-pick', choices, current: machineNow(), onPick: pickMachine });
-        document.querySelector('#cost-page .cost-header')?.after(bar);
-    }
+    // The bar loads when first needed, never at the top of this module: its own import of analytics_machine.js (a member of this group) would wait on the group file that is waiting on it (#20207).
+    if (cloud && choices.length > 1) importOnce('./computer_bar.js').then(({ computerBar }) => { document.getElementById('cost-computer-pick')?.remove(); document.querySelector('#cost-page .cost-header')?.after(computerBar({ id: 'cost-computer-pick', choices: machineChoices(), current: machineNow(), onPick: pickMachine })); }).catch(e => console.error('[cost-dashboard] computer bar:', e));
+    else document.getElementById('cost-computer-pick')?.remove();
     const none = noComputerInCloud();
     if (none && !line) { line = document.createElement('p'); line.id = 'cost-no-computer'; line.className = 'cost-note'; line.setAttribute('role', 'status'); line.textContent = LINK_A_COMPUTER; document.querySelector('#cost-page .cost-header')?.after(line); }
     if (line) line.hidden = !none;

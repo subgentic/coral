@@ -21,6 +21,8 @@ export const TOOLBARS = {
     'theme-save-bar': 'the theme save row',
 };
 export const NOT_A_TOOLBAR = {
+    'computer-bar': 'the computer bar under a page title (computer_bar.css, #20207): a label and the one button that opens the computer list, not a row of controls',
+    'cloud-automation-bar': 'the Automations page line under the title (automations_cloud.css, #20207): the computer bar and one quiet sentence, not a row of controls',
     'queue-tab-bar': 'the Queue tab\'s one line with its computer picker (queue_tab.css, #18093): a label and a menu above the table, not a row of controls',
     'team-pause-bar': 'the one status line under the team page header while the team is paused (team_pause.css, #15331): a sentence and a Resume button, not a row of controls',
     'av-bar': 'the version chip on the file viewer\'s one header row (artifact-comments.css, #12223): the previous and next buttons around the chip, not a row of its own',
