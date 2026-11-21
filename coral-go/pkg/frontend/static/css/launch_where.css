@@ -1,0 +1,28 @@
+/* The Where step under the folder field of New agent, New team and New terminal (#20388, mock #20111). */
+.launch-where { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+.launch-where[hidden] { display: none; }
+.launch-where-h { margin: 0 0 6px; font-size: var(--fs-base); font-weight: var(--fw-strong); color: var(--text-secondary); text-transform: none; }
+.launch-where-list { display: flex; flex-direction: column; gap: 6px; }
+.launch-where-opt { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); cursor: pointer; min-height: 44px; }
+.launch-where-opt input { margin: 3px 0 0; }
+.launch-where-opt:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card-fill)); }
+.launch-where-opt-text { min-width: 0; overflow-wrap: anywhere; }
+.launch-where-path, .launch-where-branch { font-family: var(--font-mono, monospace); }
+.launch-where-branch { color: var(--text-secondary); }
+.launch-where-tag-ok { color: var(--success-text, var(--text-secondary)); }
+.launch-where-tag-warn { color: var(--warning-text); }
+.launch-where-tag-info { color: var(--accent); }
+.launch-where-branchline { margin: 0 0 8px; }
+.launch-where-wts { display: flex; flex-direction: column; gap: 4px; }
+.launch-where-sub { color: var(--text-secondary); font-size: var(--fs-base); }
+.launch-where-check { position: relative; padding: 10px 12px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); }
+.launch-where-summary { position: absolute; top: 10px; right: 12px; color: var(--text-muted); font-size: var(--fs-base); }
+.launch-where-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.launch-where-item { display: grid; grid-template-columns: 1.4em 1fr; column-gap: 8px; }
+.launch-where-item-detail { grid-column: 2; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: anywhere; }
+.launch-where-mark { font-weight: var(--fw-strong); }
+.launch-where-item-ok .launch-where-mark { color: var(--success-text, var(--text-secondary)); }
+.launch-where-item-warn .launch-where-mark { color: var(--warning-text); }
+.launch-where-item-fail .launch-where-mark { color: var(--error-text); }
+.launch-where-item-info .launch-where-mark { color: var(--accent); }
+.launch-where-note { margin: 0; color: var(--text-muted); }
