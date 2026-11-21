@@ -104,6 +104,8 @@ func (m *Manager) LinksChanged(ctx context.Context) {
 			continue
 		default:
 			if cp < lc.mode() {
+				// The old connector's cap drops first, before its streams are ended and before its tunnel is cancelled (that ends the session some moments later): until then it would keep answering at the old, higher cap.
+				lc.cap.Store(int32(cp))
 				if lh := lc.local.Load(); lh != nil {
 					lh.CloseAbove(cp)
 				}

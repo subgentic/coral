@@ -11,6 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/httputil"
+	"github.com/subgentic/coral/internal/safego"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -194,7 +196,7 @@ func (h *CloudHandler) AddLink(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, store.ErrTooManyLinks):
 		writeError(w, http.StatusConflict, "too_many_links", "This computer is linked to the most Hubs it can be.")
 	case errors.As(err, &rl):
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "That Hub is busy. Try again in a moment.")
+		httputil.WriteActionLimit(w, 0, "rate_limited", "That Hub is busy. Try again in a moment.")
 	case errors.Is(err, cloud.ErrHubUnavailable), errors.Is(err, cloud.ErrHubResponse):
 		writeError(w, http.StatusBadGateway, "hub_unreachable", "Coral could not get a code from that Hub. Check the address and try again.")
 	case errors.Is(err, cloud.ErrNotConfigured):
@@ -488,6 +490,7 @@ func (h *CloudHandler) RetryRemovals(ctx context.Context, now time.Time) {
 // StartRemovalRetry runs RetryRemovals once now and then about every hour, until ctx ends.
 func (h *CloudHandler) StartRemovalRetry(ctx context.Context) {
 	go func() {
+		defer safego.Recover("cloud link removal retry")
 		h.RetryRemovals(ctx, time.Now())
 		t := time.NewTicker(removalRetryEvery)
 		defer t.Stop()

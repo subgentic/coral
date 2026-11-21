@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/httputil"
 )
 
 // RefusedRowsPerMinute caps the rows one link may add with refused writes (status >= 400) in a minute, so a loop of refused attempts cannot fill the table (Security, #20369). A write that was
@@ -154,7 +155,7 @@ func serveUpgrade(bs *board.Store, upgrades PairRecorded, mux chi.Routes, via bo
 	}
 	// the open row comes first and is never capped as a refusal: a stream that cannot leave its row is not opened (503), and one past the open bound is refused (429)
 	if !allowOpen(via.LinkID, time.Now()) {
-		http.Error(w, "too many streams opened through this link in a minute", http.StatusTooManyRequests)
+		httputil.WriteActionLimit(w, 0, "stream_limit", "too many streams opened through this link in a minute")
 		return
 	}
 	if record(PairWSOpen, 0) != nil {
