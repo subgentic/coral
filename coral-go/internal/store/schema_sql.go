@@ -585,6 +585,35 @@ CREATE TABLE IF NOT EXISTS cloud_connection (
     last_error TEXT
 );
 
+-- One row per Coral Hub this computer is linked to (#20201, multi-Hub design v2, goal #269). hub_origin is the key a person sees: scheme://host[:port],
+-- lower-case, no path (CanonicalHubOrigin). token holds a "v1:" secretbox envelope bound to "cloud-link:<link_id>" as AAD, never plaintext. In this first
+-- slice the table mirrors the one cloud_connection row (which still drives the connector); the connector set reads it in a later slice.
+CREATE TABLE IF NOT EXISTS cloud_link (
+    link_id          TEXT PRIMARY KEY,
+    hub_origin       TEXT NOT NULL UNIQUE,
+    server_id        TEXT NOT NULL,
+    label            TEXT NOT NULL,
+    token            TEXT NOT NULL,
+    state            TEXT NOT NULL,
+    max_mode         TEXT NOT NULL,
+    scope            TEXT NOT NULL DEFAULT 'all',
+    owner_account    TEXT NOT NULL DEFAULT '',
+    owner_user       TEXT NOT NULL DEFAULT '',
+    owner_adopted_at TEXT,
+    created_at       TEXT NOT NULL,
+    last_seen        TEXT,
+    last_error       TEXT
+);
+
+-- A person's own limit on one link (design v2 2.2): created now and empty; a missing row means the link's own value. Rows only ever lower access.
+CREATE TABLE IF NOT EXISTS cloud_link_user (
+    link_id     TEXT NOT NULL,
+    hub_user_id TEXT NOT NULL,
+    max_mode    TEXT NOT NULL,
+    scope       TEXT NOT NULL DEFAULT 'all',
+    PRIMARY KEY (link_id, hub_user_id)
+);
+
 -- This database's Dropbox sign-in (#14609, Dropbox stage 3a). One row, made the first time the server id is asked for, and kept through a
 -- disconnect: server_id belongs to the database (a restored copy keeps it). refresh_token holds a "v1:" secretbox envelope bound to
 -- account_id as AAD, never plaintext; NULL when not connected. fingerprint is SHA-256 of fp_salt, the machine id and the data folder (never
