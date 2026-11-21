@@ -3,12 +3,13 @@
 import { state } from './state.js';
 import { isCloud, nativeInbox, serverFetch, serverUrl, currentServer } from './server_base.js';
 import { inboxRouteFor } from './routes.js';
+import { machineNow } from './analytics_machine.js'; // the computer chosen on any per-computer page (#20207)
 
 export function historyServer() {
     if (!isCloud()) return state.hub && state.historySourceServer ? state.historySourceServer : 'local';
     if (state.historySourceServer) return state.historySourceServer;
     const online = (state.servers || []).filter(s => s.id !== 'local' && s.status === 'online');
-    const preferred = online.find(s => s.id === currentServer()) || online[0];
+    const preferred = online.find(s => s.id === machineNow()) || online.find(s => s.id === currentServer()) || online[0];
     if (preferred) state.historySourceServer = preferred.id;
     return preferred?.id || null;
 }

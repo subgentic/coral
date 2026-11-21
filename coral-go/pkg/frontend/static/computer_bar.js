@@ -10,19 +10,20 @@ const { formatLastSeen } = await importOnce('./server_status.js');
 export const ALL_COMPUTERS = 'all';
 const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
 const dotOf = id => { const d = node('span', 'computer-dot'); d.dataset.computerState = machineOnline(id) ? 'online' : 'offline'; d.setAttribute('aria-hidden', 'true'); return d; };
-const nameOf = id => id === ALL_COMPUTERS ? 'All computers' : machineLabel(id);
+const nameOf = id => id === ALL_COMPUTERS ? 'All computers' : !id ? '' : machineLabel(id);
 const seenText = id => machineOnline(id) ? 'Online' : `Offline · last seen ${formatLastSeen(machineSeen(id))}`;
 
 /** Build the bar. choices: ids in picker order; current: the id (or ALL_COMPUTERS) being read; all: offer "All computers"; onPick(id) is called with the chosen id. */
-export function computerBar({ choices, current, all = false, onPick, id = '' }) {
+export function computerBar({ choices, current, all = false, onPick, id = '', emptyText = 'No computers online' }) {
     const root = node('div', 'computer-bar');
     if (id) root.id = id;
     const label = node('span', 'computer-bar-label', 'Computer');
     const button = node('button', 'computer-bar-button'); button.type = 'button';
-    button.setAttribute('aria-haspopup', 'listbox'); button.setAttribute('aria-expanded', 'false'); button.setAttribute('aria-label', `Computer: ${nameOf(current)}`);
-    if (current !== ALL_COMPUTERS) button.append(dotOf(current));
-    button.append(node('span', 'computer-bar-name', nameOf(current)));
-    if (current !== ALL_COMPUTERS && !machineOnline(current)) button.append(node('span', 'computer-chip', 'Offline'));
+    button.setAttribute('aria-haspopup', 'listbox'); button.setAttribute('aria-expanded', 'false'); button.setAttribute('aria-label', `Computer: ${nameOf(current) || emptyText}`);
+    if (current && current !== ALL_COMPUTERS) button.append(dotOf(current));
+    button.append(node('span', 'computer-bar-name', nameOf(current) || emptyText));
+    if (!choices.some(machineOnline) && !current) button.disabled = true;
+    if (current && current !== ALL_COMPUTERS && !machineOnline(current)) button.append(node('span', 'computer-chip', 'Offline'));
     button.append(node('span', 'computer-bar-caret'));
     const list = node('div', 'computer-bar-list'); list.setAttribute('role', 'listbox'); list.hidden = true;
     const online = choices.filter(machineOnline), offline = choices.filter(c => !machineOnline(c));
