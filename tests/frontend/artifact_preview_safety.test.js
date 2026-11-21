@@ -29,6 +29,7 @@ const BASE = require('./test_base').BASE;
         return new Response(new ReadableStream({start(){window.__artifactReads++}}),{status:200,headers:{'Content-Type':'application/zip','Content-Length':'6096917','Content-Disposition':'inline; filename="final-ember-accord-acceptance.zip"'}});
       };
       window.openFilePreview(${JSON.stringify(uri)}); await window.__until(()=>/binary artifact/.test(document.querySelector('#preview-body')?.textContent||''));
+      await window.__until(()=>window.__artifactOpened>=1,5000); // the opened-version record is posted after the render, off importOnce: wait for it, then count (a slower runner posts later)
       return {text:document.querySelector('#preview-body')?.textContent||'',link:document.querySelector('#preview-body a')?.getAttribute('download')||'',reads:window.__artifactReads,opened:window.__artifactOpened};
     })()`);
     assert.match(result.text, /binary artifact is not rendered inline/);
@@ -64,6 +65,7 @@ const BASE = require('./test_base').BASE;
       const links=[...document.querySelectorAll('.artifact-manifest-download')];
       links.forEach(a=>a.addEventListener('click',e=>e.preventDefault(),{once:true}));
       links[0].click(); links[2].click();
+      await window.__until(()=>window.__manifestOpened>=1,5000); // see the binary case above: the record posts after the render
       const list={names:[...document.querySelectorAll('.artifact-manifest-name')].map(e=>e.textContent),hasUnsafeMarkup:!!document.querySelector('.artifact-manifest-list img'),rawButton:!!document.querySelector('.artifact-manifest-raw'),downloadNames:links.map(e=>e.download),downloadHrefs:links.map(e=>e.getAttribute('href')),fetchesAfterDownloads:window.__manifestFetches,openedPosts:window.__manifestOpened};
       // A tab opened by single click is a replaceable 'preview' tab; pin the collection (double-click) so the entry opens beside it.
       document.querySelector('.preview-tab').dispatchEvent(new MouseEvent('dblclick',{bubbles:true})); await new Promise(r=>setTimeout(r,40));
