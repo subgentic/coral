@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const BASE = require('./test_base').BASE;
 const { connect } = require('./agent_view_harness');
-const { coralReady } = require('./helpers/wait');
+const { coralReady, waitFor } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { ownRows, settleOwn } = require('./helpers/own_rows');
 
@@ -53,9 +53,7 @@ async function httpJson(method, path, body, headers = {}) {
 
         // the real list on the page shows one row for the file
         await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        const shown = async () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes('cut.txt')).length`);
-        const waitShown = async n => { for (let i = 0; i < 60; i++) { if (await shown() === n) return n; await new Promise(r => setTimeout(r, 250)); } return shown(); };
-        assert.equal(await waitShown(1), 1, 'Needs you shows the file once');
+        await waitFor(ev, `[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes('cut.txt')).length === 1`, 'Needs you shows the file once', { timeout: 15000 });
 
         // approve v2, then an upload that opts out does not return and says so
         assert.equal((await person('POST', `/api/board/${B}/artifacts/${hex2}/review`, { decision: 'approve' })).status, 200);

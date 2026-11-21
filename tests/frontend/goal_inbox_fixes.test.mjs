@@ -57,10 +57,10 @@ const tasksMix = cellMix.querySelector('.goals-row-tasks');
 assert.equal(tasksMix.textContent, '2 done · 1 left', 'a partial goal says "2 done · 1 left": ' + tasksMix.textContent);
 
 // --- Bug 2: empty-state text rendered in the Goals folder ---
-let goalsReply = [];
+let goalsReply = [], goalReads = 0;
 globalThis.fetch = window.fetch = async (url) => {
     const p = String(url).replace(/\?.*/, '').replace(/^https?:\/\/[^/]+/, '');
-    if (p === '/api/goals') return Response.json({ goals: goalsReply });
+    if (p === '/api/goals') { goalReads++; return Response.json({ goals: goalsReply }); }
     if (p === '/api/settings') return Response.json({ settings: {} });
     return Response.json({});
 };
@@ -74,10 +74,15 @@ goalsReply = [];
 await IS.showInbox({ folder: 'goals' });
 await waitForText('.empty-state-line', 'No open goals.', 'the empty Goals folder says "No open goals." when there are none', { scope: '#group-table-view' });
 
-// only done goals (the default All view excludes them, so the table is empty): "All goals are done."
+// A goal change invalidates the reused read, as a real websocket frame does.
+// Only done goals (the default Active view excludes them): "All goals are done."
 goalsReply = [{ id: 1, board_id: 'team-a', title: 'Ship v2', state: 'done', rollup: { done: 2 }, updated_at: new Date().toISOString() }];
-await IS.showInbox({ folder: 'goals' });
+const beforeChange = goalReads;
+const { publishGoalsBrief } = await importUi('goals_feed');
+publishGoalsBrief({ 'team-a': { seq: 1, open: 0 } });
 await waitForText('.empty-state-line', 'All goals are done.', 'the empty Goals folder says "All goals are done." when done goals exist', { scope: '#group-table-view' });
+
+assert.ok(goalReads > beforeChange, 'the changed goal was read after its sequence notification');
 
 console.log('PASS goal_inbox_fixes: closed-goal notice has no waiting text, columns say All N done, empty state names the done goals');
 process.exit(0);

@@ -71,7 +71,7 @@ assert.deepEqual(cells('local').slice(0, 6), ['This computer', '$2.50', '1,000',
 assert.deepEqual(cells('a').slice(0, 6), ['Alpha', '$1.25', '500', '600', '1', '9']);
 assert.deepEqual(cells('b').slice(0, 2), ['Beta', '$0.0040']);
 assert.equal(cells('a')[6], 'now');
-assert.equal(totalText().replace(/\s+/g, ' ').trim(), 'Total of the computers above$3.7540 · 1,505 in · 2,606 out · 5 agents · 51 requests', totalText());
+assert.equal(totalText().replace(/\s+/g, ' ').trim(), 'Total of the computers above $3.7540 · 1,505 in · 2,606 out · 5 agents · 51 requests', totalText());
 assert.equal(host.querySelector('.cost-by-computer-note'), null, 'nothing to explain while every computer answers');
 
 // a computer stops answering: its last figures stay, with when it was last seen; the total still adds the rows shown
@@ -82,7 +82,7 @@ assert.deepEqual(cells('a').slice(0, 6), ['Alpha', '$1.25', '500', '600', '1', '
 assert.match(cells('a')[6], /^last seen \d+[smhd] ago$|^last seen just now$/, cells('a')[6]);
 assert.deepEqual(cells('b').slice(0, 6), ['Beta', '$0.0040', '5', '6', '1', '2'], 'an answer that is an error also leaves the last figures');
 assert.match(rowOf('a').title, /last figures read from Alpha/);
-assert.equal(totalText().replace(/\s+/g, ' ').trim(), 'Total of the computers above$3.7540 · 1,505 in · 2,606 out · 5 agents · 51 requests', 'the total still adds every row shown');
+assert.equal(totalText().replace(/\s+/g, ' ').trim(), 'Total of the computers above $3.7540 · 1,505 in · 2,606 out · 5 agents · 51 requests', 'the total still adds every row shown');
 assert.match(host.querySelector('.cost-by-computer-note').textContent, /Alpha, Beta are not answering: the figures shown are the last ones read, and they are in the total/);
 
 // an answer that is not a summary is a failed read, not zeros
@@ -97,7 +97,7 @@ await showByComputer(host, '?since=2026-11-05T00:00:00Z', 'week');
 assert.deepEqual(cells('a').slice(0, 3), ['Alpha', '—', '—'], 'a range that was never read from Alpha has no figures, not the day\'s');
 assert.deepEqual(cells('c').slice(0, 3), ['Gamma', '—', '—']);
 assert.equal(cells('c')[6], 'no figures yet');
-assert.equal(totalText().replace(/\s+/g, ' ').trim(), 'Total of the computers above$2.50 · 1,000 in · 2,000 out · 3 agents · 40 requests', 'only the rows with figures are added');
+assert.equal(totalText().replace(/\s+/g, ' ').trim(), 'Total of the computers above $2.50 · 1,000 in · 2,000 out · 3 agents · 40 requests', 'only the rows with figures are added');
 assert.match(host.querySelector('.cost-by-computer-note').textContent, /Alpha, Beta, Gamma have given no figures yet, so they add nothing to the total\. That is not a zero\./);
 
 // a computer's name is text, never markup
