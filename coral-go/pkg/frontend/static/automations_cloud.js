@@ -7,6 +7,7 @@ import { serverFetch, pathId } from './server_base.js';
 import { go, currentRoute } from './nav.js';
 import { showView } from './utils.js';
 import { importOnce } from './import_once.js';
+const { machineOnline, machineLabel } = await importOnce('./analytics_machine.js');
 import { loadStyles } from './lazy_styles.js';
 const DT = await importOnce('./data_table.js');
 const VL = await importOnce('./view_list.js');
@@ -17,7 +18,6 @@ const FOLDERS = [ ['jobs', 'Jobs'], ['workflows', 'Workflows'], ['recent', 'Rece
 const names = new Map(FOLDERS);
 let chosen = '', route = { view: 'automations', folder: 'jobs' }, generation = 0, controller = null, query = '';
 const computers = () => [...new Map((state.servers || []).filter(s => s && s.id && s.id !== 'local').map(s => [s.id, s])).values()];
-const titleOf = s => String(s.label || s.name || s.id);
 const word = x => x == null || x === '' ? '—' : String(x);
 const dateOf = x => x ? new Date(x).toLocaleString() : '—';
 const link = (text, onClick) => { const b = el('button', 'btn btn-small', text); b.type = 'button'; b.addEventListener('click', onClick); return b; };
@@ -38,7 +38,7 @@ function shell() {
     heading.replaceChildren(el('h2', '', 'Automations'));
     const label = el('label', 'cloud-automation-picker', 'Computer '), picker = el('select', 'field');
     picker.id = 'cloud-automation-computer';
-    for (const s of computers()) { const option = el('option', '', titleOf(s)); option.value = s.id; picker.append(option); }
+    for (const s of computers()) { const option = el('option', '', machineLabel(s.id) + (machineOnline(s.id) ? '' : ' (offline)')); option.value = s.id; picker.append(option); }
     picker.value = chosen; label.append(picker);
     picker.addEventListener('change', () => { chosen = picker.value; openAutomationsRoute({ view: 'automations', folder: route.folder }); });
     heading.append(label);
@@ -47,10 +47,11 @@ function shell() {
     return panel;
 }
 async function read(server, path, signal) {
+    if (!machineOnline(server)) throw new Error(`${machineLabel(server)} is offline, so its automations can't be read now.`);
     const response = await serverFetch(server, path, { signal });
     // Read error bodies too: failed reads must not leave streams in the pool.
     const data = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(`${titleOf(computers().find(s => s.id === server) || { id: server })} can't show automations here. It may need a newer Coral.`);
+    if (!response.ok) throw new Error(`${machineLabel(server)} can't show automations here. It may need a newer Coral.`);
     if (!data || typeof data !== 'object') throw new Error('Could not read automations.');
     return data;
 }
