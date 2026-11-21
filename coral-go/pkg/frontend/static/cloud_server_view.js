@@ -22,7 +22,6 @@ import { importOnce } from './import_once.js';
 import { h } from './cloud.js';
 import { formatLastSeen, updateNotice, RELEASES_URL, DOWNLOAD_URL, serverVersion, serverAgentCount, belowMinimumText } from './server_status.js';
 import { accessChanged } from './hub_access.js';
-import { startCell } from './computer_start.js'; // New agent, New team, New terminal on every row (#20388)
 import { state } from './state.js';
 import { note } from './nav.js';
 import { serverFetch, sessionServer } from './server_base.js';
@@ -36,6 +35,7 @@ import { healthDot, healthCard, healthStatusText } from './machine_health.js';
 // This module is loaded lazily, so its search box is loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { syncRelaunchReads, resetRelaunchReads, relaunchBadge } = await importOnce('./relaunch_badge.js'); // the "Updating" badge of a hub relaunch (#5355, behind the update flag)
 const { syncServersBar, serverVisible, serversFiltered } = await importOnce('./server_search.js');
+const { startCell } = await importOnce('./computer_start.js'); // New agent, New team, New terminal on every row (#20388)
 const DT = await importOnce('./data_table.js'); // the one table (#7903)
 const { agentCopyBeside } = await importOnce('./agent_copy_button.js'); // the robot beside the Computers page's title (#15152)
 

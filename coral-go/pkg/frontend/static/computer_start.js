@@ -3,6 +3,9 @@
 import { launchBlockReason } from './launch_server.js';
 import { isHub, LOCAL_SERVER } from './server_base.js';
 import { state } from './state.js';
+import { loadStyles } from './lazy_styles.js';
+
+await loadStyles('computer_start.css');
 
 const START = [['agent', 'New agent'], ['team', 'New team'], ['terminal', 'New terminal']];
 
