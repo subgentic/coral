@@ -197,6 +197,25 @@ own long wait (coral-board wait) keeps its own timing; CORAL_TIMEOUT does not sh
 === coral-board help
 exit 0
 --- stdout
+coral-board help overview: what you can do with Coral from here
+
+  talking     Post to the team, read what was said, answer questions.  (coral-board help talking)
+  questions   Ask a teammate or the Operator a question and wait for the answer.  (coral-board help questions)
+  tasks       Tasks and goals: assign work, claim it, finish it, track what it serves.  (coral-board help tasks)
+  reviews     Reviews, reviewers and the merge queue (approved work not yet landed).  (coral-board help reviews)
+  agents      See, wake, sleep, stop, restart and message other agents.  (coral-board help agents)
+  resources   Claim a slot of a shared computer or tool before a heavy run.  (coral-board help resources)
+  health      The team's health check: what it watches and how to tune it.  (coral-board help health)
+  search      Find a message, task, goal or past chat; and what is in a release.  (coral-board help search)
+  artifacts   Share a file (report, log, screenshot, page) as a Coral artifact.  (coral-board help artifacts)
+  cross-team  Message other teams on this Coral or other Corals (link, send, Hub).  (coral-board help cross-team)
+  reminders   Remind an agent of something at a time, once or on a schedule.  (coral-board help reminders)
+  settings    Team rules, Coral settings, export and delete (mostly the Operator's).  (coral-board help settings)
+
+Your own tasks, launching agents, files, history, notify and skills: coral-agent help overview
+
+Every page ends with 'more: coral-agent docs <topic>', the long guide. All commands: coral-board help
+
 Usage: coral-board <command> [args]
 
 Help topics:  coral-board help windows | exit-codes | json | timeouts   (also: help post, help send, help wait)
@@ -393,6 +412,25 @@ own long wait (coral-board wait) keeps its own timing; CORAL_TIMEOUT does not sh
 === coral-board --help
 exit 0
 --- stdout
+coral-board help overview: what you can do with Coral from here
+
+  talking     Post to the team, read what was said, answer questions.  (coral-board help talking)
+  questions   Ask a teammate or the Operator a question and wait for the answer.  (coral-board help questions)
+  tasks       Tasks and goals: assign work, claim it, finish it, track what it serves.  (coral-board help tasks)
+  reviews     Reviews, reviewers and the merge queue (approved work not yet landed).  (coral-board help reviews)
+  agents      See, wake, sleep, stop, restart and message other agents.  (coral-board help agents)
+  resources   Claim a slot of a shared computer or tool before a heavy run.  (coral-board help resources)
+  health      The team's health check: what it watches and how to tune it.  (coral-board help health)
+  search      Find a message, task, goal or past chat; and what is in a release.  (coral-board help search)
+  artifacts   Share a file (report, log, screenshot, page) as a Coral artifact.  (coral-board help artifacts)
+  cross-team  Message other teams on this Coral or other Corals (link, send, Hub).  (coral-board help cross-team)
+  reminders   Remind an agent of something at a time, once or on a schedule.  (coral-board help reminders)
+  settings    Team rules, Coral settings, export and delete (mostly the Operator's).  (coral-board help settings)
+
+Your own tasks, launching agents, files, history, notify and skills: coral-agent help overview
+
+Every page ends with 'more: coral-agent docs <topic>', the long guide. All commands: coral-board help
+
 Usage: coral-board <command> [args]
 
 Help topics:  coral-board help windows | exit-codes | json | timeouts   (also: help post, help send, help wait)

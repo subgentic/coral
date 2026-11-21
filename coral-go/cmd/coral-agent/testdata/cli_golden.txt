@@ -54,6 +54,22 @@ own long wait (coral-board wait) keeps its own timing; CORAL_TIMEOUT does not sh
 === coral-agent help
 exit 0
 --- stdout
+coral-agent help overview: what you can do with Coral from here
+
+  tasks      Your own task list: add, claim, finish, read.  (coral-agent help tasks)
+  launch     Start another agent in a folder, with your default settings.  (coral-agent help launch)
+  artifacts  Store a report, log, screenshot or page and share it as a link.  (coral-agent help artifacts)
+  history    Search your own past conversation, including what compaction dropped.  (coral-agent help history)
+  operator   Tell the Operator something or ask them a question.  (coral-agent help operator)
+  skills     Find, read and publish skills the Operator approved.  (coral-agent help skills)
+  docs       Coral's own guides for agents, offline.  (coral-agent help docs)
+  ui         Publish an interactive panel in the Operator's sidebar.  (coral-agent help ui)
+  checks     Report the outcome of a scheduled check you were asked to run.  (coral-agent help checks)
+
+Work on a team board (posts, tasks, reviews, resources, health): coral-board help overview
+
+Every page ends with 'more: coral-agent docs <topic>', the long guide. All commands: coral-agent help
+
 coral-agent - launch Coral agents and work with your own tasks
 
 Commands:
@@ -107,6 +123,22 @@ own long wait (coral-board wait) keeps its own timing; CORAL_TIMEOUT does not sh
 === coral-agent --help
 exit 0
 --- stdout
+coral-agent help overview: what you can do with Coral from here
+
+  tasks      Your own task list: add, claim, finish, read.  (coral-agent help tasks)
+  launch     Start another agent in a folder, with your default settings.  (coral-agent help launch)
+  artifacts  Store a report, log, screenshot or page and share it as a link.  (coral-agent help artifacts)
+  history    Search your own past conversation, including what compaction dropped.  (coral-agent help history)
+  operator   Tell the Operator something or ask them a question.  (coral-agent help operator)
+  skills     Find, read and publish skills the Operator approved.  (coral-agent help skills)
+  docs       Coral's own guides for agents, offline.  (coral-agent help docs)
+  ui         Publish an interactive panel in the Operator's sidebar.  (coral-agent help ui)
+  checks     Report the outcome of a scheduled check you were asked to run.  (coral-agent help checks)
+
+Work on a team board (posts, tasks, reviews, resources, health): coral-board help overview
+
+Every page ends with 'more: coral-agent docs <topic>', the long guide. All commands: coral-agent help
+
 coral-agent - launch Coral agents and work with your own tasks
 
 Commands:
@@ -304,6 +336,21 @@ Run coral-agent artifact upload --help, artifact download --help, artifact reply
 === coral-agent help docs
 exit 0
 --- stdout
+coral-agent help docs
+
+The guides are the long answers: how do I, the board, teams, settings, troubleshooting. List them, read one, or print all.
+
+Commands:
+  coral-agent docs                                   # the topics
+  coral-agent docs how-do-i                          # one guide
+  coral-agent docs all                               # everything
+
+Rules:
+  - Look it up here before you ask or guess.
+
+more: coral-agent docs how-do-i; coral-agent docs quickstart; coral-agent docs troubleshooting
+
+The command itself:
 Usage: coral-agent docs [topic|all]
 
 Prints Coral's own documentation for agents. With no topic it lists the topics;
