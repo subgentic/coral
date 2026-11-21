@@ -27,7 +27,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`document.querySelector('#servers-tab-body button[data-action="add"]').click(); true`);
             await waitFor(`!!document.getElementById('servers-form')`, at + 'pressing it opens the add form', 10000);
             assert.match(await ev(`document.getElementById('servers-form').textContent`), /Add computer/, at + 'the form is the Add computer form');
-            assert.match(await ev(`document.querySelector('#servers-tab-body .empty-state').textContent.replace(/\\s+/g, ' ').trim()`), /^No computers connected yet\. Add one to see its agents here\.$/, at + 'the empty page says so');
+            assert.match(await ev(`document.querySelector('#servers-tab-body .empty-state').textContent.replace(/\\s+/g, ' ').trim()`), /^No other computers connected yet\. Add one to see its agents here\.$/, at + 'the empty page says so');
             console.log(`   ✓ ${w} px`);
         }
         console.log('PASS a hub with no computers still has its Computers tab, the menu item opens it, and Add computer is there');
