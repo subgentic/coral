@@ -82,7 +82,7 @@ func TestMemberGrantsAreSignedByTheOwnersDeviceAndBoundedByTheLinkCap(t *testing
 	js := map[string]string{"Content-Type": "application/json"}
 	path := "/api/board/team1/member-grants"
 	count := func() int { gs, _ := r.srv.boardStore.ListMemberGrants(ctx, "", time.Now()); return len(gs) }
-	view := board.NewMemberGrant{LinkID: l.LinkID, HubUser: grantPerson, Level: "view", ScopeKind: "board", Days: 7}
+	view := board.NewMemberGrant{LinkID: l.LinkID, HubUser: grantPerson, Level: "view", ScopeKind: "board", ScopeID: "team1", BoardID: "team1", Days: 7}
 	require.Equal(t, 200, call(h, "PUT", "/api/cloud/links/"+l.LinkID+"/cap", `{"mode":"view"}`, js).Code)
 
 	// No owner-device check wired: nothing is written, whatever the body.
@@ -135,7 +135,7 @@ func TestMemberGrantsAreSignedByTheOwnersDeviceAndBoundedByTheLinkCap(t *testing
 	rec = call(h, "POST", "/api/member-grants", d.sign(t, full, time.Now(), false), js)
 	assert.Equal(t, 400, rec.Code, "the full gate is shut: "+rec.Body.String())
 	assert.Contains(t, rec.Body.String(), "not available yet")
-	agent := board.NewMemberGrant{LinkID: l.LinkID, HubUser: "hub-user-cccc3333", Level: "view", ScopeKind: "agent", ScopeID: "a-1", Days: 7}
+	agent := board.NewMemberGrant{LinkID: l.LinkID, HubUser: "hub-user-cccc3333", Level: "view", ScopeKind: "agent", ScopeID: "a-1", BoardID: "team1", Days: 7}
 	assert.Equal(t, 400, call(h, "POST", path, d.sign(t, agent, time.Now(), false), js).Code, "one agent: shut")
 	board.AllowMemberGatesForTest(t)
 	rec = call(h, "POST", "/api/member-grants", d.sign(t, full, time.Now(), false), js)
