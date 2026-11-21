@@ -4000,6 +4000,12 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .servers-warn-icon { font-size: var(--fs-md); line-height: 1; }
 @container servers-tab (max-width: 34rem) { .servers-warn-word { display: none; } }
 .servers-needs { color: var(--warning-text); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; } /* the Servers list's Needs you count: the one thing that sends a person to the Inbox (#9679) */
+.computer-start { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; } /* New agent, New team, New terminal on a Computers row (#20388, mock #20111) */
+.computer-start-actions { display: flex; gap: 8px; }
+.computer-start-change { background: none; border: 0; padding: 0 2px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.computer-start-actions .btn { margin: 0; white-space: nowrap; }
+.computer-start-note { margin: 0; max-width: 20rem; color: var(--text-muted); font-size: var(--fs-base); text-align: right; }
+@media (max-width: 600px) { .computer-start, .computer-start-actions { width: 100%; align-items: stretch; } .computer-start-actions .btn { flex: 1 1 0; min-height: 44px; } .computer-start-note { text-align: left; max-width: none; } }
 .servers-page .item-bar { margin-top: auto; bottom: calc(-1 * var(--space-xl, 16px)); margin-bottom: calc(-1 * var(--space-xl, 16px)); padding-bottom: calc(var(--space-lg) + var(--space-xl, 16px)); } /* the view's padding is taken back so nothing shows under the bar */
 .servers-view.servers-view-page .servers-tab { min-height: 100%; display: flex; flex-direction: column; }
 .servers-view.servers-view-page .servers-tab-body { flex: 1 1 auto; display: flex; flex-direction: column; }
