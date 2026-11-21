@@ -78,6 +78,7 @@ func (h *BoardHandler) MarkRead(w http.ResponseWriter, r *http.Request) {
 // PostMessage posts a message to a board.
 // POST /api/board/{project}/messages
 func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
+	r = markNoAnswer(r) // a post through a Hub link that may not answer asks never counts as an answer (#20413)
 	project := urlParam(r, "project")
 	var body postMessageBody
 	var derr error
@@ -87,9 +88,6 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if body, ok = readGuideMessage(w, r); !ok {
-			return
-		}
-		if h.refuseUnallowedReply(w, r, project, body.ReplyTo) {
 			return
 		}
 		if h.refuseReplyToOperatorAsk(w, r, project, body.ReplyTo) { // a guide is no owner: an answer to the Operator's question is refused before anything else is said about it (#13491)
@@ -108,9 +106,6 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		derr = decodeJSON(r, &body)
-		if derr == nil && h.refuseUnallowedReply(w, r, project, body.ReplyTo) {
-			return
-		}
 		if derr == nil && h.refuseReplyToOperatorAsk(w, r, project, body.ReplyTo) {
 			return
 		}
@@ -249,7 +244,7 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	answeredAsk := false
-	if body.ReplyTo > 0 {
+	if body.ReplyTo > 0 && !board.NoAnswerFrom(r.Context()) { // no reply is recorded for a post that may not answer: it is delivered and answers nothing (#20413)
 		if err := h.bs.RecordReply(r.Context(), project, msg.ID, body.ReplyTo); err != nil {
 			slog.Warn("board reply not recorded", "board", project, "message", msg.ID, "error", err)
 		}
@@ -1086,48 +1081,31 @@ func askedHas(to []string, who string) bool {
 	return false
 }
 
-// replyAskers answers whether a link may answer an ask by reply (tunnel.AskKindMessageReply); nil until wired, which refuses.
+// replyAllowed answers whether a link may answer an ask by post (tunnel.AskKindMessageReply); nil until wired, which refuses.
 var replyAllowed func(ctx context.Context, linkID string) (bool, error)
 
 // SetReplyAllowed wires the link store's check for the message_reply kind.
 func SetReplyAllowed(f func(ctx context.Context, linkID string) (bool, error)) { replyAllowed = f }
 
-// refuseUnallowedReply is the message_reply half of #20413. POST /api/board/{project}/messages is an ordinary post unless reply_to makes it an answer, so the path cannot tell and this does, from the server's own
-// record of the message (never from a marker the client sends): for a request that came through a Hub link, a reply_to that resolves to an ask (open or closed) needs the link to be allowed message_reply, and
-// a reply_to that resolves to nothing is refused outright, never passed on. A plain post, a reply to a message that is no ask, and a request from this computer are not touched. A failed lookup refuses.
-// It reports whether it refused.
-func (h *BoardHandler) refuseUnallowedReply(w http.ResponseWriter, r *http.Request, project string, replyTo int64) bool {
-	if replyTo == 0 || !cloud.Tunneled(r) {
-		return false
+// markNoAnswer is the message_reply half of #20413 (Security: a post through a Hub link that may not answer asks never counts as an answer, whether it names reply_to or only @mentions the asker). The path cannot tell
+// an answer from an ordinary post, and an ask is answered by either form, so the rule is the arrival: a post that came through a link added here without message_reply is stored marked (board.WithNoAnswer), is
+// delivered as any other, records no reply, and is left out of every read that decides whether an ask was answered. The enrollment's own link is unchanged. A guide's post is its own thing (guide.go). A failed lookup marks.
+// A request with no link in its context (a handler called without the router's LinkStamp, which refuses a tunneled request with no known link) is not touched.
+func markNoAnswer(r *http.Request) *http.Request {
+	if !cloud.Tunneled(r) {
+		return r
+	}
+	if _, guide := guideOf(r); guide {
+		return r
 	}
 	via, ok := cloud.ViaFrom(r.Context())
 	if !ok || via.LinkID == "" {
-		return false // no link in the context: only a handler called without the router's LinkStamp, which refuses a tunneled request with no known link before any handler (cloud/via.go, tested there and in link_asks_20413_test.go)
+		return r
 	}
-	refuse := func(msg string) bool {
-		writeJSON(w, http.StatusForbidden, map[string]string{"code": cloud.LinkRefusedCode, "error": msg})
-		return true
+	if replyAllowed != nil {
+		if allowed, err := replyAllowed(r.Context(), via.LinkID); err == nil && allowed {
+			return r
+		}
 	}
-	if replyTo < 0 {
-		return refuse("reply_to does not name a message of this team")
-	}
-	asked, err := h.bs.GetMessageByID(r.Context(), project, replyTo)
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && asked == nil) {
-		return refuse("reply_to does not name a message of this team")
-	}
-	if err != nil {
-		errInternalServer(w, "could not check what this reply answers")
-		return true
-	}
-	if asked.Ask == nil {
-		return false // a reply to a plain message answers no ask
-	}
-	if replyAllowed == nil {
-		return refuse("this Hub may not answer your agents' questions through this link")
-	}
-	ok, err = replyAllowed(r.Context(), via.LinkID)
-	if err != nil || !ok {
-		return refuse("this Hub may not answer your agents' questions through this link")
-	}
-	return false
+	return r.WithContext(board.WithNoAnswer(r.Context()))
 }

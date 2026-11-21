@@ -75,7 +75,7 @@ func LinkStamp(known func(ctx context.Context, linkID string) bool, fn AllowFunc
 				actor = ""
 			}
 			v := Via{LinkID: id, HubUser: actor}
-			if !allow(fn, r.Context(), v, r.Method, r.URL.Path) {
+			if !allow(fn, r.Context(), v, r.Method, r.URL.EscapedPath()) {
 				refuseLink(w)
 				return
 			}

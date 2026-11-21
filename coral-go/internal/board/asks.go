@@ -330,7 +330,7 @@ type askRow struct {
 func (s *Store) answeredBy(ctx context.Context, project string, a askRow, member string, subs map[string]Subscriber) (bool, error) {
 	var replied bool
 	if err := s.reader().GetContext(ctx, &replied, `SELECT EXISTS(SELECT 1 FROM board_messages m JOIN board_replies r ON r.message_id = m.id
-		WHERE m.project = ? AND m.id > ? AND m.subscriber_id = ? AND COALESCE(m.is_system, 0) = 0 AND r.reply_to = ?)`, project, a.floor(), member, a.MessageID); err != nil {
+		WHERE m.project = ? AND m.id > ? AND m.subscriber_id = ? AND COALESCE(m.is_system, 0) = 0 AND COALESCE(m.no_answer, 0) = 0 AND r.reply_to = ?)`, project, a.floor(), member, a.MessageID); err != nil {
 		return false, err
 	}
 	if replied {
@@ -345,7 +345,7 @@ func (s *Store) answeredBy(ctx context.Context, project string, a askRow, member
 		}
 		// The substring narrows the posts to those that may tag the asker; the word-boundary test below decides.
 		if err := s.reader().SelectContext(ctx, &posts, `SELECT id, content FROM board_messages
-			WHERE project = ? AND id > ? AND subscriber_id = ? AND COALESCE(is_system, 0) = 0
+			WHERE project = ? AND id > ? AND subscriber_id = ? AND COALESCE(is_system, 0) = 0 AND COALESCE(no_answer, 0) = 0
 			  AND (instr(lower(content), lower('@' || ?)) > 0 OR (? != '' AND instr(lower(content), lower('@' || ?)) > 0))
 			  AND NOT EXISTS (SELECT 1 FROM board_replies r WHERE r.message_id = board_messages.id AND r.reply_to != ?)
 			ORDER BY id LIMIT 200`, project, last, member, a.Asker, title, title, a.MessageID); err != nil {

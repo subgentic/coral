@@ -121,57 +121,74 @@ func TestOnlyThePersonAtThisComputerWritesTheAskList(t *testing.T) {
 	assert.Equal(t, 404, c)
 }
 
-// An answer is a reply_to the server resolves to an ask in its own record (open or closed), never a marker or a words rule: through an added link such a reply needs message_reply, a reply_to that resolves to
-// nothing is refused, and a post that drops the marker answers nothing.
-func TestAReplyThatAnswersAnAskNeedsMessageReplyThroughAnAddedHub(t *testing.T) {
+// A post that arrives through a link added here without message_reply never counts as an answer, by reply_to or by an @mention of the asker, and is still delivered; with the row, or through the enrollment's own link,
+// it answers as it always has. Both forms, through the real router.
+func TestAPostThroughAnAddedHubAnswersAnAskOnlyWithMessageReply(t *testing.T) {
 	r, enrolled, hubOf, local := askWorld(t)
 	h := r.srv.Router()
 	ctx := context.Background()
 	bs := r.srv.boardStore
-	for _, who := range []string{"Lead", "Dev"} {
+	for _, who := range []string{"Lead", "Operator"} {
 		_, err := bs.Subscribe(ctx, "team", who, who, "", nil, "all")
 		require.NoError(t, err)
 	}
-	q, err := bs.PostMessage(ctx, "team", "Lead", "@Dev which design do we ship?", nil)
-	require.NoError(t, err)
-	to, err := bs.AskTargets(ctx, "team", "Lead", q.Content)
-	require.NoError(t, err)
-	require.NoError(t, bs.RecordAsk(ctx, "team", q, to))
-	plain, err := bs.PostMessage(ctx, "team", "Lead", "just a note", nil)
-	require.NoError(t, err)
-	post := func(link string, replyTo int64, text string) (int, string) {
-		b, _ := json.Marshal(map[string]any{"subscriber_id": "Dev", "content": text, "reply_to": replyTo})
+	ask := func(text string) int64 {
+		q, err := bs.PostMessage(ctx, "team", "Lead", text, nil)
+		require.NoError(t, err)
+		to, err := bs.AskTargets(ctx, "team", "Lead", q.Content)
+		require.NoError(t, err)
+		require.NoError(t, bs.RecordAsk(ctx, "team", q, to))
+		return q.ID
+	}
+	open := func(id int64) bool {
+		m, err := bs.GetMessageByID(ctx, "team", id)
+		require.NoError(t, err)
+		require.NotNil(t, m.Ask)
+		return len(m.Ask.Open) > 0 && !m.Ask.Closed
+	}
+	post := func(link string, body map[string]any) (int, string) {
+		body["subscriber_id"] = "Operator"
+		b, _ := json.Marshal(body)
 		rec := call(h, "POST", "/api/board/team/messages", string(b), hubOf(link))
 		return rec.Code, rec.Body.String()
 	}
-	refusedBy := func(code int, body string) bool { return code == 403 && codeOf(body) == cloud.LinkRefusedCode }
+	byReply := func(id int64) map[string]any { return map[string]any{"content": "ship A", "reply_to": id} }
+	byMention := map[string]any{"content": "@Lead ship A"}
 
-	c, b := post(askAdded, q.ID, "ship A")
-	assert.True(t, refusedBy(c, b), "no message_reply: "+b)
-	c, b = post(askAdded, 987654, "ship A")
-	assert.True(t, refusedBy(c, b), "a reply_to that resolves to nothing is refused, never passed on: "+b)
-	c, b = post(askAdded, -1, "ship A")
-	assert.True(t, refusedBy(c, b))
-	c, b = post(askAdded, plain.ID, "ack")
-	assert.False(t, refusedBy(c, b), "a reply to a message that is no ask answers none: "+b)
-	c, b = post(askAdded, 0, "@Lead ship A (no marker: not an answer)")
-	assert.False(t, refusedBy(c, b), "a post with no reply_to is an ordinary post: "+b)
-	got, err := bs.GetMessageByID(ctx, "team", q.ID)
-	require.NoError(t, err)
-	require.NotNil(t, got.Ask)
-	assert.False(t, got.Ask.Closed, "dropping the marker answers nothing")
+	q1 := ask("@Operator which design? (reply)")
+	c, b := post(askAdded, byReply(q1))
+	assert.Equal(t, 200, c, "the post is delivered: "+b)
+	assert.True(t, open(q1), "but it answers nothing: a reply_to through a link with no message_reply")
+	q2 := ask("@Operator which design? (mention)")
+	c, b = post(askAdded, byMention)
+	assert.Equal(t, 200, c, "delivered: "+b)
+	assert.True(t, open(q2), "an @mention of the asker answers nothing either")
+	assert.True(t, open(q1))
+	c, _ = post(askAdded, map[string]any{"content": "ship A", "reply_to": 987654})
+	assert.Equal(t, 400, c, "an unresolvable reply_to is still the handler's own 400")
 
-	c, b = post(enrolled, q.ID, "ship A")
-	assert.False(t, refusedBy(c, b), "the enrollment's own link answers as it always has: "+b)
+	// The same posts through the enrollment's own link answer, as they always have.
+	c, b = post(enrolled, byReply(q1))
+	require.Equal(t, 200, c, b)
+	assert.False(t, open(q1), "unchanged for the enrollment's link")
 
+	// With the row the added link answers too, both forms.
 	code, body := local("PUT", "/api/cloud/links/"+askAdded+"/asks", `{"kind":"message_reply","allow":true}`)
 	require.Equal(t, 200, code, body)
-	c, b = post(askAdded, q.ID, "ship A")
-	assert.False(t, refusedBy(c, b), "allowed: "+b)
-	// And a task reply that names an ask is the same thing.
+	c, b = post(askAdded, byMention)
+	require.Equal(t, 200, c, b)
+	assert.False(t, open(q2), "allowed: the mention answers")
+	q3 := ask("@Operator once more")
+	c, b = post(askAdded, byReply(q3))
+	require.Equal(t, 200, c, b)
+	assert.False(t, open(q3), "allowed: the reply answers")
+
+	// Taken away again: the next post answers nothing.
 	local("PUT", "/api/cloud/links/"+askAdded+"/asks", `{"kind":"message_reply","allow":false}`)
-	c, b = post(askAdded, q.ID, "ship A")
-	assert.True(t, refusedBy(c, b), "stopped again")
+	q4 := ask("@Operator and again")
+	c, _ = post(askAdded, byMention)
+	assert.Equal(t, 200, c)
+	assert.True(t, open(q4), "stopped: read on every post")
 }
 
 // Adding a route or a code path that answers or closes an ask must fail here until it is mapped: the files that call the functions which answer or close one are pinned, each with where its callers are gated.

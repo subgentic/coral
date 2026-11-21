@@ -45,3 +45,22 @@ func TestTheAskRouteTableMapsEachAnsweringRouteOnce(t *testing.T) {
 		seen[p] = true
 	}
 }
+
+// Fail closed (Security's MUST 2): a spelling of an ask route the table does not know, under the ask prefixes, is local-only and never "not an ask route"; a plain path that names none of them is not touched.
+func TestNonCanonicalPathsUnderTheAskPrefixesFailClosed(t *testing.T) {
+	for _, p := range []string{
+		"//api/agent-asks/1/dismiss", "/api/agent-asks//1/dismiss", "/api/agent-asks/1/dismiss/", "/api/agent-asks/./1/dismiss", "/api/x/../agent-asks/1/dismiss",
+		"/api/agent-asks%2F1/dismiss", "/api/agent-asks/1%2Fdismiss", "/api/agent-asks/1/dismiss%2F", "/api/agent-asks/%2e%2e/agent-asks/1/dismiss", "/api/agent-asks\\1/dismiss",
+		"/api/board/team/asks/1/close/", "/api/board/team//asks/1/close", "/api/board/team/asks/1/buttons/1%2Fclaim", "/api/board/team/%2e/asks/1/close", "/api/board/team/asks/%2F/close",
+		"/api/board/team/proposals/1/approve/", "/api/board/team/proposals/1//approve", "/api/board/team/artifacts/ab/review/", "/api/board/team/artifacts%2Fab/review", "/api/board/team/artifacts/ab/%72eview/",
+		"/api/agent-asks/1/dismiss%00", "/api/agent-asks/%zz/dismiss", "/api/AGENT-ASKS//1/dismiss",
+	} {
+		assert.Equal(t, AskKindLocalOnly, AskRouteKind("POST", p), p)
+		assert.Equal(t, AskKindLocalOnly, AskRouteKind("GET", p), "any method: "+p)
+	}
+	for _, p := range []string{"/api/board/team/messages", "/api/sessions/live/x/send", "/api/board/team//messages", "/api/board/team/tasks/1/reply/", "/api/cloud/links/lnk-aaaaaaaa/cap", ""} {
+		assert.Equal(t, "", AskRouteKind("POST", p), p)
+	}
+	// A legitimate encoded segment (a team name with a space) still maps.
+	assert.Equal(t, AskKindAskButton, AskRouteKind("POST", "/api/board/My%20Team/asks/1/close"))
+}

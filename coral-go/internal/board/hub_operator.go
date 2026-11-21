@@ -76,6 +76,16 @@ const HubActionKindWrite = "write"
 // HubActionKindStream is the Kind of the WS-OPEN and WS-CLOSE rows of a tunneled WebSocket (#20405, #20449): a stream has its own bound, so a flood of opens cannot push write rows out of their newest 1000.
 const HubActionKindStream = "stream"
 
+type noAnswerKey struct{}
+
+// WithNoAnswer marks the posts stored under ctx as never counting as an answer to an ask (#20413): the request came through a Hub link that may not answer asks. The post is delivered as any other.
+func WithNoAnswer(ctx context.Context) context.Context {
+	return context.WithValue(ctx, noAnswerKey{}, true)
+}
+
+// NoAnswerFrom says ctx carries WithNoAnswer.
+func NoAnswerFrom(ctx context.Context) bool { v, _ := ctx.Value(noAnswerKey{}).(bool); return v }
+
 // hubOperatorActionsKept bounds each kind of the table: the newest actions of that kind are kept (the write rows are many; the security rows must outlast them).
 const hubOperatorActionsKept = 1000
 
