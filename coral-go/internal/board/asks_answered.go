@@ -36,7 +36,7 @@ func (s *Store) AnsweredAsksOf(ctx context.Context, project, member string, now 
 		JOIN board_replies r ON r.project = a.project AND r.reply_to = a.message_id
 		JOIN board_messages m ON m.project = r.project AND m.id = r.message_id
 		WHERE a.project = ? AND a.created_at > ?
-		  AND lower(m.subscriber_id) = lower(?) AND COALESCE(m.is_system, 0) = 0
+		  AND lower(m.subscriber_id) = lower(?) AND COALESCE(m.is_system, 0) = 0 AND COALESCE(m.no_answer, 0) = 0
 		  AND lower(a.asker) != lower(?)
 		  AND EXISTS (SELECT 1 FROM json_each(a.asked) j WHERE lower(j.value) = lower(?))
 		  AND NOT EXISTS (SELECT 1 FROM board_ask_closed c WHERE c.project = a.project AND c.message_id = a.message_id)

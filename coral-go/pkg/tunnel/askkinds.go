@@ -1,6 +1,9 @@
 package tunnel
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 // The asks a Hub may answer for the Operator, per link (#20413, Security's gate item c). The vocabulary is closed: a kind that is not here cannot be stored, listed or allowed, by a Hub or by the person at this
 // computer. A permission prompt, a custom-check approval, a device-key approval and an approved proposal (work agents run) are not in it and have no route a Hub can answer them through.
@@ -53,9 +56,30 @@ func AskRoutePatterns() []string {
 	return out
 }
 
-// AskRouteKind is the ask kind a request answers by its method and path, "" when the route is not one that answers an ask.
+// AskRouteKind is the ask kind a request answers by its method and path (the path as it was sent: URL.EscapedPath), "" when the route is not one that answers an ask. It fails closed: a path that is not in its
+// canonical form (an empty or trailing segment, a dot segment, an encoded slash or backslash, a bad escape) and that names anything of the ask prefixes (asks, agent-asks, proposals, review) is AskKindLocalOnly,
+// whatever the router would make of it, so a spelling the table does not know is refused for a link that may answer nothing and never slips past as "not an ask route".
 func AskRouteKind(method, path string) string {
-	segs := strings.Split(strings.Trim(path, "/"), "/")
+	segs := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	canonical := strings.HasPrefix(path, "/")
+	names := false
+	for i, raw := range segs {
+		u, err := url.PathUnescape(raw)
+		if err != nil || u == "" || u == "." || u == ".." || strings.ContainsAny(u, "/\\") || strings.IndexFunc(u, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+			canonical = false
+		}
+		low := strings.ToLower(raw + " " + u)
+		if strings.Contains(low, "ask") || strings.Contains(low, "proposal") || strings.Contains(low, "review") {
+			names = true
+		}
+		segs[i] = u
+	}
+	if !canonical {
+		if names {
+			return AskKindLocalOnly
+		}
+		return ""
+	}
 	for _, r := range askRoutes {
 		if r.method != method {
 			continue

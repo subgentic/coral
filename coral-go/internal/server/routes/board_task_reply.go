@@ -18,6 +18,7 @@ import (
 // written or a board is made. The creator's mention is added only when it tags exactly the creator (board.TaskReplyMention); otherwise the reply is stored with its task_id, nobody
 // is notified and the answer carries the warning creator_not_reachable. A reply never changes the task.
 func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
+	r = markNoAnswer(r) // a task reply through a Hub link that may not answer asks answers none (#20413)
 	project := urlParam(r, "project")
 	taskID, err := parseID(chi.URLParam(r, "taskID"))
 	if err != nil || taskID <= 0 {
@@ -38,15 +39,12 @@ func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "reply_to is not a message of this board") // before anything is posted
 		return
 	}
-	if derr == nil && h.refuseUnallowedReply(w, r, project, in.ReplyTo) { // a task reply that answers an ask is a message_reply through a Hub (#20413)
-		return
-	}
 	reply := &taskReply{taskID: taskID, creator: task.CreatedBy}
 	msg, ok := h.postMessageCore(w, r, project, derr, postMessageBody{Content: in.Content, ReplyTo: in.ReplyTo}, reply)
 	if !ok {
 		return
 	}
-	if in.ReplyTo > 0 {
+	if in.ReplyTo > 0 && !board.NoAnswerFrom(r.Context()) {
 		if err := h.bs.RecordReply(r.Context(), project, msg.ID, in.ReplyTo); err != nil {
 			slog.Warn("board reply not recorded", "board", project, "message", msg.ID, "error", err)
 		}

@@ -106,9 +106,13 @@ func (s *Store) insertMessage(ctx context.Context, project, subscriberID, conten
 	if hubUser != "" {
 		hubUserVal = &hubUser
 	}
+	noAnswer := 0
+	if NoAnswerFrom(ctx) {
+		noAnswer = 1
+	}
 	result, err := s.execEnsuringBoard(ctx, project,
-		"INSERT INTO board_messages (project, session_id, subscriber_id, content, target_group_id, created_at, origin, hub_user, is_system, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		project, subscriberID, subscriberID, content, targetGroupID, now, originVal, hubUserVal, system, taskID)
+		"INSERT INTO board_messages (project, session_id, subscriber_id, content, target_group_id, created_at, origin, hub_user, is_system, task_id, no_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		project, subscriberID, subscriberID, content, targetGroupID, now, originVal, hubUserVal, system, taskID, noAnswer)
 	if err != nil {
 		return nil, err
 	}
