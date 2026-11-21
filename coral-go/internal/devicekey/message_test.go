@@ -214,7 +214,14 @@ type vector struct {
 	Body            string `json:"body"`
 	SigningInputHex string `json:"signing_input_hex,omitempty"`
 	Refused         bool   `json:"refused,omitempty"`
+	// Version 3 (relayed kinds, #20513): the exact request body the Hub relays and its SHA-256, which `body` carries as body_sha256. A vector with Mismatch set must be refused as body_hash: its request_body is not the signed one.
+	Version     int    `json:"version,omitempty"`
+	RequestBody string `json:"request_body,omitempty"`
+	BodySHA256  string `json:"body_sha256,omitempty"`
+	Mismatch    bool   `json:"body_mismatch,omitempty"`
 }
+
+const relayedVectorBody = `{"text":"run the tests","agent":"Backend Dev"}`
 
 func TestVectorsFile(t *testing.T) {
 	f := fixture(t)
@@ -233,12 +240,25 @@ func TestVectorsFile(t *testing.T) {
 	} {
 		want = append(want, vector{Name: r.n, Action: "raise-mode", Body: r.body, Refused: true})
 	}
+	for _, k := range devicekey.RelayedKinds {
+		c, err := f.relayed(k, relayedVectorBody).Canonical()
+		require.NoError(t, err)
+		want = append(want, vector{Name: "v3 " + string(k), Action: string(k), Version: 3, Body: string(c), RequestBody: relayedVectorBody, BodySHA256: devicekey.BodySHA256([]byte(relayedVectorBody)),
+			SigningInputHex: hex.EncodeToString(devicekey.RelayedSigningInput(k, c))})
+	}
+	v3good, _ := f.relayed(devicekey.SendToAgent, relayedVectorBody).Canonical()
+	want = append(want,
+		vector{Name: "v3 refused: body is not the signed one", Action: "send-to-agent", Version: 3, Body: string(v3good), RequestBody: strings.Replace(relayedVectorBody, "run the tests", "run the tests ", 1), BodySHA256: devicekey.BodySHA256([]byte(relayedVectorBody)), Mismatch: true},
+		vector{Name: "v3 refused: upper-case hash", Action: "send-to-agent", Version: 3, Refused: true, Body: strings.Replace(string(v3good), devicekey.BodySHA256([]byte(relayedVectorBody)), strings.ToUpper(devicekey.BodySHA256([]byte(relayedVectorBody))), 1)},
+		vector{Name: "v3 refused: hash missing", Action: "send-to-agent", Version: 3, Refused: true, Body: strings.Replace(string(v3good), `,"body_sha256":"`+devicekey.BodySHA256([]byte(relayedVectorBody))+`"`, "", 1)},
+		vector{Name: "v3 refused: spaces", Action: "send-to-agent", Version: 3, Refused: true, Body: strings.Replace(string(v3good), `"ts":`, `"ts": `, 1)},
+	)
 	doc := struct {
 		Note    string            `json:"note"`
 		Keys    map[string]string `json:"keys"`
 		Vectors []vector          `json:"vectors"`
 	}{
-		Note:    "Device keys step 2 (coral-hub wire format draft 7, section 10). Signing input = \"coral-hub/device-keys/2/\" + action + 0x00 + body. Keys: P-256 points from fixed scalars (byte i = seed+i, first byte & 0x7f), computer = base64url SHA-256 of the 32 X25519 public bytes of the private key \"0123456789abcdef0123456789abcdef\".",
+		Note:    "Device keys step 2 (coral-hub wire format draft 7, section 10). Signing input = \"coral-hub/device-keys/2/\" + action + 0x00 + body. Version 3 (step 4(b), relayed kinds with a body): signing input = \"coral-hub/device-keys/3/\" + kind + 0x00 + body, the body's keys being kid, computer, ts, nonce, link, hub_user, body_sha256 (lower-case hex SHA-256 of the exact request body, request_body here); the five-minute window; the computer refuses a request body whose hash is not the signed one (body_hash). Keys: P-256 points from fixed scalars (byte i = seed+i, first byte & 0x7f), computer = base64url SHA-256 of the 32 X25519 public bytes of the private key \"0123456789abcdef0123456789abcdef\".",
 		Keys:    map[string]string{"signer_pk": f.signerPK, "signer_kid": f.signerKID, "target_pk": f.targetPK, "target_kid": f.targetKID, "passkey_pk": f.passkeyPK, "computer": f.computer, "nonce": f.nonce},
 		Vectors: want,
 	}
@@ -253,6 +273,17 @@ func TestVectorsFile(t *testing.T) {
 	assert.Equal(t, string(out)+"\n", string(have), "regenerate with DEVICEKEY_VECTORS_UPDATE=1 only when the format is meant to change")
 	// every refused vector is refused, every other one parses
 	for _, v := range want {
+		if v.Version == 3 {
+			m, err := devicekey.ParseRelayed(devicekey.Kind(v.Action), []byte(v.Body))
+			if v.Refused {
+				assert.ErrorIs(t, err, devicekey.ErrBadForm, v.Name)
+				continue
+			}
+			require.NoError(t, err, v.Name)
+			assert.Equal(t, v.BodySHA256, m.BodySHA256, v.Name)
+			assert.Equal(t, !v.Mismatch, devicekey.BodySHA256([]byte(v.RequestBody)) == m.BodySHA256, v.Name)
+			continue
+		}
 		_, err := devicekey.Parse(devicekey.Action(v.Action), []byte(v.Body))
 		if v.Refused {
 			assert.ErrorIs(t, err, devicekey.ErrBadForm, v.Name)
