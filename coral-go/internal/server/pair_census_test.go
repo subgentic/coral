@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -70,6 +71,9 @@ func TestEveryTunnelWriteRouteRecordsThePairOrIsListedPending(t *testing.T) {
 func TestPairRecordedRoutesRecordThePairThroughTheRealConnector(t *testing.T) {
 	g := newInteg(t)
 	ctx := context.Background()
+	was := routes.RefusedRowsPerMinute
+	routes.RefusedRowsPerMinute = 1 << 20 // each route is called once and most answer with a refusal: the cap has its own test below
+	t.Cleanup(func() { routes.RefusedRowsPerMinute = was })
 	count := func() []board.HubOperatorAction {
 		acts, err := g.srv.boardStore.RecentHubOperatorActions(ctx, 1000)
 		require.NoError(t, err)
@@ -78,13 +82,14 @@ func TestPairRecordedRoutesRecordThePairThroughTheRealConnector(t *testing.T) {
 	for route := range pairRecordedRoutes {
 		method, pattern, _ := strings.Cut(route, " ")
 		before := len(count())
-		code, body := g.hub("owner", integOwner, method, pattern, `{"secret":"SENTINEL"}`, nil)
+		path := strings.NewReplacer("{id}", map[bool]string{true: strings.Repeat("a", 64), false: "1"}[strings.HasPrefix(pattern, "/api/artifacts/")], "{cid}", "1").Replace(pattern)
+		code, body := g.hub("owner", integOwner, method, path, `{"secret":"SENTINEL"}`, nil)
 		_ = body // any answer counts, a refusal too: the row is what is proven
 		acts := count()
 		rows := acts[:len(acts)-before]
 		var mine []board.HubOperatorAction
 		for _, a := range rows {
-			if a.Method == method && a.Path == pattern {
+			if a.Method == method && (a.Path == pattern || a.Path == path) { // the wrapper writes the pattern; a handler that records itself writes the path it was called on
 				mine = append(mine, a)
 			}
 		}
