@@ -62,7 +62,11 @@ export function decorateMessage(row, tr) {
         const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-quiet btn-small inbox-preview-toggle'; more.textContent = 'Show all'; more.hidden = true; more.setAttribute('aria-expanded', 'false');
         more.addEventListener('click', e => { e.stopPropagation(); const open = preview.classList.toggle('inbox-preview-expanded'); more.textContent = open ? 'Show less' : 'Show all'; more.setAttribute('aria-expanded', String(open)); });
         const footer = mail && tr.querySelector('.inbox-mail-footer'); if (footer) footer.before(more); else preview.after(more);
-        const observer = new ResizeObserver(() => { if (!preview.isConnected) { observer.disconnect(); return; } if (!preview.classList.contains('inbox-preview-expanded')) more.hidden = text.scrollHeight <= text.clientHeight + 1; });
-        observer.observe(text); // Recheck on viewport/text-size changes; removal reports zero size and disconnects the observer.
+        // The clamp is on the text, so its box stops at four lines: growing from 4 lines to 5 or 6 (a late font, a wider scrollbar, the text arriving) changes no size the observer watches. Recheck on a size change of the text or its row, a change of the words, and when fonts settle (#20300: 'Show all' was missing on 1 run in 10).
+        const recheck = () => { if (!preview.isConnected) return false; if (!preview.classList.contains('inbox-preview-expanded')) more.hidden = text.scrollHeight <= text.clientHeight + 1; return true; };
+        const observer = new ResizeObserver(() => { if (!recheck()) observer.disconnect(); });
+        observer.observe(text); observer.observe(preview); // Recheck on viewport/text-size changes; removal reports zero size and disconnects the observer.
+        const words = new MutationObserver(() => { if (!recheck()) words.disconnect(); }); words.observe(text, { childList: true, characterData: true, subtree: true });
+        document.fonts?.ready?.then(recheck).catch(() => {});
     }
 }
