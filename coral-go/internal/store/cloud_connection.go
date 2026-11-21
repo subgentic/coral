@@ -307,9 +307,17 @@ func (s *CloudStore) BlockOwner(ctx context.Context, serverID string) error {
 
 // Delete forgets the enrollment and its sealed token.
 func (s *CloudStore) Delete(ctx context.Context) error {
-	if _, err := s.db.ExecContext(ctx, "DELETE FROM cloud_connection WHERE id = 1"); err != nil {
+	// One transaction: a failure cannot leave a link and its sealed token after the enrollment is gone.
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, "DELETE FROM cloud_link") // the link goes with the enrollment (slice 1: they are one)
-	return err
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "DELETE FROM cloud_connection WHERE id = 1"); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM cloud_link"); err != nil { // the link goes with the enrollment (slice 1: they are one)
+		return err
+	}
+	return tx.Commit()
 }

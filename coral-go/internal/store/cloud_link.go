@@ -61,13 +61,16 @@ func NewLinkID() (string, error) {
 	return "lnk-" + hex.EncodeToString(b[:]), nil
 }
 
-// CanonicalHubOrigin is the key of a link: scheme://host[:port] in lower case, with no path, query, fragment or user information, the host in punycode, a trailing dot
+// CanonicalHubOrigin is the key of a link: scheme://host[:port] in lower case. An address with a path (other than a bare slash), a query, a fragment or user information is refused, not collapsed. The host in punycode, a trailing dot
 // and the scheme's default port dropped. https only; http is accepted for a loopback host (a dev Hub on this computer). Anything else is an error, so two spellings of one Hub are
 // one key and a URL that names no Hub is no key.
 func CanonicalHubOrigin(raw string) (string, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return "", errors.New("not a Hub address")
+	}
+	if u.Path != "" && u.Path != "/" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.Contains(strings.TrimSpace(raw), "#") {
+		return "", errors.New("a Hub address is the site only: no path, query or fragment")
 	}
 	if u.User != nil {
 		return "", errors.New("a Hub address has no user name or password")
