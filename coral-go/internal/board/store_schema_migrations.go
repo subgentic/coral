@@ -36,9 +36,9 @@ func (s *Store) migrateBoardColumns(ctx context.Context) {
 		"ALTER TABLE board_messages ADD COLUMN origin TEXT",
 		"ALTER TABLE board_messages ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0",
 		"ALTER TABLE board_messages ADD COLUMN hub_user TEXT",
+		"ALTER TABLE board_messages ADD COLUMN task_id INTEGER", // the task a reply answers (#5463): null for every message that is not a reply to a task
 		"ALTER TABLE board_messages ADD COLUMN via_link TEXT", // the Hub link and person a tunneled post arrived through (#20387); NULL for a local post
 		"ALTER TABLE board_messages ADD COLUMN via_hub_user TEXT",
-		"ALTER TABLE board_messages ADD COLUMN task_id INTEGER", // the task a reply answers (#5463): null for every message that is not a reply to a task
 		"ALTER TABLE board_tasks ADD COLUMN parked_reason TEXT",
 		"ALTER TABLE board_tasks ADD COLUMN parked_until TEXT",
 		"ALTER TABLE board_tasks ADD COLUMN parked_at TEXT", // when the task was parked (#11660): the health check lists parks older than a day; NULL on a park made before it was recorded
