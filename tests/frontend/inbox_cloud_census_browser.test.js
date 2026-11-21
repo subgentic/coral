@@ -14,8 +14,8 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
 const HISTORY_KEYS = ['type', 'source_types', 'date_from', 'date_to', 'q', 'page', 'page_size', 'fts_mode'];
 // What the plan adds (section 3, rows 1 to 6).
 const ADDED_ROUTE = '/api/sessions/history/counts';
-// The Hub-served Inbox's Goals and Artifacts folders (#11071): two more View routes, each read once a computer with their own query keys. A route outside these is still a stray.
-const FOLDER_ROUTES = { '/api/goals': ['limit', 'state'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first', 'facets'] };
+// Goals and Artifacts (#11071), plus the owner-only Activity folder (#20394): explicit folder opens read these View routes with their bounded query keys. Activity is forbidden before its folder click below; the census itself opens every folder.
+const FOLDER_ROUTES = { '/api/activity': ['limit', 'before'], '/api/goals': ['limit', 'state'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first', 'facets'] };
 const ADDED_KEYS = ['active', 'agent_name', 'archived', 'starred', 'with_notes'];
 // #13958: the Inbox badge is dashboard chrome on every tab. It reads one
 // owner-protected attention summary per computer; it never loads a file window.
@@ -138,7 +138,12 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         const ui = await ev(`(() => ({ frame: !!document.getElementById('inbox-frame'), local: !!document.getElementById('inbox-local') && !document.getElementById('inbox-local').hidden, folders: [...document.querySelectorAll('#inbox-nav-list button')].length }))()`);
         if (ui.local && ui.folders > 0) {
             const n = ui.folders;
-            for (let i = 0; i < n; i++) { await ev(`(() => { const els = [...document.querySelectorAll('#inbox-nav-list button')]; els[${i}] && els[${i}].click(); return true; })()`); await ev(`window.__quiet()`); }
+            assert.ok(!shape(await ev(`window.__census`)).some(r => r.p === '/api/activity'), 'Activity is not read on load or while only Chats/Board folders are used');
+            for (let i = 0; i < n; i++) {
+                const activity = await ev(`(() => { const els = [...document.querySelectorAll('#inbox-nav-list button')], button = els[${i}], activity = !!button?.closest('[data-key="activity"]'); if (activity) window.__census.push({m:'MARK',p:'activity-open',keys:[]}); button?.click(); return activity; })()`);
+                if (activity) await waitFor(`window.__census.filter(r=>r.m==='GET'&&r.p.endsWith('/api/activity')).length===window.__computers.filter(c=>c.online).length`, 'the explicitly opened Activity reads its linked computers', 15000);
+                await ev(`window.__quiet()`);
+            }
             tabbed = ['the Inbox tab was driven: ' + n + ' folders'];
             // the Inbox's search field, typed in key by key on a chat folder and then committed with Enter: the table toolbar's field (the sidebar's box, whose action is inbox-search-filter in app_actions.js, is not shown above it, #11859)
             await ev(`(() => { const all = [...document.querySelectorAll('#inbox-nav-list button')].find(b => /all chats/i.test(b.textContent)); all && all.click(); return true; })()`); await ev(`window.__quiet()`);
@@ -173,9 +178,16 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         assert.ok(opens, 'the opens were bounded by their marks');
         assert.deepEqual(opens.map(r => `${r.m} ${r.p} ?${r.keys}`), [], 'three chats opened send no request: no history read, no counts read (the unread numbers are updated in memory)');
         const online = await ev(`window.__computers.filter(c => c.online).length`);
+        const activityAt = inboxAll.findIndex(r => r.m === 'MARK' && r.p === 'activity-open');
+        const activityReads = inboxAll.map((r,i)=>({...r,index:i})).filter(r => r.proxied && r.p === '/api/activity');
+        assert.ok(activityAt >= 0, 'the census explicitly opens Activity with the other sidebar folders');
+        assert.equal(activityReads.length, online, 'opening Activity reads each online computer once');
+        assert.ok(activityReads.every(r => r.index > activityAt && r.query.limit === '200'), 'each bounded Activity read follows its explicit folder click');
+        console.log('Activity read phase: '+JSON.stringify({beforeOpen:0,afterOpen:activityReads.length,queryKeys:activityReads.map(r=>r.keys)}));
         // then the Inbox is left alone for 30 seconds: no timer of the Inbox asks the computers again (the idle census below)
         await new Promise(r => setTimeout(r, 30000)); // sleep-ok: the observation is that nothing happens in 30 s (coral-hub Security's condition), there is no event to wait for
         const idle = shape(await take());
+        assert.ok(!idle.some(r=>r.p==='/api/activity'),'closed Activity sends no idle read');
 
         // 3. the census
         const unproxied = inbox.filter(r => !r.proxied && /^\/api\/sessions\/history(\/|$)/.test(r.p));
@@ -188,7 +200,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         const stray = [], newKeys = new Set(), newRoutes = new Set();
         for (const [route, keys] of keysByPath(proxied)) {
             const base = baseline.get(route);
-            if (!base) { if (route === `GET ${ADDED_ROUTE}`) { newRoutes.add(route); if (keys.size) stray.push(`${route} sent keys ${[...keys]}`); } else if (route.startsWith('GET ') && FOLDER_ROUTES[route.slice(4)]) { for (const k of keys) if (!FOLDER_ROUTES[route.slice(4)].includes(k)) stray.push(`${route} ?${k} is not a key of the Goals, Artifacts or Starred folder`); } else stray.push(`${route} is not a route the Chats and Board tabs call, nor the plan's`); continue; }
+            if (!base) { if (route === `GET ${ADDED_ROUTE}`) { newRoutes.add(route); if (keys.size) stray.push(`${route} sent keys ${[...keys]}`); } else if (route.startsWith('GET ') && FOLDER_ROUTES[route.slice(4)]) { for (const k of keys) if (!FOLDER_ROUTES[route.slice(4)].includes(k)) stray.push(`${route} ?${k} is not a key of the Activity, Goals, Artifacts or Starred folder`); } else stray.push(`${route} is not a route the Chats and Board tabs call, nor the plan's`); continue; }
             for (const k of keys) if (!base.has(k)) { if (route === 'GET /api/sessions/history' && ADDED_KEYS.includes(k)) newKeys.add(k); else if (!(route.startsWith('GET ') && FOLDER_ROUTES[route.slice(4)]?.includes(k))) stray.push(`${route} ?${k} is not a key of the baseline or the plan`); }
         }
         assert.deepEqual(stray, [], 'every request is the baseline or the plan\'s: ' + JSON.stringify(stray));
