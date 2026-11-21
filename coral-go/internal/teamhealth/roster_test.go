@@ -35,7 +35,7 @@ func TestActionListOpensWithWhatToDoOldestFirstAndEndsWithCounts(t *testing.T) {
 	assert.Equal(t, "[Coral health check] 08:05Z · Orchestrator, act on these (oldest first):", lines[0])
 	assert.Equal(t, "1) DevOps Engineer has waited 19 min on YOU. Answer them.", lines[1], "what waits on the recipient is first, oldest first")
 	assert.Equal(t, "2) QA Engineer has waited 12 min on YOU (their last message is #140100). Answer them.", lines[2])
-	assert.Equal(t, "3) Digital Ocean Expert: asleep with 2 messages for it unread since 07:23. Suggest: wake it. [ack "+ItemID("asleep|Digital Ocean Expert")+"]", lines[3], "then the oldest of the rest: 42 min")
+	assert.Equal(t, "3) [ack "+ItemID("asleep|Digital Ocean Expert")+"] Digital Ocean Expert: asleep with 2 messages for it unread since 07:23. Suggest: wake it.", lines[3], "then the oldest of the rest: 42 min")
 	assert.Equal(t, "4) Frontend Dev has waited 37 min on Security Reviewer; Security Reviewer has not mentioned them since. Ask Security Reviewer what is holding it, or check Security Reviewer.", lines[4])
 	assert.Equal(t, "5) Lead Developer has waited 17 min although Security Reviewer has posted a message mentioning them since: check Lead Developer.", lines[5])
 	assert.Equal(t, "Since 07:55: 55 posts.", lines[len(lines)-2], "post volume is a count, never 'progressing'")
@@ -199,4 +199,27 @@ func TestSleeperBroadcastsAreCountedInTheHeaderOnly(t *testing.T) {
 	assert.False(t, r.NeedsAttention(), "a broadcast is no reason to speak")
 	r.SleeperBroadcasts = 0
 	assert.Equal(t, "1 working · 0 waiting · 2 asleep · 0 claimable tasks", r.headerCounts())
+}
+
+// #20398: every action line starts with its ack id (a line cut short for the eye still has it), and action_list.max_items caps how many a check says, counting the rest.
+func TestActionLinesStartWithTheirAckIdAndMaxItemsCapsThem(t *testing.T) {
+	r := &Roster{Recipient: "Orchestrator", Counts: counts(1, 0, 0, 3, 0, 0)}
+	in := listIn(r)
+	for _, n := range []string{"A", "B", "C"} {
+		in.Items = append(in.Items, Item{Rank: 2, Age: min10(40), Agent: n, Problem: "is idle", Key: "idle|" + n, State: "1"})
+	}
+	lines := ComposeLines(in)
+	for i, n := range []string{"A", "B", "C"} {
+		assert.True(t, strings.HasPrefix(lines[1+i], fmt.Sprintf("%d) [ack %s] %s: is idle", 1+i, ItemID("idle|"+n), n)), lines[1+i])
+		assert.NotContains(t, lines[1+i], "] [ack", "one id per line")
+		assert.False(t, strings.HasSuffix(lines[1+i], "]"), "no id at the end any more: "+lines[1+i])
+	}
+	assert.NotContains(t, strings.Join(lines, "\n"), "more:", "no cap: all three")
+	in.Rules.MaxItems = 2
+	capped := strings.Join(ComposeLines(in), "\n")
+	assert.Contains(t, capped, "2) [ack")
+	assert.NotContains(t, capped, "3) [ack")
+	assert.Contains(t, capped, "and 1 more:")
+	in.Rules.MaxItems = 0
+	assert.Contains(t, strings.Join(ComposeLines(in), "\n"), "3) [ack", "0 is as many as fit")
 }

@@ -264,7 +264,7 @@ func TestHealthCheckScenario(t *testing.T) {
 	assert.Len(t, typedTo("Rem", "Reminder for #"), 3, "five due together: 3 in the hour")
 	c2 := lastCheck()
 	assert.Contains(t, c2, fmt.Sprintf("Worker: silent on #%d since Coral asked for a status", work.ID))
-	m := regexp.MustCompile(`Spare: idle [^\[]*\[ack ([0-9a-f]{8})\]`).FindStringSubmatch(c2)
+	m := regexp.MustCompile(`\[ack ([0-9a-f]{8})\] Spare: idle`).FindStringSubmatch(c2)
 	require.Len(t, m, 2, c2)
 	assert.Equal(t, teamhealth.ItemID("idle|Spare"), m[1])
 	code, _ = api(http.MethodPost, "/api/board/team/health/ack", map[string]any{"item": m[1]}, "Spare")

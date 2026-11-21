@@ -113,7 +113,8 @@ func TestRosterClassifiesEveryAgent(t *testing.T) {
 	assert.Less(t, idler, blind, "an agent with no signal has no age: it comes after the aged ones")
 	for _, name := range []string{"Prompted", "Idler", "Blind"} {
 		i := strings.Index(out, name+": ")
-		assert.Contains(t, out[i:i+strings.Index(out[i:], "[ack ")+len("[ack ")+9], "[ack ", name+" keeps its ack id")
+		require.Greater(t, i, len("[ack 12345678] "), name)
+		assert.Regexp(t, `\[ack [0-9a-f]{8}\] $`, out[:i], name+" keeps its ack id, first on its line")
 	}
 }
 
@@ -209,7 +210,8 @@ func TestRosterWakesASleeperOnlyForWhatIsForIt(t *testing.T) {
 	assert.NotContains(t, out, "Reader:")
 	assert.Contains(t, out, "Asked Sleeper: asleep with 1 message for it unread (a question to it or a reply to its post) since ")
 	assert.Contains(t, out, "2 other tags to it are broadcasts")
-	assert.Contains(t, out, "Suggest: wake it. [ack "+teamhealth.ItemID("asleep|Asked Sleeper")+"]")
+	assert.Contains(t, out, "[ack "+teamhealth.ItemID("asleep|Asked Sleeper")+"] Asked Sleeper: asleep")
+	assert.Contains(t, out, "Suggest: wake it.")
 }
 
 // A task assigned to a sleeper that it has not started is a reason to wake it; acknowledged, the item stays off until what is waiting changes.
