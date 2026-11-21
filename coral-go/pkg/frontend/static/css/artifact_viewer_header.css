@@ -125,6 +125,10 @@
 
 /* A long name is cut with an ellipsis; a tap or click on it shows the whole name (#13979) */
 .artifact-viewer-header .artifact-viewer-title.is-open { white-space: normal; overflow-wrap: anywhere; }
+@media (min-width: 769px) {
+    .artifact-viewer-header:has(> .artifact-viewer-title.is-open) { flex-wrap: wrap; }
+    .artifact-viewer-header:has(> .artifact-viewer-title.is-open) > .artifact-viewer-title { flex: 1 0 100%; min-width: 0; }
+} /* Opening a long filename gives it a full row; the collapsed review header remains compact (#20290). */
 .artifact-viewer-chips .av-note { color: var(--text-muted); font-size: var(--fs-sm); } /* a file two teams hold has no version bar from a direct link: said quietly (#14015) */
 /* A computer (#15190, walk 8 M2): the change-request form takes a row of its own under the header's controls, as wide as the dialog, with Send request and Cancel side by side: it was a column squeezed between the name and the version chip, which crushed the name and grew the header to 340 px at 1024 x 700. */
 @media (min-width: 769px) {
