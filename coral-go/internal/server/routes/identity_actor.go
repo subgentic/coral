@@ -40,6 +40,8 @@ type Actor struct {
 	Name string
 	// Session is the agent session name the token belongs to (ActorToken).
 	Session string
+	// ViaCheck is the custom health check a request came from (ActorToken only): the name is the member who added the check, and every text it wrote carries the server's "[via check <name>]" mark.
+	ViaCheck string
 	// HubUser is the validated Coral Hub user of an ActorHub request (hub-user-<8 hex>), or "".
 	HubUser string
 }

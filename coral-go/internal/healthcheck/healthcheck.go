@@ -105,6 +105,7 @@ type Record struct {
 	Every      string   `json:"every"`
 	To         string   `json:"to"`
 	ActsAs     string   `json:"acts_as"`
+	MayWrite   bool     `json:"may_write"` // the Operator's tick: without it the run's token is read-only
 	Env        []string `json:"env"`
 }
 

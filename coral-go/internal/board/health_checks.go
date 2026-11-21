@@ -43,6 +43,7 @@ type HealthCheck struct {
 	TZ           string   `json:"tz" db:"tz"`
 	To           string   `json:"to" db:"to_member"`
 	ActsAs       string   `json:"acts_as" db:"acts_as"`
+	MayWrite     bool     `json:"may_write" db:"may_write"`
 	State        string   `json:"state" db:"state"`
 	ApprovedBy   string   `json:"approved_by" db:"approved_by"`
 	ApprovedHash string   `json:"approved_record_hash" db:"approved_hash"`
@@ -64,7 +65,7 @@ func (c HealthCheck) Schedule() healthcheck.Schedule {
 
 // Record is what the Operator approves.
 func (c HealthCheck) Record() healthcheck.Record {
-	return healthcheck.Record{ScriptHash: c.ScriptHash, Args: c.Args, Dir: c.Dir, Every: c.Schedule().String(), To: c.To, ActsAs: c.ActsAs, Env: []string{"CORAL_BOARD", "CORAL_BOARD_URL", "CORAL_CHECK_TOKEN"}}
+	return healthcheck.Record{ScriptHash: c.ScriptHash, Args: c.Args, Dir: c.Dir, Every: c.Schedule().String(), To: c.To, ActsAs: c.ActsAs, MayWrite: c.MayWrite, Env: []string{"CORAL_BOARD", "CORAL_BOARD_URL", "CORAL_CHECK_TOKEN"}}
 }
 
 // RecordHash is the hash of the record as it is now.
@@ -91,6 +92,7 @@ CREATE TABLE IF NOT EXISTS health_checks (
 	tz            TEXT NOT NULL DEFAULT '',
 	to_member     TEXT NOT NULL DEFAULT '',
 	acts_as       TEXT NOT NULL DEFAULT '',
+	may_write     INTEGER NOT NULL DEFAULT 0,
 	state         TEXT NOT NULL DEFAULT 'pending',
 	approved_by   TEXT NOT NULL DEFAULT '',
 	approved_hash TEXT NOT NULL DEFAULT '',
@@ -112,7 +114,14 @@ CREATE TABLE IF NOT EXISTS health_check_keys (
 	present  INTEGER NOT NULL DEFAULT 1,
 	PRIMARY KEY (check_id, key)
 );`)
-	return err
+	if err != nil {
+		return err
+	}
+	// A table made by the first build of the checks has no may_write column.
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE health_checks ADD COLUMN may_write INTEGER NOT NULL DEFAULT 0`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		return err
+	}
+	return nil
 }
 
 var (
@@ -156,8 +165,8 @@ func (s *Store) AddHealthCheck(ctx context.Context, c HealthCheck, now time.Time
 	if err := c.pack(); err != nil {
 		return c, err
 	}
-	res, err := s.db.ExecContext(ctx, `INSERT INTO health_checks(project, name, script_src, script_hash, snapshot, args, dir, every_period, daily_at, tz, to_member, acts_as, state, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, c.Project, c.Name, c.ScriptSrc, c.ScriptHash, c.Snapshot, c.ArgsJSON, c.Dir, c.Every, c.Daily, c.TZ, c.To, c.ActsAs, c.State, c.CreatedAt)
+	res, err := s.db.ExecContext(ctx, `INSERT INTO health_checks(project, name, script_src, script_hash, snapshot, args, dir, every_period, daily_at, tz, to_member, acts_as, may_write, state, created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, c.Project, c.Name, c.ScriptSrc, c.ScriptHash, c.Snapshot, c.ArgsJSON, c.Dir, c.Every, c.Daily, c.TZ, c.To, c.ActsAs, c.MayWrite, c.State, c.CreatedAt)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return c, ErrCheckExists
@@ -222,9 +231,9 @@ func (s *Store) ChangeHealthCheck(ctx context.Context, project, name string, cha
 	if c.RecordHash() != before {
 		c.State, c.ApprovedBy, c.ApprovedHash, c.NextRun = CheckPending, "", "", ""
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE health_checks SET script_src = ?, script_hash = ?, snapshot = ?, args = ?, dir = ?, every_period = ?, daily_at = ?, tz = ?, to_member = ?, acts_as = ?,
+	_, err = s.db.ExecContext(ctx, `UPDATE health_checks SET script_src = ?, script_hash = ?, snapshot = ?, args = ?, dir = ?, every_period = ?, daily_at = ?, tz = ?, to_member = ?, acts_as = ?, may_write = ?,
 		state = ?, approved_by = ?, approved_hash = ?, next_run = ? WHERE id = ?`,
-		c.ScriptSrc, c.ScriptHash, c.Snapshot, c.ArgsJSON, c.Dir, c.Every, c.Daily, c.TZ, c.To, c.ActsAs, c.State, c.ApprovedBy, c.ApprovedHash, c.NextRun, c.ID)
+		c.ScriptSrc, c.ScriptHash, c.Snapshot, c.ArgsJSON, c.Dir, c.Every, c.Daily, c.TZ, c.To, c.ActsAs, c.MayWrite, c.State, c.ApprovedBy, c.ApprovedHash, c.NextRun, c.ID)
 	return c, err
 }
 

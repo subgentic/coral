@@ -31,6 +31,13 @@ const SessionTokenHeader = "X-Coral-Session-Token"
 // sessionTokenEnv is set in the agent's shell by Coral's launch line.
 const sessionTokenEnv = "CORAL_SESSION_TOKEN"
 
+// CheckTokenHeader carries a custom health check's run token; checkTokenEnv is where its script's tools read it (#20138). It is sent only to the Coral on this computer, and only when no agent session token is set:
+// a request never carries both.
+const (
+	CheckTokenHeader = "X-Coral-Check-Token"
+	checkTokenEnv    = "CORAL_CHECK_TOKEN"
+)
+
 // Version is reported in the tools' User-Agent.
 var Version = "dev"
 
@@ -39,6 +46,9 @@ type identityTransport struct {
 	tool  string
 	token string
 	hosts []string // the configured Coral's hosts, besides loopback
+
+	// checkToken is a check script's run token (CORAL_CHECK_TOKEN): used only when there is no session token, and only for this computer's Coral.
+	checkToken string
 
 	// proof is base with every new connection proved before the token goes on it (#6103): set for a "v2." session token on macOS and Linux (the Windows check of who owns the port is used there, and an
 	// older token's tools do not ask). nil: the token is sent as before.
@@ -57,6 +67,7 @@ func (t identityTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 			return nil, errRedirectRefused
 		}
 		r.Header.Del(SessionTokenHeader)
+		r.Header.Del(CheckTokenHeader)
 	} else if t.plainHTTPOffThisComputer(r.URL) && (t.token != "" || r.Header.Get(SessionTokenHeader) != "") {
 		// The agent's own Coral, but over plain http to an address that is not this computer: the token would cross the
 		// network in clear text. Refused with a reason rather than sent without it, which the server would only refuse (#224).
@@ -68,6 +79,12 @@ func (t identityTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		return nil, verifyLocalListener(r.URL)
 	} else if t.token != "" && r.Header.Get(SessionTokenHeader) == "" {
 		r.Header.Set(SessionTokenHeader, t.token)
+	}
+	if t.checkToken != "" && t.token == "" && r.Response == nil && r.Header.Get(SessionTokenHeader) == "" && r.Header.Get(CheckTokenHeader) == "" && t.localCoral(r.URL) && !t.plainHTTPOffThisComputer(r.URL) {
+		if err := verifyLocalListener(r.URL); err != nil {
+			return nil, err
+		}
+		r.Header.Set(CheckTokenHeader, t.checkToken)
 	}
 	if r.Header.Get("User-Agent") == "" {
 		r.Header.Set("User-Agent", t.tool+"/"+Version)
@@ -87,7 +104,11 @@ func InstallIdentity(tool string) {
 	if _, done := base.(identityTransport); done {
 		return
 	}
-	http.DefaultTransport = identityTransport{base: base, tool: tool, token: token, hosts: configuredHosts(), proof: sessionProof(base, token)}
+	ct := ""
+	if token == "" {
+		ct = strings.TrimSpace(os.Getenv(checkTokenEnv))
+	}
+	http.DefaultTransport = identityTransport{base: base, tool: tool, token: token, hosts: configuredHosts(), proof: sessionProof(base, token), checkToken: ct}
 }
 
 // proofEnabled: macOS and Linux prove the program on Coral's port with a challenge; Windows checks who owns it (listener_owner_windows.go).
