@@ -11,6 +11,7 @@ import { importOnce } from './import_once.js';
 import { askWhole, listsOf, withoutOperator, askSubjects, fromAnotherComputer, buttonsOffered, noteButtonsOwnerOnly, yesNoButtons, buttonWords, claimButton, settleButton, wakeMember, refreshOperatorAsks, operatorAsks, askKey, replyToAsk as replyOnBoard, closeAnsweredDuplicates, forgetAsk, questionContextNote } from './operator_asks.js';
 const replyToAsk = (a, text) => a.kind === 'agent' ? importOnce('./agent_ask_answer.js').then(m => m.answerAgentAsk(a, text)) : replyOnBoard(a, text); // a single agent's question (#18106) is answered in its conversation, not on a board
 /** The dialog names the asker and team; the complete question is shown once in its body (#12722). */
+const CHECK_WORDS = { 'approve-check': 'Approves this exact check: the script, its arguments and folder as shown, and whether it may write', 'deny-check': 'Removes this check; nothing of it runs' }; // a custom check's two buttons (#20139)
 export function askParts(a) {
     return { title: a && a.kind === 'agent' ? markHidden(a.asker || 'Agent', { strict: true }) : `${markHidden(a.asker || 'Agent', { strict: true })} · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`, // a single agent has no team
         body: listsOf(withoutOperator(askWhole(a))) };
@@ -99,7 +100,7 @@ export function openAskDialog(a, onDone, runners = {}) {
             for (const b of offers) {
                 const item = document.createElement('div'); item.className = 'inbox-ask-offer';
                 const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; const label = binary ? (b.label === 'Yes' ? 'Approve' : 'Deny') : markHidden(b.label, { strict: true }); btn.textContent = label; btn.dataset.buttonId = String(b.id);
-                const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = buttonWords(b);
+                const what = document.createElement('span'); what.className = 'inbox-ask-offer-what sr-only'; what.textContent = CHECK_WORDS[b.action] || buttonWords(b);
                 btn.setAttribute('aria-label', `${label}: ${what.textContent}`); btn.title = what.textContent;
                 if (binary) { const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = b.label === 'Yes' ? 'check' : 'close'; const word = document.createElement('span'); word.className = 'inbox-ask-yn-word'; word.textContent = b.label; btn.replaceChildren(icon, word); /* the icon and the reply it sends, in words (#14419: an icon alone said nothing) */ btn.setAttribute('aria-label', `${label}, sends ${b.label} with any draft text and pictures`); btn.title = btn.getAttribute('aria-label'); }
                 btn.addEventListener('click', async () => {
@@ -111,6 +112,7 @@ export function openAskDialog(a, onDone, runners = {}) {
                         if (a.kind === 'agent') { await replyToAsk(a, draft ? `${b.label}\n\n${draft}` : b.label); finish(); left(); showToast(`Sent: ${markHidden(b.label, { strict: true })}`); return; } // a single agent's choice answers with its label, through the same Answer route as typing it (#18668)
                         if (binary && draft) { await replyToAsk(a, `${b.label}\n\n${draft}`); finish(); left(); showToast(`Sent: ${b.label} with your reply`); return; }
                         const got = await claimButton(a, b); // the stored action, whatever the label says
+                        if (got.ran) { forgetAsk(a); refreshOperatorAsks(true); finish(); left(); showToast(got.result === 'approved' ? 'Check approved: it runs from now on.' : 'Check denied and removed.'); return; } // a check's approval ran on the server (#20139)
                         if (isReply(got.action)) { await closeAnsweredDuplicates(a); forgetAsk(a); refreshOperatorAsks(true); finish(); left(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
                         const navigates = ['open:new-agent', 'open:task', 'open:artifact'].includes(got.action);
                         finish(); // the dialog is modal: it goes before the page it opens
