@@ -58,6 +58,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		KeepFullAccess bool `json:"keep_full_access"`
 		// TrustFolder is the person's tick on an existing folder, as in a team launch (#11889, #19176): a folder this launch makes is trusted without it; only the person's dashboard is heard.
 		TrustFolder bool `json:"trust_folder"`
+		// NewWorktree and CheckoutBranch place the agent (or terminal) on a branch before it starts (#20388, mock #20111): a new git worktree from a base branch, or the folder switched to another branch.
+		NewWorktree     *launchNewWorktree `json:"new_worktree"`
+		CheckoutBranch  string             `json:"checkout_branch"`
+		ConfirmCheckout bool               `json:"confirm_checkout"` // the person was told the folder has changes and said switch anyway
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -175,6 +179,14 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailWorkdirUnavailable, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg, "field": "working_dir"})
 		return
+	}
+	if body.NewWorktree != nil || body.CheckoutBranch != "" {
+		placed, ok := h.placeLaunchOnBranch(w, r, body.WorkingDir, body.NewWorktree, body.CheckoutBranch, body.ConfirmCheckout)
+		if !ok {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailWorktreeFailed, 0, 1)
+			return
+		}
+		body.WorkingDir = placed
 	}
 	if askAboutHomeFolder(w, r, body.WorkingDir, body.HomeFolderAsk, body.ConfirmHomeFolder) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailHomeFolderAsked, 0, 1)
