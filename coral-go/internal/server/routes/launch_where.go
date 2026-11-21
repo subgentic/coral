@@ -161,12 +161,15 @@ func samePath(a, b string) bool {
 // recentLaunchFolders are the folders a person has used on this computer lately: the pinned ones and the folders of the live sessions, each once, newest first, only the ones still there.
 func (h *SystemHandler) recentLaunchFolders(r *http.Request) []string {
 	out := []string{}
-	if h.ss == nil || !localDashboard(r) && strictBounds(r) {
+	if h.ss == nil {
 		return out
 	}
 	seen := map[string]bool{}
 	add := func(p string) {
 		if p == "" || len(out) >= launchMaxRecent || seen[p] {
+			return
+		}
+		if _, ok := browsable(r, p); !ok { // a bounded caller (the Hub) is shown only the folders it may browse
 			return
 		}
 		if info, err := os.Stat(p); err != nil || !info.IsDir() {
@@ -194,6 +197,7 @@ type launchCheck struct {
 	OK     bool   `json:"ok"`
 	Reason string `json:"reason,omitempty"` // plain words for a failure
 	Fix    string `json:"fix,omitempty"`    // what to do about it
+	Path   string `json:"path,omitempty"`   // the folder a failure is about, in a path-named field: through the Hub a home path is shown as ~ (HubPaths), never inside a sentence
 }
 
 // LaunchCheck: GET /api/launch/check?path=&branch=&new_worktree=&base=
@@ -260,7 +264,7 @@ func (h *SystemHandler) LaunchCheck(w http.ResponseWriter, r *http.Request) {
 func branchFreeCheck(ctx context.Context, dir, root, branch string) launchCheck {
 	for _, wt := range worktreesOf(ctx, dir, root) {
 		if wt.Branch == branch && !wt.Here {
-			return launchCheck{ID: "branch_free", Reason: branch + " is already checked out in " + wt.Path, Fix: "launch in that worktree, or make a new worktree from " + branch}
+			return launchCheck{ID: "branch_free", Reason: branch + " is already checked out in another worktree of this repository", Fix: "launch in that worktree, or make a new worktree from " + branch, Path: wt.Path}
 		}
 	}
 	return launchCheck{ID: "branch_free", OK: true}

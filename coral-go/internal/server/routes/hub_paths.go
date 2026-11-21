@@ -40,8 +40,8 @@ var hubPathFields = map[string]bool{
 
 // hubTextFields are messages that may quote a path inside their text (an error naming the
 // file it couldn't open); a home directory in them is shown as "~" wherever it starts a path.
-// A fixed list of three, not a rewrite of every string (Security's #3559 review).
-var hubTextFields = map[string]bool{"error": true, "detail": true, "message": true}
+// A fixed list, not a rewrite of every string (Security's #3559 review).
+var hubTextFields = map[string]bool{"error": true, "detail": true, "message": true, "reason": true, "fix": true} // reason and fix: the launch setup check says why and what to do (#20388)
 
 // hubCommandFields hold commands (a workflow step's or a scheduled job's command, its args, a
 // script, step definitions): a home directory where a path starts inside them is shown as "~"

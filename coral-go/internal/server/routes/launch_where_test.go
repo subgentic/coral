@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -150,4 +152,44 @@ func TestLaunchWhereHoldsABoundedCallerToTheProjectFolders(t *testing.T) {
 		assert.NotContains(t, out, "branches", route)
 		assert.Empty(t, out["recent"], route)
 	}
+}
+
+// Security's MUST on #20388 slice A: through Coral Hub the answers of both reads carry no home path anywhere: a branch checked out in a worktree under the home says so without its path in the sentence, the path is in
+// a path field shown as "~/...", the lists (recent, worktrees) too, and the connector's classifier lets exactly these requests through.
+func TestLaunchReadsThroughTheHubCarryNoHomePath(t *testing.T) {
+	e := newBoundsEnv(t)
+	repo := filepath.Join(e.home, "projects", "app")
+	wtDir := filepath.Join(e.home, "projects", "app-side")
+	for _, args := range [][]string{{"init", "-q", "-b", "trunk", repo}, {"-C", repo, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "x"}, {"-C", repo, "worktree", "add", "-b", "other", wtDir}} {
+		out, err := consoletest.HiddenCommand("git", args...).CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	r := chi.NewRouter()
+	r.Use(HubPaths)
+	sys := &SystemHandler{cfg: config.Load(t.TempDir())}
+	r.Get("/api/launch/where", sys.LaunchWhere)
+	r.Get("/api/launch/check", sys.LaunchCheck)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	get := func(route string, q url.Values) string {
+		require.Equal(t, tunnel.TierLaunch, tunnel.Classify("GET", route, q.Encode()), "the connector lets %s %v through", route, q)
+		req, _ := http.NewRequest("GET", srv.URL+route+"?"+q.Encode(), nil)
+		req.Header.Set(tunnel.ViaHeader, "1")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return string(b)
+	}
+	for name, body := range map[string]string{
+		"check branch free": get("/api/launch/check", url.Values{"path": {"~/projects/app"}, "branch": {"other"}}),
+		"check worktree":    get("/api/launch/check", url.Values{"path": {"~/projects/app"}, "new_worktree": {"x"}, "base": {"trunk"}}),
+		"where":             get("/api/launch/where", url.Values{"path": {"~/projects/app"}}),
+	} {
+		assert.NotContains(t, body, e.home, name+": the home path never reaches the Hub: %s", body)
+	}
+	body := get("/api/launch/check", url.Values{"path": {"~/projects/app"}, "branch": {"other"}})
+	assert.Contains(t, body, "already checked out in another worktree of this repository")
+	assert.Contains(t, body, `"path":"~/projects/app-side"`)
+	assert.Contains(t, get("/api/launch/where", url.Values{"path": {"~/projects/app"}}), "~/projects/app-side")
 }
