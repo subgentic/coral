@@ -2,6 +2,7 @@
    Mark existing nodes rather than copying their text: links, expansion and accessible names survive. */
 import { markHidden } from './visible_marks.js';
 import { isPhoneLayout } from './phone_layout.js';
+import { boardLabel, identityKey } from './server_base.js';
 export function decorateMessage(row, tr) {
     const mail = tr.classList.contains('dt-mailed');
     if (mail) tr.classList.add('inbox-mail-preview-row');
@@ -42,7 +43,7 @@ export function decorateMessage(row, tr) {
         const item = heading?.closest('.inbox-review-item');
         if (item && !item.querySelector('.inbox-header-meta')) {
             const meta = document.createElement('span'); meta.className = 'inbox-header-meta';
-            const board = document.createElement('span'); board.className = 'inbox-header-board'; board.textContent = markHidden(row.board_label || row.board_project, { strict: true });
+            const board = document.createElement('span'); board.className = 'inbox-header-board'; board.textContent = markHidden(row.board_label || boardLabel(identityKey(row.server, row.board_project)), { strict: true });
             const time = item.querySelector('.inbox-review-wait'); if (time) time.before(meta); else item.append(meta); meta.append(board); if (time) meta.append(time);
         }
     }
