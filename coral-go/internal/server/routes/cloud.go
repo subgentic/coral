@@ -209,6 +209,9 @@ func (h *CloudHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("secret key replaced by a re-key; the Coral Hub enrollment and remote API keys were discarded",
 		"remote_server_keys", ks.RemoteServerKeys, "had_hub_enrollment", ks.HubURL != "")
+	if m := h.manager(); m != nil {
+		m.LinksChanged(r.Context()) // the re-key deleted every link row: the connector set must not keep a tunnel for one
+	}
 	h.dbx.forgetShares(r.Context()) // #14944: the Dropbox sign-in is gone with the key; the shares stay in the person's Dropbox
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "discarded_remote_server_keys": ks.RemoteServerKeys,
 		"discarded_hub_enrollment": ks.HubURL != "", "status": h.status()})

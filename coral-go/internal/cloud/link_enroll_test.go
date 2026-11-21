@@ -218,3 +218,26 @@ func TestEnrollmentTextIsCleaned(t *testing.T) {
 	assert.Equal(t, "Laptop", cleanLinkText("Lap\u202etop\x07", 40))
 	assert.Equal(t, "abc", cleanLinkText("abcdef", 3))
 }
+
+// A Cancel that arrives while the link is being stored (#20385 Security SHOULD): the stored link is removed, not kept with a live token and tunnel.
+func TestACancelDuringTheStoreRemovesTheStoredLink(t *testing.T) {
+	e, m, hub2 := linkEnrollEnv(t)
+	pe, err := m.AddLinkByOrigin(context.Background(), hub2.srv.URL, "view")
+	require.NoError(t, err)
+	waitEnroll(t, m, pe.Origin, "linked")
+	b, err := e.cs.LinkByOrigin(context.Background(), hub2.srv.URL)
+	require.NoError(t, err)
+
+	m.undoCancelledLink(pe.Origin) // what completeLinkEnroll calls when its context was cancelled during AddLink
+	_, err = e.cs.LinkByOrigin(context.Background(), hub2.srv.URL)
+	require.Error(t, err, "the cancelled link is gone")
+	assert.False(t, e.cs.LinkExists(context.Background(), b.LinkID))
+	evs, _ := e.cs.ListLinkEvents(context.Background(), b.LinkID, 10)
+	require.NotEmpty(t, evs)
+	assert.Equal(t, store.LinkEventDropped, evs[0].Action, "ended as dropped: the Hub was not asked to revoke")
+
+	// The first link is never touched by it.
+	m.undoCancelledLink(e.hub.srv.URL)
+	links, _ := e.cs.ListLinks(context.Background())
+	assert.Len(t, links, 1)
+}
