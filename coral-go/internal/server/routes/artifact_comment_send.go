@@ -281,7 +281,9 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 	}
 	var in struct {
 		Agents []string `json:"agents"`
-		Now    bool     `json:"now"` // an older page may still send it: nothing changes with it, a comment is held only while the agent is in a turn (#19093, #19103)
+		Now    bool     `json:"now"`    // an older page may still send it: nothing changes with it, a comment is held only while the agent is in a turn (#19093, #19103)
+		Bundle bool     `json:"bundle"` // one of several comments sent together (#20240): this one is held, not posted; the last of them (Last) delivers every held comment of the agent as ONE message (more only past the size cap), or leaves them held, as one, while the agent is in a turn
+		Last   bool     `json:"last"`
 	}
 	if !readJSONBody(w, r, sendBodyMax, &in) {
 		return
@@ -375,6 +377,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 		bySession[naming.SessionName(ls.AgentType, ls.SessionID)] = ls
 	}
 	results := make([]sendResult, 0, len(names))
+	askSession := map[int64]string{}
 	sent := 0
 	for _, name := range names {
 		res := sendResult{Agent: name}
@@ -415,9 +418,19 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 					timedText = label + "\n" + text
 				}
 				msg := sendMessage(title, author, version, sendReplyCommand(id, t.ID), timedText, snippet, mentionNames, commentPictureLinks(t.ImagesJSON)...)
-				posted, held, err := h.holdOrPost(r.Context(), &ls, sub, t.Board, t.ID, msg, false)
+				var posted *board.Message
+				var held bool
+				if in.Bundle {
+					held, err = h.ss.HoldAskMessage(r.Context(), t.ID, ls.SessionID, msg, false, time.Now())
+					if err == nil && !held {
+						posted, held, err = h.holdOrPost(r.Context(), &ls, sub, t.Board, t.ID, msg, false) // the ask is gone: as a single comment
+					}
+				} else {
+					posted, held, err = h.holdOrPost(r.Context(), &ls, sub, t.Board, t.ID, msg, false)
+				}
 				if held { // the agent is busy: the message waits on its ask and is posted when it is free (#14860)
 					res.State, res.AskID = "queued", ask.ID
+					askSession[ask.ID] = ls.SessionID
 					sent++
 					slog.Info("[artifact comments] comment held for a busy agent", "artifact", id, "comment", t.ID, "agent", title, "board", t.Board)
 					break
@@ -438,6 +451,21 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 		}
 		results = append(results, res)
 	}
+	messages := 0
+	if in.Bundle && in.Last && sent > 0 { // the whole bundle goes now, in one message, to every agent that is free; a busy agent keeps it held, as one delivery, until its turn ends
+		out := h.flushHeldComments(r.Context(), time.Now())
+		for i := range results {
+			if results[i].State != "queued" || results[i].AskID == 0 {
+				continue
+			}
+			if ask, ok, err := h.ss.GetArtifactAsk(r.Context(), t.ID, askSession[results[i].AskID]); err == nil && ok && ask.QueuedAt == nil {
+				results[i].State = "sent" // delivered by the flush
+				if n := out[ask.AgentSession]; n > messages {
+					messages = n
+				}
+			}
+		}
+	}
 	if h.boardHandler != nil && h.boardHandler.notifyFn != nil && sent > 0 {
 		h.boardHandler.notifyFn(t.Board) // the agents are nudged now, as for any board post
 	}
@@ -451,7 +479,7 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 			status = http.StatusConflict
 		}
 	}
-	writeJSON(w, status, map[string]any{"ok": sent > 0 || status == http.StatusOK, "results": results})
+	writeJSON(w, status, map[string]any{"ok": sent > 0 || status == http.StatusOK, "results": results, "messages": messages})
 }
 
 // sendVersionLine names the exact bytes the comment is on: the digest link, and where it stands in its series when it is in one.

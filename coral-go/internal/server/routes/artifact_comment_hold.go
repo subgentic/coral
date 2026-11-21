@@ -6,6 +6,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 const (
 	commentHoldEvery = 5 * time.Second // how often the held comments are looked at
 	commentHoldBatch = 200
+	heldMessageCap   = 8 << 10 // bytes of one delivered message of held comments: more comments than fit are sent as the next message (#20240)
 )
 
 // commentHeld says whether a comment for this agent waits: only while it is in a turn (#14860, #19093). An agent that has a task open but is idle (it waits for the Operator's review, the usual case) is not disturbed by a
@@ -75,13 +77,14 @@ func (h *SessionsHandler) RunCommentHolds(ctx context.Context) {
 }
 
 // flushHeldComments is one pass: for each agent holding comments that is free for them, one board message (the held ones joined in the order they were held) is posted and the holds end.
-func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) {
+func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) map[string]int {
+	delivered := map[string]int{} // agent session -> board messages posted for it
 	if h.ss == nil || h.bs == nil || h.ts == nil {
-		return
+		return delivered
 	}
 	asks, err := h.ss.HeldAsks(ctx, commentHoldBatch)
 	if err != nil || len(asks) == 0 {
-		return
+		return delivered
 	}
 	type group struct {
 		asks []store.ArtifactAsk
@@ -116,32 +119,59 @@ func (h *SessionsHandler) flushHeldComments(ctx context.Context, now time.Time) 
 		if h.commentHeld(ctx, ls, first.Board, sub) {
 			continue
 		}
-		var parts []string
-		ids := make([]int64, 0, len(g.asks))
+		// The held comments of one agent go as ONE message, in the order they were held; only past the size cap is it more than one (#20240): each message holds whole comments, and says how many follow.
+		var chunks [][]store.ArtifactAsk
+		size := 0
 		for _, a := range g.asks {
-			parts = append(parts, a.QueuedMsg)
-			ids = append(ids, a.ID)
+			if n := len(chunks); n == 0 || (size+len(a.QueuedMsg) > heldMessageCap && len(chunks[n-1]) > 0) {
+				chunks = append(chunks, nil)
+				size = 0
+			}
+			chunks[len(chunks)-1] = append(chunks[len(chunks)-1], a)
+			size += len(a.QueuedMsg) + 2
 		}
-		msg := strings.Join(parts, "\n\n")
 		system := first.QueuedSystem != 0
-		posted, err := h.postHeldMessage(ctx, first.Board, msg, system)
-		if err != nil {
-			slog.Warn("[artifact comments] a held comment was not posted; it stays held", "board", first.Board, "error", err)
+		failed := false
+		for ci, chunk := range chunks {
+			parts := make([]string, 0, len(chunk))
+			ids := make([]int64, 0, len(chunk))
+			for _, a := range chunk {
+				parts = append(parts, a.QueuedMsg)
+				ids = append(ids, a.ID)
+			}
+			msg := strings.Join(parts, "\n\n")
+			if len(chunk) > 1 || len(chunks) > 1 {
+				head := fmt.Sprintf("%d comments from the Operator, in time order: answer each in its own thread with the command under it.", len(chunk))
+				if len(chunks) > 1 {
+					head = fmt.Sprintf("Part %d of %d (%d comments; the size limit of one message): ", ci+1, len(chunks), len(chunk)) + head
+				}
+				msg = head + "\n\n" + msg
+			}
+			posted, err := h.postHeldMessage(ctx, first.Board, msg, system)
+			if err != nil {
+				slog.Warn("[artifact comments] a held comment was not posted; it stays held", "board", first.Board, "error", err)
+				failed = true
+				break
+			}
+			for _, a := range chunk {
+				h.linkCommentMessage(ctx, first.Board, posted, a.CommentID, a.AgentSession)
+			}
+			h.operatorPostedTo(first.Board, msg, sub.SubscriberID) // a delivery ends the waits it matches, an automatic one too: what is delivered overrides the wait (#19085)
+			if _, err := h.ss.ReleaseHeldAsks(ctx, ids, now); err != nil {
+				slog.Warn("[artifact comments] a held comment's hold was not cleared", "error", err)
+			}
+			delivered[first.AgentSession]++
+			slog.Info("[artifact comments] held comments delivered to a free agent", "agent", sub.JobTitle, "board", first.Board, "comments", len(ids))
+		}
+		if failed && delivered[first.AgentSession] == 0 {
 			continue
 		}
-		for _, a := range g.asks {
-			h.linkCommentMessage(ctx, first.Board, posted, a.CommentID, a.AgentSession)
-		}
-		h.operatorPostedTo(first.Board, msg, sub.SubscriberID) // a delivery ends the waits it matches, an automatic one too: what is delivered overrides the wait (#19085)
-		if _, err := h.ss.ReleaseHeldAsks(ctx, ids, now); err != nil {
-			slog.Warn("[artifact comments] a held comment's hold was not cleared", "error", err)
-		}
 		notify[first.Board] = true
-		slog.Info("[artifact comments] held comments delivered to a free agent", "agent", sub.JobTitle, "board", first.Board, "comments", len(ids))
 	}
 	if h.boardHandler != nil && h.boardHandler.notifyFn != nil {
 		for b := range notify {
 			h.boardHandler.notifyFn(b)
 		}
 	}
+	return delivered
 }

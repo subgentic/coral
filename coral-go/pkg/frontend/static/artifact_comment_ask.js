@@ -22,7 +22,7 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
     };
     // A viewer lifetime owns its picker and transient status, even when the
     // next open uses the same computer, team and file.
-    const resetAsk = () => { st.ask = null; askedBy.clear(); names.clear(); };
+    const resetAsk = () => { st.ask = null; delete st.bulkSent; askedBy.clear(); names.clear(); };
     const current = k => st.ask === k && st.lifetime === k.lifetime && st.hex === k.context.hex && st.server === k.context.server && st.board === k.context.board;
     const names = new Map(); // lower-cased role -> the role as written ("UX/UX Engineer"): the line under a comment shows it as written (#12168)
     const askedOf = (id) => askedBy.get(id) || (askedBy.set(id, new Map()), askedBy.get(id));
@@ -134,13 +134,15 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         let res, sentThreads = 0;
         try {
             const { sendCommentQueue } = await importOnce('./artifact_comment_send_queue.js');
+            const tally = { total: 0, sent: 0, queued: 0, agents: new Set() };
             const batch = await sendCommentQueue(k.queue, {
                 isCurrent: () => current(k),
-                send: c => api.sendComment(c.artifactId, k.context.server, c.id, agents, k.now),
-                record: (c, results) => { for (const r of results) if (r.state === 'sent' || r.state === 'queued' || r.state === 'already_asked') { names.set(r.agent.toLowerCase(), r.agent); askedOf(c.id).set(r.agent.toLowerCase(), (r.state === 'sent' || r.state === 'queued') ? 'Asked just now' : 'Already asked'); } },
+                send: (c, bundle) => api.sendComment(c.artifactId, k.context.server, c.id, agents, k.now, bundle),
+                record: (c, results) => { if (k.queue.length > 1) { const live = results.filter(r => r.state === 'sent' || r.state === 'queued' || r.state === 'already_asked'); if (live.length) { tally.total++; for (const r of live) tally.agents.add(r.agent); } } for (const r of results) if (r.state === 'sent' || r.state === 'queued' || r.state === 'already_asked') { names.set(r.agent.toLowerCase(), r.agent); askedOf(c.id).set(r.agent.toLowerCase(), (r.state === 'sent' || r.state === 'queued') ? 'Asked just now' : 'Already asked'); } },
             });
             if (batch.cancelled) return;
             res = batch.response; sentThreads = batch.sentThreads;
+            if (k.queue.length > 1 && tally.total) st.bulkSent = { total: tally.total, of: k.queue.length, queued: res.results.some(r => r.state === 'queued'), messages: res.messages || 1, agents: [...tally.agents] }; // what the panel says in place of the button (#20240)
         } catch { res = { ok: false, status: 0, results: [], error: 'Coral could not be reached. Some earlier comments may already have been sent; their status stays in each thread.' }; }
         if (!current(k)) return;
         k.busy = false;

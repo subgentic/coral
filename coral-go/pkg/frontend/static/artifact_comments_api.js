@@ -79,13 +79,13 @@ export const hubSendOff = () => isCloud() && commentWritesOn() && !commentSendOn
 
 /** Send to agent (#6357, #6456): ask 1 to 10 agents of the comment's board into its thread; the server posts one board message to each from the owner. `agents` are the names the board knows them by (their roles).
  *  Resolves { ok, status, results: [{agent, state, reason}], error }: a 409 with results (nobody was asked) is an answer to show, not a throw. Through Coral Hub it is the owner's alone and only when the Hub forwards it (the account's comment_send); a refusal there is said in words (SEND_NOT_THROUGH_HUB), not as an HTTP code. */
-export async function sendComment(hex, server, id, agents, now = false) {
-    const resp = await fetch(`${base(hex, server)}/${id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(now ? { agents, now: true } : { agents }) });
+export async function sendComment(hex, server, id, agents, now = false, bundle = null) {
+    const resp = await fetch(`${base(hex, server)}/${id}/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agents, ...(now ? { now: true } : {}), ...(bundle ? { bundle: true, last: !!bundle.last } : {}) }) }); // bundle (#20240): one of several comments sent together, the last one delivers them all as one message
     let data = {};
     try { data = await resp.json(); } catch { /* an answer that is not JSON has no results */ }
     const results = Array.isArray(data.results) ? data.results.map(r => ({ agent: String(r.agent || ''), state: String(r.state || ''), reason: String(r.reason || '') })) : [];
     const refusedByHub = isCloud() && !resp.ok && !results.length && (resp.status === 404 || resp.status === 405 || resp.status === 501 || (resp.status === 403 && typeof data.error !== 'string'));
-    return { ok: resp.ok && !!data.ok, status: resp.status, results, error: refusedByHub ? SEND_NOT_THROUGH_HUB : typeof data.error === 'string' ? data.error : (resp.ok ? '' : `HTTP ${resp.status}`) };
+    return { ok: resp.ok && !!data.ok, status: resp.status, results, messages: Number(data.messages) || 0, error: refusedByHub ? SEND_NOT_THROUGH_HUB : typeof data.error === 'string' ? data.error : (resp.ok ? '' : `HTTP ${resp.status}`) };
 }
 
 /** What the drawer says of a lock (#14549): a lock that covers a whole board says so (every file of the board), one on this file says that; the owner is told they can unlock it, anyone else that it is read only. */

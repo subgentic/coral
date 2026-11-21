@@ -193,6 +193,17 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();${YES}`);
                 await waitFor(`document.body.textContent.includes('Review save failed')`,'failed save is visible');
                 assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'failed save keeps row');
+                if(width===1280){ // #20240, the Operator: a button that moves a file to Waiting on an agent (no automatic move when a comment is sent); nobody is told, and it comes back when the agent sends an update
+                    const wid=(2).toString(16).padStart(64,'0');
+                    await ev(`window.__reviewFail=false;import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${wid}',{filename:'Review file 02.txt',board:'${team}',server:undefined}));true`);
+                    await waitFor(`!!document.querySelector('.artifact-review-wait') && !document.querySelector('.artifact-review-wait').hidden && !document.querySelector('.artifact-review-approve').hidden`,'a pending file offers Wait for agent',8000);
+                    await ev(`document.querySelector('.artifact-viewer-more').click();true`);
+                    await ev(`document.querySelector('.artifact-review-wait').click();true`);
+                    await waitFor(`window.__decisions.some(d=>d.decision==='changes'&&d.id==='${wid}')`,'Wait for agent records the file as waiting on the agent',5000);
+                    assert.deepEqual(await ev(`window.__decisions.filter(d=>d.id==='${wid}').map(d=>[d.decision,d.note||''])`),[['changes','']],'one decision, with no words: nobody is sent a message');
+                    await waitFor(`document.querySelector('.artifact-review-wait').hidden`,'a file that is waiting offers no second Wait for agent',5000);
+                    await ev(`document.querySelector('.artifact-viewer-close').click();window.__reviewItems.forEach(a=>{if(a.id==='${wid}')a.tags=a.tags.filter(t=>t!=='changes requested')});true`);
+                }
                 await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();${YES}`);
                 await waitFor(`!(${row('Review file 01.txt')})`,'approved row removed');
                 if(width===1280){ // Mobile Beta Tester (live): the approved artifact's viewer says Approved with the time (it showed only the tag chip)
