@@ -17,7 +17,7 @@ import (
 func TestOutputLinesAreDataNotCommands(t *testing.T) {
 	in := strings.Join([]string{
 		`{"key":"pr-14-stale","text":"PR 14 open 26 h","level":"warn","to":"Dev One"}`,
-		`{"key":"a","text":"hello \u001b[31mred\u001b[0m and ‮evil"}`,
+		`{"key":"a","text":"hello \u001b[31mred\u001b[0m and \u202eevil"}`,
 		`not json`,
 		`{"key":"bad key!","text":"x"}`,
 		`{"key":"k","text":"x","level":"loud"}`,
