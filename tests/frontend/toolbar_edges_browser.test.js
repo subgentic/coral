@@ -9,18 +9,19 @@ const BASE = require('./test_base').BASE;
     const shot = require('./helpers/scene_shots')(Page, 'toolbar-edges');
     const { settle, coralReady } = require('./helpers/wait').bind(ev); // the live list and the views draw from several answers: settle waits for the layout to stop moving
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({source:"localStorage.removeItem('coral-inbox-needs-filters');"});
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings');
-            await ev(`(() => { window.__m.add('a1', 'Alpha agent', 2, {}); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); return true; })()`); await settle(900);
+            await ev(`(() => { window.__m.add('a1', 'Alpha agent', 2, {sleeping:false}); window.__m.add('a2','Beta agent',2,{sleeping:false}); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); return true; })()`); await settle(900);
             if (!mobile) {
                 const icon = await ev(`(() => { const i = document.querySelector('.sidebar-header[data-header="agents"] .sidebar-search-icon'); return !!i && getComputedStyle(i).display !== 'none' && i.getClientRects().length > 0; })()`);
                 assert.equal(icon, true, at + 'the Agents search has its magnifier');
                 await shot(`${w}-agents`);
             }
             await ev(`window.switchNavTab('hub-inbox'); true`);
+            if(!mobile) await ev(`(async()=>{const {state}=await import((window.__coralStatic||'/static/')+'state.js');state.liveSessions=state.liveSessions.map((s,i)=>({...s,waiting_for_input:true,waiting_kind:i?'question':'permission',waiting_since:new Date().toISOString(),waiting_summary:i?'Pick a colour':'Claude needs permission'}));(await import((window.__coralStatic||'/static/')+'inbox_tab.js')).updateInboxTab();return true;})()`); // #20264: three populated pills; zero-count kinds are intentionally hidden.
             if (!mobile) {
                 await waitFor(`document.querySelectorAll('.list-bar-search-row .goals-chip').length >= 3 && !!document.querySelector('.list-bar-search-row .list-bar-search')`, 'the Needs you pills', 10000);
                 const m = await ev(`(() => ({ pills: [...document.querySelectorAll('.list-bar-search-row .goals-chip')].map(b => Math.round(b.getBoundingClientRect().height)), field: Math.round(document.querySelector('.list-bar-search-row .list-bar-search').getBoundingClientRect().height) }))()`);

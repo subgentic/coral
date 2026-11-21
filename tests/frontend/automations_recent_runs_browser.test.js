@@ -112,8 +112,8 @@ const STUB = `(() => {
             await ev(`history.back(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}back in Needs you`, 8000);
             await installGuard(ev); // a dismissal sends nothing to an agent (the operator's rule, #11552)
-            // a phone's row has no button (#11671): Dismiss is in the row's three-dot menu (or a swipe), and a tap on the row opens it
-            if (mobile) await ev(`document.querySelector('#group-table-view button.menu-item[aria-label^="Dismiss: nightly-build-job"]').click(); true`);
+            // #20264: the phone's sole Dismiss is a direct footer action; dismissal still sends nothing to an agent.
+            if (mobile) await ev(`document.querySelector('#group-table-view .inbox-single-action button[aria-label^="Dismiss: nightly-build-job"]').click(); true`);
             else await ev(`document.querySelector('#group-table-view button[aria-label^="Dismiss the failed run of nightly-build-job"]').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 1`, `${at}Dismiss takes the run out`, 8000);
             assert.deepEqual(await reached(ev), [], `${at}Dismiss sent nothing to an agent`);

@@ -4,6 +4,7 @@ import { markHidden } from './visible_marks.js';
 import { isPhoneLayout } from './phone_layout.js';
 export function decorateMessage(row, tr) {
     const mail = tr.classList.contains('dt-mailed');
+    if (mail) tr.classList.add('inbox-mail-preview-row');
     if (mail) { tr.classList.add('inbox-kind-row'); tr.querySelector('.dt-mail-lead')?.classList.add('inbox-v4-leading'); }
     if (!tr.classList.contains('inbox-kind-row')) return;
     tr.classList.add('inbox-message-row', 'inbox-v4-row');
@@ -33,18 +34,34 @@ export function decorateMessage(row, tr) {
         }
     }
     if (mail && message) { message.classList.add('inbox-v4-mail-message'); message.parentElement.classList.add('inbox-v4-mail-line'); }
-    if ((row.operatorAsk || row.waiting_kind === 'question') && !tr.querySelector('.inbox-author-kind')) {
-        const line = document.createElement('span'); line.className = 'inbox-author-kind';
-        line.textContent = `${markHidden(row.operatorAsk?.asker || row.display_name || row.name || 'an agent', { strict: true })} · ${row.operatorAsk ? 'question' : 'prompt'}`;
-        const meta = tr.querySelector('.inbox-meta') || document.createElement('span');
-        if (message && !mail) { if (!meta.parentNode) { meta.className = 'inbox-meta'; message.before(meta); } meta.append(line); }
-        else tr.querySelector('td[data-key="waiting"]')?.append(line);
+    if ((row.operatorAsk || row.waiting_kind === 'question') && heading) {
+        tr.classList.add('inbox-question-heading-row');
+        if (!heading.querySelector('.inbox-heading-kind')) { const kind = document.createElement('span'); kind.className = 'inbox-heading-kind'; kind.textContent = ' · question'; heading.append(kind); }
+    }
+    if (!mail && isPhoneLayout() && row.board_project) {
+        const item = heading?.closest('.inbox-review-item');
+        if (item && !item.querySelector('.inbox-header-meta')) {
+            const meta = document.createElement('span'); meta.className = 'inbox-header-meta';
+            const board = document.createElement('span'); board.className = 'inbox-header-board'; board.textContent = markHidden(row.board_label || row.board_project, { strict: true });
+            const time = item.querySelector('.inbox-review-wait'); if (time) time.before(meta); else item.append(meta); meta.append(board); if (time) meta.append(time);
+        }
     }
     if (!mail && !isPhoneLayout()) {
-        const computer = tr.querySelector('td[data-key="server"]');
-        if (computer?.textContent.trim()) {
-            const meta = tr.querySelector('.inbox-sent-back-meta, .inbox-meta, .inbox-command-meta');
-            if (meta) { const line = document.createElement('span'); line.className = 'inbox-computer-line'; line.append(...computer.childNodes); meta.prepend(line); computer.hidden = true; }
-        }
+        const computer = tr.querySelector('td[data-key="server"]'), team = tr.querySelector('td[data-key="team"]');
+        if (computer?.textContent.trim() && team) { if (!team.textContent.includes(computer.textContent.trim())) team.prepend(...computer.childNodes); computer.hidden = true; }
+    }
+    for (const preview of [message, tr.querySelector('.inbox-sent-back-ask')].filter(Boolean)) {
+        preview.classList.add('inbox-preview');
+        const native = tr.querySelector('.inbox-ask-expand');
+        if (native && !native.closest('.inbox-preview-controls')) { const controls = document.createElement('span'); controls.className = 'inbox-preview-controls'; const note = tr.querySelector('.inbox-ask-note'); if (note) controls.append(note); controls.append(native); const footer = mail && tr.querySelector('.inbox-mail-footer'); if (footer) footer.before(controls); else preview.after(controls); }
+        let text = preview.querySelector(':scope > .inbox-preview-text');
+        if (!text) { text = document.createElement('span'); text.className = 'inbox-preview-text'; text.append(...preview.childNodes); preview.append(text); }
+        if (native) { preview.classList.toggle('inbox-preview-expanded', native.getAttribute('aria-expanded') === 'true'); continue; }
+        if (preview.nextElementSibling?.classList.contains('inbox-preview-toggle')) continue;
+        const more = document.createElement('button'); more.type = 'button'; more.className = 'btn btn-quiet btn-small inbox-preview-toggle'; more.textContent = 'Show all'; more.hidden = true; more.setAttribute('aria-expanded', 'false');
+        more.addEventListener('click', e => { e.stopPropagation(); const open = preview.classList.toggle('inbox-preview-expanded'); more.textContent = open ? 'Show less' : 'Show all'; more.setAttribute('aria-expanded', String(open)); });
+        const footer = mail && tr.querySelector('.inbox-mail-footer'); if (footer) footer.before(more); else preview.after(more);
+        const observer = new ResizeObserver(() => { if (!preview.isConnected) { observer.disconnect(); return; } if (!preview.classList.contains('inbox-preview-expanded')) more.hidden = text.scrollHeight <= text.clientHeight + 1; });
+        observer.observe(text); // Recheck on viewport/text-size changes; removal reports zero size and disconnects the observer.
     }
 }

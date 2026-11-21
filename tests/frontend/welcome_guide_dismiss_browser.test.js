@@ -35,12 +35,7 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await activityCount(), before, width + ': closing does not add a handled Activity item');
             }
             await shot(`guide-kept-${width}`);
-            if (width === 1280) await ev(`[...document.querySelectorAll('${row} button')].find(b=>b.textContent==='Dismiss').click(); true`);
-            else {
-                await ev(`document.querySelector('${row} .inbox-row-more-toggle').click(); true`);
-                await waitFor(`[...document.querySelectorAll('.menu:not([hidden]) button')].some(b=>b.textContent==='Dismiss')`, 'guide Dismiss menu');
-                await ev(`[...document.querySelectorAll('.menu:not([hidden]) button')].find(b=>b.textContent==='Dismiss').click(); true`);
-            }
+            await ev(`[...document.querySelectorAll('${row} button')].find(b=>b.textContent==='Dismiss').click(); true`); // #20264: sole Dismiss is direct at both widths.
             await waitFor(`!document.querySelector('${row}')`, width + ': explicit Dismiss removes guide');
             await waitFor(`fetch('/api/activity').then(r=>r.json()).then(d=>(d.actions||[]).some(r=>r.title==='Read the Coral guide'))`, width + ': real Activity records dismissed guide');
             await waitFor(`fetch('/api/activity').then(r=>r.json()).then(d=>(d.actions||[]).filter(r=>r.title==='Read the Coral guide').length === ${before + 1})`, width + ': Dismiss adds one Activity entry');

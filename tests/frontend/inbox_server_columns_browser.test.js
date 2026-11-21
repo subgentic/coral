@@ -50,7 +50,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     await open(folder);
     // A phone's rows are mail rows (#9545): one cell each, no Server column or sort. What holds there: rows of both origins are listed and the Server filter in the panel narrows them (the columns are checked at 1280).
     if(width===390)await waitFor(`!!document.querySelector('#group-table-view tr.dt-mailed')||!!document.querySelector('#group-table-view th[data-key="server"]')`,'the '+folder+' rows, as mail rows or as a table',8000); // Artifacts rows come after the folder opens
-    if(width===390&&await ev(`!!document.querySelector('#group-table-view tr.dt-mailed')`)){
+    if(folder==='needs'||width===390&&await ev(`!!document.querySelector('#group-table-view tr.dt-mailed')`)){
      // The needs list draws mail rows only while it holds agents alone; a review file that arrives (a computer's files are read after its agents) turns the same rows into folded ones (#14300, found under load): count the rows of either layout, and take the first count once the list has stopped changing.
      const rows=`document.querySelectorAll('#group-table-view tbody tr.dt-row').length`,pick=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Computer')?.querySelector('select')`;
      await waitFor(`${rows}>=2`,'rows of both origins in '+folder+' on a phone',8000);
