@@ -31,12 +31,12 @@ var healthKeyRanges = map[string]string{
 	"landing.wait_min": fmt.Sprintf("%d to %d minutes", LandingWaitMin, LandingWaitMax), "release.wait_min": fmt.Sprintf("%d to %d minutes", ReleaseWaitMin, ReleaseWaitMax),
 	"goals_ready.wait_min": fmt.Sprintf("%d to %d minutes", WaitCheckMin, WaitCheckMax), "unowned_tasks.wait_min": fmt.Sprintf("%d to %d minutes", WaitCheckMin, WaitCheckMax), "unowned_tasks.max_list": "1 to 20", "goals_ready.max_list": "(not used)",
 	"dialog_timeout.after_min": fmt.Sprintf("%d to %d minutes", DialogTimeoutMin, DialogTimeoutMax), "auto_recommend.grace_min": fmt.Sprintf("1 to %d minutes", AutoRecommendGraceMax),
-	"deviations.min_age_min": "0 (no floor) to 1440 minutes", "deviations.factor_pct": "100 to 1000 (percent of the usual threshold)", "deviations.min_samples": "0 (the rule's own minimums) to 50", "off_books.post_grace_min": "1 to 30 minutes", "off_books.max_lines": "1 to 20", "pool_review.after_min": "5 to 1440 minutes", "wait_escalate.after_min": "5 to 1440 minutes",
+	"operator_wait.grace_min": "1 to 120 minutes", "operator_wait.chat_max_age_min": "5 to 1440 minutes", "deviations.min_age_min": "0 (no floor) to 1440 minutes", "deviations.factor_pct": "100 to 1000 (percent of the usual threshold)", "deviations.min_samples": "0 (the rule's own minimums) to 50", "off_books.post_grace_min": "1 to 30 minutes", "off_books.max_lines": "1 to 20", "pool_review.after_min": "5 to 1440 minutes", "wait_escalate.after_min": "5 to 1440 minutes",
 }
 
 // healthKeyWords: the accepted words of the settings that are text.
 var healthKeyWords = map[string]string{
-	"recipient": "a member of this team, or empty for the Orchestrator", "default_reviewers": "member names, at most 8", "reviewer_pool": "member names, at most 12",
+	"operator_wait.authors_exempt": "member names, at most 8", "recipient": "a member of this team, or empty for the Orchestrator", "default_reviewers": "member names, at most 8", "reviewer_pool": "member names, at most 12",
 	"landing.branch": "a branch name (letters, digits, . _ - /)", "release.branch": "a branch name (letters, digits, . _ - /)", "release.tag_pattern": "a tag glob such as v*",
 	"compact_context.trigger": "threshold, task or both", "compact_context.method": "compact, clear_next or clear_handoff",
 }

@@ -21,7 +21,15 @@ const (
 // tagged "for review" (board.OperatorWaitCovered), it is a line of the check and a nudge to its author to put it in Needs you. The first scan only marks where the board is. A post younger than the grace stops the scan
 // there (it is judged at a later check), so nothing is judged before the author had the time. Said once per message; the line has the message number and its age, never the post's words.
 func (m *BoardHealthMonitor) noteOperatorWaits(ctx context.Context, project, orch string, subs []board.Subscriber, bySession map[string]AgentInfo, now time.Time) {
+	ow := m.store.GetHealthSettings(ctx, project).OperatorWait
+	grace := time.Duration(ow.GraceMin) * time.Minute
 	cursor, known := m.store.OperatorWaitCursor(ctx, project)
+	if !ow.On {
+		if latest, err := m.store.LatestMessageID(ctx, project); err == nil && known {
+			_ = m.store.SetOperatorWaitCursor(ctx, project, latest) // off: nothing is judged later either
+		}
+		return
+	}
 	if !known {
 		if latest, err := m.store.LatestMessageID(ctx, project); err == nil {
 			_ = m.store.SetOperatorWaitCursor(ctx, project, latest)
@@ -43,11 +51,11 @@ func (m *BoardHealthMonitor) noteOperatorWaits(ctx context.Context, project, orc
 		if err != nil {
 			at = now
 		}
-		if now.Sub(at) < board.OperatorWaitGrace {
+		if now.Sub(at) < grace {
 			break // not old enough to judge: the author still has the time; a later check reads it
 		}
 		last = msg.ID
-		if msg.IsSystem || msg.Origin != nil || !member[msg.SubscriberID] || board.IsOperatorName(msg.SubscriberID) || !board.WaitsOnOperator(msg.Content) {
+		if msg.IsSystem || msg.Origin != nil || !member[msg.SubscriberID] || board.IsOperatorName(msg.SubscriberID) || ow.Exempt(msg.SubscriberID) || !board.WaitsOnOperator(msg.Content) {
 			continue
 		}
 		if msg.Ask != nil && askedTheOperator(msg.Ask) {
@@ -61,11 +69,11 @@ func (m *BoardHealthMonitor) noteOperatorWaits(ctx context.Context, project, orc
 			last = msg.ID - 1 // it cannot tell yet: it is judged again at the next check
 			break
 		}
-		if board.OperatorWaitCovered(msg, later, tags) {
+		if board.OperatorWaitCoveredWithin(msg, later, tags, grace) {
 			continue
 		}
 		id := strconv.FormatInt(msg.ID, 10)
-		detail := fmt.Sprintf("posted something that waits on the Operator (message #%s, %s ago) with no --ask to them and no \"for review\" file within %d minutes: it is not in their Needs you", id, teamhealth.Age(now.Sub(at)), int(board.OperatorWaitGrace/time.Minute))
+		detail := fmt.Sprintf("posted something that waits on the Operator (message #%s, %s ago) with no --ask to them and no \"for review\" file within %d minutes: it is not in their Needs you", id, teamhealth.Age(now.Sub(at)), ow.GraceMin)
 		if added, err := m.store.AddOffBooksOnce(ctx, project, board.OffBooksOperatorWait, msg.SubscriberID, id, detail, at); err == nil && added {
 			nudge := fmt.Sprintf("Your board message #%s waits on the Operator, but it is not in their Needs you. Post it again as `coral-board post --ask \"@Operator <the question>\"` (or tag the file \"for review\" and link it), so they see it.", id)
 			m.nudgeMember(ctx, project, orch, board.HealthSettings{}, msg.SubscriberID, "operator-wait:"+id+":", nudge, bySession, subs)
@@ -95,15 +103,17 @@ const operatorWaitChatMaxAge = time.Hour
 // as a board post. Said once per reply (the reply's time is its ref); the line has how long ago, never the reply's words. Only the newest reply is read: an agent that has said more since has the Operator's wait in an older one that
 // is not judged. The Operator, an agent with no live session and the orchestrator's nudge-to-itself follow the board-post rules.
 func (m *BoardHealthMonitor) noteChatOperatorWaits(ctx context.Context, project, orch string, subs []board.Subscriber, bySession map[string]AgentInfo, now time.Time) {
-	if m.lastMessage == nil {
+	ow := m.store.GetHealthSettings(ctx, project).OperatorWait
+	if m.lastMessage == nil || !ow.On {
 		return
 	}
+	grace, chatMax := time.Duration(ow.GraceMin)*time.Minute, time.Duration(ow.ChatMaxAgeMin)*time.Minute
 	var recent []board.Message
 	var tags map[string][]string
 	loaded := false
 	for _, sub := range subs {
 		a, live := bySession[sub.SessionName]
-		if !live || board.IsOperatorName(sub.SubscriberID) {
+		if !live || board.IsOperatorName(sub.SubscriberID) || ow.Exempt(sub.SubscriberID) {
 			continue
 		}
 		lm, ok := m.lastMessage(a.SessionID, a.WorkingDirectory, a.AgentType)
@@ -115,7 +125,7 @@ func (m *BoardHealthMonitor) noteChatOperatorWaits(ctx context.Context, project,
 			continue
 		}
 		age := now.Sub(at)
-		if age < board.OperatorWaitGrace || age > operatorWaitChatMaxAge {
+		if age < grace || age > chatMax {
 			continue
 		}
 		if !loaded {
@@ -130,11 +140,11 @@ func (m *BoardHealthMonitor) noteChatOperatorWaits(ctx context.Context, project,
 			tags, _ = m.store.ArtifactTags(ctx, project)
 		}
 		reply := board.Message{SubscriberID: sub.SubscriberID, CreatedAt: at.UTC().Format(time.RFC3339)}
-		if board.OperatorWaitCovered(reply, recent, tags) {
+		if board.OperatorWaitCoveredWithin(reply, recent, tags, grace) {
 			continue
 		}
 		ref := "chat:" + a.SessionID + ":" + at.UTC().Format(time.RFC3339)
-		detail := fmt.Sprintf("said something in its chat that waits on the Operator (%s ago) with no --ask to them and no \"for review\" file within %d minutes: it is not in their Needs you", teamhealth.Age(age), int(board.OperatorWaitGrace/time.Minute))
+		detail := fmt.Sprintf("said something in its chat that waits on the Operator (%s ago) with no --ask to them and no \"for review\" file within %d minutes: it is not in their Needs you", teamhealth.Age(age), ow.GraceMin)
 		if added, err := m.store.AddOffBooksOnce(ctx, project, board.OffBooksOperatorWait, sub.SubscriberID, ref, detail, at); err == nil && added {
 			nudge := "Your last chat reply waits on the Operator, but it is not in their Needs you. Post it as `coral-board post --ask \"@Operator <the question>\"` (or tag the file \"for review\" and link it), so they see it."
 			m.nudgeMember(ctx, project, orch, board.HealthSettings{}, sub.SubscriberID, "operator-wait-chat:"+ref+":", nudge, bySession, subs)
