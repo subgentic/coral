@@ -858,8 +858,9 @@ func TestAnEnrollmentWithAPathStillDialsAndWarns(t *testing.T) {
 	st := m.Status()
 	require.NotEqual(t, StateKeyUnreadable, st.State, "it dials: %s", st.LastError)
 	require.NotContains(t, st.LastError, "needs re-enrol")
-	require.Contains(t, st.HubAddressWarning, "enrol again")
-	require.Contains(t, st.HubAddressWarning, "/app")
+	require.Contains(t, st.HubAddressWarning, "extra parts")
+	require.Contains(t, st.HubAddressWarning, "new link needs the bare address")
+	require.NotContains(t, st.HubAddressWarning, "/app", "the cut origin only, never the saved address")
 
 	// A plain address has no warning.
 	require.NoError(t, e.cs.Save(context.Background(), e.hub.srv.URL, "srv_1", "x", fakeToken))

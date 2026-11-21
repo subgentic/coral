@@ -26,6 +26,11 @@ export function operatorLine(operatorOn) {
     return '';
 }
 
+/** The Hub address warning as the status carries it (the computer words it from the cut origin, never the saved address), or '' when there is none. */
+export function hubAddressLine(st) {
+    return st && typeof st.hub_address_warning === 'string' ? st.hub_address_warning : '';
+}
+
 /** "WXYZ-1234" as "W X Y Z, 1 2 3 4": the letters and digits said apart, the dash a pause. */
 export function spellCode(code) {
     return String(code == null ? '' : code).split('-').map(part => [...part].join(' ')).filter(Boolean).join(', ');
