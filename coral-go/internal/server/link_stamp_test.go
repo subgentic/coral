@@ -66,5 +66,17 @@ func TestTheRealRouterRefusesAConnectorRequestWithAStaleLink(t *testing.T) {
 	}
 	_, body := get("lnk-0a0b0c0d")
 	assert.NotContains(t, body, cloud.LinkRefusedCode, "a known link is not refused for its link")
+	// Security's point 8: a paused, revoked or removing link is refused too, and an active one is served again.
+	for _, st := range []string{"paused", "revoked", "removing"} {
+		_, err = db.ExecContext(context.Background(), "UPDATE cloud_link SET state = ? WHERE link_id = 'lnk-0a0b0c0d'", st)
+		require.NoError(t, err)
+		code, body := get("lnk-0a0b0c0d")
+		assert.Equal(t, http.StatusForbidden, code, st)
+		assert.Contains(t, body, cloud.LinkRefusedCode, st)
+	}
+	_, err = db.ExecContext(context.Background(), "UPDATE cloud_link SET state = 'active' WHERE link_id = 'lnk-0a0b0c0d'")
+	require.NoError(t, err)
+	_, body = get("lnk-0a0b0c0d")
+	assert.NotContains(t, body, cloud.LinkRefusedCode)
 	require.NotNil(t, routerTestWrap)
 }

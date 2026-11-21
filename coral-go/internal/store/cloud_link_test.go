@@ -75,8 +75,8 @@ func TestSavingAnEnrollmentMakesOneLinkWithItsOwnSealedToken(t *testing.T) {
 	assert.Equal(t, l.LinkID, got.LinkID)
 	_, err = cs.LinkByOrigin(ctx, "https://other.example.com")
 	assert.ErrorIs(t, err, ErrNoCloudLink)
-	_, err = cs.LinkByOrigin(ctx, "https://hub.example.com/some/path")
-	assert.ErrorIs(t, err, ErrNoCloudLink, "an address with a path names no link")
+	_, err = CanonicalHubOrigin("https://hub.example.com/some/path")
+	assert.Error(t, err, "a new link's address with a path is refused (the lookup of the one legacy enrollment is the only place that cuts it)")
 
 	// The same Hub enrolled again is a new link with the new token.
 	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "tok-two"))
@@ -233,4 +233,75 @@ func TestDeleteIsOneTransaction(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNoCloudConnection)
 	links, _ = cs.ListLinks(ctx)
 	assert.Empty(t, links)
+}
+
+// Security's point 9 and the upgrade rule (#20312): an enrollment whose Hub address has a path, as the previous release saved it, still mirrors, is found for the dial and keeps the token;
+// the dial address is not changed. A NEW link's origin with a path is still refused, and nothing but the legacy mirror and lookup accepts a path.
+func TestAnEnrollmentWithAPathStillMirrorsAndDialsButANewLinkRefusesAPath(t *testing.T) {
+	rs, db, _, _ := newRemoteStore(t)
+	cs := NewCloudStore(db, rs)
+	ctx := context.Background()
+	const enrolled = "https://hub.example.com/app/"
+	require.NoError(t, cs.Save(ctx, enrolled, "srv_1", "Laptop", "tok-keep"))
+	// As v2.1.2 left it: the enrollment and no link tables.
+	_, err := db.ExecContext(ctx, "DROP TABLE cloud_link")
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, "DROP TABLE cloud_link_user")
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, schemaSQL)
+	require.NoError(t, err)
+
+	require.NoError(t, cs.MirrorLegacyLink(ctx))
+	links, err := cs.ListLinks(ctx)
+	require.NoError(t, err)
+	require.Len(t, links, 1)
+	assert.Equal(t, "https://hub.example.com", links[0].HubOrigin, "the origin is the key")
+	assert.Equal(t, LinkStateActive, links[0].State)
+	tok, err := cs.LinkToken(ctx, links[0].LinkID)
+	require.NoError(t, err)
+	assert.Equal(t, "tok-keep", tok)
+	found, err := cs.LinkByOrigin(ctx, enrolled)
+	require.NoError(t, err)
+	assert.Equal(t, links[0].LinkID, found.LinkID, "the enrolled address finds its link")
+	assert.True(t, HubAddressHasPath(enrolled))
+	assert.False(t, HubAddressHasPath("https://hub.example.com"))
+	var hubURL string
+	require.NoError(t, db.GetContext(ctx, &hubURL, "SELECT hub_url FROM cloud_connection WHERE id = 1"))
+	assert.Equal(t, "https://hub.example.com/app", hubURL, "the enrolled address is kept exactly as Save stored it, not cut to the site")
+
+	// A changed Hub address is not this enrollment's link: no match on another host.
+	_, err = cs.LinkByOrigin(ctx, "https://other.example.com/app/")
+	assert.ErrorIs(t, err, ErrNoCloudLink)
+
+	// A new link: a path is refused, whatever else is true.
+	for _, raw := range []string{enrolled, "https://hub.example.com/app", "https://hub.example.com?x=1", "https://hub.example.com/#f"} {
+		_, err := CanonicalHubOrigin(raw)
+		assert.Error(t, err, raw)
+	}
+	// Not reachable by anything but the enrollment: user information and a non-https host are refused even in the legacy path.
+	_, _, err = legacyHubOrigin("https://u:p@hub.example.com/app")
+	assert.Error(t, err)
+	_, _, err = legacyHubOrigin("http://hub.example.com/app")
+	assert.Error(t, err)
+}
+
+// Security's point 8: only an active link passes; a paused, revoked or removing link and an unknown id are refused.
+func TestOnlyAnActiveLinkExists(t *testing.T) {
+	rs, db, _, _ := newRemoteStore(t)
+	cs := NewCloudStore(db, rs)
+	ctx := context.Background()
+	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "tok"))
+	links, _ := cs.ListLinks(ctx)
+	require.Len(t, links, 1)
+	id := links[0].LinkID
+	assert.True(t, cs.LinkExists(ctx, id))
+	assert.False(t, cs.LinkExists(ctx, "lnk-00000000"))
+	for _, st := range []string{LinkStatePaused, LinkStateRevoked, LinkStateRemoving} {
+		_, err := db.ExecContext(ctx, "UPDATE cloud_link SET state = ? WHERE link_id = ?", st, id)
+		require.NoError(t, err)
+		assert.False(t, cs.LinkExists(ctx, id), st)
+	}
+	_, err := db.ExecContext(ctx, "UPDATE cloud_link SET state = ? WHERE link_id = ?", LinkStateActive, id)
+	require.NoError(t, err)
+	assert.True(t, cs.LinkExists(ctx, id))
 }

@@ -846,3 +846,24 @@ func TestAnAnswerThatArrivesAfterASleepStillCountsTheGap(t *testing.T) {
 	waitState(t, m, StateIdle)
 	require.Equal(t, ErrCodeUncollected, m.Status().LastErrorCode)
 }
+
+// #20312, Security's point 9 and the upgrade rule: an enrollment saved with a path in its Hub address keeps dialing as it did (it finds its link, it is not "needs re-enrol"), and Settings gets a warning.
+func TestAnEnrollmentWithAPathStillDialsAndWarns(t *testing.T) {
+	e := newEnv(t)
+	hubURL := e.hub.srv.URL + "/app"
+	require.NoError(t, e.cs.Save(context.Background(), hubURL, "srv_1", "x", fakeToken))
+	m := e.manager(hubURL)
+	start(t, m)
+	time.Sleep(300 * time.Millisecond)
+	st := m.Status()
+	require.NotEqual(t, StateKeyUnreadable, st.State, "it dials: %s", st.LastError)
+	require.NotContains(t, st.LastError, "needs re-enrol")
+	require.Contains(t, st.HubAddressWarning, "enrol again")
+	require.Contains(t, st.HubAddressWarning, "/app")
+
+	// A plain address has no warning.
+	require.NoError(t, e.cs.Save(context.Background(), e.hub.srv.URL, "srv_1", "x", fakeToken))
+	m2 := e.manager(e.hub.srv.URL)
+	start(t, m2)
+	require.Empty(t, m2.Status().HubAddressWarning)
+}

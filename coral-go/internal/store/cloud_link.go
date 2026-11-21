@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/url"
 	"strings"
@@ -107,6 +108,32 @@ func CanonicalHubOrigin(raw string) (string, error) {
 	return scheme + "://" + host, nil
 }
 
+// legacyHubOrigin is the key for an enrollment that already exists (an upgrade never breaks Coral): CanonicalHubOrigin, and for an address that has only a path, query or fragment too
+// many, the same address cut to its site. It is used only to find or mirror the one existing enrollment, never to add a link: nothing that adds a link calls it, and no flag or
+// setting reaches it. The second result is true when the address had to be cut.
+func legacyHubOrigin(raw string) (string, bool, error) {
+	if o, err := CanonicalHubOrigin(raw); err == nil {
+		return o, false, nil
+	}
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" || u.User != nil {
+		return "", false, errors.New("not a Hub address")
+	}
+	cut := *u
+	cut.Path, cut.RawPath, cut.RawQuery, cut.ForceQuery, cut.Fragment, cut.RawFragment = "", "", "", false, "", ""
+	o, err := CanonicalHubOrigin(cut.String())
+	if err != nil {
+		return "", false, err
+	}
+	return o, true, nil
+}
+
+// HubAddressHasPath reports whether an enrolled Hub address is one only the legacy path accepts (it has a path, query or fragment): Settings and the log warn about it.
+func HubAddressHasPath(raw string) bool {
+	_, cut, err := legacyHubOrigin(raw)
+	return err == nil && cut
+}
+
 // ListLinks returns every link, oldest first, without tokens.
 func (s *CloudStore) ListLinks(ctx context.Context) ([]CloudLink, error) {
 	var out []CloudLink
@@ -117,7 +144,7 @@ func (s *CloudStore) ListLinks(ctx context.Context) ([]CloudLink, error) {
 
 // LinkByOrigin returns the link for a Hub address (any spelling CanonicalHubOrigin accepts).
 func (s *CloudStore) LinkByOrigin(ctx context.Context, hubURL string) (*CloudLink, error) {
-	origin, err := CanonicalHubOrigin(hubURL)
+	origin, _, err := legacyHubOrigin(hubURL) // a lookup only: a link with a path exists only when the legacy mirror made it
 	if err != nil {
 		return nil, ErrNoCloudLink
 	}
@@ -130,10 +157,10 @@ func (s *CloudStore) LinkByOrigin(ctx context.Context, hubURL string) (*CloudLin
 	return &l, err
 }
 
-// LinkExists reports whether id is a link on this computer. A store error is "no": the caller refuses.
+// LinkExists reports whether id is an active link on this computer: a paused, revoked or removing link is "no" (Security's point 8). A store error is "no": the caller refuses.
 func (s *CloudStore) LinkExists(ctx context.Context, id string) bool {
 	var n int
-	return s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE link_id = ?", id) == nil && n == 1
+	return s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE link_id = ? AND state = ?", id, LinkStateActive) == nil && n == 1
 }
 
 // LinkToken returns a link's decrypted token, for dialing only (see Token). A link with no token (one made paused because its token could not be read) returns ErrKeyUnreadable.
@@ -192,9 +219,12 @@ func (s *CloudStore) MirrorLegacyLink(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	origin, err := CanonicalHubOrigin(row.HubURL)
+	origin, cut, err := legacyHubOrigin(row.HubURL)
 	if err != nil {
 		return fmt.Errorf("the enrolled Hub address is not usable as a link: %w", err)
+	}
+	if cut {
+		log.Printf("WARNING: the enrolled Hub address %q has a path, query or fragment; it keeps working as enrolled (linked as %s), but enroll again with the site address only", row.HubURL, origin)
 	}
 	var existing string
 	err = s.db.GetContext(ctx, &existing, "SELECT link_id FROM cloud_link WHERE hub_origin = ? AND server_id = ?", origin, row.ServerID)
