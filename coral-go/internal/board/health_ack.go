@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 // Acknowledging an item of the orchestrator's check (#4175 step 3): the orchestrator marks it
@@ -31,6 +33,10 @@ func (s *Store) NoteHealthItems(ctx context.Context, project string, items map[s
 	}
 	defer tx.Rollback()
 	at := now.UTC().Format(healthTimeFormat)
+	// When the newest check was made, even one that showed nothing: the open items are the ones shown at that time (ListOpenHealthItems).
+	if _, err := tx.ExecContext(ctx, `INSERT INTO board_settings (project, key, value) VALUES (?, ?, ?) ON CONFLICT (project, key) DO UPDATE SET value = excluded.value`, project, settingHealthItemsAt, at); err != nil {
+		return nil, nil, err
+	}
 	for id, state := range items {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO health_items (project, item, state, shown_at) VALUES (?, ?, ?, ?)
 			ON CONFLICT(project, item) DO UPDATE SET state = excluded.state, shown_at = excluded.shown_at`, project, id, state, at); err != nil {
@@ -70,4 +76,42 @@ func (s *Store) AckHealthItem(ctx context.Context, project, item, by string, now
 		return ErrNoSuchHealthItem
 	}
 	return nil
+}
+
+// settingHealthItemsAt is the board setting that holds when the newest check noted its items.
+const settingHealthItemsAt = "health_items_at"
+
+// maxHealthItemText bounds an item's stored line.
+const maxHealthItemText = 600
+
+// NoteHealthItemTexts stores the line each item of the check just made was shown as (id -> line), for ListOpenHealthItems. An id the check has not noted is left alone. The lines are the check's own words about
+// agents' names and states, cleaned and cut here.
+func (s *Store) NoteHealthItemTexts(ctx context.Context, project string, texts map[string]string) error {
+	for id, text := range texts {
+		t := []rune(clitext.Clean(text))
+		if len(t) > maxHealthItemText {
+			t = t[:maxHealthItemText]
+		}
+		if _, err := s.db.ExecContext(ctx, `UPDATE health_items SET text = ? WHERE project = ? AND item = ?`, string(t), project, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// HealthItem is one open item of the last check.
+type HealthItem struct {
+	ID      string `db:"item" json:"id"`
+	Text    string `db:"text" json:"text"`
+	ShownAt string `db:"shown_at" json:"shown_at"`
+}
+
+// ListOpenHealthItems is the items the newest check of the board showed (they share its time) that are not acknowledged at the state they were shown in, oldest first by id. A check that showed nothing
+// lists nothing: the time of the newest check is kept whether or not it had items.
+func (s *Store) ListOpenHealthItems(ctx context.Context, project string) ([]HealthItem, error) {
+	out := []HealthItem{}
+	err := s.reader().SelectContext(ctx, &out, `SELECT item, text, shown_at FROM health_items
+		WHERE project = ? AND shown_at = (SELECT value FROM board_settings WHERE project = ? AND key = ?) AND (acked_state IS NULL OR acked_state != state)
+		ORDER BY item`, project, project, settingHealthItemsAt)
+	return out, err
 }

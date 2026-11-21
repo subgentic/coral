@@ -71,6 +71,9 @@ func (w WaitEntry) Actionable(you bool, rules Rules) bool {
 // statusHint is where the rest of a long list is.
 const statusHint = "coral-board status"
 
+// itemsHint is where the action lines a check left out are: every open item with its ack id.
+const itemsHint = "coral-board health list"
+
 func minutes(d time.Duration) string { return age(d) }
 
 // actions are the lines for the orchestrator, in the order they are said: what waits on the recipient first, then the oldest.
@@ -108,23 +111,7 @@ func (in CheckInput) actions(items []Item) []action {
 		}
 	}
 	for _, it := range items {
-		l := ""
-		if it.Key != "" {
-			l = "[ack " + ItemID(it.Key) + "] " // first, so a line cut short for the eye still has the id that acknowledges it (#20398)
-		}
-		l += fmt.Sprintf("%s: %s.", it.Agent, it.Problem)
-		if it.Evidence != "" {
-			l += " " + it.Evidence + "."
-		}
-		if it.Said != "" {
-			l += " Last said, " + it.Said
-		}
-		if it.Suggest != "" {
-			l += " Suggest: " + it.Suggest + "."
-		}
-		if it.Back {
-			l += " (back: changed since it was acknowledged)"
-		}
+		l := ItemText(it)
 		out = append(out, action{age: it.Age, rank: it.Rank, pinned: it.Rank == 0, text: l})
 	}
 	for _, b := range r.Blocked {
@@ -233,7 +220,7 @@ func composeActionList(in CheckInput) []string {
 				ls = append(ls, fmt.Sprintf("%d) %s", i+1, acts[i].text))
 			}
 			if na < len(acts) {
-				ls = append(ls, fmt.Sprintf("and %d more: %s", len(acts)-na, statusHint))
+				ls = append(ls, fmt.Sprintf("and %d more: %s", len(acts)-na, itemsHint)) // the lines left out are listed with their ack ids (#20495)
 			}
 		} else {
 			ls = append(ls, stamp)

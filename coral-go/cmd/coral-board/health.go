@@ -12,12 +12,15 @@ import (
 )
 
 const healthUsageText = `Usage: coral-board health ack <id>
+       coral-board health list
        coral-board health settings show [--json] [--since 24h]
        coral-board health settings set <key> <value>
        coral-board health settings reset <key>
 
   ack <id>   Mark an item of the health check handled: the check prints it as [ack <id>].
              It stays off the list until its state changes (the orchestrator or the Operator only).
+  list       Print every open item of the last check with its [ack <id>], so one the check left out is still
+             reachable (the orchestrator or the Operator only).
   settings   Read and tune the team's health check (the orchestrator or the Operator only, on this computer).
              show lists every key with its value, its default and what it accepts (--since 24h adds the changes
              made this way); set changes one key and is refused, with what is accepted, when the value is not;
@@ -32,6 +35,10 @@ func cmdHealth() {
 	}
 	if len(os.Args) >= 3 && os.Args[2] == "check" {
 		cmdHealthCheck(os.Args[3:])
+		return
+	}
+	if len(os.Args) >= 3 && os.Args[2] == "list" {
+		cmdHealthList()
 		return
 	}
 	if len(os.Args) < 4 || os.Args[2] != "ack" {
@@ -176,5 +183,40 @@ func cmdHealthSettings(args []string) {
 	default:
 		fmt.Fprintln(os.Stderr, healthUsageText)
 		clierr.Exit1()
+	}
+}
+
+// cmdHealthList: coral-board health list (#20495): the open items of the newest check, each as the check said it, ack id first.
+func cmdHealthList() {
+	st := loadState()
+	if st == nil {
+		fmt.Fprintln(os.Stderr, "Not subscribed to any board. Run: coral-board join <project> --as <role>")
+		clierr.Exit1()
+	}
+	data, status, err := apiCallRaw("GET", "/"+url.PathEscape(st.Project)+"/health/items", nil)
+	if err != nil || status != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "Error listing the open health items: %v %s\n", err, data)
+		clierr.Exit1()
+	}
+	var out struct {
+		Items []struct {
+			ID   string `json:"id"`
+			Text string `json:"text"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(data, &out); err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading the answer: %v\n", err)
+		clierr.Exit1()
+	}
+	if len(out.Items) == 0 {
+		fmt.Println("No open items in the last health check.")
+		return
+	}
+	for _, it := range out.Items {
+		text := it.Text
+		if text == "" { // shown before the text was kept: the id still acknowledges it
+			text = "[ack " + it.ID + "] (no text kept for this item yet: it is said again at the next check)"
+		}
+		fmt.Println(text)
 	}
 }
