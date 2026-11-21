@@ -56,6 +56,7 @@ var shellNeverRoutes = map[string]shellNever{
 	"team_uncommitted.js GET /api/teams/detail/{}/uncommitted":   {bHidden, `return r\.ok \? \(\(await r\.json\(\)\)`, "the line about work left uncommitted asks this computer; where that is refused through a Hub nothing is listed and the line is not drawn: a hidden line, not a broken page (#17203)", 0},
 	"team_uncommitted.js POST /api/teams/detail/{}/commit":       {bExplains, `The commit did not happen`, "Commit stays never through the Hub; a refused commit says it did not happen, with git's output when git said something, and nothing was committed (#17203)", 0},
 	"launch_disclosure.js POST /api/launch-disclosure/ack":       {bExplains, `Could not record that you have read this`, "acknowledgement stays never through the Hub; a refused acknowledgement says it could not be recorded and nothing was launched, with no retry; the Computers notice is information only (#14501)", 0},
+	"check_approval.js GET /api/board/{}/health/checks":          {bExplains, `The script could not be loaded`, "the script text beside a custom check's approval comes from this computer: the approval is never through a Coral Hub (#20139), so the row does not exist there; a failed read says it could not be loaded and approving still works from the words on the row (#20220)", 0},
 	"team_form.js GET /api/filesystem/trust-probe":               {bLocal, `isHub\(\) \|\| d\.dataset\.dirServer`, "only this computer’s folder choice is probed; Hub/remote inputs never request the default and the server rejects tunneled callers (#14090)", 0},
 	"info_tab.js GET /api/sessions/live/{}/mcp-servers":          {bHidden, `if \(!lines\.length\) return`, "the Info tab asks the agent's own computer for its MCP servers; where that read is refused through a Hub (or is empty) no row is drawn and nothing says why: a hidden row, not a wrong one (#13917)", 0},
 	"team_reminders.js GET /api/reminders/agents":                {bHidden, `if \(!r \|\| !r\.ok\) return null`, "the Agent reminders group of Team settings reads each agent's reminder count from this computer; where that is refused through a Hub the read gives nothing and the group is not drawn: a hidden group, not a wrong one (#19288)", 0},
@@ -384,6 +385,7 @@ func TestEveryNeverRouteTheShellCallsHasAListedBehaviour(t *testing.T) {
 var perComputerPrefixes = []string{"/api/sessions/live", "/api/sessions/launch", "/api/board/", "/api/resources", "/api/teams", "/api/tasks", "/api/scheduled", "/api/workflows"}
 
 var shellBareFetches = map[string]string{
+	"check_approval.js GET /api/board/{}/health/checks":            "this computer only: a custom check's approval is refused through a Hub (#20139), so the row, and this read of the script text, exist only on the computer it runs on (#20220)",
 	"automations_queue.js GET /api/resources":                      "this computer only: through a Hub the read is not sent (isCloud returns first, #13871)",
 	"board_export.js GET /api/sessions/live":                       "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"board_fetch.js GET /api/board/projects":                       "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
@@ -406,7 +408,7 @@ var shellBareFetches = map[string]string{
 	"workflow_agent.js POST /api/sessions/launch":                  "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 }
 
-const shellBareFetchesMax = 24
+const shellBareFetchesMax = 25
 
 func TestBareFetchesToAComputersRoutesAreListed(t *testing.T) {
 	calls, _ := shellCalls(t)

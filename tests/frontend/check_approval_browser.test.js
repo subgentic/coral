@@ -22,6 +22,7 @@ const WORDS = '@Operator [Coral] A custom check waits for your approval: stale-p
                 const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
                 window.fetch = (u, o) => { const url = String(u);
                     if (url === '/api/operator-asks') return json(window.__asks);
+                    if (url === '/api/board/team/health/checks') return json({ checks: [{ name: 'stale-prs', record_hash: 'hash', script_text: '#!/bin/sh\\n# \\\\u{202e} evil\\n' + 'x'.repeat(5000) }] });
                     const m = url.match(/\\/asks\\/41\\/buttons\\/(\\d+)\\/claim$/);
                     if (m) { window.__claims.push(Number(m[1]));
                         if (window.__mode === 'changed') { window.__asks = []; return json({ code: 'check_changed', message: 'the check changed since this question was filed: look at the new question' }, 409); }
@@ -29,7 +30,7 @@ const WORDS = '@Operator [Coral] A custom check waits for your approval: stale-p
                     return orig(u, o); };
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && !!document.querySelector('[data-check-action=approve]') && !!document.querySelector('[data-check-action=deny]')`, at + 'one row with its lazy-loaded approval actions in Needs you', 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && !!document.querySelector('[data-check-action=approve]') && !!document.querySelector('[data-check-action=deny]') && !!document.querySelector('[data-check-script]')`, at + 'one row with its lazy-loaded Approve, Deny and Script in Needs you', 10000);
             const row = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); return { text: r.textContent, approve: !!r.querySelector('[data-check-action=approve]'), deny: !!r.querySelector('[data-check-action=deny]'), more: !!r.querySelector('.inbox-ask-expand') }; })()`);
             assert.ok(row.text.includes('SHA-256 ' + 'ab12'.repeat(16)), at + 'the SHA-256 is on the row: ' + row.text.slice(0, 200));
             assert.ok(row.text.includes('"--days"') && row.text.includes('/Users/me/repo'), at + 'the arguments and the folder are on the row');
@@ -37,6 +38,15 @@ const WORDS = '@Operator [Coral] A custom check waits for your approval: stale-p
             assert.ok(row.text.includes('It can only read'), at + 'the may-write answer, in words');
             assert.ok(row.approve && row.deny, at + 'Approve and Deny are in the row');
             assert.ok(!row.more, at + 'the words are shown whole, with no Show all to miss');
+            // the script text, on request, escaped, in a box that scrolls
+            const shown = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); const b = r.querySelector('[data-check-script]'); const pre = r.querySelector('[data-check-script-text]'); return { has: !!b && !!pre, hidden: pre && pre.hidden }; })()`);
+            assert.ok(shown.has && shown.hidden, at + 'a Script button, the text hidden until asked for');
+            await ev(`document.querySelector('[data-check-script]').click(); true`);
+            await waitFor(`document.querySelector('[data-check-script-text]').textContent.includes('evil')`, at + 'the script text is shown', 8000);
+            const box = await ev(`(() => { const pre = document.querySelector('[data-check-script-text]'); const cs = getComputedStyle(pre); return { text: pre.textContent.slice(0, 60), scrolls: cs.overflowY === 'auto' && pre.scrollHeight > pre.clientHeight, fits: document.documentElement.scrollWidth <= window.innerWidth + 1 }; })()`);
+            assert.ok(box.text.includes('\\u{202e}'), at + 'the escape is shown as text: ' + box.text);
+            assert.ok(box.scrolls, at + 'a long script scrolls inside its box');
+            assert.ok(box.fits, at + 'no horizontal scroll with the script open');
             // Approve: one click, one claim of the Approve button, the row goes
             await ev(`document.querySelector('[data-check-action=approve]').click(); true`);
             await waitFor(`window.__claims.length === 1`, at + 'the claim was sent', 8000);

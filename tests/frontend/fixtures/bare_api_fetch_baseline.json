@@ -21,6 +21,10 @@
       "count": 1,
       "reason": "this computer's own board list: the remote computers' lists are read next to it with serverFetch"
     },
+    "check_approval.js": {
+      "count": 1,
+      "reason": "the script text beside a custom check's approval (GET /api/board/{}/health/checks): the approval is refused through a Hub, so the row and this read exist only on the computer the check runs on"
+    },
     "dropbox_connected.js": {
       "count": 1,
       "reason": "Share via Dropbox (#14944): the Dropbox status, read only for this computer's own file or board outside Coral Hub, to show the share entries; Dropbox is this computer's alone"

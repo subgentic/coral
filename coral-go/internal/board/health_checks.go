@@ -128,6 +128,7 @@ var (
 	ErrCheckExists  = errors.New("a check with that name already exists on this board")
 	ErrCheckLimit   = fmt.Errorf("a board has at most %d checks", MaxHealthChecksPerBoard)
 	ErrCheckMissing = errors.New("no such check")
+	ErrCheckPaused  = errors.New("the check is paused: resume it first, then approve it")
 	ErrCheckRecord  = errors.New("the check changed since it was shown: look at it again before approving")
 )
 
@@ -208,6 +209,9 @@ func (s *Store) ApproveHealthCheck(ctx context.Context, project, name, by, recor
 	}
 	if recordHash == "" || c.RecordHash() != recordHash {
 		return ErrCheckRecord
+	}
+	if c.State == CheckPaused && c.ApprovedHash != recordHash { // a check paused while it was still pending is not un-paused by an approval: resume first (#20220). One paused after it ran (its record approved) is approved again as before.
+		return ErrCheckPaused
 	}
 	_, err = s.db.ExecContext(ctx, `UPDATE health_checks SET state = ?, approved_by = ?, approved_hash = ?, next_run = ?, fails = 0, fail_said = 0 WHERE id = ?`,
 		CheckApproved, by, recordHash, now.UTC().Format(healthTimeFormat), c.ID)
@@ -454,4 +458,17 @@ func (s *Store) TakeCheckDelivery(ctx context.Context, project, check, member st
 		return "", err
 	}
 	return "", tx.Commit()
+}
+
+// ScriptHashesInUse are the script hashes (snapshot names) any check on any board holds: a snapshot no check holds is dropped (#20220).
+func (s *Store) ScriptHashesInUse(ctx context.Context) (map[string]bool, error) {
+	var hs []string
+	if err := s.db.SelectContext(ctx, &hs, `SELECT DISTINCT script_hash FROM health_checks`); err != nil {
+		return nil, err
+	}
+	in := make(map[string]bool, len(hs))
+	for _, h := range hs {
+		in[h] = true
+	}
+	return in, nil
 }
