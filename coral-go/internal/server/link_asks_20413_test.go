@@ -155,6 +155,8 @@ func TestAPostThroughAnAddedHubAnswersAnAskOnlyWithMessageReply(t *testing.T) {
 	byReply := func(id int64) map[string]any { return map[string]any{"content": "ship A", "reply_to": id} }
 	byMention := map[string]any{"content": "@Lead ship A"}
 
+	rec0 := call(h, "GET", "/api/activity", "", hubOf(askAdded))
+	require.Equal(t, 200, rec0.Code, "the added link's owner is the owner here: "+rec0.Body.String())
 	q1 := ask("@Operator which design? (reply)")
 	c, b := post(askAdded, byReply(q1))
 	assert.Equal(t, 200, c, "the post is delivered: "+b)
