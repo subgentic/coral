@@ -64,6 +64,7 @@ export async function loadBoardMessages(project) {
             }, machine);
             return;
         }
+        if (e.code === 'coral_too_old' && bs.currentProject === project && loadingEl) { loadingEl.textContent = e.message; loadingEl.setAttribute('role', 'status'); }
         console.error('Failed to load board messages:', e);
     }
 }

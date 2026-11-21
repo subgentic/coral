@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 import { importOnce } from './import_once.js';
 /* Live history controller: polling, page cursors, cancellation, kept pages and reset. Moved from live_chat.js (#8353). */
 
@@ -142,11 +143,12 @@ function _renderHistoryReply(container, session, data) {
 }
 
 /** The first load failed: say so, with Retry. */
-function _showHistoryError(container) {
+function _showHistoryError(container, update) {
     container.innerHTML = `<div class="chat-load-error" role="alert">
                 <span class="chat-error-message">Could not load this conversation. Reload the page to try again.</span>
                 <button type="button" class="btn btn-small chat-retry-btn">Retry</button>
             </div>`;
+    if (update) container.querySelector('.chat-error-message').textContent = update;
     const retryBtn = container.querySelector('.chat-retry-btn');
     if (retryBtn) {
         retryBtn.onclick = () => {
@@ -210,6 +212,11 @@ export async function refreshLiveHistory() {
         }
 
         if (!resp.ok) {
+            if (resp.status === 409) {
+                const update = await responseUpdateError(resp, server);
+                if (generation !== historyGeneration) return;
+                if (update) throw update;
+            }
             let errorText = `HTTP ${resp.status}`;
             try {
                 const errData = await resp.json();
@@ -253,7 +260,7 @@ export async function refreshLiveHistory() {
         }
         console.error("Failed to refresh live history:", e);
         if (generation === historyGeneration && !initialLoadDone) {
-            _showHistoryError(container);
+            _showHistoryError(container, e.code === 'coral_too_old' ? e.message : '');
         }
     } finally {
         if (activeChatAbortController === abortCtrl) {

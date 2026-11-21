@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 import { serverMatches } from './inbox_servers.js';
 /* Save for Later (#4510), the list and the jump back: the Saved tab of the right sidebar (Open and Done, newest saved first), which stays open beside the main
  * view while you go back to a saved message. The buttons
@@ -77,7 +78,7 @@ async function loadCloud(mine) {
     const results = await Promise.all(sources.map(async s => {
         try {
             const r = await serverFetch(s.id, '/api/saved?limit=200');
-            if (!r.ok) return { server: s.id, label: s.label, ownerOnly: r.status === 403, failed: true };
+            if (!r.ok) return { update: (await responseUpdateError(r, s.id))?.message || '', server: s.id, label: s.label, ownerOnly: r.status === 403, failed: true };
             const d = await r.json();
             if (!Array.isArray(d.items)) throw new Error('not a saved list');
             return { server: s.id, d };
@@ -85,7 +86,7 @@ async function loadCloud(mine) {
     }));
     if (mine !== loadSeq) return;
     const answered = results.filter(r => !r.failed && nativeSavedSourceAllowed(r.server));
-    down = results.filter(r => r.failed).map(r => ({ id: r.server, label: r.label, ownerOnly: r.ownerOnly }));
+    down = results.filter(r => r.failed).map(r => ({ id: r.server, label: r.label, ownerOnly: r.ownerOnly, update: r.update }));
     sourceItems = answered.flatMap(a => a.d.items.slice(0, 200).filter(validSavedItem).map(i => ({ ...i, server: a.server })));
     capped = answered.some(a => a.d.items.length >= 200 || a.d.has_more || a.d.truncated);
     multi = personalInboxSources().length > 1;
@@ -396,7 +397,7 @@ export function onSavedRender(fn) { renderListeners.add(fn); }
 /** What the Inbox shows: the tab's items (Open or Done), both totals, the servers that did not answer, and whether a search or filter is on. */
 export function savedView() {
     if (isCloud()) browserItems();
-    return { notice: [personalInboxNotice('saved items'), ...(isCloud() ? personalInboxSources().filter(s => personalInboxAllowed(s.id) && !nativeSavedSourceAllowed(s.id)).map(s => `Saved on ${s.label || s.id} requires Coral 2.0.62 or newer; its version is older or unknown.`) : [])].filter(Boolean).join(' '), capped: isCloud() && capped, browserOnly: isCloud(), loading: !_drawn && !_readError, error: _readError, scoped: scope.kind === 'all' ? '' : scopeEmpty(scope, tab), tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
+    return { notice: [personalInboxNotice('saved items'), ...down.map(s => s.update && `${s.update}.`).filter(Boolean), ...(isCloud() ? personalInboxSources().filter(s => personalInboxAllowed(s.id) && !nativeSavedSourceAllowed(s.id)).map(s => `Saved on ${s.label || s.id} requires Coral 2.0.62 or newer; its version is older or unknown.`) : [])].filter(Boolean).join(' '), capped: isCloud() && capped, browserOnly: isCloud(), loading: !_drawn && !_readError, error: _readError, scoped: scope.kind === 'all' ? '' : scopeEmpty(scope, tab), tab, totals: { ...totals }, shown: items.filter(i => (tab === 'done') === !!i.done_at), down: [...down], filtered: savedFiltered(filters), query: filters.q || '' };
 }
 /** One item's facts for a row or a page: its words, and what it can do. */
 export function savedItemFacts(it) {

@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* Live history requests: session parameters, trimmed messages and prefetched first pages. Moved from live_chat.js (#8353). */
 
 import { serverFetch, sessionServer, isCloud } from './server_base.js';
@@ -25,7 +26,10 @@ export async function fetchChatMessage(session, index) {
     params.set("limit", "1");
     params.set("before", String(index + 1));
     const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/chat?${params}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) {
+
+        throw await responseUpdateError(resp, sessionServer(session)) || new Error(`HTTP ${resp.status}`);
+    }
     const data = await resp.json();
     return (data && Array.isArray(data.messages) && data.messages[0]) || null;
 }

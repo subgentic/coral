@@ -1,3 +1,4 @@
+const { computerUpdateError } = await importOnce('./computer_update_error.js');
 /* The Skills tab (#12078, goal #191): the Operator's list of skills (the shared data table, sortable, set column widths), the approval view with every file and its text, the scanner's warnings and the two-step
  * approval of a skill with scripts, and Import. Instructions use the strict Markdown renderer, including escaped HTML comments; raw files remain available as text. Local Coral only; an agent has none of these routes. */
 import { importOnce } from './import_once.js';
@@ -41,7 +42,7 @@ async function readJson(path) {
     if (!id) { const e = new Error('No computer is linked to read skills from.'); e.status = 0; throw e; }
     const r = await serverFetch(id, path);
     const data = await r.json().catch(() => null);
-    if (!r.ok) { const e = new Error((data && (data.error || data.message)) || (r.status === 403 ? 'Only the account this computer is linked to can read its skills through the Hub.' : 'The skills could not be read')); e.status = r.status; e.data = data; throw e; }
+    if (!r.ok) { const update = computerUpdateError(id, r.status, data); if (update) throw update; const e = new Error((data && (data.error || data.message)) || (r.status === 403 ? 'Only the account this computer is linked to can read its skills through the Hub.' : 'The skills could not be read')); e.status = r.status; e.data = data; throw e; }
     return data;
 }
 const button = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', onClick); return b; };
@@ -153,7 +154,7 @@ function drawList() {
     if (cloud()) { if (computer()) page.append(el('p', 'skills-note', `This is ${computer() === 'local' ? 'this computer' : machineLabel(computer())}'s list, read only. Import, approve and remove a skill in that computer's own Coral.`)); }
     else if (!loadError) page.append(el('p', 'skills-note', approval)); // the description is for an empty list; the approval rule stays under the header with skills listed (#16211)
     if (!cloud()) page.append(el('p', 'skills-note skills-get-started', 'Ask an agent to write a skill for a task you repeat, or download one from a source you trust. Import its .zip or SKILL.md file here, read it, then choose Use in a team.'));
-    if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }
+    if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); return page; }
     const columns = [
         { key: 'name', label: 'Name', primary: true, width: 'grow', min: 32, sort: true, sortValue: r => r.name.toLowerCase(), line: 1, cell: r => r.name },
         { key: 'description', label: 'Description', share: 3, min: 24, line: 2, cell: r => r.description, narrowHide: true },

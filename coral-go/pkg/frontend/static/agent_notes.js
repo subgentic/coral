@@ -3,10 +3,11 @@
 
 import { state } from './state.js';
 import { showToast, sanitizeMarkdown } from './utils.js';
-import { serverFetch, serverForSession } from './server_base.js';
+import { serverFetch, serverForSession, sessionServer, responseUpdateError } from './server_base.js';
 import { whenText } from './when_text.js';
 import { currentServer, pathId } from './server_base.js';
 
+let _notesUpdate = '', _notesUpdateKey = '';
 let _notes = [];      // { id, content, created_at, updated_at }, newest first (the server's order)
 let _editing = null;  // null, or { id } of the note being edited ('new' for one not saved yet)
 
@@ -20,18 +21,21 @@ function el(tag, className, text) {
 export async function loadAgentNotes(agentName, sessionId, options) {
     if (!agentName) return;
     const sid = sessionId || (state.currentSession && state.currentSession.session_id);
+    const server = serverForSession(agentName, sid);
     try {
         const params = new URLSearchParams();
         if (sid) params.set("session_id", sid);
         const qs = params.toString() ? `?${params}` : "";
-        const resp = await serverFetch(serverForSession(agentName, sid), `/api/sessions/live/${encodeURIComponent(agentName)}/notes${qs}`, options);
-        if (!resp.ok) throw new Error(`notes fetch failed: ${resp.status}`);
+        const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(agentName)}/notes${qs}`, options);
+        if (!resp.ok) throw await responseUpdateError(resp, server) || new Error(`notes fetch failed: ${resp.status}`);
         const notes = await resp.json();
-        if (sid && state.currentSession?.session_id !== sid) return;
+        if (sid && (state.currentSession?.session_id !== sid || sessionServer(state.currentSession) !== server)) return;
+        _notesUpdate = '';
         _notes = Array.isArray(notes) ? notes.filter(n => n && String(n.content || '').trim()) : [];
     } catch (e) {
         if (e?.name === 'AbortError') return;
-        if (sid && state.currentSession?.session_id !== sid) return;
+        if (sid && (state.currentSession?.session_id !== sid || sessionServer(state.currentSession) !== server)) return;
+        _notesUpdate = e.code === 'coral_too_old' ? e.message : ''; _notesUpdateKey = `${server}|${sid}`;
         _notes = [];
     }
     renderNotes();
@@ -57,6 +61,7 @@ function renderNotes() {
     const editor = document.getElementById('note-md-editor');
     if (!list || !editor) return;
     if (_editing) return; // don't clobber while editing
+    if (_notesUpdate && _notesUpdateKey === `${sessionServer(state.currentSession)}|${state.currentSession?.session_id}`) { list.replaceChildren(el('p', 'empty-state-line', _notesUpdate)); return; }
     editor.style.display = 'none';
     if (editor.parentElement !== list.parentElement) list.after(editor);
     const items = [];

@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 import { refreshAgentUI } from './agent_ui.js';
 /* Agentic State — event loading, timeline rendering, tab switching, filtering */
 
@@ -10,7 +11,7 @@ import { startBoardTaskPoll, stopBoardTaskPoll } from './tasks.js';
 import { morphHtml } from './dom_morph.js';
 import { eventRowHtml, renderActivityChart } from './event_row.js';
 import { syncActivitySearch } from './activity_search.js';
-import { serverFetch, serverForSession } from './server_base.js';
+import { serverFetch, serverForSession, sessionServer } from './server_base.js';
 import { FILTER_GROUPS, eventVisible } from './event_icons.js';
 import { openableTab } from './tab_customize.js';
 import { browserLocal } from './safe_storage.js';
@@ -30,21 +31,23 @@ function isEventVisible(ev) {
     return eventVisible(ev, getHiddenFilters());
 }
 
+let eventUpdate = '', eventUpdateSession = '', eventUpdateServer = '';
 export async function loadAgentEvents(agentName, sessionId, options) {
     if (!agentName) return;
     const sid = sessionId || (state.currentSession && state.currentSession.session_id);
+    const server = serverForSession(agentName, sid);
     try {
         const params = new URLSearchParams({ limit: 50 });
         if (sid) params.set("session_id", sid);
-        const resp = await serverFetch(serverForSession(agentName, sid), `/api/sessions/live/${encodeURIComponent(agentName)}/events?${params}`, options);
-        if (!resp.ok) throw new Error(`events fetch failed: ${resp.status}`);
+        const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(agentName)}/events?${params}`, options);
+        if (!resp.ok) throw (await responseUpdateError(resp, server)) || new Error(`events fetch failed: ${resp.status}`);
         const events = await resp.json();
-        if (sid && state.currentSession?.session_id !== sid) return;
-        state.currentAgentEvents = events;
+        if (sid && (state.currentSession?.session_id !== sid || sessionServer(state.currentSession) !== server)) return;
+        eventUpdate = ''; eventUpdateSession = sid; eventUpdateServer = server; state.currentAgentEvents = events;
     } catch (e) {
         if (e?.name === 'AbortError') return;
-        if (sid && state.currentSession?.session_id !== sid) return;
-        state.currentAgentEvents = [];
+        if (sid && (state.currentSession?.session_id !== sid || sessionServer(state.currentSession) !== server)) return;
+        eventUpdate = e.code === 'coral_too_old' ? e.message : ''; eventUpdateSession = sid; eventUpdateServer = server; state.currentAgentEvents = [];
     }
     renderEventTimeline();
 }
@@ -53,6 +56,7 @@ export function renderEventTimeline() {
     const container = document.getElementById('agentic-state-events');
     if (!container) return;
 
+    if (eventUpdate && eventUpdateSession === state.currentSession?.session_id && eventUpdateServer === sessionServer(state.currentSession)) { container.replaceChildren(Object.assign(document.createElement('p'), { className: 'empty-state', textContent: eventUpdate })); return; }
     // A search of the agent's events (the bar above the list) shows its results in place of the live feed
     if (syncActivitySearch(renderEventTimeline)) { renderLiveActivityChart(); return; }
 

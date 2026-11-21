@@ -1,9 +1,10 @@
+import { responseUpdateError } from './server_base.js';
 /* The Branches tab (goal #11): the worktrees of the repository the agent works in, and on a team's page those of every repository its agents work in. Read-only, from the git poller's snapshot
  * (GET .../branches, GET /api/board/<team>/branches: no git runs for this page). Every text from the repository or GitHub (a branch name, the base, the remote) is set with textContent;
  * nothing is a link, and no folder path is shown. A tab reads only while it is open. */
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { serverFetch, serverForSession, boardFetch, splitKey } from './server_base.js';
+import { serverFetch, serverForSession, boardFetch, splitKey, sessionServer } from './server_base.js';
 import { emptyState } from './dom_write.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('branches.css'); // the tab's rules load with it, not at start (#17746)
@@ -26,14 +27,16 @@ export async function loadBranches() {
     if (!el || !el.classList.contains('active')) return;
     const s = state.currentSession;
     if (!s || s.type !== 'live' || !s.name) { emptyState(el, 'Branches show for a live agent.'); return; }
-    const mine = ++generation;
-    let data = null;
+    const mine = ++generation, server = sessionServer(s);
+    let data = null, update = '';
     try {
         const qs = new URLSearchParams({ session_id: s.session_id || '', agent_type: s.agent_type || '' });
-        const resp = await serverFetch(serverForSession(s.name, s.session_id), `/api/sessions/live/${encodeURIComponent(s.name)}/branches?${qs}`);
+        const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(s.name)}/branches?${qs}`);
+        if (resp.status === 409) update = (await responseUpdateError(resp, server))?.message || '';
         if (resp.ok) data = await resp.json();
     } catch { /* drawn as unavailable below */ }
-    if (mine !== generation || state.currentSession?.session_id !== s.session_id) return; // another agent was chosen meanwhile
+    if (mine !== generation || state.currentSession?.session_id !== s.session_id || sessionServer(state.currentSession) !== server) return; // another agent was chosen meanwhile
+    if (update) { emptyState(el, update); return; }
     const notGit = !!data && data.available !== false && !data.found && data.not_git === true; // no .git in the folder or above it: said at once, with the next step (#17483)
     const notYet = !!data && data.available !== false && !data.found && !notGit;
     if (!notYet) waiting = { session: '', since: 0, tries: 0 };
@@ -55,18 +58,21 @@ let teamWaiting = { team: '', since: 0 }; // how long the team's page has asked 
 export async function showTeamBranches(host, team) {
     clearTimeout(teamTimer);
     const mine = ++teamSeq;
-    let data = null;
+    let data = null, update = '';
     try {
         const resp = await boardFetch(team, '/branches');
+        if (resp.status === 409) update = (await responseUpdateError(resp, splitKey(team).server))?.message || '';
         if (resp.ok) data = await resp.json();
     } catch { /* drawn as unavailable below */ }
     if (mine !== teamSeq || !host.isConnected) return; // another team or tab was opened meanwhile
+    if (update) { emptyState(host, update); return; }
     if (!data || data.available === false) emptyState(host, 'Branches are not available from this computer.');
     const notGit = !!data && data.available !== false && !(data.repos || []).length && data.not_git === true;
     const none = !!data && data.available !== false && !(data.repos || []).length && !notGit;
     if (!none) teamWaiting = { team: '', since: 0 };
     else if (teamWaiting.team !== team) teamWaiting = { team, since: Date.now() };
     const overdue = none && Date.now() - teamWaiting.since > FIRST_READ_LIMIT_MS;
+    if (update) { emptyState(host, update); return; }
     if (!data || data.available === false) emptyState(host, 'Branches are not available from this computer.');
     else if (notGit) emptyState(host, NOT_GIT_TEAM);
     else if (none) emptyState(host, overdue

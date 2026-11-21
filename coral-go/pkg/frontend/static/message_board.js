@@ -52,7 +52,7 @@ function renderBoardSidebar(projects) {
     const list = document.getElementById('messageboard-sidebar-list');
     if (!list) return;
     if (!projects.length) {
-        emptyState(list, 'No teams', 'empty-state empty-state-tight', 'li');
+        emptyState(list, projects.updates?.join('. ') || 'No teams', 'empty-state empty-state-tight', 'li');
         return;
     }
     list.innerHTML = projects.map(p => {
@@ -180,7 +180,8 @@ async function loadBoardProjectList() {
         const projects = await fetchProjects();
         if (!projects.length) {
             ul.innerHTML = '';
-            empty.style.display = '';
+            empty.style.display = projects.updates?.length ? 'none' : '';
+            if (projects.updates?.length) ul.innerHTML = `<li class="empty-state" role="status">${escapeHtml(projects.updates.join('. '))}</li>`;
             return;
         }
         empty.style.display = 'none';
@@ -194,6 +195,7 @@ async function loadBoardProjectList() {
                 <span class="mb-project-meta">${p.message_count} messages</span>
             </button></li>
         `).join('');
+        if (projects.updates?.length) ul.insertAdjacentHTML('beforeend', `<li class="empty-state" role="status">${escapeHtml(projects.updates.join('. '))}</li>`);
     } catch (e) {
         console.error('Failed to load board project list:', e);
     }

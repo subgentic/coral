@@ -387,7 +387,7 @@ var shellBareFetches = map[string]string{
 	"check_approval.js GET /api/board/{}/health/checks":            "this computer only: a custom check's approval is refused through a Hub (#20139), so the row, and this read of the script text, exist only on the computer it runs on (#20220)",
 	"automations_queue.js GET /api/resources":                      "this computer only: through a Hub the read is not sent (isCloud returns first, #13871)",
 	"board_export.js GET /api/sessions/live":                       "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
-	"board_fetch.js GET /api/board/projects":                       "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
+	"board_bulk_reads.js GET /api/board/projects":                  "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"job_form.js GET /api/scheduled/jobs/{}":                       "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"job_form.js GET /api/workflows":                               "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",
 	"job_form.js POST /api/scheduled/jobs/init-repo":               "unreviewed: a bare fetch asks the page's own origin, which through a Hub is the Hub (#13860 worklist)",

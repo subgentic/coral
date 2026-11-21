@@ -1,3 +1,5 @@
+import { responseUpdateError } from './server_base.js';
+
 /* The Inbox's Activity folder (#12070, the Activity record #12064): what the Operator did in Needs you, newest first, on the shared data table. The server's record is GET /api/activity (the Operator's alone, on this
  * computer; a dashboard that links other computers reads each online one on its own and merges them, #15380). A row says what was done, to what, in which team, when and from where; a file's row opens THAT version in the viewer with its comments and its other versions
  * (the digest the record kept), a goal's row opens the goal. Everything shown is text (textContent, never HTML), and an item's title is words an agent wrote. The record is chained: when its check finds it was changed
@@ -112,7 +114,7 @@ export function refresh(done, { next = false } = {}) {
             if (next && cursors[server] != null) q.set('before', String(cursors[server]));
             const r = await serverFetch(server === LOCAL_SERVER ? undefined : server, `/api/activity?${q}`);
             if (r.status === 403) return { server, denied: true };
-            if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { server });
+            if (!r.ok) throw await responseUpdateError(r, server) || Object.assign(new Error(`HTTP ${r.status}`), { server });
             const d = await r.json();
             const got = (Array.isArray(d.actions) ? d.actions : []).filter(a => a && Number.isSafeInteger(a.id)).map(a => ({ ...a, server, team: identityKey(server, a.team) }));
             return { server, got, check: d.check || null, more: got.length === PAGE };
@@ -131,7 +133,7 @@ export function refresh(done, { next = false } = {}) {
         check = combineChecks(checks);
         more = Object.values(moreBy).some(Boolean);
         const kept = next ? unread.filter(u => !targets.includes(u.id)) : []; // a page of older actions asks only some computers: the others' gaps stay named
-        unread = [...kept, ...settled.map((x, i) => x.status === 'rejected' ? { id: targets[i], why: 'could not be read' } : x.value.denied ? { id: targets[i], why: 'refused to give its record: an older Coral may need an update' } : null).filter(Boolean)];
+        unread = [...kept, ...settled.map((x, i) => x.status === 'rejected' ? { id: targets[i], why: x.reason?.code === 'coral_too_old' ? x.reason.message : 'could not be read', update: x.reason?.code === 'coral_too_old' } : x.value.denied ? { id: targets[i], why: 'refused to give its record: an older Coral may need an update' } : null).filter(Boolean)];
         failed = answered.length === 0 && !deniedAll && settled.some(x => x.status === 'rejected');
         denied = deniedAll;
         loaded = true;
@@ -188,7 +190,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
     const narrowed = AF.isFiltered(f), onlyNotes = !narrowed && f.important === true && shown().length > 0; // the view is Important (the default, not a filter the person set) and every row read is a delivery note (#19219)
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         // All sources refusing is not an empty record: keep the node with its missing-computer notice.
-        empty: denied && missingComputers().length ? null : { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : 'The record could not be read.') : narrowed ? 'No action matches the search and filters.' : onlyNotes ? 'Nothing important yet.' : 'Nothing yet.',
+        empty: denied && missingComputers().length ? null : { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : unread.some(u => u.update) ? missingWords(missingComputers(), shownComputers()) : 'The record could not be read.') : narrowed ? 'No action matches the search and filters.' : onlyNotes ? 'Nothing important yet.' : 'Nothing yet.',
             hint: loaded && !failed && onlyNotes ? 'Delivery notes, like words sent to an agent, are under Everything.' : loaded && !failed && !narrowed ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
         signature: JSON.stringify([list.map(keyOf), check, loaded, failed, denied, more, missingComputers(), multipleServers(), grouped, grouped ? taskSignature : '']),
         node: () => {

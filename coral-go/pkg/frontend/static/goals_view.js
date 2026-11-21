@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* The local Goals view (#7113, UI/UX's #7091 design, layout A): the second face of a board's screen, beside Messages. A list on the left (filter chips, Waiting on you, one card per goal), the open goal
  * on the right (outcome, done when, the rollup, its tasks with Open task and Open the agent); on a phone the two are two screens with a back row. First cut: read, plus New goal.
  * The routes' JSON becomes the model in goals_adapter.js, the words come from goal_words.js; everything drawn here is built with the DOM and textContent (no text from a goal or a task is read as markup).
@@ -39,6 +40,10 @@ const say = (t) => { const s = root && root.querySelector('.goals-status'); if (
 
 /** An Error carrying the route's code and sentence (or the status when the answer is not JSON). */
 async function failure(r) {
+    if (r.status === 409) {
+        const update = await responseUpdateError(r, splitKey(model.project).server);
+        if (update) return update;
+    }
     let e = { code: '', message: '' };
     try { e = errorOf(await r.json()); } catch { /* the status stays */ }
     return Object.assign(new Error(e.message || `${r.status}`), { code: e.code });

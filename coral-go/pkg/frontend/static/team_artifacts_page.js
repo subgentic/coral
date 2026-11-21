@@ -228,7 +228,7 @@ export function createArtifactsList({ inbox = false } = {}) {
                 data = { ...next, artifacts: data.artifacts.concat(next.artifacts) };
             }
             if (inbox && data.waiting) { model.waiting = true; return; } // the list of computers has not loaded: the read is not finished, so nothing is said of the artifacts (the page keeps saying it is loading, and the next read asks again)
-            model.partial = inbox && data.expected > data.answered ? { failed: data.failed || [], answered: data.answered, expected: data.expected, all: data.all } : null; // some computers did not answer: the count is of the others, and the page says so (#12672)
+            model.partial = inbox && data.expected > data.answered ? { updates: data.updates || [], failed: data.failed || [], answered: data.answered, expected: data.expected, all: data.all } : null; // some computers did not answer: the count is of the others, and the page says so (#12672)
             model.versionless = inbox && Array.isArray(data.versionless) ? data.versionless : []; // computers on an older Coral count every version of a file, not files
             const rows = data.artifacts.filter(a => a && (a.uri || a.id || a.name));
             model.items = append ? model.items.concat(rows) : rows;
@@ -307,6 +307,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const line = el('p', 'goals-note team-partial-line');
         const names = ids => ids.map(serverLabel).join(', ');
         const parts = [];
+        if (model.partial?.updates?.length) parts.push(model.partial.updates.join('. '));
         if (model.partial) parts.push(`${model.partial.all} artifact${model.partial.all === 1 ? '' : 's'} from ${model.partial.answered} of ${model.partial.expected} computers. ${names(model.partial.failed)} could not be read.`);
         if (model.versionless && model.versionless.length) parts.push(`${names(model.versionless)} counts every version of a file, not files.`);
         line.append(document.createTextNode(parts.join(' ')));

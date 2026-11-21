@@ -559,7 +559,7 @@ export async function selectHistorySession(sessionId, locator = null, entry = nu
         if (error.status === 404) return false;
         showHistoryReadState(() => {
             if (generation === switchGeneration && source === historyServer()) selectHistorySession(sessionId, locator, entry);
-        });
+        }, error.code === 'coral_too_old' ? error.message : '');
         return true; // handled on the chat page: route restoration must not replace a read failure with "not found"
     }
     let messageBaseIndex = 0;

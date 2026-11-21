@@ -1,3 +1,5 @@
+import { responseUpdateError } from './server_base.js';
+
 import { artifactRevision, artifactsUnchanged } from './artifacts_feed.js';
 /* The Inbox's source identity and shared Server controls. No requests run at module load. */
 import { state } from './state.js';
@@ -59,7 +61,7 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
         // Only a 400 means "this Coral does not know the key": a 404 is a route that is not there (an older Coral without the list at all), which asking again without the key cannot fix.
         if (response.status === 400 && query.has('versions')) { query.delete('versions'); versionless = true; ({ response } = await fetchSkewed(server, '/api/team-artifacts', query, { signal })); } // an older Coral does not know versions: its list is whole, and its count is of versions
         if (response.status === 403 && await isOwnerOnlyAnswer(response)) { ownerOnly.add(server); return emptyArtifacts(server); } // a grantee on that computer: its artifacts are View plus owner-only, so it a
-        if (!response.ok) throw Object.assign(new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`), { server });
+        if (!response.ok) throw await responseUpdateError(response, server) || Object.assign(new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`), { server });
         const data = await response.json();
         if (!Array.isArray(data.artifacts)) throw Object.assign(new Error(`${serverLabel(server)} sent an answer this page does not understand.`), { server });
         return { ...data, artifacts_board: data.artifacts_board ? identityKey(server, data.artifacts_board) : null, server, versionless, artifacts: data.artifacts.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) })),
@@ -68,18 +70,19 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
     }));
     const aborted = settled.find(r => r.status === 'rejected' && r.reason && r.reason.name === 'AbortError');
     if (aborted) throw aborted.reason; // the caller's own cancel is not a computer failing
-    const results = [], failed = [];
+    const results = [], failed = [], updates = [];
     settled.forEach((r, i) => {
         if (r.status === 'fulfilled') { results.push(r.value); if (r.value.failed) failed.push(r.value.server); return; }
         const server = sources[i];
         failed.push(server);
+        if (r.reason?.code === 'coral_too_old') updates.push(r.reason.message);
         results.push({ server, artifacts: [], teams: [], all: 0, total: 0, offset: cursors[server]?.offset || 0, cursor: '', done: true, failed: true }); // kept as unread: a Retry reads the folder again from the top
     });
     const read = results.filter(d => !d.ownerOnly && !d.failed); // the computers whose answer is in the numbers
     const expected = results.filter(d => !d.ownerOnly).length;
     if (expected > 0 && !read.length) {
         const bad = settled.filter(r => r.status === 'rejected').map(r => r.reason);
-        throw new Error(bad.length === 1 && failed.length === 1 ? bad[0].message : `Artifacts could not be read from ${failed.map(serverLabel).join(', ')}.`);
+        throw new Error(updates.length ? updates.join('. ') : bad.length === 1 && failed.length === 1 ? bad[0].message : `Artifacts could not be read from ${failed.map(serverLabel).join(', ')}.`);
     }
     const next = Object.fromEntries(results.map(({ artifacts, ...data }) => [data.server, data]));
     return { artifact_revisions: Object.fromEntries(results.filter(d => !d.failed && !d.ownerOnly && !d.partial && !d.failed_boards?.length).map(d => [d.server, { rev: artifactRevision(d.artifacts_rev), team: d.artifacts_board || d.teams?.find(t => t.board_id)?.board_id }])),
@@ -88,7 +91,7 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
         tag_counts: results.reduce((counts,d) => { for (const [tag,n] of Object.entries(d.tag_counts || {})) counts[tag] = (counts[tag] || 0) + n; return counts; }, Object.create(null)),
         has_more: results.some(d => !d.done), next_cursor: JSON.stringify(next), truncated: results.some(d => d.truncated || d.partial || d.failed_boards?.length),
         partial: results.some(d => d.partial || d.failed_boards?.length), failed_boards: results.flatMap(d => (d.failed_boards || []).map(id => identityKey(d.server, id))),
-        failed: [...new Set(failed)], answered: read.length, expected, versionless: results.filter(d => d.versionless).map(d => d.server) };
+        updates, failed: [...new Set(failed)], answered: read.length, expected, versionless: results.filter(d => d.versionless).map(d => d.server) };
 }
 
 /** Only a complete snapshot of the currently online sources can suppress a read.

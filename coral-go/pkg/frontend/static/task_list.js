@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* The task list: polling, loading, filtering, sorting and drawing it (moved out of tasks.js, #5082; no behaviour change). */
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
@@ -179,7 +180,7 @@ async function _boardTasksFetch(boardName, suffix) {
     try {
         // Polled every 10 s per open board: an unchanged page comes back 304 (#3439).
         const r = await fetchValidated('board-tasks ' + boardName + suffix, headers => boardFetch(boardName, suffix, { signal: ctrl.signal, headers }));
-        if (!r.ok) { dropBody(r.resp); const err = new Error(`board tasks fetch failed: ${r.resp.status}`); err.resp = r.resp; throw err; }
+        if (!r.ok) { const update = await responseUpdateError(r.resp, splitKey(boardName).server); dropBody(r.resp); const err = update || new Error(`board tasks fetch failed: ${r.resp.status}`); err.resp = r.resp; throw err; }
         return JSON.parse(r.text);
     } finally {
         clearTimeout(timer);
@@ -210,7 +211,7 @@ async function _loadBoardTasksDefault(boardName) {
         renderBoardTaskList();
         return;
     }
-    let data = null, refused = null;
+    let data = null, refused = null, update = '';
     try {
         const scope = agentTaskScope();
         if (scope) {
@@ -224,15 +225,17 @@ async function _loadBoardTasksDefault(boardName) {
         } else data = await _fetchTaskPage(boardName, '');
     } catch (e) {
         data = null;
+        if (e?.code === 'coral_too_old') update = e.message;
         if (e && e.resp && isBusyStatus(e.resp.status)) refused = e.resp;
     }
     if (seq !== _boardTasksLoadSeq || _taskScopeKey !== (agentTaskScope()?.key || '')) return;
     const sameBoard = _boardList.board === boardName;
     if (!data) {
         // A failed refresh keeps the board's last good list; another board's is dropped.
-        if (sameBoard && !_boardList.busy) return;
+        if (sameBoard && !_boardList.busy && !update) return;
         _boardList = _emptyBoardList(boardName);
         state.currentBoardTasks = [];
+        if (update) _boardList.busy = update;
         // A first load refused as busy (#3430): say so instead of "No tasks yet", and load again
         // once the pause is over rather than at the next 10 s poll; a newer load supersedes it.
         if (refused) {
@@ -318,7 +321,7 @@ async function _taskQueryFetch(boardKey, pairs) {
     const timer = setTimeout(() => ctrl.abort(), boardTaskFetchHooks.timeoutMs);
     try {
         const r = await fetch(serverUrl(`/api/board/tasks?${qs}`, server), { signal: ctrl.signal });
-        if (!r.ok) { const err = new Error(`task search failed: ${r.status}`); err.resp = r; throw err; }
+        if (!r.ok) { const update = await responseUpdateError(r, server); const err = update || new Error(`task search failed: ${r.status}`); err.resp = r; throw err; }
         return await r.json();
     } finally { clearTimeout(timer); }
 }
@@ -364,7 +367,7 @@ async function _loadFilteredTasks(boardName, { append = false, refresh = false }
         Object.assign(L, { rows, cursor, total, doneTotal, truncated, phase });
     } catch (e) {
         if (seq !== _filteredSeq || _taskFilters !== savedFilters || scopeKey !== (agentTaskScope()?.key || '')) return;
-        L.error = e && e.resp && e.resp.status === 400 ? 'This search can not be run. Change it and try again.' : 'Could not search the tasks. Try again.';
+        L.error = e?.code === 'coral_too_old' ? e.message : e && e.resp && e.resp.status === 400 ? 'This search can not be run. Change it and try again.' : 'Could not search the tasks. Try again.';
         if (append) showToast(L.error, true);
     } finally {
         if (seq === _filteredSeq) { L.busy = false; renderBoardTaskList(); }
