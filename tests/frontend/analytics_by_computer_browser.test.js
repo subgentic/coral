@@ -34,7 +34,7 @@ const { setTheme } = require('./helpers/contrast');
         const r1 = await rows();
         if (r1[0][0] !== 'local' || r1[0][2][0] !== 'This computer') problems.push('this computer is not first: ' + JSON.stringify(r1));
         if (r1[0][2][1] !== '$12.40' || r1[1][2][1] !== '$7.35' || r1[2][2][1] !== '$0.62') problems.push('the costs: ' + JSON.stringify(r1));
-        if (norm(await total()) !== 'Total of the computers above$20.37 · 5,120,000 in · 1,454,000 out · 10 agents · 633 requests') problems.push('the total is not the sum of the rows: ' + norm(await total()));
+        if (norm(await total()) !== 'Total of the computers above $20.37 · 5,120,000 in · 1,454,000 out · 10 agents · 633 requests') problems.push('the total is not the sum of the rows: ' + norm(await total()));
         const reqs = await ev('window.__reqs');
         if (!reqs.every(q => /include=totals/.test(q)) || new Set(reqs.map(q => q.split('?')[0])).size !== 3) problems.push('each computer is read for the range, totals only: ' + JSON.stringify(reqs));
 
@@ -54,7 +54,7 @@ const { setTheme } = require('./helpers/contrast');
         const r2 = await rows();
         if (r2[1][2][1] !== '$7.35' || r2[1][2][2] !== '1,800,000') problems.push('a computer that does not answer lost its figures: ' + JSON.stringify(r2[1]));
         if (!/^last seen 3h ago$/.test(r2[1][2][6])) problems.push('no last seen on the row: ' + JSON.stringify(r2[1][2]));
-        if (norm(await total()) !== 'Total of the computers above$20.37 · 5,120,000 in · 1,454,000 out · 10 agents · 633 requests') problems.push('the total moved when a computer stopped answering: ' + norm(await total()));
+        if (norm(await total()) !== 'Total of the computers above $20.37 · 5,120,000 in · 1,454,000 out · 10 agents · 633 requests') problems.push('the total moved when a computer stopped answering: ' + norm(await total()));
         const note = await ev(`(document.querySelector('#cost-by-computer .cost-by-computer-note') || {}).textContent || ''`);
         if (!/Build box is not answering: the figures shown are the last ones read/.test(note)) problems.push('no note: ' + note);
         for (const theme of ['light', 'dark']) { await setTheme(ev, theme); await inView(`1280/${theme}/stale`); await shot(`one-not-answering-1280-${theme}`); }
