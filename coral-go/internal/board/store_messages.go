@@ -110,14 +110,21 @@ func (s *Store) insertMessage(ctx context.Context, project, subscriberID, conten
 	if NoAnswerFrom(ctx) {
 		noAnswer = 1
 	}
+	var viaLink, viaUser *string // the Hub link and person behind a tunneled post, from the context's stamp (#20387)
+	if v, ok := ActionViaFrom(ctx); ok && v.LinkID != "" {
+		viaLink = &v.LinkID
+		if v.HubUser != "" {
+			viaUser = &v.HubUser
+		}
+	}
 	result, err := s.execEnsuringBoard(ctx, project,
-		"INSERT INTO board_messages (project, session_id, subscriber_id, content, target_group_id, created_at, origin, hub_user, is_system, task_id, no_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		project, subscriberID, subscriberID, content, targetGroupID, now, originVal, hubUserVal, system, taskID, noAnswer)
+		"INSERT INTO board_messages (project, session_id, subscriber_id, content, target_group_id, created_at, origin, hub_user, is_system, task_id, no_answer, via_link, via_hub_user) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		project, subscriberID, subscriberID, content, targetGroupID, now, originVal, hubUserVal, system, taskID, noAnswer, viaLink, viaUser)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := result.LastInsertId()
-	msg := &Message{ID: id, Project: project, SubscriberID: subscriberID, Content: content, CreatedAt: now, Origin: originVal, HubUser: hubUserVal, IsSystem: system, TaskID: taskID}
+	msg := &Message{ID: id, Project: project, SubscriberID: subscriberID, Content: content, CreatedAt: now, Origin: originVal, HubUser: hubUserVal, ViaLink: viaLink, ViaHubUser: viaUser, IsSystem: system, TaskID: taskID}
 	if targetGroupID != nil {
 		msg.TargetGroupID = targetGroupID
 	}
