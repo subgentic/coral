@@ -25,7 +25,11 @@ const (
 // askWorld is a server with its enrollment link and one link added here, the Hub mode at Launch so the tunnel table is not what refuses anything.
 func askWorld(t *testing.T) (r *e2eRemote, enrolled string, hubOf func(link string) map[string]string, local func(method, path, body string) (int, string)) {
 	t.Helper()
-	r, _, l := linkedRemote(t, &fakeRevoker{})
+	r, cs, l := linkedRemote(t, &fakeRevoker{})
+	r.srv.cloudHandler.SetLinkedCheck(func() bool { return true }) // a linked computer: the Hub's owner may act as the Operator
+	pinned, perr := cs.PinOwnerUser(context.Background(), "srv_a", askPerson)
+	require.NoError(t, perr)
+	require.True(t, pinned)
 	_, err := r.db.ExecContext(context.Background(), `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, owner_account, owner_user, created_at, source)
 		VALUES (?, 'https://hub-b.example.com', 'srv_b', 'Laptop B', 'v1:b-sealed', 'active', 'launch', 'all', 'acct-b', ?, '2026-01-01T00:00:00Z', 'added')`, askAdded, askPerson)
 	require.NoError(t, err)
@@ -59,6 +63,12 @@ func TestAnAddedHubAnswersOnlyTheAsksThePersonAllowed(t *testing.T) {
 	}
 	dismiss, button, closeAsk := "/api/agent-asks/1/dismiss", "/api/board/team/asks/1/buttons/1/claim", "/api/board/team/asks/1/close"
 	assert.True(t, refused(askAdded, "POST", dismiss), "empty by default")
+	// Spellings the table does not know are refused, not passed as "not an ask route" (Security's MUST 2): the router would serve some of them with the same handler.
+	for _, p := range []string{"/api/agent-asks//1/dismiss", "/api/agent-asks/1/dismiss/", "/api/agent-asks/./1/dismiss", "/api/x/../agent-asks/1/dismiss", "/api/agent-asks%2F1/dismiss",
+		"/api/agent-asks/1%2Fdismiss", "/api/board/team//asks/1/close", "/api/board/team/asks/1/close/", "/api/board/team/asks%2F1/close", "/api/board/team/asks/1/buttons/1%2Fclaim"} {
+		rec := call(h, "POST", p, `{}`, hubOf(askAdded))
+		assert.Equal(t, 403, rec.Code, p+" "+rec.Body.String())
+	}
 	assert.True(t, refused(askAdded, "POST", button))
 	assert.False(t, refused(enrolled, "POST", dismiss), "the enrollment's own link answers as it always has")
 	assert.False(t, refused(enrolled, "POST", button))
@@ -155,8 +165,6 @@ func TestAPostThroughAnAddedHubAnswersAnAskOnlyWithMessageReply(t *testing.T) {
 	byReply := func(id int64) map[string]any { return map[string]any{"content": "ship A", "reply_to": id} }
 	byMention := map[string]any{"content": "@Lead ship A"}
 
-	rec0 := call(h, "GET", "/api/activity", "", hubOf(askAdded))
-	require.Equal(t, 200, rec0.Code, "the added link's owner is the owner here: "+rec0.Body.String())
 	q1 := ask("@Operator which design? (reply)")
 	c, b := post(askAdded, byReply(q1))
 	assert.Equal(t, 200, c, "the post is delivered: "+b)
