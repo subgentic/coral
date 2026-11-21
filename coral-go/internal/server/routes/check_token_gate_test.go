@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
@@ -23,6 +24,7 @@ import (
 )
 
 type checkRig struct {
+	bs      *board.Store
 	h       http.Handler
 	db      *store.DB
 	seen    Actor
@@ -37,7 +39,7 @@ func newCheckRig(t *testing.T) *checkRig {
 	t.Cleanup(func() { db.Close() })
 	_, err = bh.bs.Subscribe(context.Background(), "p", "Dev", "Developer", "claude-dev", nil, "")
 	require.NoError(t, err)
-	rg := &checkRig{db: db}
+	rg := &checkRig{db: db, bs: bh.bs}
 	o := NewIdentityObserver(db, bh.bs, func(*http.Request) bool { return false })
 	record := func(w http.ResponseWriter, r *http.Request) {
 		rg.reached = true
@@ -64,6 +66,7 @@ func newCheckRig(t *testing.T) *checkRig {
 func (rg *checkRig) do(method, target, body string, hdr map[string]string) *httptest.ResponseRecorder {
 	rg.seen, rg.body, rg.reached = Actor{}, "", false
 	r := httptest.NewRequest(method, target, strings.NewReader(body))
+	r.RemoteAddr = "127.0.0.1:50321"
 	for k, v := range hdr {
 		r.Header.Set(k, v)
 	}
@@ -213,5 +216,57 @@ func TestTheAllowListNamesRealAgentRoutes(t *testing.T) {
 	for _, k := range append(reads, writes...) {
 		method, path, _ := strings.Cut(k, " ")
 		assert.Regexp(t, `(?m)^[abc] `+method+` `+strings.NewReplacer("{", `\{`, "}", `\}`).Replace(path)+`$`, census, k)
+	}
+}
+
+func TestACheckTokenIsForItsOwnBoardLoopbackAndNamedMembersOnly(t *testing.T) {
+	rg := newCheckRig(t)
+	_, err := rg.bs.Subscribe(context.Background(), "other", "Dev", "Developer", "claude-dev", nil, "")
+	require.NoError(t, err)
+	w := rg.token(t, true, time.Minute)
+
+	// 1. a member seated on two boards reads and writes on the check's board only
+	for _, c := range [][3]string{{"GET", "/api/board/other/tasks", ""}, {"POST", "/api/board/other/messages", `{"content":"x"}`}} {
+		rec := rg.do(c[0], c[1], c[2], hdr(w))
+		assert.Equal(t, http.StatusForbidden, rec.Code, c[1])
+		assert.False(t, rg.reached, c[1])
+	}
+	assert.Equal(t, http.StatusOK, rg.do("GET", "/api/board/p/tasks", "", hdr(w)).Code)
+
+	// 2. nobody is given work who is not a member of the board, and never the Operator
+	for name, body := range map[string]string{
+		"the Operator":   `{"title":"t","assigned_to":"Operator"}`,
+		"the Operator 2": `{"title":"t","assigned_to":" operator "}`,
+		"a stranger":     `{"title":"t","assigned_to":"Nobody"}`,
+		"not text":       `{"title":"t","assigned_to":7}`,
+	} {
+		rec := rg.do("POST", "/api/board/p/tasks", body, hdr(w))
+		assert.Equal(t, http.StatusForbidden, rec.Code, name)
+		assert.False(t, rg.reached, name)
+	}
+	assert.Equal(t, http.StatusForbidden, rg.do("POST", "/api/board/p/tasks/3/reassign", `{"assignee":"Operator"}`, hdr(w)).Code)
+	assert.Equal(t, http.StatusOK, rg.do("POST", "/api/board/p/tasks", `{"title":"t","assigned_to":"Dev"}`, hdr(w)).Code, "a member")
+
+	// 3. everyone is not named either, and the mark cannot be spelled in another case
+	for _, c := range []string{"@all hi", "@Everyone hi", "@notify-all hi"} {
+		assert.Equal(t, http.StatusForbidden, rg.do("POST", "/api/board/p/messages", `{"content":"`+c+`"}`, hdr(w)).Code, c)
+	}
+	rg.do("POST", "/api/board/p/messages", `{"content":"[VIA CHECK evil] x"}`, hdr(w))
+	assert.NotContains(t, strings.ToLower(strings.TrimPrefix(rg.body, `{"content":"[via check stale-prs] `)), "[via check")
+
+	// 4. loopback by the connection, with no forwarding header
+	r := httptest.NewRequest("GET", "/api/board/p/tasks", nil)
+	r.Header.Set(store.CheckTokenHeader, w)
+	for name, mod := range map[string]func(){
+		"another address": func() { r.RemoteAddr = "192.168.1.20:4000" },
+		"forwarded":       func() { r.RemoteAddr = "127.0.0.1:4000"; r.Header.Set("X-Forwarded-For", "203.0.113.9") },
+	} {
+		mod()
+		rec := httptest.NewRecorder()
+		rg.reached = false
+		rg.h.ServeHTTP(rec, r)
+		assert.Equal(t, http.StatusForbidden, rec.Code, name)
+		assert.False(t, rg.reached, name)
+		r.Header.Del("X-Forwarded-For")
 	}
 }

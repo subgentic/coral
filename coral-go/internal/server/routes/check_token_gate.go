@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/auth"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/store"
@@ -59,22 +62,40 @@ func CheckAllowedRoutes() (reads, writes []string) {
 // viaCheckMark is the server's own prefix on every text a check writes: it names the check, and nothing a script prints can replace it.
 func viaCheckMark(check string) string { return "[via check " + check + "] " }
 
-func routePattern(r *http.Request) string {
+// routePattern is the router's pattern for the request and the {project} it matched ("" when the route has none).
+func routePattern(r *http.Request) (pattern, project string) {
 	rc := chi.RouteContext(r.Context())
 	if rc == nil || rc.Routes == nil {
-		return ""
+		return "", ""
 	}
 	t := chi.NewRouteContext()
 	if !rc.Routes.Match(t, r.Method, routedPath(r)) {
-		return ""
+		return "", ""
 	}
-	return t.RoutePattern()
+	return t.RoutePattern(), t.URLParam("project")
 }
+
+// forwardedHeaders are the ones a proxy adds: a request that has any came from somewhere else.
+var forwardedHeaders = []string{"X-Forwarded-For", "Forwarded", "X-Real-Ip", "X-Forwarded-Host"}
+
+// fromLoopback says the connection itself came from this computer and no proxy stands in front of it. The token is the credential that is checked next, so this is the loopback pass (auth.IsDirectLocalPeer), not a
+// local-power decision; the extra headers are refused too.
+func fromLoopback(r *http.Request) bool {
+	for _, h := range forwardedHeaders {
+		if r.Header.Get(h) != "" {
+			return false
+		}
+	}
+	return auth.IsDirectLocalPeer(r)
+}
+
+var viaCheckRE = regexp.MustCompile(`(?i)\[via check`)
+var broadcastRE = regexp.MustCompile(`(?i)@(all|everyone|notify-all|notify_all|notifyall)\b`)
 
 // checkTokenGate admits or refuses a request that carries a check token. ok false means the response is written. On ok, via says who the token stands for, and r is the request with its text marked.
 func (o *IdentityObserver) checkTokenGate(w http.ResponseWriter, r *http.Request, token string) (via *store.CheckTokenOwner, out *http.Request, ok bool) {
 	// Loopback only: a tunneled request (any Via stamp, even an unverified one) never carries a check token, and never both kinds of token.
-	if r.Header.Get(tunnel.ViaHeader) != "" || r.Header.Get(store.SessionTokenHeader) != "" {
+	if r.Header.Get(tunnel.ViaHeader) != "" || r.Header.Get(store.SessionTokenHeader) != "" || !fromLoopback(r) {
 		o.refuse(w, http.StatusForbidden, "check_token_refused", "A check's token is for this computer only, and never on a request that also carries an agent's token")
 		return nil, r, false
 	}
@@ -84,7 +105,11 @@ func (o *IdentityObserver) checkTokenGate(w http.ResponseWriter, r *http.Request
 		o.refuse(w, http.StatusUnauthorized, "check_token_invalid", "This check's token is unknown, or its run has ended")
 		return nil, r, false
 	}
-	pattern := routePattern(r)
+	pattern, project := routePattern(r)
+	if project != "" && project != v.Project { // the check's own board and no other, even for a member seated on two
+		o.refuse(w, http.StatusForbidden, "check_token_denied", "A check's token is for the board it was added on")
+		return nil, r, false
+	}
 	key := r.Method + " " + pattern
 	if checkReadRoutes[key] {
 		return v, r, true
@@ -98,7 +123,7 @@ func (o *IdentityObserver) checkTokenGate(w http.ResponseWriter, r *http.Request
 		o.refuse(w, http.StatusForbidden, "check_token_read_only", "This check may only read: the Operator has not ticked 'may write' for it")
 		return nil, r, false
 	}
-	out, why := markViaCheck(r, v.Check, spec.fields, spec.text)
+	out, why := o.markViaCheck(r, v.Project, v.Check, spec.fields, spec.text)
 	if why != "" {
 		o.refuse(w, http.StatusForbidden, "check_token_denied", why)
 		return nil, r, false
@@ -116,7 +141,7 @@ func (o *IdentityObserver) checkTokenGate(w http.ResponseWriter, r *http.Request
 
 // markViaCheck reads the body, refuses a field that is not listed or an @Operator mention, cleans and redacts each text and puts the server's mark in front of it, and returns the request with that body.
 // why is the refusal in words, "" when the body is fine.
-func markViaCheck(r *http.Request, check string, fields, text []string) (*http.Request, string) {
+func (o *IdentityObserver) markViaCheck(r *http.Request, project, check string, fields, text []string) (*http.Request, string) {
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
 		return r, "the request body could not be read"
@@ -134,6 +159,24 @@ func markViaCheck(r *http.Request, check string, fields, text []string) (*http.R
 			return r, "a check's write may not carry the field " + k + " (it may carry " + strings.Join(fields, ", ") + ")"
 		}
 	}
+	for _, f := range []string{"assigned_to", "assignee"} { // an assignment posts a notice, and the Operator's would be a Needs you item: only a member of this board, never the Operator
+		if v, present := m[f]; present {
+			name, isText := v.(string)
+			name = strings.TrimSpace(name)
+			if !isText {
+				return r, "the field " + f + " is a member's name"
+			}
+			if name == "" {
+				continue
+			}
+			if board.SameIdentity(name, board.OperatorName) {
+				return r, "a check may not give the Operator work: that would put an item in Needs you"
+			}
+			if sub, err := o.bs.GetProjectSubscription(r.Context(), project, name); err != nil || sub == nil {
+				return r, f + " must be a member of this board"
+			}
+		}
+	}
 	for _, f := range text {
 		v, ok := m[f].(string)
 		if !ok {
@@ -142,9 +185,9 @@ func markViaCheck(r *http.Request, check string, fields, text []string) (*http.R
 			}
 			continue
 		}
-		clean := strings.ReplaceAll(clitext.Clean(v), "[via check", "(via check")
-		if strings.Contains(strings.ToLower(clean), "@operator") {
-			return r, "a check may not mention the Operator: that would put an item in Needs you"
+		clean := viaCheckRE.ReplaceAllString(clitext.Clean(v), "(via check")
+		if strings.Contains(strings.ToLower(clean), "@operator") || broadcastRE.MatchString(clean) {
+			return r, "a check may not mention the Operator or everyone: that would put an item in Needs you or wake the whole team"
 		}
 		red, rerr := secrets.Redactor().Text([]byte(clean))
 		if rerr != nil {
