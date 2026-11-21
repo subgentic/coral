@@ -150,7 +150,7 @@ func TestActionListNeverCutsALineAndStaysWithinTheCap(t *testing.T) {
 	}
 	assert.Len(t, more, 2, "the actions and the Operator's lines each say how many more: %v", more)
 	for _, m := range more {
-		assert.True(t, strings.HasSuffix(m, "more: coral-board status") || strings.Contains(m, " more: coral-board status"), m)
+		assert.True(t, strings.Contains(m, " more: coral-board status") || strings.Contains(m, " more: coral-board health list"), m)
 	}
 	assert.Equal(t, "Counts: 0 working · 0 waiting · 200 idle · 0 asleep · 0 claimable tasks", lines[len(lines)-1], "the counts survive")
 }

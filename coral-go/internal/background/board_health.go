@@ -449,16 +449,18 @@ func reviewItems(reviews map[string][]int64, reviewers map[string]bool, parked, 
 // dropAcknowledged leaves out what the orchestrator acknowledged while its state is the same (#4175 step 3): the
 // states shown are recorded, acknowledged ones left out, and one whose acknowledgement lapsed is marked back.
 func (m *BoardHealthMonitor) dropAcknowledged(ctx context.Context, project string, items []teamhealth.Item, now time.Time) []teamhealth.Item {
-	states := map[string]string{}
+	states, texts := map[string]string{}, map[string]string{}
 	for _, it := range items {
 		if it.Key != "" {
 			states[teamhealth.ItemID(it.Key)] = it.State
+			texts[teamhealth.ItemID(it.Key)] = teamhealth.ItemText(it)
 		}
 	}
 	acked, back, err := m.store.NoteHealthItems(ctx, project, states, now)
 	if err != nil {
 		return items
 	}
+	_ = m.store.NoteHealthItemTexts(ctx, project, texts) // what coral-board health list prints; a failure leaves the check as it was
 	kept := items[:0]
 	for _, it := range items {
 		if it.Key == "" || !acked[teamhealth.ItemID(it.Key)] {

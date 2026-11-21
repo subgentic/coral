@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS health_items (
 	acked_state TEXT,
 	acked_by    TEXT,
 	acked_at    TEXT,
+	text        TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (project, item)
 );
 CREATE TABLE IF NOT EXISTS health_offbooks (
@@ -73,7 +75,14 @@ CREATE TABLE IF NOT EXISTS health_goal_size (
 	said_level INTEGER NOT NULL,
 	PRIMARY KEY (project, goal_id)
 );`)
-	return err
+	if err != nil {
+		return err
+	}
+	// The line an item was last shown as (#20495): coral-board health list prints it, so an item a check left out is still reachable. Added to a table made before it existed.
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE health_items ADD COLUMN text TEXT NOT NULL DEFAULT ''`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		return err
+	}
+	return nil
 }
 
 const healthTimeFormat = "2006-01-02T15:04:05.000Z"

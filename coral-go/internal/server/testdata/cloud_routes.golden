@@ -113,6 +113,7 @@ GET /api/board/{project}/groups/{groupID}/members view
 GET /api/board/{project}/guide-asks view
 GET /api/board/{project}/guide-roster launch
 GET /api/board/{project}/health/checks never
+GET /api/board/{project}/health/items never
 GET /api/board/{project}/health/settings never
 GET /api/board/{project}/lifecycle-log launch
 GET /api/board/{project}/messages view

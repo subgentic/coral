@@ -271,6 +271,15 @@ func TestHealthCheckScenario(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, code, "an agent can't ack")
 	code, out = api(http.MethodPost, "/api/board/team/health/ack", map[string]any{"item": m[1]}, "Orchestrator")
 	require.Equal(t, http.StatusOK, code, "%v", out)
+	// coral-board health list (#20495): the orchestrator reads the open items with their ack ids, an agent does not, and the acknowledged one is not there.
+	code, _ = api(http.MethodGet, "/api/board/team/health/items", nil, "Spare")
+	require.Equal(t, http.StatusForbidden, code, "an agent can't list")
+	code, out = api(http.MethodGet, "/api/board/team/health/items", nil, "Orchestrator")
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	listed, _ := json.Marshal(out["items"])
+	assert.Contains(t, string(listed), fmt.Sprintf("Worker: silent on #%d", work.ID), "the open items are listed with their text")
+	assert.Contains(t, string(listed), "[ack ", "each with its ack id first")
+	assert.NotContains(t, string(listed), "Spare: idle", "an acknowledged item is not open")
 
 	// Step 3 (15 min): Dev escalated after two nudges; Spare's item stays off; no second
 	// reminder of the mention, no second held notice.

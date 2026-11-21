@@ -201,28 +201,34 @@ func age(d time.Duration) string {
 // Age is age, for the rules that build items.
 func Age(d time.Duration) string { return age(d) }
 
-// itemTexts is each item as the check says it, numbered; an item the orchestrator can acknowledge ends with its id.
+// ItemText is one item as the check says it, without its number: its ack id first (so a line cut short for the eye still has the id that acknowledges it), then who and what, the evidence, what was last said and
+// the suggestion (#20398).
+func ItemText(it Item) string {
+	l := ""
+	if it.Key != "" {
+		l = "[ack " + ItemID(it.Key) + "] "
+	}
+	l += fmt.Sprintf("%s: %s.", it.Agent, it.Problem)
+	if it.Evidence != "" {
+		l += " " + it.Evidence + "."
+	}
+	if it.Said != "" {
+		l += " Last said, " + it.Said
+	}
+	if it.Suggest != "" {
+		l += " Suggest: " + it.Suggest + "."
+	}
+	if it.Back {
+		l += " (back: changed since it was acknowledged)"
+	}
+	return l
+}
+
+// itemTexts is each item as the check says it, numbered.
 func itemTexts(items []Item) []string {
 	var itemLines []string
 	for i, it := range items {
-		l := fmt.Sprintf("%d) ", i+1)
-		if it.Key != "" {
-			l += "[ack " + ItemID(it.Key) + "] " // first, so a line cut short for the eye still has the id that acknowledges it (#20398)
-		}
-		l += fmt.Sprintf("%s: %s.", it.Agent, it.Problem)
-		if it.Evidence != "" {
-			l += " " + it.Evidence + "."
-		}
-		if it.Said != "" {
-			l += " Last said, " + it.Said
-		}
-		if it.Suggest != "" {
-			l += " Suggest: " + it.Suggest + "."
-		}
-		if it.Back {
-			l += " (back: changed since it was acknowledged)"
-		}
-		itemLines = append(itemLines, l)
+		itemLines = append(itemLines, fmt.Sprintf("%d) %s", i+1, ItemText(it)))
 	}
 	return itemLines
 }

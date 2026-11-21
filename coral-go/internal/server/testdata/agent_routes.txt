@@ -363,6 +363,7 @@ b POST /api/board/{project}/groups/{groupID}/members
 a POST /api/board/{project}/health/ack
 a DELETE /api/board/{project}/health/checks/{name}
 a GET /api/board/{project}/health/checks
+a GET /api/board/{project}/health/items
 a POST /api/board/{project}/health/checks
 a POST /api/board/{project}/health/checks/{name}/pause
 a PUT /api/board/{project}/health/checks/{name}

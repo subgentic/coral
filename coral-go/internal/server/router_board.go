@@ -348,6 +348,7 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Delete("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/release", boardHandler.ReleaseTaskByID) // "not now" work back to the queue (#11660)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/ack", boardHandler.AckHealthItem)
+	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/health/items", boardHandler.ListHealthItems) // the open items with their ack ids (#20495)
 	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/health/settings", boardHandler.GetHealthSettings)
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/settings", boardHandler.PutHealthSettings)
 	r.Get("/api/board/{project}/health/checks", boardHandler.ListHealthChecksRoute)                                             // a team's custom health checks (#20176)

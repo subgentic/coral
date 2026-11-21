@@ -36,6 +36,7 @@ GET /api/board/{project}/groups/{groupID}/members | (*BoardHandler).ListGroupMem
 GET /api/board/{project}/guide-asks | (*BoardHandler).GuideAsks-fm
 GET /api/board/{project}/guide-roster | (*BoardHandler).GuideRoster-fm
 GET /api/board/{project}/health/checks | (*BoardHandler).ListHealthChecksRoute-fm
+GET /api/board/{project}/health/items | (*BoardHandler).ListHealthItems-fm
 GET /api/board/{project}/health/settings | (*BoardHandler).GetHealthSettings-fm
 GET /api/board/{project}/lifecycle-log | (*SessionsHandler).LifecycleLog-fm
 GET /api/board/{project}/messages | (*BoardHandler).ReadMessages-fm
