@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -207,48 +209,156 @@ func (h *CloudHandler) RemoveLink(w http.ResponseWriter, r *http.Request) {
 	if m := h.manager(); m != nil {
 		m.StopTunnel()
 	}
+	state, note, err := h.askAndSettle(ctx, *link, time.Now())
+	if err != nil {
+		errInternalServer(w, "Could not finish removing the link")
+		return
+	}
+	out, _ := h.linkList(ctx)
+	switch state {
+	case removalWaiting:
+		writeJSON(w, http.StatusAccepted, map[string]any{"links": out, "pending": true, "message": "Removing: waiting for the Hub to confirm. It is asked again every hour."})
+	case removalStuck:
+		writeJSON(w, http.StatusAccepted, map[string]any{"links": out, "pending": true, "stuck": true, "message": "The Hub refused the remove request. This is a Coral bug, not retried; you can drop the link here."})
+	default:
+		resp := map[string]any{"links": out}
+		if note != "" {
+			resp["message"] = note
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+type removalState int
+
+const (
+	removalDone removalState = iota
+	removalWaiting
+	removalStuck
+)
+
+// Removal retries: about every hour (a 429's Retry-After wins), for 7 days, then the token is deleted and the Hub is not asked again.
+const (
+	removalRetryEvery = time.Hour
+	removalJitterMax  = 10 * time.Minute
+	removalGiveUpAt   = 7 * 24 * time.Hour
+)
+
+type removalRetry struct {
+	next  time.Time
+	stuck bool
+}
+
+// askAndSettle asks the Hub to remove this computer, once, and ends the link here or leaves it removing, as the answer says. now is when the answer came, for the next try.
+func (h *CloudHandler) askAndSettle(ctx context.Context, link store.CloudLink, now time.Time) (removalState, string, error) {
 	rev := h.revoker
 	if rev == nil {
 		rev = newHTTPRevoker(h.hubRevokeOn, nil) // the real call, dark until its setting is on
 	}
-	token, terr := h.links.LinkToken(ctx, id)
-	answer := RevokeUnsupported
+	token, terr := h.links.LinkToken(ctx, link.LinkID)
+	res := RevokeResult{Answer: RevokeUnsupported}
 	if terr == nil {
-		answer = rev.Revoke(ctx, link.HubOrigin, link.ServerID, token).Answer
+		res = rev.Revoke(ctx, link.HubOrigin, link.ServerID, token)
 	}
 	how, note := store.LinkEventRemoved, ""
-	switch answer {
+	switch res.Answer {
 	case RevokeRemoved, RevokeAlreadyGone, RevokeNotFound:
 	case RevokeTokenRefused:
 		how, note = store.LinkEventDropped, msgHubTokenRefused
 	case RevokeUnsupported:
 		how, note = store.LinkEventDropped, msgHubStillLists
-	case RevokeBadRequest: // our own bug: not retried; the person is told
-		h.linkAction(ctx, id, "remove-stuck", "the Hub refused the request")
-		out, _ := h.linkList(ctx)
-		writeJSON(w, http.StatusAccepted, map[string]any{"links": out, "pending": true, "stuck": true, "message": "The Hub refused the remove request. This is a Coral bug, not retried; you can drop the link here."})
-		return
-	default: // forbidden, retry: the link stays removing and is asked again
-		h.linkAction(ctx, id, "remove-waiting", "the Hub has not confirmed")
-		out, _ := h.linkList(ctx)
-		writeJSON(w, http.StatusAccepted, map[string]any{"links": out, "pending": true, "message": "Removing: waiting for the Hub to confirm. It is asked again every hour."})
-		return
+	case RevokeBadRequest: // our own bug: asked once, never again; the person is told
+		h.setRetry(link.LinkID, removalRetry{stuck: true})
+		h.linkAction(ctx, link.LinkID, "remove-stuck", "the Hub refused the request")
+		return removalStuck, "", nil
+	default: // forbidden, busy, unreachable: still removing, asked again
+		wait := removalRetryEvery + time.Duration(rand.Int63n(int64(removalJitterMax)))
+		if res.RetryAfter > wait {
+			wait = res.RetryAfter
+		}
+		h.setRetry(link.LinkID, removalRetry{next: now.Add(wait)})
+		h.linkAction(ctx, link.LinkID, "remove-waiting", "the Hub has not confirmed")
+		return removalWaiting, "", nil
 	}
 	if terr != nil { // no token to send: finish here
 		how, note = store.LinkEventDropped, msgHubStillLists
 	}
-	if err := h.links.FinishRemoveLink(ctx, id, how); err != nil {
-		errInternalServer(w, "Could not finish removing the link")
-		return
+	if err := h.links.FinishRemoveLink(ctx, link.LinkID, how); err != nil {
+		return removalDone, "", err
 	}
-	h.linkAction(ctx, id, how, note)
+	h.setRetry(link.LinkID, removalRetry{})
+	h.linkAction(ctx, link.LinkID, how, note)
 	if m := h.manager(); m != nil {
 		_ = m.Disconnect(ctx) // forgets the enrollment the removed link mirrored
 	}
-	out, _ := h.linkList(ctx)
-	resp := map[string]any{"links": out}
-	if note != "" {
-		resp["message"] = note
+	return removalDone, note, nil
+}
+
+func (h *CloudHandler) setRetry(id string, r removalRetry) {
+	h.retryMu.Lock()
+	defer h.retryMu.Unlock()
+	if h.retries == nil {
+		h.retries = map[string]removalRetry{}
 	}
-	writeJSON(w, http.StatusOK, resp)
+	if r == (removalRetry{}) {
+		delete(h.retries, id)
+		return
+	}
+	h.retries[id] = r
+}
+
+// RetryRemovals asks again for every removal the Hub has not confirmed whose time has come, and at 7 days deletes the sealed token instead (the link stays so the Operator can drop it). It is safe to call at
+// any time: at start and about every hour.
+func (h *CloudHandler) RetryRemovals(ctx context.Context, now time.Time) {
+	if h.links == nil {
+		return
+	}
+	pending, err := h.links.RemovingLinks(ctx)
+	if err != nil {
+		return
+	}
+	all, err := h.links.ListLinks(ctx)
+	if err != nil {
+		return
+	}
+	byID := map[string]store.CloudLink{}
+	for _, l := range all {
+		byID[l.LinkID] = l
+	}
+	for _, p := range pending {
+		l, ok := byID[p.LinkID]
+		if !ok {
+			continue
+		}
+		if now.Sub(p.Since) >= removalGiveUpAt {
+			if err := h.links.DeleteLinkToken(ctx, p.LinkID); err == nil {
+				h.linkAction(ctx, p.LinkID, "remove-gave-up", "the Hub did not confirm in 7 days; the token was deleted")
+			}
+			continue
+		}
+		h.retryMu.Lock()
+		st := h.retries[p.LinkID]
+		h.retryMu.Unlock()
+		if st.stuck || now.Before(st.next) {
+			continue
+		}
+		_, _, _ = h.askAndSettle(ctx, l, now)
+	}
+}
+
+// StartRemovalRetry runs RetryRemovals once now and then about every hour, until ctx ends.
+func (h *CloudHandler) StartRemovalRetry(ctx context.Context) {
+	go func() {
+		h.RetryRemovals(ctx, time.Now())
+		t := time.NewTicker(removalRetryEvery)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-t.C:
+				h.RetryRemovals(ctx, now)
+			}
+		}
+	}()
 }

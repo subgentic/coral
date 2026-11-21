@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // Link management at this computer (#20346, design v2 1.7, 3). Every call here is the Operator's own act at this computer: the routes and the CLI that reach them are never tunneled. Each one is keyed by link_id
@@ -25,10 +26,11 @@ var ErrBadLinkState = errors.New("that link is not in a state that allows this")
 
 // Link event actions.
 const (
-	LinkEventCap         = "cap"
-	LinkEventRemoveBegin = "remove-begin"
-	LinkEventRemoved     = "removed"
-	LinkEventDropped     = "dropped"
+	LinkEventCap          = "cap"
+	LinkEventRemoveBegin  = "remove-begin"
+	LinkEventRemoved      = "removed"
+	LinkEventDropped      = "dropped"
+	LinkEventTokenDeleted = "token-deleted"
 )
 
 // LinkEvent is one row of the log of link changes.
@@ -192,4 +194,72 @@ func (s *CloudStore) ListLinkEvents(ctx context.Context, linkID string, limit in
 	args = append(args, limit)
 	err := s.db.SelectContext(ctx, &out, q, args...)
 	return out, err
+}
+
+// RemovingLink is a link whose removal the Hub has not confirmed, and when it began.
+type RemovingLink struct {
+	LinkID    string
+	HubOrigin string
+	Since     time.Time
+}
+
+// RemovingLinks lists the links in state removing, oldest first, each with the time its removal began (from the log).
+func (s *CloudStore) RemovingLinks(ctx context.Context) ([]RemovingLink, error) {
+	var rows []struct {
+		LinkID string `db:"link_id"`
+		Origin string `db:"hub_origin"`
+		At     string `db:"at"`
+	}
+	err := s.db.SelectContext(ctx, &rows, `SELECT l.link_id, l.hub_origin, COALESCE((SELECT MAX(e.at) FROM cloud_link_event e WHERE e.link_id = l.link_id AND e.action = ?), l.created_at) AS at
+		FROM cloud_link l WHERE l.state = ? ORDER BY at, l.rowid`, LinkEventRemoveBegin, LinkStateRemoving)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]RemovingLink, 0, len(rows))
+	for _, r := range rows {
+		t, perr := time.Parse(time.RFC3339Nano, r.At)
+		if perr != nil {
+			t = time.Now().UTC() // an unreadable time never makes a removal look old: the token is kept
+		}
+		out = append(out, RemovingLink{LinkID: r.LinkID, HubOrigin: r.Origin, Since: t})
+	}
+	return out, nil
+}
+
+// DeleteLinkToken deletes a removing link's sealed token, so none stays at rest when the Hub never confirmed (7 days). The row stays so the Operator can drop it; a repeat does nothing.
+func (s *CloudStore) DeleteLinkToken(ctx context.Context, linkID string) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var l struct {
+		Origin string `db:"hub_origin"`
+		State  string `db:"state"`
+		Token  string `db:"token"`
+	}
+	if err := tx.GetContext(ctx, &l, "SELECT hub_origin, state, token FROM cloud_link WHERE link_id = ?", linkID); errors.Is(err, sql.ErrNoRows) {
+		return ErrNoCloudLink
+	} else if err != nil {
+		return err
+	}
+	if l.State != LinkStateRemoving {
+		return ErrBadLinkState
+	}
+	if l.Token == "" {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE cloud_link SET token = '' WHERE link_id = ?", linkID); err != nil {
+		return err
+	}
+	if err := logLinkEvent(ctx, tx, linkID, l.Origin, LinkEventTokenDeleted, "the Hub did not confirm in 7 days"); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// RemovalPending reports whether a link for this server id is in state removing: the connector does not dial it.
+func (s *CloudStore) RemovalPending(ctx context.Context, serverID string) bool {
+	var n int
+	return s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE server_id = ? AND state = ?", serverID, LinkStateRemoving) == nil && n > 0
 }

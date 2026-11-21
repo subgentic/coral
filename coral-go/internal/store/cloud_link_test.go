@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -447,4 +448,38 @@ func TestASecondLinkIsRefusedWhileTheSwitchIsOff(t *testing.T) {
 	if !SecondLinkOpen {
 		assert.ErrorIs(t, cs.CheckCanAddLink(ctx), ErrSecondLinkNotYet)
 	}
+}
+
+// #20346, Security 4: a removal the Hub has not confirmed is listed with when it began, and its sealed token is deleted at 7 days (the link row stays, so the Operator can drop it).
+func TestAnUnconfirmedRemovalIsListedAndItsTokenDeletedAfterSevenDays(t *testing.T) {
+	cs, a, b := twoLinks(t)
+	ctx := context.Background()
+	require.NoError(t, cs.BeginRemoveLink(ctx, a))
+	got, err := cs.RemovingLinks(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, a, got[0].LinkID)
+	assert.WithinDuration(t, time.Now(), got[0].Since, time.Minute)
+
+	require.Error(t, cs.DeleteLinkToken(ctx, b), "only a removing link's token is deleted")
+	var bEnv string
+	require.NoError(t, cs.db.GetContext(ctx, &bEnv, "SELECT token FROM cloud_link WHERE link_id = ?", b))
+	assert.NotEmpty(t, bEnv, "the other link keeps its token")
+
+	require.NoError(t, cs.DeleteLinkToken(ctx, a))
+	var env string
+	require.NoError(t, cs.db.GetContext(ctx, &env, "SELECT token FROM cloud_link WHERE link_id = ?", a))
+	assert.Empty(t, env, "no sealed token stays at rest")
+	_, err = cs.LinkToken(ctx, a)
+	assert.Error(t, err)
+	require.NoError(t, cs.DeleteLinkToken(ctx, a), "a repeat is fine")
+	ev, _ := cs.ListLinkEvents(ctx, a, 10)
+	n := 0
+	for _, e := range ev {
+		if e.Action == LinkEventTokenDeleted {
+			n++
+		}
+	}
+	assert.Equal(t, 1, n, "logged once")
+	require.NoError(t, cs.FinishRemoveLink(ctx, a, LinkEventDropped), "the Operator can still drop the link")
 }

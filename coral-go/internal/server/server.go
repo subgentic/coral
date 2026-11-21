@@ -321,6 +321,13 @@ func (s *Server) RunRemoteAgents(ctx context.Context) {
 	s.remoteAgents.Run(ctx)
 }
 
+// StartLinkRemovalRetry asks again, about every hour, for each Hub link whose removal the Hub has not confirmed (#20346).
+func (s *Server) StartLinkRemovalRetry(ctx context.Context) {
+	if s.cloudHandler != nil {
+		s.cloudHandler.StartRemovalRetry(ctx)
+	}
+}
+
 // SetScheduler injects the job scheduler into the tasks handler for launching/killing.
 // SetCloud attaches the Cloud Hub connector manager to the /api/cloud routes.
 // CloseCloud removes the command-line token at a graceful shutdown (#3285).

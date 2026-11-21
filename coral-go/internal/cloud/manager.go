@@ -279,6 +279,12 @@ func (m *Manager) Run(ctx context.Context) {
 		m.st.State, m.st.LastErrorCode = StateIdle, ErrCodeHubMoved
 		m.st.LastError = "this server is enrolled with a different hub (" + conn.HubURL + "); run 'coral cloud connect --force' to enroll with " + m.o.HubURL
 		m.mu.Unlock()
+	case m.o.Store.RemovalPending(ctx, conn.ServerID):
+		// The link is being removed (#20346): no tunnel until the Hub confirms or the Operator drops it.
+		m.mu.Lock()
+		m.st.State, m.st.Label, m.st.ServerID = StateIdle, conn.Label, conn.ServerID
+		m.st.LastError = "this Hub link is being removed; it reconnects only if you add it again"
+		m.mu.Unlock()
 	case conn.State == store.CloudStateRevoked:
 		m.mu.Lock()
 		m.st.State, m.st.Label, m.st.ServerID = StateRevoked, conn.Label, conn.ServerID

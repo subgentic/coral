@@ -868,3 +868,26 @@ func TestAnEnrollmentWithAPathStillDialsAndWarns(t *testing.T) {
 	start(t, m2)
 	require.Empty(t, m2.Status().HubAddressWarning)
 }
+
+// #20346: a link in removal has no tunnel, also after a restart: the connector does not dial the Hub while its removal waits for the Hub's answer.
+func TestARestartDoesNotDialALinkThatIsBeingRemoved(t *testing.T) {
+	e := newEnv(t)
+	m := e.manager(e.hub.srv.URL)
+	start(t, m)
+	require.NoError(t, m.Connect(context.Background()))
+	waitState(t, m, StateConnected)
+	m.StopTunnel()
+	n := e.hub.tunnels.Load()
+
+	links, err := e.cs.ListLinks(context.Background())
+	require.NoError(t, err)
+	require.Len(t, links, 1)
+	require.NoError(t, e.cs.BeginRemoveLink(context.Background(), links[0].LinkID))
+
+	m2 := e.manager(e.hub.srv.URL)
+	start(t, m2)
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, n, e.hub.tunnels.Load(), "no tunnel while the removal waits")
+	require.Equal(t, StateIdle, m2.Status().State)
+	require.Contains(t, m2.Status().LastError, "being removed")
+}

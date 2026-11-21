@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -183,4 +184,69 @@ func TestOperatorActionsNameTheHubTheyCameThrough(t *testing.T) {
 	assert.Equal(t, "a removed link (lnk-deadbeef)", b.Hub.Text)
 	assert.Empty(t, b.Hub.Origin)
 	assert.Nil(t, c.Hub, "a local action names no Hub")
+}
+
+type seqRevoker struct {
+	answers []routes.RevokeResult
+	calls   int
+}
+
+func (s *seqRevoker) Revoke(context.Context, string, string, string) routes.RevokeResult {
+	i := s.calls
+	if i >= len(s.answers) {
+		i = len(s.answers) - 1
+	}
+	s.calls++
+	return s.answers[i]
+}
+
+// A removal the Hub has not confirmed is asked again about every hour (not before), a 429's Retry-After is honoured, and the link ends here when the Hub finally answers.
+func TestAnUnconfirmedRemovalIsAskedAgainEveryHourAndEndsWhenTheHubAnswers(t *testing.T) {
+	rev := &seqRevoker{answers: []routes.RevokeResult{{Answer: routes.RevokeRetry, RetryAfter: 3 * time.Hour}, {Answer: routes.RevokeRetry}, {Answer: routes.RevokeRemoved}}}
+	r, cs, l := linkedRemote(t, rev)
+	ctx := context.Background()
+	h := r.srv.cloudHandler
+	require.NoError(t, cs.BeginRemoveLink(ctx, l.LinkID))
+	t0 := time.Now()
+	h.RetryRemovals(ctx, t0)
+	require.Equal(t, 1, rev.calls, "asked at once the first time")
+	h.RetryRemovals(ctx, t0.Add(2*time.Hour))
+	require.Equal(t, 1, rev.calls, "the Hub said wait 3 hours")
+	h.RetryRemovals(ctx, t0.Add(3*time.Hour+time.Minute))
+	require.Equal(t, 2, rev.calls)
+	h.RetryRemovals(ctx, t0.Add(3*time.Hour+30*time.Minute))
+	require.Equal(t, 2, rev.calls, "not again within the hour")
+	ls, _ := cs.ListLinks(ctx)
+	require.Len(t, ls, 1)
+	assert.Equal(t, store.LinkStateRemoving, ls[0].State)
+	h.RetryRemovals(ctx, t0.Add(5*time.Hour))
+	require.Equal(t, 3, rev.calls, "about an hour after the last answer, with jitter, never longer than 70 minutes")
+	ls, _ = cs.ListLinks(ctx)
+	assert.Empty(t, ls, "the Hub confirmed: the link ends here")
+}
+
+// At 7 days the sealed token is deleted and the Hub is not asked again; the link stays so the Operator can drop it. A 400 is our bug: asked once, never again.
+func TestAnUnconfirmedRemovalGivesUpAtSevenDaysAndABadRequestIsNotRetried(t *testing.T) {
+	rev := &seqRevoker{answers: []routes.RevokeResult{{Answer: routes.RevokeRetry}}}
+	r, cs, l := linkedRemote(t, rev)
+	ctx := context.Background()
+	h := r.srv.cloudHandler
+	require.NoError(t, cs.BeginRemoveLink(ctx, l.LinkID))
+	h.RetryRemovals(ctx, time.Now().Add(7*24*time.Hour+time.Minute))
+	assert.Zero(t, rev.calls, "no call at 7 days")
+	var env string
+	require.NoError(t, r.db.GetContext(ctx, &env, "SELECT token FROM cloud_link WHERE link_id = ?", l.LinkID))
+	assert.Empty(t, env, "the token is deleted")
+	ls, _ := cs.ListLinks(ctx)
+	require.Len(t, ls, 1, "the Operator can still drop it")
+
+	bad := &seqRevoker{answers: []routes.RevokeResult{{Answer: routes.RevokeBadRequest}}}
+	r2, cs2, l2 := linkedRemote(t, bad)
+	h2 := r2.srv.cloudHandler
+	require.NoError(t, cs2.BeginRemoveLink(ctx, l2.LinkID))
+	now := time.Now()
+	h2.RetryRemovals(ctx, now)
+	h2.RetryRemovals(ctx, now.Add(3*time.Hour))
+	h2.RetryRemovals(ctx, now.Add(30*time.Hour))
+	assert.Equal(t, 1, bad.calls, "400 is not retried")
 }
