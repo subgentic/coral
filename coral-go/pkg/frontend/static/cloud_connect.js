@@ -13,7 +13,7 @@
 import { copyText } from './utils.js';
 import { isSignedOut } from './overload.js';
 import { importOnce } from './import_once.js';
-const { morePermsWords, operatorLine, hubAddressLine, linkRowWords, removeLinkConfirm, capSavedText, LINK_CAPS, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
+const { morePermsWords, operatorLine, hubAddressLine, linkRowWords, ownerConfirmWords, removeLinkConfirm, capSavedText, LINK_CAPS, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
 export const { enrolledRetrying, rekeyText, describe } = await importOnce('./cloud_words.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH, HUB_RELAUNCH_OFF_AT_LAUNCH, HUB_RELAUNCH_OFF_TOAST_AT_LAUNCH } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
 
@@ -285,19 +285,22 @@ class CloudPanel {
         if (!box || !list) return;
         this.linksAt = Date.now();
         let links = [];
+        let adding = [];
         try {
             const r = await fetch('/api/cloud/links');
-            if (r.ok) { const d = await r.json(); if (Array.isArray(d.links)) links = d.links; }
+            if (r.ok) { const d = await r.json(); if (Array.isArray(d.links)) links = d.links; if (Array.isArray(d.adding)) adding = d.adding; }
         } catch (_) { /* the list stays as it was */ return; }
-        this.drawLinks(links);
+        this.drawLinks(links, adding);
     }
 
-    drawLinks(links) {
+    drawLinks(links, adding = []) {
         const box = this.part('links');
         const list = this.part('links-list');
         const say = this.part('links-say');
-        box.hidden = links.length === 0;
+        const confirms = adding.map(ownerConfirmWords).filter(Boolean);
+        box.hidden = links.length === 0 && confirms.length === 0;
         list.replaceChildren();
+        for (const c of confirms) list.append(this.ownerConfirmRow(c, say));
         for (const l of links) {
             const w = linkRowWords(l);
             if (!w.id) continue;
@@ -329,6 +332,36 @@ class CloudPanel {
             li.append(sel, rm);
             list.append(li);
         }
+    }
+
+    /** A Hub added here whose owner is not confirmed yet (#20421): the Hub's address, the person it named (as text), the plain line, and a button that sends exactly that address and that name. */
+    ownerConfirmRow(c, say) {
+        const li = document.createElement('li');
+        li.className = 'settings-cloud-link settings-cloud-owner-confirm';
+        li.dataset.owner = c.hub;
+        const title = document.createElement('div');
+        title.className = 'settings-cloud-link-name';
+        title.textContent = c.title;
+        const line = document.createElement('p');
+        line.className = 'settings-cloud-help';
+        line.textContent = c.line;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-small';
+        btn.textContent = c.button;
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            let said = 'Could not confirm the owner.';
+            try {
+                const r = await fetch('/api/cloud/links/confirm-owner', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c.body) });
+                if (r.ok) said = 'Owner confirmed. This person now acts through this link.';
+                else if (r.status === 409) said = 'That is not the person the Hub named now, or the owner is already set. Reload and look again.';
+            } catch (_) { /* said stays */ }
+            if (say) say.textContent = said;
+            this.loadLinks();
+        });
+        li.append(title, line, btn);
+        return li;
     }
 
     confirmRemoveLink(li, l, w, rm, say) {

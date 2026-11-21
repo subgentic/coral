@@ -42,6 +42,22 @@ export function linkRowWords(l) {
     return { id: /^lnk-[0-9a-f]{8}$/.test(l.link_id) ? l.link_id : '', origin: bareOrigin(l.hub_origin), label: cleanLabel(l.label), state: LINK_STATE[l.state] || '', cap, grant: LEVEL_NOW[cap], removing: l.state === 'removing' };
 }
 
+/** Confirm owner for a Hub added here (#20421): what the person is shown and what pressing the button sends. null unless the entry names a Hub address and a candidate of the form this Coral makes (hub-user- and 8 hex
+ *  digits): the Hub's own words never get past that test, and they are set as text. The button sends the Hub address and the candidate shown, exactly, and nothing the Hub wrote beyond them. */
+export function ownerConfirmWords(a) {
+    a = a && typeof a === 'object' ? a : {};
+    const hub = bareOrigin(a.hub);
+    const cand = typeof a.owner_candidate === 'string' && /^hub-user-[0-9a-f]{8}$/.test(a.owner_candidate) ? a.owner_candidate : '';
+    if (!hub || !cand) return null;
+    const cap = LINK_CAPS.includes(a.cap) ? a.cap : 'view';
+    return {
+        hub, candidate: cand, button: 'Confirm owner',
+        title: `Confirm the owner of ${hub}`,
+        line: `${hub} named this person as its owner: ${cand}. If you confirm, this person will have everything this link allows (${LEVEL_NOW[cap]}).`,
+        body: { hub, candidate: cand },
+    };
+}
+
 /** The question before a link is removed. */
 export function removeLinkConfirm(l) {
     return `Remove ${bareOrigin(l && l.hub_origin) || 'this Hub'}? This computer stops talking to that Hub at once and asks it to forget this computer.`;

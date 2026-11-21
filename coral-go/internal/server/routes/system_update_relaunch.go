@@ -289,6 +289,19 @@ func (h *UpdateRelaunchHandler) relinkNeeded(r *http.Request) bool {
 	return id.owner && !id.team && routeNeedsOwnerLabel(r) && !ownerLabelRecordedWith(r, h.OwnerUser)
 }
 
+// relinkWords is the code and sentence for a request refused only for want of the owner's label (#20421): for a Hub added here the way to fix it is to confirm its owner on this computer, not to link again.
+func relinkWords(r *http.Request) (code, text string) {
+	if viaAddedLink(r.Context()) {
+		return codeConfirmOwnerNeeded, textConfirmOwnerNeeded
+	}
+	return codeRelinkNeeded, textRelinkNeeded
+}
+
+const (
+	codeConfirmOwnerNeeded = "confirm_owner_needed"
+	textConfirmOwnerNeeded = "this Hub was added to this computer but its owner is not confirmed here: confirm the owner for this Hub in Settings on this computer, then update from there"
+)
+
 const (
 	codeRelinkNeeded = "relink_needed"
 	textRelinkNeeded = "this computer was linked to Coral Hub before it recorded its owner: link this computer to Coral Hub again to update it from there"
@@ -862,7 +875,8 @@ func (h *UpdateRelaunchHandler) Relaunch(w http.ResponseWriter, r *http.Request)
 	id := h.identify(r)
 	if !id.owner {
 		if h.relinkNeeded(r) {
-			h.refuse(w, r, id, nil, http.StatusForbidden, codeRelinkNeeded, textRelinkNeeded, nil)
+			code, text := relinkWords(r)
+			h.refuse(w, r, id, nil, http.StatusForbidden, code, text, nil)
 			return
 		}
 		h.refuse(w, r, id, nil, http.StatusForbidden, "owner_only", "only the account this computer is linked to can relaunch it from Coral Hub", nil)

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -51,6 +52,14 @@ func TestCheckHubIsTheOwnersAloneAndOnlyWithThePersonsSwitch(t *testing.T) {
 	code, out = e.checkHub("", "", owner)
 	assert.Equal(t, http.StatusForbidden, code, "a computer linked before it recorded its owner")
 	assert.Equal(t, "relink_needed", out["code"], "is told to link again, not that the caller is not the owner")
+	// #20421: through a Hub added here the cure is to confirm its owner on this computer, and it is told so.
+	prior := hubLinkAdded
+	hubLinkAdded = func(context.Context) bool { return true }
+	code, out = e.checkHub("", "", owner)
+	hubLinkAdded = prior
+	assert.Equal(t, http.StatusForbidden, code)
+	assert.Equal(t, "confirm_owner_needed", out["code"])
+	assert.Contains(t, out["error"], "confirm the owner for this Hub")
 	e.label = ownerA
 
 	e.on = false

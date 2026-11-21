@@ -1,6 +1,6 @@
 // cloud_words.js: the closed permissions summary (permissive switches named, a protective one off marked), the Operator sentence and the spelled code.
 import assert from 'node:assert/strict';
-import { morePermsWords, operatorLine, hubAddressLine, linkRowWords, removeLinkConfirm, capSavedText, LINK_CAPS, spellCode, describe, enrolledRetrying, rekeyText, autoAcceptChangedText, severalAccountsText, codeExpired, codeUncollected, UNCOLLECTED_TEXT, OFF_TEXT, EXPIRED_TEXT, HUB_ACCESS_URL, LEVEL_NOW } from '../../coral-go/pkg/frontend/static/cloud_words.js';
+import { morePermsWords, operatorLine, hubAddressLine, linkRowWords, ownerConfirmWords, removeLinkConfirm, capSavedText, LINK_CAPS, spellCode, describe, enrolledRetrying, rekeyText, autoAcceptChangedText, severalAccountsText, codeExpired, codeUncollected, UNCOLLECTED_TEXT, OFF_TEXT, EXPIRED_TEXT, HUB_ACCESS_URL, LEVEL_NOW } from '../../coral-go/pkg/frontend/static/cloud_words.js';
 
 assert.deepEqual(morePermsWords({}, null), { text: 'More Coral Hub permissions: may change cross-team settings', warn: '' }, 'cross-team is on unless turned off');
 assert.equal(morePermsWords({ hub_cross_team_settings: false }, false).text, 'More Coral Hub permissions: none on');
@@ -36,6 +36,20 @@ assert.equal(spellCode('WXYZ-1234'), 'W X Y Z, 1 2 3 4');
 assert.equal(spellCode('H2XR-HS16'), 'H 2 X R, H S 1 6');
 assert.equal(spellCode(''), '');
 assert.equal(spellCode(undefined), '');
+
+// #20421: Confirm owner for a Hub added here: shown only for a candidate of this Coral's own form and a Hub address, said with the plain line, and the button sends exactly what was shown.
+{
+    const w = ownerConfirmWords({ hub: 'https://hub-b.example.com', cap: 'interact', owner_candidate: 'hub-user-bbbb2222', state: 'done' });
+    assert.equal(w.button, 'Confirm owner');
+    assert.deepEqual(w.body, { hub: 'https://hub-b.example.com', candidate: 'hub-user-bbbb2222' });
+    assert.match(w.line, /hub-b\.example\.com named this person as its owner: hub-user-bbbb2222/);
+    assert.match(w.line, /this person will have everything this link allows \(send and answer\)/);
+    assert.equal(ownerConfirmWords({ hub: 'https://hub-b.example.com', owner_candidate: '' }), null, 'no candidate, no row');
+    assert.equal(ownerConfirmWords({ hub: 'https://hub-b.example.com', owner_candidate: 'Ada <b>from Acme</b>' }), null, 'a name the Hub made up never gets past the test');
+    assert.equal(ownerConfirmWords({ hub: 'javascript:alert(1)', owner_candidate: 'hub-user-bbbb2222' }), null, 'only an https address');
+    assert.equal(ownerConfirmWords(null), null);
+    assert.match(ownerConfirmWords({ hub: 'https://h.example.com', cap: 'root', owner_candidate: 'hub-user-00000000' }).line, /look only/, 'an unknown cap says the lowest');
+}
 console.log('cloud_words: ok');
 
 // The status sentences of the connect panel (moved here from cloud_connect.js, #8386).

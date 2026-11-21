@@ -112,6 +112,7 @@ const REASON_TEXT = {
     owner_only: 'Only the owner can relaunch this Coral.',
     hub_relaunch_off: 'Relaunching from Coral Hub is switched off on this computer. Change it in Settings > Coral Hub and remote access.',
     relink_needed: 'This computer was linked to Coral Hub before it recorded its owner. Link it to Coral Hub again to update it from here.',
+    confirm_owner_needed: 'This Hub was added to this computer but its owner is not confirmed here. Confirm the owner for this Hub in Settings on this computer, then update from here.',
     switch_off: 'Relaunching from Coral Hub is switched off on this computer. Change it in Settings > Coral Hub and remote access.',
     nothing_staged: 'There is no update ready to install.',
     not_verified: 'The update has not been verified, so it was not installed.',
