@@ -23,7 +23,7 @@ const { coralReady } = require('./helpers/wait');
             safePaused(client, e => setTimeout(() => Fetch.continueRequest({ requestId: e.requestId }).catch(() => {}), 1500));
             assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`), 200);
             await ev(`(() => {
-                const mk = n => ({ id: n.toString(16).padStart(64, '0'), name: 'Phone review ' + n + '.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - (10 - n) * 60000).toISOString(), tags: ['for review'], available: true, uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0'), produced_by: 'Review Writer', session_id: 'rw-1', task_id: n });
+                const mk = n => ({ id: n.toString(16).padStart(64, '0'), name: 'Phone review ' + n + '.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - (10 - n) * 60000).toISOString(), tags: ['for review'], available: true, uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0'), produced_by: 'Review Writer', session_id: 'rw-1', task_id: n, goal_id: 77, goal_title: 'Phone selection' });
                 window.__reviewItems = [mk(1), mk(2), mk(3), mk(4), mk(5)]; window.__asks = [{ board: '${team}', kind: 'ask', id: 71, asker: 'Lead', text: 'Which port should the test server use?', at: '2026-10-31T01:00:00Z' }];
                 window.__calls = []; const original = window.fetch.bind(window), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const pageURL = new URL(String(u), location.href), page = pageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(pageURL, location.href, {'${team}': window.__reviewItems}) : null; if (page) return json(page); const url = String(u), x = window.__reviewFixtureURL(url, location.origin), method = o.method || 'GET';
@@ -55,7 +55,36 @@ const { coralReady } = require('./helpers/wait');
 
             // Phone rows keep navigation and the approved review star; other actions stay in selection.
             const visible = await ev(`[...document.querySelectorAll('${T} tbody tr button')].filter(b => { const c = b.getBoundingClientRect(); return b.getClientRects().length > 0 && c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
-            assert.deepEqual(visible.filter(l => !/^(Show all$|Show less$|Open |Task: |Star |Remove the star from |Approve: |Request changes: |More actions for |Approve with a note: |Dismiss: |Deny: |Save for later: |Copy version ID: |Answer the question of |Dismiss the question of |Got it: |New agent: |New team: |Connect: |Read it: |Open guide: )/.test(l)), [], at + 'a phone row carries navigation, the review star and its own review buttons (#14627: Approve and Request changes at rest, the rest in More actions): ' + JSON.stringify(visible));
+            assert.deepEqual(visible.filter(l => !/^(Show all$|Show less$|Open |Goal: |Task: |Star |Remove the star from |Approve: |Request changes: |More actions for |Approve with a note: |Dismiss: |Deny: |Save for later: |Copy version ID: |Answer the question of |Dismiss the question of |Got it: |New agent: |New team: |Connect: |Read it: |Open guide: )/.test(l)), [], at + 'a phone row carries navigation, the review star and its own review buttons (#14627: Approve and Request changes at rest, the rest in More actions): ' + JSON.stringify(visible));
+            // #20309: selection owns taps on nested navigation and action controls too.
+            const touchNode = async (selector, hold = false) => {
+                const p = await ev(`(() => { const node = document.querySelector(${JSON.stringify(selector)}); node.scrollIntoView({block:'center'}); const r=node.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+                await touch('touchStart',p); await new Promise(r=>setTimeout(r,hold?700:60)); await touch('touchEnd',p); await new Promise(r=>setTimeout(r,300)); // sleep-ok: real tap or held finger, then selection redraw
+            }; // sleep-ok: real tap or held finger, then the selection redraw
+            const control = (name, suffix) => `${T} tr[data-key] .inbox-review-item:has([data-review-artifact="${name.toString(16).padStart(64,'0')}"]) ${suffix}`;
+            const chip = (n, kind) => control(n, kind === 'goal' ? '[data-goal-pill="77"]' : `[data-task-pill="${n}"]`);
+            await touchNode(chip(2,'goal'),true);
+            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '1 selected'`, at+'long-press Goal chip selects its card', 3000);
+            await touchNode(chip(3,'goal'));
+            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '2 selected'`, at+'Goal chip tap adds its card without navigating', 3000);
+            await touchNode(chip(3,'task'));
+            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '1 selected'`, at+'Task chip tap removes its selected card without navigating', 3000);
+            await touchNode(chip(4,'task'));
+            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '2 selected'`, at+'Task chip tap adds its card without navigating', 3000);
+            const approveChipRow = `${T} tr:has([data-review-artifact="${(3).toString(16).padStart(64,'0')}"]) .inbox-approve-action`;
+            await touchNode(approveChipRow);
+            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '3 selected'`,at+'row action tap also selects instead of approving',3000);
+            assert.equal(await ev(`!!document.querySelector('dialog[open]')`),false,at+'selection tap never opens the review confirmation');
+            assert.deepEqual(await ev('window.__calls'), [], at+'chip selection sends no action');
+            await pressBar('Cancel');
+            await waitFor(`!document.querySelector('.dt-bar-count')`,at+'Cancel leaves chip selection',3000);
+            // Outside selection, Goal and Task chips must still navigate normally.
+            for (const kind of ['goal','task']) {
+                await touchNode(chip(3,kind));
+                await waitFor(`!(${rowOf('Phone review 3.txt')})`,at+kind+' chip navigates outside selection',8000);
+                await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
+                await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length === 6`,at+'return to unchanged Inbox after normal chip navigation',10000);
+            }
             // a tap opens the question
             await tap('Which port should the test server use?');
             await waitFor(`!!document.querySelector('dialog[open]')`, at + 'a tap opens the question', 6000);
@@ -161,6 +190,16 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`window.__calls.filter(c => c.review && c.decision === 'approve').length === 2`, at + 'confirming is one request per file', 8000);
             await removeBoards(ev, [team]).catch(() => {});
         }
+        // Desktop nested controls retain their action even when the table has a selection.
+        await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
+        await Emulation.setTouchEmulationEnabled({enabled:false});
+        const desktopPoint = await ev(`(async()=>{const DT=await import((window.__coralStatic||'/static/')+'data_table.js');window.__desktopSelectionActions=0;const table=DT.dataTable({label:'Desktop selection guard',rows:[{id:'one'}],rowKey:r=>r.id,fold:'always',columns:[{key:'agent',label:'Name',primary:true,line:1,cell:()=>{const b=DT.el('button','desktop-nested-action','Open task');b.addEventListener('click',()=>window.__desktopSelectionActions++);return b;}}],selectable:{longPress:true}});window.__desktopSelectionTable=table;const host=DT.el('div','inbox-needs-results');host.style.cssText='position:fixed;inset:100px 40px auto;z-index:10000;background:var(--bg-primary)';host.append(table.el);document.body.append(host);window.__desktopSelectionHost=host;table.selectButton.click();table.el.querySelector('.dt-check input').click();const button=table.el.querySelector('.desktop-nested-action');button.scrollIntoView({block:'center'});const r=button.getBoundingClientRect();const x=r.left+r.width/2,y=r.top+r.height/2;return {x,y,width:r.width,height:r.height,target:document.elementFromPoint(x,y)?.closest('.desktop-nested-action')===button};})()`);
+        assert.ok(desktopPoint.width>0 && desktopPoint.height>0 && desktopPoint.target,'desktop fixture exposes a real pointer target: '+JSON.stringify(desktopPoint));
+        await client.Input.dispatchMouseEvent({type:'mousePressed',x:desktopPoint.x,y:desktopPoint.y,button:'left',clickCount:1});
+        await client.Input.dispatchMouseEvent({type:'mouseReleased',x:desktopPoint.x,y:desktopPoint.y,button:'left',clickCount:1});
+        await waitFor(`window.__desktopSelectionActions === 1`,'desktop pointer still reaches its nested action while selected',3000);
+        assert.equal(await ev(`window.__desktopSelectionTable.selection().size`),1,'desktop action preserves selection');
+        await ev(`window.__desktopSelectionHost.remove();true`);
         console.log('\nPASS the phone rows: no buttons, tap opens, long press selects, the bar acts on the selection');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
