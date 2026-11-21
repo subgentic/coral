@@ -38,37 +38,82 @@ func memberOperatorOnly(w http.ResponseWriter, r *http.Request) bool {
 
 const maxMemberGrantBody = 4 << 10
 
-type memberGrantRequest struct {
-	LinkID  string `json:"link_id"`
-	HubUser string `json:"hub_user"`
-	Level   string `json:"level"`
-	Label   string `json:"label"`
-	Days    int    `json:"days"`
+// memberGrantWindow is how far from this computer's clock a signed grant's time may be.
+const memberGrantWindow = 5 * time.Minute
+
+// memberVerify checks that kid is a device of this computer's owner and that sig is its signature over the grant's digest (board.MemberGrantDigest): the Hub half of the signed `grant-member` message and the
+// owner-pair check (B2) are what make it. Nil until they exist, which refuses every grant: no grant is written without it, and nothing here accepts a signature it did not check.
+var memberVerify func(ctx context.Context, digest []byte, kid, sig string) error
+
+// SetMemberVerify wires the owner-device signature check.
+func SetMemberVerify(f func(ctx context.Context, digest []byte, kid, sig string) error) {
+	memberVerify = f
 }
 
-// MemberGrants answers GET and POST /api/board/{project}/member-grants: the live grants of one team, and a new one.
+type memberGrantRequest struct {
+	LinkID       string `json:"link_id"`
+	HubUser      string `json:"hub_user"`
+	Level        string `json:"level"`
+	ScopeKind    string `json:"scope_kind"`
+	ScopeID      string `json:"scope_id"`
+	Artifacts    bool   `json:"artifacts"`
+	Files        bool   `json:"files"`
+	PinnedFolder string `json:"pinned_folder"`
+	Label        string `json:"label"`
+	Days         int    `json:"days"`
+	Signature    struct {
+		KID   string `json:"kid"`
+		Nonce string `json:"nonce"`
+		Ts    int64  `json:"ts"`
+		Sig   string `json:"sig"`
+	} `json:"signature"`
+}
+
+// MemberGrants answers GET and POST /api/board/{project}/member-grants: the live grants of one team, and a new view grant for the team or one of its agents.
 func (h *BoardHandler) MemberGrants(w http.ResponseWriter, r *http.Request) {
 	if !memberOperatorOnly(w, r) {
 		return
 	}
 	project := urlParam(r, "project")
 	if r.Method == http.MethodGet {
-		gs, err := h.bs.ListMemberGrants(r.Context(), project, time.Now())
-		if err != nil {
-			errInternalServer(w, "could not read who has access")
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"grants": gs})
+		h.listMemberGrants(w, r, project)
 		return
 	}
+	h.createMemberGrant(w, r, project)
+}
+
+// ComputerMemberGrants answers GET and POST /api/member-grants: every live grant of this computer, and a new full one.
+func (h *BoardHandler) ComputerMemberGrants(w http.ResponseWriter, r *http.Request) {
+	if !memberOperatorOnly(w, r) {
+		return
+	}
+	if r.Method == http.MethodGet {
+		h.listMemberGrants(w, r, "")
+		return
+	}
+	h.createMemberGrant(w, r, "")
+}
+
+func (h *BoardHandler) listMemberGrants(w http.ResponseWriter, r *http.Request, project string) {
+	gs, err := h.bs.ListMemberGrants(r.Context(), project, time.Now())
+	if err != nil {
+		errInternalServer(w, "could not read who has access")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"grants": gs})
+}
+
+// createMemberGrant writes one signed grant. project is the team the path names ("" on the computer's route, which takes only a full grant): a team's route can give only that team (or its agents), and a
+// field of the body never names another one.
+func (h *BoardHandler) createMemberGrant(w http.ResponseWriter, r *http.Request, project string) {
 	var in memberGrantRequest
 	r.Body = http.MaxBytesReader(w, r.Body, maxMemberGrantBody)
 	if err := decodeJSONStrict(r, &in); err != nil {
-		errBadRequest(w, `send {"link_id": "lnk-…", "hub_user": "hub-user-…", "level": "view" or "team", "label": "a name", "days": 7}`)
+		errBadRequest(w, `send {"link_id": "lnk-…", "hub_user": "hub-user-…", "level": "view" or "full", "scope_kind": "board", "label": "a name", "days": 7, "signature": {…}}`)
 		return
 	}
-	if memberLinkCap == nil {
-		errInternalServer(w, "Hub links are not available")
+	if memberLinkCap == nil || memberVerify == nil {
+		writeError(w, http.StatusServiceUnavailable, "grants_unavailable", "giving a Hub person access is not available yet")
 		return
 	}
 	capMode, ok := memberLinkCap(r.Context(), in.LinkID)
@@ -77,14 +122,41 @@ func (h *BoardHandler) MemberGrants(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	need := tunnel.TierView
-	if in.Level == board.MemberLevelTeam {
-		need = tunnel.TierInteract
+	if in.Level == board.MemberLevelFull {
+		need = tunnel.TierInteract // full is the link's cap and no more: a link that cannot interact has nothing to give
 	}
 	if capMode < need {
 		errBadRequest(w, "that link's access setting is lower than this level: raise the link's access first, or give less")
 		return
 	}
-	g, err := h.bs.CreateMemberGrant(r.Context(), board.NewMemberGrant{LinkID: in.LinkID, HubUser: in.HubUser, BoardID: project, Level: in.Level, Label: in.Label, Days: in.Days})
+	ng := board.NewMemberGrant{LinkID: in.LinkID, HubUser: in.HubUser, Level: in.Level, ScopeKind: in.ScopeKind, ScopeID: in.ScopeID, FlagArtifacts: in.Artifacts, FlagFiles: in.Files,
+		PinnedFolder: in.PinnedFolder, Label: in.Label, Days: in.Days, SignedBy: in.Signature.KID, Nonce: in.Signature.Nonce, Ts: in.Signature.Ts}
+	switch {
+	case project != "":
+		if in.Level == board.MemberLevelFull || in.ScopeKind == board.MemberScopeComputer {
+			errBadRequest(w, "full access is given on the computer's own list, not on a team's")
+			return
+		}
+		ng.BoardID = project // the team the request is made on; for the team's own scope the id is the team
+		if in.ScopeKind == board.MemberScopeBoard {
+			ng.ScopeID = project
+		}
+	default:
+		if in.Level != board.MemberLevelFull {
+			errBadRequest(w, "give a team's or an agent's access on that team")
+			return
+		}
+	}
+	if d := time.Since(time.Unix(ng.Ts, 0)); d > memberGrantWindow || d < -memberGrantWindow {
+		errBadRequest(w, "the signature is too old or too new: sign it again")
+		return
+	}
+	// The signature is checked before anything is written; the store checks the rest and spends the nonce.
+	if err := memberVerify(r.Context(), board.MemberGrantDigest(ng), in.Signature.KID, in.Signature.Sig); err != nil {
+		errForbidden(w, "that is not the signature of one of your own devices")
+		return
+	}
+	g, err := h.bs.CreateMemberGrant(r.Context(), ng)
 	if err != nil {
 		if errors.Is(err, board.ErrMemberGrant) {
 			errBadRequest(w, memberReason(err))
@@ -108,6 +180,7 @@ func memberReason(err error) string {
 
 // RevokeMemberGrant answers DELETE /api/board/{project}/member-grants/{id}: access ends at once.
 func (h *BoardHandler) RevokeMemberGrant(w http.ResponseWriter, r *http.Request) {
+	// On a team's route (project set) only that team's grants can be ended; on the computer's route (project empty) any of the computer's.
 	if !memberOperatorOnly(w, r) {
 		return
 	}
@@ -124,13 +197,13 @@ func (h *BoardHandler) RevokeMemberGrant(w http.ResponseWriter, r *http.Request)
 		found = found || g.GrantID == id
 	}
 	if !found {
-		errNotFound(w, "no one has that access to this team")
+		errNotFound(w, "no one has that access here")
 		return
 	}
 	g, err := h.bs.RevokeMemberGrant(r.Context(), id, time.Now())
 	if err != nil {
 		if errors.Is(err, board.ErrNoMemberGrant) {
-			errNotFound(w, "no one has that access to this team")
+			errNotFound(w, "no one has that access here")
 			return
 		}
 		errInternalServer(w, "could not end the access")

@@ -3,31 +3,71 @@ package board
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
-// The member grant (#20387, G1-G6): what a Hub person may do on ONE board of this computer, held here. It is written only by the Operator at this computer (the route is never reachable through a Hub and
-// no Hub field writes a row), keyed by the link and the Hub person the connector stamped, naming one board by its id, with a level and a mandatory expiry. The Hub never holds the authority: it names a
-// person, and this table says what that person may do. Reads of it are made on every call, never cached.
-
-// Member levels. A member is never an owner: "view" reads the board, "team" may also send to one agent of it and post to it.
+// The member grant (#20387 S1, reshaped by #20511 to the two levels of Hub sharing): what a Hub person may do on this computer, held here. It is written only after the owner's own device has signed it
+// (MemberGrantDigest) and never by a Hub or an agent; it is keyed by the link and the Hub person the connector stamped. The Hub never holds the authority: it names a person, and this table says what that person may
+// do. Reads of it are made on every call, never cached.
+//
+// Two levels. "view" reads ONE scope (a team's board, or one agent), with optional add-ons for its artifacts and its files. "full" is the whole computer and has no scope and no add-ons. Every grant
+// expires: view in at most 30 days, full in at most 7.
 const (
 	MemberLevelView = "view"
-	MemberLevelTeam = "team"
+	MemberLevelFull = "full"
 )
+
+// Scope kinds: a view grant names a board or an agent; a full grant names the computer.
+const (
+	MemberScopeBoard    = "board"
+	MemberScopeAgent    = "agent"
+	MemberScopeComputer = "computer"
+)
+
+// The gates. Full access is a remote shell on the computer and the add-ons and the agent scope each need their own slice and its own read: until a commit says otherwise, nothing can be granted for them.
+// Each changes only in a commit Security has read (B8, V5, V9). The store checks the variables below, which equal the constants unless a test opened them (AllowMemberGatesForTest).
+const (
+	MemberFullOpen       = false // a full grant
+	MemberAgentScopeOpen = false // a view grant for one agent (its identity across a resume is not traced yet)
+	MemberFilesOpen      = false // the files add-on (a pinned folder, safefs reads)
+)
+
+var (
+	memberFullOpen       = MemberFullOpen
+	memberAgentScopeOpen = MemberAgentScopeOpen
+	memberFilesOpen      = MemberFilesOpen
+	memberGatesMu        sync.Mutex
+)
+
+// AllowMemberGatesForTest opens the three gates for one test and shuts them when it ends. Nothing but a test calls it; tests that use it do not run in parallel with each other (the gates are package variables,
+// and a second one waits for the lock).
+func AllowMemberGatesForTest(t interface{ Cleanup(func()) }) {
+	memberGatesMu.Lock()
+	memberFullOpen, memberAgentScopeOpen, memberFilesOpen = true, true, true
+	t.Cleanup(func() {
+		memberFullOpen, memberAgentScopeOpen, memberFilesOpen = MemberFullOpen, MemberAgentScopeOpen, MemberFilesOpen
+		memberGatesMu.Unlock()
+	})
+}
 
 // Bounds on a grant.
 const (
-	MemberGrantMaxDays      = 30 // the longest a grant lives
+	MemberViewMaxDays       = 30 // the longest a view grant lives
+	MemberFullMaxDays       = 7  // the longest a full grant lives
 	MemberGrantDefaultDays  = 7
-	MemberGrantsPerBoard    = 20 // live grants on one board
+	MemberGrantsPerScope    = 20 // live grants on one board or agent
 	MemberGrantsPerPerson   = 5  // live grants for one (link, Hub person)
+	MemberFullPerComputer   = 3  // live full grants on this computer
 	maxMemberGrantLabelRune = 40
+	maxMemberScopeID        = 200
 )
 
 var (
@@ -39,55 +79,129 @@ var (
 	memberLinkRe = regexp.MustCompile(`^lnk-[0-9a-f]{8}$`)
 	memberUserRe = regexp.MustCompile(`^hub-user-[0-9a-f]{8}$`)
 	memberIDRe   = regexp.MustCompile(`^mg-[0-9a-f]{16}$`)
+	memberKIDRe  = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
+	memberNonce  = regexp.MustCompile(`^[A-Za-z0-9_-]{22}$`)
 )
 
 // MemberGrant is one row.
 type MemberGrant struct {
-	GrantID   string  `db:"grant_id" json:"grant_id"`
-	LinkID    string  `db:"link_id" json:"link_id"`
-	HubUser   string  `db:"hub_user" json:"hub_user"`
-	BoardID   string  `db:"board_id" json:"board_id"`
-	Level     string  `db:"level" json:"level"`
-	Label     string  `db:"label" json:"label"`
-	CreatedAt string  `db:"created_at" json:"created_at"`
-	ExpiresAt string  `db:"expires_at" json:"expires_at"`
-	RevokedAt *string `db:"revoked_at" json:"revoked_at,omitempty"`
+	GrantID       string  `db:"grant_id" json:"grant_id"`
+	LinkID        string  `db:"link_id" json:"link_id"`
+	HubUser       string  `db:"hub_user" json:"hub_user"`
+	Level         string  `db:"level" json:"level"`
+	ScopeKind     string  `db:"scope_kind" json:"scope_kind"`
+	ScopeID       string  `db:"scope_id" json:"scope_id"`
+	BoardID       string  `db:"board_id" json:"board_id"` // the board of a board or agent scope; empty for the computer
+	FlagArtifacts bool    `db:"flag_artifacts" json:"artifacts"`
+	FlagFiles     bool    `db:"flag_files" json:"files"`
+	PinnedFolder  string  `db:"pinned_folder" json:"pinned_folder,omitempty"`
+	Label         string  `db:"label" json:"label"`
+	SignedBy      string  `db:"signed_by" json:"signed_by"` // the owner's device that signed it
+	CreatedAt     string  `db:"created_at" json:"created_at"`
+	ExpiresAt     string  `db:"expires_at" json:"expires_at"`
+	RevokedAt     *string `db:"revoked_at" json:"revoked_at,omitempty"`
 }
 
-// NewMemberGrant is what the Operator asks for.
+const memberGrantCols = `grant_id, link_id, hub_user, level, scope_kind, scope_id, board_id, flag_artifacts, flag_files, pinned_folder, label, signed_by, created_at, expires_at, revoked_at`
+
+// NewMemberGrant is what the owner's device signed. SignedBy, Nonce and Ts are the proof: a grant without them is never written, and a nonce is spent once.
 type NewMemberGrant struct {
-	LinkID  string
-	HubUser string
-	BoardID string
-	Level   string
-	Label   string
-	Days    int // 0 is MemberGrantDefaultDays
+	LinkID        string
+	HubUser       string
+	Level         string
+	ScopeKind     string
+	ScopeID       string // the board's id, or the agent's stable record id; empty for the computer
+	BoardID       string // the board of the scope (the agent's board for an agent scope); empty for the computer
+	FlagArtifacts bool
+	FlagFiles     bool
+	PinnedFolder  string
+	Label         string
+	Days          int // 0 is MemberGrantDefaultDays
+	SignedBy      string
+	Nonce         string
+	Ts            int64
+}
+
+// MemberGrantDigest is the text the owner's device signs: every field of the grant in one fixed order, behind a label no other protocol uses, so a signature made for a message of another kind (or for another
+// grant) is never a grant. The label of the person and the proof (the signer, the signature) are not in it; the nonce and the time are.
+func MemberGrantDigest(in NewMemberGrant) []byte {
+	days := in.Days
+	if days == 0 {
+		days = MemberGrantDefaultDays
+	}
+	b2i := func(b bool) string {
+		if b {
+			return "1"
+		}
+		return "0"
+	}
+	return []byte(strings.Join([]string{"coral/member-grant/1", in.LinkID, in.HubUser, in.Level, in.ScopeKind, in.ScopeID, in.BoardID, b2i(in.FlagArtifacts), b2i(in.FlagFiles),
+		in.PinnedFolder, fmt.Sprint(days), in.Nonce, fmt.Sprint(in.Ts)}, "\n"))
 }
 
 func (s *Store) ensureMemberGrantSchema(ctx context.Context) error {
+	// The first shape of this table (#20387, level view or team, one board, no proof) never reached a release. A table of that shape is dropped: its rows are not mapped to anything (a team grant is never a
+	// full one), and none can exist outside a development database.
+	var hasScope int
+	var hasTable int
+	if err := s.db.GetContext(ctx, &hasTable, `SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='member_grant'`); err != nil {
+		return err
+	}
+	if hasTable > 0 {
+		if err := s.db.GetContext(ctx, &hasScope, `SELECT COUNT(*) FROM pragma_table_info('member_grant') WHERE name='signed_nonce'`); err != nil {
+			return err
+		}
+		if hasScope == 0 {
+			if _, err := s.db.ExecContext(ctx, `DROP TABLE member_grant`); err != nil {
+				return err
+			}
+			if _, err := s.db.ExecContext(ctx, `DROP TABLE IF EXISTS member_grant_audit`); err != nil {
+				return err
+			}
+		}
+	}
 	for _, ddl := range []string{
+		// The checks are the model, not the code's good manners (B5): a view grant has a board or an agent scope with a non-empty id and a board; a full grant has the computer, no id, no board, no add-ons;
+		// the add-ons belong to view only, and a files add-on pins a folder.
 		`CREATE TABLE IF NOT EXISTS member_grant (
-			grant_id   TEXT PRIMARY KEY,
-			link_id    TEXT NOT NULL,
-			hub_user   TEXT NOT NULL,
-			board_id   TEXT NOT NULL,
-			level      TEXT NOT NULL,
-			label      TEXT NOT NULL,
-			created_at TEXT NOT NULL,
-			expires_at TEXT NOT NULL,
-			revoked_at TEXT
+			grant_id       TEXT PRIMARY KEY,
+			link_id        TEXT NOT NULL,
+			hub_user       TEXT NOT NULL,
+			level          TEXT NOT NULL CHECK (level IN ('view', 'full')),
+			scope_kind     TEXT NOT NULL CHECK (scope_kind IN ('board', 'agent', 'computer')),
+			scope_id       TEXT NOT NULL,
+			board_id       TEXT NOT NULL,
+			flag_artifacts INTEGER NOT NULL DEFAULT 0 CHECK (flag_artifacts IN (0, 1)),
+			flag_files     INTEGER NOT NULL DEFAULT 0 CHECK (flag_files IN (0, 1)),
+			pinned_folder  TEXT NOT NULL DEFAULT '',
+			label          TEXT NOT NULL,
+			signed_by      TEXT NOT NULL CHECK (length(signed_by) = 43),
+			signed_nonce   TEXT NOT NULL UNIQUE CHECK (length(signed_nonce) = 22),
+			signed_digest  TEXT NOT NULL CHECK (length(signed_digest) = 64),
+			created_at     TEXT NOT NULL,
+			expires_at     TEXT NOT NULL,
+			revoked_at     TEXT,
+			CHECK (
+				(level = 'view' AND scope_kind IN ('board', 'agent') AND scope_id <> '' AND board_id <> '' AND (scope_kind <> 'board' OR scope_id = board_id))
+				OR (level = 'full' AND scope_kind = 'computer' AND scope_id = '' AND board_id = '' AND flag_artifacts = 0 AND flag_files = 0)
+			),
+			CHECK (flag_files = 0 OR pinned_folder <> ''),
+			CHECK (pinned_folder = '' OR flag_files = 1)
 		)`,
-		`CREATE INDEX IF NOT EXISTS idx_member_grant_pair ON member_grant(link_id, hub_user, board_id)`,
-		// The audit of grants: who was given what, by the Operator here, and what ended it. There is no text field: nothing a person wrote is kept here.
+		`CREATE INDEX IF NOT EXISTS idx_member_grant_pair ON member_grant(link_id, hub_user, scope_kind, scope_id)`,
+		// The audit of grants: who was given what, signed by which device, and what ended it. There is no text field: nothing a person wrote is kept here.
 		`CREATE TABLE IF NOT EXISTS member_grant_audit (
-			id       INTEGER PRIMARY KEY AUTOINCREMENT,
-			at       TEXT NOT NULL,
-			grant_id TEXT NOT NULL,
-			event    TEXT NOT NULL,
-			link_id  TEXT NOT NULL,
-			hub_user TEXT NOT NULL,
-			board_id TEXT NOT NULL,
-			level    TEXT NOT NULL
+			id        INTEGER PRIMARY KEY AUTOINCREMENT,
+			at        TEXT NOT NULL,
+			grant_id  TEXT NOT NULL,
+			event     TEXT NOT NULL,
+			link_id   TEXT NOT NULL,
+			hub_user  TEXT NOT NULL,
+			level     TEXT NOT NULL,
+			scope_kind TEXT NOT NULL,
+			scope_id  TEXT NOT NULL,
+			board_id  TEXT NOT NULL,
+			signed_by TEXT NOT NULL
 		)`,
 	} {
 		if _, err := s.db.ExecContext(ctx, ddl); err != nil {
@@ -99,7 +213,7 @@ func (s *Store) ensureMemberGrantSchema(ctx context.Context) error {
 
 func memberErr(why string) error { return errors.Join(ErrMemberGrant, errors.New(why)) }
 
-// CleanMemberLabel is the label as it may be stored: one cleaned line the Operator typed, at most maxMemberGrantLabelRune characters, never empty.
+// CleanMemberLabel is the label as it may be stored: one cleaned line the owner typed, at most maxMemberGrantLabelRune characters, never empty.
 func CleanMemberLabel(s string) string {
 	s = CleanGuideName(s)
 	if r := []rune(s); len(r) > maxMemberGrantLabelRune {
@@ -108,45 +222,77 @@ func CleanMemberLabel(s string) string {
 	return s
 }
 
-// CreateMemberGrant writes a grant and its audit row in one transaction. The caller is the Operator's own route; no other code calls it. It refuses a board that is not there, a malformed link or
-// person, a level that is not one of the two, an expiry past MemberGrantMaxDays, a second live grant for the same person on the same board, and the per-board and per-person ceilings.
+// CreateMemberGrant writes a grant and its audit row in one transaction. The caller is the owner's own signed route; no other code calls it. It refuses a grant with no proof of the owner's device, a
+// level or scope that is not one of the two models, a gate that is shut (MemberFullOpen, MemberAgentScopeOpen, MemberFilesOpen), an expiry past the level's bound, a board that is not there, a second live
+// grant of the same person for the same scope, and the ceilings (per scope, per person, and live full grants on the computer).
 func (s *Store) CreateMemberGrant(ctx context.Context, in NewMemberGrant) (*MemberGrant, error) {
+	if !memberKIDRe.MatchString(in.SignedBy) || !memberNonce.MatchString(in.Nonce) || in.Ts <= 0 {
+		return nil, memberErr("access is given only with the signature of your own device")
+	}
 	if !memberLinkRe.MatchString(in.LinkID) {
 		return nil, memberErr("the Hub link is not a link id")
 	}
 	if !memberUserRe.MatchString(in.HubUser) {
 		return nil, memberErr("the person is not a Hub person label (hub-user- and 8 hex digits)")
 	}
-	if in.Level != MemberLevelView && in.Level != MemberLevelTeam {
-		return nil, memberErr("the level is view or team")
-	}
 	label := CleanMemberLabel(in.Label)
 	if label == "" {
 		return nil, memberErr("give the person a name you will know them by")
+	}
+	maxDays := MemberViewMaxDays
+	switch in.Level {
+	case MemberLevelView:
+		if in.ScopeKind != MemberScopeBoard && in.ScopeKind != MemberScopeAgent {
+			return nil, memberErr("a view grant is for one team or one agent")
+		}
+		if in.ScopeKind == MemberScopeAgent && !memberAgentScopeOpen {
+			return nil, memberErr("access to one agent is not available yet")
+		}
+		if in.ScopeID == "" || strings.TrimSpace(in.ScopeID) != in.ScopeID || len(in.ScopeID) > maxMemberScopeID {
+			return nil, memberErr("name what the person may see by its id")
+		}
+		if in.BoardID == "" || strings.TrimSpace(in.BoardID) != in.BoardID || len(in.BoardID) > maxMemberScopeID || (in.ScopeKind == MemberScopeBoard && in.ScopeID != in.BoardID) {
+			return nil, memberErr("name the team by its id")
+		}
+		if in.FlagFiles && !memberFilesOpen {
+			return nil, memberErr("sharing files is not available yet")
+		}
+		if in.FlagFiles != (in.PinnedFolder != "") {
+			return nil, memberErr("sharing files names the one folder it is for")
+		}
+		ok, err := s.BoardExists(ctx, in.BoardID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, memberErr("there is no team with that id on this computer")
+		}
+	case MemberLevelFull:
+		if !memberFullOpen {
+			return nil, memberErr("full access is not available yet")
+		}
+		if in.ScopeKind != MemberScopeComputer || in.ScopeID != "" || in.BoardID != "" || in.FlagArtifacts || in.FlagFiles || in.PinnedFolder != "" {
+			return nil, memberErr("full access is the whole computer: it has no team, agent or add-on")
+		}
+		maxDays = MemberFullMaxDays
+	default:
+		return nil, memberErr("the level is view or full")
 	}
 	days := in.Days
 	if days == 0 {
 		days = MemberGrantDefaultDays
 	}
-	if days < 1 || days > MemberGrantMaxDays {
-		return nil, memberErr("a grant lasts 1 to 30 days")
-	}
-	if in.BoardID == "" || strings.TrimSpace(in.BoardID) != in.BoardID || len(in.BoardID) > 200 {
-		return nil, memberErr("name the team by its id")
-	}
-	ok, err := s.BoardExists(ctx, in.BoardID)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, memberErr("there is no team with that id on this computer")
+	if days < 1 || days > maxDays {
+		return nil, memberErr(fmt.Sprintf("a %s grant lasts 1 to %d days", in.Level, maxDays))
 	}
 	now := time.Now().UTC()
 	idb := make([]byte, 8)
 	if _, err := rand.Read(idb); err != nil {
 		return nil, err
 	}
-	g := MemberGrant{GrantID: "mg-" + hex.EncodeToString(idb), LinkID: in.LinkID, HubUser: in.HubUser, BoardID: in.BoardID, Level: in.Level, Label: label,
+	sum := sha256.Sum256(MemberGrantDigest(in))
+	g := MemberGrant{GrantID: "mg-" + hex.EncodeToString(idb), LinkID: in.LinkID, HubUser: in.HubUser, Level: in.Level, ScopeKind: in.ScopeKind, ScopeID: in.ScopeID, BoardID: in.BoardID,
+		FlagArtifacts: in.FlagArtifacts, FlagFiles: in.FlagFiles, PinnedFolder: in.PinnedFolder, Label: label, SignedBy: in.SignedBy,
 		CreatedAt: now.Format(time.RFC3339), ExpiresAt: now.Add(time.Duration(days) * 24 * time.Hour).Format(time.RFC3339)}
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -155,26 +301,39 @@ func (s *Store) CreateMemberGrant(ctx context.Context, in NewMemberGrant) (*Memb
 	defer tx.Rollback()
 	var n int
 	live := `revoked_at IS NULL AND expires_at > ?`
-	if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE link_id = ? AND hub_user = ? AND board_id = ? AND `+live, in.LinkID, in.HubUser, in.BoardID, g.CreatedAt); err != nil {
+	if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE link_id = ? AND hub_user = ? AND scope_kind = ? AND scope_id = ? AND `+live, in.LinkID, in.HubUser, in.ScopeKind, in.ScopeID, g.CreatedAt); err != nil {
 		return nil, err
 	}
 	if n > 0 {
-		return nil, memberErr("this person already has access to that team: revoke it first to change it")
+		return nil, memberErr("this person already has access to that: revoke it first to change it")
 	}
-	if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE board_id = ? AND `+live, in.BoardID, g.CreatedAt); err != nil {
-		return nil, err
-	}
-	if n >= MemberGrantsPerBoard {
-		return nil, memberErr("that team already has as many people with access as Coral allows")
+	if in.Level == MemberLevelFull {
+		if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE level = 'full' AND `+live, g.CreatedAt); err != nil {
+			return nil, err
+		}
+		if n >= MemberFullPerComputer {
+			return nil, memberErr("this computer already has as many people with full access as Coral allows")
+		}
+	} else {
+		if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE scope_kind = ? AND scope_id = ? AND `+live, in.ScopeKind, in.ScopeID, g.CreatedAt); err != nil {
+			return nil, err
+		}
+		if n >= MemberGrantsPerScope {
+			return nil, memberErr("that already has as many people with access as Coral allows")
+		}
 	}
 	if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE link_id = ? AND hub_user = ? AND `+live, in.LinkID, in.HubUser, g.CreatedAt); err != nil {
 		return nil, err
 	}
 	if n >= MemberGrantsPerPerson {
-		return nil, memberErr("this person already has access to as many teams as Coral allows")
+		return nil, memberErr("this person already has as much access as Coral allows")
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO member_grant (grant_id, link_id, hub_user, board_id, level, label, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		g.GrantID, g.LinkID, g.HubUser, g.BoardID, g.Level, g.Label, g.CreatedAt, g.ExpiresAt); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO member_grant (grant_id, link_id, hub_user, level, scope_kind, scope_id, board_id, flag_artifacts, flag_files, pinned_folder, label, signed_by, signed_nonce, signed_digest, created_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		g.GrantID, g.LinkID, g.HubUser, g.Level, g.ScopeKind, g.ScopeID, g.BoardID, b2n(g.FlagArtifacts), b2n(g.FlagFiles), g.PinnedFolder, g.Label, g.SignedBy, in.Nonce, hex.EncodeToString(sum[:]), g.CreatedAt, g.ExpiresAt); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			return nil, memberErr("that signature was already used")
+		}
 		return nil, err
 	}
 	if err := memberAudit(ctx, tx, "granted", g); err != nil {
@@ -183,22 +342,29 @@ func (s *Store) CreateMemberGrant(ctx context.Context, in NewMemberGrant) (*Memb
 	return &g, tx.Commit()
 }
 
+func b2n(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 type execer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
 func memberAudit(ctx context.Context, tx execer, event string, g MemberGrant) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO member_grant_audit (at, grant_id, event, link_id, hub_user, board_id, level) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		nowUTC(), g.GrantID, event, g.LinkID, g.HubUser, g.BoardID, g.Level)
+	_, err := tx.ExecContext(ctx, `INSERT INTO member_grant_audit (at, grant_id, event, link_id, hub_user, level, scope_kind, scope_id, board_id, signed_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		nowUTC(), g.GrantID, event, g.LinkID, g.HubUser, g.Level, g.ScopeKind, g.ScopeID, g.BoardID, g.SignedBy)
 	return err
 }
 
-// MemberGrantLive is the live grant of a person on a board: not revoked, not expired, read from the table now. ErrNoMemberGrant when there is none; any other error is a store failure the caller
-// refuses on. Every member call reads it; nothing keeps its answer.
-func (s *Store) MemberGrantLive(ctx context.Context, linkID, hubUser, boardID string, now time.Time) (*MemberGrant, error) {
+// MemberGrantLive is the live grant of a person for one scope (kind and id; the computer's id is empty): not revoked, not expired, read from the table now. ErrNoMemberGrant when there is none; any other
+// error is a store failure the caller refuses on. Every member call reads it; nothing keeps its answer.
+func (s *Store) MemberGrantLive(ctx context.Context, linkID, hubUser, scopeKind, scopeID string, now time.Time) (*MemberGrant, error) {
 	var g MemberGrant
-	err := s.db.GetContext(ctx, &g, `SELECT grant_id, link_id, hub_user, board_id, level, label, created_at, expires_at, revoked_at FROM member_grant
-		WHERE link_id = ? AND hub_user = ? AND board_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1`, linkID, hubUser, boardID, now.UTC().Format(time.RFC3339))
+	err := s.db.GetContext(ctx, &g, `SELECT `+memberGrantCols+` FROM member_grant
+		WHERE link_id = ? AND hub_user = ? AND scope_kind = ? AND scope_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1`, linkID, hubUser, scopeKind, scopeID, now.UTC().Format(time.RFC3339))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoMemberGrant
 	}
@@ -208,10 +374,10 @@ func (s *Store) MemberGrantLive(ctx context.Context, linkID, hubUser, boardID st
 	return &g, nil
 }
 
-// ListMemberGrants is the live grants of a board (or of every board when board is ""), newest first.
+// ListMemberGrants is the live grants of a board (its board scope and its agents' scopes), or of every scope when board is "" (the full grants too), newest first.
 func (s *Store) ListMemberGrants(ctx context.Context, board string, now time.Time) ([]MemberGrant, error) {
 	out := []MemberGrant{}
-	q := `SELECT grant_id, link_id, hub_user, board_id, level, label, created_at, expires_at, revoked_at FROM member_grant WHERE revoked_at IS NULL AND expires_at > ?`
+	q := `SELECT ` + memberGrantCols + ` FROM member_grant WHERE revoked_at IS NULL AND expires_at > ?`
 	args := []any{now.UTC().Format(time.RFC3339)}
 	if board != "" {
 		q += ` AND board_id = ?`
@@ -233,7 +399,7 @@ func (s *Store) RevokeMemberGrant(ctx context.Context, grantID string, now time.
 	defer tx.Rollback()
 	var g MemberGrant
 	ts := now.UTC().Format(time.RFC3339)
-	err = tx.GetContext(ctx, &g, `SELECT grant_id, link_id, hub_user, board_id, level, label, created_at, expires_at, revoked_at FROM member_grant WHERE grant_id = ? AND revoked_at IS NULL AND expires_at > ?`, grantID, ts)
+	err = tx.GetContext(ctx, &g, `SELECT `+memberGrantCols+` FROM member_grant WHERE grant_id = ? AND revoked_at IS NULL AND expires_at > ?`, grantID, ts)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoMemberGrant
 	}
@@ -254,7 +420,7 @@ func (s *Store) RevokeMemberGrant(ctx context.Context, grantID string, now time.
 func (s *Store) RevokeMemberGrantsOfLink(ctx context.Context, linkID string, now time.Time) (int, error) {
 	gs := []MemberGrant{}
 	ts := now.UTC().Format(time.RFC3339)
-	if err := s.db.SelectContext(ctx, &gs, `SELECT grant_id, link_id, hub_user, board_id, level, label, created_at, expires_at, revoked_at FROM member_grant WHERE link_id = ? AND revoked_at IS NULL AND expires_at > ?`, linkID, ts); err != nil {
+	if err := s.db.SelectContext(ctx, &gs, `SELECT `+memberGrantCols+` FROM member_grant WHERE link_id = ? AND revoked_at IS NULL AND expires_at > ?`, linkID, ts); err != nil {
 		return 0, err
 	}
 	n := 0
