@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	setreg "github.com/subgentic/coral/internal/settings"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // HubOperatorDisabledSetting is the local owner opt-out "Don't let Coral Hub act as the
@@ -97,8 +99,47 @@ func (h *CloudHandler) HubOperator(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"disabled": off, "linked": h.hubLinked(), "recent_actions": []board.HubOperatorAction{}}
 	if h.bs != nil {
 		if recent, err := h.bs.RecentHubOperatorActions(r.Context(), 50); err == nil {
-			out["recent_actions"] = recent
+			out["recent_actions"] = h.withHub(r.Context(), recent)
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// actionHub says which Hub an Operator action came through (#20346). Label and origin are read from the link when the list is read, never kept on the row, and are shown as text only; a link that no longer
+// exists reads "a removed link (lnk-...)". Attribution only, never authority.
+type actionHub struct {
+	Label   string `json:"label,omitempty"`
+	Origin  string `json:"origin,omitempty"`
+	Removed bool   `json:"removed,omitempty"`
+	Text    string `json:"text"`
+}
+
+type actionWithHub struct {
+	board.HubOperatorAction
+	Hub *actionHub `json:"hub,omitempty"`
+}
+
+func (h *CloudHandler) withHub(ctx context.Context, in []board.HubOperatorAction) []actionWithHub {
+	out := make([]actionWithHub, 0, len(in))
+	byID := map[string]store.CloudLink{}
+	if h.links != nil {
+		if ls, err := h.links.ListLinks(ctx); err == nil {
+			for _, l := range ls {
+				byID[l.LinkID] = l
+			}
+		}
+	}
+	for _, a := range in {
+		row := actionWithHub{HubOperatorAction: a}
+		if a.ViaLink != "" {
+			if l, ok := byID[a.ViaLink]; ok {
+				label := cleanSavedField(l.Label)
+				row.Hub = &actionHub{Label: label, Origin: l.HubOrigin, Text: label + " (" + l.HubOrigin + ")"}
+			} else {
+				row.Hub = &actionHub{Removed: true, Text: "a removed link (" + cleanSavedField(a.ViaLink) + ")"}
+			}
+		}
+		out = append(out, row)
+	}
+	return out
 }
