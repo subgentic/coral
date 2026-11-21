@@ -593,7 +593,7 @@ var routeTable = cat(
 		"/api/workflows/{id}/trigger",
 		"/api/workflows/by-name/{name}/trigger",
 	),
-	rules(http.MethodGet, TierLaunch, "/api/filesystem/list", "/api/filesystem/is-git", "/api/worktrees"), // the kept worktrees (#6736); their removal is never through the Hub
+	rules(http.MethodGet, TierLaunch, "/api/filesystem/list", "/api/filesystem/is-git", "/api/worktrees", "/api/launch/where", "/api/launch/check"), // the launch's where step and setup check on a remote computer (#20388): reads only, for the folders the browser serves // the kept worktrees (#6736); their removal is never through the Hub
 	// The prerequisite check for Coral Hub's New Agent dialog (#4579): it RUNS "<cli> --version" on the computer, so it is Launch,
 	// never View. Only type (an exact agent type) and source (cli_recheck) may pass (routes_query.go); binary, which would name a
 	// program to run, is not in the table, and the handler refuses it through the tunnel as well. The reply carries no path.
@@ -766,7 +766,7 @@ func UnsafeFileRef(v string) bool { return !safeRef(v, false) }
 // through Coral Hub shows the home directory as "~" (hubDisplayPath: an absolute path under it would carry the OS account name
 // through the Hub) and asks for "~/folder" when a folder is clicked, so the machine has to take that form back on these two
 // routes; it is refused on every other route and parameter (safeRef), and "~user" is refused everywhere.
-var homeBrowseRoutes = map[string]bool{"GET /api/filesystem/list": true, "GET /api/filesystem/is-git": true}
+var homeBrowseRoutes = map[string]bool{"GET /api/filesystem/list": true, "GET /api/filesystem/is-git": true, "GET /api/launch/where": true, "GET /api/launch/check": true}
 
 // homeRef reports whether v is "~", or "~/" and a relative path that is itself a plain reference (no "..", no absolute or
 // "~" start, no backslash, scheme, control or percent-encoded form left after decoding, as safeRef decides).
