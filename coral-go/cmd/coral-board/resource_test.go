@@ -26,6 +26,7 @@ type resStub struct {
 	respText string
 	lease    string // the granted entry's lease_until, when set (#18488)
 	how      string // the answer to GET /api/resources/<name> when set (#17560)
+	entry    string // the granted entry's JSON, when set (#20221: where it runs)
 }
 
 func (s *resStub) handler(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +45,10 @@ func (s *resStub) handler(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(r.URL.Path, "/claim") {
 		s.claims++
 		if s.claims >= s.grantAt {
+			if s.entry != "" {
+				w.Write([]byte(`{"granted":true,"place":0,"entry":` + s.entry + `}`))
+				return
+			}
 			if s.lease != "" {
 				w.Write([]byte(`{"granted":true,"place":0,"entry":{"id":1,"lease_until":"` + s.lease + `"}}`))
 				return
