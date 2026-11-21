@@ -405,6 +405,12 @@ func (h *ThemesHandler) GetTheme(w http.ResponseWriter, r *http.Request) {
 // SaveTheme saves or updates a theme.
 // PUT /api/themes/{name}
 func (h *ThemesHandler) SaveTheme(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub, with a closed body (#20258)
+		return
+	}
+	if !hubClosedBody(w, r, 65536, "description", "base", "variables") {
+		return
+	}
 	h.ensureDir()
 	name := chi.URLParam(r, "name")
 	path := h.safePath(name)

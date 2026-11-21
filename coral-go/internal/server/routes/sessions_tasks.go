@@ -265,6 +265,12 @@ func (h *SessionsHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SessionsHandler) ReorderTasks(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub, with a closed body (#20258)
+		return
+	}
+	if !hubClosedBody(w, r, 16384, "task_ids") {
+		return
+	}
 	scope, ok := h.itemScope(w, r, queryClaim(r))
 	if !ok {
 		return

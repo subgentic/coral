@@ -45,6 +45,12 @@ func (h *SystemHandler) GetAgentCLIModels(w http.ResponseWriter, r *http.Request
 // Refresh): at most once every 30 seconds per CLI. It answers with the cached list.
 // POST /api/agents/models/refresh?type=...
 func (h *SystemHandler) RefreshAgentCLIModels(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub, with a closed body (#20258)
+		return
+	}
+	if !hubClosedBody(w, r, 16384) {
+		return
+	}
 	typ := r.URL.Query().Get("type")
 	if agentmodels.Family(typ) == "" {
 		errBadRequest(w, "type must be one of claude, codex, agy, antigravity, gemini, pi")

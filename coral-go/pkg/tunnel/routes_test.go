@@ -708,9 +708,9 @@ func TestHubTierChanges4274(t *testing.T) {
 		{"POST", "/api/board/team/tasks/9/reassign", TierNever},
 		{"PUT", "/api/board/team/working-mode/presets/p", TierNever},
 		{"POST", "/api/board/team/working-mode/presets/p/reset", TierNever},
-		{"POST", "/api/sessions/live/agent-1/tasks/reorder", TierNever},
-		{"GET", "/api/tasks/runs", TierView},   // the owner's read since #20257
-		{"GET", "/api/tasks/runs/7", TierView}, // the owner's read since #20257
+		{"POST", "/api/sessions/live/agent-1/tasks/reorder", TierInteract}, // the owner's write since #20258
+		{"GET", "/api/tasks/runs", TierView},                               // the owner's read since #20257
+		{"GET", "/api/tasks/runs/7", TierView},                             // the owner's read since #20257
 		{"POST", "/api/tasks/runs/7/kill", TierNever},
 		{"GET", "/api/board/team/tasks/9/changes.diff", TierView}, // was never (#4274); the owner's read since #19629 (the handler filters it for the Hub)
 
@@ -774,8 +774,11 @@ func TestAgentModelsListIsALaunchRouteWithOnlyType(t *testing.T) {
 	if !ok || tier != TierLaunch {
 		t.Fatalf("GET /api/agents/models: ok=%v tier=%v, want Launch", ok, tier)
 	}
-	if _, _, ok := RuleFor("POST", "/api/agents/models/refresh"); ok {
-		t.Fatal("the refresh route must stay local")
+	if _, tier, ok := RuleFor("POST", "/api/agents/models/refresh"); !ok || tier != TierInteract {
+		t.Fatal("the refresh route is the owner's alone at Interact (#20258)")
+	}
+	if _, mode := OwnerRoute("POST", "/api/agents/models/refresh"); mode != OwnerRefuse {
+		t.Fatal("the refresh route must be an owner route")
 	}
 	if got := routeQueries["GET /api/agents/models"]; got != "type" {
 		t.Fatalf("query parameters = %q, want only type", got)

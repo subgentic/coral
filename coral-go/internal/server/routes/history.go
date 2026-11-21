@@ -442,6 +442,12 @@ func (h *HistoryHandler) GetSessionNotes(w http.ResponseWriter, r *http.Request)
 // SaveSessionNotes saves notes for a historical session.
 // PUT /api/sessions/history/{sessionID}/notes
 func (h *HistoryHandler) SaveSessionNotes(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub, with a closed body (#20258)
+		return
+	}
+	if !hubClosedBody(w, r, 262144, "notes_md") {
+		return
+	}
 	sid := chi.URLParam(r, "sessionID")
 	var body struct {
 		NotesMD string `json:"notes_md"`

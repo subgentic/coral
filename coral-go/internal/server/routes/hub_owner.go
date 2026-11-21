@@ -4,11 +4,15 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
+	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -206,6 +210,60 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("GET", "/api/tasks/runs"):                                                  textTaskRunsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/tasks/runs/{runID}"):                                          textTaskRunsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/scheduled/validate-cron"):                                    textCronCheckOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/agents/models/refresh"):                                      textSmallWriteOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/folder-tags/{folderName}"):                                   textSmallWriteOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/history/{sessionID}/tags"):                          textSmallWriteOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/tasks/reorder"):                         textSmallWriteOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/waiting/dismiss"):                       textSmallWriteOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/tags"):                                                       textSmallWriteOwnerOnly,
+	tunnel.OwnerRouteKey("PUT", "/api/sessions/history/{sessionID}/notes"):                          textSmallWriteOwnerOnly,
+	tunnel.OwnerRouteKey("PUT", "/api/themes/{name}"):                                               textSmallWriteOwnerOnly,
+}
+
+// The class B small writes of Hub parity batch B (#20258): the same decision (refuseNonOwner), one sentence for all of them.
+const textSmallWriteOwnerOnly = "through Coral Hub this change (a tag, a note, a theme, a goal request's answer, a read mark or a task order) is for the account this computer is linked to only (#20258)"
+
+// hubClosedBody is the closed body of a class B write that came through Coral Hub (#20258): the body is read to at most max bytes (413 body_too_large over that), it must be empty or one JSON object, and
+// every key in it must be one of keys (400 body_key_not_allowed names the first that is not, in sorted order). The body is put back for the handler. A request from this computer is not looked at: the
+// handler's own decoding stands for it. Run it after refuseNonOwner, so only the owner's body is ever read.
+func hubClosedBody(w http.ResponseWriter, r *http.Request, max int64, keys ...string) bool {
+	if !cloud.Tunneled(r) {
+		return true
+	}
+	raw, err := io.ReadAll(io.LimitReader(r.Body, max+1))
+	if err != nil {
+		refuseUnreadableBody(w)
+		return false
+	}
+	if int64(len(raw)) > max {
+		writeError(w, http.StatusRequestEntityTooLarge, "body_too_large", "the request body is too large for this route through Coral Hub")
+		return false
+	}
+	r.Body = io.NopCloser(bytes.NewReader(raw))
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return true
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil || obj == nil {
+		writeError(w, http.StatusBadRequest, "body_not_an_object", "the request body must be one JSON object")
+		return false
+	}
+	allowed := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		allowed[k] = true
+	}
+	var bad []string
+	for k := range obj {
+		if !allowed[k] {
+			bad = append(bad, k)
+		}
+	}
+	if len(bad) > 0 {
+		sort.Strings(bad)
+		writeError(w, http.StatusBadRequest, "body_key_not_allowed", "this route does not take the key "+strconv.Quote(bad[0])+" through Coral Hub")
+		return false
+	}
+	return true
 }
 
 // The class A reads of Hub parity batch A (#20257): the same decision (refuseNonOwner), one sentence for each kind of read.

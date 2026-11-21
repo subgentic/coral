@@ -112,6 +112,7 @@ var routeQueries = map[string]string{
 	"PATCH /api/sessions/live/{}/tasks/{}":        "session_id",
 	"POST /api/agent/ui-request":                  "session_id",
 	"POST /api/agent/ui/{}/events":                "session_id",
+	"POST /api/agents/models/refresh":             "type",
 	"POST /api/board/{}/artifacts/{}/edit":        "expected_latest",
 	"POST /api/board/{}/goal-images":              "version_of",
 	"POST /api/board/{}/operator-artifacts":       "goal_id,session_id",
@@ -123,6 +124,7 @@ var routeQueries = map[string]string{
 	"POST /api/sessions/live/{}/share-file":       "filepath*,session_id",
 	"POST /api/sessions/live/{}/skills":           "session_id",
 	"POST /api/sessions/live/{}/tasks":            "session_id",
+	"POST /api/sessions/live/{}/tasks/reorder":    "session_id",
 	"POST /api/sessions/record-agents":            "dry_run=1",
 	"PUT /api/sessions/live/{}/file-content":      "filepath*,session_id,worktree",
 }

@@ -29,6 +29,12 @@ func (h *SystemHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 // CreateTag creates a new tag.
 // POST /api/tags
 func (h *SystemHandler) CreateTag(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub, with a closed body (#20258)
+		return
+	}
+	if !hubClosedBody(w, r, 16384, "name", "color") {
+		return
+	}
 	var body struct {
 		Name  string `json:"name"`
 		Color string `json:"color"`
@@ -66,6 +72,12 @@ func (h *SystemHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 // AddSessionTag adds a tag to a session.
 // POST /api/sessions/history/{sessionID}/tags
 func (h *SystemHandler) AddSessionTag(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub, with a closed body (#20258)
+		return
+	}
+	if !hubClosedBody(w, r, 16384, "tag_id") {
+		return
+	}
 	sessionID := chi.URLParam(r, "sessionID")
 	var body struct {
 		TagID int `json:"tag_id"`
@@ -120,6 +132,12 @@ func (h *SystemHandler) GetFolderTags(w http.ResponseWriter, r *http.Request) {
 // AddFolderTag adds a tag to a folder.
 // POST /api/folder-tags/{folderName}
 func (h *SystemHandler) AddFolderTag(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub, with a closed body (#20258)
+		return
+	}
+	if !hubClosedBody(w, r, 16384, "tag_id") {
+		return
+	}
 	folderName := chi.URLParam(r, "folderName")
 	var body struct {
 		TagID int64 `json:"tag_id"`

@@ -66,7 +66,7 @@ func TestTheClassAReadRowsAreOwnerRowsAtViewWithAClosedQuery(t *testing.T) {
 			if m == r.method {
 				continue
 			}
-			if _, mode := OwnerRoute(m, path); mode != OwnerNone {
+			if pat, mode := OwnerRoute(m, path); mode != OwnerNone && !inParityBRows(m, pat) {
 				t.Errorf("%s: %s of the same path is an owner route", name, m)
 			}
 		}

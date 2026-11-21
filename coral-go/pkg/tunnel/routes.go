@@ -411,6 +411,22 @@ var routeTable = cat(
 	)),
 	// Checking a cron expression (#20257): no state is read or written; the owner's alone, like the reads of the block above.
 	owner(OwnerRefuse, rules(http.MethodPost, TierView, "/api/scheduled/validate-cron")),
+	// Hub parity, batch B (#20258, coral-hub's ask #256265, section B): small writes the dashboard makes, the computer OWNER's alone through the Hub (OwnerRefuse), at Interact: each records a mark, a tag, a note, a theme,
+	// a goal request's answer or a task order and moves no agent's work. The handler checks a CLOSED body for a request that came through the Hub (a key it does not list is refused, and the body is capped).
+	// Held, and NOT rows here, because the handler (or an older rule of this table) refuses the Hub owner on purpose: PATCH history flags (never, #7809), artifacts/retention/ack, board health/ack, the three reminders writes,
+	// resources define/move/claim/release/renew, views create and update, the working-mode preset save (PUT) and reset (hub.md: a preset's edit and reset are never reachable through the tunnel); the three goal-requests writes and mark-read, whose handler takes the caller's name from the body (the Hub owner could name any orchestrator or subscriber).
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract,
+		"/api/agents/models/refresh",
+		"/api/folder-tags/{folderName}",
+		"/api/sessions/history/{sessionID}/tags",
+		"/api/sessions/live/{name}/tasks/reorder",
+		"/api/sessions/live/{name}/waiting/dismiss",
+		"/api/tags",
+	)),
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract,
+		"/api/sessions/history/{sessionID}/notes",
+		"/api/themes/{name}",
+	)),
 	// Coral Hub's word that a guide's grant ended (#11457): the Hub's own service stream (its stamp and the guide's board as the asker), never a person's, and View so a computer in any mode takes it: it only takes proposals back.
 	service(rules(http.MethodPost, TierView, "/api/cloud/guide-revoked")),
 	// The device-signed routes (#19669 slice 7, wire format draft 11): what a trusted browser signed, forwarded by the Hub unstamped. View, so a computer in any mode takes it, and neither owner nor service: the signature is the only authority, the verifier decides, and no Hub user, owner or account header is read.

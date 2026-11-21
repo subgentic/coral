@@ -338,7 +338,7 @@ POST /api/agent/tasks/{taskID}/complete never
 POST /api/agent/tasks/{taskID}/publish never
 POST /api/agent/ui-request interact
 POST /api/agent/ui/{id}/events interact
-POST /api/agents/models/refresh never
+POST /api/agents/models/refresh interact
 POST /api/artifacts/prune never
 POST /api/artifacts/received/unlisted/delete never
 POST /api/artifacts/retention/ack never
@@ -462,7 +462,7 @@ POST /api/dropbox/switch never
 POST /api/dropbox/takeover never
 POST /api/dropbox/undo/{digest} never
 POST /api/dropbox/upload-anyway/{digest} never
-POST /api/folder-tags/{folderName} never
+POST /api/folder-tags/{folderName} interact
 POST /api/google/connect never
 POST /api/google/disconnect never
 POST /api/history-import never
@@ -487,7 +487,7 @@ POST /api/scheduled/jobs/{jobID}/toggle never
 POST /api/scheduled/runs/{runID}/seen interact
 POST /api/scheduled/validate-cron view
 POST /api/sessions/history/{sessionID}/resummarize never
-POST /api/sessions/history/{sessionID}/tags never
+POST /api/sessions/history/{sessionID}/tags interact
 POST /api/sessions/launch launch
 POST /api/sessions/launch-team launch
 POST /api/sessions/live/sleep-all launch
@@ -523,10 +523,10 @@ POST /api/sessions/live/{name}/send interact
 POST /api/sessions/live/{name}/share-file launch
 POST /api/sessions/live/{name}/skills interact
 POST /api/sessions/live/{name}/tasks interact
-POST /api/sessions/live/{name}/tasks/reorder never
+POST /api/sessions/live/{name}/tasks/reorder interact
 POST /api/sessions/live/{name}/token-usage never
 POST /api/sessions/live/{name}/turn-end never
-POST /api/sessions/live/{name}/waiting/dismiss never
+POST /api/sessions/live/{name}/waiting/dismiss interact
 POST /api/sessions/live/{name}/waiting/send never
 POST /api/sessions/live/{sessionID}/archive interact
 POST /api/sessions/live/{sessionID}/record-agent never
@@ -553,7 +553,7 @@ POST /api/system/update/check-hub launch
 POST /api/system/update/install never
 POST /api/system/update/relaunch launch
 POST /api/system/update/relaunch-local never
-POST /api/tags never
+POST /api/tags interact
 POST /api/tasks/run launch
 POST /api/tasks/runs/{runID}/kill never
 POST /api/teams/detail/{name}/commit never
@@ -612,7 +612,7 @@ PUT /api/dropbox/offload never
 PUT /api/dropbox/retention never
 PUT /api/resources/{name} never
 PUT /api/scheduled/jobs/{jobID} never
-PUT /api/sessions/history/{sessionID}/notes never
+PUT /api/sessions/history/{sessionID}/notes interact
 PUT /api/sessions/live/{name}/display-name interact
 PUT /api/sessions/live/{name}/file-content launch
 PUT /api/sessions/live/{name}/icon interact
@@ -632,6 +632,6 @@ PUT /api/teams/detail/{name}/daily-knowledge interact
 PUT /api/teams/detail/{name}/daily-knowledge/auto-apply interact
 PUT /api/teams/detail/{name}/home-folder never
 PUT /api/teams/detail/{name}/knowledge/{agentName} never
-PUT /api/themes/{name} never
+PUT /api/themes/{name} interact
 PUT /api/views/{id} never
 PUT /api/workflows/{workflowID} never

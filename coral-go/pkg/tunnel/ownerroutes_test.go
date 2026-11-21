@@ -266,6 +266,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if pat, _ := OwnerRoute(m, p); got && inParityARows(m, pat) {
 				continue
 			}
+			// The class B small writes of #20258 (a tag, a note, a theme, a goal request's answer...) are the owner's alone through the hub: the old list never had them (some were open to every Hub user at Interact before).
+			if pat, _ := OwnerRoute(m, p); got && inParityBRows(m, pat) {
+				continue
+			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).
 			if strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/artifact-content") && m == http.MethodGet {
 				continue
@@ -391,6 +395,15 @@ func TestTheLiveSessionListIsAnOwnerSeesRouteAndNothingAroundItChanged(t *testin
 
 func inParityARows(method, pattern string) bool {
 	for _, r := range parityARows {
+		if r.method == method && r.pattern == pattern {
+			return true
+		}
+	}
+	return false
+}
+
+func inParityBRows(method, pattern string) bool {
+	for _, r := range parityBRows {
 		if r.method == method && r.pattern == pattern {
 			return true
 		}

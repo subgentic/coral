@@ -187,6 +187,12 @@ func (h *SessionsHandler) SendWaitingNow(w http.ResponseWriter, r *http.Request)
 // agent's: the identity layer refuses a token (a member cannot clear another's messages, an Orchestrator included), and the handler asks again.
 // POST /api/sessions/live/{name}/waiting/dismiss  {"agent_type":..,"session_id":..,"through_id":N}
 func (h *SessionsHandler) DismissWaiting(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub, with a closed body (#20258)
+		return
+	}
+	if !hubClosedBody(w, r, 16384, "agent_type", "session_id", "through_id") {
+		return
+	}
 	if _, agent := VerifiedSession(r.Context()); agent {
 		errForbidden(w, "An agent can't mark another agent's messages read")
 		return
