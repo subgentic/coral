@@ -10,8 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subgentic/coral/internal/coralnames"
+	"github.com/subgentic/coral/internal/foldertrust"
 	"github.com/subgentic/coral/internal/gitutil"
+	setreg "github.com/subgentic/coral/internal/settings"
 )
 
 // The shared "where" step of a launch (#20388, mock #20111): for a terminal, an agent or a team, what is in the folder the person picked: is it a repository, its current branch and whether it is clean,
@@ -83,6 +84,8 @@ func (h *SystemHandler) LaunchWhere(w http.ResponseWriter, r *http.Request) {
 	}
 	resp["branches"] = localBranches(ctx, dir)
 	resp["worktrees"] = worktreesOf(ctx, dir, root)
+	resp["worktree_dir"] = defaultWorktreeDir(root) // where a new worktree goes unless the person edits it: next to the repository, <repo>-worktrees
+	resp["worktree_launch"] = h.worktreeLaunchOn(r) // the setting a launch into a worktree needs (#12746): off, the page says so instead of offering it
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -153,6 +156,18 @@ func worktreesOf(ctx context.Context, dir, root string) []launchWorktree {
 	return list
 }
 
+// defaultWorktreeDir is the folder a new worktree is made in unless the person edits it: <repo>-worktrees next to the repository (mock #20111).
+func defaultWorktreeDir(root string) string { return filepath.Clean(root) + "-worktrees" }
+
+// worktreeLaunchOn reports the "launch into git worktree" setting (off unless turned on, #12746).
+func (h *SystemHandler) worktreeLaunchOn(r *http.Request) bool {
+	if h.ss == nil {
+		return false
+	}
+	st, err := h.ss.GetSettings(r.Context())
+	return err == nil && setreg.Bool(st, setreg.LaunchInWorktree)
+}
+
 func samePath(a, b string) bool {
 	ra, rb := realPath(a), realPath(b)
 	return ra != "" && ra == rb
@@ -200,7 +215,7 @@ type launchCheck struct {
 	Path   string `json:"path,omitempty"`   // the folder a failure is about, in a path-named field: through the Hub a home path is shown as ~ (HubPaths), never inside a sentence
 }
 
-// LaunchCheck: GET /api/launch/check?path=&branch=&new_worktree=&base=
+// LaunchCheck: GET /api/launch/check?path=&branch=&new_worktree=&base=&worktree_path=&type=
 // The setup check shown before the launch button: repo found, branch exists, worktree free. The CLI's install and sign-in have their own routes (cli-check, cli-signin) and the page asks them for the type
 // being launched, so this one runs no program but git. branch names the branch to launch on (empty: the folder as it is); new_worktree is the name of a worktree to make from the branch `base`.
 func (h *SystemHandler) LaunchCheck(w http.ResponseWriter, r *http.Request) {
@@ -224,6 +239,7 @@ func (h *SystemHandler) LaunchCheck(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), launchWhereBudget)
 	defer cancel()
 	branch, from, name := strings.TrimSpace(q.Get("branch")), strings.TrimSpace(q.Get("base")), strings.TrimSpace(q.Get("new_worktree"))
+	wtPath := strings.TrimSpace(q.Get("worktree_path"))
 	root := gitutil.TopLevel(ctx, dir)
 	if root == "" {
 		if branch != "" || name != "" {
@@ -255,7 +271,14 @@ func (h *SystemHandler) LaunchCheck(w http.ResponseWriter, r *http.Request) {
 			c.Reason, c.Fix = "there is no branch named "+from+" to make the worktree from", "pick the branch the worktree starts from"
 		}
 		checks = append(checks, c)
-		checks = append(checks, h.worktreeFreeCheck(ctx, root, name))
+		checks = append(checks, h.worktreeFreeCheck(ctx, r, root, name, wtPath))
+	}
+	if t := q.Get("type"); t != "" {
+		where := dir
+		if name != "" {
+			where = worktreePathFor(root, name, wtPath)
+		}
+		checks = append(checks, folderTrustCheck(t, where))
 	}
 	done()
 }
@@ -270,23 +293,49 @@ func branchFreeCheck(ctx context.Context, dir, root, branch string) launchCheck 
 	return launchCheck{ID: "branch_free", OK: true}
 }
 
-// worktreeFreeCheck: the name is usable as a folder and nothing is there yet. The folder is Coral's worktrees folder / name, as the launch makes it.
-func (h *SystemHandler) worktreeFreeCheck(ctx context.Context, root, name string) launchCheck {
-	bad := func(reason, fix string) launchCheck {
+// worktreeFreeCheck: the name is usable as a branch and a folder and nothing is there yet. The folder is the one the person typed, else <repo>-worktrees/name, as the launch makes it.
+func (h *SystemHandler) worktreeFreeCheck(ctx context.Context, r *http.Request, root, name, custom string) launchCheck {
+	path, reason, fix := worktreeTarget(r, root, name, custom)
+	if reason != "" {
 		return launchCheck{ID: "worktree_free", Reason: reason, Fix: fix}
 	}
-	if len(name) > launchWorktreeNameN || name == "." || name == ".." || strings.ContainsAny(name, `/\: `) || strings.HasPrefix(name, "-") || gitutil.ValidRef(name) != nil {
-		return bad("that name cannot be a worktree's folder", "use letters, numbers, dots, dashes or underscores")
-	}
-	if h.cfg == nil {
-		return bad("this computer's worktrees folder is not known", "try again in a moment")
-	}
-	path := filepath.Join(coralnames.WorktreesRoot(h.cfg.CoralDir()), name)
 	if _, err := os.Lstat(path); err == nil {
 		if gitutil.IsRegisteredWorktree(ctx, root, path) {
-			return bad("a worktree named "+name+" already exists", "pick it from the list, or use another name")
+			return launchCheck{ID: "worktree_free", Reason: "a worktree already exists at that folder", Fix: "pick it from the list, or use another name", Path: path}
 		}
-		return bad("a folder named "+name+" is already in the worktrees folder", "use another name")
+		return launchCheck{ID: "worktree_free", Reason: "that folder already exists", Fix: "use another name or folder", Path: path}
 	}
-	return launchCheck{ID: "worktree_free", OK: true}
+	return launchCheck{ID: "worktree_free", OK: true, Path: path}
+}
+
+// worktreePathFor is the folder a new worktree called name is made in.
+func worktreePathFor(root, name, custom string) string {
+	if custom != "" {
+		return filepath.Clean(custom)
+	}
+	return filepath.Join(defaultWorktreeDir(root), name)
+}
+
+// folderTrustCheck says whether the agent's CLI already trusts the folder, so it will not stop to ask. Only Claude's settings are read (a read of one file, never written); any other CLI, or a file that cannot be
+// read, is "not checked" and never blocks.
+func folderTrustCheck(agentType, folder string) launchCheck {
+	c := launchCheck{ID: "trusted"}
+	home, err := os.UserHomeDir()
+	if agentType != "claude" || err != nil {
+		c.OK, c.Reason = true, "not checked: this CLI's trust is not readable"
+		return c
+	}
+	trusted, known := foldertrust.ClaudeTrusted(claudeConfigPath(home), folder)
+	if real := realPath(folder); !trusted && real != "" && real != folder { // Claude keys its entries by the folder's real path
+		trusted, known = foldertrust.ClaudeTrusted(claudeConfigPath(home), real)
+	}
+	switch {
+	case !known:
+		c.OK, c.Reason = true, "not checked: Claude's settings could not be read"
+	case trusted:
+		c.OK = true
+	default:
+		c.OK, c.Reason, c.Fix = true, "Claude will ask about this folder when the agent starts", "tick Trust this folder, or answer it in Needs you"
+	}
+	return c
 }

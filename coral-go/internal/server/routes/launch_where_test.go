@@ -96,7 +96,7 @@ func TestParseStatusBranchReadsAheadAndBehind(t *testing.T) {
 
 // #20388: each failure of the setup check has a plain reason and a fix; a good setup passes.
 func TestLaunchCheckSaysWhatIsWrongBeforeTheLaunch(t *testing.T) {
-	srv, cfg := launchWhereServer(t)
+	srv, _ := launchWhereServer(t)
 	repo, git := repoOn(t, "trunk", true)
 	wt := filepath.Join(t.TempDir(), "side")
 	git("worktree", "add", "-b", "other", wt)
@@ -126,11 +126,11 @@ func TestLaunchCheckSaysWhatIsWrongBeforeTheLaunch(t *testing.T) {
 	// a new worktree: a free name passes, a taken or bad name does not, a missing base does not
 	out = launchGet(t, srv, "/api/launch/check", url.Values{"path": {repo}, "new_worktree": {"fresh"}, "base": {"trunk"}})
 	assert.Equal(t, true, out["ok"], out)
-	require.NoError(t, os.MkdirAll(filepath.Join(cfg.CoralDir(), "worktrees", "taken"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(defaultWorktreeDir(realOf(t, repo)), "taken"), 0o755))
 	out = launchGet(t, srv, "/api/launch/check", url.Values{"path": {repo}, "new_worktree": {"taken"}, "base": {"trunk"}})
-	assert.Contains(t, checkOf(out, "worktree_free")["reason"], "already in the worktrees folder")
+	assert.Contains(t, checkOf(out, "worktree_free")["reason"], "folder already exists")
 	out = launchGet(t, srv, "/api/launch/check", url.Values{"path": {repo}, "new_worktree": {"../evil"}, "base": {"trunk"}})
-	assert.Contains(t, checkOf(out, "worktree_free")["reason"], "cannot be a worktree's folder")
+	assert.Contains(t, checkOf(out, "worktree_free")["reason"], "cannot be a branch and a folder")
 	out = launchGet(t, srv, "/api/launch/check", url.Values{"path": {repo}, "new_worktree": {"fresh"}, "base": {"nosuch"}})
 	assert.Contains(t, checkOf(out, "base")["reason"], "no branch named nosuch")
 }
@@ -192,4 +192,54 @@ func TestLaunchReadsThroughTheHubCarryNoHomePath(t *testing.T) {
 	assert.Contains(t, body, "already checked out in another worktree of this repository")
 	assert.Contains(t, body, `"path":"~/projects/app-side"`)
 	assert.Contains(t, get("/api/launch/where", url.Values{"path": {"~/projects/app"}}), "~/projects/app-side")
+}
+
+// #20388: the check says whether Claude already trusts the folder (a read of its settings), and a new worktree's folder is the one typed or <repo>-worktrees/<name>; the where answer names that folder and the setting.
+func TestLaunchCheckReadsFolderTrustAndTheNewWorktreeFolder(t *testing.T) {
+	srv, _ := launchWhereServer(t)
+	repo, _ := repoOn(t, "trunk", true)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	where := launchGet(t, srv, "/api/launch/where", url.Values{"path": {repo}})
+	assert.Equal(t, defaultWorktreeDir(realOf(t, repo)), where["worktree_dir"])
+	assert.Equal(t, false, where["worktree_launch"], "off until the setting is on")
+
+	ask := func(extra url.Values) map[string]any {
+		q := url.Values{"path": {repo}, "type": {"claude"}}
+		for k, v := range extra {
+			q[k] = v
+		}
+		return launchGet(t, srv, "/api/launch/check", q)
+	}
+	c := checkOf(ask(nil), "trusted")
+	require.NotNil(t, c)
+	assert.Equal(t, true, c["ok"])
+	assert.Contains(t, c["reason"], "not checked", "no settings file: unknown, never trusted")
+
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"projects":{}}`), 0o600))
+	c = checkOf(ask(nil), "trusted")
+	assert.Contains(t, c["reason"], "will ask")
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"projects":{"`+realOf(t, repo)+`":{"hasTrustDialogAccepted":true}}}`), 0o600))
+	c = checkOf(ask(nil), "trusted")
+	assert.Equal(t, true, c["ok"])
+	assert.Empty(t, c["reason"])
+	assert.Contains(t, checkOf(launchGet(t, srv, "/api/launch/check", url.Values{"path": {repo}, "type": {"pi"}}), "trusted")["reason"], "not checked")
+
+	free := checkOf(ask(url.Values{"new_worktree": {"fix-login"}}), "worktree_free")
+	assert.Equal(t, true, free["ok"])
+	assert.Equal(t, filepath.Join(defaultWorktreeDir(realOf(t, repo)), "fix-login"), free["path"])
+	mine := filepath.Join(t.TempDir(), "mine")
+	assert.Equal(t, mine, checkOf(ask(url.Values{"new_worktree": {"x"}, "worktree_path": {mine}}), "worktree_free")["path"])
+	bad := checkOf(ask(url.Values{"new_worktree": {"x"}, "worktree_path": {"relative"}}), "worktree_free")
+	assert.Equal(t, false, bad["ok"])
+	assert.NotContains(t, bad["reason"], home, "no path in a sentence")
+}
+
+func realOf(t *testing.T, p string) string {
+	t.Helper()
+	r, err := filepath.EvalSymlinks(p)
+	require.NoError(t, err)
+	return r
 }

@@ -23,7 +23,7 @@ if len(sys.argv) == 3 and sys.argv[1] == '--out':
 elif len(sys.argv) != 1:
     sys.exit('usage: python3 tools/gen_route_queries.py [--out PATH]')
 # Parameter names that carry a file or directory reference.
-FILE_PARAMS = {'filepath', 'dir', 'path', 'working_directory', 'file', 'ref', 'cwd', 'folder', 'directory', 'root'}
+FILE_PARAMS = {'filepath', 'dir', 'path', 'worktree_path', 'working_directory', 'file', 'ref', 'cwd', 'folder', 'directory', 'root'}
 
 # Parameters the shipped UI sends that a handler does not (yet) read, found by comparing the real UI's requests
 # against this table (coral-hub internal/e2e TestChromeUIPass records them). Add here, with the reason, never

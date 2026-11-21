@@ -34,7 +34,7 @@ import (
 // and a "~" value is expanded too, whoever wrote it, and its body is re-marshalled.
 var hubPathFields = map[string]bool{
 	"working_directory": true, "working_dir": true, "default_working_dir": true, "repo_path": true,
-	"worktree_path": true, "git_root": true, "cwd": true, "root": true, "dir": true,
+	"worktree_path": true, "worktree_dir": true, "git_root": true, "cwd": true, "root": true, "dir": true,
 	"directory": true, "folder": true, "path": true, "filepath": true, "file": true,
 }
 
