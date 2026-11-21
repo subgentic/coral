@@ -1,5 +1,5 @@
 // #13256 (the operator, through coral-hub: 'the coral hub inbox has a different layout than the coral local'): the Hub-served Inbox's sidebar used its own list: Artifacts under NEEDS ATTENTION, no FILES or HISTORY group,
-// 'Saved for later' for Saved. It now uses local Coral's groups, order and words: NEEDS ATTENTION (Needs you, Tasks, Goals, Saved), FILES (Artifacts), and HISTORY (Activity) only where the Hub serves it (it does not today).
+// 'Saved for later' for Saved. It now uses local Coral's groups, order and words: NEEDS ATTENTION (Needs you, Tasks, Goals, Saved), FILES (Artifacts), and HISTORY (Activity) on the Hub as well as a computer (#20394).
 // Local first (the plain dev server), then the stubbed Hub of helpers/hub_world.js (native boot). 1280 px.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -34,16 +34,41 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await shot('hub-inbox-sidebar-local');
         console.log('   ✓');
 
-        console.log('2. The Hub-served Inbox: the same groups, order and words; History only where the Hub serves it (not today)');
+        console.log('2. The Hub-served Inbox: the same groups, order and words; History includes the owner Activity record');
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native' });
         await open();
         const hub = await sidebar();
-        assert.deepEqual(hub, ['Needs attention', 'Needs you', 'Tasks', 'Goals', 'Saved', 'Files', 'Artifacts'], JSON.stringify(hub));
-        assert.ok(!hub.includes('Saved for later'), 'the word is Saved, as on a computer');
         await shot('hub-inbox-sidebar-hub');
+        assert.deepEqual(hub, ['Needs attention', 'Needs you', 'Tasks', 'Goals', 'Saved', 'Files', 'Artifacts', 'History', 'Activity'], JSON.stringify(hub));
+        assert.ok(!hub.includes('Saved for later'), 'the word is Saved, as on a computer');
         console.log('   ✓');
 
-        console.log('3. A Hub folder still opens its page: Saved frames the Hub page, Artifacts is the native list');
+        console.log('3. Activity opens from the Hub sidebar, reads owner records and clears them on a 403');
+        assert.equal(await ev(`window.__remoteRequests.filter(r=>r.path==='/api/activity').length`),0,'the visible Activity entry sends no read until opened');
+        await ev(`(() => { const real=window.fetch; window.__activityReads=[]; window.__activityDeny=false;
+            window.fetch=(u,o={})=>{ const p=new URL(String(u),location.href); if(p.pathname.endsWith('/api/activity')) {
+                window.__activityReads.push({path:p.pathname,method:o.method||'GET'});
+                const denied=window.__activityDeny;
+                return Promise.resolve(new Response(JSON.stringify(denied?{code:'owner_only',error:'owner_only'}:{actions:[{id:1,at:'2026-11-21T10:00:00Z',action:'approve',item_kind:'file',item_id:'report',title:'Owner report',team:'release',source:'hub',actor:'Operator'}],check:{intact:true,rows:1},more:false}),{status:denied?403:200,headers:{'Content-Type':'application/json'}}));
+            } return real(u,o);}; return true; })()`);
+        await ev(`document.querySelector('nav.view-list-nav [data-key="activity"]').click(); true`);
+        await waitFor(`document.querySelectorAll('#group-table-view .al-row').length===2`, 'owner Activity records from the two computers',10000);
+        assert.ok((await ev(`document.querySelector('#group-table-view').textContent`)).includes('Owner report'));
+        const reads=await ev(`window.__activityReads`);
+        assert.deepEqual(reads.map(r=>r.path).sort(),['/api/remote/m1/api/activity','/api/remote/m2/api/activity']);
+        assert.ok(reads.every(r=>r.method==='GET'),'Activity is read only');
+        assert.equal(await ev(`!!document.querySelector('#group-table-view iframe.inbox-frame')`),false,'Activity is native, not a frame');
+        await shot('hub-inbox-activity-owner');
+        await ev(`window.__activityDeny=true; import(${S}+'inbox_activity.js').then(async m=>{await m.refresh();}).then(()=>true)`);
+        await waitFor(`document.querySelectorAll('#group-table-view .al-row').length===0`, 'owner-only refusal clears the previous records',10000);
+        assert.ok(!(await ev(`document.querySelector('#group-table-view').textContent`)).includes('Owner report'),'no cached owner records after refusal');
+        const refused = await ev(`import(${S}+'inbox_activity.js').then(m=>m.missingComputers())`);
+        assert.equal(refused.length, 2);
+        assert.ok(refused.every(r=>r.why.startsWith('refused to give its record')), 'both reads were owner-only refusals');
+        await shot('hub-inbox-activity-refused');
+        console.log('   ✓');
+
+        console.log('4. A Hub folder still opens its page: Saved frames the Hub page, Artifacts is the native list');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
         await waitFor(`!!document.querySelector('#group-table-view iframe.inbox-frame')`, 'the Saved frame', 10000);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
