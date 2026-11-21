@@ -227,3 +227,28 @@ func TestWriteRowsNeverEvictSecurityRows(t *testing.T) {
 	assert.Equal(t, hubOperatorActionsKept, security)
 	assert.Equal(t, hubOperatorActionsKept, writes)
 }
+
+// #20449: a flood of stream rows keeps its own bound and leaves the write rows (and the security rows) alone.
+func TestStreamRowsNeverEvictWriteRows(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for i := 0; i < 20; i++ {
+		require.NoError(t, s.RecordHubOperatorAction(ctx, HubOperatorAction{HubUser: "hub-user-1234abcd", Kind: HubActionKindWrite, Method: "POST", Path: "/api/saved", Status: 200}))
+	}
+	for i := 0; i < hubOperatorActionsKept+300; i++ {
+		require.NoError(t, s.RecordHubOperatorAction(ctx, HubOperatorAction{HubUser: "hub-user-1234abcd", Kind: HubActionKindStream, Method: "WS-OPEN", Path: "/ws/terminal/{name}", Status: 0}))
+	}
+	all, err := s.RecentHubOperatorActions(ctx, 5000)
+	require.NoError(t, err)
+	var writes, streams int
+	for _, a := range all {
+		switch a.Kind {
+		case HubActionKindWrite:
+			writes++
+		case HubActionKindStream:
+			streams++
+		}
+	}
+	assert.Equal(t, 20, writes, "1300 stream rows left every write row")
+	assert.Equal(t, hubOperatorActionsKept, streams, "streams keep their own newest bound")
+}
