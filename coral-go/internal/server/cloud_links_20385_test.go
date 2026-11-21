@@ -96,8 +96,8 @@ func TestAddingAHubByAddressRefusals(t *testing.T) {
 		code int
 		say  string
 	}{
-		"no cap":       {`{"hub":"` + hub.srv.URL + `"}`, 400, "cap"},
-		"bad cap":      {`{"hub":"` + hub.srv.URL + `","cap":"root"}`, 400, "cap"},
+		"no cap":       {`{"hub":"` + hub.srv.URL + `"}`, 400, "view, interact or launch"},
+		"bad cap":      {`{"hub":"` + hub.srv.URL + `","cap":"root"}`, 400, "view, interact or launch"},
 		"bad address":  {`{"hub":"http://hub.example.com","cap":"view"}`, 400, "https"},
 		"already here": {`{"hub":"` + a.HubOrigin + `","cap":"view"}`, 409, "already linked to that Hub"},
 	} {
