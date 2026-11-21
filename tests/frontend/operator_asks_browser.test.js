@@ -38,9 +38,10 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             assert.ok(dev.text.includes('may I delete the old table?'), at + "the wait's question is on the row");
             // #12649: the asker leads the preview; its subtitle continues the question without repeating that preview.
             // #12722: the dialog names the asker/team and retains the complete question, checked below.
-            const leadRow = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr')].find(x => x.textContent.includes('Lead')); const n = r.querySelector('.inbox-review-name'), sub = r.querySelector('.cell-subtitle, [class*="subtitle"]'), from = r.querySelector('.inbox-review-from'); return { name: n ? n.textContent : '', sub: sub ? sub.textContent : '', from: from ? from.textContent.replace(/ \u00b7$/, '') : '' }; })()`);
+            const leadRow = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr')].find(x => x.textContent.includes('Lead')); const n = r.querySelector('.inbox-review-name'), sub = r.querySelector('.cell-subtitle, [class*="subtitle"]'), from = r.querySelector('.inbox-review-from'); return { name: n ? n.textContent : '', sub: sub ? sub.textContent : '', from: from ? from.firstChild.textContent : '', kind: from?.querySelector('.inbox-heading-kind')?.textContent.trim() }; })()`);
             assert.ok(leadRow.name.startsWith('Which of the two'), at + "the row's name is the question's first line: " + JSON.stringify(leadRow));
             assert.equal(leadRow.from, 'Lead', at + 'the asker leads the top line');
+            assert.equal(leadRow.kind, '· question', at + '#20239 Operator ask: question kind follows the sender in the header');
             { const said = leadRow.name.replace(/…$/, '').replace(/\s+/g, ' ').trim(), whole = LONG.replace(/\u202e/g, '<U+202E>').replace(/\s+/g, ' ').trim(); assert.ok(whole.startsWith(said) && said.length >= Math.min(whole.length, 450) && !leadRow.sub.includes(said.slice(0, 40)), at + 'the row\'s name is the whole question (the preview\'s 500 characters), and the line under it does not say it again (#12649, #14574): ' + leadRow.sub.slice(0, 80)); }
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, at + 'the badge counts both', 6000);
 

@@ -37,6 +37,8 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: a search that matches no agent says what to do`, /^No agents match zzz-matches-nothing\. Clear search$/.test((none || '').trim().replace(/\s+/g, ' ')), String(none));
             await ev(`(() => { const i = document.getElementById('agent-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             // the Archived folder, empty
+            // This wording fixture is a completed empty history, independent of the server's first indexing pass (Linux gate #20290).
+            await ev(`(() => { const real=window.fetch.bind(window);window.fetch=(u,o)=>new URL(String(u),location.origin).pathname==='/api/sessions/history'?Promise.resolve(Response.json({sessions:[],total:0,indexing:false})):real(u,o);return true;})()`);
             await ev(`Promise.all([import(${S} + 'nav.js')]).then(([n]) => n.go({ view: 'inbox-folder', folder: 'chats-archived' })).then(() => true)`);
             await waitFor(`!!document.querySelector('#group-table-view .empty-state-line') && !/^Loading/.test(document.querySelector('#group-table-view .empty-state-line').textContent)`, 'the empty line', 10000);
             const arch = await text('#group-table-view .empty-state-line');

@@ -37,6 +37,7 @@
     font-size: var(--fs-copy); color: var(--text-primary);
 }
 @media (min-width: 761px) {
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row:has(.inbox-bookmark) > .inbox-v4-footer[data-key="review"] { grid-row: 5; }
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row.inbox-card-tr:not(:has(.inbox-sent-back)) .inbox-meta { grid-column: 3 / -1; grid-row: 2; order: 5; margin-top: 0; }
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row.inbox-card-tr .inbox-message { grid-column: 3 / -1; grid-row: 3; order: 7; }
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row.inbox-card-tr.inbox-ask-row .inbox-ask-name { grid-column: 3 / -1; grid-row: 3; }
@@ -108,8 +109,9 @@
 
 @media (max-width: 760px) {
     /* More and Star moved out of the header: give their reserved width back to name/time/version. */
-    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first { grid-template-columns: minmax(max(2.5rem, 96px), 1fr) fit-content(min(9rem, 35%)) max-content; grid-template-areas: "from chip wait" "name name name" "meta meta meta" "pills pills pills" "more more more"; }
-    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first:has(> .inbox-review-tags .inbox-review-version) { grid-template-areas: "from chip wait" "name name pill" "meta meta meta" "pills pills pills" "more more more"; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first { grid-template-columns: minmax(96px, 1fr) minmax(0, .6fr) minmax(4ch, 1fr); align-items: start; grid-template-areas: "from chip wait" "name name name" "meta meta meta" "pills pills pills" "more more more"; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first:not(:has(.inbox-computer-chip)) { grid-template-columns: minmax(96px, 1fr) 0 minmax(4ch, min(120px, 40%)); }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first:has(> .inbox-review-tags .inbox-review-version:not([hidden])) { grid-template-areas: "from chip wait" "name name pill" "meta meta meta" "pills pills pills" "more more more"; }
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first .inbox-computer-chip { grid-area: chip; max-width: 100%; }
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first :is(.inbox-review-wait, .inbox-review-version) { margin-inline-end: 0; }
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first > .inbox-review-name:not(.inbox-ask-name):not(.inbox-whole-name) { margin-inline-end: 0; width: auto; max-width: 100%; }
@@ -182,6 +184,8 @@
 @media (max-width: 760px) {
     .inbox-v4-row .inbox-phone-meta { white-space: normal; overflow-wrap: anywhere; }
     .inbox-v4-row .inbox-phone-meta .inbox-review-earlier::before { content: none; }
+    .inbox-v4-row .inbox-review-name:has(.inbox-pinned-filename) .inbox-pinned-inline-context { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .inbox-v4-row .inbox-pinned-filename { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 }
 
 /* #20239: four-line message previews; permission command boxes retain their separate reading gate. */
@@ -196,15 +200,18 @@
 }
 @media (max-width: 760px) {
     .inbox-v4-row.inbox-question-heading-row .inbox-review-item.inbox-agent-first { grid-template-rows: minmax(40px, auto); }
-    .inbox-v4-row .inbox-header-meta { grid-area: wait; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: start; gap: 4px; min-width: 0; max-width: 120px; }
-    .inbox-v4-row .inbox-header-board { max-width: 100%; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-message-row .inbox-review-item > .inbox-sent-back-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
+    /* Sent-back state chips need a full row below the board/time header (#20290). */
+    :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-review-item.inbox-agent-first > .inbox-wait-state { grid-area: auto; grid-column: 1 / -1; justify-self: start; }
+    .inbox-v4-row .inbox-header-meta { grid-area: wait; display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: start; gap: 4px; min-width: 0; max-width: 100%; }
+    .inbox-v4-row .inbox-header-board { max-width: 100%; font-size: var(--fs-sm); color: var(--text-secondary); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-preview-toggle { grid-area: auto; grid-column: 1 / -1; }
 }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row :is(.inbox-blocks.inbox-blocks-closes, .inbox-closes-goal) { color: var(--text-secondary); background: transparent; border-color: var(--border); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-closes-label { color: inherit; }
 
 /* Keep common controls together when large text wraps the decision buttons. */
-:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-footer .inbox-review-actions > .inbox-common-actions { display: inline-flex; align-items: center; flex: none; gap: inherit; margin-inline-start: auto; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-v4-footer .inbox-review-actions > .inbox-common-actions { display: inline-flex; flex-wrap: wrap; align-items: center; flex: 0 1 auto; max-width: 100%; gap: inherit; margin-inline-start: auto; }
 
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-preview-controls { grid-column: 3 / -1; order: 20; display: flex; flex-wrap: wrap; gap: 6px; align-items: start; }
 .inbox-v4-row .inbox-preview-controls > .inbox-ask-note { flex-basis: 100%; }

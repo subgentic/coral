@@ -55,7 +55,7 @@ const PENDING = [
         assert.match(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), /^[2-9]\d*$/, 'the Inbox tab counts them');
         assert.match(await ev(`Array.from(document.querySelectorAll('#group-table-view button')).map(b => b.textContent.trim()).join('|')`), /Review/, 'a Review button on the row');
         // Review opens the Skills tab at that skill
-        await ev(`Array.from(document.querySelectorAll('#group-table-view tr.dt-row')).find(r => /db-review/.test(r.textContent)).querySelector('button.btn').click(); true`);
+        await ev(`Array.from(document.querySelectorAll('#group-table-view tr.dt-row')).find(r => /db-review/.test(r.textContent)).querySelector('button[aria-label="Review the skill db-review"]').click(); true`);
         await waitFor(`location.pathname === '/skills/${PENDING[0].id}'`, 'the Skills tab at that skill', 8000);
         console.log('PASS a skill waiting for approval is an item of Needs you');
     } finally { await client.close(); }
