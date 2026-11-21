@@ -75,6 +75,7 @@ const setTheme=(ev,theme)=>ev(`(async()=>{const m=await import((window.__coralSt
     await ev(`document.querySelector('#cloud-automation-computer .computer-bar-button').click();true`);
     // one card per cannot state, each naming the computer, none showing an HTTP code in its headline
     await pick('old-laptop'); await ready('old-laptop is offline');
+    assert.match(await ev(`document.querySelector('[data-computer-card=offline]').textContent`),/It was last connected (today at \d\d:\d\d|yesterday at \d\d:\d\d|\d{1,2} [A-Z][a-z]{2})\./,'the offline card says when it last connected, in the mock\'s words');
     assert.equal(await ev(`document.querySelector('#cloud-automation-computer .computer-bar-button .computer-dot').getBoundingClientRect().width`),8,'the bar shows the computer\'s dot');
     assert.equal(await ev(`document.querySelector('#cloud-automation-computer .computer-bar-button .computer-chip').textContent`),'Offline','and the one-word chip when it is off');
     await shot(`${tag}-card-offline`);
