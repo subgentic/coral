@@ -282,6 +282,9 @@ func shouldValidateExactTarget(agentType, sessionID string) bool {
 // stripped (e.g. Codex sandbox).
 // GET /api/sessions/resolve?pids=12345,12340,12335
 func (h *SessionsHandler) ResolveByPIDs(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	pidStr := r.URL.Query().Get("pids")
 	if pidStr == "" {
 		errBadRequest(w, "pids parameter required")

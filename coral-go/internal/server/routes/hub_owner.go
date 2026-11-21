@@ -186,7 +186,33 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("PUT", "/api/artifacts/{hex64}/private"):                                   textArtifactPrivateOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/guide-roster"):                                textGuideRosterOwnerOnly,
 	tunnel.OwnerRouteKey("PUT", "/api/board/{project}/guide-roster"):                                textGuideRosterOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board-seats/foreign"):                                         textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/goal-requests"):                               textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/groups"):                                      textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/groups/{groupID}/members"):                    textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/messages/check"):                              textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/peek"):                                        textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/queue"):                                       textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/reminder"):                                    textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/waits"):                                       textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/waits/poll"):                                  textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/waiting-on-agent"):                                            textBoardReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/resources/{name}"):                                            textHubResourcesOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/search-access/log"):                                           textSessionReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/sessions/live/{name}/waiting"):                                textSessionReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/sessions/live/{sessionID}/agent-candidate"):                   textSessionReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/sessions/resolve"):                                            textSessionReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/teams/detail/{name}/uncommitted"):                             textSessionReadsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/tasks/runs"):                                                  textTaskRunsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/tasks/runs/{runID}"):                                          textTaskRunsOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/scheduled/validate-cron"):                                    textCronCheckOwnerOnly,
 }
+
+// The class A reads of Hub parity batch A (#20257): the same decision (refuseNonOwner), one sentence for each kind of read.
+const textBoardReadsOwnerOnly = "through Coral Hub a team's board reads (its queue, waits, groups, cross-team state and the like) are for the account this computer is linked to only (#20257)"
+const textSessionReadsOwnerOnly = "through Coral Hub this read of an agent or a team's working folders is for the account this computer is linked to only (#20257)"
+const textTaskRunsOwnerOnly = "through Coral Hub the task runs are for the account this computer is linked to only (#20257)"
+const textCronCheckOwnerOnly = "through Coral Hub only the account this computer is linked to can check a cron expression (#20257)"
 
 const textHubResourcesOwnerOnly = "through Coral Hub only the account this computer is linked to can read its resource queue (#16140)"
 const textSkillsOwnerOnly = "through Coral Hub only the account this computer is linked to can search the skills or attach one to an agent (#19430)"

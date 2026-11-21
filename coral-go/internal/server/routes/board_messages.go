@@ -838,6 +838,9 @@ const BoardPausedHeader = "X-Coral-Board-Paused"
 // CheckUnread returns the unread message count, and paused: true when the board is paused (read delivers none of them until it is resumed).
 // GET /api/board/{project}/messages/check
 func (h *BoardHandler) CheckUnread(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	project := urlParam(r, "project")
 	subscriberID, attrOK := attributedTo(w, r, r.URL.Query().Get("subscriber_id"))
 	if !attrOK {

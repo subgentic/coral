@@ -239,6 +239,9 @@ func (h *ResourcesHandler) addStuck(views []resourceView) {
 
 // Get answers GET /api/resources/{name}.
 func (h *ResourcesHandler) Get(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	h.reap()
 	st, err := h.M.Queue().Status(chi.URLParam(r, "name"))
 	if err != nil {

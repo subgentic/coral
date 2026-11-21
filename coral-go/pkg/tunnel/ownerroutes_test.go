@@ -262,6 +262,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodGet && (strings.Contains(p, "/attachment/") || strings.HasSuffix(p, "/changes.diff") && strings.HasPrefix(p, "/api/board/")) {
 				continue
 			}
+			// The class A reads of #20257 (a board's queue, groups, waits, peek..., the task runs, a resource by name) are the owner's alone through the hub: the old list never had them.
+			if pat, _ := OwnerRoute(m, p); got && inParityARows(m, pat) {
+				continue
+			}
 			// The one difference of #5610: the table's {id} is any one segment, so a task artifact-content path with a non-number id is stamped too (its handler refuses it).
 			if strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/artifact-content") && m == http.MethodGet {
 				continue
@@ -383,4 +387,13 @@ func TestTheLiveSessionListIsAnOwnerSeesRouteAndNothingAroundItChanged(t *testin
 	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
 		assert.False(t, IsOwnerRoute(m, "/api/sessions/live"), m)
 	}
+}
+
+func inParityARows(method, pattern string) bool {
+	for _, r := range parityARows {
+		if r.method == method && r.pattern == pattern {
+			return true
+		}
+	}
+	return false
 }

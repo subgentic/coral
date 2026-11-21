@@ -384,6 +384,33 @@ var routeTable = cat(
 	// The Hub's service-only per-machine read of the tasks that came from one accepted goal request (#7364, #7331 section 6): forwarded at View, and the machine answers only a stream the Hub's own service stamped
 	// with who asked (hubservice.go): an owner, a viewer or a local program gets 403 there.
 	service(rules(http.MethodGet, TierView, "/api/goal-links")),
+	// Hub parity, batch A (#20257, coral-hub's ask #256265, Security's rulings of 07:21Z): reads of Coral state the dashboard shows, the computer OWNER's alone through the Hub (OwnerRefuse: the machine refuses a grantee, a
+	// viewer and the Hub service), each its own row with the query list its handler reads closed (routes_query.go: any other key is refused). Nothing here writes, and every route is listed by its whole path: a
+	// neighbour never matches. Not here: the analytics reads and the board's spend (held with #19968, spendTeamKeys: per-person cost stays behind that fix); GET /api/goal-links, which is the Hub service's own row above; and the 14 reads whose handler
+	// refuses the Hub owner on purpose (cross-team state, candidates, links and log, relay targets, task and goal search, Chief's checks and triggers, the reminders, an agent's loaded skills, the context reset status): they wait for a decision to lift that refusal, route by route.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView,
+		"/api/board-seats/foreign",
+		"/api/board/{project}/goal-requests",
+		"/api/board/{project}/groups",
+		"/api/board/{project}/groups/{groupID}/members",
+		"/api/board/{project}/messages/check",
+		"/api/board/{project}/peek",
+		"/api/board/{project}/queue",
+		"/api/board/{project}/reminder",
+		"/api/board/{project}/waits",
+		"/api/board/{project}/waits/poll",
+		"/api/resources/{name}",
+		"/api/search-access/log",
+		"/api/sessions/live/{name}/waiting",
+		"/api/sessions/live/{sessionID}/agent-candidate",
+		"/api/sessions/resolve",
+		"/api/tasks/runs",
+		"/api/tasks/runs/{runID}",
+		"/api/teams/detail/{name}/uncommitted",
+		"/api/waiting-on-agent",
+	)),
+	// Checking a cron expression (#20257): no state is read or written; the owner's alone, like the reads of the block above.
+	owner(OwnerRefuse, rules(http.MethodPost, TierView, "/api/scheduled/validate-cron")),
 	// Coral Hub's word that a guide's grant ended (#11457): the Hub's own service stream (its stamp and the guide's board as the asker), never a person's, and View so a computer in any mode takes it: it only takes proposals back.
 	service(rules(http.MethodPost, TierView, "/api/cloud/guide-revoked")),
 	// The device-signed routes (#19669 slice 7, wire format draft 11): what a trusted browser signed, forwarded by the Hub unstamped. View, so a computer in any mode takes it, and neither owner nor service: the signature is the only authority, the verifier decides, and no Hub user, owner or account header is read.

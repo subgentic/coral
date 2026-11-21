@@ -101,6 +101,9 @@ func (h *BoardHandler) RegisterWait(w http.ResponseWriter, r *http.Request) {
 // GetActiveWait returns active registered wait(s) for a subscriber or board.
 // GET /api/board/{project}/waits
 func (h *BoardHandler) GetActiveWait(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	project := urlParam(r, "project")
 	subscriberID := r.URL.Query().Get("subscriber_id")
 	if subscriberID != "" {
@@ -156,6 +159,9 @@ func (h *BoardHandler) CancelWait(w http.ResponseWriter, r *http.Request) {
 // PollWait long-polls until an active wait is resolved, expired, or cancelled.
 // GET /api/board/{project}/waits/poll
 func (h *BoardHandler) PollWait(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	project := urlParam(r, "project")
 	subscriberID, attrOK := attributedTo(w, r, r.URL.Query().Get("subscriber_id"))
 	if !attrOK {

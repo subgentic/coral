@@ -11,6 +11,9 @@ import (
 // ListGroups returns all groups for a project with member counts.
 // GET /api/board/{project}/groups
 func (h *BoardHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	project := urlParam(r, "project")
 	groups, err := h.bs.ListGroups(r.Context(), project)
 	if err != nil {
@@ -23,6 +26,9 @@ func (h *BoardHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 // ListGroupMembers returns subscriber IDs in a group.
 // GET /api/board/{project}/groups/{groupID}/members
 func (h *BoardHandler) ListGroupMembers(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	project := urlParam(r, "project")
 	groupID := chi.URLParam(r, "groupID")
 	members, err := h.bs.ListGroupMembers(r.Context(), project, groupID)

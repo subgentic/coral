@@ -211,6 +211,9 @@ func (h *TasksHandler) SubmitTask(w http.ResponseWriter, r *http.Request) {
 // GetTaskStatus returns the status of a one-shot run.
 // GET /api/tasks/runs/{runID}
 func (h *TasksHandler) GetTaskStatus(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	runID, _ := strconv.ParseInt(chi.URLParam(r, "runID"), 10, 64)
 	run, err := h.sched.GetScheduledRun(r.Context(), runID)
 	if err != nil || run == nil || h.isChiefRun(r.Context(), run) {
@@ -255,6 +258,9 @@ func (h *TasksHandler) KillTask(w http.ResponseWriter, r *http.Request) {
 // ListTasks returns recent one-shot runs.
 // GET /api/tasks/runs
 func (h *TasksHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	limit := clampLimit(queryInt(r, "limit", 50), 50, 200)
 	status := r.URL.Query().Get("status")
 	var statusPtr *string

@@ -83,6 +83,9 @@ func (h *SessionsHandler) agentMayReachWaiting(w http.ResponseWriter, r *http.Re
 //
 //	{"board": "team", "unread": N, "messages": [{"id", "sender", "at", "text", "truncated"?}], "skipped": {"why", "what", "at", "since"} | null}
 func (h *SessionsHandler) ListWaiting(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // the owner's alone through Coral Hub (#20257)
+		return
+	}
 	name := chi.URLParam(r, "name")
 	ls, status, message := h.validateExactLiveTarget(r.Context(), name, r.URL.Query().Get("agent_type"), r.URL.Query().Get("session_id"), false)
 	if status != 0 {

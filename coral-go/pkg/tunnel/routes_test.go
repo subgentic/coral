@@ -653,17 +653,17 @@ func TestHubTierMoves3942(t *testing.T) {
 		{"POST", "/api/board/team/tasks/current", TierNever},
 		{"POST", "/api/board/team/tasks/9/submit-review", TierNever},
 		{"POST", "/api/board/team/tasks/9/release-review", TierNever},
-		{"GET", "/api/board/team/waits", TierNever},
-		{"GET", "/api/board/team/waits/poll", TierNever},
+		{"GET", "/api/board/team/waits", TierView},      // the owner's read since #20257
+		{"GET", "/api/board/team/waits/poll", TierView}, // the owner's read since #20257
 		{"POST", "/api/board/team/waits", TierNever},
 		{"DELETE", "/api/board/team/waits", TierNever},
-		{"GET", "/api/board/team/groups", TierNever},
-		{"GET", "/api/board/team/groups/g/members", TierNever},
+		{"GET", "/api/board/team/groups", TierView},           // the owner's read since #20257
+		{"GET", "/api/board/team/groups/g/members", TierView}, // the owner's read since #20257
 		{"POST", "/api/board/team/groups/g/members", TierNever},
 		{"DELETE", "/api/board/team/groups/g/members/s", TierNever},
-		{"GET", "/api/board/team/messages/check", TierNever},
-		{"GET", "/api/board/team/peek", TierNever},
-		{"GET", "/api/sessions/resolve", TierNever},
+		{"GET", "/api/board/team/messages/check", TierView}, // the owner's read since #20257
+		{"GET", "/api/board/team/peek", TierView},           // the owner's read since #20257
+		{"GET", "/api/sessions/resolve", TierView},          // the owner's read since #20257
 		{"DELETE", "/api/board/team/subscribe", TierNever},
 
 		{"POST", "/api/board/team/subscribe", TierInteract},
@@ -681,8 +681,8 @@ func TestShapeAllowed(t *testing.T) {
 		"GET /api/sessions/live/{}/poll":                  true,
 		"GET /api/artifacts/{}":                           true, // a {hex64} segment
 		"DELETE /api/board/{}/messages/{}":                true, // Launch
-		"GET /api/board/{}/peek":                          false,
-		"GET /api/sessions/resolve":                       false,
+		"GET /api/board/{}/peek":                          true, // the owner's read since #20257
+		"GET /api/sessions/resolve":                       true, // the owner's read since #20257
 		"GET /api/agent/history/search":                   false,
 		"GET /api/board/remotes/proxy/{}/{}/messages/all": false,
 		"GET /api/system/status":                          false,
@@ -709,8 +709,8 @@ func TestHubTierChanges4274(t *testing.T) {
 		{"PUT", "/api/board/team/working-mode/presets/p", TierNever},
 		{"POST", "/api/board/team/working-mode/presets/p/reset", TierNever},
 		{"POST", "/api/sessions/live/agent-1/tasks/reorder", TierNever},
-		{"GET", "/api/tasks/runs", TierNever},
-		{"GET", "/api/tasks/runs/7", TierNever},
+		{"GET", "/api/tasks/runs", TierView},   // the owner's read since #20257
+		{"GET", "/api/tasks/runs/7", TierView}, // the owner's read since #20257
 		{"POST", "/api/tasks/runs/7/kill", TierNever},
 		{"GET", "/api/board/team/tasks/9/changes.diff", TierView}, // was never (#4274); the owner's read since #19629 (the handler filters it for the Hub)
 

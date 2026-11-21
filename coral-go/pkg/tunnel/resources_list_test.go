@@ -14,7 +14,6 @@ func TestOnlyTheResourceListIsReachableThroughTheHubAndItIsTheOwnersAlone(t *tes
 	assert.Equal(t, "/api/resources", pattern)
 	assert.Equal(t, OwnerRefuse, mode, "the machine refuses anyone but the owner before it reads the queue")
 	for _, c := range []struct{ method, path string }{
-		{http.MethodGet, "/api/resources/mac-heavy"},
 		{http.MethodPost, "/api/resources/mac-heavy/claim"},
 		{http.MethodPost, "/api/resources/mac-heavy/release"},
 		{http.MethodPost, "/api/resources/mac-heavy/renew"},
