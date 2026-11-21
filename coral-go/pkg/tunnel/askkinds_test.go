@@ -34,7 +34,7 @@ func TestTheAskRouteTableMapsEachAnsweringRouteOnce(t *testing.T) {
 		{"POST", "/api/board/team/messages", ""},
 		{"GET", "/api/agent-asks/7/answer", ""},
 		{"POST", "/api/agent-asks/7/answer/x", ""},
-		{"POST", "/api/agent-asks//answer", ""},
+		{"POST", "/api/agent-asks//answer", AskKindLocalOnly}, // not canonical, under an ask prefix: fails closed
 		{"POST", "/api/board/team/asks/12", ""},
 	} {
 		assert.Equal(t, c.kind, AskRouteKind(c.method, c.path), c.method+" "+c.path)

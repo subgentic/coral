@@ -68,9 +68,10 @@ func AskRouteKind(method, path string) string {
 		if err != nil || u == "" || u == "." || u == ".." || strings.ContainsAny(u, "/\\") || strings.IndexFunc(u, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
 			canonical = false
 		}
-		low := strings.ToLower(raw + " " + u)
-		if strings.Contains(low, "ask") || strings.Contains(low, "proposal") || strings.Contains(low, "review") {
-			names = true
+		for _, key := range []string{"agent-asks", "asks", "proposals", "review"} {
+			if strings.HasPrefix(strings.ToLower(raw), key) || strings.HasPrefix(strings.ToLower(u), key) {
+				names = true
+			}
 		}
 		segs[i] = u
 	}
