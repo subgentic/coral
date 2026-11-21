@@ -76,7 +76,7 @@ const { coralReady } = require('./helpers/wait');
             await fire('goals_ready_wait_min', '45'); await fire('goals_ready_nudge', 'Dev One'); await fire('unowned_tasks_on', false); await fire('unowned_tasks_wait_min', '20'); await save();
             let kept;
             for (let i = 0; i < 30 && !(kept && kept.goals_ready && kept.goals_ready.nudge); i++) { kept = ((await api('/settings')).body || {}).health; if (!(kept && kept.goals_ready && kept.goals_ready.nudge)) await new Promise(r => setTimeout(r, 200)); } // sleep-ok: the PUT lands a frame after the click
-            assert.deepEqual([kept.goals_ready, kept.unowned_tasks], [{ on: true, wait_min: 45, nudge: 'Dev One' }, { on: false, wait_min: 20, nudge: '' }], at + 'what the server kept');
+            assert.deepEqual([kept.goals_ready, kept.unowned_tasks], [{ on: true, wait_min: 45, nudge: 'Dev One', max_list: 0 }, { on: false, wait_min: 20, nudge: '', max_list: 8 }], at + 'what the server kept');
             await ev(`{ const s = document.querySelector('${P} [name=unowned_tasks_nudge]'); s.append(Object.assign(document.createElement('option'), { value: 'Ghost', textContent: 'Ghost' })); } true`);
             await fire('unowned_tasks_on', true); await fire('unowned_tasks_nudge', 'Ghost'); await save();
             await waitFor(`/not a member/.test((document.querySelector('${P} .sv-row[data-key=unowned_tasks_nudge] .sv-error') || {}).textContent || '')`, 'the unowned-tasks refusal at its field', 8000);
