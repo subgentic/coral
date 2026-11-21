@@ -44,7 +44,7 @@ func TestApproveRefusesAPausedPendingCheckAndTheQuestionStays(t *testing.T) {
 func TestTheOperatorsListCarriesTheEscapedScriptTextAndAnAgentsDoesNot(t *testing.T) {
 	rg := newChecksRig(t)
 	p := filepath.Join(rg.dir, "odd.sh")
-	require.NoError(t, os.WriteFile(p, []byte("#!/bin/sh\n# ‮ evil \x1b[31m\necho '{\"key\":\"a\",\"text\":\"hi\"}'\n"), 0o700))
+	require.NoError(t, os.WriteFile(p, []byte("#!/bin/sh\n# \u202e evil \x1b[31m\necho '{\"key\":\"a\",\"text\":\"hi\"}'\n"), 0o700))
 	body := `{"name":"odd","script":"` + p + `","dir":"` + rg.dir + `","every":"30m"}`
 	code, out := rg.call("POST", "/x", body, "", checkAsSession("claude-orch"), rg.h.AddHealthCheckRoute)
 	require.Equal(t, http.StatusOK, code, out)
@@ -60,7 +60,7 @@ func TestTheOperatorsListCarriesTheEscapedScriptTextAndAnAgentsDoesNot(t *testin
 	assert.Contains(t, text, "#!/bin/sh")
 	assert.Contains(t, text, `\u{202e}`, "a bidi control is shown escaped, never raw")
 	assert.Contains(t, text, `\u{1b}`, "so is an escape character")
-	assert.NotContains(t, text, "‮")
+	assert.NotContains(t, text, "\u202e")
 	assert.NotContains(t, text, "\x1b")
 }
 
