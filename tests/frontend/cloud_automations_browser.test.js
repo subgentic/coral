@@ -91,6 +91,18 @@ const STUB = `(() => {
   }
   await ev('window.__automationDeny=0;true');
   await ev(`document.querySelector('#scheduler-view .notice-error').nextElementSibling.click();true`); await ready('two job');
+  await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers.find(s=>s.id==='two').status='offline';window.__automationReads=[];return true;})`);
+  for (const request of [{folder:'jobs'}, {folder:'workflows'}, {folder:'recent'}, {folder:'running'}, {folder:'failed'}, {folder:'jobs',id:1}, {folder:'workflows',id:2,run:9}]) {
+   await route({view:'automations',...request}); await ready("Second computer is offline, so its automations can't be read now.");
+  }
+  assert.deepEqual(await ev('window.__automationReads'),[],'an offline computer sends no list, detail, or run read');
+  assert.equal(await ev(`document.querySelector('#cloud-automation-computer option[value="two"]').textContent`),'Second computer (offline)','offline computers remain named in the picker');
+  await ev(`[...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Retry').click();true`);
+  await ready("Second computer is offline, so its automations can't be read now.");
+  assert.deepEqual(await ev('window.__automationReads'),[],'Retry while offline sends no read');
+  await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers.find(s=>s.id==='two').status='online';return true;})`);
+  await ev(`[...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Retry').click();true`); await ready('Run 9');
+  assert.ok((await ev('window.__automationReads')).length>0,'Retry after reconnect reads the selected computer');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers=[];window.__automationReads=[];return true;})`);
   await route({view:'automations',folder:'workflows'}); await ready('Link a computer');
   assert.deepEqual(await ev('window.__automationReads'),[],'no linked computer sends no request');
