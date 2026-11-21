@@ -175,6 +175,14 @@ func (d *DB) ensureSchema(ctx context.Context) error {
 		d.ExecContext(ctx, sql) // Ignore error — column may already exist
 	}
 
+	// The pair of a device key (#20513): a key listed before the pair existed was made at this computer, so it is marked as the owner's, once, when the columns are added. The columns default to '', which fails closed.
+	if _, err := d.ExecContext(ctx, "ALTER TABLE device_keys ADD COLUMN link TEXT NOT NULL DEFAULT ''"); err == nil {
+		d.ExecContext(ctx, "ALTER TABLE device_keys ADD COLUMN hub_user TEXT NOT NULL DEFAULT ''")
+		if _, err := d.ExecContext(ctx, "UPDATE device_keys SET link = ?, hub_user = ?", PairOwner, PairOwner); err != nil {
+			slog.Warn("could not mark the device keys that were already listed as the owner's; they are refused until paired again", "error", err)
+		}
+	}
+
 	// When a person opened a run (#9315): the column is added here, not in columnMigrations, because the runs that are over when it is added are all given the time: nobody is told about a history
 	// they never saw (a run finished after this is unread until it is opened). ALTER succeeds only when the column is new, so the backfill runs once.
 	for _, table := range []string{"scheduled_runs", "workflow_runs"} {

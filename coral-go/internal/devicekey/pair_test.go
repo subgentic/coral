@@ -2,6 +2,8 @@ package devicekey_test
 
 import (
 	"context"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -50,7 +52,7 @@ func TestThePairIsStoredWithTheKey(t *testing.T) {
 	l, u := r.pairOf(s.kid)
 	assert.Equal(t, [2]string{linkA, userA}, [2]string{l, u})
 	l, u = r.pairOf(r.signer.kid)
-	assert.Equal(t, [2]string{"", ""}, [2]string{l, u}, "a key made at the computer has no pair")
+	assert.Equal(t, [2]string{store.PairOwner, store.PairOwner}, [2]string{l, u}, "a key made at the computer carries the explicit owner marker")
 }
 
 func TestAKeyApprovedInsideAPairBelongsToThatPair(t *testing.T) {
@@ -157,4 +159,52 @@ func TestRelayedFromTheOwnersKeyStillNamesTheLinkItArrivedOn(t *testing.T) {
 	assert.ErrorIs(t, err, devicekey.ErrWrongLink)
 	_, err = r.v.HandleRelayedOn(context.Background(), "lnk_1", "POST", "/api/x", m.Kind, c, body, r.signer.signRelayed(t, m.Kind, c), t0, allow)
 	assert.NoError(t, err)
+}
+
+// Coral Hub's Security (#260155): the owner is an explicit marker, never an empty or missing value, and a key whose pair is missing fails closed.
+func TestAKeyWithNoPairOrHalfAMarkerIsNeverTheOwnerAndNeverActs(t *testing.T) {
+	r := newRig(t)
+	for name, pair := range map[string][2]string{"empty": {"", ""}, "link only": {linkA, ""}, "hub user only": {"", userA}, "half a marker": {store.PairOwner, userA}, "marker and empty": {store.PairOwner, ""}} {
+		s := newSigner(t)
+		raw, _ := b64.DecodeString(s.pk)
+		_, err := r.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: s.kid, PK: raw, Label: "d", Mode: "launch", Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: pair[0], HubUser: pair[1]}, t0.Add(-time.Hour))
+		assert.ErrorIs(t, err, store.ErrDeviceKeyForm, name+": the store refuses to list it")
+	}
+}
+
+func TestARowThatLostItsPairFailsClosedEvenIfItIsInTheTable(t *testing.T) {
+	r := newRig(t)
+	s, target := newSigner(t), newSigner(t)
+	r.add(s, "launch", store.DeviceOriginPairing, store.DeviceKindDevice)
+	_, err := r.ss.DB().ExecContext(context.Background(), `UPDATE device_keys SET link = '', hub_user = '' WHERE kid = ?`, s.kid) // a migration or a hand edit left it empty
+	require.NoError(t, err)
+	assert.ErrorIs(t, r.handleOn("", r.approve(s, target, "view"), s), devicekey.ErrOutsidePair)
+	assert.ErrorIs(t, r.handleOn(linkA, r.approve(s, target, "view"), s), devicekey.ErrOutsidePair)
+	body := []byte("b")
+	m := r.relayedMsg(devicekey.SendToAgent, s, body)
+	_, err = r.handleRelayed(m, s, body, t0, allow)
+	assert.ErrorIs(t, err, devicekey.ErrOutsidePair)
+}
+
+func TestARowThatLostItsPairIsNotATargetOfTheOwnersLowerPairEither(t *testing.T) {
+	r := newRig(t)
+	a, lost := newSigner(t), newSigner(t)
+	r.addPaired(a, "interact", linkA, userA)
+	r.add(lost, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
+	_, err := r.ss.DB().ExecContext(context.Background(), `UPDATE device_keys SET link = '', hub_user = '' WHERE kid = ?`, lost.kid)
+	require.NoError(t, err)
+	assert.ErrorIs(t, r.handleOn(linkA, r.remove(a, lost.kid), a), devicekey.ErrOutsidePair)
+}
+
+// What Coral Hub's browser sends is /api/remote/<server>/api/...; the tunnel strips the prefix. The computer signs and compares the stripped URI with the query as sent.
+func TestRequestTargetIsTheStrippedURIWithTheQueryExactlyAsSent(t *testing.T) {
+	for _, uri := range []string{"/api/board/team%2F1/send?b=2&a=%2F1&a=0", "/api/x?", "/api/x", "/api/x?q=a+b%20c"} {
+		r := httptest.NewRequest("POST", uri, nil)
+		assert.Equal(t, uri, devicekey.RequestTarget(r), uri)
+	}
+	// the tunnel's stripped request: a path that began /api/remote/srv1/api/...
+	hub := httptest.NewRequest("POST", "/api/remote/srv1/api/board/team1/send?b=2&a=%2F1", nil)
+	hub.URL.Path = strings.TrimPrefix(hub.URL.Path, "/api/remote/srv1")
+	hub.URL.RawPath = ""
+	assert.Equal(t, "/api/board/team1/send?b=2&a=%2F1", devicekey.RequestTarget(hub))
 }

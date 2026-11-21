@@ -95,7 +95,7 @@ func (v *Verifier) Handle(ctx context.Context, a Action, body []byte, sig string
 }
 
 // HandleOn is Handle for a message that arrived on the Hub link arrivedLink, taken from this computer's own stamp ("" for one that came by no link). A signer whose row carries a link (M1, #20514) is held to it: the
-// message must have arrived on that link, and it acts only inside the signer's (link, Hub label) pair. A signer with no pair is the owner's own key, made at this computer, and is held to neither.
+// message must have arrived on that link, and it acts only inside the signer's (link, Hub label) pair. A signer marked as the owner's (store.PairOwner, set where the computer made the key) is held to neither; a signer with no pair at all is refused.
 func (v *Verifier) HandleOn(ctx context.Context, arrivedLink string, a Action, body []byte, sig string, now time.Time) (Message, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -129,7 +129,11 @@ func (v *Verifier) HandleOn(ctx context.Context, arrivedLink string, a Action, b
 	if !verifyP1363(signer.PK, SigningInput(a, body), sig) {
 		return Message{}, ErrBadSignature
 	}
-	if signer.Link != "" && arrivedLink != signer.Link {
+	owner, bound := signer.PairState()
+	if !owner && !bound { // a pair that is missing or half a marker fails closed
+		return Message{}, ErrOutsidePair
+	}
+	if bound && arrivedLink != signer.Link {
 		return Message{}, ErrWrongLink
 	}
 	// The signature is good: from here the signer is who it says. A replay is answered nonce_repeat before anything about the list or the mode is said.
@@ -222,7 +226,7 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 			}
 			return none, 0, err
 		}
-		if signer.Link != "" && (target.Link != signer.Link || target.HubUser != signer.HubUser) { // acts only inside the signer's own pair
+		if o, _ := signer.PairState(); !o && (target.Link != signer.Link || target.HubUser != signer.HubUser) { // acts only inside the signer's own pair; the owner's key acts on any
 			return none, 0, ErrOutsidePair
 		}
 		if m.Action == RemoveDevice && m.TargetKID != m.KID { // anyone may remove itself; another device only by a pairing signer at or above its mode

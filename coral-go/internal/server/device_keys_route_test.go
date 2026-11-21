@@ -79,7 +79,7 @@ func (d *dkRig) addDevice(mode, kind string) (*ecdsa.PrivateKey, string) {
 	e, _ := priv.ECDH()
 	raw := e.PublicKey().Bytes()
 	kid := rb64.EncodeToString(sha(raw))
-	_, err = d.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: kid, PK: raw, Label: "Phone", Mode: mode, Origin: store.DeviceOriginPairing, Kind: kind}, time.Now().Add(-time.Hour))
+	_, err = d.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: kid, PK: raw, Label: "Phone", Mode: mode, Origin: store.DeviceOriginPairing, Kind: kind, Link: store.PairOwner, HubUser: store.PairOwner}, time.Now().Add(-time.Hour))
 	require.NoError(d.t, err)
 	return priv, kid
 }

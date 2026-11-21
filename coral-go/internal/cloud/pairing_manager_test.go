@@ -136,7 +136,7 @@ func TestAnEnrollmentClearsEarlierKeysAndSoDoesDisconnect(t *testing.T) {
 	r := pairingSetup(t, true)
 	old := newDevicePK(t)
 	raw, _ := b64u.DecodeString(old)
-	_, err := r.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: devicekey.KIDOf(raw), PK: raw, Label: "old", Mode: "view", Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, time.Now())
+	_, err := r.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: devicekey.KIDOf(raw), PK: raw, Label: "old", Mode: "view", Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}, time.Now())
 	require.NoError(t, err)
 	r.connect(t)
 	for _, k := range r.listed(t) {

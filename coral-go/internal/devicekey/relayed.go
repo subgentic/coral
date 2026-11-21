@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"strconv"
 	"time"
 	"unicode/utf8"
@@ -43,6 +44,10 @@ var RelayedKinds = []Kind{GuideRoster, GrantMember, InputGrant, KeepFullAccess, 
 
 // relayedLabel starts every v3 signing input, so a v3 signature is never a v2 one and the reverse.
 const relayedLabel = "coral-hub/device-keys/3/"
+
+// RequestTarget is the one string a relayed request is signed and compared by: the request URI exactly as this computer received it, the path as sent and the query as sent, with nothing reordered, decoded or re-encoded. Through
+// the Hub the browser calls /api/remote/<server>/api/...: the tunnel strips /api/remote/<server>, so the request this computer sees starts at /api/, and that stripped form is what is signed.
+func RequestTarget(r *http.Request) string { return r.URL.RequestURI() }
 
 // RelayedBodyMax is the most body bytes a relayed request may carry: the hash is of the exact received bytes, so the computer reads at most this many before it hashes.
 const RelayedBodyMax = 1 << 20
@@ -331,10 +336,14 @@ func (v *Verifier) HandleRelayedOn(ctx context.Context, arrivedLink, method, pat
 	if subtle.ConstantTimeCompare([]byte(BodySHA256(body)), []byte(m.BodySHA256)) != 1 {
 		return Relayed{}, ErrBodyHash
 	}
-	if signer.Link != "" && m.Link != signer.Link {
+	owner, bound := signer.PairState()
+	if !owner && !bound { // a pair that is missing or half a marker fails closed
+		return Relayed{}, ErrOutsidePair
+	}
+	if bound && m.Link != signer.Link {
 		return Relayed{}, ErrWrongLink
 	}
-	if signer.HubUser != "" && m.HubUser != signer.HubUser {
+	if bound && m.HubUser != signer.HubUser {
 		return Relayed{}, ErrOutsidePair
 	}
 	if err := v.Store.NonceSeen(ctx, m.Nonce, now); err != nil {
