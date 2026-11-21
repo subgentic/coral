@@ -85,7 +85,7 @@ async function details(panel, server, request, signal, myGeneration) {
         panel.append(el('h3', '', `Run ${word(run.id)}`), runFacts(run));
         return;
     }
-    panel.append(facts(kind === 'job' ? [['Schedule', item.cron_expr], ['Time zone', item.timezone], ['State', item.paused ? 'Paused' : item.enabled ? 'On' : 'Off'], ['Next run', dateOf(item.next_fire_at)], ['Prompt, flags, folder and description', OMITTED]] : [['Steps', item.step_count], ['State', item.enabled ? 'On' : 'Off'], ['Step prompts, commands and files', OMITTED], ['Folder and description', OMITTED]]));
+    panel.append(facts(kind === 'job' ? [['Schedule', item.cron_expr || 'Manual'], ['Time zone', item.timezone], ['State', item.paused ? 'Paused' : item.enabled ? 'On' : 'Off'], ['Next run', dateOf(item.next_fire_at)], ['Last run', word(item.last_run?.status)], ['Prompt, flags, folder and description', OMITTED]] : [['Steps', item.step_count], ['State', item.enabled ? 'On' : 'Off'], ['Step prompts, commands and files', OMITTED], ['Folder and description', OMITTED]]));
     panel.append(el('h3', '', 'Runs'));
     const runsHost = el('div'); panel.append(runsHost);
     let offset = 0, loading = false;
@@ -140,8 +140,8 @@ export async function openAutomationsRoute(request = {}) {
                     columns: [
                         { key: 'name', label: folder === 'jobs' ? 'Job' : 'Workflow', primary: true, width: 'grow', cell: r => primary(String(r.name || ''), () => open(r)) },
                         ...(everyone ? [{ key: 'which', label: 'Computer', width: '9rem', cell: r => machineLabel(r._server) }] : []),
+                        { key: 'schedule', label: 'Schedule', width: '10rem', cell: r => String(r.cron_expr || r.schedule || '') || 'Manual' },
                         { key: 'state', label: 'State', width: '7rem', cell: r => r.paused ? 'Paused' : r.enabled ? 'On' : 'Off' },
-                        { key: 'last', label: 'Last run', width: '9rem', cell: r => word(r.last_run?.status) },
                     ], empty: 'No automations found.' }).el, ...[notShown()].filter(Boolean));
             } else {
                 const rows = (data.runs || []).filter(r => !query || itemName(r, r.kind).toLowerCase().includes(query));

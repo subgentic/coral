@@ -62,7 +62,7 @@ const STUB = `(() => {
   assert.equal(await ev(`document.querySelector('#scheduler-view').textContent.includes('Read only here. Edit them in Coral on each computer.')`),true,'the read-only fact is one quiet line beside the bar, with its next step');
   assert.equal(await ev(`document.getElementById('nav-tab-automations').hasAttribute('data-local-only')`),false);
   assert.ok(await ev(`document.querySelector('#scheduler-view').textContent.includes('two job')`),'All computers merges the rows of every readable computer');
-  assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-view [role=columnheader], #scheduler-view .dt-head [data-col], #scheduler-view th')].map(e=>e.textContent.trim()).filter(Boolean)`).catch(()=>[]).then(h=>h.includes('Computer')?['Computer']:h),['Computer'],'rows carry a Computer column');
+  assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-view [role=columnheader], #scheduler-view .dt-head [data-col], #scheduler-view th')].map(e=>e.textContent.trim()).filter(Boolean)`),['Job','Computer','Schedule','State'],'the mock\'s columns: Job, Computer, Schedule, State (last run lives in the details)');
   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-not-shown p').textContent`),'Not shown: Fourth computer is offline · Third computer is offline.','unreadable computers are named once under the list');
   assert.equal(await ev(`document.querySelector('.cloud-automation-count').textContent`),'4 computers · 2 of them cannot be read');
   await route({view:'automations',folder:'jobs',id:1}); await ready('Not shown through Coral Hub');
