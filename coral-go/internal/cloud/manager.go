@@ -425,6 +425,11 @@ func (m *Manager) Connect(ctx context.Context) error {
 	}
 	m.mu.Unlock()
 
+	// A Hub an added link already has is not enrolled again: said before the Hub is asked for a code (#20368).
+	if m.o.Store.AddedLinkAt(ctx, m.o.HubURL) {
+		m.setError(StateIdle, store.ErrLinkExists.Error())
+		return store.ErrLinkExists
+	}
 	// The token must be storable here before the hub enrolls this server (#3693): enrolling
 	// first and failing to store the token left an enrollment in Coral Hub with no connection.
 	if err := m.o.Store.CheckSecrets(ctx); err != nil {

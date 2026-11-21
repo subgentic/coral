@@ -139,3 +139,21 @@ func TestEachLinkKeepsItsOwnCap(t *testing.T) {
 	code, _ = viaTunnel(t, s1, "POST", "/api/sessions/live/a/send")
 	assert.Equal(t, 200, code, "A kept its cap and its tunnel")
 }
+
+// Connect to a Hub an added link already has says so at once, before the Hub is asked for a code.
+func TestConnectToAnAddedLinksHubIsRefusedBeforeAskingTheHub(t *testing.T) {
+	e := newEnv(t)
+	store.AllowSecondLinkForTest(t)
+	// An enrollment elsewhere, then a second link to the test Hub; the enrollment is then forgotten so Connect has a free slot.
+	require.NoError(t, e.cs.Save(context.Background(), "https://other.example.com", "srv_o", "O", "tok-o"))
+	_, err := e.cs.AddLink(context.Background(), e.hub.srv.URL, "srv_1", "B", fakeToken, "view")
+	require.NoError(t, err)
+	require.NoError(t, e.cs.Delete(context.Background()))
+	m := e.manager(e.hub.srv.URL)
+	start(t, m)
+	err = m.Connect(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already linked to that Hub")
+	assert.Zero(t, e.hub.starts.Load(), "the Hub was not asked for a code")
+	assert.Contains(t, m.Status().LastError, "already linked to that Hub")
+}

@@ -100,3 +100,25 @@ func TestARefusedLinkIsMarkedRevokedAndTheOtherIsUntouched(t *testing.T) {
 	assert.Equal(t, LinkStateActive, a.State)
 	assert.False(t, cs.LinkExists(ctx, b.LinkID))
 }
+
+// Security's SHOULD on #20368: an enrollment to a Hub an added link already has is refused with a plain sentence before anything is written.
+func TestEnrollingToAnAddedLinksHubIsRefusedBeforeAnythingIsWritten(t *testing.T) {
+	rs, db, _, _ := newRemoteStore(t)
+	cs := NewCloudStore(db, rs)
+	ctx := context.Background()
+	require.NoError(t, cs.Save(ctx, "https://hub-a.example.com", "srv_a", "Laptop", "tok-a"))
+	AllowSecondLinkForTest(t)
+	b, err := cs.AddLink(ctx, "https://hub-b.example.com", "srv_b", "Laptop B", "tok-b", "view")
+	require.NoError(t, err)
+
+	err = cs.Save(ctx, "https://Hub-B.example.com/", "srv_b2", "Again", "tok-b2")
+	require.ErrorIs(t, err, ErrLinkExists)
+	assert.Contains(t, err.Error(), "already linked to that Hub")
+	conn, err := cs.Get(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "srv_a", conn.ServerID, "the enrollment is as it was")
+	ls, _ := cs.ListLinks(ctx)
+	require.Len(t, ls, 2)
+	tok, _ := cs.LinkToken(ctx, b.LinkID)
+	assert.Equal(t, "tok-b", tok)
+}
