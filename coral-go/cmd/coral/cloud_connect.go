@@ -51,6 +51,7 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: coral cloud connect [--force] [--ticket-file <path|-> [--proof-file <path>]] [--url "+defaultCoralURL()+"] [--home DIR]")
 		fmt.Fprintln(stderr, "       coral cloud status [--url ...] [--home DIR]")
 		fmt.Fprintln(stderr, "       coral cloud disconnect [--url ...] [--home DIR]")
+		fmt.Fprintln(stderr, "       coral cloud links [list | cap <link_id|hub address> <view|interact|launch> | remove <link_id|hub address>]")
 		fmt.Fprintln(stderr, "       coral cloud devices [list | remove <kid> | mode <kid> <view|interact|launch> | web-mode <view|interact|launch> | clear-clock]")
 		return 2
 	}
@@ -58,7 +59,7 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return usage()
 	}
 	cmd := args[0]
-	if cmd != "connect" && cmd != "status" && cmd != "disconnect" && cmd != "devices" {
+	if cmd != "connect" && cmd != "status" && cmd != "disconnect" && cmd != "devices" && cmd != "links" {
 		return usage()
 	}
 	fs := flag.NewFlagSet("cloud "+cmd, flag.ContinueOnError)
@@ -79,7 +80,7 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if err := fs.Parse(rest); err != nil {
 			return usage()
 		}
-		if cmd != "devices" || fs.NArg() == 0 {
+		if (cmd != "devices" && cmd != "links") || fs.NArg() == 0 {
 			break
 		}
 		words = append(words, fs.Arg(0))
@@ -103,6 +104,8 @@ func runCloud(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return c.disconnect(ctx, stdout)
 	case "devices":
 		return c.devices(ctx, words, stdout, stderr)
+	case "links":
+		return c.links(ctx, words, stdout, stderr)
 	}
 	if *ticket != "" {
 		return c.redeemTicket(ctx, *ticket, *proof, *devKey, stdin, stdout)
