@@ -73,6 +73,9 @@ func markActionRecorded(ctx context.Context) {
 // HubActionKindWrite is the Kind of a row left by routes.RecordPairWrites.
 const HubActionKindWrite = "write"
 
+// HubActionKindStream is the Kind of the WS-OPEN and WS-CLOSE rows of a tunneled WebSocket (#20405, #20449): a stream has its own bound, so a flood of opens cannot push write rows out of their newest 1000.
+const HubActionKindStream = "stream"
+
 // hubOperatorActionsKept bounds each kind of the table: the newest actions of that kind are kept (the write rows are many; the security rows must outlast them).
 const hubOperatorActionsKept = 1000
 

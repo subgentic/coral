@@ -145,7 +145,7 @@ func serveUpgrade(bs *board.Store, upgrades PairRecorded, mux chi.Routes, via bo
 	}
 	record := func(method string, status int) error {
 		err := bs.RecordHubOperatorAction(context.WithoutCancel(r.Context()), board.HubOperatorAction{
-			HubUser: via.HubUser, Kind: board.HubActionKindWrite, Method: method, Path: pattern, Status: status,
+			HubUser: via.HubUser, Kind: board.HubActionKindStream, Method: method, Path: pattern, Status: status,
 		})
 		if err != nil {
 			slog.Warn("[cloud] could not record a Coral Hub stream", "error", err)
