@@ -44,14 +44,18 @@ function shell(everyone) {
     return panel;
 }
 /** A read that could not be answered carries the card it should draw (offline, not shared, no answer, key rejected, or the hedged "may need a newer Coral") and the support line. */
-class ReadError extends Error { constructor(server, state, detail) { super(`${machineLabel(server)}: ${state}`); this.server = server; this.state = state; this.detail = detail; } }
+class ReadError extends Error { constructor(server, state, detail, min = '') { super(`${machineLabel(server)}: ${state}`); this.server = server; this.state = state; this.detail = detail; this.min = min; } }
 async function read(server, path, signal) {
     if (!machineOnline(server)) throw new ReadError(server, 'offline', '');
     let response;
     try { response = await serverFetch(server, path, { signal }); } catch (e) { if (signal.aborted) throw e; throw new ReadError(server, 'no-answer', `${e.name || 'Error'}: ${e.message || 'the request failed'} (${path})`); }
     // Read error bodies too: failed reads must not leave streams in the pool.
     const data = await response.json().catch(() => null);
-    if (!response.ok) throw new ReadError(server, stateOfStatus(server, response.status), `${response.status} from ${path} (${machineLabel(server)})`);
+    if (!response.ok) {
+        // Only the Hub's owner-only contract proves the computer needs an update (#20185).
+        const update = response.status === 409 && data?.error === 'coral_too_old' && typeof data.min === 'string' && data.min.trim() && Object.keys(data).length === 2;
+        throw new ReadError(server, update ? 'update-required' : stateOfStatus(server, response.status), `${response.status} from ${path} (${machineLabel(server)})`, update ? data.min : '');
+    }
     if (!data || typeof data !== 'object') throw new ReadError(server, 'no-answer', `Unreadable reply from ${path} (${machineLabel(server)})`);
     return data;
 }
@@ -103,7 +107,7 @@ async function details(panel, server, request, signal, myGeneration) {
                 else { runsHost.replaceChildren(link('Back to runs', () => openAutomationsRoute(request)), el('h3', '', `Run ${word(r.id)}`), runFacts(r)); more.hidden = true; }
             }));
             more.hidden = !rows.length || !(data.has_more || Number(data.total) > offset);
-        } catch (e) { if (!signal.aborted && myGeneration === generation) runsHost.append(e instanceof ReadError ? computerCard({ state: e.state, server: e.server, what: 'automations', detail: e.detail, barId: 'cloud-automation-computer' }) : el('p', 'notice notice-error', e.message)); }
+        } catch (e) { if (!signal.aborted && myGeneration === generation) runsHost.append(e instanceof ReadError ? computerCard({ state: e.state, server: e.server, what: 'automations', detail: e.detail, min: e.min, barId: 'cloud-automation-computer' }) : el('p', 'notice notice-error', e.message)); }
         finally { loading = false; more.disabled = false; }
     }
     await loadRuns(); panel.append(more);
@@ -154,7 +158,7 @@ export async function openAutomationsRoute(request = {}) {
             }
         }
     } catch (e) {
-        if (!signal.aborted && myGeneration === generation) panel.replaceChildren(e instanceof ReadError ? computerCard({ state: e.state, server: e.server, what: 'automations', detail: e.detail, retry: () => openAutomationsRoute(route), barId: 'cloud-automation-computer' }) : el('p', 'notice notice-error', e.message), ...(e instanceof ReadError ? [] : [link('Retry', () => openAutomationsRoute(route))]));
+        if (!signal.aborted && myGeneration === generation) panel.replaceChildren(e instanceof ReadError ? computerCard({ state: e.state, server: e.server, what: 'automations', detail: e.detail, min: e.min, retry: () => openAutomationsRoute(route), barId: 'cloud-automation-computer' }) : el('p', 'notice notice-error', e.message), ...(e instanceof ReadError ? [] : [link('Retry', () => openAutomationsRoute(route))]));
     } finally { if (myGeneration === generation) panel.removeAttribute('aria-busy'); }
     return true;
 }
