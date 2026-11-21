@@ -53,7 +53,7 @@ async function read(server, path, signal) {
     const data = await response.json().catch(() => null);
     if (!response.ok) {
         // Only the Hub's owner-only contract proves the computer needs an update (#20185).
-        const update = response.status === 409 && data?.error === 'coral_too_old' && typeof data.min === 'string' && data.min.trim() && Object.keys(data).length === 2;
+        const update = response.status === 409 && data?.error === 'coral_too_old' && typeof data.min === 'string' && data.min.length <= 20 && /^\d+\.\d+\.\d+$/.test(data.min) && data.min === data.min.trim() && Object.keys(data).length === 2;
         throw new ReadError(server, update ? 'update-required' : stateOfStatus(server, response.status), `${response.status} from ${path} (${machineLabel(server)})`, update ? data.min : '');
     }
     if (!data || typeof data !== 'object') throw new ReadError(server, 'no-answer', `Unreadable reply from ${path} (${machineLabel(server)})`);
