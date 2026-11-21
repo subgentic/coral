@@ -48,8 +48,8 @@ const BASE = require('./test_base').BASE;
                 localStorage.removeItem('coral-inbox-needs-filters');T.state.liveSessions=[];T.state.servers=[];T.state.settings={...T.state.settings,inbox_welcome:'off',inbox_welcome_done:'agent,team'};return true;})()`);
             await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'operator_asks.js').then(m=>m.refreshOperatorAsks(true)).then(()=>import((window.__coralStatic||'/static/')+'inbox_tab.js')).then(m=>m.selectInboxTab('needs')).then(()=>true)`);
             await waitFor(`(${chips})['All']==='All 4'`,'four questions loaded');
-            const counts=await ev(chips);assert.equal(counts.Question,'Question 4');assert.equal(counts['Needs input'],'Needs input 0');
-            for(const [label,count] of [['Question',4],['Needs input',0],['All',4]]){
+            const counts=await ev(chips);assert.equal(counts.Question,'Question 4');assert.equal(counts['Needs input'],undefined,'a kind with no questions has no pill (#20148)');
+            for(const [label,count] of [['Question',4],['All',4]]){
                 await ev(`[...document.querySelectorAll('#group-table-view button.goals-chip')].find(b=>b.textContent.trim().startsWith('${label} ')).click();true`);
                 await waitFor(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length===${count}`,label+' rows match count');
             }
