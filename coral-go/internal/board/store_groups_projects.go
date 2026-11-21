@@ -245,6 +245,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM board_clashes WHERE project = ?", 1},    // the clashes filed on a board go with it (#11457)
 		{"DELETE FROM board_orch_grant WHERE project = ?", 1}, // the grant to a board's orchestrator and its log go with the board (#11432)
 		{"DELETE FROM board_lifecycle_log WHERE project = ?", 1},
+		{"DELETE FROM member_grant WHERE board_id = ?", 1},      // a Hub person's access goes with the team: a board made again under the name inherits none (#20387); the audit rows stay
 		{"DELETE FROM board_ask_closed WHERE project = ?", 1},   // a question closed by hand goes with its board (#11417)
 		{"DELETE FROM board_opening_ask WHERE project = ?", 1},  // the first-goal marker goes with its board (#19170)
 		{"DELETE FROM board_ask_reopened WHERE project = ?", 1}, // and a question the Operator reopened (#15792)
