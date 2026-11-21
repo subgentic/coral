@@ -24,6 +24,7 @@ export function pickMachine(id) { state.machineChosen = id || 'local'; document.
 export const noComputerInCloud = () => isCloud() && machineChoices().length === 0;
 export const machineInventoryPending = () => isCloud() && !state.serversKnown && machineChoices().length === 0;
 export const LINK_A_COMPUTER = 'Link a computer to see usage';
+export const OWNER_ONLY_LINE = 'Analytics is visible to the owner of this computer.'; // a share grantee (View) through the Hub: the computer answers 403 owner_only (coral-hub #259186)
 /** One Analytics read: this computer's own route off a Hub's page, the chosen computer's through /api/remote/<id>/ in cloud, never the same origin there and never with no computer chosen (the read is refused, not sent). */
 export const readNow = (path, init) => !isCloud() ? fetch(path, init) : noComputerInCloud() ? Promise.reject(new Error(LINK_A_COMPUTER)) : serverFetch(machineNow(), path, init);
 

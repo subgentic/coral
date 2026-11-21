@@ -18,7 +18,7 @@ const agentDetail = await importOnce('./analytics_agent.js'); // one agent over 
 const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
 const { syncEfficiency } = await importOnce('./analytics_efficiency.js'); // the Group by switch and the comparison of Tokens per commit and Task time (Goal #77)
 const { readCostTasks } = await importOnce('./analytics_cost_tasks.js');
-const { readNow, noComputerInCloud, machineInventoryPending, LINK_A_COMPUTER, machineChoices, machineLabel, machineOnline, machineNow, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // in cloud every read goes to the chosen computer, none with no computer linked (#19569)
+const { readNow, noComputerInCloud, machineInventoryPending, LINK_A_COMPUTER, OWNER_ONLY_LINE, machineChoices, machineLabel, machineOnline, machineNow, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // in cloud every read goes to the chosen computer, none with no computer linked (#19569)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
@@ -347,6 +347,15 @@ export async function _recheckTotals(view) {
     } catch (e) { console.error('[cost-dashboard] totals re-check:', e); } finally { _rechecking = false; }
 }
 
+/** A share grantee (View) through the Hub: the computer answers 403 to the owner-only Analytics, so the page says that in one line and draws no cards, bars or empty team (coral-hub #259186). */
+function _ownerOnly(on) {
+    const view = document.getElementById('cost-dashboard-view'); let line = document.getElementById('cost-owner-only');
+    if (on && !line) { line = document.createElement('p'); line.id = 'cost-owner-only'; line.className = 'cost-note'; line.setAttribute('role', 'status'); line.textContent = OWNER_ONLY_LINE; document.querySelector('#cost-page .cost-header')?.after(line); }
+    if (line) line.hidden = !on;
+    if (view) view.hidden = on;
+    if (on) document.getElementById('cost-computer-pick')?.remove();
+}
+
 /** Coral Hub's own page (cloud, #19569): every number is one computer's, so the header has the Computer picker, and with no computer linked the page says so and reads nothing. True when there is nothing to read. */
 let waitingInventory = false;
 document.addEventListener('coral:servers-updated', () => { if (waitingInventory && !machineInventoryPending()) { waitingInventory = false; if (document.getElementById('cost-dashboard-view')?.getClientRects().length) _refreshCostDashboard(); } });
@@ -391,6 +400,7 @@ async function _readCostDashboard({ force = false } = {}) {
             readNow(`/api/token-usage/by-branch${sinceParam}`).catch(() => null),
         ]);
 
+        if (isCloud()) { const grantee = !!summaryResp && summaryResp.status === 403; _ownerOnly(grantee); if (grantee) return; }
         if (summaryResp && summaryResp.ok) {
             const data = await summaryResp.json();
             const t = data.totals || {};

@@ -18,6 +18,7 @@ const { coralReady } = require('./helpers/wait');
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin), m = /^\\/api\\/remote\\/([^/]+)(\\/api\\/.*)$/.exec(url.pathname);
                 if (m) { window.__seen.push(url.pathname + url.search);
                     if (m[2] === '/api/board/projects') return ok([{ board_id: BOARDS[m[1]] }]);
+                    if (m[2] === '/api/analytics/activity' && window.__closed) return Promise.resolve(new Response('{}', { status: 404 }));
                     if (m[2] === '/api/analytics/activity') return ok({ range: '14d', activity: { total: 0, by_day: [], by_hour: [] } });
                     if (m[2] === '/api/token-usage/summary') return ok({ totals: { input_tokens: 1, output_tokens: 1, num_sessions: 1, num_requests: 1, cost_usd: 0.1 }, by_agent: [], by_model: [], by_agent_type: [] }); }
                 return R(u, o); };
@@ -31,6 +32,10 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__seen.length = 0; (() => { const p = document.getElementById('cost-computer-pick'); p.querySelector('.computer-bar-button').click(); p.querySelector('.computer-bar-option[data-computer="m2"]').click(); return true; })()`);
         await waitFor(`window.__seen.some(p => /^\\/api\\/remote\\/m2\\/api\\/analytics\\/activity\\?team=beta-team&/.test(p))`, "the pick moves the read to the second computer's team", 10000);
         assert.ok(!(await ev(`window.__seen`)).some(p => /\/m1\/api\/analytics\/activity/.test(p)), 'the first computer is not read again after the pick');
+        // the Hub has no route for it yet (coral-hub #258866, #20423): the owner is told so, not that it is the owner's alone to see
+        await ev(`window.__closed = true; (() => { const p = document.getElementById('cost-computer-pick'); p.querySelector('.computer-bar-button').click(); p.querySelector('.computer-bar-option[data-computer="m1"]').click(); return true; })()`);
+        await waitFor(`/Not available through the Hub yet/.test(document.getElementById('cost-dashboard-view')?.textContent || '')`, 'a closed route says "Not available through the Hub yet."', 10000);
+        assert.ok(!/visible to the owner of this Coral only/.test(await ev(`document.getElementById('cost-dashboard-view')?.textContent || ''`)), 'and does not say it is the owner\u2019s to see');
         console.log('PASS Hub Operator interaction reads the picked computer\'s team');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
