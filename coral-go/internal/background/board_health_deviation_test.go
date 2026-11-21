@@ -268,3 +268,42 @@ func TestDeviationSaidOnceSurvivesARestartAndIsClearedWhenTheTaskIsGone(t *testi
 	d.check()
 	assert.Zero(t, counters(), "cleared when the task is gone, so the same finding later is new")
 }
+
+// #20398: the floor, the factor and the sample minimum. A one-minute usual was flagged at 22 minutes; with a 30-minute floor it is not, and the defaults are what the rule always did.
+func TestDeviationFloorFactorAndSamplesFollowTheSettings(t *testing.T) {
+	d := newDeviationHarness(t)
+	ctx := context.Background()
+	d.member("Orchestrator", "Orchestrator", 1, 0)
+	d.member("Dev", "Developer", 2, 0)
+	d.finished("Dev", 5, time.Minute) // the usual is 1 minute: the limit is 2
+	id := d.running("Dev", 21*time.Minute)
+	line := fmt.Sprintf("#%d has been in progress", id)
+	hs := d.s.GetHealthSettings(ctx, "team")
+	assert.Equal(t, 0, hs.Deviations.MinAgeMin, "the default has no floor")
+	assert.Equal(t, 100, hs.Deviations.FactorPct)
+	assert.Equal(t, 0, hs.Deviations.MinSamples)
+	assert.Contains(t, d.checkNoReset(), line, "by default as before")
+
+	hs.Deviations.MinAgeMin = 30
+	require.NoError(t, d.s.SetHealthSettings(ctx, "team", hs))
+	assert.NotContains(t, d.checkNoReset(), line, "under the 30-minute floor")
+
+	hs.Deviations.MinAgeMin = 0
+	hs.Deviations.FactorPct = 1000 // ten times the limit: 20 minutes
+	require.NoError(t, d.s.SetHealthSettings(ctx, "team", hs))
+	assert.Contains(t, d.checkNoReset(), line, "21 minutes is past 10 x 2")
+	d2 := d.running("Dev", 11*time.Minute)
+	assert.NotContains(t, d.checkNoReset(), fmt.Sprintf("#%d has been in progress", d2), "11 minutes is under 20")
+
+	hs.Deviations.FactorPct = 100
+	hs.Deviations.MinSamples = 6 // it has 5
+	require.NoError(t, d.s.SetHealthSettings(ctx, "team", hs))
+	assert.NotContains(t, d.checkNoReset(), fmt.Sprintf("#%d has been in progress", d2), "too little history for the raised minimum")
+
+	hs.Deviations.MinAgeMin, hs.Deviations.FactorPct, hs.Deviations.MinSamples = 5000, 5, 900
+	require.NoError(t, d.s.SetHealthSettings(ctx, "team", hs))
+	got := d.s.GetHealthSettings(ctx, "team").Deviations
+	assert.Equal(t, 1440, got.MinAgeMin)
+	assert.Equal(t, 100, got.FactorPct)
+	assert.Equal(t, 50, got.MinSamples)
+}
