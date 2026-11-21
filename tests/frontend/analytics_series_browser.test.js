@@ -172,7 +172,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await view('agent');
         await waitFor(`document.querySelectorAll('#cost-series-agent .viz-svg path.viz-line').length === 2`, 'the agent lines', 10000);
         await ev(`window.__fail = true; true`); await view('team'); await ev(`import(${MOD} + 'cost_dashboard.js').then(m => m._refreshCostDashboard()).then(() => true)`);
-        await waitFor(`/unavailable/.test(document.getElementById('cost-series-team').textContent) && document.querySelectorAll('#cost-by-team tbody tr').length === ${NAMES.length}`, 'the message and the whole table', 10000);
+        await waitFor(`/There is no chart to show right now\\. The table below is complete\\./.test(document.getElementById('cost-series-team').textContent) && !/unavailable|error|failed/i.test(document.getElementById('cost-series-team').textContent) && document.querySelectorAll('#cost-by-team tbody tr').length === ${NAMES.length}`, 'the message and the whole table', 10000);
         console.log('   ✓');
 
         console.log('5b. By provider and By model: the same panel, the totals agree (Requests too: they have the column)');

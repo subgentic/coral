@@ -150,7 +150,7 @@ function drawList() {
     PH.pageHeader(head, { idp: 'skills' });
     page.append(head);
     const approval = 'Skills are reusable instructions that help an agent do a particular job, such as reviewing code or writing release notes. A skill an agent publishes waits here until you approve it; one you import is approved at once.';
-    if (cloud()) page.append(el('p', 'skills-note', `This is ${machineLabel(computer())}'s list, read only. Import, approve and remove a skill in that computer's own Coral.`));
+    if (cloud()) { if (computer()) page.append(el('p', 'skills-note', `This is ${computer() === 'local' ? 'this computer' : machineLabel(computer())}'s list, read only. Import, approve and remove a skill in that computer's own Coral.`)); }
     else if (!loadError) page.append(el('p', 'skills-note', approval)); // the description is for an empty list; the approval rule stays under the header with skills listed (#16211)
     if (!cloud()) page.append(el('p', 'skills-note skills-get-started', 'Ask an agent to write a skill for a task you repeat, or download one from a source you trust. Import its .zip or SKILL.md file here, read it, then choose Use in a team.'));
     if (loadError) { const p = el('p', 'skills-error', loadError); p.setAttribute('role', 'alert'); page.append(p); }

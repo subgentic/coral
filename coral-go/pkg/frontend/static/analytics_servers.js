@@ -7,7 +7,7 @@ import { serverFetch, isCloud } from './server_base.js';
 import { formatLastSeen } from './server_status.js';
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
-const { machineChoices, machineLabel, machineOnline } = await importOnce('./analytics_machine.js');
+const { machineChoices, machineLabel, machineOnline, machineNow, pickMachine } = await importOnce('./analytics_machine.js');
 const { dataTable, tableState, el } = await importOnce('./data_table.js');
 
 const STORE_KEY = 'coral-by-computer';
@@ -96,6 +96,10 @@ export async function showByComputer(host, sinceParam, period) {
     if (mine !== seq) return true; // a later read is drawing
     const known = new Map(computers.map(c => [c.id, recall(c.id, period)]).filter(([, v]) => v));
     draw(host, breakdown(computers, known, fresh));
+    if (isCloud() && !state.machineChosen && computers.length > 1) { // nothing picked yet: open on the first computer that has spend, not on one with none (coral-hub #258906); a pick, here or on the bar, is never overridden
+        const own = known.get(machineNow()), spend = computers.find(c => (known.get(c.id)?.figs?.cost || 0) > 0);
+        if (spend && !((own?.figs?.cost || 0) > 0) && spend.id !== machineNow()) pickMachine(spend.id);
+    }
     return true;
 }
 
@@ -116,6 +120,7 @@ function draw(host, b) {
     const total = el('div', 'cost-by-computer-total'); total.dataset.total = '1';
     total.append(el('span', 'cost-by-computer-total-label', b.rows.length === 1 ? 'Total' : 'Total of the computers above'),
         el('span', 'cost-by-computer-total-figs', `${showUnits(b.total.cost)} · ${num(b.total.input)} in · ${num(b.total.output)} out · ${num(b.total.agents)} agents · ${num(b.total.requests)} requests`));
+    total.firstChild.after(' '); // the label and the figures are two spans: a space between them for a screen reader and for the eye
     host.replaceChildren(t.el, total);
     const notes = [];
     if (b.stale.length) notes.push(`${b.stale.join(', ')} ${b.stale.length === 1 ? 'is' : 'are'} not answering: the figures shown are the last ones read, and they are in the total.`);

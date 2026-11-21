@@ -519,7 +519,7 @@ async function _refreshSeries(view = _currentView()) {
         if (!resp.ok) throw new Error('unavailable');
         const data = await resp.json();
         series.setData(view, { buckets: data.buckets || [], interval, sinceMs, untilMs });
-    } catch { series.setData(view, null, 'The chart is unavailable. The table below is complete.'); }
+    } catch { series.setData(view, null, 'There is no chart to show right now. The table below is complete.'); }
     const drawn = _seriesDraws[view] || 0;
     _rerender(view); // the table, whose draw ends with the chart's (and the swatches)
     if ((_seriesDraws[view] || 0) === drawn) _drawSeries(view); // no table was drawn (no rows, or a filter left none): the chart alone. One draw, not two: each reads the chart's width, a layout of the whole page (#9450: 70 of By agent's 270 ms of long tasks)
@@ -582,7 +582,7 @@ async function _refreshOverview() {
     } catch {
         for (const id of Object.values(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`); if (e) e.textContent = ''; }
         _setCompare('');
-        series.setData('overview', null, 'The chart is unavailable. The figures above are complete.');
+        series.setData('overview', null, 'There is no chart to show right now. The figures above are complete.');
     }
     series.drawOverviewPanel(host, { phone: isPhoneLayout() });
 }

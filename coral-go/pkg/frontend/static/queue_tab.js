@@ -35,7 +35,7 @@ function statusLines(id) {
         out.push(`${machineLabel(id)} is offline${server.last_seen ? `, last seen ${formatLastSeen(server.last_seen)}` : ''}.`);
         if (AQ.queueLoaded() && AQ.queueReadAt()) out.push(`The queue shown is the last one read, ${ageWords(AQ.queueReadAt())}.`);
     }
-    out.push(`This is ${machineLabel(id)}'s queue, read only: move or remove an entry in that computer's own Coral.`);
+    out.push(`This is ${!id || id === 'local' ? 'this computer' : machineLabel(id)}'s queue, read only: move or remove an entry in that computer's own Coral.`);
     return out;
 }
 
