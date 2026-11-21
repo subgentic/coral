@@ -31,6 +31,27 @@ export function hubAddressLine(st) {
     return st && typeof st.hub_address_warning === 'string' ? st.hub_address_warning : '';
 }
 
+export const LINK_CAPS = ['view', 'interact', 'launch'];
+const LINK_STATE = { active: 'Linked', paused: 'Paused', removing: 'Being removed: waiting for the Hub to confirm', revoked: 'Revoked by the Hub' };
+const bareOrigin = v => (typeof v === 'string' && /^https:\/\/[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/i.test(v) ? v : '');
+
+/** One Hub link as a row of plain text (#20346): the Hub's address only when it is a bare https origin, its label with control and bidi characters removed, the cap, and what that cap lets it do. */
+export function linkRowWords(l) {
+    l = l && typeof l === 'object' ? l : {};
+    const cap = LINK_CAPS.includes(l.max_mode) ? l.max_mode : 'view';
+    return { id: /^lnk-[0-9a-f]{8}$/.test(l.link_id) ? l.link_id : '', origin: bareOrigin(l.hub_origin), label: cleanLabel(l.label), state: LINK_STATE[l.state] || '', cap, grant: LEVEL_NOW[cap], removing: l.state === 'removing' };
+}
+
+/** The question before a link is removed. */
+export function removeLinkConfirm(l) {
+    return `Remove ${bareOrigin(l && l.hub_origin) || 'this Hub'}? This computer stops talking to that Hub at once and asks it to forget this computer.`;
+}
+
+/** Said once a cap is saved: which Hub, and what it may now do; '' for a word that is not a cap. */
+export function capSavedText(l, mode) {
+    return LINK_CAPS.includes(mode) ? `${bareOrigin(l && l.hub_origin) || 'This Hub'} may now: ${LEVEL_NOW[mode]}.` : '';
+}
+
 /** "WXYZ-1234" as "W X Y Z, 1 2 3 4": the letters and digits said apart, the dash a pause. */
 export function spellCode(code) {
     return String(code == null ? '' : code).split('-').map(part => [...part].join(' ')).filter(Boolean).join(', ');
