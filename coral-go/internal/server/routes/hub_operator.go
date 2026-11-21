@@ -42,14 +42,26 @@ func recordHubOwnerAction(ctx context.Context, bs *board.Store, id callerIdentit
 	recordHubOperatorActionAs(ctx, bs, id.pseudo, id.hubUserID, method, path, project, status)
 }
 
+// linkOriginOf reads a link's Hub address from the stored link (set with the link store); "" for an unknown link. A log line names the address only from here, never from a header or the Hub's own words.
+var linkOriginOf = func(context.Context, string) string { return "" }
+
 func recordHubOperatorActionAs(ctx context.Context, bs *board.Store, hubUser, hubUserID, method, path, project string, status int) {
+	attrs := []any{"hub_user", hubUser}
 	if hubUserID != "" {
-		// logsafe-ok: a request's URL path, not a place on this computer
-		slog.Info("[cloud] Coral Hub acted as the Operator", "hub_user", hubUser, "hub_user_id", hubUserID, "method", method, "path", path, "status", status)
-	} else {
-		// logsafe-ok: a request's URL path, not a place on this computer
-		slog.Info("[cloud] Coral Hub acted as the Operator", "hub_user", hubUser, "method", method, "path", path, "status", status)
+		attrs = append(attrs, "hub_user_id", hubUserID)
 	}
+	if v, ok := board.ActionViaFrom(ctx); ok && v.LinkID != "" { // the link and the Hub person behind it, as the connector stamped them (#20312): id, address and pseudonym only
+		attrs = append(attrs, "link", v.LinkID)
+		if o := linkOriginOf(ctx, v.LinkID); o != "" {
+			attrs = append(attrs, "hub", o)
+		}
+		if v.HubUser != "" {
+			attrs = append(attrs, "via_hub_user", v.HubUser)
+		}
+	}
+	attrs = append(attrs, "method", method, "path", path, "status", status)
+	// logsafe-ok: a request's URL path, not a place on this computer
+	slog.Info("[cloud] Coral Hub acted as the Operator", attrs...)
 	if bs == nil {
 		return
 	}

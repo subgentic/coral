@@ -2,12 +2,14 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/store"
@@ -142,4 +144,43 @@ func TestRemovingALinkFollowsTheHubsAnswer(t *testing.T) {
 			}
 		})
 	}
+}
+
+// #20346: each Operator action taken through a Hub shows which Hub it came through, read from the link at that moment (a label and an address as text); a link that was removed shows as one.
+func TestOperatorActionsNameTheHubTheyCameThrough(t *testing.T) {
+	r, _, l := linkedRemote(t, &fakeRevoker{})
+	ctx := context.Background()
+	require.NoError(t, r.srv.boardStore.RecordHubOperatorAction(ctx, board.HubOperatorAction{HubUser: "Ann", ViaLink: l.LinkID, ViaHubUser: "hub-user-1234abcd", Method: "POST", Path: "/a", Status: 200}))
+	require.NoError(t, r.srv.boardStore.RecordHubOperatorAction(ctx, board.HubOperatorAction{HubUser: "Bob", ViaLink: "lnk-deadbeef", ViaHubUser: "hub-user-9999abcd", Method: "POST", Path: "/b", Status: 200}))
+	require.NoError(t, r.srv.boardStore.RecordHubOperatorAction(ctx, board.HubOperatorAction{HubUser: "Cy", Method: "POST", Path: "/c", Status: 200}))
+	rec := call(r.srv.Router(), "GET", "/api/system/hub-operator", "", map[string]string{"Content-Type": "application/json"})
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	var out struct {
+		Recent []struct {
+			Path       string `json:"path"`
+			ViaHubUser string `json:"via_hub_user"`
+			Hub        *struct {
+				Label   string `json:"label"`
+				Origin  string `json:"origin"`
+				Removed bool   `json:"removed"`
+				Text    string `json:"text"`
+			} `json:"hub"`
+		} `json:"recent_actions"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	by := map[string]int{}
+	for i, a := range out.Recent {
+		by[a.Path] = i
+	}
+	a, b, c := out.Recent[by["/a"]], out.Recent[by["/b"]], out.Recent[by["/c"]]
+	require.NotNil(t, a.Hub)
+	assert.Equal(t, l.HubOrigin, a.Hub.Origin)
+	assert.Equal(t, "Laptop", a.Hub.Label)
+	assert.False(t, a.Hub.Removed)
+	assert.Equal(t, "hub-user-1234abcd", a.ViaHubUser)
+	require.NotNil(t, b.Hub)
+	assert.True(t, b.Hub.Removed)
+	assert.Equal(t, "a removed link (lnk-deadbeef)", b.Hub.Text)
+	assert.Empty(t, b.Hub.Origin)
+	assert.Nil(t, c.Hub, "a local action names no Hub")
 }

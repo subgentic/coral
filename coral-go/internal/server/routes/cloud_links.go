@@ -33,8 +33,20 @@ type HubRevoker interface {
 }
 
 // SetLinkStore sets where the links are kept (the server's own store) and SetLinkRevoker the Hub call; until the Hub's call exists the default says the Hub still lists this computer.
-func (h *CloudHandler) SetLinkStore(cs *store.CloudStore) { h.links = cs }
-func (h *CloudHandler) SetLinkRevoker(r HubRevoker)       { h.revoker = r }
+func (h *CloudHandler) SetLinkStore(cs *store.CloudStore) {
+	h.links = cs
+	linkOriginOf = func(ctx context.Context, id string) string {
+		if ls, err := cs.ListLinks(ctx); err == nil {
+			for _, l := range ls {
+				if l.LinkID == id {
+					return l.HubOrigin
+				}
+			}
+		}
+		return ""
+	}
+}
+func (h *CloudHandler) SetLinkRevoker(r HubRevoker) { h.revoker = r }
 
 // hubRevokeSetting switches the real Hub call on: off by default, and nothing in Coral's routes, flags or environment sets it; it is turned on after a joint real run with coral-hub and the Operator's yes.
 const hubRevokeSetting = setreg.HubRevokeCall
