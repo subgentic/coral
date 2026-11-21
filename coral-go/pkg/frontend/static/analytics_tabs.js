@@ -14,7 +14,7 @@ import { importOnce } from './import_once.js';
 await loadStyles('analytics_tabs.css');
 const V = await importOnce('./analytics_viz.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const D = await importOnce('./analytics_tabs_data.js');
-const { machineChoices, machineLabel, machineNow, machineOnline, pickMachine, noComputerInCloud, machineInventoryPending, LINK_A_COMPUTER, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer these tabs read (#15730)
+const { machineChoices, machineLabel, machineNow, machineOnline, pickMachine, noComputerInCloud, machineInventoryPending, LINK_A_COMPUTER, OWNER_ONLY_LINE, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer these tabs read (#15730)
 const T = await importOnce('./analytics_tasks.js'); // the Tasks view (#17206)
 const Q = await importOnce('./analytics_queue.js'); // the Resource queue view (#13671) // not in the start's stylesheet: it arrives before the page is drawn (#10706)
 const { el } = V;
@@ -113,7 +113,8 @@ async function load(key) {
             const { server, name } = splitKey(m.team);
             const r = await serverFetch(server, `/api/analytics/activity?team=${encodeURIComponent(name)}&range=${encodeURIComponent(m.range)}`);
             if (seq !== m.seq) return;
-            if (r.status === 401 || r.status === 403 || (r.status === 404 && isCloud())) { m.status = 'guest'; m.data = null; draw(key); return; }
+            if (r.status === 404 && isCloud()) { m.status = 'hubclosed'; m.data = null; draw(key); return; } // the Hub has no route for it yet: the owner is not a guest (coral-hub #258866)
+            if (r.status === 401 || r.status === 403) { m.status = 'guest'; m.data = null; draw(key); return; }
             if (!r.ok) throw new Error(String(r.status));
             m.data = (await r.json()).activity || {}; m.status = 'ok';
         }
@@ -152,11 +153,13 @@ function say(text, cls = 'atab-say') { const p = el('p', cls, text); p.setAttrib
 function draw(key) {
     const host = hosts[key]; if (!host || !host.isConnected) return;
     const m = tabs[key], root = el('div', 'atab' + (phone() ? ' atab-phone' : ''));
-    root.append(filterBar(key));
+    if (!(isCloud() && m.status === 'guest')) root.append(filterBar(key)); // a grantee through the Hub has nothing to filter: one line
     if (m.status === 'nocomputer') root.append(say(machineInventoryPending() ? 'Loading computers…' : LINK_A_COMPUTER));
     else if (m.status === 'offline') root.append(say(`${machineLabel(machineNow())} is offline, so its numbers cannot be read.`));
     else if (m.status === 'refused') root.append(say(`${machineLabel(machineNow())} would not give these numbers. It may be an older Coral that needs an update, or you may only be a guest there.`));
+    else if (m.status === 'guest' && isCloud()) root.append(say(OWNER_ONLY_LINE));
     else if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : key === 'tasks' ? 'Tasks completed are visible to the owner of this Coral only.' : GUEST_LINE));
+    else if (m.status === 'hubclosed') root.append(say('Not available through the Hub yet.'));
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
     else if (m.status === 'error') { const p = say(machineNow() === 'local' ? 'This could not be read.' : `${machineLabel(machineNow())} could not be read.`); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
     else if (!m.data) root.append(say('Loading…'));
