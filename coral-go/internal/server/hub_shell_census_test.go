@@ -51,6 +51,8 @@ type shellNever struct {
 
 // shellNeverRoutes: a never route one script calls, with what it does today. The key is "script METHOD route" with {} for a variable segment.
 var shellNeverRoutes = map[string]shellNever{
+	"artifact_reads.js GET /api/tracking/event":                  {bHidden, `!url\.pathname\.endsWith\('/api/tracking/event'\)`, "the census reads the telemetry exclusion literal as GET, but this module sends no GET to it: the wrapper forwards the original request unchanged and exempts telemetry from artifact-cache invalidation; the actual tracking route is POST and never in cloud_routes.golden, not a computer read through the Hub (#20457)", 0},
+	"auth_status_read.js GET /api/system/auth-status":            {bHidden, `then\(r => r\.ok \? r\.json\(\) : null\)`, "the shared browser-identity read is same-origin, not a computer proxy read; through a Hub a refused or failed read returns null and retains no error, so its password prompt and local-auth/Hub-offer consumers draw no notice from that answer; the machine route is GET never in cloud_routes.golden (#20457)", 0},
 	"permission_flags_line.js POST /api/launch/permission-args":  {bHidden, `if \(!answer\) return \[\]`, "the flags line (New agent's recap, Restart, Resume) asks this computer for the permission flags a launch would add; where that is refused through a Hub it draws no line and the mode sentence above it stays: a hidden line, not a wrong one (#15719)", 0},
 	"setup_agent.js PUT /api/settings":                           {bHidden, `default_agent_type: pick`, "the setup card remembers the agent type the person picked as the default; the write is a bare fetch whose failure is swallowed (.catch(() => {})), so where a Hub refuses it nothing is shown and the choice is simply not saved: a hidden failure, not a break", 0},
 	"team_uncommitted.js POST /api/teams/detail/{}/commit":       {bExplains, `The commit did not happen`, "Commit stays never through the Hub; a refused commit says it did not happen, with git's output when git said something, and nothing was committed (#17203)", 0},
@@ -109,7 +111,7 @@ var shellNeverFiles = map[string]shellNever{
 	"goal_write.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"hub_indicator.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"hub_mode_setting.js":       {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
-	"hub_notice.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 4},
+	"hub_notice.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 3},
 	"hub_pending.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"inbox_sidebar.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"job_form.js":               {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
@@ -117,12 +119,11 @@ var shellNeverFiles = map[string]shellNever{
 	"launch_models.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"list_display_settings.js":  {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"list_order.js":             {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
-	"local_auth_banner.js":      {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"mailbox_chats.js":          {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"mobile_connect.js":         {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 6},
 	"notes.js":                  {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"notice_pause.js":           {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
-	"password_ui.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
+	"password_ui.js":            {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 	"received_cap_notice.js":    {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 2},
 	"registered_server_view.js": {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 7}, // 7: Reconnect (POST /api/servers/{id}/reconnect, a route that never goes through a Hub)
 	"scheduler.js":              {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 3},
@@ -170,7 +171,7 @@ var shellNeverFiles = map[string]shellNever{
 	"xterm_renderer.js":         {bUnreviewed, "", "unreviewed: nobody has read what this script does through a Hub (#13860 worklist)", 1},
 }
 
-const shellUnreviewedMax = 86
+const shellUnreviewedMax = 85
 
 type shellCall struct {
 	file, method, route, raw string
