@@ -605,6 +605,17 @@ CREATE TABLE IF NOT EXISTS cloud_link (
     last_error       TEXT
 );
 
+-- What was done to links at this computer (#20346, design v2 1.7): who (always the computer), when, which link and origin, what. Never a token, a header or a name a Hub gave.
+-- Rows outlive the link they are about, so a removed link still shows in the log.
+CREATE TABLE IF NOT EXISTS cloud_link_event (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    link_id    TEXT NOT NULL,
+    hub_origin TEXT NOT NULL,
+    action     TEXT NOT NULL,
+    detail     TEXT NOT NULL DEFAULT '',
+    at         TEXT NOT NULL
+);
+
 -- A person's own limit on one link (design v2 2.2): created now and empty; a missing row means the link's own value. Rows only ever lower access.
 CREATE TABLE IF NOT EXISTS cloud_link_user (
     link_id     TEXT NOT NULL,
