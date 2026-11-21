@@ -45,7 +45,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.getElementById('group-table-title').textContent`), 'Needs you', at + 'the current folder name stays visible');
 
             const rowOf = name => `[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
-            const point = async name => ev(`(() => { const r = ${rowOf(name)}; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.35 }; })()`); // the row's own box, off its two links
+            const point = async name => ev(`(() => { const r = ${rowOf(name)}; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + 6, y: b.top + b.height * 0.35 }; })()`); // the card's left padding, clear of the full-width chip rows and their expanded hit targets (#20308)
             const touch = (type, p) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });
             const tap = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 60)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 250)); }; // sleep-ok: a tap, and the table redraws
             const press = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
