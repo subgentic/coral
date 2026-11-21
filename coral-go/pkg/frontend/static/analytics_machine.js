@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { isCloud, serverFetch } from './server_base.js';
 
-let chosen = 'local';
+let chosen = 'all'; // 'all' is the default: a page that can merge computers reads them all, any other page reads the first on its list (#20207)
 export const MACHINE_EVENT = 'analytics-machine-change';
 /** The computers that can be picked: this one (not on a Coral Hub's own page, which has none) and every linked one, offline ones too (they are named, not hidden). Empty off a Hub: nothing to pick. */
 const seenAt = s => s.status === 'online' || s.online === true ? Number.MAX_SAFE_INTEGER : (Date.parse(s.last_seen) || 0);
@@ -16,6 +16,8 @@ export const machineOnline = id => !id || id === 'local' || (state.servers || []
 /** The computer being read: the choice if it is still on the list, else the first one on it (or this computer when there is no list). */
 // 'local' (the fallback when nothing is linked) is the same origin: in cloud every caller must read through readNow, or stop on noComputerInCloud(), never use this id with fetch (#19591).
 export const machineNow = () => { const c = machineChoices(); return c.includes(chosen) ? chosen : (c[0] || 'local'); };
+/** True when the person is reading all linked computers (the default with two or more): only a page that can merge their rows asks. */
+export const machineIsAll = () => chosen === 'all' && machineChoices().length > 1;
 export function pickMachine(id) { chosen = id || 'local'; document.dispatchEvent(new CustomEvent(MACHINE_EVENT, { detail: chosen })); }
 
 /** Coral Hub's own page (cloud) has no computer of its own: with none linked there is nothing to read, and nothing is asked of this origin (coral-hub §7.2). */

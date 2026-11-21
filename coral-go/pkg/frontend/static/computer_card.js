@@ -48,3 +48,6 @@ export function computerCard({ state, server, what, detail = '', retry, barId, o
 
 /** Which card a failed read is: a 403 is a computer that keeps it private, a 404 the hedged "may need a newer Coral", an offline computer is offline, and anything else (a network error, a 5xx, a timeout) did not answer. */
 export const stateOfStatus = (server, status) => !machineOnline(server) ? 'offline' : status === 403 ? 'not-shared' : status === 404 ? 'old' : 'no-answer';
+
+/** One short phrase for a computer whose rows are left out of a merged list ("lab-pc may need a newer Coral"). */
+export const notShownText = (e, what) => { const name = machineLabel(e.server); return e.state === 'offline' ? `${name} is offline` : e.state === 'not-shared' ? `${name} does not share ${what}` : e.state === 'old' ? `${name} may need a newer Coral` : `${name} did not answer`; };
