@@ -11,8 +11,9 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// #20346, Security 1: a second link is allowed only when no tunnel write is still pending in the pair census (the Manager is still one connector, and a write that does not record the pair would be
-// attributed to the wrong Hub). While the list is not empty the store's switch must stay off, so lifting it is its own reviewed change.
+// #20346, Security 1, and #20444: a second link is allowed only when no tunnel write is pending in the pair census AND Security has signed off what is still open. The census is now empty (#20369), but the switch
+// stays OFF while Security's items are open: #20405 (WebSocket upgrade rows, the refused-row cap), #20413 and the second-Hub sign-in. Lifting store.SecondLinkOpen is its own reviewed change, never made here:
+// when those are closed, change this test with that review.
 func TestSecondLinkSwitchStaysOffWhileAWriteIsPending(t *testing.T) {
 	raw, err := os.ReadFile("testdata/pair_census.golden")
 	require.NoError(t, err)
@@ -22,8 +23,9 @@ func TestSecondLinkSwitchStaysOffWhileAWriteIsPending(t *testing.T) {
 			pending++
 		}
 	}
-	if store.SecondLinkOpen {
-		assert.Zero(t, pending, "SecondLinkOpen is true while %d tunnel writes are still pending in pair_census.golden", pending)
+	if pending > 0 {
+		assert.False(t, store.SecondLinkOpen, "SecondLinkOpen is true while %d tunnel writes are still pending in pair_census.golden", pending)
 	}
-	assert.Positive(t, pending, "the census lists pending writes today; when it is empty, this test is the reminder to review lifting SecondLinkOpen")
+	openSecurityItems := []string{"#20405 (WebSocket upgrade rows, refused-row cap)", "#20413", "second-Hub sign-in"}
+	assert.False(t, store.SecondLinkOpen, "SecondLinkOpen must stay false while Security's items are open: %s", strings.Join(openSecurityItems, ", "))
 }
