@@ -113,13 +113,9 @@ async function syncSavedButtons(root) {
 }
 
 /** The Saved list changed (done, removed, saved elsewhere): forget what is known and repaint the buttons on screen. */
-export function savedChanged() {
-    sets.clear();
-    for (const root of watched()) syncSavedButtons(root);
-}
+export const savedChanged = () => { sets.clear(); watched().forEach(syncSavedButtons); };
 
-const WATCHED = ['live-history-messages', 'history-messages', 'mb-messages'];
-const watched = () => WATCHED.map(id => document.getElementById(id)).filter(Boolean);
+const watched = () => ['live-history-messages', 'history-messages', 'mb-messages'].map(id => document.getElementById(id)).filter(Boolean);
 
 let pending = new Set();
 function schedule(root) {
@@ -166,7 +162,7 @@ document.addEventListener('keydown', (e) => {
 
 // The Inbox's Saved folder shows how many are open; refreshed at start and whenever the list changes.
 let countTimer = 0;
-export function setSavedCount(n) { setInboxCount('saved', n); }
+export const setSavedCount = n => setInboxCount('saved', n);
 /** The number on the dock's Saved tab: the open items of the page's own scope (an agent or a team), where the Inbox's Saved folder counts everything. */
 export function setScopedCount(n) {
     const tc = document.getElementById('saved-tab-count');
@@ -175,7 +171,7 @@ export function setScopedCount(n) {
 /** The scope of the page on screen: the agent or the team its Saved list and count are of, or everything (saved_scope.js). */
 let wantAll = false;
 /** The Inbox's Saved folder is being opened: its Saved list is everything's even before the nav tab's switch has finished. */
-export function wantAllScope(on) { wantAll = !!on; }
+export const wantAllScope = on => { wantAll = !!on; };
 export function currentScope() {
     if (wantAll || savedViewShowing()) return ALL; // the Inbox page is the all scope whatever agent or team is behind it (#4905)
     const key = k => (k ? splitKey(k) : null);
