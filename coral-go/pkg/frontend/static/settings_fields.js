@@ -165,7 +165,7 @@ const AGENTS_FIELDS = host => [
     { key: 'nudge_claude_artifacts', type: 'toggle', id: 'settings-nudge-claude-artifacts', label: 'Coral artifact reminders', help: moreOnly('Asks an agent to publish to Coral when it publishes to claude.ai.', 'When an agent publishes to claude.ai, Coral types one note into its terminal asking for a Coral artifact instead (coral-agent artifact upload) and a link to it. Once per artifact; Coral never uploads or posts for the agent. When off, nothing is typed.') },
     { key: 'board_health_monitor', type: 'toggle', id: 'settings-board-health-monitor', label: 'Team health checks', help: 'Applies to every team; each team still turns its own check on in Team settings. Takes effect after Coral restarts.' }, // the operator's own sentence, kept on the screen (#8497)
     { key: 'agents_experimental', type: 'heading', id: 'settings-agents-experimental', label: 'Experimental' },
-    { key: 'gdoc_share', type: 'toggle', id: 'settings-gdoc-share', label: 'Share to Google (experimental)', help: moreOnly('Off until you turn it on: share a Markdown file to a Google Doc. Mac only.') },
+    { key: 'gdoc_share', type: 'toggle', id: 'settings-gdoc-share', label: 'Google sharing (experimental)', help: moreOnly('Off until you turn it on: share a Markdown file to a Google Doc. Mac only.') },
     { key: 'launch_in_worktree', type: 'toggle', id: 'settings-launch-in-worktree', label: 'Enable launch into git worktree (experimental)', help: moreOnly('Experimental, and off until you turn it on: a team can then be launched into its own git worktree.') },
     { key: 'agents_tools', type: 'heading', id: 'settings-agents-tools', label: 'Tools' },
     { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Skip Codex's review of Coral's hooks", help: helpLine('Turns off a safety check: Codex will not ask you to review Coral\'s hooks.', "Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on, Coral trusts its own hooks, and only those exact commands, for each Codex agent it launches, so the agent starts without that question; your own hooks, a repository's and a plugin's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") },
@@ -307,7 +307,7 @@ const HELP_LINES = {
     agent_low_priority: 'Keeps the dashboard quick while agents are busy.',
     board_auto_attach: 'Stores recent local images and Markdown documents so teammates can open them.',
     nudge_claude_artifacts: 'Reminds agents to publish shared files to Coral.',
-    launch_in_worktree: 'Uses an isolated checkout for each team. Experimental; off by default.',
+    launch_in_worktree: 'Isolated checkout per team. Experimental; off by default.',
     prune_days: 'Removes old saved diffs and unlinked artifacts after a preview.',
     retention_enabled: 'Deletes old saved diffs and unlinked artifacts automatically after a preview.',
     accounts: 'CLI sign-in.',

@@ -39,7 +39,7 @@ function hideAll() { show('settings-google-connect', false); show('settings-goog
 
 function render(st) {
     hideAll();
-    if (st.enabled === false) { setStatus('Turn on "Share to Google (experimental)" to use Google.'); return; }
+    if (st.enabled === false) { setStatus('Turn on "Google sharing (experimental)" to use Google.'); return; }
     if (!st.client_file_ok) {
         setStatus(st.client_file_set ? "Google sign-in isn't ready: the client file on this computer can't be used." : "Google sign-in isn't set up on this computer.");
         return;
@@ -68,7 +68,7 @@ export async function loadGoogle() {
             return null;
         }
     } catch { /* shown below */ }
-    show('settings-google', true);
+    show('settings-google', !st || st.enabled !== false); // the block is for people who turned the switch on: while it is off it adds no words to Storage (#20265)
     if (!st) { hideAll(); setStatus("Couldn't read the Google connection."); return null; }
     render(st);
     if (st.signin_pending) {
