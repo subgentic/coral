@@ -13,7 +13,7 @@
 import { copyText } from './utils.js';
 import { isSignedOut } from './overload.js';
 import { importOnce } from './import_once.js';
-const { morePermsWords, operatorLine, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
+const { morePermsWords, operatorLine, hubAddressLine, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
 export const { enrolledRetrying, rekeyText, describe } = await importOnce('./cloud_words.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH, HUB_RELAUNCH_OFF_AT_LAUNCH, HUB_RELAUNCH_OFF_TOAST_AT_LAUNCH } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
 
@@ -270,6 +270,8 @@ class CloudPanel {
                 if (w.warn) { const m = document.createElement('span'); m.className = 'settings-cloud-warn'; const i = document.createElement('span'); i.className = 'material-icons'; i.setAttribute('aria-hidden', 'true'); i.textContent = 'warning'; m.append(i, ' ' + w.warn); sum.append(m); }
             } else if (warn === null && w.warn) { /* unchanged */ }
         }
+        const addr = this.part('address-line');
+        if (addr) { const t = linked ? hubAddressLine(st) : ''; put(addr, t); addr.hidden = !t; }
         const line = this.part('operator-line');
         // Linked: the Operator's state, as it is. Not linked: only an opt-out that outlives the link is said, so it stays visible (Security's #6629 LOW 4).
         if (line) { const on = this.operatorOn === undefined ? null : this.operatorOn; const t = linked ? operatorLine(on) : (on === false ? operatorLine(false) : ''); put(line, t); line.hidden = !t; }
