@@ -22,17 +22,19 @@ const BASE = require('./test_base').BASE;
       window.__until=(cond,ms=3000)=>new Promise(res=>{const end=Date.now()+ms;(function f(){let ok=false;try{ok=!!cond()}catch{}ok||Date.now()>end?res(ok):setTimeout(f,10)})()});})()`);
     const uri = 'coral://artifacts/a7cfde2b2f1a96d3a9086c715ff5c04afbcb3823daa611dd642fb377e2b23f44';
     const result = await ev(`(async()=>{
-      const real=window.fetch; window.__artifactReads=0;
+      const real=window.fetch; window.__artifactReads=0; window.__artifactOpened=0;
       window.fetch=async (url,opts)=>{
         if(!String(url).includes('/api/artifacts/')) return real(url,opts);
+        if(String(url).endsWith('/opened')) { window.__artifactOpened++; return new Response('{}',{status:200}); } // the opened-version record (#20190) is not a read of the file
         return new Response(new ReadableStream({start(){window.__artifactReads++}}),{status:200,headers:{'Content-Type':'application/zip','Content-Length':'6096917','Content-Disposition':'inline; filename="final-ember-accord-acceptance.zip"'}});
       };
       window.openFilePreview(${JSON.stringify(uri)}); await window.__until(()=>/binary artifact/.test(document.querySelector('#preview-body')?.textContent||''));
-      return {text:document.querySelector('#preview-body')?.textContent||'',link:document.querySelector('#preview-body a')?.getAttribute('download')||'',reads:window.__artifactReads};
+      return {text:document.querySelector('#preview-body')?.textContent||'',link:document.querySelector('#preview-body a')?.getAttribute('download')||'',reads:window.__artifactReads,opened:window.__artifactOpened};
     })()`);
     assert.match(result.text, /binary artifact is not rendered inline/);
     assert.equal(result.link, '');
     assert.equal(result.reads, 1);
+    assert.equal(result.opened, 1, 'opening the file records its opened version once');
     await ev(`window.__closePreview()`);
     const markdown = await ev(`(async()=>{
       window.fetch=async()=>new Response('# Safe preview\\n\\nThis is markdown.',{status:200,headers:{'Content-Type':'text/markdown','Content-Length':'25','Content-Disposition':'inline; filename="report.md"'}});
@@ -48,11 +50,12 @@ const BASE = require('./test_base').BASE;
       const missing='coral://artifacts/c7cfde2b2f1a96d3a9086c715ff5c04afbcb3823daa611dd642fb377e2b23f44';
       const childImage='coral://artifacts/d7cfde2b2f1a96d3a9086c715ff5c04afbcb3823daa611dd642fb377e2b23f44';
       const payload=JSON.stringify([{name:'<unsafe>.md',uri:childMd,media_type:'text/markdown'},{name:'missing.txt',uri:missing,media_type:'text/plain'},{name:'journey.png',uri:childImage,media_type:'image/png'}]);
-      window.__manifestFetches=0;
+      window.__manifestFetches=0; window.__manifestOpened=0;
       window.fetch=async (url)=>{
         const u=String(url);
         // Count artifact reads only: a background poll landing here must not move the count.
-        if(u.includes('/api/artifacts/')) window.__manifestFetches++;
+        // The opened-version record (#20190) is its own POST, counted apart: it is not a read of the manifest.
+        if(u.endsWith('/opened')) window.__manifestOpened++; else if(u.includes('/api/artifacts/')) window.__manifestFetches++;
         if(u.includes(manifestUri.slice(-64))) return new Response(payload,{status:200,headers:{'Content-Type':'application/json','Content-Disposition':'inline; filename="qa-manifest.json"'}});
         if(u.includes(childMd.slice(-64))) return new Response('# Child report',{status:200,headers:{'Content-Type':'text/markdown','Content-Disposition':'inline; filename="child.md"'}});
         return new Response('missing',{status:404});
@@ -61,7 +64,7 @@ const BASE = require('./test_base').BASE;
       const links=[...document.querySelectorAll('.artifact-manifest-download')];
       links.forEach(a=>a.addEventListener('click',e=>e.preventDefault(),{once:true}));
       links[0].click(); links[2].click();
-      const list={names:[...document.querySelectorAll('.artifact-manifest-name')].map(e=>e.textContent),hasUnsafeMarkup:!!document.querySelector('.artifact-manifest-list img'),rawButton:!!document.querySelector('.artifact-manifest-raw'),downloadNames:links.map(e=>e.download),downloadHrefs:links.map(e=>e.getAttribute('href')),fetchesAfterDownloads:window.__manifestFetches};
+      const list={names:[...document.querySelectorAll('.artifact-manifest-name')].map(e=>e.textContent),hasUnsafeMarkup:!!document.querySelector('.artifact-manifest-list img'),rawButton:!!document.querySelector('.artifact-manifest-raw'),downloadNames:links.map(e=>e.download),downloadHrefs:links.map(e=>e.getAttribute('href')),fetchesAfterDownloads:window.__manifestFetches,openedPosts:window.__manifestOpened};
       // A tab opened by single click is a replaceable 'preview' tab; pin the collection (double-click) so the entry opens beside it.
       document.querySelector('.preview-tab').dispatchEvent(new MouseEvent('dblclick',{bubbles:true})); await new Promise(r=>setTimeout(r,40));
       document.querySelector('.artifact-manifest-open').click(); await window.__until(()=>document.querySelectorAll('.preview-tab').length>=2&&document.querySelector('#preview-body h1'));
@@ -80,7 +83,8 @@ const BASE = require('./test_base').BASE;
     assert.equal(manifest.list.rawButton,true);
     assert.deepEqual(manifest.list.downloadNames,['<unsafe>.md','missing.txt','journey.png']);
     assert.equal(manifest.list.downloadHrefs[2].startsWith('/api/artifacts/'),true);
-    assert.equal(manifest.list.fetchesAfterDownloads,1);
+    assert.equal(manifest.list.fetchesAfterDownloads,1,'the manifest is read once');
+    assert.equal(manifest.list.openedPosts,1,'opening it records its opened version once');
     assert.equal(manifest.child.heading,'Child report');
     assert.equal(manifest.tabsAfterOpen,2,'the entry opens as its own tab and the collection stays open');
     assert.equal(manifest.returnedToManifest,true);
