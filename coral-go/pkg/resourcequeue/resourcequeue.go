@@ -476,6 +476,30 @@ func (q *Queue) Renew(key, agent string) (Entry, error) {
 	return *e, q.save()
 }
 
+// WaitingFor reports whether agent has a queued (not yet granted) entry on key, and its id (0 when none): what a release is about to cancel, and what a claim that keeps polling still has.
+func (q *Queue) WaitingFor(key, agent string) (int64, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if _, ok := q.res[key]; !ok {
+		return 0, false
+	}
+	if e := q.entryFor(key, agent); e != nil && e.Waiting() {
+		return e.ID, true
+	}
+	return 0, false
+}
+
+// HasEntry reports whether agent still has the entry with this id on key, waiting or holding: a wait that polls asks, so that a release or a kick that ended its place ends the wait instead of queueing it again (#20345).
+func (q *Queue) HasEntry(key, agent string, id int64) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if _, ok := q.res[key]; !ok {
+		return false
+	}
+	e := q.entryFor(key, agent)
+	return e != nil && e.ID == id
+}
+
 // Release gives up a slot, or leaves the line; the next in line is granted.
 func (q *Queue) Release(key, agent string) error { return q.ReleaseWhy(key, agent, "released") }
 

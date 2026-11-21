@@ -27,6 +27,7 @@ type resStub struct {
 	lease    string // the granted entry's lease_until, when set (#18488)
 	how      string // the answer to GET /api/resources/<name> when set (#17560)
 	entry    string // the granted entry's JSON, when set (#20221: where it runs)
+	goneAt   int    // from this claim on, a claim that names its place (poll_entry) is answered 410 cancelled (#20345)
 }
 
 func (s *resStub) handler(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +45,11 @@ func (s *resStub) handler(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasSuffix(r.URL.Path, "/claim") {
 		s.claims++
+		if _, polling := body["poll_entry"]; polling && s.goneAt > 0 && s.claims >= s.goneAt {
+			w.WriteHeader(http.StatusGone)
+			w.Write([]byte(`{"code":"cancelled","error":"your place in line was cancelled"}`))
+			return
+		}
 		if s.claims >= s.grantAt {
 			if s.entry != "" {
 				w.Write([]byte(`{"granted":true,"place":0,"entry":` + s.entry + `}`))
@@ -381,5 +387,52 @@ func TestAClaimWithRunAndNoCommandIsRefusedBeforeAnythingIsClaimed(t *testing.T)
 		if strings.HasSuffix(r, "/claim") {
 			t.Fatalf("a claim was made with nothing to run: %v", s.reqs)
 		}
+	}
+}
+
+// #20345: a claim --wait whose place was released or removed while it waited stops, says so and runs nothing; it does not queue again and run later.
+func TestResourceClaimWaitStopsWhenItsPlaceWasCancelled(t *testing.T) {
+	prev := resourcePoll
+	resourcePoll = 5 * time.Millisecond
+	defer func() { resourcePoll = prev }()
+	s := &resStub{grantAt: 9999, goneAt: 3}
+	out, exited := runResource(t, s, "claim", "mac-heavy", "--wait", "--run", "--", "echo", "should-not-run")
+	if !exited {
+		t.Fatal("did not exit")
+	}
+	if strings.Contains(out, "Your turn") || strings.Contains(out, "should-not-run") {
+		t.Fatalf("a cancelled wait must not run: %q", out)
+	}
+	if s.claims != 3 {
+		t.Fatalf("claims after the cancel: %d (want 3: the first, one look, the cancelled one)", s.claims)
+	}
+	var claimBodies []map[string]any
+	for i, r := range s.reqs {
+		if r == "POST /api/resources/mac-heavy/claim" {
+			claimBodies = append(claimBodies, s.bodies[i])
+		}
+	}
+	if len(claimBodies) != 3 {
+		t.Fatalf("claim requests: %v", s.reqs)
+	}
+	if _, first := claimBodies[0]["poll_entry"]; first {
+		t.Fatalf("the first claim names no place: %v", claimBodies[0])
+	}
+	if id, _ := claimBodies[1]["poll_entry"].(float64); id != 1 {
+		t.Fatalf("a look names the place the first claim queued, body: %v", claimBodies[1])
+	}
+}
+
+// #20345: releasing a place that was only queued says so.
+func TestResourceReleaseOfAQueuedPlaceSaysItWasCancelled(t *testing.T) {
+	s := &resStub{status: 200, respText: `{"ok":true,"left_line":true}`}
+	out, exited := runResource(t, s, "release", "mac-heavy")
+	if exited || !strings.Contains(out, "Left the line for mac-heavy") || !strings.Contains(out, "stops without running") {
+		t.Fatalf("exited=%v out=%q", exited, out)
+	}
+	s = &resStub{status: 200, respText: `{"ok":true,"left_line":false}`}
+	out, exited = runResource(t, s, "release", "mac-heavy")
+	if exited || !strings.Contains(out, "Released mac-heavy.") {
+		t.Fatalf("a held slot is released as before: exited=%v out=%q", exited, out)
 	}
 }

@@ -362,6 +362,7 @@ func resourceClaim(rest []string) {
 		Granted bool `json:"granted"`
 		Place   int  `json:"place"`
 		Entry   struct {
+			ID         int64  `json:"id"`
 			Member     string `json:"member"`
 			Machine    string `json:"machine"`
 			Where      string `json:"where"`
@@ -389,9 +390,17 @@ func resourceClaim(rest []string) {
 		until = time.Now().Add(*timeout)
 	}
 	last := res.Place
+	if res.Entry.ID > 0 {
+		body["poll_entry"] = res.Entry.ID // the place this wait queued: if it is released or kicked, the wait ends instead of queueing again (#20345)
+	}
 	for {
 		time.Sleep(resourcePoll) // sleep-ok: the poll between looks at the line while waiting for a turn
 		data, status, err = resourceCall("POST", "/"+name+"/claim", body)
+		if status == http.StatusGone {
+			fmt.Fprintln(os.Stderr, "Your place in line for "+plainText(rest[0])+" was cancelled (released or removed): nothing was claimed and the command was not run.")
+			exitFn(4)
+			return
+		}
 		if err != nil || (status != http.StatusOK && status != http.StatusAccepted) {
 			resourceFail("Lost the place in line for "+rest[0], err, status, data)
 			return
@@ -501,6 +510,14 @@ func resourceSimple(what string, rest []string) {
 		return
 	}
 	if what == "release" {
+		var out struct {
+			LeftLine bool `json:"left_line"`
+		}
+		_ = json.Unmarshal(data, &out)
+		if out.LeftLine {
+			fmt.Println("Left the line for " + rest[0] + ": your queued claim was cancelled, and a claim --wait still waiting for it stops without running its command.")
+			return
+		}
 		fmt.Println("Released " + rest[0] + ".")
 	} else {
 		fmt.Println("Lease on " + rest[0] + " renewed.")
