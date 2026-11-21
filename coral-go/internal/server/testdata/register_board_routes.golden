@@ -4,6 +4,7 @@ DELETE /api/board/{project}/artifacts/{id}/review | (*BoardHandler).UnmarkArtifa
 DELETE /api/board/{project}/cross-team-links | (*BoardHandler).RemoveLocalLinks-fm
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | (*BoardHandler).RemoveGroupMember-fm
 DELETE /api/board/{project}/health/checks/{name} | (*BoardHandler).RemoveHealthCheckRoute-fm
+DELETE /api/board/{project}/member-grants/{id} | (*BoardHandler).RevokeMemberGrant-fm
 DELETE /api/board/{project}/messages/{messageID} | (*BoardHandler).DeleteMessage-fm
 DELETE /api/board/{project}/reminder | (*BoardHandler).RemindSubscriber-fm
 DELETE /api/board/{project}/seats/{subscriberID} | (*BoardHandler).RemoveSeat-fm
@@ -38,6 +39,7 @@ GET /api/board/{project}/guide-roster | (*BoardHandler).GuideRoster-fm
 GET /api/board/{project}/health/checks | (*BoardHandler).ListHealthChecksRoute-fm
 GET /api/board/{project}/health/settings | (*BoardHandler).GetHealthSettings-fm
 GET /api/board/{project}/lifecycle-log | (*SessionsHandler).LifecycleLog-fm
+GET /api/board/{project}/member-grants | (*BoardHandler).MemberGrants-fm
 GET /api/board/{project}/messages | (*BoardHandler).ReadMessages-fm
 GET /api/board/{project}/messages/all | (*BoardHandler).ListAllMessages-fm
 GET /api/board/{project}/messages/check | (*BoardHandler).CheckUnread-fm
@@ -110,6 +112,7 @@ POST /api/board/{project}/health/ack | (*BoardHandler).AckHealthItem-fm
 POST /api/board/{project}/health/checks | (*BoardHandler).AddHealthCheckRoute-fm
 POST /api/board/{project}/health/checks/{name}/pause | (*BoardHandler).PauseHealthCheckRoute-fm
 POST /api/board/{project}/hub-notice | (*BoardHandler).PostHubNotice-fm
+POST /api/board/{project}/member-grants | (*BoardHandler).MemberGrants-fm
 POST /api/board/{project}/messages | (*BoardHandler).PostMessage-fm
 POST /api/board/{project}/messages/mark-read | (*BoardHandler).MarkRead-fm
 POST /api/board/{project}/operator-artifacts | (*BoardHandler).UploadOperatorArtifact-fm
