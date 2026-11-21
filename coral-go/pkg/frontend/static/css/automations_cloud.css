@@ -1,11 +1,8 @@
 .cloud-automations { padding: 16px; min-width: 0; }
-.cloud-automation-picker { display: flex; align-items: center; gap: 8px; margin-inline-start: auto; }
-.cloud-automation-picker select { max-width: min(18rem, 65vw); }
 .cloud-automation-content { min-width: 0; overflow-wrap: anywhere; }
 .cloud-automation-facts { grid-template-columns: minmax(8rem, 1fr) 3fr; gap: 8px 16px; }
 .cloud-automation-facts dd { margin: 0; min-width: 0; }
 @media (max-width: 600px) {
-    .cloud-automation-picker { width: 100%; margin-inline-start: 0; }
     .cloud-automation-facts { grid-template-columns: 1fr; gap: 4px; }
     .cloud-automation-facts dd { margin-bottom: 8px; }
 }

@@ -37,6 +37,7 @@ const { coralReady } = require('./helpers/wait');
             // 7.2.4: By computer has loaded, and localStorage holds none of it
             assert.equal(await ev(`localStorage.getItem('coral-by-computer')`), null, `${tag}: no coral-by-computer key in cloud`);
             // the Computer picker is on the page, and a pick moves the reads to that computer
+            await waitFor(`!!document.querySelector('#cost-computer-pick .computer-bar-option')`, `${tag}: the computer bar is drawn`, 10000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-computer-pick .computer-bar-option')].map(o => o.dataset.computer)`), ['m1', 'm2'], `${tag}: the Computer picker names the linked computers`);
             await shot(`analytics-cloud-overview-${w}`);
             // 7.2.3: the four closed views are not listed, and their addresses open Overview

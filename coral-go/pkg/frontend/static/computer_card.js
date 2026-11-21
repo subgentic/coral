@@ -17,7 +17,7 @@ const openComputers = id => () => go(id ? { view: 'servers', id } : { view: 'ser
  *  what names the thing that could not be read ('automations'); detail is the support line; retry re-reads; barId is the page's computer bar. */
 export function computerCard({ state, server, what, detail = '', retry, barId, onAll }) {
     const name = machineLabel(server), card = node('section', 'computer-card');
-    card.dataset.computerCard = state; card.setAttribute('role', 'status');
+    card.setAttribute('data-computer-card', state); card.setAttribute('role', 'status');
     let headline, why, actions = [];
     if (state === 'offline') {
         const seen = machineSeen(server);

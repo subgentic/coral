@@ -9,7 +9,7 @@ const { formatLastSeen } = await importOnce('./server_status.js');
 
 export const ALL_COMPUTERS = 'all';
 const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-const dotOf = id => { const d = node('span', 'computer-dot'); d.dataset.computerState = machineOnline(id) ? 'online' : 'offline'; d.setAttribute('aria-hidden', 'true'); return d; };
+const dotOf = id => { const d = node('span', 'computer-dot'); d.setAttribute('data-computer-state', machineOnline(id) ? 'online' : 'offline'); d.setAttribute('aria-hidden', 'true'); return d; };
 const nameOf = id => id === ALL_COMPUTERS ? 'All computers' : !id ? '' : machineLabel(id);
 const seenText = id => machineOnline(id) ? 'Online' : `Offline · last seen ${formatLastSeen(machineSeen(id))}`;
 
@@ -18,12 +18,12 @@ export function computerBar({ choices, current, all = false, onPick, id = '', em
     const root = node('div', 'computer-bar');
     if (id) root.id = id;
     const label = node('span', 'computer-bar-label', 'Computer');
-    const button = node('button', 'computer-bar-button'); button.type = 'button';
+    const button = node('button', 'btn computer-bar-button'); button.type = 'button';
     button.setAttribute('aria-haspopup', 'listbox'); button.setAttribute('aria-expanded', 'false'); button.setAttribute('aria-label', `Computer: ${nameOf(current) || emptyText}`);
     if (current && current !== ALL_COMPUTERS) button.append(dotOf(current));
     button.append(node('span', 'computer-bar-name', nameOf(current) || emptyText));
     if (!choices.some(machineOnline) && !current) button.disabled = true;
-    if (current && current !== ALL_COMPUTERS && !machineOnline(current)) button.append(node('span', 'computer-chip', 'Offline'));
+    if (current && current !== ALL_COMPUTERS && !machineOnline(current)) button.append(node('span', 'chip computer-chip', 'Offline'));
     button.append(node('span', 'computer-bar-caret'));
     const list = node('div', 'computer-bar-list'); list.setAttribute('role', 'listbox'); list.hidden = true;
     const online = choices.filter(machineOnline), offline = choices.filter(c => !machineOnline(c));
@@ -35,7 +35,7 @@ export function computerBar({ choices, current, all = false, onPick, id = '', em
         const text = node('span', 'computer-bar-text'); text.append(node('span', 'computer-bar-title', nameOf(cid)));
         text.append(node('span', 'computer-bar-sub', cid === ALL_COMPUTERS ? `${choices.length} linked · ${offline.length} offline` : seenText(cid)));
         o.append(text);
-        if (cid !== ALL_COMPUTERS && !machineOnline(cid)) o.append(node('span', 'computer-chip', 'Offline'));
+        if (cid !== ALL_COMPUTERS && !machineOnline(cid)) o.append(node('span', 'chip computer-chip', 'Offline'));
         o.addEventListener('click', () => { close(); if (cid !== current) onPick(cid); });
         options.push(o); return o;
     };
@@ -47,9 +47,10 @@ export function computerBar({ choices, current, all = false, onPick, id = '', em
     const outside = e => { if (!root.contains(e.target)) close(); };
     function open() { list.hidden = false; button.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); (options.find(o => o.getAttribute('aria-selected') === 'true') || options[0])?.focus(); }
     button.addEventListener('click', () => list.hidden ? open() : close(true));
+    const neighbour = step => options[(options.indexOf(document.activeElement) + step + options.length) % options.length];
     root.addEventListener('keydown', e => {
         if (e.key === 'Escape' && !list.hidden) { e.stopPropagation(); close(true); return; }
-        if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !list.hidden) { e.preventDefault(); const i = options.indexOf(document.activeElement), step = e.key === 'ArrowDown' ? 1 : -1; options[(i + step + options.length) % options.length]?.focus(); }
+        if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !list.hidden) { e.preventDefault(); neighbour(e.key === 'ArrowDown' ? 1 : -1)?.focus(); }
     });
     root.append(label, button, list);
     return root;
