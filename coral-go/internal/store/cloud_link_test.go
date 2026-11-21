@@ -13,21 +13,21 @@ import (
 // #20201 (multi-Hub slice 1): a link's key is its canonical origin, so two spellings of one Hub are one key and an address that names no Hub is no key.
 func TestCanonicalHubOriginIsOneKeyPerHub(t *testing.T) {
 	for in, want := range map[string]string{
-		"https://hub.example.com":             "https://hub.example.com",
-		"https://Hub.Example.COM/":            "https://hub.example.com",
-		"https://hub.example.com./path?x=1#f": "https://hub.example.com",
-		"https://hub.example.com:443":         "https://hub.example.com",
-		"https://hub.example.com:8443":        "https://hub.example.com:8443",
-		"https://bücher.example":              "https://xn--bcher-kva.example",
-		"http://127.0.0.1:8420/":              "http://127.0.0.1:8420",
-		"http://localhost":                    "http://localhost",
-		"http://[::1]:9":                      "http://[::1]:9",
+		"https://hub.example.com":      "https://hub.example.com",
+		"https://Hub.Example.COM/":     "https://hub.example.com",
+		"https://hub.example.com./":    "https://hub.example.com",
+		"https://hub.example.com:443":  "https://hub.example.com",
+		"https://hub.example.com:8443": "https://hub.example.com:8443",
+		"https://bücher.example":       "https://xn--bcher-kva.example",
+		"http://127.0.0.1:8420/":       "http://127.0.0.1:8420",
+		"http://localhost":             "http://localhost",
+		"http://[::1]:9":               "http://[::1]:9",
 	} {
 		got, err := CanonicalHubOrigin(in)
 		require.NoError(t, err, in)
 		assert.Equal(t, want, got, in)
 	}
-	for _, bad := range []string{"", "hub.example.com", "http://hub.example.com", "ftp://hub.example.com", "https://user:pw@hub.example.com", "https://", "https://exa mple.com", "https://hub.example.com:99999x"} {
+	for _, bad := range []string{"https://hub.example.com/path", "https://hub.example.com/a/", "https://hub.example.com?x=1", "https://hub.example.com/?", "https://hub.example.com#f", "https://hub.example.com/#f", "", "hub.example.com", "http://hub.example.com", "ftp://hub.example.com", "https://user:pw@hub.example.com", "https://", "https://exa mple.com", "https://hub.example.com:99999x"} {
 		_, err := CanonicalHubOrigin(bad)
 		assert.Error(t, err, "%q is not a link key", bad)
 	}
@@ -70,11 +70,13 @@ func TestSavingAnEnrollmentMakesOneLinkWithItsOwnSealedToken(t *testing.T) {
 	assert.Error(t, err, "bound to the link, not to the old enrollment's AAD")
 
 	// A link found by any spelling of its address.
-	got, err := cs.LinkByOrigin(ctx, "https://hub.example.com:443/x")
+	got, err := cs.LinkByOrigin(ctx, "https://HUB.example.com:443/")
 	require.NoError(t, err)
 	assert.Equal(t, l.LinkID, got.LinkID)
 	_, err = cs.LinkByOrigin(ctx, "https://other.example.com")
 	assert.ErrorIs(t, err, ErrNoCloudLink)
+	_, err = cs.LinkByOrigin(ctx, "https://hub.example.com/some/path")
+	assert.ErrorIs(t, err, ErrNoCloudLink, "an address with a path names no link")
 
 	// The same Hub enrolled again is a new link with the new token.
 	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "tok-two"))
@@ -207,4 +209,28 @@ func TestAnEnrollmentWithNoUsableOriginMakesNoLink(t *testing.T) {
 	assert.Error(t, cs.MirrorLegacyLink(ctx))
 	_, err := cs.Get(ctx)
 	assert.NoError(t, err, "Coral keeps the enrollment")
+}
+
+// Security's SHOULD on #20201: forgetting the enrollment and its link is one transaction, so a failure leaves both, never a link and token after a disconnect.
+func TestDeleteIsOneTransaction(t *testing.T) {
+	rs, db, _, _ := newRemoteStore(t)
+	cs := NewCloudStore(db, rs)
+	ctx := context.Background()
+	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "tok"))
+	_, err := db.ExecContext(ctx, "CREATE TRIGGER refuse_link_delete BEFORE DELETE ON cloud_link BEGIN SELECT RAISE(ABORT, 'refused'); END")
+	require.NoError(t, err)
+
+	require.Error(t, cs.Delete(ctx))
+	_, err = cs.Get(ctx)
+	assert.NoError(t, err, "the enrollment is still there: the delete rolled back")
+	links, _ := cs.ListLinks(ctx)
+	assert.Len(t, links, 1)
+
+	_, err = db.ExecContext(ctx, "DROP TRIGGER refuse_link_delete")
+	require.NoError(t, err)
+	require.NoError(t, cs.Delete(ctx))
+	_, err = cs.Get(ctx)
+	assert.ErrorIs(t, err, ErrNoCloudConnection)
+	links, _ = cs.ListLinks(ctx)
+	assert.Empty(t, links)
 }
