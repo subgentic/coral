@@ -212,6 +212,7 @@ func (h *BoardHandler) AddHealthCheckRoute(w http.ResponseWriter, r *http.Reques
 		checkErr(w, err)
 		return
 	}
+	h.askCheckApproval(r.Context(), project, c)
 	writeJSON(w, http.StatusOK, viewOf(c))
 }
 
@@ -253,6 +254,9 @@ func (h *BoardHandler) ChangeHealthCheckRoute(w http.ResponseWriter, r *http.Req
 			return
 		}
 	}
+	if c.State == board.CheckPending && c.RecordHash() != before.RecordHash() {
+		h.askCheckApproval(r.Context(), project, c)
+	}
 	writeJSON(w, http.StatusOK, viewOf(c))
 }
 
@@ -285,6 +289,11 @@ func (h *BoardHandler) PauseHealthCheckRoute(w http.ResponseWriter, r *http.Requ
 		checkErr(w, err)
 		return
 	}
+	if !*b.Paused && c.State == board.CheckPending {
+		if ids, _ := h.bs.OpenCheckApprovalAsks(r.Context(), project, name); len(ids) == 0 {
+			h.askCheckApproval(r.Context(), project, c)
+		}
+	}
 	writeJSON(w, http.StatusOK, viewOf(c))
 }
 
@@ -299,6 +308,7 @@ func (h *BoardHandler) RemoveHealthCheckRoute(w http.ResponseWriter, r *http.Req
 		checkErr(w, err)
 		return
 	}
+	h.closeCheckApprovalAsks(r.Context(), project, name, "the check was removed")
 	if err := h.revokeCheck(r.Context(), project, name); err != nil {
 		errInternalServer(w, "the check is removed, but its live tokens could not be ended")
 		return
