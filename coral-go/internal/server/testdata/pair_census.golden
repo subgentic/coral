@@ -13,6 +13,8 @@ DELETE /api/saved/{id} recorded
 DELETE /api/sessions/live/{name}/held/{id} recorded
 DELETE /api/sessions/live/{name}/notes/{noteID} recorded
 DELETE /api/sessions/live/{name}/tasks/{taskID} recorded
+GET /ws/coral recorded
+GET /ws/terminal/{name} recorded
 PATCH /api/artifacts/{id}/comments/{cid} recorded
 PATCH /api/board/{project}/goals/{goalID} recorded
 PATCH /api/board/{project}/tasks/{taskID} recorded

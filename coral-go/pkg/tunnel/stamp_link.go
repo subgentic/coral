@@ -38,3 +38,12 @@ func stampActor(out http.Header, h Header, method string) {
 	}
 	out.Set(ActorHeader, h.HubUser)
 }
+
+// stampActorWS sets ActorHeader on a WebSocket upgrade from the stream's own HubUser, after removing whatever the request carried (#20405). An upgrade is a GET and stampActor leaves a GET with no actor, but a
+// terminal stream carries keystrokes: the computer records the (link, Hub person) pair at connect and at close, and the person can only come from here. It is attribution only, as for a write.
+func stampActorWS(out http.Header, h Header) {
+	out.Del(ActorHeader)
+	if ValidHubUser(h.HubUser) {
+		out.Set(ActorHeader, h.HubUser)
+	}
+}

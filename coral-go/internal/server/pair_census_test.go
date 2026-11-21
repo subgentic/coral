@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,9 @@ func init() {
 	for route := range pairRecordedRoutes {
 		pairProven[route] = "TestPairRecordedRoutesRecordThePairThroughTheRealConnector"
 	}
+	for route := range pairUpgradeRoutes {
+		pairProven[route] = "TestPairUpgradeRoutesRecordThePairAtConnectAndClose"
+	}
 }
 
 func TestEveryTunnelWriteRouteRecordsThePairOrIsListedPending(t *testing.T) {
@@ -43,7 +47,8 @@ func TestEveryTunnelWriteRouteRecordsThePairOrIsListedPending(t *testing.T) {
 	for _, rt := range registeredRoutes(t) {
 		method, route, _ := strings.Cut(rt, " ")
 		registered[method+" "+route] = true
-		if method == "GET" || method == "HEAD" || method == "OPTIONS" || (!strings.HasPrefix(route, "/api/") && !strings.HasPrefix(route, "/ws/")) {
+		upgrade := method == "GET" && strings.HasPrefix(route, "/ws/") // a WebSocket upgrade is a GET that can carry input (#20405): listed like a write
+		if (method == "GET" && !upgrade) || method == "HEAD" || method == "OPTIONS" || (!strings.HasPrefix(route, "/api/") && !strings.HasPrefix(route, "/ws/")) {
 			continue
 		}
 		if tunnel.Classify(method, concrete(route), "") == tunnel.TierNever {
@@ -113,6 +118,49 @@ func TestPairRecordedRoutesRecordThePairThroughTheRealConnector(t *testing.T) {
 	assert.Equal(t, before, len(count()), "a local write leaves no pair row")
 }
 
+// A WebSocket upgrade carries terminal input and agent control after the handshake (#20405): each route in pairUpgradeRoutes, opened through the real connector by the Hub's owner, leaves a WS-OPEN row at
+// connect and a WS-CLOSE row at close, each with the pattern, the link and the person, and nothing from the request (path, query, frames).
+func TestPairUpgradeRoutesRecordThePairAtConnectAndClose(t *testing.T) {
+	g := newInteg(t)
+	ctx := tunnel.WithHubRole(tunnel.WithHubUser(context.Background(), integOwner), "owner")
+	rowsFor := func(pattern string) (open, closed []board.HubOperatorAction) {
+		acts, err := g.srv.boardStore.RecentHubOperatorActions(context.Background(), 1000)
+		require.NoError(t, err)
+		for _, a := range acts {
+			if a.Path != pattern {
+				continue
+			}
+			switch a.Method {
+			case routes.PairWSOpen:
+				open = append(open, a)
+			case routes.PairWSClose:
+				closed = append(closed, a)
+			}
+		}
+		return
+	}
+	for route := range pairUpgradeRoutes {
+		_, pattern, _ := strings.Cut(route, " ")
+		conn, err := g.sess.DialWS(ctx, pairConcretePath(pattern), "", nil)
+		if err == nil {
+			open, _ := rowsFor(pattern)
+			require.Len(t, open, 1, "%s: a row at connect, while the stream is open", route)
+			conn.CloseNow()
+		}
+		require.Eventually(t, func() bool { o, c := rowsFor(pattern); return len(o) == 1 && len(c) == 1 }, 5*time.Second, 20*time.Millisecond, "%s: a row at connect and one at close (dial error: %v)", route, err)
+		open, closed := rowsFor(pattern)
+		for _, a := range append(open, closed...) {
+			assert.Equal(t, testLinkID, a.ViaLink, route)
+			assert.Equal(t, integOwner, a.ViaHubUser, route)
+			assert.Equal(t, board.HubActionKindWrite, a.Kind, route)
+			assert.NotContains(t, a.Path+a.Project+a.HubUser, "SENTINEL", route)
+		}
+	}
+	// a path that matches no route is never silent either
+	_, err := g.sess.DialWS(ctx, "/ws/nosuch/SENTINEL", "", nil)
+	require.Error(t, err)
+}
+
 // Security's MUST on batch 3 (#20369): the pattern is the one chi routed by (RawPath, the Hub's encoded path), never the decoded path, and a write that matches no route still leaves a row.
 func TestPairRowsFollowTheRoutedPatternAndNeverGoSilent(t *testing.T) {
 	g := newInteg(t)
@@ -157,7 +205,7 @@ func TestPairRowsUseRawPathWhenAGuardRefusesBeforeRouting(t *testing.T) {
 	// a global guard that refuses before routing, with the wrapper in front of it as in the router
 	outer := chi.NewRouter()
 	outer.Use(stamp)
-	outer.Use(routes.RecordPairWrites(g.srv.boardStore, set, mux))
+	outer.Use(routes.RecordPairWrites(g.srv.boardStore, set, nil, mux))
 	outer.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "no", http.StatusForbidden) })
 	})
