@@ -58,7 +58,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	r.Use(httputil.GzipAPI)     // /api/ JSON over 1 KB, gzipped for a client that accepts it (#3724)
 	r.Use(noStoreAPI)
 	r.Use(s.buildHeader)
-	if routerTestWrap != nil { // nil outside tests (router_link_test_seam.go)
+	if routerTestWrap != nil { // nil outside tests (router_link_seam.go)
 		r.Use(routerTestWrap(s.db))
 	}
 
