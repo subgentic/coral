@@ -186,3 +186,44 @@ func TestHubOperatorActionsTableGainsTheLinkColumnsOnUpgrade(t *testing.T) {
 		s.Close()
 	}
 }
+
+// #20369, Security's condition: a flood of write rows never evicts the security rows (the switch, device-key and cloud rows, kind ""), and each kind keeps its own newest hubOperatorActionsKept.
+func TestWriteRowsNeverEvictSecurityRows(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, p := range []string{"/api/device-keys/message", "/api/cloud/cross-team-links", "/api/board/{project}/cross-team/enable"} {
+		require.NoError(t, s.RecordHubOperatorAction(ctx, HubOperatorAction{HubUser: "hub-user-1234abcd", Method: "POST", Path: p, Status: 200}))
+	}
+	for i := 0; i < hubOperatorActionsKept+500; i++ {
+		require.NoError(t, s.RecordHubOperatorAction(ctx, HubOperatorAction{HubUser: "hub-user-1234abcd", Kind: HubActionKindWrite, Method: "POST", Path: "/api/saved", Status: 200}))
+	}
+	all, err := s.RecentHubOperatorActions(ctx, 5000)
+	require.NoError(t, err)
+	var security, writes int
+	for _, a := range all {
+		if a.Kind == "" {
+			security++
+		} else {
+			assert.Equal(t, HubActionKindWrite, a.Kind)
+			writes++
+		}
+	}
+	assert.Equal(t, 3, security, "every security row is still there after 1500 write rows")
+	assert.Equal(t, hubOperatorActionsKept, writes, "the write rows keep their own newest bound")
+	// and the other way: a flood of security rows keeps its own bound and leaves the writes
+	for i := 0; i < hubOperatorActionsKept+10; i++ {
+		require.NoError(t, s.RecordHubOperatorAction(ctx, HubOperatorAction{HubUser: "hub-user-1234abcd", Method: "POST", Path: "/api/device-keys/message", Status: 200}))
+	}
+	all, err = s.RecentHubOperatorActions(ctx, 5000)
+	require.NoError(t, err)
+	security, writes = 0, 0
+	for _, a := range all {
+		if a.Kind == "" {
+			security++
+		} else {
+			writes++
+		}
+	}
+	assert.Equal(t, hubOperatorActionsKept, security)
+	assert.Equal(t, hubOperatorActionsKept, writes)
+}

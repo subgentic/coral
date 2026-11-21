@@ -94,6 +94,9 @@ func TestPairRecordedRoutesRecordThePairThroughTheRealConnector(t *testing.T) {
 			}
 		}
 		require.Len(t, mine, 1, "%s: one row for one tunneled write (rows added: %+v)", route, rows)
+		if mine[0].Path == pattern {
+			assert.Equal(t, board.HubActionKindWrite, mine[0].Kind, route+": the wrapper's rows are their own kind")
+		}
 		assert.Equal(t, testLinkID, mine[0].ViaLink, route)
 		assert.Equal(t, integOwner, mine[0].ViaHubUser, route)
 		assert.Equal(t, code, mine[0].Status, route)
