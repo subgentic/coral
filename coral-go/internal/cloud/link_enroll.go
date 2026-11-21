@@ -262,6 +262,9 @@ func (m *Manager) completeLinkEnroll(ctx context.Context, p *linkPending, en *En
 	}
 	_, err := m.o.Store.AddLink(ctx, p.Origin, en.ServerID, cleanLinkText(en.Label, linkTextMax), en.Token, p.Cap)
 	switch {
+	case err == nil && ctx.Err() != nil:
+		// Cancelled while AddLink was storing: the Operator said stop, so the link is not kept (no tunnel, no token at rest). The Hub may still list this computer.
+		m.undoCancelledLink(p.Origin)
 	case err == nil:
 		m.finishLinkEnroll(p, LinkEnrollLinked, "Linked.")
 		m.LinksChanged(ctx)
@@ -272,5 +275,18 @@ func (m *Manager) completeLinkEnroll(ctx context.Context, p *linkPending, en *En
 	default:
 		// The error is about the key or the database, never the token.
 		m.finishLinkEnroll(p, LinkEnrollFailed, "The Hub approved this computer, but the link could not be stored here."+orphan)
+	}
+}
+
+// undoCancelledLink removes the link an enrollment stored after it was cancelled. It uses its own context (the enrollment's is cancelled) and ends as dropped: the Hub was not asked to revoke.
+func (m *Manager) undoCancelledLink(origin string) {
+	ctx, stop := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stop()
+	l, err := m.o.Store.LinkByOrigin(ctx, origin)
+	if err != nil || l == nil || l.Source != store.LinkSourceAdded {
+		return
+	}
+	if m.o.Store.BeginRemoveLink(ctx, l.LinkID) == nil {
+		_ = m.o.Store.FinishRemoveLink(ctx, l.LinkID, store.LinkEventDropped)
 	}
 }
