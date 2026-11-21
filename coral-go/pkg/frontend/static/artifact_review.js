@@ -224,14 +224,15 @@ export function attachReview(d, { reload }) {
     const banner = mk('div', 'artifact-newer-banner notice notice-warn notice-bar', '', { role: 'status' }), bannerText = mk('span', 'artifact-newer-banner-text', ''); banner.hidden = true; banner.append(bannerText, newest);
     const paintBanner = () => { const v = cur && cur.newer && cur.newer.n, n = d.dataset.shownVersion; banner.hidden = !newerHex; if (newerHex) bannerText.textContent = `You're looking at ${n ? `v${n}, ` : ''}an older version. v${v} is the newest.`; }; newest.addEventListener('click', () => { if (newerHex) reload(newerHex); }); // an older file opens the newest in one click (#15329)
     const approveNote = mk('button', 'menu-item artifact-review-note', 'Approve with a note', { role: 'menuitem' });
+    const refuseItem = mk('button', 'menu-item artifact-review-refuse-item', 'Refuse', { role: 'menuitem', title: 'A final no: the agent is told to stop this and not send it again' }); refuseItem.addEventListener('click', () => refuse.click()); // a computer with a decision waiting keeps the header on one line: Refuse is an item of the menu (#20241)
     // Send for review / Remove from review (#13152): the Operator's own way to put this file in Needs you, or take it out, in the ⋯ menu (artifact_send_review.js)
     const sendItem = mk('button', 'menu-item artifact-review-send', 'Send for review', { role: 'menuitem' }); sendItem.hidden = true;
     (d.querySelector('.artifact-viewer-menu') || bar).prepend(sendItem);
     let sendCtx = null; // { team, hex, server, filename, inReview } of the open file
     const syncSendItem = () => { sendItem.hidden = !sendCtx || decisionNeedsPerson(sendCtx.server); if (sendCtx) sendItem.textContent = sendCtx.inReview ? 'Remove from review' : 'Send for review'; };
     const slotted = !!d.querySelector('.artifact-viewer-chips'); // the controls are on the header row; without it (a bare viewer) they stay in this bar
-    stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = true;
-    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-main') ? d.querySelector('.artifact-viewer-main').before(banner) : bar.append(banner)); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes, refuse); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote);
+    stateEl.hidden = approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = refuseItem.hidden = true;
+    (d.querySelector('.artifact-viewer-chips') || bar).append(stateEl); (d.querySelector('.artifact-viewer-main') ? d.querySelector('.artifact-viewer-main').before(banner) : bar.append(banner)); (d.querySelector('.artifact-viewer-actions') || bar).append(approve, changes, refuse); (d.querySelector('.artifact-viewer-menu') || bar).prepend(approveNote, refuseItem);
     const $ = s => bar.querySelector(s);
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
     // Keep confirmed legacy writes while this form is open: an explicit delivery
@@ -266,8 +267,8 @@ export function attachReview(d, { reload }) {
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;
-        approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = !pending;
-        d.dataset.reviewPending = pending ? '1' : ''; // the comment box says where approving is (#15128)
+        approve.hidden = changes.hidden = approveNote.hidden = refuse.hidden = refuseItem.hidden = !pending;
+        if (pending) d.setAttribute('data-review-pending', '1'); else d.removeAttribute('data-review-pending'); // the header's one-line rules read it (#20241) // the comment box says where approving is (#15128)
         for (const h of d.querySelectorAll('.ac-hint')) { h.hidden = !pending; const t = h.parentNode.querySelector('textarea'); if (t) { const how = t.dataset.sendhint || ''; if (pending || how) t.setAttribute('aria-describedby', pending ? `${h.id} ${how}`.trim() : how); else t.removeAttribute('aria-describedby'); } } // a box that is open follows the file's state, not the state it was drawn in
         syncHold();
         paintApprove(); // changes were asked for: Approve is still the Operator's, and says it approves this version as it is; with a newer version in the series it names the one it approves (#15197)
