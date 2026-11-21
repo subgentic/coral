@@ -68,10 +68,14 @@ func TestTwoHubsLinkedToOneCoralEndToEnd(t *testing.T) {
 	// Each link may do what its own cap says: Hub A is the enrollment (the setting), B is set above.
 	require.Equal(t, 200, call(h, "PUT", "/api/cloud/max-mode", `{"mode":"launch"}`, js).Code)
 
+	pinned, err := cs.PinOwnerUser(ctx, "srv_a", "hub-user-aaaa1111")
+	require.NoError(t, err)
+	require.True(t, pinned)
 	person := map[string]string{a.LinkID: "hub-user-aaaa1111", b.LinkID: "hub-user-bbbb2222"}
 	send := func(link string) *httptest.ResponseRecorder {
-		hdr := map[string]string{"Content-Type": "application/json", tunnel.ViaHeader: cloud.ViaSecret(), tunnel.LinkHeader: link, tunnel.ActorHeader: person[link]}
-		return call(h, "PUT", "/api/board/team/settings", `{"subscriber_id":"Operator","health":{"on":false}}`, hdr)
+		hdr := map[string]string{"Content-Type": "application/json", tunnel.ViaHeader: cloud.ViaSecret(), tunnel.LinkHeader: link, tunnel.ActorHeader: person[link],
+			tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: person[link]}
+		return call(h, "PUT", "/api/board/team/settings", `{"subscriber_id":"Operator","cross_team_messaging":true}`, hdr)
 	}
 	// A message through a link works for each Hub (a plain read stands for "the Hub is served").
 	read := func(link string) int {
