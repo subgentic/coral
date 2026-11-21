@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/faketoken"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -470,7 +471,7 @@ func TestRelayAttachSwappedFileAbortsWithNothingSent(t *testing.T) {
 
 // A text file with a secret in it is refused; binary types are not scanned; a clean text file goes.
 func TestRelayAttachSecretScan(t *testing.T) {
-	token := "ghp_" + "1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R"
+	token := faketoken.GitHub("1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R")
 	e := newRelayAttachEnv(t, true)
 	dirty := e.upload(alphaOrchSID, "# notes\ndeploy with token="+token+"\n")
 	code, out, _ := e.relay(alphaOrchSID, "", uri(dirty))
@@ -623,7 +624,7 @@ func TestRelayAttachSwitchTurnedOffBetweenFiles(t *testing.T) {
 // refused plain, in base64 and split, with a fixed code that names nothing from the text; nothing reaches
 // Coral Hub and no rate token is spent (#4449).
 func TestRelayMessageTextWithASecretIsRefused(t *testing.T) {
-	token := "ghp_" + "1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R"
+	token := faketoken.GitHub("1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R")
 	e := newRelayAttachEnv(t, true)
 	for name, text := range map[string]string{
 		"plain":     "deploy with token=" + token,

@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"github.com/subgentic/coral/internal/faketoken"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -92,7 +93,7 @@ func TestCoralsKeyRulesLeaveOrdinaryTextAlone(t *testing.T) {
 		"sl." + fake(40, urlSafe, 32),                                                 // too short for a token
 		"sl." + fake(120, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", 33), // letters only: not a token (QA's gap on #14643)
 		"basl." + fake(120, alnumAZ, 34),                                              // a word that ends in sl.: never masked mid-word
-		"AKIA" + "IOSFODNN7" + "EXAMPLE",                                              // Amazon's documentation key
+		faketoken.AWS("IOSFODNN7EXAMPLE"),                                             // Amazon's documentation key
 		"AKIAlowercase0123456789",
 		"BAKIA" + fake(16, upperNum, 11),
 		"ASIA" + fake(17, upperNum, 12), // too long for a key ID

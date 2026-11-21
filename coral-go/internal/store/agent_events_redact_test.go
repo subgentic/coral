@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"github.com/subgentic/coral/internal/faketoken"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func TestAgentEventsAreStoredRedacted(t *testing.T) {
 	ts := NewTaskStore(openTestDB(t))
 	ctx := context.Background()
 	sid := "s1"
-	gh := "ghp_" + "R8kd2LqP0vXz7TnWb4YcHs9JmQe1Ua6GfKo3"
+	gh := faketoken.GitHub("R8kd2LqP0vXz7TnWb4YcHs9JmQe1Ua6GfKo3")
 	pw := "Zq8" + "rT2vLm9XkP4sWn7B"
 	cmd := "git push https://x:" + gh + "@github.com/org/repo && psql postgres://admin:" + pw + "@db.example.test/app"
 	detail, err := json.Marshal(map[string]any{"command": cmd, "description": "deploy"})

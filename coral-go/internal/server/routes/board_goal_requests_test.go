@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"github.com/subgentic/coral/internal/faketoken"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -47,7 +48,7 @@ func TestGoalRequestFlowAcceptAndDecline(t *testing.T) {
 	ctx := context.Background()
 
 	// A token-shaped string is built from pieces when the test runs: no literal of one is in the source (a secret scanner reads this file too).
-	token := "gh" + "p_" + "abcdefghijklmnopqrstuvwxyz0123456789"
+	token := faketoken.GitHub("abcdefghijklmnopqrstuvwxyz0123456789")
 	code, out := sendRequest(call, goal, "Please build the importer, token "+token)
 	require.Equal(t, http.StatusCreated, code, "%v", out)
 	assert.Equal(t, []any{"Orchestrator B"}, out["delivered_to"])

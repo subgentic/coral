@@ -3,6 +3,7 @@ package inputlog
 import (
 	"encoding/hex"
 	"errors"
+	"github.com/subgentic/coral/internal/faketoken"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,7 +18,7 @@ import (
 )
 
 // fakeToken is a GitHub token by its shape (ghp_ and 36 characters): the redactor's rules know it.
-const fakeToken = "ghp_" + "abcdefghijklmnopqrstuvwxyz0123456789"
+var fakeToken = faketoken.GitHub("abcdefghijklmnopqrstuvwxyz0123456789")
 
 // #60 (Security's condition a): the sent text is checked for secrets in full, before the line is
 // cut to maxText, so a secret that starts in the shown part and runs past the cut is still
