@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -310,4 +311,175 @@ func TestOnlyAnActiveLinkExists(t *testing.T) {
 	_, err := db.ExecContext(ctx, "UPDATE cloud_link SET state = ? WHERE link_id = ?", LinkStateActive, id)
 	require.NoError(t, err)
 	assert.True(t, cs.LinkExists(ctx, id))
+}
+
+// two links in one store for the isolation tests: the one the enrollment mirrors, and a second inserted as the later connector set will make it.
+func twoLinks(t *testing.T) (*CloudStore, string, string) {
+	t.Helper()
+	rs, db, _, _ := newRemoteStore(t)
+	cs := NewCloudStore(db, rs)
+	ctx := context.Background()
+	require.NoError(t, cs.Save(ctx, "https://hub-a.example.com", "srv_a", "Laptop", "tok-a"))
+	_, err := cs.PinOwner(ctx, "srv_a", "acct-a")
+	require.NoError(t, err)
+	links, err := cs.ListLinks(ctx)
+	require.NoError(t, err)
+	require.Len(t, links, 1)
+	_, err = db.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, owner_account, owner_user, created_at, source)
+		VALUES ('lnk-0000000b', 'https://hub-b.example.com', 'srv_b', 'Laptop B', 'v1:b-sealed', 'active', 'interact', 'all', 'acct-b', 'hub-user-0000000b', '2026-01-01T00:00:00Z', 'added')`)
+	require.NoError(t, err)
+	return cs, links[0].LinkID, "lnk-0000000b"
+}
+
+// #20346: a cap is one link's, is logged in the same step, and a bad mode or an unknown link changes nothing.
+func TestSetLinkCapIsOneLinksAndLogged(t *testing.T) {
+	cs, a, _ := twoLinks(t)
+	ctx := context.Background()
+	old, err := cs.SetLinkCap(ctx, a, "launch")
+	require.NoError(t, err)
+	assert.Equal(t, "view", old, "the cap it had")
+	la, _ := cs.LinkByOrigin(ctx, "https://hub-a.example.com")
+	lb, _ := cs.LinkByOrigin(ctx, "https://hub-b.example.com")
+	assert.Equal(t, "launch", la.MaxMode)
+	assert.Equal(t, "interact", lb.MaxMode, "the other link's cap is as it was")
+	ev, err := cs.ListLinkEvents(ctx, "", 10)
+	require.NoError(t, err)
+	require.Len(t, ev, 1)
+	assert.Equal(t, a, ev[0].LinkID)
+	assert.Equal(t, LinkEventCap, ev[0].Action)
+	assert.Equal(t, "view -> launch", ev[0].Detail)
+	assert.Equal(t, "https://hub-a.example.com", ev[0].HubOrigin)
+
+	_, err = cs.SetLinkCap(ctx, a, "root")
+	assert.Error(t, err)
+	_, err = cs.SetLinkCap(ctx, "lnk-ffffffff", "view")
+	assert.ErrorIs(t, err, ErrNoCloudLink)
+	la, _ = cs.LinkByOrigin(ctx, "https://hub-a.example.com")
+	assert.Equal(t, "launch", la.MaxMode, "a refused change changes nothing")
+	ev, _ = cs.ListLinkEvents(ctx, "", 10)
+	assert.Len(t, ev, 1, "a refused change is not logged as done")
+}
+
+// #20346: with one link the setting the live check reads follows the cap.
+func TestSetLinkCapOfTheOnlyLinkMovesTheSetting(t *testing.T) {
+	rs, db, _, _ := newRemoteStore(t)
+	cs := NewCloudStore(db, rs)
+	ctx := context.Background()
+	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "tok"))
+	links, _ := cs.ListLinks(ctx)
+	_, err := cs.SetLinkCap(ctx, links[0].LinkID, "interact")
+	require.NoError(t, err)
+	var v string
+	require.NoError(t, db.GetContext(ctx, &v, "SELECT value FROM user_settings WHERE key = 'cloud_max_mode'"))
+	assert.Equal(t, "interact", v)
+}
+
+// #20346: removing one link leaves the other's row, token, owner pin, state and log alone, and the log outlives the removed link.
+func TestRemovingOneLinkNeverTouchesAnother(t *testing.T) {
+	cs, a, b := twoLinks(t)
+	ctx := context.Background()
+	tokBefore, err := cs.LinkToken(ctx, a)
+	require.NoError(t, err)
+	var rowBefore CloudLink
+	require.NoError(t, cs.db.GetContext(ctx, &rowBefore, "SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error FROM cloud_link WHERE link_id = ?", a))
+
+	require.NoError(t, cs.BeginRemoveLink(ctx, b))
+	var st string
+	require.NoError(t, cs.db.GetContext(ctx, &st, "SELECT state FROM cloud_link WHERE link_id = ?", b))
+	assert.Equal(t, LinkStateRemoving, st)
+	assert.False(t, cs.LinkExists(ctx, b), "a removing link has no stream and no sign-in")
+	assert.True(t, cs.LinkExists(ctx, a))
+	require.NoError(t, cs.BeginRemoveLink(ctx, b), "removal under way is idempotent")
+	assert.ErrorIs(t, cs.FinishRemoveLink(ctx, a, LinkEventRemoved), ErrBadLinkState, "only a link in removing can be finished")
+
+	require.NoError(t, cs.FinishRemoveLink(ctx, b, LinkEventRemoved))
+	links, _ := cs.ListLinks(ctx)
+	require.Len(t, links, 1)
+	var rowAfter CloudLink
+	require.NoError(t, cs.db.GetContext(ctx, &rowAfter, "SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error FROM cloud_link WHERE link_id = ?", a))
+	assert.Equal(t, rowBefore, rowAfter, "the other link's row is as it was")
+	tokAfter, err := cs.LinkToken(ctx, a)
+	require.NoError(t, err)
+	assert.Equal(t, tokBefore, tokAfter, "and its token still opens")
+	conn, err := cs.Get(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, "srv_a", conn.ServerID, "the enrollment of the other link stays")
+	var n int
+	require.NoError(t, cs.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE link_id = ?", b))
+	assert.Zero(t, n)
+	evB, _ := cs.ListLinkEvents(ctx, b, 10)
+	require.Len(t, evB, 2, "the log of a removed link stays: begin and removed")
+	assert.Equal(t, LinkEventRemoved, evB[0].Action)
+	assert.Equal(t, LinkEventRemoveBegin, evB[1].Action)
+	evA, _ := cs.ListLinkEvents(ctx, a, 10)
+	assert.Empty(t, evA, "nothing was logged against the other link")
+}
+
+// #20346: removing the link the enrollment mirrors ends the enrollment and its token in the same step, and the mirror does not make it again; the log never holds a token.
+func TestRemovingTheMirroredLinkEndsTheEnrollment(t *testing.T) {
+	cs, a, _ := twoLinks(t)
+	ctx := context.Background()
+	require.NoError(t, cs.BeginRemoveLink(ctx, a))
+	require.NoError(t, cs.MirrorLegacyLink(ctx), "the mirror runs on every start")
+	var st string
+	require.NoError(t, cs.db.GetContext(ctx, &st, "SELECT state FROM cloud_link WHERE link_id = ?", a))
+	assert.Equal(t, LinkStateRemoving, st, "a removing link stays removing through the mirror")
+	require.NoError(t, cs.FinishRemoveLink(ctx, a, LinkEventDropped))
+	var n int
+	require.NoError(t, cs.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_connection"))
+	assert.Zero(t, n, "no removed token stays in the old table")
+	l, err := cs.LinkByOrigin(ctx, "https://hub-a.example.com")
+	assert.Nil(t, l)
+	assert.ErrorIs(t, err, ErrNoCloudLink)
+	var logged string
+	require.NoError(t, cs.db.GetContext(ctx, &logged, "SELECT COALESCE(group_concat(link_id || hub_origin || action || detail), '') FROM cloud_link_event"))
+	assert.NotContains(t, logged, "tok-a")
+	assert.NotContains(t, logged, "sealed")
+	assert.Contains(t, logged, LinkEventDropped)
+}
+
+// #20346, Security's condition 3b: a second link is refused. SecondLinkOpen is the one switch; the server's census test fails if it is on while a Hub write is pending.
+func TestASecondLinkIsRefusedWhileTheSwitchIsOff(t *testing.T) {
+	rs, db, _, _ := newRemoteStore(t)
+	cs := NewCloudStore(db, rs)
+	ctx := context.Background()
+	assert.NoError(t, cs.CheckCanAddLink(ctx), "the first link is fine")
+	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "tok"))
+	if !SecondLinkOpen {
+		assert.ErrorIs(t, cs.CheckCanAddLink(ctx), ErrSecondLinkNotYet)
+	}
+}
+
+// #20346, Security 4: a removal the Hub has not confirmed is listed with when it began, and its sealed token is deleted at 7 days (the link row stays, so the Operator can drop it).
+func TestAnUnconfirmedRemovalIsListedAndItsTokenDeletedAfterSevenDays(t *testing.T) {
+	cs, a, b := twoLinks(t)
+	ctx := context.Background()
+	require.NoError(t, cs.BeginRemoveLink(ctx, a))
+	got, err := cs.RemovingLinks(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, a, got[0].LinkID)
+	assert.WithinDuration(t, time.Now(), got[0].Since, time.Minute)
+
+	require.Error(t, cs.DeleteLinkToken(ctx, b), "only a removing link's token is deleted")
+	var bEnv string
+	require.NoError(t, cs.db.GetContext(ctx, &bEnv, "SELECT token FROM cloud_link WHERE link_id = ?", b))
+	assert.NotEmpty(t, bEnv, "the other link keeps its token")
+
+	require.NoError(t, cs.DeleteLinkToken(ctx, a))
+	var env string
+	require.NoError(t, cs.db.GetContext(ctx, &env, "SELECT token FROM cloud_link WHERE link_id = ?", a))
+	assert.Empty(t, env, "no sealed token stays at rest")
+	_, err = cs.LinkToken(ctx, a)
+	assert.Error(t, err)
+	require.NoError(t, cs.DeleteLinkToken(ctx, a), "a repeat is fine")
+	ev, _ := cs.ListLinkEvents(ctx, a, 10)
+	n := 0
+	for _, e := range ev {
+		if e.Action == LinkEventTokenDeleted {
+			n++
+		}
+	}
+	assert.Equal(t, 1, n, "logged once")
+	require.NoError(t, cs.FinishRemoveLink(ctx, a, LinkEventDropped), "the Operator can still drop the link")
 }

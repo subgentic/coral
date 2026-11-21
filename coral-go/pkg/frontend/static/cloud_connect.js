@@ -13,7 +13,7 @@
 import { copyText } from './utils.js';
 import { isSignedOut } from './overload.js';
 import { importOnce } from './import_once.js';
-const { morePermsWords, operatorLine, hubAddressLine, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
+const { morePermsWords, operatorLine, hubAddressLine, linkRowWords, removeLinkConfirm, capSavedText, LINK_CAPS, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
 export const { enrolledRetrying, rekeyText, describe } = await importOnce('./cloud_words.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH, HUB_RELAUNCH_OFF_AT_LAUNCH, HUB_RELAUNCH_OFF_TOAST_AT_LAUNCH } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
 
@@ -246,7 +246,8 @@ class CloudPanel {
         // The Hub link came or went (connect, disconnect, revoke): the server clears the
         // Operator setting with it, so read it again.
         const enrolled = ENROLLED.includes(st.state);
-        if (enrolled !== this.enrolled) { this.enrolled = enrolled; this.loadHubOperator(); }
+        if (enrolled !== this.enrolled) { this.enrolled = enrolled; this.loadHubOperator(); this.loadLinks(); }
+        else if (enrolled && Date.now() - (this.linksAt || 0) > 15000) this.loadLinks();
         this.syncMorePerms(st, enrolled);
         document.dispatchEvent(new CustomEvent('coral-cloud-state', { detail: { state: st.state } })); // the setup code is offered while a link is being made (setup_code_setting.js)
         this.restoreFocus(had, st);
@@ -275,6 +276,85 @@ class CloudPanel {
         const line = this.part('operator-line');
         // Linked: the Operator's state, as it is. Not linked: only an opt-out that outlives the link is said, so it stays visible (Security's #6629 LOW 4).
         if (line) { const on = this.operatorOn === undefined ? null : this.operatorOn; const t = linked ? operatorLine(on) : (on === false ? operatorLine(false) : ''); put(line, t); line.hidden = !t; }
+    }
+
+    // Hub links (#20346): the list, a cap per link and Remove with its confirm. Everything a Hub supplied is set as text; the calls go to this computer only.
+    async loadLinks() {
+        const box = this.part('links');
+        const list = this.part('links-list');
+        if (!box || !list) return;
+        this.linksAt = Date.now();
+        let links = [];
+        try {
+            const r = await fetch('/api/cloud/links');
+            if (r.ok) { const d = await r.json(); if (Array.isArray(d.links)) links = d.links; }
+        } catch (_) { /* the list stays as it was */ return; }
+        this.drawLinks(links);
+    }
+
+    drawLinks(links) {
+        const box = this.part('links');
+        const list = this.part('links-list');
+        const say = this.part('links-say');
+        box.hidden = links.length === 0;
+        list.replaceChildren();
+        for (const l of links) {
+            const w = linkRowWords(l);
+            if (!w.id) continue;
+            const li = document.createElement('li');
+            li.className = 'settings-cloud-link';
+            li.dataset.link = w.id;
+            const name = document.createElement('div');
+            name.className = 'settings-cloud-link-name';
+            name.textContent = (w.label ? w.label + ' · ' : '') + (w.origin || 'a Hub') + ' · ' + w.state;
+            li.append(name);
+            const sel = document.createElement('select');
+            sel.setAttribute('aria-label', 'What ' + (w.origin || 'this Hub') + ' may do');
+            for (const m of LINK_CAPS) { const o = document.createElement('option'); o.value = m; o.textContent = LEVEL_NOW[m]; if (m === w.cap) o.selected = true; sel.append(o); }
+            sel.disabled = w.removing;
+            sel.addEventListener('change', async () => {
+                const mode = sel.value;
+                try {
+                    const r = await fetch('/api/cloud/links/' + encodeURIComponent(w.id) + '/cap', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+                    if (say) say.textContent = r.ok ? capSavedText(l, mode) : 'Could not change what this Hub may do.';
+                } catch (_) { if (say) say.textContent = 'Could not change what this Hub may do.'; }
+                this.loadLinks();
+            });
+            const rm = document.createElement('button');
+            rm.type = 'button';
+            rm.className = 'btn btn-small';
+            rm.textContent = 'Remove';
+            rm.disabled = w.removing;
+            rm.addEventListener('click', () => this.confirmRemoveLink(li, l, w, rm, say));
+            li.append(sel, rm);
+            list.append(li);
+        }
+    }
+
+    confirmRemoveLink(li, l, w, rm, say) {
+        rm.hidden = true;
+        const ask = document.createElement('div');
+        ask.className = 'settings-cloud-link-confirm';
+        ask.setAttribute('role', 'group');
+        const q = document.createElement('span');
+        q.textContent = removeLinkConfirm(l) + ' ';
+        const yes = document.createElement('button');
+        yes.type = 'button'; yes.className = 'btn btn-small'; yes.textContent = 'Remove';
+        const no = document.createElement('button');
+        no.type = 'button'; no.className = 'btn btn-small'; no.textContent = 'Keep';
+        no.addEventListener('click', () => { ask.remove(); rm.hidden = false; rm.focus(); });
+        yes.addEventListener('click', async () => {
+            yes.disabled = no.disabled = true;
+            try {
+                const r = await fetch('/api/cloud/links/' + encodeURIComponent(w.id), { method: 'DELETE' });
+                const d = r.ok || r.status === 202 ? await r.json().catch(() => ({})) : null;
+                if (say) say.textContent = d === null ? 'Could not remove this link.' : (typeof d.message === 'string' ? d.message : 'Removed.');
+            } catch (_) { if (say) say.textContent = 'Could not remove this link.'; }
+            this.loadLinks();
+        });
+        ask.append(q, yes, no);
+        li.append(ask);
+        no.focus();
     }
 
     /** After a state change: when focus was inside the panel and its control has gone, it goes to the control that took its place. */

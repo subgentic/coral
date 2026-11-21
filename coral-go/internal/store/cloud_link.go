@@ -46,7 +46,15 @@ type CloudLink struct {
 	CreatedAt      string  `json:"created_at" db:"created_at"`
 	LastSeen       *string `json:"last_seen" db:"last_seen"`
 	LastError      *string `json:"last_error" db:"last_error"`
+	// Source is "enrollment" for the link the one enrollment mirrors, "added" for one added here (#20368). Never sent anywhere.
+	Source string `json:"-" db:"source"`
 }
+
+// Link sources.
+const (
+	LinkSourceEnrollment = "enrollment"
+	LinkSourceAdded      = "added"
+)
 
 // ErrNoCloudLink is returned for a link id or origin that is not linked.
 var ErrNoCloudLink = errors.New("no such Coral Hub link")
@@ -146,9 +154,22 @@ func HubAddressHasPath(raw string) bool {
 // ListLinks returns every link, oldest first, without tokens.
 func (s *CloudStore) ListLinks(ctx context.Context) ([]CloudLink, error) {
 	var out []CloudLink
-	err := s.db.SelectContext(ctx, &out, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error
+	err := s.db.SelectContext(ctx, &out, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error, source
 		FROM cloud_link ORDER BY created_at, rowid`)
+	if err == nil {
+		s.liveCap(ctx, out)
+	}
 	return out, err
+}
+
+// liveCap makes the cap a list shows the one the checks read: for the link the one enrollment mirrors that is the setting cloud_max_mode (the max-mode route, the launch flag and Connect write only the setting), so there is
+// one source of truth and the list, CLI and Settings never disagree with it (Security's MUST on #20346). A link added here has its own cap.
+func (s *CloudStore) liveCap(ctx context.Context, ls []CloudLink) {
+	for i := range ls {
+		if ls[i].Source == LinkSourceEnrollment {
+			ls[i].MaxMode = s.settingMaxMode(ctx)
+		}
+	}
 }
 
 // LinkByOrigin returns the link for a Hub address (any spelling CanonicalHubOrigin accepts).
@@ -158,10 +179,15 @@ func (s *CloudStore) LinkByOrigin(ctx context.Context, hubURL string) (*CloudLin
 		return nil, ErrNoCloudLink
 	}
 	var l CloudLink
-	err = s.db.GetContext(ctx, &l, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error
+	err = s.db.GetContext(ctx, &l, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error, source
 		FROM cloud_link WHERE hub_origin = ?`, origin)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoCloudLink
+	}
+	if err == nil {
+		one := []CloudLink{l}
+		s.liveCap(ctx, one)
+		l = one[0]
 	}
 	return &l, err
 }
@@ -222,7 +248,7 @@ func (s *CloudStore) MirrorLegacyLink(ctx context.Context) error {
 	var row legacyRow
 	err := s.db.GetContext(ctx, &row, "SELECT "+legacyCols+" FROM cloud_connection WHERE id = 1")
 	if errors.Is(err, sql.ErrNoRows) {
-		_, err = s.db.ExecContext(ctx, "DELETE FROM cloud_link")
+		_, err = s.db.ExecContext(ctx, "DELETE FROM cloud_link WHERE source = 'enrollment'") // a link added here is not the enrollment's to remove
 		return err
 	}
 	if err != nil {
@@ -236,7 +262,7 @@ func (s *CloudStore) MirrorLegacyLink(ctx context.Context) error {
 		log.Printf("WARNING: the saved Hub address for %s has extra parts; it keeps working as saved, but enroll again with the bare address", origin)
 	}
 	var existing string
-	err = s.db.GetContext(ctx, &existing, "SELECT link_id FROM cloud_link WHERE hub_origin = ? AND server_id = ?", origin, row.ServerID)
+	err = s.db.GetContext(ctx, &existing, "SELECT link_id FROM cloud_link WHERE hub_origin = ? AND server_id = ? AND source = 'enrollment'", origin, row.ServerID)
 	switch {
 	case err == nil:
 		return s.refreshLink(ctx, existing, row)
@@ -277,7 +303,7 @@ func (s *CloudStore) MirrorLegacyLink(ctx context.Context) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, "DELETE FROM cloud_link"); err != nil { // one enrollment, one link, in this slice
+	if _, err := tx.ExecContext(ctx, "DELETE FROM cloud_link WHERE source = 'enrollment'"); err != nil { // one enrollment, one link: a link added here stays
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_error)
@@ -289,8 +315,8 @@ func (s *CloudStore) MirrorLegacyLink(ctx context.Context) error {
 }
 
 func (s *CloudStore) refreshLink(ctx context.Context, linkID string, row legacyRow) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE cloud_link SET label = ?, state = CASE WHEN state = ? THEN state ELSE ? END, owner_account = ?, owner_user = ?, owner_adopted_at = ?, last_error = ? WHERE link_id = ?`,
-		row.Label, LinkStatePaused, row.State, row.HubOwner.String, row.HubOwnerUser.String, nullStr(row.HubOwnerAdopt), nullStr(row.LastError), linkID)
+	_, err := s.db.ExecContext(ctx, `UPDATE cloud_link SET label = ?, state = CASE WHEN state IN (?, ?) THEN state ELSE ? END, owner_account = ?, owner_user = ?, owner_adopted_at = ?, last_error = ? WHERE link_id = ?`,
+		row.Label, LinkStatePaused, LinkStateRemoving, row.State, row.HubOwner.String, row.HubOwnerUser.String, nullStr(row.HubOwnerAdopt), nullStr(row.LastError), linkID)
 	return err
 }
 

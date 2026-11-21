@@ -15,6 +15,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/httputil"
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -37,6 +38,7 @@ type ownerLabelStore interface {
 var ownerArm = struct {
 	sync.Mutex
 	until time.Time
+	link  string // "" for the enrollment's own link; else the added link the arm is for (#20407)
 	arms  []time.Time
 }{}
 
@@ -47,7 +49,7 @@ var ownerNow = time.Now
 var hubOwnerAdopt func(ctx context.Context, user string) bool
 
 // armOwnerAdoption arms the adoption for ownerArmWindow, unless it was pressed ownerArmsMax times in the last hour (then ok is false and retry says how long to wait).
-func armOwnerAdoption(now time.Time) (until time.Time, ok bool, retry time.Duration) {
+func armOwnerAdoption(now time.Time, link string) (until time.Time, ok bool, retry time.Duration) {
 	ownerArm.Lock()
 	defer ownerArm.Unlock()
 	kept := ownerArm.arms[:0]
@@ -62,15 +64,20 @@ func armOwnerAdoption(now time.Time) (until time.Time, ok bool, retry time.Durat
 	}
 	ownerArm.arms = append(ownerArm.arms, now)
 	ownerArm.until = now.Add(ownerArmWindow)
+	ownerArm.link = link
 	return ownerArm.until, true, 0
 }
 
-// takeOwnerArm reports whether the adoption is armed and not expired, and disarms it either way: one request gets the chance, whatever it turns out to be.
-func takeOwnerArm(now time.Time) bool {
+// takeOwnerArm reports whether the adoption is armed for link and not expired, and disarms it: one request through that link gets the chance, whatever it turns out to be. An arm for another link is neither
+// used nor used up by this one (#20407): a request through Hub A cannot spend the minute the Operator gave Hub B.
+func takeOwnerArm(now time.Time, link string) bool {
 	ownerArm.Lock()
 	defer ownerArm.Unlock()
+	if !ownerArm.until.IsZero() && now.Before(ownerArm.until) && ownerArm.link != link {
+		return false
+	}
 	armed := !ownerArm.until.IsZero() && now.Before(ownerArm.until)
-	ownerArm.until = time.Time{}
+	ownerArm.until, ownerArm.link = time.Time{}, ""
 	return armed
 }
 
@@ -92,7 +99,7 @@ func (h *CloudHandler) SetOwnerLabelStore(s ownerLabelStore) {
 	ownerStamps.seen = map[string]time.Time{}
 	ownerStamps.Unlock()
 	ownerArm.Lock()
-	ownerArm.until, ownerArm.arms = time.Time{}, nil
+	ownerArm.until, ownerArm.link, ownerArm.arms = time.Time{}, "", nil
 	ownerArm.Unlock()
 }
 
@@ -214,8 +221,18 @@ func (h *CloudHandler) ArmOwnerLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var raw map[string]any
-	if err := decodeJSONMax(w, r, &raw, 1<<10); err != nil || len(raw) != 0 {
-		errBadRequest(w, `the body is exactly {}`)
+	if err := decodeJSONMax(w, r, &raw, 1<<10); err != nil {
+		errBadRequest(w, `the body is {} or {"hub": the address of an added Hub}`)
+		return
+	}
+	if hub, has := raw["hub"]; has && len(raw) == 1 {
+		if addr, ok := hub.(string); ok {
+			h.armAddedLinkOwner(w, r, addr)
+			return
+		}
+	}
+	if len(raw) != 0 {
+		errBadRequest(w, `the body is {} or {"hub": the address of an added Hub}`)
 		return
 	}
 	missing, known := h.ownerLabelState(r.Context())
@@ -239,7 +256,7 @@ func (h *CloudHandler) ArmOwnerLabel(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]any{"code": "several_hub_users", "error": textSeveralHubUsers, "retry_after": wait})
 		return
 	}
-	until, ok, retry := armOwnerAdoption(ownerNow())
+	until, ok, retry := armOwnerAdoption(ownerNow(), "")
 	if !ok {
 		httputil.WriteActionLimit(w, int(retry/time.Second)+1, "too_soon", "Confirm owner was pressed a few times already: try again later")
 		return
@@ -256,4 +273,47 @@ func (h *CloudHandler) ownerIsTeam(ctx context.Context) bool {
 	}
 	kind, _, err := h.ownerLabels.OwnerRecord(ctx)
 	return err == nil && kind == tunnel.OwnerKindTeam
+}
+
+// armAddedLinkOwner is Confirm owner for one added Hub (#20407): the fallback when the Hub named no owner to confirm (or the candidate expired). It arms the adoption for that link alone, for a minute, one
+// shot; the first read through THAT link in the minute that the Hub stamps for its owner is recorded as the owner, and a request through another link neither uses it nor spends it. The label is the Hub
+// person the stamp carries: nothing the Hub says in words is trusted. The same three presses an hour as the first link.
+func (h *CloudHandler) armAddedLinkOwner(w http.ResponseWriter, r *http.Request, addr string) {
+	origin, err := store.CanonicalHubOrigin(addr)
+	if err != nil {
+		errBadRequest(w, "That is not a Hub address")
+		return
+	}
+	if h.links == nil {
+		errInternalServer(w, "the link store is not available")
+		return
+	}
+	links, err := h.links.ListLinks(r.Context())
+	if err != nil {
+		errInternalServer(w, "the links could not be read")
+		return
+	}
+	var link *store.CloudLink
+	for i := range links {
+		if links[i].HubOrigin == origin {
+			link = &links[i]
+		}
+	}
+	switch {
+	case link == nil || link.Source != store.LinkSourceAdded:
+		errNotFound(w, "No Hub added at that address")
+		return
+	case link.OwnerUser != "":
+		writeJSON(w, http.StatusConflict, map[string]string{"code": "owner_label_set", "error": "this Hub link already has an owner recorded"})
+		return
+	case link.State == store.LinkStateRemoving:
+		writeJSON(w, http.StatusConflict, map[string]string{"code": "link_removing", "error": "this Hub link is being removed"})
+		return
+	}
+	until, ok, retry := armOwnerAdoption(ownerNow(), link.LinkID)
+	if !ok {
+		httputil.WriteActionLimit(w, int(retry/time.Second)+1, "too_soon", "Confirm owner was pressed a few times already: try again later")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "armed_until": until.UTC().Format(time.RFC3339), "seconds": int(ownerArmWindow / time.Second), "hub": origin})
 }

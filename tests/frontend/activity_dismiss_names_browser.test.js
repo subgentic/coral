@@ -5,16 +5,17 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { guardSettings } = require('./helpers/settings_guard');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const settings = await guardSettings();
     const put = body => ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(r => r.status)`);
     const load = async () => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await load();
-        const before = await ev(`fetch('/api/settings').then(r => r.json()).then(s => String(s.inbox_welcome_done || ''))`);
         try {
             assert.equal(await put({ inbox_welcome_done: '' }), 200);
             assert.equal(await put({ inbox_welcome_done: 'guide' }), 200); // the guide item dismissed: one new id in the list
@@ -32,6 +33,6 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(!/·\s*·/.test(open), 'no empty part between the dots: ' + open);
             assert.equal(await ev(`document.querySelector('.activity-check')`), null, 'an intact record says nothing above the table');
             console.log('PASS activity dismiss names the item: card, no header line');
-        } finally { await put({ inbox_welcome_done: before }).catch(() => {}); }
+        } finally { await settings.restore(); }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

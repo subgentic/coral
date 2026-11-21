@@ -1,5 +1,43 @@
 # Release Notes
 
+## v2.1.3 — A Computers page and bar that work across machines, the Hub reads an owner needs, and the first Multi-Hub link
+
+Task numbers in brackets. Built on v2.1.2. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **One computer bar across Chats, Cost and Automations** (#20207, #20319, #20348): online computers first, then offline, most recently seen first in each group; a pick is shared with every per-computer page. The Computers page matches the approved mock: update card words and buttons, an amber dot and chip, the version and access lines, and "No other computers connected yet" under "This computer".
+- **Automations reads every computer** (#20207, #20185, #20188): with two or more computers it lists all of them with a Computer column (Job, Computer, Schedule, State; Manual when there is none); a computer that cannot be read is named once, offline or not shared or no answer, and a Hub-required Coral update is explained instead of failing.
+- **Inbox fixes** (#20240, #20286, #20309, #20328, #20349): Send N open comments goes to the agent as one message and Wait for agent is a menu item; the Google sharing switch saves, loads and shows the Google block in the same Settings session; phone Inbox card taps follow the active selection; a waiting task shows its real state and review labels are no longer clipped; one-click decision buttons on a Needs you question row answer from the row at 1280 and 390 px, with no dialog.
+- **One prompt per goal that looks done, and a goal's uncommitted work stays visible** (#20128, #20167): no goals-ready line or switch, one notice that asks for no reply and is not repeated within 24 hours; the uncommitted line no longer disappears on a redraw.
+- **Review-question file links stay on their team** (#20151); **OpenCode setup is explained before you choose a model** (#20121).
+
+#### Health checks
+
+- **Tunable health follow-ups** (#20220, #20238): Approve refuses a check that was paused while it was pending (resume it first; the question stays); the Operator's list and the approval row show the script text, escaped, in a scrollable box.
+- **Saved messages keep their emoji, and only those** (#20329, #20333, #20336, #20339): invisible format characters are dropped, a joiner or tag run between two non-ASCII characters is kept, and tag characters stay only in the three real subdivision flags.
+
+#### Hub and Multi-Hub
+
+- **The owner's reads through the Hub** (#20061, #20255, #20257, #20078): a goal's thread, a diff thread and 20 class A read routes answer an owner through the Hub, with owner rows for the routes.
+- **Multi-Hub, slice 1** (#20201, #20312, #20320, #20356, goal #269): a `cloud_link` table and an enrollment mirror; the connection stamps its link, the Operator-actions record carries the (link, Hub person) pair, a Hub address with a path, query or fragment is refused and the warning names only the cut origin. An upgrade keeps an enrollment whose address had a path.
+
+#### For the team
+
+- `coral-board resource claim --run` on a remote resource sends the command to its machine over ssh and refuses a this-machine-only command, giving the slot back (#20221); a release says a queued place was cancelled and a wait still polling for it stops (#20345).
+
+### Test and gate fixes in this release
+
+- The Go census and fixtures for the new routes and joins: the pair census lists `POST /api/scheduled/validate-cron` as pending (#20356); the join census reviews healthcheck `Prune` (#20382); a shared fake-token helper for Go tests (#20301).
+- Browser fixtures follow the computer order and the `gdoc_share` default; `activity_dismiss_names` leaves no `inbox_welcome_done` (#20386).
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- `coral-go/internal/devicekey/codes.go` is unchanged since v2.1.1.
+
 ## v2.1.2 — A new Inbox layout, Share to Google (experimental, off), and tunable health checks
 
 Task numbers in brackets. Built on v2.1.1. A prerelease until the Operator promotes it.

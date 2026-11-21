@@ -167,6 +167,13 @@ type Manager struct {
 
 	devicePK atomic.Pointer[string] // the device public key this Coral redeemed with (#16726); memory only, public
 
+	// lmu guards extras: the connectors of the links added at this computer (manager_links.go, #20368), one each, apart from the enrollment's tunnel above.
+	lmu    sync.Mutex
+	extras map[string]*linkConn
+	// pmu guards pending: the enrollments of Hubs being added by address (link_enroll.go, #20385), one per Hub, in memory only.
+	pmu     sync.Mutex
+	pending map[string]*linkPending
+
 	mu       sync.Mutex
 	redeemMu sync.Mutex // one redeem at a time
 	root     context.Context
@@ -279,6 +286,12 @@ func (m *Manager) Run(ctx context.Context) {
 		m.st.State, m.st.LastErrorCode = StateIdle, ErrCodeHubMoved
 		m.st.LastError = "this server is enrolled with a different hub (" + conn.HubURL + "); run 'coral cloud connect --force' to enroll with " + m.o.HubURL
 		m.mu.Unlock()
+	case m.o.Store.RemovalPending(ctx, conn.ServerID):
+		// The link is being removed (#20346): no tunnel until the Hub confirms or the Operator drops it.
+		m.mu.Lock()
+		m.st.State, m.st.Label, m.st.ServerID = StateIdle, conn.Label, conn.ServerID
+		m.st.LastError = "this Hub link is being removed; it reconnects only if you add it again"
+		m.mu.Unlock()
 	case conn.State == store.CloudStateRevoked:
 		m.mu.Lock()
 		m.st.State, m.st.Label, m.st.ServerID = StateRevoked, conn.Label, conn.ServerID
@@ -288,6 +301,7 @@ func (m *Manager) Run(ctx context.Context) {
 		m.startTunnel(conn)
 	}
 	m.markLoaded()
+	m.LinksChanged(ctx) // every other active link gets its own connector
 	<-ctx.Done()
 	m.mu.Lock()
 	m.stopLocked()
@@ -414,6 +428,11 @@ func (m *Manager) Connect(ctx context.Context) error {
 	}
 	m.mu.Unlock()
 
+	// A Hub an added link already has is not enrolled again: said before the Hub is asked for a code (#20368).
+	if m.o.Store.AddedLinkAt(ctx, m.o.HubURL) {
+		m.setError(StateIdle, store.ErrLinkExists.Error())
+		return store.ErrLinkExists
+	}
 	// The token must be storable here before the hub enrolls this server (#3693): enrolling
 	// first and failing to store the token left an enrollment in Coral Hub with no connection.
 	if err := m.o.Store.CheckSecrets(ctx); err != nil {
@@ -791,6 +810,16 @@ func (m *Manager) Disconnect(ctx context.Context) error {
 	m.linkLost(ctx)
 	_ = m.o.Store.ClearEnrollment(ctx)
 	return m.o.Store.Delete(ctx)
+}
+
+// StopTunnel ends the live tunnel without forgetting the enrollment: a link being removed has no tunnel from the moment the person asks (#20346), while the token waits for the Hub's answer.
+func (m *Manager) StopTunnel() {
+	m.mu.Lock()
+	m.stopLocked()
+	if m.o.HubURL != "" {
+		m.st = Status{Configured: true, HubURL: m.o.HubURL, State: StateIdle}
+	}
+	m.mu.Unlock()
 }
 
 func (m *Manager) linkLost(ctx context.Context) {

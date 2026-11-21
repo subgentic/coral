@@ -16,7 +16,7 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'settings_apply_oracle.json');
 const PAYLOAD_KEYS = ['theme', 'custom_theme', 'default_renderer', 'default_agent_type', 'default_permission_mode', 'default_working_dir', 'fit_pane_width', 'notify_needs_input', 'terminal_font_size', 'terminal_scrollback',
     'show_scrollbars', 'cli_path_claude', 'cli_path_codex', 'cli_path_agy', 'cli_path_gemini', 'cli_path_pi', 'cli_path_opencode', 'default_model_claude', 'default_model_codex', 'default_model_agy', 'default_model_gemini', 'default_model_pi',
     'file_search_mode', 'file_search_limit', 'git_diff_mode', 'git_poll_interval_s', 'agent_priority', 'telemetry_enabled', 'board_auto_attach', 'board_health_monitor', 'auto_resume_after_api_error', 'auto_goals',
-    'artifact_store_max_bytes', 'received_artifacts_max_bytes', 'artifact_retention_days', 'artifact_retention_kinds', 'debug_input_log', 'remote_access_enabled', 'nudge_claude_artifacts', 'launch_in_worktree', 'inbox_kind_file', 'inbox_kind_done', 'inbox_kind_release', 'inbox_kind_decided', 'inbox_kind_digest', 'inbox_included_teams', 'inbox_digest_time'];
+    'artifact_store_max_bytes', 'received_artifacts_max_bytes', 'artifact_retention_days', 'artifact_retention_kinds', 'debug_input_log', 'remote_access_enabled', 'nudge_claude_artifacts', 'launch_in_worktree', 'gdoc_share', 'inbox_kind_file', 'inbox_kind_done', 'inbox_kind_release', 'inbox_kind_decided', 'inbox_kind_digest', 'inbox_included_teams', 'inbox_digest_time'];
 
 // [case name, edits ([control id, 'value'|'check'|'next'|'input', value]), how the save answers]
 const sel = id => [id, 'next'];

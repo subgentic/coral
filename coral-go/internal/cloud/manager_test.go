@@ -43,19 +43,20 @@ type fakeHub struct {
 	down        atomic.Bool  // start answers 503
 	sessions    chan *tunnel.Session
 
-	routeKey  atomic.Value // string: the route key Welcome carries (#3683); unset: none
-	account   atomic.Value // string: the account the enrollment reply names (#3966); unset: none
-	ownerUser atomic.Value // string: the owner's hub-user label the enrollment reply names (#5280); unset: none
-	ownerKind atomic.Value // string: the owner_kind the enrollment reply names (#7061); unset: none
-	ownerOrg  atomic.Value // string: the owner_org the enrollment reply names; unset: none
-	verifyEnd atomic.Value // string: appended to the verification_url the start answer names (the link's #p= fragment, #16726); unset: none
-	pairing   atomic.Value // map[string]any: the pairing{} object the poll answer carries (#16726); unset: none
-	signin    atomic.Value // signinFunc: answers Hub sign-in (#3966); unset: not advertised
-	onMode    atomic.Value // func(tunnel.Mode): takes the local mode message (#5918); unset: local_mode/1 is not advertised
-	routeMu   sync.Mutex
-	routeSeen []string // the X-Coral-Route header of each /tunnel dial
-	replyMu   sync.Mutex
-	replies   []map[string]string // each POST /api/enroll/reply body (slice 4)
+	routeKey   atomic.Value // string: the route key Welcome carries (#3683); unset: none
+	account    atomic.Value // string: the account the enrollment reply names (#3966); unset: none
+	ownerUser  atomic.Value // string: the owner's hub-user label the enrollment reply names (#5280); unset: none
+	ownerKind  atomic.Value // string: the owner_kind the enrollment reply names (#7061); unset: none
+	ownerOrg   atomic.Value // string: the owner_org the enrollment reply names; unset: none
+	verifyBase atomic.Value // string: the origin the start answer's verification_url names instead of this hub's own (a Hub naming another site)
+	verifyEnd  atomic.Value // string: appended to the verification_url the start answer names (the link's #p= fragment, #16726); unset: none
+	pairing    atomic.Value // map[string]any: the pairing{} object the poll answer carries (#16726); unset: none
+	signin     atomic.Value // signinFunc: answers Hub sign-in (#3966); unset: not advertised
+	onMode     atomic.Value // func(tunnel.Mode): takes the local mode message (#5918); unset: local_mode/1 is not advertised
+	routeMu    sync.Mutex
+	routeSeen  []string // the X-Coral-Route header of each /tunnel dial
+	replyMu    sync.Mutex
+	replies    []map[string]string // each POST /api/enroll/reply body (slice 4)
 }
 
 func (h *fakeHub) replyBodies() []map[string]string {
@@ -91,7 +92,12 @@ func newFakeHub(t *testing.T) *fakeHub {
 		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"device_code": strings.Repeat("d", 43), "user_code": "ABCD-EFGH",
-			"verification_url": h.srv.URL + "/enroll?code=ABCD-EFGH" + func() string { e, _ := h.verifyEnd.Load().(string); return e }(), "interval": 2, "expires_in": 600,
+			"verification_url": func() string {
+				if b, ok := h.verifyBase.Load().(string); ok {
+					return b
+				}
+				return h.srv.URL
+			}() + "/enroll?code=ABCD-EFGH" + func() string { e, _ := h.verifyEnd.Load().(string); return e }(), "interval": 2, "expires_in": 600,
 		})
 	})
 	mux.HandleFunc("POST /api/enroll/reply", func(w http.ResponseWriter, r *http.Request) {
@@ -867,4 +873,27 @@ func TestAnEnrollmentWithAPathStillDialsAndWarns(t *testing.T) {
 	m2 := e.manager(e.hub.srv.URL)
 	start(t, m2)
 	require.Empty(t, m2.Status().HubAddressWarning)
+}
+
+// #20346: a link in removal has no tunnel, also after a restart: the connector does not dial the Hub while its removal waits for the Hub's answer.
+func TestARestartDoesNotDialALinkThatIsBeingRemoved(t *testing.T) {
+	e := newEnv(t)
+	m := e.manager(e.hub.srv.URL)
+	start(t, m)
+	require.NoError(t, m.Connect(context.Background()))
+	waitState(t, m, StateConnected)
+	m.StopTunnel()
+	n := e.hub.tunnels.Load()
+
+	links, err := e.cs.ListLinks(context.Background())
+	require.NoError(t, err)
+	require.Len(t, links, 1)
+	require.NoError(t, e.cs.BeginRemoveLink(context.Background(), links[0].LinkID))
+
+	m2 := e.manager(e.hub.srv.URL)
+	start(t, m2)
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, n, e.hub.tunnels.Load(), "no tunnel while the removal waits")
+	require.Equal(t, StateIdle, m2.Status().State)
+	require.Contains(t, m2.Status().LastError, "being removed")
 }

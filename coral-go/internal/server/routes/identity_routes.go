@@ -157,6 +157,12 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/cloud/devices":                         "list the browsers and passkeys Coral Hub's owner trusts on this computer",  // #19669
 	"PUT /api/cloud/device-web-mode":                 "change the access a newly paired browser starts with",                      // #19669
 	"PUT /api/cloud/devices/{kid}/mode":              "change one paired device's access",                                         // #19669
+	"GET /api/cloud/links":                           "list the Coral Hubs this computer is linked to",                            // #20346
+	"POST /api/cloud/links":                          "add a Coral Hub link",                                                      // #20346
+	"POST /api/cloud/links/cancel":                   "cancel adding a Coral Hub",                                                 // #20385
+	"POST /api/cloud/links/confirm-owner":            "confirm the owner of an added Coral Hub",                                   // #20407
+	"PUT /api/cloud/links/{id}/cap":                  "change what one linked Coral Hub may do",                                   // #20346
+	"DELETE /api/cloud/links/{id}":                   "remove one Coral Hub link",                                                 // #20346
 	"DELETE /api/cloud/devices/{kid}":                "remove one paired device",                                                  // #19669
 	"POST /api/cloud/devices/clear-clock":            "reset the clock mark for signed device messages",                           // #19669
 	"POST /api/device-keys/message":                  "send a signed device message (only a Hub-forwarded browser does)",          // #19669

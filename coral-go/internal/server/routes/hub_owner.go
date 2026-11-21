@@ -72,7 +72,7 @@ func hubOwnerRequest(r *http.Request) callerIdentity {
 func ownerIdentityWith(r *http.Request, label func(context.Context) (string, error), record func(context.Context) (string, string, error), noLabelLogged *sync.Once) callerIdentity {
 	id := identifyOwner(r, label, record, noLabelLogged)
 	// A team's machine has no owner label to require: its record is the organisation, which the check has just matched.
-	if id.owner && !id.team && routeNeedsOwnerLabel(r) && !ownerLabelRecordedWith(r, label) {
+	if id.owner && !id.team && (routeNeedsOwnerLabel(r) || viaAddedLink(r.Context())) && !ownerLabelRecordedWith(r, label) {
 		id.owner = false
 	}
 	return id
@@ -290,12 +290,17 @@ func adoptOwnerFromRequest(r *http.Request) bool {
 	if !id.owner || !tunnel.ValidHubUser(id.pseudo) {
 		return false
 	}
-	// More than one hub account was stamped as the owner in the last hour: there is no one account to trust, so nothing is adopted (and the arm stays for the person to see the answer).
-	if _, _, several := ownerCandidate(ownerNow()); several {
+	link := addedLinkIDOf(r.Context()) // "" for the enrollment's own link; an added link has its own arm and its own record (#20407)
+	// More than one hub account was stamped as the owner in the last hour: there is no one account to trust, so nothing is adopted (and the arm stays for the person to see the answer). The stamps are the
+	// first link's: an added link is one Hub's, and its arm is the Operator's own act for that link alone.
+	if _, _, several := ownerCandidate(ownerNow()); several && link == "" {
 		return false
 	}
-	if !takeOwnerArm(ownerNow()) {
+	if !takeOwnerArm(ownerNow(), link) {
 		return false
+	}
+	if link != "" {
+		return hubLinkAdopt != nil && hubLinkAdopt(r.Context(), link, id.pseudo)
 	}
 	return hubOwnerAdopt(r.Context(), id.pseudo)
 }

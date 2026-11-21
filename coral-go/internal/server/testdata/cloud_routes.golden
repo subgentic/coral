@@ -23,6 +23,7 @@ DELETE /api/board/{project}/tasks/{taskID}/reminder interact
 DELETE /api/board/{project}/waits never
 DELETE /api/chief/checks/{checkID} never
 DELETE /api/cloud/devices/{kid} never
+DELETE /api/cloud/links/{id} never
 DELETE /api/folder-tags/{folderName}/{tagID} never
 DELETE /api/launch-disclosure/ack never
 DELETE /api/pinned-folders launch
@@ -147,6 +148,7 @@ GET /api/chief/checks never
 GET /api/chief/checks/{checkID} never
 GET /api/chief/triggers never
 GET /api/cloud/devices never
+GET /api/cloud/links never
 GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view
@@ -436,6 +438,9 @@ POST /api/cloud/cross-team-links interact
 POST /api/cloud/devices/clear-clock never
 POST /api/cloud/disconnect never
 POST /api/cloud/guide-revoked never
+POST /api/cloud/links never
+POST /api/cloud/links/cancel never
+POST /api/cloud/links/confirm-owner never
 POST /api/cloud/owner-label/arm never
 POST /api/cloud/redeem never
 POST /api/cloud/rekey never
@@ -601,6 +606,7 @@ PUT /api/cloud/devices/{kid}/mode never
 PUT /api/cloud/hub-cross-team never
 PUT /api/cloud/hub-dropbox-share never
 PUT /api/cloud/hub-relaunch never
+PUT /api/cloud/links/{id}/cap never
 PUT /api/cloud/max-mode never
 PUT /api/cloud/redact-tokens never
 PUT /api/custom-models launch

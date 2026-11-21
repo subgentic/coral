@@ -119,3 +119,25 @@ func TestRekeyOnlyForARefusalNotAReadError(t *testing.T) {
 	assert.Equal(t, "refused", st.State, "a malformed key is refused")
 	require.NoError(t, rs.Rekey(ctx))
 }
+
+// #20385 (QA INFO): links added at this computer carry tokens sealed with the old key, so the re-key removes them; the key state counts them so the notice can say so before the Operator confirms.
+func TestRekeyCountsAndRemovesAddedHubLinks(t *testing.T) {
+	rs, db, dir, _ := newRemoteStore(t)
+	ctx := context.Background()
+	cs := NewCloudStore(db, rs)
+	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "hub-token"))
+	AllowSecondLinkForTest(t)
+	_, err := cs.AddLink(ctx, "https://hub-b.example.com", "srv_b", "B", "tok-b", "view")
+	require.NoError(t, err)
+	require.NoError(t, os.Chmod(secretbox.KeyFilePath(dir), 0o644))
+	st, err := rs.KeyState(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, st.AddedLinks, "the enrollment's own link is counted by HubURL, not here")
+	require.NoError(t, rs.Rekey(ctx))
+	st, err = rs.KeyState(ctx)
+	require.NoError(t, err)
+	assert.Zero(t, st.AddedLinks)
+	links, err := cs.ListLinks(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, links)
+}

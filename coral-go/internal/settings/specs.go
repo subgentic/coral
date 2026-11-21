@@ -43,6 +43,7 @@ const (
 	HubAutoAcceptChanged     = "cloud_hub_auto_accept_changed"
 	UpdateChannel            = "update_channel"
 	CloudMaxMode             = "cloud_max_mode"
+	HubRevokeCall            = "hub_revoke_call"
 	IdentityActor            = "identity_actor"
 	AgentLaunchLimit         = "agent_launch_limit"
 	AutoResumeAfterAPIError  = "auto_resume_after_api_error"
@@ -271,6 +272,7 @@ func init() {
 	ownRoute(HubDropboxShare, KindBool, "false", "Share through Coral Hub (#16109): the Hub's owner may send a file to the Dropbox connected on the Hub, when the person at this computer presses Share on it. Off until the person here turns it on; it has its own route and is never set through the tunnel.")
 	optIn(HubDropboxShare)
 	ownRoute(HubCrossTeamSettings, KindBool, "true", "Coral Hub's owner may turn cross-team messaging and file sharing on or off for this computer's teams (#5572); off, Coral Hub changes neither, in either direction.")
+	coral(HubRevokeCall, "\"on\" lets Remove link ask the Hub to remove this computer (#20346, coral-hub #20354). Off until a joint real run and the Operator's yes; no route, flag or environment sets it.")
 	coral(HubAutoAcceptChanged, "Who last changed the Coral Hub auto-accept switch, the Coral Hub owner or this computer, and when, as JSON: written by Coral, shown beside the switch in Settings > Coral Hub and remote access (#5840).")
 	coral(CrossTeamLinksSeen, "Set once, by Coral, when a Coral Hub advertised cross_team_links/1 to this computer: from then on a connection without it is refused, never sent back to the old path (#5572).")
 	ownRoute(HubRedactTokens, KindBool, "true", "Redact tokens in what the Hub sees.")
