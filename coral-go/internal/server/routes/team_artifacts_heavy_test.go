@@ -60,7 +60,7 @@ func heavyServer(t *testing.T) (*httptest.Server, *BoardHandler, string) {
 
 var heavyQueries = map[string]string{
 	"waiting-on-you": "tag=for%20review&waiting=1&muted=0&versions=newest&limit=1",
-	"facets":         "facets=team&starred_first=1&versions=newest&limit=50",
+	"facets":         "facets=team&starred_first=true&versions=newest&limit=50",
 	"saved":          "tag=saved&versions=newest&limit=50",
 }
 
