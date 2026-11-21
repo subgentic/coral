@@ -56,6 +56,7 @@ const AW = await importOnce('./inbox_agent_wait.js'), { stillWaitingOnAgent } = 
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
+const { savedRouteOpen } = await importOnce('./saved_routes.js'); // through the Hub a bookmark write is offered only for the routes it reports open (saved.js has read them)
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
 await loadStyles('needs_actions.css'); // the actions cell's fixed slots (moved out of the start CSS, #12231)
 await loadStyles('inbox_review_groups.css');
@@ -1317,7 +1318,7 @@ function savedListSpec(where = '') {
                 { key: 'saved', label: 'Saved', tone: 'tertiary', align: 'end', line: 1, tiny: true, fixed: !dock, width: dock ? undefined : '8rem', cell: f => f.saved },
                 ...(rows.some(f => f.state && f.state.toLowerCase() !== v.tab) ? [{ key: 'state', label: 'State', line: 0, cell: f => (f.state ? DT.tag(f.state) : '') }] : []), // the Open and Done filter already says it: a State column that repeats it on every row is drawn only when a row's state is something else (gone)
                 { key: 'action', label: 'Action', hideLabel: true, line: 1, tiny: true, fixed: !dock, width: dock ? undefined : '6rem', cell: f => {
-                    if (f.gone || isCloud()) return '';
+                    if (f.gone || !savedRouteOpen('done')) return '';
                     const b = DT.el('button', 'btn btn-small dt-quiet dt-hover-action inbox-saved-done', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`); // drawn on the row's hover and keyboard focus (css); always on a touch screen
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
                     return b; } },
@@ -1342,8 +1343,8 @@ async function openDockSavedSheet(id, opener) {
     const cannotOpen = f.gone || f.noopen;
     const actions = [];
     if (!isCloud() && !cannotOpen) actions.push({ label: f.open.text, primary: true, ariaLabel: f.open.name, run: () => saved.savedOpen(it) });
-    if (!f.gone && !isCloud()) actions.push({ label: f.done ? 'Reopen' : 'Done', ariaLabel: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`, run: async () => { const now = saved.findSavedItem(id); if (!now) return; const done = !now.done_at; if (await saved.savedSetDone(now, done)) { sayLive(done ? 'Marked done' : 'Moved back to Open'); back(); } } }); // a phone's rows have no Done button: it is in the item (#9786)
-    if (!isCloud()) actions.push({ label: 'Remove from saved', ariaLabel: `Remove from saved: ${f.which}`, run: async () => { if (await saved.savedRemove(it)) { sayLive('Removed from saved'); back(); } } });
+    if (!f.gone && savedRouteOpen('done')) actions.push({ label: f.done ? 'Reopen' : 'Done', ariaLabel: `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`, run: async () => { const now = saved.findSavedItem(id); if (!now) return; const done = !now.done_at; if (await saved.savedSetDone(now, done)) { sayLive(done ? 'Marked done' : 'Moved back to Open'); back(); } } }); // a phone's rows have no Done button: it is in the item (#9786)
+    if (savedRouteOpen('remove')) actions.push({ label: 'Remove from saved', ariaLabel: `Remove from saved: ${f.which}`, run: async () => { if (await saved.savedRemove(it)) { sayLive('Removed from saved'); back(); } } });
     dockSheetId = id;
     openDetailPane({
         key: `saved:${id}`, title: f.title, sub: [f.said ? `Said ${f.said}` : '', `Saved ${f.saved}`, f.state, f.serverName].filter(Boolean).join(' · '),
@@ -1842,7 +1843,7 @@ function openSavedPage(id) {
     });
     wrap.addEventListener('focusout', e => { if (openMore && openMore.wrap === wrap && !wrap.contains(e.relatedTarget)) closeMore(false); }); // Tab out of the menu closes it
     rm.addEventListener('click', async () => { closeMore(false); if (await saved.savedRemove(it)) { sayLive('Removed from saved'); closePage(true); } });
-    menu.append(rm); wrap.append(toggle, menu); if (!isCloud()) bar.append(wrap);
+    menu.append(rm); wrap.append(toggle, menu); if (savedRouteOpen('remove')) bar.append(wrap);
     const open = el('button', 'btn btn-small btn-primary', f.open.text);
     open.type = 'button'; open.setAttribute('aria-label', f.open.name);
     if (f.gone || f.noopen) { open.disabled = true; open.title = f.why; } else open.addEventListener('click', () => saved.savedOpen(it));
