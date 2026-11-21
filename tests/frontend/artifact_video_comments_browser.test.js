@@ -57,7 +57,7 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
       if(method==='GET')return json({comments:window.__comments,you:{can_comment:true,can_lock:true},locked:false});
       const body=o.body?JSON.parse(o.body):null;window.__writes.push({url,method,body});
       const m=url.match(/comments\\/(\\d+)\\/(resolve|reopen|send)/);
-      if(m){const c=window.__comments.find(c=>c.id===+m[1]);if(m[2]==='send')return json({ok:true,results:[{agent:'Dev',state:'sent'}]});c.resolved_at=m[2]==='resolve'?new Date().toISOString():null;return json(c);}
+      if(m){const c=window.__comments.find(c=>c.id===+m[1]);if(m[2]==='send'){const b=body&&body.bundle;return json({ok:true,messages:b&&body.last?1:0,results:[{agent:'Dev',state:b&&!body.last?'queued':window.__busy?'queued':'sent'}]});}c.resolved_at=m[2]==='resolve'?new Date().toISOString():null;return json(c);}
       const c={...window.__comments[0],...body,id:window.__comments.length+1,artifact_id:'${HEX}'};window.__comments.push(c);return json(c);
      }
      if(url.includes('/api/board/team-a/status'))return json({agents:[{role:'Dev',name:'Dev',agent_type:'codex',availability:'ready'}]});
@@ -108,9 +108,15 @@ const HEX = '9'.repeat(64), OLD = '8'.repeat(64);
     await ev(`window.__sendStart=window.__writes.length;document.querySelector('.ac-send-open').click()`);
     await waitFor(`!!document.querySelector('.ac-ask input[type="checkbox"]')`,'bulk send picker');
     await ev(`document.querySelector('.ac-ask input[type="checkbox"]').click();document.querySelector('.ac-ask-go').click()`);
-    await waitFor(`window.__writes.slice(window.__sendStart).filter(w=>w.url.endsWith('/send')).length===window.__comments.length`,'all open comments sent sequentially',5000,`({sent:window.__writes.slice(window.__sendStart),comments:window.__comments,picker:document.querySelector('.ac-ask')?.textContent})`);
-    assert.equal(await ev(`(()=>{const sent=window.__writes.slice(window.__sendStart).filter(w=>w.url.endsWith('/send'));const expected=[...window.__comments].sort((a,b)=>a.at_s-b.at_s);return sent.every((w,i)=>w.url.includes('/'+expected[i].artifact_id+'/comments/'+expected[i].id+'/send'));})()`),true,'bulk sends in time order using each original artifact');
+    await waitFor(`window.__writes.slice(window.__sendStart).filter(w=>w.url.endsWith('/send')).length===window.__comments.length-1`,'all open comments not yet asked (comment 1 was asked above) sent sequentially',5000,`({sent:window.__writes.slice(window.__sendStart),comments:window.__comments,picker:document.querySelector('.ac-ask')?.textContent})`);
+    assert.equal(await ev(`(()=>{const sent=window.__writes.slice(window.__sendStart).filter(w=>w.url.endsWith('/send'));const expected=[...window.__comments].filter(c=>c.id!==1).sort((a,b)=>a.at_s-b.at_s);return sent.every((w,i)=>w.url.includes('/'+expected[i].artifact_id+'/comments/'+expected[i].id+'/send'));})()`),true,'bulk sends in time order using each original artifact');
+    assert.deepEqual(await ev(`window.__writes.slice(window.__sendStart).filter(w=>w.url.endsWith('/send')).map(w=>[!!w.body.bundle,!!w.body.last])`),await ev(`window.__writes.slice(window.__sendStart).filter(w=>w.url.endsWith('/send')).map((w,i,a)=>[true,i===a.length-1])`),'every comment goes as part of one bundle; only the last asks for the delivery');
+    await waitFor(`!!document.querySelector('.ac-ask-state')`,'bulk results shown');
     await ev(`document.querySelector('.ac-ask .ac-cancel').click()`);
+    // #20240: after the send the button no longer offers the same send again; the panel says how many went and how many wait for a busy agent
+    const done=await ev(`({btn:!!document.querySelector('.ac-send-open'),done:document.querySelector('.ac-send-done')?.textContent||''})`);
+    assert.equal(done.btn,false,'the Send N open comments button is gone once every comment was sent: '+JSON.stringify(done));
+    assert.match(done.done,/^Sent \d+ open comments to Dev, in one message\. /,'the panel says all of them went in one message: '+done.done);
    } else {
     assert.equal(await ev(`document.querySelector('.avc-comment').hidden && !document.querySelector('.ac-whole') && !document.querySelector('.ac-resolve') && !document.querySelector('.ac-ask-open') && !document.querySelector('.ac-send-open')`),true,'Hub controls hidden: '+JSON.stringify(await ev(`({boot:JSON.parse(document.getElementById('coral-boot').textContent),comment:document.querySelector('.avc-comment').hidden,whole:!!document.querySelector('.ac-whole'),resolve:!!document.querySelector('.ac-resolve'),ask:!!document.querySelector('.ac-ask-open'),bulk:!!document.querySelector('.ac-send-open')})`)));
     assert.equal(await ev(`window.__writes.length`),0);

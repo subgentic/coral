@@ -289,8 +289,9 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one, or Tab to the document and press Enter to choose a passage.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
-        const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked);
-        if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
+        const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked && !askedNow(c.id).size); // one an agent already has is not offered again (#20240)
+        if (st.bulkSent && st.video) { const b = st.bulkSent, who = b.agents.join(', '); const done = el('p', 'ac-send-done', `Sent ${plural(b.total, 'open comment')}${b.of > b.total ? ` of ${b.of}` : ''} to ${who}${b.queued ? ` (delivers when ${b.agents.length === 1 ? who : 'the agent'} is free)` : b.messages > 1 ? `, in ${b.messages} messages because of the size limit of one` : ', in one message'}. Each comment says where it stands.`); done.setAttribute('role', 'status'); panel.append(done); }
+        if (st.video && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, st.bulkSent ? 'remaining open comment' : 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked && !opts.compact) {
             const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); focusComposer(); });

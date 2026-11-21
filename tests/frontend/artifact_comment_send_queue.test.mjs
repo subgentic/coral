@@ -30,3 +30,14 @@ for (const [states,expected] of [
  const result=await sendCommentQueue(comments.slice(0,states.length),{isCurrent:()=>true,send:async()=>({ok:true,results:[{agent:'Dev',state:states[n++]}]}),record:()=>{}});
  assert.equal(result.response.results[0].state,expected,'merge '+states.join(' -> '));
 }
+
+// #20240: several comments go as ONE bundle: every request says so, only the last asks for the delivery, and the last answer's state (sent, or queued while the agent is in a turn) is the bundle's.
+{
+ const flags = [], answers = ['queued', 'queued', 'sent'];
+ const r = await sendCommentQueue(comments, { isCurrent: () => true, send: async (c, b) => { flags.push(b); return { ok: true, messages: 1, results: [{ agent: 'Dev', state: answers[flags.length - 1] }] }; }, record: () => {} });
+ assert.deepEqual(flags, [{ bundle: true, last: false }, { bundle: true, last: false }, { bundle: true, last: true }], 'every comment is part of the bundle; only the last delivers');
+ assert.equal(r.response.results[0].state, 'sent', 'the last answer says the bundle was delivered');
+ const one = []; await sendCommentQueue(comments.slice(0, 1), { isCurrent: () => true, send: async (c, b) => { one.push(b); return { ok: true, results: [{ agent: 'Dev', state: 'sent' }] }; }, record: () => {} });
+ assert.deepEqual(one, [null], 'a single comment is sent as before');
+}
+console.log('artifact_comment_send_queue: bundle flags and the last answer pass');
