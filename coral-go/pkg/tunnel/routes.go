@@ -273,6 +273,9 @@ var routeTable = cat(
 		// A goal's thread (#20061, coral-hub's #253742): the same read for the key goal:<team>:<n> and no other ({goal} matches that shape only, never a digest or a diff: key). Its query is board and state, no series
 		// (routeQueries has its own shape). The stamped Hub owner is the owner kind for this read alone (ownerCommentRequest); a grantee, a viewer and the service stay refused. No write and no diff row are listed (never).
 		"/api/artifacts/{goal}/comments",
+		// A diff file's thread (#20255, coral-hub's #256214): the same read for the key diff:<team>:<session>:<16 hex> and no other ({diff} matches that shape only, never a digest or a goal: key). Its query is board and
+		// state, no series. The stamped Hub owner is the owner kind for this read alone (ownerCommentRequest, diffCommentSubject); a grantee, a viewer and the service stay refused. No write is listed (never).
+		"/api/artifacts/{diff}/comments",
 		"/api/board/{project}/tasks/{id}/artifact-content",
 		"/api/board/{project}/artifacts",
 		"/api/session-artifacts",
@@ -635,7 +638,7 @@ var routeTable = cat(
 func shapeOf(method, pattern string) string {
 	segs := strings.Split(pattern, "/")
 	for i, sg := range segs {
-		if strings.HasPrefix(sg, "{") && sg != "{goal}" { // {goal} keeps its name: the goal thread's read has its own query list (board and state, no series), not the artifact read's
+		if strings.HasPrefix(sg, "{") && sg != "{goal}" && sg != "{diff}" { // {goal} keeps its name: the goal thread's read has its own query list (board and state, no series), not the artifact read's
 			segs[i] = "{}"
 		}
 	}
@@ -888,6 +891,9 @@ func RoutePatterns() []string {
 // goalKeyRe is a goal thread's subject key, goal:<team>:<n>, the shape the machine itself parses (goalSubjectRe in internal/server/routes): a team name as the board names have it, a positive number with no leading zero.
 var goalKeyRe = regexp.MustCompile(`^goal:[A-Za-z0-9][A-Za-z0-9_.-]{0,63}:[1-9][0-9]{0,9}$`)
 
+// diffKeyRe is a diff thread's subject key, diff:<team>:<session id>:<16 hex>, the shape the machine itself parses (diffSubjectRe in internal/server/routes).
+var diffKeyRe = regexp.MustCompile(`^diff:[A-Za-z0-9][A-Za-z0-9_.-]{0,63}:[A-Za-z0-9][A-Za-z0-9_-]{5,63}:[0-9a-f]{16}$`)
+
 func splitSegments(p string) ([]string, bool) {
 	if !strings.HasPrefix(p, "/") || p == "/" {
 		return nil, false
@@ -915,6 +921,12 @@ func matchSegments(pattern string, segs []string) bool {
 		}
 		if ps == "{goal}" {
 			if !goalKeyRe.MatchString(segs[i]) {
+				return false
+			}
+			continue
+		}
+		if ps == "{diff}" {
+			if !diffKeyRe.MatchString(segs[i]) {
 				return false
 			}
 			continue

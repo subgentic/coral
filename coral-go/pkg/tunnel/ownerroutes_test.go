@@ -44,7 +44,7 @@ func instances(pattern string) []string {
 	hex := strings.Repeat("a", 64)
 	var out []string
 	for _, id := range []string{"12", "x"} {
-		p := strings.NewReplacer("{hex64}", hex, "{hex32}", hex[:32], "{goal}", "goal:team-a:12").Replace(pattern)
+		p := strings.NewReplacer("{hex64}", hex, "{hex32}", hex[:32], "{goal}", "goal:team-a:12", "{diff}", "diff:coral-go-team:agent-12345:0123456789abcdef").Replace(pattern)
 		segs := strings.Split(p, "/")
 		for i, s := range segs {
 			if strings.HasPrefix(s, "{") {
@@ -125,6 +125,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			}
 			// The goal thread's read (#20061) is the owner's alone through the hub, for that one key: the old list never had it.
 			if m == http.MethodGet && strings.HasPrefix(p, "/api/artifacts/goal:") && strings.HasSuffix(p, "/comments") {
+				continue
+			}
+			// The diff thread's read (#20255) is the owner's alone through the hub, for that one key: the old list never had it.
+			if m == http.MethodGet && strings.HasPrefix(p, "/api/artifacts/diff:") && strings.HasSuffix(p, "/comments") {
 				continue
 			}
 			// Resolving a shortened artifact link (#9841) is the owner's alone through the hub: the old list never had it.

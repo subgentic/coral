@@ -137,7 +137,7 @@ func (h *SessionsHandler) diffCommentSubject(w http.ResponseWriter, r *http.Requ
 	}
 	// Defence in depth (#12560, QA): artifactCommentCaller below already gives a tunnelled request no owner standing, so removing this guard or the caller-kind check after it changes no test; both stay so a change to the
 	// caller rules cannot open a person's source code to the Hub.
-	if cloud.Tunneled(r) {
+	if cloud.Tunneled(r) && !(r.Method == http.MethodGet && ownerCommentRequest(r)) { // the one read the Hub's owner has (#20255): the owner row of pkg/tunnel, GET only; any other method or key stays refused
 		commentRefuse(w, http.StatusForbidden, "owner_only", "comments on a diff are for the person at this computer")
 		return false
 	}

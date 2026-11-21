@@ -28,6 +28,8 @@ func concretePath(pattern string) string {
 			segs[i] = strings.Repeat("ab", 16)
 		case s == "{goal}":
 			segs[i] = "goal:team-a:12"
+		case s == "{diff}":
+			segs[i] = "diff:coral-go-team:agent-12345:0123456789abcdef"
 		case s == "{uiid}":
 			segs[i] = "panel-1"
 		case strings.HasPrefix(s, "{") && strings.HasSuffix(s, "}"):

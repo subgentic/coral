@@ -24,7 +24,7 @@ func TestRouteQueriesListOnlyReachableRoutes(t *testing.T) {
 			t.Errorf("%s: the tunnel refuses this route at every tier; drop it from the table (python3 tools/gen_route_queries.py)", shape)
 			continue
 		}
-		pattern, tier, ok := RuleFor(method, strings.ReplaceAll(strings.ReplaceAll(path, "{}", shapeSegment), "{goal}", "goal:coral-go-team:1"))
+		pattern, tier, ok := RuleFor(method, strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(path, "{}", shapeSegment), "{goal}", "goal:coral-go-team:1"), "{diff}", "diff:coral-go-team:agent-12345:0123456789abcdef"))
 		if !ok || tier == TierNever {
 			t.Errorf("%s: no allowing rule", shape)
 			continue

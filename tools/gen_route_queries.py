@@ -73,6 +73,8 @@ EXTRA = {
     'GET /api/artifacts/{}/comments': {'state', 'board', 'series'},
     # A goal's thread (#20061, coral-hub's #253742): the owner's read of goal:<team>:<n> through the Hub, its own shape ({goal}, pkg/tunnel shapeOf keeps the name): board and state only, never series (a goal has no versions).
     'GET /api/artifacts/{goal}/comments': {'state', 'board'},
+    # A diff file's thread (#20255, coral-hub's #256214): the owner's read of diff:<team>:<session>:<16 hex> through the Hub, its own shape ({diff}): board and state only, never series.
+    'GET /api/artifacts/{diff}/comments': {'state', 'board'},
 }
 
 # Parameters a handler reads that Coral Hub never sends, refused through the tunnel (#3942, agreed with coral-hub):
