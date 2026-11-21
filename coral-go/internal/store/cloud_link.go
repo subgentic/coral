@@ -130,6 +130,12 @@ func (s *CloudStore) LinkByOrigin(ctx context.Context, hubURL string) (*CloudLin
 	return &l, err
 }
 
+// LinkExists reports whether id is a link on this computer. A store error is "no": the caller refuses.
+func (s *CloudStore) LinkExists(ctx context.Context, id string) bool {
+	var n int
+	return s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE link_id = ?", id) == nil && n == 1
+}
+
 // LinkToken returns a link's decrypted token, for dialing only (see Token). A link with no token (one made paused because its token could not be read) returns ErrKeyUnreadable.
 func (s *CloudStore) LinkToken(ctx context.Context, linkID string) (string, error) {
 	var env string
