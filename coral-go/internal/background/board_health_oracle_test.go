@@ -111,6 +111,9 @@ func dumpBoard(t *testing.T, path string) []string {
 			var b strings.Builder
 			b.WriteString(tbl)
 			for i, v := range vals {
+				if tbl == "health_items" && cols[i] == "text" {
+					continue // the shown line of each open item (#20495) is new work the frozen walk does not store
+				}
 				if bs, ok := v.([]byte); ok {
 					v = string(bs)
 				}
