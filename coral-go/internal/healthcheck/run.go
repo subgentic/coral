@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // Timeouts: the default and the most a check may ask for.
@@ -106,6 +108,7 @@ func Run(ctx context.Context, sp Spec) Result {
 	var res Result
 	done := make(chan struct{})
 	go func() {
+		defer safego.Recover("healthcheck/run:108")
 		select {
 		case <-ctx.Done():
 			killGroup(cmd)

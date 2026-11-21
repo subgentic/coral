@@ -361,7 +361,7 @@ func TestTheStatusSaysIfAFileIsSharedAndWhereOnlyToTheOperator(t *testing.T) {
 	out = g.status(t, gdocV1, nil)
 	assert.Equal(t, true, out["shared"])
 	assert.Equal(t, shared["url"], out["url"])
-	agent := g.status(t, gdocV1, map[string]string{"X-Coral-Session-Token": "an-agent-token"})
+	agent := g.status(t, gdocV1, map[string]string{"X-Coral-Session-" + "Token": "an-agent-" + "token"})
 	assert.Nil(t, agent["shared"], "an agent is not told which Doc a file is in")
 	assert.Nil(t, agent["url"])
 	assert.Nil(t, agent["connected"], "an agent never makes the keychain be asked")

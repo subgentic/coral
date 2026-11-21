@@ -14,6 +14,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/healthcheck"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -89,6 +90,7 @@ func (c *CustomChecks) RunOnce(ctx context.Context) {
 		}
 		wg.Add(1)
 		go func(hc board.HealthCheck) {
+			defer safego.Recover("background/health_custom_checks:91")
 			defer wg.Done()
 			defer func() { c.mu.Lock(); delete(c.running, hc.ID); c.mu.Unlock() }()
 			select {
