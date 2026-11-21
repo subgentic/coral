@@ -303,6 +303,14 @@ function launchDisclosureLine(s) {
     return line;
 }
 
+/** New agent, New team and New terminal for one linked computer, with the reason in words when they are off (mock #20111): offline says it, View says it with the way to change it. Used by the list row and the computer's page. */
+function startFor(s) {
+    const el = (tag, cls, text) => h(tag, { className: cls || '', ...(text != null ? { text } : {}) });
+    const online = s.online === true, view = effectiveOf(s) === 'view';
+    const reason = !online ? `Offline${s.last_seen ? ` since ${formatLastSeen(s.last_seen)}` : ''}. It can't start things until it is back.` : view ? 'Hub access is View, so it cannot start things.' : '';
+    return startCell(s.id, s.label || 'this computer', el, { reason, change: online && view ? { label: 'Change to Interact', run: () => setAccess(s, 'interact') } : null });
+}
+
 /** A machine's page (Goal #79, #9722): the machine's name (the rename form while renaming), its facts, the details the row used to expand to (health, what applies, the update notice, the relink help, the revoke question), and its actions in a foot bar: the relink help, Rename, and Revoke behind More. */
 function machinePage(s) {
     const live = liveOf(s), online = s.online === true, isBusy = busy.has(s.id);
@@ -323,6 +331,7 @@ function machinePage(s) {
             ...fact('Hub access', accessPicker(s, isBusy, helpId))),
         detailCell(s, live, online, isBusy, helpId),
         launchDisclosureLine(s),
+        h('div', { className: 'servers-page-start' }, startFor(s)), // the same three starts as the list row, by Rename and More (mock #20111)
         h('div', { className: 'item-bar servers-page-bar cs-actions' }, rowActions(s, isBusy)));
     page.addEventListener('keydown', e => { if (e.key === 'Escape' && confirming === s.id) { e.preventDefault(); e.stopPropagation(); cancelRevoke(s); } });
     return page;
@@ -341,13 +350,7 @@ function serversTable(shown) {
         needs: s => { const n = needsCount(s); if (!n) return ''; const e = h('span', { className: 'cs-needs', text: String(n) }); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; },
         seen: s => seenWords(s),
         access: s => accessPicker(s, busy.has(s.id), `${rowId(s.id)}-access-help`),
-        start: s => {
-            const el = (tag, cls, text) => h(tag, { className: cls || '', ...(text != null ? { text } : {}) });
-            const online = s.online === true, view = effectiveOf(s) === 'view';
-            // the reason in words, not only grey buttons (mock #20111): offline says it, View says it with the way to change it
-            const reason = !online ? `Offline${s.last_seen ? ` since ${formatLastSeen(s.last_seen)}` : ''}. It can't start things until it is back.` : view ? 'Hub access is View.' : '';
-            return startCell(s.id, s.label || 'this computer', el, { reason, change: online && view ? { label: 'Change to Interact', run: () => setAccess(s, 'interact') } : null });
-        },
+        start: s => startFor(s),
     };
     return buildServersTable(DT, {
         label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed computer',
@@ -359,7 +362,7 @@ function serversTable(shown) {
             { key: 'seen', foldLabel: true, label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
             { key: 'version', foldLabel: true, label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
             { key: 'access', foldLabel: true, label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
-            { key: 'start', label: 'Start', line: 3, width: '22rem', fixed: true, align: 'end', cell: cellOf.start },
+            { key: 'start', label: 'Start', line: 3, width: '19rem', fixed: true, align: 'end', cell: cellOf.start },
         ],
         // The names the deep links, the focus keep and the suites read: the table keeps its own classes, these are hooks only (no rule in any stylesheet); they are put back whenever a sort draws the rows again.
         decorateHead: (th, c) => { th.classList.add('cs-th', `cs-col-${c.key}`); th.querySelector('.dt-sort')?.classList.add('cs-sort'); },

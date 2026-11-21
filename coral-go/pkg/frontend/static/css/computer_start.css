@@ -4,4 +4,7 @@
 .computer-start-change { background: none; border: 0; padding: 0 2px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
 .computer-start-actions .btn { margin: 0; white-space: nowrap; }
 .computer-start-note { margin: 0; max-width: 20rem; color: var(--text-muted); font-size: var(--fs-base); text-align: right; }
-@media (max-width: 600px) { .computer-start, .computer-start-actions { width: 100%; align-items: stretch; } .computer-start-actions .btn { flex: 1 1 0; min-height: 44px; } .computer-start-note { text-align: left; max-width: none; } }
+@media (max-width: 600px) { .computer-start, .computer-start-actions { width: 100%; align-items: stretch; } .computer-start-actions .btn { flex: 1 1 0; min-width: 0; min-height: 44px; padding-left: 4px; padding-right: 4px; } .computer-start-change { display: block; min-height: 44px; padding: 0 4px; text-align: left; } .computer-start-note { text-align: left; max-width: none; } }
+/* an off New agent stays the primary button, dimmed (mock #20111): the others go flat, a state told by color and by the sentence under it, not by opacity alone */
+.computer-start-btn.btn-primary:disabled { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); }
+.servers-page-start { margin: 0 0 12px; } .servers-page-start .computer-start { align-items: flex-start; } .servers-page-start .computer-start-note { text-align: left; }
