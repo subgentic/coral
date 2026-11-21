@@ -148,6 +148,8 @@ c GET /api/cloud/status
 b GET /api/custom-models
 b GET /api/custom-modes
 c GET /api/filesystem/is-git
+c GET /api/launch/check
+c GET /api/launch/where
 c GET /api/gdoc/status
 b GET /api/filesystem/trust-probe
 c GET /api/filesystem/list

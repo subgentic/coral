@@ -175,6 +175,8 @@ GET /api/google/status never
 GET /api/health view
 GET /api/history-import never
 GET /api/launch-disclosure view
+GET /api/launch/check never
+GET /api/launch/where never
 GET /api/needs-you view
 GET /api/operator-asks view
 GET /api/pinned-folders view

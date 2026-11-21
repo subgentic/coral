@@ -747,6 +747,8 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/system/network-info", sysHandler.NetworkInfo)
 	r.Get("/api/filesystem/list", sysHandler.ListFilesystem)
 	r.Get("/api/filesystem/is-git", sysHandler.IsGitDir)
+	r.Get("/api/launch/where", sysHandler.LaunchWhere) // #20388: the launch's where step: repo, branch state, branches, worktrees, recent folders (read-only)
+	r.Get("/api/launch/check", sysHandler.LaunchCheck) // #20388: the setup check before a launch: folder, repo, branch, worktree (read-only)
 	r.Get("/api/filesystem/trust-probe", sysHandler.TrustFolderProbe)
 	r.Post("/api/indexer/refresh", sysHandler.RefreshIndexer)
 	r.With(routes.RefuseSignInLink).Post("/api/teams/import", sysHandler.ImportTeam)
