@@ -24,3 +24,4 @@
     .computer-bar-button { width: 100%; max-width: none; min-height: 44px; }
     .computer-bar-list { position: fixed; inset: auto 0 0 0; z-index: 60; width: auto; max-height: 70vh; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
 }
+#cost-page > .computer-bar { margin: 0 var(--space-lg) var(--space-md); }
