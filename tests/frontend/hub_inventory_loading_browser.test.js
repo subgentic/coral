@@ -27,6 +27,11 @@ const {setupHubWorld,BASE}=require('./helpers/hub_world');
    if(name==='goals')await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);
    if(name==='automations')await ev(`import((window.__coralStatic||'/static/')+'automations_cloud.js').then(m=>m.openAutomationsRoute({folder:'jobs'}))`);
    await waitFor(`document.querySelector(${JSON.stringify(selector)})?.textContent.trim().length>0`,name+' shell while inventory is held',15000);
+   if(name==='goals') {
+    // #20503: the folder's own empty state must win over ordinary empty/update text,
+    // not merely a Loading computers message elsewhere in the surrounding shell.
+    await waitFor(`document.querySelector('#group-table-view .empty-state-line')?.textContent==='Loading goals…'`, 'Goals empty state takes loading precedence while inventory is unknown');
+   }
    if(name==='analytics')await ev(`import((window.__coralStatic||'/static/')+'analytics_views.js').then(m=>m.selectView('overview'))`);
    const text=await ev(`document.querySelector(${JSON.stringify(selector)}).textContent`);
    if(!empty)await shot(`${width}-${name}-held`);console.log(width+' '+name+' held: '+text.slice(0,140));
