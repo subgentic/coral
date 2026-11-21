@@ -23,9 +23,9 @@ export function connectedWords(seen, now = new Date()) {
     return `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}`;
 }
 
-/** The card for one computer and one state. state: 'offline' | 'not-shared' | 'no-answer' | 'old' (the hedged 404 words until the Hub says why);
+/** The card for one computer and one state. state: 'offline' | 'not-shared' | 'no-answer' | 'update-required' (the Hub's explicit minimum) | 'old' (the hedged 404 words until the Hub says why);
  *  what names the thing that could not be read ('automations'); detail is the support line; retry re-reads; barId is the page's computer bar. */
-export function computerCard({ state, server, what, detail = '', retry, barId, onAll }) {
+export function computerCard({ state, server, what, detail = '', min = '', retry, barId, onAll }) {
     const name = machineLabel(server), card = node('section', 'computer-card');
     card.setAttribute('data-computer-card', state); card.setAttribute('role', 'status');
     let headline, why, actions = [];
@@ -42,12 +42,16 @@ export function computerCard({ state, server, what, detail = '', retry, barId, o
         headline = `${name} did not answer`;
         why = 'This is usually a short network gap. Nothing was changed.';
         actions = [retry && button('Try again', retry, true), button('Switch computer', switchComputer(barId))];
+    } else if (state === 'update-required') {
+        headline = `Update Coral on ${name} (needs ${min}+)`;
+        why = 'Update Coral on that computer, then try again.';
+        actions = [retry && button('Retry', retry, true), button('Switch computer', switchComputer(barId))];
     } else {
         headline = `${name} can't show ${what} here`;
         why = 'It may need a newer Coral.';
         actions = [retry && button('Retry', retry, true), button('Switch computer', switchComputer(barId))];
     }
-    card.append(node('span', 'computer-card-mark', state === 'old' || state === 'not-shared' ? 'i' : '!'));
+    card.append(node('span', 'computer-card-mark', state === 'old' || state === 'not-shared' || state === 'update-required' ? 'i' : '!'));
     const body = node('div', 'computer-card-body');
     body.append(node('h3', 'computer-card-title', headline), node('p', 'computer-card-why', why));
     const row = node('div', 'computer-card-actions'); row.append(...actions.filter(Boolean)); body.append(row);
@@ -60,4 +64,4 @@ export function computerCard({ state, server, what, detail = '', retry, barId, o
 export const stateOfStatus = (server, status) => !machineOnline(server) ? 'offline' : status === 403 ? 'not-shared' : status === 404 ? 'old' : 'no-answer';
 
 /** One short phrase for a computer whose rows are left out of a merged list ("lab-pc may need a newer Coral"). */
-export const notShownText = (e, what) => { const name = machineLabel(e.server); return e.state === 'offline' ? `${name} is offline` : e.state === 'not-shared' ? `${name} does not share ${what}` : e.state === 'old' ? `${name} may need a newer Coral` : `${name} did not answer`; };
+export const notShownText = (e, what) => { const name = machineLabel(e.server); return e.state === 'update-required' ? `Update Coral on ${name} (needs ${e.min}+)` : e.state === 'offline' ? `${name} is offline` : e.state === 'not-shared' ? `${name} does not share ${what}` : e.state === 'old' ? `${name} may need a newer Coral` : `${name} did not answer`; };
