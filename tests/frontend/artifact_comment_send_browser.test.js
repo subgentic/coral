@@ -39,7 +39,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             if (url.includes('/api/artifacts/${HEX}/comments')) {
                 const sub = url.split('/comments')[1].split('?')[0];
                 if (method === 'POST' && /^\\/\\d+\\/send$/.test(sub)) {
-                    const b = JSON.parse(o.body); window.__sends.push({ id: Number(sub.split('/')[1]), agents: b.agents, now: b.now === true });
+                    const b = JSON.parse(o.body); window.__sends.push({ id: Number(sub.split('/')[1]), agents: b.agents, now: b.now === true, bundle: b.bundle === true, last: b.last === true });
                     if (window.__send.body) return json(window.__send.body, window.__send.status);
                     return json({ ok: true, results: b.agents.map((a, i) => ({ agent: a, state: a === 'Backend Dev' ? 'already_asked' : 'sent', ask_id: i + 1 })) });
                 }
@@ -231,16 +231,51 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
 
             }
 
+            // #20371: text documents offer the same bundled send as video, keeping
+            // per-thread reply destinations and a single final delivery boundary.
+            await open('ask-team', undefined, true);
+            await ev(`window.__cs.push({...window.__cs[0],id:4,body:'Also update the examples.',asks:[]}); true`);
+            await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
+            await ev(`import(${S}+'artifact_viewer.js').then(v=>v.openArtifactViewer('${HEX}',{filename:'plan.md',board:'ask-team'})).then(()=>true)`);
+            await waitFor(`document.querySelectorAll('.ac-card').length>=2`,tag+': two open text threads',8000);
+            await ev(`document.querySelector('.ac-toggle')?.getAttribute('aria-expanded')==='true'||document.querySelector('.ac-toggle')?.click();true`);
+            await ev(`document.querySelector('.ac-send-open')?.scrollIntoView({block:'center',behavior:'instant'});true`);
+            await shot(`text-bundle-${w}`);
+            const bundle=await ev(`document.querySelector('.ac-send-open')?.textContent||''`);
+            check(`${tag}: text offers Send 2 open comments to an agent`,bundle==='Send 2 open comments to an agent',bundle);
+            if(bundle){
+                await ev(`document.querySelector('.ac-send-open').click();true`);
+                await waitFor(`!!document.querySelector('.ac-ask input[value="QA Engineer"]')`,tag+': bundle agent picker',8000);
+                await ev(`document.querySelector('.ac-ask input[value="QA Engineer"]').click();document.querySelector('.ac-ask-go').click();true`);
+                await waitFor(`window.__sends.length===2`,tag+': both open threads queued',8000);
+                const sent=await ev(`window.__sends`);
+                check(`${tag}: only the two open top-level threads share a bundle; only the last delivers`,sent[0].id===1&&sent[1].id===4&&sent.every(x=>x.bundle&&x.agents.join()==='QA Engineer')&&!sent[0].last&&sent[1].last,JSON.stringify(sent));
+                await waitFor(`!!document.querySelector('.ac-send-done')`,tag+': bundled result',8000);
+                check(`${tag}: text confirms one message and per-comment destinations`,await ev(`/Sent 2 open comments to QA Engineer, in one message/.test(document.querySelector('.ac-send-done').textContent)&&document.querySelector('.ac-send-done').textContent.includes('Each comment says where it stands.')`));
+                await ev(`document.querySelector('.ac-send-done').scrollIntoView({block:'center',behavior:'instant'});true`);
+                await shot(`text-bundle-sent-${w}`);
+            }
+            await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click();true`);
+            // Exercise the goal component's real uncommitted slot with a labelled team
+            // whose worktree basename is an opaque board id.
+            await ev(`(async()=>{const sb=await import(${S}+'server_base.js');sb.noteBoardLabel('local','b-n4dwtytis2','Release studio');const real=window.fetch;window.fetch=(u,o)=>String(u).endsWith('/uncommitted')?Promise.resolve(new Response(JSON.stringify({repos:[{folder:'/work/teams/b-n4dwtytis2',changed:0,new:1,files:[{path:'notes.txt',status:'new'}],secret_like:[],signing:false}]}),{headers:{'Content-Type':'application/json'}})):real(u,o);const host=document.createElement('div');host.id='labelled-goal';document.body.append(host);const g=await import(${S}+'goal_view.js');window.__labelledGoal=g.mountGoal(host,{team:'b-n4dwtytis2',id:987,back(){},goal:{id:987,title:'Release preview',state:'active',images:[],updatedAt:new Date().toISOString(),rollup:{done:1,active:0,blocked:0,queued:0}},refresh(){},status:()=>({})});return true;})()`);
+            await waitFor(`!!document.querySelector('#labelled-goal .team-uncommitted-review')`,tag+': goal uncommitted controls',10000);
+            const unc=await ev(`(()=>{const box=document.querySelector('#labelled-goal .goal-uncommitted');box.scrollIntoView({block:'center',behavior:'instant'});return{words:box.querySelector('.team-uncommitted-words')?.textContent,folder:box.querySelector('.team-uncommitted-folder')?.textContent,html:box.querySelector('.team-uncommitted-words')?.innerHTML};})()`);
+            check(`${tag}: uncommitted work uses the team label as primary text`,unc.words==='Files changed in Release studio, not committed: 1 new',JSON.stringify(unc));
+            check(`${tag}: exact worktree folder remains secondary text`,unc.folder==='/work/teams/b-n4dwtytis2',JSON.stringify(unc));
+            await shot(`goal-team-label-${w}`);
+            await ev(`window.__labelledGoal.dispose();document.getElementById('labelled-goal').remove();true`);
+
             // not offered: a comment made with no board; and a viewer who is not the owner
             await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
             await sleep(300); // sleep-ok: the viewer closes over a frame
             await open(null);
-            check(`${tag}: a comment made with no board has no Send to agent`, !(await ev(`!!${sendBtn(1)}`)));
+            check(`${tag}: a comment made with no board has no Send to agent or bundled send`, !(await ev(`!!${sendBtn(1)} || !!document.querySelector('.ac-send-open')`)));
             await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
             await sleep(300); // sleep-ok: the viewer closes over a frame
             await ev(`window.__you_next = { can_comment: true, can_lock: false }; true`);
             await open('ask-team', { can_comment: true, can_lock: false });
-            check(`${tag}: a viewer who is not the owner has no Send to agent`, !(await ev(`!!${sendBtn(1)}`)));
+            check(`${tag}: a viewer who is not the owner has no Send to agent or bundled send`, !(await ev(`!!${sendBtn(1)} || !!document.querySelector('.ac-send-open')`)));
             await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
             await sleep(300); // sleep-ok: the viewer closes over a frame
         }
