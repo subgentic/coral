@@ -276,7 +276,7 @@ func TestDeviationFloorFactorAndSamplesFollowTheSettings(t *testing.T) {
 	d.member("Orchestrator", "Orchestrator", 1, 0)
 	d.member("Dev", "Developer", 2, 0)
 	d.finished("Dev", 5, time.Minute) // the usual is 1 minute: the limit is 2
-	id := d.running("Dev", 21*time.Minute)
+	id := d.running("Dev", 14*time.Minute)
 	line := fmt.Sprintf("#%d has been in progress", id)
 	hs := d.s.GetHealthSettings(ctx, "team")
 	assert.Equal(t, 0, hs.Deviations.MinAgeMin, "the default has no floor")
@@ -291,14 +291,15 @@ func TestDeviationFloorFactorAndSamplesFollowTheSettings(t *testing.T) {
 	hs.Deviations.MinAgeMin = 0
 	hs.Deviations.FactorPct = 1000 // ten times the limit: 20 minutes
 	require.NoError(t, d.s.SetHealthSettings(ctx, "team", hs))
-	assert.Contains(t, d.checkNoReset(), line, "21 minutes is past 10 x 2")
-	d2 := d.running("Dev", 11*time.Minute)
-	assert.NotContains(t, d.checkNoReset(), fmt.Sprintf("#%d has been in progress", d2), "11 minutes is under 20")
+	assert.NotContains(t, d.checkNoReset(), line, "15 minutes is under 10 x 2 = 20")
 
 	hs.Deviations.FactorPct = 100
 	hs.Deviations.MinSamples = 6 // it has 5
 	require.NoError(t, d.s.SetHealthSettings(ctx, "team", hs))
-	assert.NotContains(t, d.checkNoReset(), fmt.Sprintf("#%d has been in progress", d2), "too little history for the raised minimum")
+	assert.NotContains(t, d.checkNoReset(), line, "too little history for the raised minimum")
+	hs.Deviations.MinSamples = 5
+	require.NoError(t, d.s.SetHealthSettings(ctx, "team", hs))
+	assert.Contains(t, d.checkNoReset(), line, "and at its own five it is said")
 
 	hs.Deviations.MinAgeMin, hs.Deviations.FactorPct, hs.Deviations.MinSamples = 5000, 5, 900
 	require.NoError(t, d.s.SetHealthSettings(ctx, "team", hs))
