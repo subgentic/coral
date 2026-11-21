@@ -718,6 +718,16 @@
                                     </fieldset>
                                 </div>
                             </section>
+                            <section id="settings-google" class="settings-dropbox" aria-labelledby="settings-google-title" hidden>
+                                <!-- Google sign-in (#20022): the Operator's, on this computer's dashboard only; google_settings.js fills it. Never an account id. -->
+                                <h5 id="settings-google-title">Google sign-in</h5>
+                                <div id="settings-google-status" class="settings-hint sv-help" role="status" aria-live="polite">Loading&hellip;</div>
+                                <div class="settings-dropbox-actions">
+                                    <button type="button" class="btn btn-small" id="settings-google-connect" hidden>Connect Google&hellip;</button>
+                                    <button type="button" class="btn btn-small" id="settings-google-disconnect" hidden>Disconnect</button>
+                                </div>
+                                <div id="settings-google-note" class="settings-hint sv-help" role="status"></div>
+                            </section>
                             <div id="settings-worktrees-live">
                                 <div id="wt-status" class="settings-hint sv-help" role="status"></div>
                                 <p id="wt-empty" class="settings-hint sv-help" hidden></p>

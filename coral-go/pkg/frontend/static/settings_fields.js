@@ -165,6 +165,7 @@ const AGENTS_FIELDS = host => [
     { key: 'nudge_claude_artifacts', type: 'toggle', id: 'settings-nudge-claude-artifacts', label: 'Coral artifact reminders', help: moreOnly('Asks an agent to publish to Coral when it publishes to claude.ai.', 'When an agent publishes to claude.ai, Coral types one note into its terminal asking for a Coral artifact instead (coral-agent artifact upload) and a link to it. Once per artifact; Coral never uploads or posts for the agent. When off, nothing is typed.') },
     { key: 'board_health_monitor', type: 'toggle', id: 'settings-board-health-monitor', label: 'Team health checks', help: 'Applies to every team; each team still turns its own check on in Team settings. Takes effect after Coral restarts.' }, // the operator's own sentence, kept on the screen (#8497)
     { key: 'agents_experimental', type: 'heading', id: 'settings-agents-experimental', label: 'Experimental' },
+    { key: 'gdoc_share', type: 'toggle', id: 'settings-gdoc-share', label: 'Share to Google (experimental)', help: moreOnly('Off until you turn it on: share a Markdown file to a Google Doc. Mac only.') },
     { key: 'launch_in_worktree', type: 'toggle', id: 'settings-launch-in-worktree', label: 'Enable launch into git worktree (experimental)', help: moreOnly('Experimental, and off until you turn it on: a team can then be launched into its own git worktree.') },
     { key: 'agents_tools', type: 'heading', id: 'settings-agents-tools', label: 'Tools' },
     { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Skip Codex's review of Coral's hooks", help: helpLine('Turns off a safety check: Codex will not ask you to review Coral\'s hooks.', "Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on, Coral trusts its own hooks, and only those exact commands, for each Codex agent it launches, so the agent starts without that question; your own hooks, a repository's and a plugin's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") },
@@ -196,6 +197,7 @@ export const CLEANUP_FIELDS = [
     { key: 'local_backup', type: 'heading', id: 'settings-local-backup-title', label: 'Local backup' },
     live('settings-local-backup'),
     { key: 'dropbox_backup', type: 'notice', render: slot => { slot.id = 'settings-dropbox-row'; const el = document.getElementById('settings-dropbox'); if (el) slot.append(el); } },
+    { key: 'google_signin', type: 'notice', render: slot => { slot.id = 'settings-google-row'; const el = document.getElementById('settings-google'); if (el) slot.append(el); } },
 ];
 
 // The API key's line (#8460): the key (masked, read only; security_settings.js and settings_machine.js fill it) with Show, Copy and the Mobile QR beside it (under it where the panel is narrow). Drawn here, with the component's own line class.
@@ -314,7 +316,7 @@ const HELP_LINES = {
 
 // One definition per setting; layout chooses its home without copying a control.
 const TEAM_KEYS = new Set(['agents_team', 'board_auto_attach', 'nudge_claude_artifacts', 'board_health_monitor']);
-const ADVANCED_KEYS = new Set(['agents_experimental', 'launch_in_worktree', 'agents_tools', 'live_settings-prompts-live']);
+const ADVANCED_KEYS = new Set(['agents_experimental', 'launch_in_worktree', 'gdoc_share', 'agents_tools', 'live_settings-prompts-live']);
 const pick = (fields, keys) => fields.filter(f => keys.has(f.key));
 const advanced = id => ({ key: id, id, type: 'heading', label: 'Advanced', fold: true });
 

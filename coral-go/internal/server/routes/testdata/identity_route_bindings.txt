@@ -1,5 +1,6 @@
 DELETE /api/agent/ui/{id} | token-bound
 DELETE /api/artifacts/{id}/comments/{cid} | token-session | operator-only
+DELETE /api/artifacts/{id}/gdoc/share | token-session | operator-only
 DELETE /api/board/remotes | board-unchecked | operator-only
 DELETE /api/board/{project} | board-claims | operator-only
 DELETE /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
@@ -91,6 +92,7 @@ GET /api/board/{project}/waits/poll | board-claims
 GET /api/board/{project}/working-mode | board-claims
 GET /api/board/{project}/working-mode/presets | board-claims
 GET /api/filesystem/trust-probe | token-session | operator-only
+GET /api/gdoc/status | token-session
 GET /api/goals | token-session | operator-only
 GET /api/launch-disclosure | token-session | operator-only
 GET /api/needs-you | token-session | operator-only
@@ -177,6 +179,8 @@ POST /api/artifacts/{id}/comment-images | token-session | operator-only
 POST /api/artifacts/{id}/comments | token-session | operator-only
 POST /api/artifacts/{id}/comments/{cid}/reply | token-session
 POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only
+POST /api/artifacts/{id}/gdoc/share | token-session | operator-only
+POST /api/artifacts/{id}/gdoc/sync | token-session | operator-only
 POST /api/board/remotes | board-unchecked | operator-only
 POST /api/board/{project}/agents/{subscriber}/interrupt | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/restart | board-claims +token-session

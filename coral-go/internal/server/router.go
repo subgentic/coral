@@ -436,7 +436,9 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	s.registerResources(r, sessHandler) // the resource queue (#13613) and its shell hook (#13645)
 	// Agent tasks
 	sessHandler.RegisterAgentArtifacts(r)
-	sessHandler.RegisterArtifactComments(r) // #5176
+	sessHandler.RegisterArtifactComments(r)                                                 // #5176
+	sessHandler.RegisterGdocShare(r)                                                        // #19996
+	s.goBackground(func(ctx context.Context) { sessHandler.GdocSyncRun(ctx, time.Minute) }) // #20010 C: one loop for every shared Doc; a pass does nothing while the switch is off
 	sessHandler.RegisterTerminalLogs(r)
 	r.Get("/api/sessions/live/{name}/tasks", sessHandler.ListTasks)
 	r.With(routes.RefuseSignInLink).Post("/api/sessions/live/{name}/tasks", sessHandler.CreateTask)
@@ -521,6 +523,10 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Get("/api/dropbox/status", s.cloudHandler.DropboxStatus)
 	r.Post("/api/dropbox/connect", s.cloudHandler.DropboxConnect)
 	r.Post("/api/dropbox/disconnect", s.cloudHandler.DropboxDisconnect)
+	s.cloudHandler.SetGoogle(store.NewGoogleStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir()))) // the Google sign-in for Google Doc share (#20022): the Operator's only, never on the Hub
+	r.Get("/api/google/status", s.cloudHandler.GoogleStatus)
+	r.Post("/api/google/connect", s.cloudHandler.GoogleConnect)
+	r.Post("/api/google/disconnect", s.cloudHandler.GoogleDisconnect)
 	r.Post("/api/dropbox/switch", s.cloudHandler.DropboxConfirmSwitch)
 	r.Post("/api/dropbox/takeover", s.cloudHandler.DropboxTakeOver)
 	r.Put("/api/dropbox/app-key", s.cloudHandler.DropboxSetAppKey)                              // #15638: the person's own Dropbox app key

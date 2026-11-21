@@ -84,6 +84,28 @@ type Comment struct {
 // NewClient returns a client for Production that asks tok for the token inside each request.
 func NewClient(tok func() (string, error)) *Client { return &Client{TokenFunc: tok} }
 
+// NewClientAt is a client for a Drive and Docs stand-in at base (another package's tests): it answers for both hosts and never sleeps between retries.
+func NewClientAt(base string, tok func() (string, error)) *Client {
+	if u, err := url.Parse(base); err != nil || (u.Hostname() != "127.0.0.1" && u.Hostname() != "localhost") {
+		panic("gdocsync: NewClientAt is for a stand-in on this computer (127.0.0.1 or localhost) only") // a token must never be sent to another host through this door
+	}
+	return &Client{base: base, TokenFunc: tok, Sleep: func(time.Duration) {}}
+}
+
+// DocsProduction is the second and last host: Docs v1 is served from here, Drive v3 from Production (found live, #19953).
+const DocsProduction = "https://docs.googleapis.com"
+
+// hostFor picks the host for a request path; a test server (the unexported base) answers for both.
+func (c *Client) hostFor(path string) string {
+	if c.base != "" {
+		return c.base
+	}
+	if strings.HasPrefix(path, "/v1/documents/") {
+		return DocsProduction
+	}
+	return Production
+}
+
 func (c *Client) baseURL() string {
 	if c.base != "" {
 		return c.base
@@ -110,7 +132,7 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, cont
 	if c.TokenFunc == nil {
 		return errors.New("gdocsync: no token source")
 	}
-	u := c.baseURL() + path
+	u := c.hostFor(path) + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
@@ -245,8 +267,18 @@ func (c *Client) Comments(ctx context.Context, fileID string) ([]Comment, error)
 
 // Reply adds a reply to a comment; action "resolve" also resolves the comment, "reopen" reopens it, "" is a plain reply.
 func (c *Client) Reply(ctx context.Context, fileID, commentID, content, action string) error {
+	_, err := c.ReplyID(ctx, fileID, commentID, content, action)
+	return err
+}
+
+// ReplyID is Reply that also returns the new reply's id, so the sync can tell its own reply from a person's when it next pulls. One attempt only: a write is never sent again on a guess.
+func (c *Client) ReplyID(ctx context.Context, fileID, commentID, content, action string) (string, error) {
 	body, _ := json.Marshal(map[string]string{"content": content, "action": action})
-	return c.do(ctx, http.MethodPost, "/drive/v3/files/"+url.PathEscape(fileID)+"/comments/"+url.PathEscape(commentID)+"/replies", url.Values{"fields": {"id"}}, "application/json", body, nil)
+	var out struct {
+		ID string `json:"id"`
+	}
+	err := c.do(ctx, http.MethodPost, "/drive/v3/files/"+url.PathEscape(fileID)+"/comments/"+url.PathEscape(commentID)+"/replies", url.Values{"fields": {"id"}}, "application/json", body, &out)
+	return out.ID, err
 }
 
 // CoralAnchor is the shape of Coral's artifact comment anchor (routes.commentAnchor): the selected text with context, or the whole document.
@@ -288,6 +320,9 @@ func ToCoral(c Comment, markdown string) CoralComment {
 
 // signed puts the Google author in front of the text as "[Name] text". Both are the reviewer's words and untrusted: the name loses its brackets, line breaks and control characters (and
 // is cut), and a bracket that starts a line of the text is escaped, so no text can pass as another author's "[Name]" line. Exactly one line of the result starts with a bracket.
+// Signed is a Google author's text as Coral stores it: "[Name] text", the name only.
+func Signed(a Author, text string) string { return signed(a, text) }
+
 func signed(a Author, text string) string {
 	return "[" + cleanName(a.DisplayName) + "] " + escapeLeadingBrackets(text)
 }

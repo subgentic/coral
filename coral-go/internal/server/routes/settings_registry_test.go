@@ -48,6 +48,7 @@ var settingRows = map[string]struct{ good, bad string }{
 	"auto_summarize":              {`"1"`, `"nope"`},
 	"nudge_claude_artifacts":      {`"off"`, `"nope"`},
 	"launch_in_worktree":          {`"off"`, `"nope"`},
+	"gdoc_share":                  {`"off"`, `"nope"`},
 	"inbox_kind_file":             {`"off"`, `"nope"`},
 	"inbox_kind_done":             {`"off"`, `"nope"`},
 	"inbox_kind_release":          {`"off"`, `"nope"`},

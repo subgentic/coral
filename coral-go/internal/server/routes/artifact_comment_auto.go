@@ -43,7 +43,12 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 	if b == "" || h.bs == nil || h.ss == nil {
 		return autoDelivery{Reason: "no_uploader"}
 	}
-	ctx := r.Context()
+	return h.deliverBoardComment(r.Context(), caller.Issuer+"|"+caller.Subject, c, id, b, sendAuthorOperator)
+}
+
+// deliverBoardComment types a comment of an artifact on a team's board into the agent that uploaded it (or the agents in its thread): the part of deliverOperatorComment after the checks of who wrote it, shared
+// with the Google Doc pull (the comment's author is then a name from Google, quoted as untrusted data). key is what the hourly limit counts.
+func (h *SessionsHandler) deliverBoardComment(ctx context.Context, key string, c store.ArtifactComment, id, b, author string) autoDelivery {
 	subs, err := h.bs.ListSubscribers(ctx, b)
 	if err != nil {
 		return autoDelivery{Reason: "failed"}
@@ -56,14 +61,13 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 			root = t
 		}
 	}
-	targets := h.commentTargets(r, subs, id, b, rootID, c.ParentID != nil)
+	targets := h.commentTargets(ctx, subs, id, b, rootID, c.ParentID != nil)
 	if len(targets) == 0 {
 		return autoDelivery{Reason: "no_uploader"}
 	}
 	if h.boardHandler != nil && h.boardHandler.IsPaused(b) {
 		return autoDelivery{Reason: "board_paused"}
 	}
-	key := caller.Issuer + "|" + caller.Subject
 	if !h.sendLimit.allow(key, time.Now()) {
 		return autoDelivery{Reason: "rate_limited"}
 	}
@@ -110,7 +114,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 			continue
 		}
 		h.ss.ResetAskReplies(ctx, rootID, t.sessionID) // a new turn of the Operator's: the agent has its replies again (#15034)
-		msg := sendMessage(title, sendAuthorOperator, h.sendVersionLine(id, b), sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
+		msg := sendMessage(title, author, h.sendVersionLine(id, b), sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
 		posted, held, err := h.holdOrPost(ctx, ls, &t.sub, b, rootID, msg, true)
 		if held { // the agent is busy: the comment waits on the ask and is posted when it is free (#14860)
 			queued = append(queued, title)
@@ -176,7 +180,7 @@ type commentTarget struct {
 // commentTargets are the agents the owner's comment goes to (#12203). A reply goes to the agents already in its thread (asked into it by hand or by the comment that began it, open or ended: the owner
 // is talking to them again), and a first comment, or a reply in a thread nobody is in, to the agent that uploaded the file. The uploader is the agent of this board with an upload record for exactly this
 // object: a direct look at each member's own record, never a walk of every record. The file's tag does not matter: an agent that put a file in front of the Operator is the one to answer about it.
-func (h *SessionsHandler) commentTargets(r *http.Request, subs []board.Subscriber, id, b string, rootID int64, reply bool) []commentTarget {
+func (h *SessionsHandler) commentTargets(ctx context.Context, subs []board.Subscriber, id, b string, rootID int64, reply bool) []commentTarget {
 	bySession := map[string]int{}
 	for i := range subs {
 		if sid := naming.SessionIDFromName(subs[i].SessionName); sid != "" {
@@ -185,7 +189,7 @@ func (h *SessionsHandler) commentTargets(r *http.Request, subs []board.Subscribe
 	}
 	var out []commentTarget
 	if reply {
-		asks, err := h.ss.ListArtifactAsks(r.Context(), id)
+		asks, err := h.ss.ListArtifactAsks(ctx, id)
 		if err == nil {
 			seen := map[string]bool{}
 			for _, a := range asks {

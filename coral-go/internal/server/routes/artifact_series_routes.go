@@ -75,6 +75,8 @@ type versionRow struct {
 	// EditedInDropbox (#14714, Security's condition 1 on auto-sync): this version is an edit made in Dropbox (an unknown writer), for every reader,
 	// agents included: outside text, not an instruction from the Operator or the team.
 	EditedInDropbox bool `json:"edited_in_dropbox,omitempty"`
+	// EditedInGoogle (#20047): the same for a version taken from an edit made in a shared Google Doc (an unknown writer: anyone with access to the Doc).
+	EditedInGoogle bool `json:"edited_in_google,omitempty"`
 	// Note (#17119): the line the uploading agent gave this version (--note), one cleaned line of at most 140 characters; shown as text.
 	Note string `json:"note,omitempty"`
 }
@@ -99,6 +101,7 @@ func (h *SessionsHandler) versionsOf(w http.ResponseWriter, r *http.Request, id 
 	for i, m := range vs {
 		row := versionRow{Digest: m.Digest, Version: m.N, Versions: len(vs), IsLatest: i == len(vs)-1, At: m.At, Uploader: m.Uploader, Role: m.Role}
 		row.EditedInDropbox = m.Source == sourceDropboxEdit
+		row.EditedInGoogle = m.Source == sourceGdocEdit
 		if meta, ok := readSidecar(filepath.Join(coralDir, "artifacts", "objects", m.Digest+".json")); ok {
 			row.Name, row.MediaType, row.Size = meta.Name, meta.MediaType, meta.Size
 		}

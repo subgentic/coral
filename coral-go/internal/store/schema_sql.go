@@ -589,6 +589,14 @@ CREATE TABLE IF NOT EXISTS cloud_connection (
 -- disconnect: server_id belongs to the database (a restored copy keeps it). refresh_token holds a "v1:" secretbox envelope bound to
 -- account_id as AAD, never plaintext; NULL when not connected. fingerprint is SHA-256 of fp_salt, the machine id and the data folder (never
 -- the machine id itself). last_account_id is the account of the last connection, so a connect to another account is a confirmed switch.
+CREATE TABLE IF NOT EXISTS google_connection (
+    id            INTEGER PRIMARY KEY CHECK (id = 1),
+    account_id    TEXT,
+    refresh_token TEXT,
+    state         TEXT NOT NULL DEFAULT 'disconnected',
+    connected_at  TEXT
+);
+
 CREATE TABLE IF NOT EXISTS dropbox_connection (
     id              INTEGER PRIMARY KEY CHECK (id = 1),
     server_id       TEXT NOT NULL,
@@ -744,6 +752,32 @@ CREATE TABLE IF NOT EXISTS dropbox_share_contacts (
     email      TEXT NOT NULL,
     used_at    TEXT NOT NULL,
     PRIMARY KEY (account_id, email)
+);
+
+-- Share to Google Docs (#19996, goal #265, slice B of #20010): one row per shared artifact series (key = the series id, or the digest of a file with no series). The Doc's
+-- id and the file it came from, whether the sync is live or paused (the owner's per-Doc stop), and what the automatic sync needs to never overwrite a Doc edit: the Doc's
+-- revision and the Markdown digest at the last sync. Never a token, never who the Doc is shared with (Google keeps that).
+CREATE TABLE IF NOT EXISTS gdoc_shares (
+    key          TEXT PRIMARY KEY,
+    doc_id       TEXT NOT NULL,
+    digest       TEXT NOT NULL DEFAULT '',     -- the artifact version last pushed to the Doc
+    name         TEXT NOT NULL DEFAULT '',
+    state        TEXT NOT NULL DEFAULT 'live', -- live or paused
+    doc_revision TEXT NOT NULL DEFAULT '',     -- the Doc's revision id at the last sync
+    conflict_doc_id TEXT NOT NULL DEFAULT '',  -- the earlier Doc that kept a person's edits when the Doc was edited in Google since the last sync (keep both)
+    created_at   TEXT NOT NULL,
+    synced_at    TEXT NOT NULL DEFAULT ''
+);
+
+-- Share to Google Docs, slice D of #20010: which Coral comment mirrors which Google comment or reply, so a pull never adds one twice. remote_id is the Google comment's id, or
+-- "<comment id>/<reply id>" for a reply. Names and text only live in artifact_comments; nothing here is a person's email.
+CREATE TABLE IF NOT EXISTS gdoc_comment_map (
+    doc_id     TEXT NOT NULL,
+    remote_id  TEXT NOT NULL,
+    comment_id INTEGER NOT NULL,
+    resolved   INTEGER NOT NULL DEFAULT 0, -- the comment was resolved in Google when last pulled
+    seen       INTEGER NOT NULL DEFAULT 1, -- the last pull saw this comment in the Doc: an agent's reply goes only to a comment it saw (Security's condition)
+    PRIMARY KEY (doc_id, remote_id)
 );
 
 -- Coral Hub enrollment in progress, and its rate limit (one row). The device code is
