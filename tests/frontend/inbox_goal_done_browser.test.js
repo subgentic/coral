@@ -50,7 +50,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'nor in /api/needs-you');
         await root('PUT', '/api/settings', { goal_done_quiet_minutes: '0' });
         await openNeeds();
-        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item', 20000);
+        await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the goal item', 20000);
         let rows = await doneRows();
         assert.equal(rows.length, 1, 'one row: not the goal with an open task, nor the one with no tasks: ' + JSON.stringify(rows));
         assert.match(rows[0].text, new RegExp(`Goal #${gid} looks done: Ship the pilot`));
@@ -60,7 +60,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         for (const theme of ['dark', 'light']) {
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
             await openNeeds();
-            await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, `${theme}: the goal item`, 20000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, `${theme}: the goal item`, 20000);
         { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/inbox-goal-done-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // the row as the approved list draws it (#19824)
             const g = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(),
                 btns = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), tr_ = R(tr), c = e => { const r = R(e); return (r.top + r.bottom) / 2; },
@@ -80,7 +80,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         if (process.env.CORAL_SCREENSHOT_DIR) { // the row on a phone, for the review page (#19841)
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
             await openNeeds();
-            await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item at 390', 20000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the goal item at 390', 20000);
             const d = process.env.CORAL_SCREENSHOT_DIR; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/inbox-goal-done-390.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         }
@@ -91,7 +91,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         const stubId = (await Page.addScriptToEvaluateOnNewDocument({ source: stub })).identifier; // before the page's first read: a late stub sat behind the list already read
         try {
             await openNeeds();
-            try { await waitFor(`/plan-mixed/.test(document.querySelector('${T}')?.textContent || '') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'a review row and the goal row in one list', 20000); }
+            try { await waitFor(`/plan-mixed/.test(document.querySelector('${T}')?.textContent || '') && [...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'a review row and the goal row in one list', 20000); }
             catch (e) { assert.fail('the mixed list did not appear; rows: ' + JSON.stringify(await ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim().slice(0, 80))`))); }
         const mixed = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)), box = tr.querySelector('.inbox-goaldone-actions'), td = box.closest('td'), R = e => e.getBoundingClientRect(), bs = [...box.querySelectorAll(':scope > button, :scope > .inbox-row-more > button')].filter(b => R(b).width > 0), cell = R(td), c = e => (R(e).top + R(e).bottom) / 2;
             return { n: bs.length, inside: bs.every(b => R(b).left >= cell.left - 1 && R(b).right <= cell.right + 1), spread: Math.max(...bs.map(c)) - Math.min(...bs.map(c)), cellW: Math.round(cell.width), fits: box.scrollWidth <= box.clientWidth + 1, align: getComputedStyle(td).verticalAlign }; })()`);
@@ -99,7 +99,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         } finally { await Page.removeScriptToEvaluateOnNewDocument({ identifier: stubId }); }
         await Emulation.setEmulatedMedia({ features: [] });
         await openNeeds();
-        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item again', 20000);
+        await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the goal item again', 20000);
         const badge = async () => Number(await ev(`(document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0`));
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) >= 1`, 'the item is in the Inbox number', 20000); // the badge is drawn after the list: read at once it was 0 on a slower machine (Windows, v2.0.35 gate)
         const withItem = await badge(); assert.ok(withItem >= 1, 'the item is in the Inbox number: ' + withItem);
@@ -109,7 +109,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         // Not yet: gone here and on the machine, until a task is added
         await root('PUT', '/api/settings', { goal_done_hidden: JSON.stringify(['other|9|9']) }); // another browser hid something since this page read the list (#13841): the page's copy is stale, and pressing Not yet must not erase it
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Not yet"]').click(); true`);
-        await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Not yet', 8000);
+        await waitFor(`![...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the item gone after Not yet', 8000);
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${withItem - 1}`, 'and out of the Inbox number', 10000);
         assert.equal(await badge(), withItem - 1, 'and out of the Inbox number');
         const saved = (await root('GET', '/api/settings')).json.settings.goal_done_hidden;
@@ -117,7 +117,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'the phone push does not keep announcing it');
         await task(gid, true);
         await openNeeds();
-        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item is back after a task was added and finished', 20000);
+        await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the item is back after a task was added and finished', 20000);
 
         // #11983: opening the item reads it: it stays listed and stops counting, in the Inbox number, the badge and /api/needs-you; a task done since has a new total, and it is unread again
         await require('./helpers/wait').settle(ev, 600, 300);
@@ -126,7 +126,7 @@ const B = 'goal-done-' + Date.now().toString(36);
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
         await waitFor(`!!document.querySelector('.goal-view, [data-goal-view], #goal-view') || /goals|goal/i.test(location.hash + location.pathname)`, 'the goal opened', 10000);
         await openNeeds();
-        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the opened item is still listed', 20000);
+        await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the opened item is still listed', 20000);
         await waitFor(`Number((document.getElementById('nav-tab-hub-inbox-badge') || {}).textContent || 0) === ${unreadBadge - 1}`, 'and out of the Inbox number', 10000);
         assert.equal((await doneRows()).length, 1, 'listed once');
         assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).classList.contains('dt-read')`), 'the opened row is drawn read (needsUnread, QA #11983)');
@@ -146,13 +146,13 @@ const B = 'goal-done-' + Date.now().toString(36);
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: rowAt.x, y: rowAt.y }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the pointer events reach the page
         const dismissAt = Date.now();
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Dismiss"]').click(); true`);
-        await waitFor(`!/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the item gone after Dismiss', 8000);
+        await waitFor(`![...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the item gone after Dismiss', 8000);
         assert.ok(Date.now() - dismissAt < 4000, `the dismissed goal left at once under a resting pointer (took ${Date.now() - dismissAt} ms)`);
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 4, y: 4 });
         assert.ok(JSON.parse((await root('GET', '/api/settings')).json.settings.goal_done_hidden).includes(`${B}|${gid}|*`), 'Dismiss is kept');
         await waitFor(`!![...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim()))`, 'the Undo in the notice', 5000);
         await ev(`[...document.querySelectorAll('.toast button, [role=status] button, #toast-container button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`);
-        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'Undo brings it back', 8000);
+        await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'Undo brings it back', 8000);
 
         // Close goal: the goal's page with the Close dialog set to Done; closing it takes the item away
         await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('button[aria-label^="Mark goal"]').click(); true`);
@@ -172,7 +172,7 @@ const B = 'goal-done-' + Date.now().toString(36);
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
             await Emulation.setTouchEmulationEnabled({ enabled: true });
             await openNeeds();
-            await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item on a phone', 20000);
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the goal item on a phone', 20000);
             const shown = await ev(`(() => {
                 const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /looks done/.test(r.textContent)); if (!tr) return { error: 'no row' };
                 const title = [...tr.querySelectorAll('*')].find(e => [...e.children].every(c => c.classList.contains('inbox-kind-icon')) && (/looks done: Customers sign up without help/.test(e.textContent) || (e.classList.contains('inbox-review-name') && e.textContent.trim() === 'Customers sign up without help'))); /* the title's own element: its only element child may be the kind icon in front of it (#13144) */ if (!title) return { error: 'no title element' };

@@ -14,11 +14,11 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
     const api = (method, path, body) => ev(`fetch('/api/board/${B}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const root = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const T = '#group-table-view';
-    const where = () => ev(`({ path: location.pathname, group: document.querySelector('${T}')?.dataset.group || '', onGoal: !!document.querySelector('.goals-open'), needs: /looks done/.test(document.querySelector('${T}')?.textContent || ''), scroll: document.querySelector('${T}')?.scrollTop || 0 })`);
+    const where = () => ev(`({ path: location.pathname, group: document.querySelector('${T}')?.dataset.group || '', onGoal: !!document.querySelector('.goals-open'), needs: [...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent)), scroll: document.querySelector('${T}')?.scrollTop || 0 })`);
     const openNeeds = async () => {
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'a Goal looks done row', 20000);
+        await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'a Goal looks done row', 20000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -71,7 +71,7 @@ const B = 'needs-goal-back-' + Date.now().toString(36);
             for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: pos.x, y: pos.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: type === 'mouseMoved' ? 0 : 1 });
             await waitFor(`!!document.querySelector('.goals-open')`, at + 'the goal opened by a real click', 10000);
             await ev(`history.back(); true`);
-            await waitFor(`!document.querySelector('.goals-open') && /looks done/.test(document.querySelector('${T}')?.textContent || '')`, at + 'back on the list', 10000);
+            await waitFor(`!document.querySelector('.goals-open') && [...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, at + 'back on the list', 10000);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the folder draws after the route and restores its place
             const after = await ev(`(() => { const rows = [...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)), tr = rows.find(r => (r.querySelector('.inbox-review-name')?.textContent || '') === ${JSON.stringify(target.text)}), r = tr && tr.getBoundingClientRect(), a = document.activeElement; return { scroller: (${SCROLLER}).id || (${SCROLLER}).className, top: ${SCROLLER}.scrollTop, rowOnScreen: !!r && r.bottom > 0 && r.top < innerHeight, focusInRow: !!tr && !!a && tr.contains(a), active: a ? a.tagName + '.' + String(a.className).slice(0, 40) : null }; })()`);
             assert.ok(Math.abs(after.top - pos.top) <= 40, at + `Back keeps the scroll position (${pos.top} before, ${JSON.stringify(after)} after)`);

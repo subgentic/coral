@@ -29,7 +29,7 @@ const BASE = require('./test_base').BASE;
                 const count = await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`);
                 if (count !== expected) failures.push(`${width}: ${label} lists ${count}, expected ${expected}`);
             };
-            await pick('All', 1); await pick('Question', 1); await pick('Needs input', 0); await pick('All', 1);
+            await pick('All', 1); await pick('Question', 1); await pick('Permission', 0); await pick('All', 1);
             assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '1', 'the badge counts the one unread review');
         }
         // C8: saving the only review removes it from both the All chip and the list.

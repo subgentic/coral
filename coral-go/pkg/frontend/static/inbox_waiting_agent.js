@@ -15,6 +15,9 @@ const dismissed = (() => { try { const v = JSON.parse(browserLocal.get(DISMISS_K
 const keyOf = it => `${it.kind}:${it.id}`;
 /** Stop waiting: the item leaves this list in this browser; nobody is told. */
 export const dismiss = it => { dismissed.add(keyOf(it)); browserLocal.set(DISMISS_KEY, JSON.stringify([...dismissed].slice(-500))); };
+// A sent-back file and its request-changes comment are one waiting item. Capture only
+// comments already read, so a later comment on the same file can still appear.
+export const dismissArtifact = hex => { for (const it of items) if (it.kind === 'comment_sent' && String(it.artifact?.hex || '').toLowerCase() === String(hex || '').toLowerCase()) dismiss(it); };
 let items = [], failed = false, readAt = 0, inflight = null, redraw = () => {};
 
 /** The rows as the list holds them: a row that is not a file, an agent or an ask, with the fields the table reads. */

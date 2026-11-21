@@ -57,7 +57,7 @@ const AGENTS = (waiting) => waiting ? [
             const step = async (name, fn) => { try { await fn(); console.log(`[PASS] ${label}: ${name}`); } catch (e) { console.log(`[FAIL] ${label}: ${name}: ${e.message}`); process.exitCode = 1; } };
 
             await step('the search says "Search" for every group and keeps its whole name', async () => {
-                for (const [group, name] of [['needs', 'Search needs you'], ['tasks', 'Search tasks'], ['saved', 'Search saved messages']]) {
+                for (const [group, name] of [['needs', 'Search waiting on you'], ['tasks', 'Search tasks'], ['saved', 'Search saved messages']]) {
                     await ev(`document.querySelector('${pane} .view-list-item[data-key="${group}"]').click(); true`); await settle(300);
                     const r = await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); return { ph: i.placeholder, name: i.getAttribute('aria-label') }; })()`);
                     assert.deepEqual(r, { ph: 'Search', name }, group);
