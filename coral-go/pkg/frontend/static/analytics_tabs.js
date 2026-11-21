@@ -1,3 +1,5 @@
+import { responseUpdateError } from './server_base.js';
+
 /* The Analytics tabs below Overview (#11222, the Operator's approved mockup): Usage (a KPI strip, one stacked bar a day by agent, team, provider or model, and the day's drill-down), Operator interaction (how often
  * the Operator steps in) and Team communication (who @mentions whom, messages a day, asks). Usage reads GET /api/token-usage/timeseries (the same read as Overview, so Hub guests have it); the other two read
  * GET /api/analytics/activity?team=&range= (counts only, never text), which is the Hub owner's: a guest's read is refused and the page says so in one line. A number the read does not carry yet (the
@@ -77,28 +79,28 @@ document.addEventListener('coral:servers-updated', () => { if (machineInventoryP
 async function load(key) {
     const m = tabs[key], seq = ++m.seq, server = machineNow(); // the computer picked on a Hub-served dashboard (this one otherwise, #15730)
     if (noComputerInCloud()) { if (machineInventoryPending()) inventoryTabs.add(key); m.status = 'nocomputer'; m.data = null; draw(key); return; } // Coral Hub's page with no computer linked: nothing is read (#19569)
-    m.status = m.data ? 'ok' : 'loading'; m.stale = false;
+    m.status = m.data ? 'ok' : 'loading'; m.stale = false; m.update = '';
     try {
         if (key === 'usage') {
             const days = D.daysOf(m.range), since = new Date(Date.parse(todayUTC() + 'T00:00:00Z') - (2 * days - 1) * 86400000).toISOString();
             if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
             const r = await serverFetch(server, `/api/token-usage/timeseries?since=${encodeURIComponent(since)}&interval=1d&group_by=${encodeURIComponent(m.group)}`);
             if (seq !== m.seq) return;
-            if (!r.ok) throw new Error(String(r.status));
+            if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
         } else if (key === 'tasks') {
             if (isCloud()) throw new Error('closed on Coral Hub'); // this computer's own route: never asked of Coral Hub's origin (#19591)
             const r = await serverFetch('local', `/api/analytics/tasks?range=${encodeURIComponent(m.range)}&group_by=${encodeURIComponent(m.group)}${m.reviews ? '&reviews=1' : ''}`);
             if (seq !== m.seq) return;
             if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = 'guest'; m.data = null; draw(key); return; }
-            if (!r.ok) throw new Error(String(r.status));
+            if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
             m.data = await r.json(); m.status = 'ok';
         } else if (key === RQ) {
             if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
             const r = await serverFetch(server, `/api/analytics/resource-queue?days=${D.daysOf(m.range)}`);
             if (seq !== m.seq) return;
             if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = server === 'local' ? 'guest' : 'refused'; m.data = null; draw(key); return; }
-            if (!r.ok) throw new Error(String(r.status));
+            if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
             m.data = await r.json(); m.status = 'ok';
         } else if (key === IVC) {
             const team = m.team ? splitKey(m.team).name : '';
@@ -106,7 +108,7 @@ async function load(key) {
             const r = await serverFetch(server, `/api/analytics/inbox-vs-chat?days=${D.daysOf(m.range)}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
             if (seq !== m.seq) return;
             if (r.status === 401 || r.status === 403 || (r.status === 404 && server !== 'local')) { m.status = server === 'local' ? 'guest' : 'refused'; m.data = null; draw(key); return; }
-            if (!r.ok) throw new Error(String(r.status));
+            if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
             m.data = await r.json(); m.status = 'ok';
         } else {
             if (!m.team) { m.status = 'noteam'; m.data = null; draw(key); return; }
@@ -115,10 +117,10 @@ async function load(key) {
             if (seq !== m.seq) return;
             if (r.status === 404 && isCloud()) { m.status = 'hubclosed'; m.data = null; draw(key); return; } // the Hub has no route for it yet: the owner is not a guest (coral-hub #258866)
             if (r.status === 401 || r.status === 403) { m.status = 'guest'; m.data = null; draw(key); return; }
-            if (!r.ok) throw new Error(String(r.status));
+            if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
             m.data = (await r.json()).activity || {}; m.status = 'ok';
         }
-    } catch { if (seq !== m.seq) return; m.status = 'error'; }
+    } catch (e) { if (seq !== m.seq) return; m.update = e.code === 'coral_too_old' ? e.message : ''; m.status = 'error'; }
     draw(key);
 }
 
@@ -161,7 +163,7 @@ function draw(key) {
     else if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : key === 'tasks' ? 'Tasks completed are visible to the owner of this Coral only.' : GUEST_LINE));
     else if (m.status === 'hubclosed') root.append(say('Not available through the Hub yet.'));
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
-    else if (m.status === 'error') { const p = say(machineNow() === 'local' ? 'This could not be read.' : `${machineLabel(machineNow())} could not be read.`); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
+    else if (m.status === 'error') { const p = say(m.update || (machineNow() === 'local' ? 'This could not be read.' : `${machineLabel(machineNow())} could not be read.`)); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
     else if (!m.data) root.append(say('Loading…'));
     else root.append(...({ usage: drawUsage, tasks: mm => T.drawTasks(mm.data, { phone: phone(), group: mm.group }), operator: drawOperator, [IVC]: drawInbox, comm: drawComm, [RQ]: mm => Q.drawQueue(mm.data, phone()) }[key])(m));
     const focus = host.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
@@ -220,19 +222,19 @@ function drawUsage(m) {
 const rowOf = (a, b) => { const r = el('div', 'atab-row2'); r.append(a, b); return r; };
 
 async function loadTurns(agent, day) {
-    const m = tabs.usage;
+    const m = tabs.usage, server = machineNow();
     m.turns = { agent, day, rows: null }; draw('usage');
     try {
-        const r = await serverFetch(machineNow(), `/api/token-usage/turns?agent=${encodeURIComponent(agent)}&since=${encodeURIComponent(day + 'T00:00:00.000Z')}&until=${encodeURIComponent(new Date(Date.parse(day + 'T00:00:00Z') + 86400000).toISOString())}&order=cost&limit=8`);
-        if (!r.ok) throw new Error(String(r.status));
+        const r = await serverFetch(server, `/api/token-usage/turns?agent=${encodeURIComponent(agent)}&since=${encodeURIComponent(day + 'T00:00:00.000Z')}&until=${encodeURIComponent(new Date(Date.parse(day + 'T00:00:00Z') + 86400000).toISOString())}&order=cost&limit=8`);
+        if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
         const rows = (await r.json()).turns || [];
         if (m.turns && m.turns.agent === agent && m.turns.day === day) m.turns.rows = rows;
-    } catch { if (m.turns) m.turns.rows = []; m.turns && (m.turns.error = true); }
+    } catch (e) { if (server !== machineNow()) return; if (m.turns) m.turns.rows = []; m.turns && (m.turns.error = e.code === 'coral_too_old' ? e.message : true); }
     draw('usage');
 }
 function turnsTable(t) {
     if (!t.rows) return say('Loading the turns…');
-    if (!t.rows.length) return say(t.error ? 'The turns could not be read.' : 'No turns recorded for this agent on this day.');
+    if (!t.rows.length) return say(t.error ? (typeof t.error === 'string' ? t.error : 'The turns could not be read.') : 'No turns recorded for this agent on this day.');
     return V.plainTable(['Time (UTC)', 'Model', 'Cost', 'Tokens'], t.rows.map(r => [String(r.timestamp || '').slice(11, 16), r.model || '—', D.fmtMoney(r.cost_usd || 0), D.fmtCount((r.input_tokens || 0) + (r.output_tokens || 0))]), { right: [2, 3], label: `Biggest turns of ${t.agent}` });
 }
 

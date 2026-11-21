@@ -29,10 +29,11 @@ export async function drawInboxTeams(raw) {
     if (!host) return;
     let projects = [];
     try { projects = (await fetchProjectsChecked()).map(p => p.project); // every contributing source is checked: a source that cannot be read is a failure, never an empty list
-    } catch {
+    } catch (e) {
         // The teams could not be read: that is not an empty list. Say so, with a way to try again; no box is drawn, so Save sends the saved choice as it was (readIncludedTeams) and nothing is lost.
         const p = document.createElement('p'), b = document.createElement('button');
         p.className = 'sv-help settings-inbox-teams-failed'; p.setAttribute('role', 'alert');
+        if (e?.code === 'coral_too_old') p.append(e.message + '. ');
         p.append('Your teams could not be loaded, so they cannot be changed now. What you saved stays as it is. ');
         b.type = 'button'; b.className = 'btn btn-quiet btn-small'; b.textContent = 'Retry';
         b.addEventListener('click', () => drawInboxTeams(raw));

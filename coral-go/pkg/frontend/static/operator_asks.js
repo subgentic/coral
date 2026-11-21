@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* Questions to the Operator in their Needs you (#11417). An agent asks the Operator with `coral-board post --ask "@Operator ..."` or `coral-board wait --operator "..."`; neither was in the Inbox, which is
  * built from the live list, so the person did not see what they were asked. GET /api/operator-asks lists both for every board (the whole question as text); a row of Needs you says who asks and the question
  * on one line, and opens whole in a dialog with a Reply box. The reply is the board post the dashboard already makes (POST /api/board/{board}/messages as the Operator, with the asker's @name, and reply_to
@@ -89,7 +90,7 @@ export function refreshOperatorAsks(force = false) {
     const readAsks = async server => {
         try {
             const r = await serverFetch(server === LOCAL_SERVER ? undefined : server, '/api/operator-asks');
-            if (!r.ok) { readOutcome('questions', server, false, r.status === 401 || r.status === 403); return r.status === 401 || r.status === 403 ? [] : null; } // access taken away (401, 403): none drawn, and the note says so; anything else keeps the rows
+            if (!r.ok) { readOutcome('questions', server, false, r.status === 401 || r.status === 403, (await responseUpdateError(r, server))?.message || ''); return r.status === 401 || r.status === 403 ? [] : null; } // access taken away (401, 403): none drawn, and the note says so; anything else keeps the rows
             const rows = await r.json();
             if (!Array.isArray(rows)) { readOutcome('questions', server, false); return null; }
             readOutcome('questions', server, true);

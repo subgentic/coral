@@ -17,7 +17,7 @@
       "count": 1,
       "reason": "the live list is the merged list of every computer ({sessions, servers}); the code below it keeps this board's server"
     },
-    "board_fetch.js": {
+    "board_bulk_reads.js": {
       "count": 1,
       "reason": "this computer's own board list: the remote computers' lists are read next to it with serverFetch"
     },

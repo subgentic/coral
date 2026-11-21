@@ -7,15 +7,16 @@ import { setNoTeam } from './launch_cards.js';
 import { showConfirmModal } from './confirm_dialog.js';
 
 async function teams() {
-    try { return (await fetchProjectsChecked()).map(p => ({ key: String(p.project), label: teamLabel(p.project, p.board_label || '') })).filter(t => t.key).sort((a, b) => a.label.localeCompare(b.label)); } catch { return null; } // null: could not tell. A refusal, an error body or an unreadable computer is never "no teams" (the checked read throws on each): the card keeps its plain line and pressing it says the read failed (#13012, UI Reviewer)
+    try { return (await fetchProjectsChecked()).map(p => ({ key: String(p.project), label: teamLabel(p.project, p.board_label || '') })).filter(t => t.key).sort((a, b) => a.label.localeCompare(b.label)); } catch (e) { return e?.code === 'coral_too_old' ? e : null; } // null: could not tell. A refusal, an error body or an unreadable computer is never "no teams" (the checked read throws on each): the card keeps its plain line and pressing it says the read failed (#13012, UI Reviewer)
 }
 
 /** Put the card's line right (no team, or the plain one); a failed read leaves it as it was. */
-export async function refreshGoalCard() { const list = await teams(); if (list) setNoTeam(list.length === 0); }
+export async function refreshGoalCard() { const list = await teams(); if (Array.isArray(list)) setNoTeam(list.length === 0); }
 
 /** The card was pressed (or the Inbox's New goal: opts.project is the team its filter names, opts.fallback the teams the goals name, opts.onCreated what to do after). */
 export async function startGoalFromHome(opts = {}) {
     let list = await teams();
+    if (list?.code === 'coral_too_old') { const { showToast } = await importOnce('./notifications.js'); showToast(list.message, true); return; }
     if ((list === null || !list.length) && opts.fallback && opts.fallback.length) list = opts.fallback; // the read failed or found none but the goals name teams: the Inbox's old fallback
     if (list === null) { const { showToast } = await importOnce('./notifications.js'); showToast('Could not read your teams. Try again.', true); return; }
     setNoTeam(list.length === 0);

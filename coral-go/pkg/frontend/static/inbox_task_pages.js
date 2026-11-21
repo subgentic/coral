@@ -1,3 +1,5 @@
+import { responseUpdateError } from './server_base.js';
+
 /* Inbox task queries (#17325). The shared pager keeps source cursors, retries,
  * refresh depth and stale replies; its `artifacts` array carries task rows here. */
 import { importOnce } from './import_once.js';
@@ -16,7 +18,7 @@ export function createTaskQueries(readTaskQuery) {
         if (isCloud() && !personalInboxAllowed(server)) throw new Error('This computer’s tasks are not available.');
         const q = new URLSearchParams(query); q.set('limit', String(limit)); if (cursor) q.set('cursor', cursor);
         const r = await readTaskQuery(server, q, { signal });
-        if (!r.ok) { dropBody(r); throw new Error(`Tasks could not be read (HTTP ${r.status}).`); }
+        if (!r.ok) { const update = await responseUpdateError(r, server); dropBody(r); if (update) throw update; throw new Error(`Tasks could not be read (HTTP ${r.status}).`); }
         const data = await r.json();
         if (!Array.isArray(data.tasks)) throw new Error('The task list was not usable.');
         if (isCloud() && !personalInboxAllowed(server)) throw new Error('This computer’s tasks are no longer available.');

@@ -1,3 +1,5 @@
+import { responseUpdateError } from './server_base.js';
+
 /* The Overview's "By computer" table (#16017, the Operator's ask of 2026-11-12): on a dashboard that links other computers, the spend of this one and of each linked one, side by side: cost, input and output tokens, agents
  * and requests, read from each computer (GET /api/token-usage/summary?include=totals through the Hub). A computer that does not answer shows the last figures read from it for this same range, with when it was last seen,
  * never a zero; one never read has no figures and says so. The total is the sum of the rows shown: every figure is a whole number or a cost rounded the way it is shown, so what is added is what is read. The Overview's
@@ -83,11 +85,12 @@ export async function showByComputer(host, sinceParam, period) {
     if (section) { delete section.dataset.empty; section.hidden = section.dataset.cview !== state.analyticsView; }
     const mine = ++seq;
     const query = (sinceParam ? sinceParam + '&' : '?') + 'include=totals';
-    const fresh = new Set();
+    const fresh = new Set(), updates = [];
     const wasReading = reading;
     reading = Promise.all(computers.map(async c => {
         try {
             const r = await serverFetch(c.id, '/api/token-usage/summary' + query, { cache: 'no-store' });
+            const update = await responseUpdateError(r, c.id); if (update) updates.push(update.message);
             const figs = r.ok ? figuresOf(await r.json()) : null;
             if (figs) { remember(c.id, period, figs, Date.now()); fresh.add(c.id); }
         } catch { /* not answering: its last figures stay */ }
@@ -100,6 +103,7 @@ export async function showByComputer(host, sinceParam, period) {
         const own = known.get(machineNow()), spend = computers.find(c => (known.get(c.id)?.figs?.cost || 0) > 0);
         if (spend && !((own?.figs?.cost || 0) > 0) && spend.id !== machineNow()) pickMachine(spend.id);
     }
+    for (const message of updates) host.append(el('p', 'cost-note', message));
     return true;
 }
 

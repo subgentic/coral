@@ -49,7 +49,7 @@ const { fileContext } = await importOnce('./artifact_file_context.js');
 import { claudeSignedIn, onSigninChange } from './signin_line.js';
 import { markHidden } from './visible_marks.js';
 import { onInboxHooks, setInboxCount, askOf, updateInboxTab, needsCount } from './inbox_tab.js';
-const { coralInboxAdapter, savedExpandFor, listInboxGoals, goalsReadFailed, doneGoalsCapped, taskReadState } = await importOnce('./inbox_coral.js');
+const { coralInboxAdapter, savedExpandFor, listInboxGoals, goalsReadFailed, goalsUpdateNote, doneGoalsCapped, taskReadState } = await importOnce('./inbox_coral.js');
 const { closedGoalRows, madeByPerson } = await importOnce('./goal_closed_items.js'); // 'Goal closed as done by <agent>' with Reopen: listed, not counted (#15257)
 const WA = await importOnce('./inbox_waiting_agent.js'); // the Operator's answered asks and sent comments, still waiting on an agent (#19904, #19916)
 const AW = await importOnce('./inbox_agent_wait.js'), { stillWaitingOnAgent } = AW; // what Waiting on an agent says of the agent (#19904)
@@ -1201,7 +1201,7 @@ function renderInboxNav(force = false) {
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);
     const liveAsks = new Set(operatorAsks().map(askKey)); for (const key of askActionErrors.keys()) if (!liveAsks.has(key)) askActionErrors.delete(key);
-    const key = JSON.stringify([[...askActionErrors], reviewAttentionCount(), reviewPagingSignature(), loadingEmpty(), reviewQueryState(), here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
+    const key = JSON.stringify([incompleteNote(), goalsUpdateNote(), taskReadState(), [...askActionErrors], reviewAttentionCount(), reviewPagingSignature(), loadingEmpty(), reviewQueryState(), here, sections, queries.needs, queries.tasks, page && `${page.kind}:${page.project || ''}#${page.id}`,
         needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.trustGroup?.members.map(m => m.session.session_id), s.waiting_kind, s.waiting_since, teamOf(s), askOf(s), s.review ? [s.review.version, s.review.opened_version, s.review.new_comments, s.review.starred] : null]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state]), savedFiles().map(a => a.reviewKey), mutedWords(mutedReviewItems()), dayOldMutedFiles().map(a => a.hex)]); // the quiet Muted line is part of what the table shows: a change that only moves muted files redraws it (#12881)
     if (!force && key === _navKey) return;
     _navKey = key;
@@ -1302,7 +1302,7 @@ function savedListSpec(where = '') {
     const files = dock ? [] : savedFiles().filter(a => !v.query || [a.name, a.produced_by].join(' ').toLowerCase().includes(v.query.toLowerCase())); // the saved review files, listed above the messages (#11641)
     const spec = { title: 'Saved', count: dock ? rows.length : savedHeadWords(files.length, rows.length), noun: ['item', 'items'], headless: dock, chipsLabel: 'Show',
         chips: !dock ? [] : [{ action: 'inbox-saved-chip', data: { tab: 'open' }, label: 'Open', count: v.totals.open, pressed: v.tab === 'open' }, { action: 'inbox-saved-chip', data: { tab: 'done' }, label: 'Done', count: v.totals.done, pressed: v.tab === 'done' }],
-        empty: { line: empty, hint: v.loading || v.error || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
+        empty: { line: empty, hint: v.loading || v.error || v.down?.some(s => s.update) || v.filtered || v.tab === 'done' ? '' : 'Save a message from a chat or a board with its bookmark.' },
         note: [v.notice, v.browserOnly ? 'Read-only. Search filters the first 200 saved messages loaded from each owned computer.' : v.query ? 'The search covers every saved message, not only these.' : '', v.capped ? 'More saved messages may be available on the source computer.' : '', ...v.down.map(d => d.ownerOnly ? `Only this computer's owner sees Saved on ${d.label || d.id}.` : `${d.label || d.id} did not answer, so its saved messages are not shown.`)].filter(Boolean).join(' '), rows,
         signature: JSON.stringify([v.notice, v.capped, v.down, multi, rows.map(f => [f.id, f.which, f.saved, f.state, f.gone, f.done, f.serverName])]),
         node: () => DT.dataTable({ label: `Saved, ${rows.length}`, compact: true, bare: !dock, rows, rowKey: f => f.id, state: dock ? dockSavedState : savedState, sortBar: !dock, rowName: f => f.which,
@@ -1660,7 +1660,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'tasks') {
             const rows = taskRows();
             const unfinished = taskReadState().pages.some(p => p.has_more || p.error);
-            return { title: 'Tasks', note: isCloud() ? [personalInboxNotice('tasks'), taskReadState().failed ? 'Some owned computers did not answer.' : '', taskReadState().capped ? 'Load more to see older matching tasks.' : ''].filter(Boolean).join(' ') : '', noun: ['task', 'tasks'], rows, empty: unfinished ? null : { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : (isCloud() && personalInboxNotice('tasks') || 'No tasks assigned to you.'), hint: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? undefined : "The tasks of your agents are in each team's Tasks tab." },
+            return { title: 'Tasks', note: isCloud() ? [personalInboxNotice('tasks'), ...taskReadState().pages.map(p => p.error && p.error.replace(/\.$/, '') + '.').filter(Boolean), taskReadState().failed && !taskReadState().pages.some(p => p.error) ? 'Some owned computers did not answer.' : '', taskReadState().capped ? 'Load more to see older matching tasks.' : ''].filter(Boolean).join(' ') : '', noun: ['task', 'tasks'], rows, empty: unfinished ? null : { line: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? 'No task matches the filters.' : (isCloud() && personalInboxNotice('tasks') || 'No tasks assigned to you.'), hint: queries.tasks || TF.isFiltered(taskFilters) || taskState !== 'all' ? undefined : "The tasks of your agents are in each team's Tasks tab." },
                 signature: JSON.stringify([isCloud() ? personalInboxNotice('tasks') : '', taskReadState(), rows.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count, IR.isUnread('task', `${t.project}#${t.id}`, t.updated_at || t.created_at)])]), // the read state is part of what is drawn (#9687)
                 node: () => {
                     const row = document.querySelector('#group-table-view .gt-toolbar');
@@ -1689,12 +1689,12 @@ registerGroupSource('hub-inbox', {
         if (key === 'goals') {
             const rows = goalRows();
             const waitingGoals = goalProposals().length, waitingNote0 = waitingGoals ? `${waitingGoals} goal${waitingGoals === 1 ? '' : 's'} an agent proposed ${waitingGoals === 1 ? 'is' : 'are'} waiting for your approval in Needs you.` : '';
-            const waitingNote = [waitingNote0, goalFilters.state === 'done' && doneGoalsCapped() ? 'Each computer shows up to 100 finished goals, oldest first. Newer goals may be missing when this limit is reached.' : ''].filter(Boolean).join(' ');
+            const waitingNote = [goalsUpdateNote(), waitingNote0, goalFilters.state === 'done' && doneGoalsCapped() ? 'Each computer shows up to 100 finished goals, oldest first. Newer goals may be missing when this limit is reached.' : ''].filter(Boolean).join(' ');
             const hasDone = goals.some(g => String(g.state || '').toLowerCase() === 'done');
             const narrowed = GF.isFiltered({ ...goalFilters, state: goalFilters.state === 'active' ? '' : goalFilters.state }); // the list opens on Active (#16371): that chip alone is the default, not a narrowing
             const pendingGoals = goalInventoryPending() || (!!_goalsReading && !openAt && !goals.length);
-            const emptyLine = pendingGoals ? 'Loading goals…' : narrowed ? 'No goal matches the search and filters.' : goalFilters.state === 'done' ? 'No finished goals.' : hasDone ? 'All goals are done.' : 'No open goals.';
-            return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: emptyLine, hint: pendingGoals ? undefined : waitingNote || (narrowed ? undefined : goalFilters.state === 'done' || hasDone ? undefined : "Press New goal to create one, or an Orchestrator can propose one too.") },
+            const emptyLine = pendingGoals ? 'Loading goals…' : goalsUpdateNote() || (narrowed ? 'No goal matches the search and filters.' : goalFilters.state === 'done' ? 'No finished goals.' : hasDone ? 'All goals are done.' : 'No open goals.');
+            return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: emptyLine, hint: pendingGoals || goalsUpdateNote() ? undefined : waitingNote || (narrowed ? undefined : goalFilters.state === 'done' || hasDone ? undefined : "Press New goal to create one, or an Orchestrator can propose one too.") },
                 signature: JSON.stringify([pendingGoals, rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])]),
                 node: () => { const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); if (phone) bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     selectable: { contextKey: 'inbox-goals', canSelect: g => ['proposed', 'active', 'blocked'].includes(String(g.state || '').toLowerCase()), actions: closeGoalsActions(), onChange: () => mountBar(), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // the tick column of the team page's Goals too (#16371); a phone: a long press selects, as in Needs you (#12230)

@@ -1,3 +1,4 @@
+import { importOnce } from './import_once.js';
 /* Server routing helpers for the multi-server hub.
  *
  * Identity of an agent, terminal or team is (server, name). `server` is the
@@ -110,6 +111,11 @@ export function serverFetch(server, url, options) {
     let target;
     try { target = serverUrl(url, server); } catch (e) { return Promise.reject(e); }
     return fetch(target, options);
+}
+
+/** Decode only an explicit version refusal; successful reads keep the error code lazy. */
+export async function responseUpdateError(response, server) {
+    return response.status === 409 ? (await importOnce('./computer_update_error.js')).responseUpdateError(response, server) : null;
 }
 
 /** An id that goes into a request path: a positive safe integer, as a number, or an error. Ids come from lists a registered server sent, and that is another machine: an id

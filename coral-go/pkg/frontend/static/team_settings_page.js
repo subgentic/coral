@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 // The team page's Settings tab (#7744): the page is a settings_view, so its nav, rows, help, errors and save bar are the component's; this module is what is the team's own: what it loads, the
 // shapes it saves, the presets editor, the Health check and Messaging parts (their own forms and Saves, held by the bar) and the read-only prompt preview.
 import { importOnce } from './import_once.js';
@@ -163,6 +164,8 @@ function settingsGroups(st) {
 function loadSettings(st) {
     return async () => {
         const [modeResponse, presetsResponse, settingsResponse, inspectionResponse, boardSettingsResponse] = await st.dataReady;
+        const update = (await Promise.all([modeResponse, presetsResponse, inspectionResponse, boardSettingsResponse].filter(Boolean).map(r => responseUpdateError(r, st.teamServer)))).find(Boolean);
+        if (update) throw update;
         if (!modeResponse.ok) throw new Error('Could not load working mode. Close and reopen to retry.');
         if (!presetsResponse.ok) throw new Error(await jsonError(presetsResponse, 'Could not load workflow presets.'));
         st.workingMode = await modeResponse.json();

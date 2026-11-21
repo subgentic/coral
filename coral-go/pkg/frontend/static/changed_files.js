@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 import { cachedServerAccess } from './hub_access.js';
 /* Changed files panel — load and render per-agent file diffs */
 
@@ -19,7 +20,7 @@ let _currentFiles = [];
 const _keyOf = s => s ? `${sessionServer(s)}|${s.name || ''}|${s.session_id || ''}` : ''; // the same key as session_header_updates.js whereKey
 let _wtFor = ''; // the agent _worktree was read for
 const paintWhere = () => { importOnce('./session_header_updates.js').then(m => m.setFilesWorktree(_worktree, _wtFor)).catch(() => {}); };
-const forThisAgent = (k = _keyOf(state.currentSession)) => { if (_wtFor !== k) { _worktree = null; _wtFor = k; paintWhere(); } return k; }; // another agent or computer: nothing of the last one's worktree stays // the one line at the top of Files names the followed worktree (#12690)
+const forThisAgent = (k = _keyOf(state.currentSession)) => { if (_wtFor !== k) { _worktree = null; _filesUpdate = ''; _wtFor = k; paintWhere(); } return k; }; // another agent or computer: nothing of the last one's worktree stays // the one line at the top of Files names the followed worktree (#12690)
 let _worktree = null; // the worktree the agent works in, when it is not its launch folder: { path, name, branch, followed, launch } (#11351)
 const _expandedFiles = new Set(); // the paths whose diff is open under their row (#11350): kept across the list's redraws, and by path so a file that moves in the list keeps it
 let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit open on a phone (#7652): kept across the list's redraws
@@ -120,7 +121,7 @@ export function initFileSearch() {
 
 
 // The list was refused as too large to check through Coral Hub (#3718): it says so, not "No changed files".
-let _filesRefused = false;
+let _filesRefused = false, _filesUpdate = '';
 let _notGit = false; // the folder is not a git repository (#6072): there is nothing to compare, so the panel says so instead of "0 files changed vs HEAD~1"
 
 export async function loadChangedFiles(agentName, sessionId, quiet = false) { // quiet: the watch's read (#10485): nothing is drawn unless the list moved
@@ -139,7 +140,8 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
         const qs = params.toString() ? `?${params}` : "";
         const resp = await serverFetch(serverForSession(agentName), `/api/sessions/live/${encodeURIComponent(agentName)}/files${qs}`);
         _filesRefused = !resp.ok && await refusedTooLarge(resp);
-        if (!resp.ok) { dropBody(resp); throw new Error(`files fetch failed: ${resp.status}`); }
+        if (!resp.ok) { const update = await responseUpdateError(resp, serverForSession(agentName, sid)); dropBody(resp); throw update || new Error(`files fetch failed: ${resp.status}`); }
+        _filesUpdate = '';
         const data = await resp.json();
         if (staleRead()) return; // the answer is for an agent that is no longer open
         const wasPaused = JSON.stringify(pausedNow()), wasTotal = _totalChanged, wasTimedOut = timedOutNow();
@@ -153,7 +155,8 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
     } catch (e) {
         if (staleRead()) return;
         if (_worktree) { _worktree = null; paintWhere(); } // a read that failed: the line does not go on naming a worktree it could not read
-        if (quiet) return; // a read that failed in the background leaves the list as it was
+        _filesUpdate = e.code === 'coral_too_old' ? e.message : '';
+        if (quiet && !_filesUpdate) return; // a read that failed in the background leaves the list as it was
         _currentFiles = [];
         _notGit = false;
     }
@@ -565,7 +568,7 @@ document.addEventListener('keydown', e => {
 
     if (files.length === 0) {
         // The comparison choice is in the header above, with the count: not drawn a second time under "No changed files" (#5991).
-        list.innerHTML = staleNoteHtml() + (_filesRefused
+        list.innerHTML = staleNoteHtml() + (_filesUpdate ? `<div class="empty-state empty-state-tight">${escapeHtml(_filesUpdate)}</div>` : _filesRefused
             ? '<div class="empty-state empty-state-tight">Too many changed files to show through Coral Hub; open the agent on the computer.</div>'
             : (timedOutNow() ? '' : `<div class="empty-state empty-state-tight">No changed files</div>`)); // a pass that timed out says so in the note above, not 'No changed files'
         return;

@@ -1,3 +1,4 @@
+const { computerUpdateError } = await importOnce('./computer_update_error.js');
 /* Coral's side of the shared Inbox (#5754): the adapter that gives inbox_panel.js its tasks, task text, reply and saved-message read from this Coral's own routes, and the one mounted panel
  * (the Inbox tab's "Tasks for you" and the "Read the whole message" control of a Saved for later item). The component itself is inbox_panel.js; Coral Hub mounts the same file with its own adapter. */
 import { nativeSavedSourceAllowed } from './server_status.js';
@@ -23,10 +24,10 @@ const TASK_PATH = '/api/board/tasks?';
 const OPEN_STATUSES = ['pending', 'in_progress', 'review_pending', 'blocked'];
 const FIELDS = 'id,board_id,board_label,title,priority,status,created_by,created_at,updated_at,revision,goal_id,goal_title,artifact_count'; // updated_at and revision are the change stamp the panel keeps a drawn task by (#5803)
 
-async function json(resp) {
+async function json(resp, server) {
     let data = {};
     try { data = await resp.json(); } catch { /* no body */ }
-    if (!resp.ok) throw new Error((data && typeof data.error === 'string' && data.error) || `HTTP ${resp.status}`);
+    if (!resp.ok) throw computerUpdateError(server, resp.status, data) || new Error((data && typeof data.error === 'string' && data.error) || `HTTP ${resp.status}`);
     return data;
 }
 
@@ -35,21 +36,24 @@ async function json(resp) {
 async function inboxRows(path, field, personal = false) {
     const servers = personal && isCloud() ? personalInboxSources().filter(s => personalInboxAllowed(s.id)).map(s => s.id) : [...(isCloud() ? [] : ['local']), ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];
     const results = await Promise.allSettled(servers.map(async server => {
-        const data = await json(await serverFetch(server, path));
+        const data = await json(await serverFetch(server, path), server);
         if (personal && !Array.isArray(data[field])) throw new Error('The task list was not usable.');
         const rows = Array.isArray(data[field]) ? (personal ? data[field].slice(0, 100) : data[field]) : [];
         noteBoardLabels(rows, 'board_id', server);
         return rows.filter(row => !personal || (validTask(row) && personalInboxAllowed(server))).map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) }));
     }));
-    inboxRows.failed = results.some(result => result.status === 'rejected'); // a read that failed or was refused is told to the caller, which backs off (#13389)
+    const updates = results.filter(r => r.status === 'rejected' && r.reason?.code === 'coral_too_old').map(r => r.reason.message);
+    const failed = results.some(result => result.status === 'rejected'); // a read that failed or was refused is told to the caller, which backs off (#13389)
     // Each source is ordered independently; merge by update time, not server order.
     const updated = row => { const time = Date.parse(row.updated_at); return Number.isFinite(time) ? time : -Infinity; };
-    return results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
+    const merged = results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
         .sort((a, b) => updated(a) === updated(b) ? 0 : updated(b) - updated(a));
+    return Object.defineProperties(merged, { failed: { value: failed }, updates: { value: updates } });
 }
 
 /** Open goals from this Coral and its registered machines, preserving team identity. */
-let goalsFailed = false, doneCapped = false;
+let goalsFailed = false, doneCapped = false, goalUpdates = [];
+export const goalsUpdateNote = () => goalUpdates.join('. ');
 const DONE_PAGE = 100;
 /** Whether a computer sent a whole page of finished goals: there may be newer ones that are not listed (#14613); the Done list then says it shows the first ones. */
 export const doneGoalsCapped = () => doneCapped;
@@ -58,7 +62,7 @@ export const goalsReadFailed = () => goalsFailed;
 export async function listInboxGoals(finished = false) { // finished: true or 'done' for the done goals, 'dropped' for the dropped ones (#16371), false for the open ones
     const state = finished === 'dropped' ? 'dropped' : 'done';
     const rows = await inboxRows(finished ? `/api/goals?state=${state}&limit=` + DONE_PAGE : '/api/goals?limit=100', 'goals');
-    goalsFailed = !!inboxRows.failed;
+    goalsFailed = !!rows.failed; goalUpdates = rows.updates || [];
     if (finished && state === 'done') doneCapped = Object.values(rows.reduce((n, d) => (n[d.server] = (n[d.server] || 0) + 1, n), {})).some(n => n >= DONE_PAGE);
     return rows;
 }
@@ -100,7 +104,7 @@ export const coralInboxAdapter = {
         const q = new URLSearchParams({ ...(hub ? {} : { assigned_to: 'Operator' }), fields: FIELDS + (hub ? ',assigned_to,parked_reason,parked_until' : ''), sort: 'updated_at', order: 'desc', limit: '100' });
         for (const s of [...OPEN_STATUSES, ...(hub ? ['draft'] : [])]) q.append('status', s);
         let rows = await inboxRows(`${TASK_PATH}${q}`, 'tasks', hub);
-        taskReadFailed = !!inboxRows.failed;
+        taskReadFailed = !!rows.failed;
         tasksCapped = Object.values(rows.reduce((out, row) => (out[row.server] = (out[row.server] || 0) + 1, out), {})).some(n => n >= 100);
         if (hub) rows = rows.filter(t => String(t.assigned_to || '').replace(/^@/, '').toLowerCase() === 'operator' || t.status === 'review_pending');
         for (const task of rows) if (hub) rememberReply(task.board_id, task);
@@ -110,7 +114,7 @@ export const coralInboxAdapter = {
     },
     openGoal(task) { return importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(task.project, task.goal.id)); },
     async getTask(project, id) {
-        const task = await json(await boardFetch(project, `/tasks/${pathId(id)}`));
+        const task = await json(await boardFetch(project, `/tasks/${pathId(id)}`), splitKey(project).server);
         if (isCloud()) rememberReply(project, { ...task, id: pathId(id) });
         return task;
     },
@@ -120,14 +124,14 @@ export const coralInboxAdapter = {
         return { ok: !!d.ok, notified: d.notified || [], warnings: d.warnings || [] };
     },
     async listTaskMessages(project, taskId) { // the task's conversation (#7703): the person's replies and the agents' answers posted with --task, oldest first
-        const d = await json(await boardFetch(project, `/messages/all?task_id=${pathId(taskId)}&limit=200`));
+        const d = await json(await boardFetch(project, `/messages/all?task_id=${pathId(taskId)}&limit=200`), splitKey(project).server);
         return (Array.isArray(d) ? d : []).map(m => ({ id: m.id, from: m.hub_user || m.subscriber_id || '', mine: m.subscriber_id === 'Operator' && !m.hub_user, content: m.content, created_at: m.created_at }));
     },
     canReply(task) { return !isCloud() || (inboxReplyOn() && personalInboxAllowed(splitKey(task?.project).server, true) && ['pending', 'in_progress', 'blocked', 'draft'].includes(task?.status) && !task?.parked_reason && !task?.parked_until) ? { ok: true } : { ok: false, reason: 'Reply requires an owned computer in Interact or Launch mode and an available task.' }; }, // the Operator of this computer; a Coral Hub viewer's adapter says why not
     async readSavedMessage(item) {
         // GET /api/saved/{id}/message (Backend, #5753): the redacted, capped text of the stored item's source; reason says why there is none (gone, not_reachable, too_long)
         if (isCloud() && (!savedExpandOn() || !nativeSavedSourceAllowed(item.server))) throw new Error('This saved message is not available.');
-        const d = await json(await serverFetch(item.server, `/api/saved/${pathId(item.id)}/message`));
+        const d = await json(await serverFetch(item.server, `/api/saved/${pathId(item.id)}/message`), item.server);
         if (isCloud() && !nativeSavedSourceAllowed(item.server)) throw new Error('This saved message is no longer available.');
         return { text: typeof d.text === 'string' ? d.text : '', partial: !!d.partial, reason: typeof d.reason === 'string' ? d.reason : '' };
     },

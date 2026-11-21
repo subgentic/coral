@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
@@ -63,6 +64,10 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     /** An Error carrying the route's code and sentence (or the status when the answer is not JSON). */
     async function failure(r) {
+        if (r.status === 409) {
+            const update = await responseUpdateError(r, splitKey(model.project).server);
+            if (update) return update;
+        }
         let e = { code: '', message: '' };
         try { e = errorOf(await r.json()); } catch { /* the status stays */ }
         return Object.assign(new Error(e.message || `${r.status}`), { code: e.code });

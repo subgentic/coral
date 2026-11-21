@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* Who sees Move and Kick (#13651, the Orchestrator's ruling): the Queue folder is local-only (its routes are never reached through the Hub), so its one viewer is the Operator, who is always a manager. There is no
  * up-front permission check; the server still decides, and a 403 (anything else asking) takes the buttons away for good.
  * The Queue folder of Automations (#13651, goal #225): the resource queue of this computer (GET /api/resources) as one table, each resource a group: its name, how many of its slots are in use,
@@ -67,7 +68,9 @@ export async function refreshQueue() {
             try { r = asked === 'local' ? await fetch('/api/resources') : await serverFetch(asked, '/api/resources', { cache: 'no-store' }); } catch { r = null; }
             if (asked !== machine) return; // another computer was chosen while this read was out
             if (!r || !r.ok) { // said, not left on 'Reading the queue.' (#13871); a linked computer that does not answer keeps its last queue, said as such (#16030)
-                unavailable = asked === 'local' ? (r ? `The queue could not be read from this computer (HTTP ${r.status}).` : '') : !r ? 'Not answering.' : r.status === 403 || r.status === 404 ? 'Does not share its queue with the hub.' : `The queue could not be read from this computer (HTTP ${r.status}).`;
+                const update = r?.status === 409 ? await responseUpdateError(r, asked) : null;
+                if (asked !== machine) return;
+                unavailable = update?.message || (asked === 'local' ? (r ? `The queue could not be read from this computer (HTTP ${r.status}).` : '') : !r ? 'Not answering.' : r.status === 403 || r.status === 404 ? 'Does not share its queue with the hub.' : `The queue could not be read from this computer (HTTP ${r.status}).`);
                 if (was !== unavailable) emit();
                 return;
             }
@@ -221,6 +224,7 @@ const linkActions = r => (r.state === 'free' || queueReadOnly() ? [] : [
 /** The Queue folder's table. */
 export function queueTable(rows, narrowed) {
     return { title: 'Queue (experimental)', noun: ['entry', 'entries'], rows,
+        note: unavailable && (rows.length || narrowed) ? unavailable : '',
         empty: { line: narrowed ? 'No entry matches the search.' : unavailable ? unavailable : loaded ? 'No resource is defined.' : 'Reading the queue.', hint: narrowed || !loaded || unavailable ? '' : 'An Orchestrator defines a resource with coral-board resource; agents claim a slot before a heavy run and wait in line when it is taken.' },
         signature: JSON.stringify([machine, denied, unavailable, loaded, rows.map(r => [r.key, r.state, r.place, r.agent, r.project, r.goal_id, r.goal_title, r.stuck, r.stuck_min, r.member, r.heldOn, r.note, r.used, r.slots, r.waiting, r.lease_until, r.first, r.last, r.state === 'holding' ? leaseWords(r) : r.state === 'waiting' ? waitWords(r) : ''])]), // the words of the clock are in it: the table is drawn again when they change
         node: () => DT.dataTable({

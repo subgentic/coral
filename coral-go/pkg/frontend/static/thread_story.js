@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* The story under a task (#14444, threading U4, goal #233): what the task's thread holds, oldest first: the ask, the files sent, the replies, what the Operator decided and 'Task done'.
  * Read from GET /api/thread?team=&task= (the owner's read, #14440) when a task row is open: the newest ten, a 'Show earlier' that pages back. Everything is text (textContent, never HTML): the words are
  * an agent's or the Operator's own. Drawn as the mockup's option A: who and when, a file as a chip, a decision as a chip with its quote, the end of the task as a line. Lazy: the table that draws task rows imports it. */
@@ -29,7 +30,7 @@ async function read(team, task, after) {
     if (after) q.set('after', after);
     try {
         const r = await serverFetch(server, `/api/thread?${q}`);
-        if (!r.ok) return { failed: true, status: r.status };
+        if (!r.ok) return { failed: true, status: r.status, update: (await responseUpdateError(r, server))?.message || '' };
         const d = await r.json();
         return { entries: Array.isArray(d.entries) ? d.entries : [], more: d.more === true, cursor: d.cursor || '' };
     } catch { return { failed: true }; }
@@ -96,7 +97,7 @@ export function storyNode(team, task) {
         earlier.hidden = !st.more; earlier.disabled = false;
         status.hidden = st.entries.length > 0 || !!st.failed;
         if (!st.entries.length && !st.failed) status.textContent = 'Nothing has been said about this task yet.';
-        if (st.failed) { status.hidden = false; status.textContent = 'The story could not be read.'; }
+        if (st.failed) { status.hidden = false; status.textContent = st.update || 'The story could not be read.'; }
     };
     drawers.set(key, draw);
     const load = async () => {
@@ -104,14 +105,14 @@ export function storyNode(team, task) {
         if (st.entries && Date.now() - st.at < FRESH_MS) { draw(st); return; }
         if (st.entries) draw(st); // the last read stands while the new one comes
         const got = await read(team, task, '');
-        const next = got.failed ? (st.entries ? { ...st, failed: false } : { at: 0, entries: [], more: false, cursor: '', failed: true }) : { at: Date.now(), entries: got.entries, more: got.more, cursor: got.cursor };
+        const next = got.failed ? (st.entries && !got.update ? { ...st, failed: false } : { at: 0, entries: [], more: false, cursor: '', failed: true, update: got.update }) : { at: Date.now(), entries: got.entries, more: got.more, cursor: got.cursor };
         cache.set(key, next); drawers.get(key)(next);
     };
     earlier.addEventListener('click', async () => {
         const st = cache.get(key); if (!st || !st.more) return;
         earlier.disabled = true;
         const got = await read(team, task, st.cursor);
-        if (got.failed) { earlier.disabled = false; status.hidden = false; status.textContent = 'Earlier entries could not be read.'; return; }
+        if (got.failed) { earlier.disabled = false; status.hidden = false; status.textContent = got.update || 'Earlier entries could not be read.'; return; }
         const next = { ...st, entries: [...st.entries, ...got.entries], more: got.more, cursor: got.cursor, at: st.at };
         cache.set(key, next); drawers.get(key)(next);
     });
