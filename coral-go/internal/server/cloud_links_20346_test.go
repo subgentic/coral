@@ -20,9 +20,9 @@ type fakeRevoker struct {
 	calls  []string
 }
 
-func (f *fakeRevoker) Revoke(_ context.Context, origin, serverID, token string) routes.RevokeAnswer {
+func (f *fakeRevoker) Revoke(_ context.Context, origin, serverID, token string) routes.RevokeResult {
 	f.calls = append(f.calls, origin+"|"+serverID+"|"+token)
-	return f.answer
+	return routes.RevokeResult{Answer: f.answer}
 }
 
 func linkedRemote(t *testing.T, rev routes.HubRevoker) (*e2eRemote, *store.CloudStore, store.CloudLink) {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -23,22 +24,25 @@ const (
 	RevokeTokenRefused                     // 401: the Hub does not accept this link's token, so it is useless here
 	RevokeForbidden                        // 403: keep removing, retry
 	RevokeRetry                            // 429, 5xx, timeout: keep removing, retry
+	RevokeBadRequest                       // 400: our own bug: no retry, the Operator is told
 )
 
 // HubRevoker asks one Hub to remove this computer. It sends the sealed token only to the stored origin, with TLS verified, no redirects, a 10 s timeout and an answer read to 1 KB, and never logs it.
 type HubRevoker interface {
-	Revoke(ctx context.Context, origin, serverID, token string) RevokeAnswer
-}
-
-type noHubRevoke struct{}
-
-func (noHubRevoke) Revoke(context.Context, string, string, string) RevokeAnswer {
-	return RevokeUnsupported
+	Revoke(ctx context.Context, origin, serverID, token string) RevokeResult
 }
 
 // SetLinkStore sets where the links are kept (the server's own store) and SetLinkRevoker the Hub call; until the Hub's call exists the default says the Hub still lists this computer.
 func (h *CloudHandler) SetLinkStore(cs *store.CloudStore) { h.links = cs }
 func (h *CloudHandler) SetLinkRevoker(r HubRevoker)       { h.revoker = r }
+
+// hubRevokeSetting switches the real Hub call on: off by default, and nothing in Coral's routes, flags or environment sets it; it is turned on after a joint real run with coral-hub and the Operator's yes.
+const hubRevokeSetting = setreg.HubRevokeCall
+
+func (h *CloudHandler) hubRevokeOn() bool {
+	set, err := h.ss.GetSettings(context.Background())
+	return err == nil && set[hubRevokeSetting] == "on"
+}
 
 const (
 	msgHubStillLists   = "the Hub still lists this computer"
@@ -193,12 +197,12 @@ func (h *CloudHandler) RemoveLink(w http.ResponseWriter, r *http.Request) {
 	}
 	rev := h.revoker
 	if rev == nil {
-		rev = noHubRevoke{}
+		rev = newHTTPRevoker(h.hubRevokeOn, nil) // the real call, dark until its setting is on
 	}
 	token, terr := h.links.LinkToken(ctx, id)
 	answer := RevokeUnsupported
 	if terr == nil {
-		answer = rev.Revoke(ctx, link.HubOrigin, link.ServerID, token)
+		answer = rev.Revoke(ctx, link.HubOrigin, link.ServerID, token).Answer
 	}
 	how, note := store.LinkEventRemoved, ""
 	switch answer {
@@ -207,6 +211,11 @@ func (h *CloudHandler) RemoveLink(w http.ResponseWriter, r *http.Request) {
 		how, note = store.LinkEventDropped, msgHubTokenRefused
 	case RevokeUnsupported:
 		how, note = store.LinkEventDropped, msgHubStillLists
+	case RevokeBadRequest: // our own bug: not retried; the person is told
+		h.linkAction(ctx, id, "remove-stuck", "the Hub refused the request")
+		out, _ := h.linkList(ctx)
+		writeJSON(w, http.StatusAccepted, map[string]any{"links": out, "pending": true, "stuck": true, "message": "The Hub refused the remove request. This is a Coral bug, not retried; you can drop the link here."})
+		return
 	default: // forbidden, retry: the link stays removing and is asked again
 		h.linkAction(ctx, id, "remove-waiting", "the Hub has not confirmed")
 		out, _ := h.linkList(ctx)
