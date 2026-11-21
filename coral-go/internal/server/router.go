@@ -524,6 +524,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/dropbox/connect", s.cloudHandler.DropboxConnect)
 	r.Post("/api/dropbox/disconnect", s.cloudHandler.DropboxDisconnect)
 	s.cloudHandler.SetGoogle(store.NewGoogleStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir()))) // the Google sign-in for Google Doc share (#20022): the Operator's only, never on the Hub
+	routes.WireGdocGoogle(s.cloudHandler)                                                                    // the sealed sign-in is the token source of Google Doc share (#20212)
 	r.Get("/api/google/status", s.cloudHandler.GoogleStatus)
 	r.Post("/api/google/connect", s.cloudHandler.GoogleConnect)
 	r.Post("/api/google/disconnect", s.cloudHandler.GoogleDisconnect)

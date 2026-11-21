@@ -1,9 +1,9 @@
 package routes
 
 // Share to Google Docs, slice C of #20010: one background loop keeps every shared Doc in step with its artifact, and the one place a Doc is written (pushGdoc), which a press
-// of Share uses too. Off with the switch (a pass does nothing, no Google call, no keychain read), paused per Doc by the owner, never overwrites a Doc edited in Google since the
+// of Share uses too. Off with the switch (a pass does nothing, no Google call, no token read), paused per Doc by the owner, never overwrites a Doc edited in Google since the
 // last sync (the Doc is kept and the new version goes to a new Doc: keep both), backs off on 429, at most gdocWritesPerHour changes to one Doc an hour, and every outgoing text
-// is redacted and capped. The token comes only from the token source (the keychain, or the sealed sign-in) and is never printed.
+// is redacted and capped. The token comes only from the token source (the sealed sign-in) and is never printed.
 
 import (
 	"context"
@@ -244,7 +244,7 @@ func (h *SessionsHandler) GdocSyncRun(ctx context.Context, every time.Duration) 
 	}
 }
 
-// gdocSyncPass pushes each live share's newest version when it is not the one in its Doc. Nothing happens while the switch is off (no Google call, no keychain read).
+// gdocSyncPass pushes each live share's newest version when it is not the one in its Doc. Nothing happens while the switch is off (no Google call, no token read).
 func (h *SessionsHandler) gdocSyncPass(ctx context.Context, st *gdocSyncState, now time.Time) {
 	settings, err := h.ss.GetSettings(ctx)
 	if err != nil || !gdocSwitchOn(settings) || !gdocMac() || now.Before(st.until) {

@@ -17,21 +17,37 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// gdocAccount is the keychain item the sign-in helper wrote (scope drive.file).
-const gdocAccount = "file"
-
-// GdocTokenSource gives a fresh Google access token for the one sign-in. It is the only place the share code gets a token from: the preview reads the keychain item
-// (account "file", drive.file); the sealed in-app sign-in (Backend Dev) replaces gdocTokenSource without a change to the share code. A token is never kept in a field of ours.
+// GdocTokenSource gives a fresh Google access token for the one sign-in. It is the only place the share code gets a token from. The server sets it to the sealed in-app
+// sign-in (WireGdocGoogle, #20212); until then there is no sign-in. A token is never kept in a field of ours.
 type GdocTokenSource func() (string, error)
 
-var gdocTokenSource GdocTokenSource = gdocsync.KeychainTokenFunc(gdocAccount)
+var gdocTokenSource GdocTokenSource = func() (string, error) { return "", ErrGoogleNotConnected }
+
+// WireGdocGoogle makes the sealed in-app Google sign-in (Settings, #20022) the token source of Google Doc share, and what "connected" means. The macOS keychain reader is
+// not a fallback: a sign-in that is not the sealed one is not used (#20212).
+func WireGdocGoogle(h *CloudHandler) {
+	gdocTokenSource = func() (string, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return h.GoogleAccessToken(ctx)
+	}
+	gdocConnected = func() bool {
+		if h.ggl == nil {
+			return false
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		c, err := h.ggl.store.Get(ctx)
+		return err == nil && c.Connected && c.State == store.GoogleStateConnected
+	}
+}
 
 // gdocClientFor makes the Drive and Docs client from the token source; a test replaces it with one that talks to a stand-in.
 var gdocClientFor = func() (*gdocsync.Client, error) {
 	return gdocsync.NewClient(gdocTokenSource), nil
 }
 
-// gdocMac says whether this computer can keep the sign-in (the macOS keychain): elsewhere the feature is unavailable. A test changes it.
+// gdocMac says whether this computer can keep the sign-in (a Mac for now): elsewhere the feature is unavailable. A test changes it.
 var gdocMac = func() bool { return runtime.GOOS == "darwin" }
 
 // gdocShareMu serialises shares, so two presses cannot make two Docs for one file.
@@ -69,14 +85,14 @@ func (h *SessionsHandler) RegisterGdocShare(r chi.Router) {
 	r.With(h.requireGdocShare).Post("/api/artifacts/{id}/gdoc/sync", h.pauseGdoc)
 }
 
-// gdocConnected says whether a Google sign-in is stored on this computer (no network call, nothing read out); a test replaces it.
-var gdocConnected = func() bool { return gdocsync.HasCreds(gdocAccount) }
+// gdocConnected says whether the sealed Google sign-in is kept on this computer (no network call, nothing read out); WireGdocGoogle sets it, a test replaces it.
+var gdocConnected = func() bool { return false }
 
 // gdocStatus: GET /api/gdoc/status[?id=<artifact>]. Whether the switch is on and a sign-in is kept here, and, for the Operator alone and an artifact asked about, whether it is shared
 // and the address of its Doc. An agent's call gets neither: no agent learns which Doc a file is in.
 func (h *SessionsHandler) gdocStatus(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"enabled": h.gdocShareOn(r)}
-	if out["enabled"] == true && !isAgentCaller(r) { // an agent's call never touches the keychain and is told nothing about the sign-in or a Doc
+	if out["enabled"] == true && !isAgentCaller(r) { // an agent's call never touches the sign-in and is told nothing about the sign-in or a Doc
 		out["connected"] = gdocMac() && gdocConnected()
 		if id := r.URL.Query().Get("id"); id != "" && validArtifactID(id) {
 			key := id
@@ -140,7 +156,7 @@ func (h *SessionsHandler) shareToGdoc(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
-	if _, err := c.TokenFunc(); err != nil { // the keychain read (and a refresh) happens before the lock, so a slow one blocks no other share
+	if _, err := c.TokenFunc(); err != nil { // the token read (and a refresh) happens before the lock, so a slow one blocks no other share
 		writeError(w, http.StatusBadGateway, "gdoc_failed", "Google Docs is not signed in on this computer. Sign in and try again.")
 		return
 	}

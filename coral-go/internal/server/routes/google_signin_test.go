@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/googlesignin"
+	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -169,6 +170,10 @@ func TestConnectNeedsAClientFileAndNeverEchoesIt(t *testing.T) {
 	rec = bad.call(http.MethodPost, "/api/google/connect", true, nil)
 	assert.Equal(t, http.StatusConflict, rec.Code)
 	assert.NotContains(t, rec.Body.String(), googleSecretText)
+	off := bad.call(http.MethodGet, "/api/google/status", true, nil)
+	assert.Contains(t, off.Body.String(), `"enabled":false`)
+	assert.NotContains(t, off.Body.String(), "client_file_ok", "while the switch is off the client file is not read, so the status says nothing of it (#20212)")
+	require.NoError(t, bad.h.ss.SetSetting(context.Background(), setreg.GdocShare, "true"))
 	st := bad.call(http.MethodGet, "/api/google/status", true, nil)
 	assert.NotContains(t, st.Body.String(), googleSecretText)
 	assert.Contains(t, st.Body.String(), `"client_file_ok":false`)

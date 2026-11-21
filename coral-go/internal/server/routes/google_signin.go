@@ -71,11 +71,14 @@ func (h *CloudHandler) GoogleStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "", "could not read the Google connection")
 		return
 	}
-	_, cerr := g.creds()
-	writeJSON(w, http.StatusOK, map[string]any{
-		"client_file_set": g.clientFile != "", "client_file_ok": cerr == nil, "connected": c.Connected, "account_id": c.AccountID, "state": c.State,
-		"signin_pending": g.flows.Pending(),
-	})
+	out := map[string]any{"client_file_set": g.clientFile != "", "connected": c.Connected, "account_id": c.AccountID, "state": c.State, "signin_pending": g.flows.Pending()}
+	st, serr := h.ss.GetSettings(r.Context())
+	out["enabled"] = serr == nil && gdocSwitchOn(st)
+	if out["enabled"] == true { // the client file is read only while "Share to Google" is on (#20212)
+		_, cerr := g.creds()
+		out["client_file_ok"] = cerr == nil
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // GoogleConnect answers POST /api/google/connect: opens the one-shot callback listener, binds a new sign-in to this browser (a flow cookie), and returns the Google URL

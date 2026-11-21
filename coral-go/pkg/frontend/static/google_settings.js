@@ -39,6 +39,7 @@ function hideAll() { show('settings-google-connect', false); show('settings-goog
 
 function render(st) {
     hideAll();
+    if (st.enabled === false) { setStatus('Turn on "Share to Google (experimental)" to use Google.'); return; }
     if (!st.client_file_ok) {
         setStatus(st.client_file_set ? "Google sign-in isn't ready: the client file on this computer can't be used." : "Google sign-in isn't set up on this computer.");
         return;
