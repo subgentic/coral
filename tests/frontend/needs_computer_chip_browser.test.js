@@ -28,7 +28,7 @@ const { coralReady } = require('./helpers/wait');
             await shot(`needs-computer-chip-${w}`);
             const r = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr.dt-row')].map(tr => { const td = tr.querySelector('td.dt-grow') || tr.querySelector('td'); const chip = tr.querySelector('.inbox-computer-chip'); const from = tr.querySelector('.inbox-review-from');
                     const vis = e => e && e.getClientRects().length > 0 && e.getBoundingClientRect().width > 1; const cell = [...tr.querySelectorAll('td')].find(c => c.dataset.key === 'server' || /Computer/.test(c.getAttribute('data-label') || ''));
-                    const serverCellText = cell && vis(cell) ? cell.textContent.trim() : '';
+                    const origin = tr.querySelector('[data-key=team]'); const serverCellText = cell && vis(cell) ? cell.textContent.trim() : !${mobile} && origin && vis(origin) ? origin.textContent.trim() : ''; // #20264: desktop origin is in the v4 header.
                     return { chip: chip ? chip.textContent.trim() : null, chipTop: chip && vis(chip) ? Math.round(chip.getBoundingClientRect().top) : null, fromTop: from ? Math.round(from.getBoundingClientRect().top) : null, serverCellText, h: Math.round(tr.getBoundingClientRect().height), right: Math.round(tr.getBoundingClientRect().right), headers: [...document.querySelectorAll('#group-table-view thead th')].filter(vis).map(t => t.textContent.trim()) }; });
                 return { rows, wide: document.documentElement.scrollWidth - innerWidth }; })()`);
             console.log(`${at}` + JSON.stringify(r));

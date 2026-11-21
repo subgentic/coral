@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, framesJs } = require('./helpers/wait');
 const team = 'versions-' + Date.now().toString(36);
 const id = n => n.toString(16).padStart(64, '0');
 
@@ -24,7 +24,7 @@ const id = n => n.toString(16).padStart(64, '0');
         await ev(`(() => {
             localStorage.removeItem('coral-inbox-needs-filters');
             window.__decisions = [];
-            const mk = (n, mins, tags) => ({ id: '${''}' + n.toString(16).padStart(64, '0'), name: 'Design note.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - mins * 60000).toISOString(), task_id: 0, source: 'upload', available: true, session_id: 'writer-s', produced_by: 'Writer', tags, uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0') });
+            const mk = (n, mins, tags) => ({ id: '${''}' + n.toString(16).padStart(64, '0'), name: 'Design note.md', file_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', review_question: 'Is this design ready?', version: n, version_line: 'version ' + n + ' of Design note.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - mins * 60000).toISOString(), task_id: 0, source: 'upload', available: true, session_id: 'writer-s', produced_by: 'Writer', tags, uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0') });
             window.__items = [mk(1, 30, ['for review', 'internal']), mk(2, 20, ['for review', 'internal']), mk(3, 10, ['for review', 'internal'])];
             const R = window.fetch, json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), m = (opts.method || 'GET').toUpperCase();
@@ -43,6 +43,20 @@ const id = n => n.toString(16).padStart(64, '0');
         await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length === 1`, 'one row for the three versions', 10000);
         let rows = await needs();
         assert.ok(rows.length === 1 && /2 earlier versions/.test(rows[0]), 'the file is one row with its earlier versions: ' + JSON.stringify(rows));
+
+        // #20239: the version and earlier-versions link must be whole at 390, above the box/footer.
+        await Emulation.setDeviceMetricsOverride({width:390,height:1000,deviceScaleFactor:1,mobile:true});
+        await Emulation.setTouchEmulationEnabled({enabled:true});
+        await ev(framesJs(8));
+        for (const theme of ['dark','light']) {
+            await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`); await ev(framesJs(4));
+            const geometry = await ev(`(() => { const row=document.querySelector('#group-table-view [data-review-artifact]').closest('tr'), meta=row.querySelector('.inbox-meta'), box=row.querySelector('.inbox-message'), foot=row.querySelector('.inbox-v4-footer'), mr=meta.getBoundingClientRect(), bad=[]; const walker=document.createTreeWalker(meta,NodeFilter.SHOW_TEXT); for(let n=walker.nextNode();n;n=walker.nextNode()){if(!n.textContent.trim())continue;const range=document.createRange();range.selectNodeContents(n);for(const r of range.getClientRects()){if(r.width<=0||r.height<=0)continue;let e=n.parentElement;while(e&&row.contains(e)){const er=e.getBoundingClientRect(),cs=getComputedStyle(e);if((cs.overflowX!=='visible'&&cs.overflowX!=='clip'&&r.right>er.right+1)||(cs.overflowX==='clip'&&r.right>er.right+1)||(cs.overflowY!=='visible'&&r.bottom>er.bottom+1))bad.push({text:n.textContent,clippedBy:e.className,right:r.right,bound:er.right});e=e.parentElement;}}}const earlier=meta.querySelector('.inbox-review-earlier'), before=earlier&&getComputedStyle(earlier,'::before').content, rendered=meta.textContent.replace(earlier.textContent,(before&&before!=='none'&&before!=='normal'?before.slice(1,-1):'')+earlier.textContent);return {text:meta.textContent,rendered,bad,metaBottom:mr.bottom,messageTop:box?.getBoundingClientRect().top,footerTop:foot?.getBoundingClientRect().top,overflow:document.documentElement.scrollWidth>innerWidth};})()`);
+            const dir=process.env.CORAL_SCREENSHOT_DIR;if(dir){require('node:fs').mkdirSync(dir,{recursive:true});require('node:fs').writeFileSync(`${dir}/review-version-meta-390-${theme}.png`,Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
+            assert.ok(/version 3 of Design note.md/.test(geometry.text)&&/2 earlier versions/.test(geometry.text),'version fixture includes the whole metadata');
+            assert.ok(!/·\s*·/.test(geometry.rendered),theme+': metadata has one separator before earlier versions: '+geometry.rendered);
+            assert.ok(!geometry.overflow&&geometry.bad.length===0&&geometry.metaBottom<=geometry.messageTop+1&&geometry.metaBottom<=geometry.footerTop+1,theme+': version metadata is whole and clears the box/footer: '+JSON.stringify(geometry));
+        }
+        await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false}); await Emulation.setTouchEmulationEnabled({enabled:false}); await ev(framesJs(8));
 
         // Save for later: every version leaves Needs you, together
         await ev(`document.querySelector('#group-table-view tbody tr .inbox-bookmark').click(); true`);
