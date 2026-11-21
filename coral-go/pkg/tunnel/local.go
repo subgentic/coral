@@ -59,6 +59,9 @@ type LocalHandler struct {
 	// from a local process that forges the header (any value still makes
 	// tunnel-only rules apply, so a forged stamp can only make things stricter).
 	ViaValue string
+	// LinkID is the id of the cloud_link whose own token authenticated this tunnel (#20312). It is stamped on every forwarded request (LinkHeader); it comes from the store row that opened
+	// the tunnel, never from a stream or a header. The server refuses a tunneled request with no known link.
+	LinkID string
 	// RedactTokens turns on token redaction in View replies (#3560): well-known credential
 	// formats and private keys are replaced by redact.Marker before a reply leaves this
 	// computer. Read on every request; nil means on.
@@ -276,6 +279,8 @@ func (l *LocalHandler) serveHTTP(ctx context.Context, s *Stream) {
 	stampService(req.Header, h, h.Method, dec)
 	stampUploader(req.Header, h, h.Method, dec)
 	stampLinks(req.Header, s, h.Method, dec)
+	stampLink(req.Header, l.LinkID)
+	stampActor(req.Header, h, h.Method)
 	redactRoute := l.redactFor(viewerTier(h))() && redactsRoute(h.Method, dec)
 	if redactRoute {
 		// A partial body could start inside a token: the whole reply is fetched and redacted.

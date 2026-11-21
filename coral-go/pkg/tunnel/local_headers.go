@@ -181,6 +181,9 @@ func scrub(h http.Header, method, decodedPath string) http.Header {
 	if !ForwardsHubLinks(method, decodedPath) {
 		out.Del(HubLinksHeader)
 	}
+	// Never from the hub: the connector's own (stampLink, stampActor).
+	out.Del(LinkHeader)
+	out.Del(ActorHeader)
 	// Never from the hub: the connector's own, below (stampLinks).
 	out.Del(HubLinksSessionHeader)
 	out.Del(HubLinksCapHeader)
