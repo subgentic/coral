@@ -264,3 +264,66 @@ func TestAnAgentSendsTheNewestVersionForReviewWithoutNewBytes(t *testing.T) {
 	code, _ = review("a1", strings.Repeat("0", 64), ``)
 	assert.Equal(t, http.StatusNotFound, code)
 }
+
+// #20401 SHOULDs (Security, QA2): a denied file is not sent again by an agent's call (409, only a real new version returns it); an agent cannot re-send one file in a loop (429 after 5 in an hour);
+// and an upload with no_review on a file whose older version is still waiting says that row is still in Needs you.
+func TestAgentReviewResendRefusesDeniedAndCapsLoopsAndNoReviewSaysWhatIsStillWaiting(t *testing.T) {
+	rig, _ := ownerRig(t)
+	_, bh := setupBoardTestServer(t)
+	rig.h.bs = bh.bs
+	bh.coralDir = rig.coralDir
+	ctx := context.Background()
+	up := func(text, ref, query string) map[string]any {
+		req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/agent/artifacts?session_id=a1"+query, strings.NewReader(text))
+		require.NoError(t, err)
+		req.Header.Set("X-Artifact-Name", "cut.html")
+		req.Header.Set("X-Artifact-Media-Type", "text/plain")
+		if ref != "" {
+			req.Header.Set(seriesHeader, ref)
+		}
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return out
+	}
+	hexOf := func(out map[string]any) string { return strings.TrimPrefix(out["uri"].(string), "coral://artifacts/") }
+	review := func(id string) (int, map[string]any) {
+		req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/agent/artifacts/"+id+"/review?session_id=a1", strings.NewReader(``))
+		require.NoError(t, err)
+		resp, err := agentClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+
+	// no_review with an older version still waiting: it stays, and the answer says so
+	w1 := hexOf(up("w1", "", "&tag=for+review&question=Ok%3F"))
+	out := up("w2", "coral://artifacts/"+w1, "&no_review=1")
+	assert.Equal(t, false, out["for_review"])
+	assert.Equal(t, "coral://artifacts/"+w1, out["earlier_version_waiting"])
+	assert.Contains(t, out["inbox"], "STILL there")
+
+	// denied: refused with a reason
+	d1 := hexOf(up("d1", "", "&tag=for+review&question=Ok%3F"))
+	_, _, err := rig.h.bs.DecideArtifactReview(ctx, "team-a", d1, board.ReviewDenied, time.Now())
+	require.NoError(t, err)
+	code, body := review(d1)
+	assert.Equal(t, http.StatusConflict, code, body)
+	assert.Equal(t, "denied", body["code"])
+	tags, _ := rig.h.bs.ArtifactTags(ctx, "team-a")
+	assert.Contains(t, tags[d1], board.ReviewDenied, "still denied")
+
+	// the loop cap: 5 sends of one file an hour, then 429
+	l1 := hexOf(up("l1", "", "&tag=for+review&question=Ok%3F"))
+	for i := 0; i < reviewResendsPerHour; i++ {
+		code, body = review(l1)
+		require.Equal(t, http.StatusOK, code, body)
+	}
+	code, body = review(l1)
+	assert.Equal(t, http.StatusTooManyRequests, code, body)
+	assert.Equal(t, "resend_limit", body["code"])
+}

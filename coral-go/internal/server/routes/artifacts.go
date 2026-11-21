@@ -522,6 +522,18 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			}
 		}
 	}
+	earlierWaiting := "" // --no-review on a file whose older version is still waiting: that row stays in Needs you, and the answer says so (#20401, QA2)
+	if plan != nil && h.bs != nil && !hasTag(tags, tagForReview) && r.URL.Query().Get("no_review") == "1" {
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && teamBoard == plan.board {
+			if byTag, terr := h.bs.ArtifactTags(r.Context(), teamBoard); terr == nil {
+				for _, m := range plan.rows {
+					if m.Digest != hexID && m.Board == teamBoard && hasTag(byTag[m.Digest], tagForReview) {
+						earlierWaiting = m.Digest
+					}
+				}
+			}
+		}
+	}
 	if plan != nil && h.bs != nil && hasTag(tags, "for review") { // a new version of the series for review: the older versions' reviews are closed, this one is the pending one (#136588)
 		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && teamBoard == plan.board {
 			for _, m := range plan.rows { // the versions before this one, read under the series lock (a new series: the artifact it is a version of); the series index does not hold them yet
@@ -548,6 +560,10 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		reply["inbox"] = "In the Operator's Inbox (Needs you) for review."
 	} else {
 		reply["inbox"] = "Not in the Operator's Inbox: it is not tagged for review (upload it with --tag \"for review\" --question \"...\", or send it with coral-agent artifact review <uri>)."
+		if earlierWaiting != "" {
+			reply["inbox"] = "Not in the Operator's Inbox, but the earlier version coral://artifacts/" + earlierWaiting + " is STILL there waiting for review: send this one with coral-agent artifact review <uri> to replace it."
+			reply["earlier_version_waiting"] = "coral://artifacts/" + earlierWaiting
+		}
 	}
 	fileID, fileVersion := "", 0 // the file's stable id and this version's number (#14145), told the same way everywhere by versionLine
 	if linkNote != "" {

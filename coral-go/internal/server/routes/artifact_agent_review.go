@@ -1,9 +1,12 @@
 package routes
 
 import (
+	"errors"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -45,13 +48,23 @@ func (h *SessionsHandler) reviewAgentArtifact(w http.ResponseWriter, r *http.Req
 	}
 	coralDir := h.cfg.CoralDir()
 	seriesID, _, in := digestSeriesOnBoard(coralDir, id, teamBoard)
+	if !in { // a file with one version has no series yet: it is the team's when one of its records is
+		for _, rr := range recordsOfDigest(coralDir, id) {
+			if rr.rec.Board == teamBoard {
+				in = true
+				break
+			}
+		}
+	}
 	if !in {
 		errNotFound(w, "this team has no such file")
 		return
 	}
 	newest := id
-	if ms := seriesMembers(coralDir, seriesID); len(ms) > 0 && ms[0].Board == teamBoard {
-		newest = ms[len(ms)-1].Digest
+	if seriesID != "" {
+		if ms := seriesMembers(coralDir, seriesID); len(ms) > 0 && ms[0].Board == teamBoard {
+			newest = ms[len(ms)-1].Digest
+		}
 	}
 	meta, _ := readSidecar(filepath.Join(coralDir, "artifacts", "objects", newest+".json"))
 	name := meta.Name
@@ -60,7 +73,21 @@ func (h *SessionsHandler) reviewAgentArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 	ctx := r.Context()
+	// a file the Operator denied does not come back by an agent's call: only a real new version returns it (the Operator's own Send for review is theirs to make)
+	if byTag, terr := h.bs.ArtifactTags(ctx, teamBoard); terr == nil && hasTag(byTag[newest], board.ReviewDenied) {
+		writeError(w, http.StatusConflict, "denied", "the Operator denied this file: upload a changed version with --new-version-of to ask again")
+		return
+	}
+	if !reviewResendAllowed(teamBoard+"/"+newest, time.Now()) {
+		w.Header().Set("Retry-After", "3600")
+		writeError(w, http.StatusTooManyRequests, "resend_limit", "this file was sent for review "+strconv.Itoa(reviewResendsPerHour)+" times in the last hour: the Operator has it; upload a changed version to ask again")
+		return
+	}
 	tags, decided, err := h.bs.StartArtifactReview(ctx, teamBoard, newest, time.Now())
+	if errors.Is(err, board.ErrAlreadyDecided) {
+		writeError(w, http.StatusConflict, "already_decided", "the Operator already decided on this file: upload a changed version with --new-version-of to ask again")
+		return
+	}
 	if err != nil {
 		errInternalServer(w, "could not send the file for review")
 		return
@@ -75,7 +102,7 @@ func (h *SessionsHandler) reviewAgentArtifact(w http.ResponseWriter, r *http.Req
 			_, _ = h.bs.SetArtifactQuestion(ctx, teamBoard, newest, q, sid, time.Now())
 		}
 	}
-	for _, m := range seriesMembers(coralDir, seriesID) { // the older versions' reviews are closed: this one is the pending one, as after an upload
+	for _, m := range reviewSeriesMembers(coralDir, seriesID) { // the older versions' reviews are closed: this one is the pending one, as after an upload
 		if m.Digest != newest && m.Board == teamBoard {
 			_, _ = h.bs.SupersedeArtifactReview(ctx, teamBoard, m.Digest, time.Now())
 		}
@@ -91,4 +118,39 @@ func (h *SessionsHandler) reviewAgentArtifact(w http.ResponseWriter, r *http.Req
 		reply["again_after"] = decided
 	}
 	writeJSON(w, http.StatusOK, reply)
+}
+
+// An agent may send one file for review a few times an hour, not in a loop: the Operator's Needs you is theirs (#20401, Security).
+const reviewResendsPerHour = 5
+
+var (
+	reviewResendMu sync.Mutex
+	reviewResends  = map[string][]time.Time{}
+)
+
+func reviewResendAllowed(key string, now time.Time) bool {
+	reviewResendMu.Lock()
+	defer reviewResendMu.Unlock()
+	kept := reviewResends[key][:0]
+	for _, t := range reviewResends[key] {
+		if now.Sub(t) < time.Hour {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) >= reviewResendsPerHour {
+		reviewResends[key] = kept
+		return false
+	}
+	reviewResends[key] = append(kept, now)
+	if len(reviewResends) > 4096 { // bounded: a table of idle files is dropped whole, a cap that forgets is only ever generous
+		reviewResends = map[string][]time.Time{key: reviewResends[key]}
+	}
+	return true
+}
+
+func reviewSeriesMembers(coralDir, seriesID string) []seriesMember {
+	if seriesID == "" {
+		return nil
+	}
+	return seriesMembers(coralDir, seriesID)
 }
