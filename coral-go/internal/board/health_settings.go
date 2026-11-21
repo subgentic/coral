@@ -50,6 +50,9 @@ type HealthSettings struct {
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
 	// Deviations flags, in the orchestrator's check, a task, a silence or a wait far past its own history (#11729): once at the crossing, again at each doubling.
 	Deviations HealthDeviations `json:"deviations"`
+	// OperatorWait is the rule "waits on the Operator with no --ask" (#12138) with the knobs it lacked (#20398): switch, the grace an author has, how old a chat reply may be and still be judged, and members whose posts are
+	// never judged (an Orchestrator whose status replies mention the Operator and ask nothing). The defaults are what it always did.
+	OperatorWait HealthOperatorWait `json:"operator_wait"`
 	// ActionList holds the thresholds of the check's action list (#11729): a zero field is its default.
 	ActionList HealthActionList `json:"action_list"`
 	// Landing puts a line in the health check (off by default, #8942, goal #80) when the branch work lands on (Branch, "main" by default) has not moved for WaitMin although tasks were approved or completed
@@ -255,6 +258,30 @@ type HealthDeviations struct {
 	MinSamples int `json:"min_samples"`
 }
 
+// HealthOperatorWait: see HealthSettings.OperatorWait. AuthorsExempt is member names, at most 8.
+type HealthOperatorWait struct {
+	On            bool     `json:"on"`
+	GraceMin      int      `json:"grace_min"`
+	ChatMaxAgeMin int      `json:"chat_max_age_min"`
+	AuthorsExempt []string `json:"authors_exempt"`
+}
+
+// The operator-wait rule's defaults: the grace and the chat age it always had.
+const (
+	OperatorWaitGraceDefaultMin      = 10
+	OperatorWaitChatMaxAgeDefaultMin = 60
+)
+
+// Exempt says a member's posts are never judged by the rule.
+func (o HealthOperatorWait) Exempt(subscriberID string) bool {
+	for _, n := range o.AuthorsExempt {
+		if SameIdentity(n, subscriberID) {
+			return true
+		}
+	}
+	return false
+}
+
 // DeviationFactorDefault is 100 percent: the threshold the rule always used.
 const DeviationFactorDefault = 100
 
@@ -380,6 +407,7 @@ func DefaultHealthSettings() HealthSettings {
 		StaleSweepHours: DefaultStaleSweepHours,
 		ParkLimit:       DefaultParkLimit,
 		AskReminder:     HealthMentionNudge{On: true, AfterMin: 15},
+		OperatorWait:    HealthOperatorWait{On: true, GraceMin: OperatorWaitGraceDefaultMin, ChatMaxAgeMin: OperatorWaitChatMaxAgeDefaultMin},
 		Deviations:      HealthDeviations{HealthRuleOn: HealthRuleOn{On: true}, FactorPct: DeviationFactorDefault},
 		ActionList:      HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
 		Landing:         HealthLanding{On: false, Branch: "main", WaitMin: 120},
@@ -462,6 +490,15 @@ func (h HealthSettings) Clamp() HealthSettings {
 	}
 	h.AutoRecommend.GraceMin = min(max(h.AutoRecommend.GraceMin, 1), AutoRecommendGraceMax)
 	h.UnownedTasks.MaxList = pickInt(h.UnownedTasks.MaxList, UnownedMaxListDefault, 1, 20)
+	h.OperatorWait.GraceMin = pickInt(h.OperatorWait.GraceMin, OperatorWaitGraceDefaultMin, 1, 120)
+	h.OperatorWait.ChatMaxAgeMin = pickInt(h.OperatorWait.ChatMaxAgeMin, OperatorWaitChatMaxAgeDefaultMin, 5, 1440)
+	var exempt []string
+	for _, n := range h.OperatorWait.AuthorsExempt {
+		if n = strings.TrimSpace(n); n != "" && len(exempt) < 8 {
+			exempt = append(exempt, n)
+		}
+	}
+	h.OperatorWait.AuthorsExempt = exempt
 	h.Deviations.MinAgeMin = min(max(h.Deviations.MinAgeMin, 0), 1440)
 	h.Deviations.FactorPct = pickInt(h.Deviations.FactorPct, DeviationFactorDefault, 100, 1000)
 	h.Deviations.MinSamples = min(max(h.Deviations.MinSamples, 0), 50)
