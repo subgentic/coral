@@ -180,6 +180,9 @@ func (s *CloudStore) FinishRemoveLink(ctx context.Context, linkID, how string) e
 	if _, err := tx.ExecContext(ctx, "DELETE FROM cloud_link WHERE link_id = ?", linkID); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM link_ask_allow WHERE link_id = ?", linkID); err != nil { // what a Hub was allowed to answer goes with its link (#20413)
+		return err
+	}
 	var hubURL string
 	if err := tx.GetContext(ctx, &hubURL, "SELECT hub_url FROM cloud_connection WHERE id = 1 AND server_id = ?", l.ServerID); err == nil {
 		if o, _, oerr := legacyHubOrigin(hubURL); oerr == nil && o == l.Origin {

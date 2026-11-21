@@ -501,3 +501,64 @@ func (h *CloudHandler) StartRemovalRetry(ctx context.Context) {
 		}
 	}()
 }
+
+// LinkAsks: GET /api/cloud/links/{id}/asks. The kinds of ask a Hub added here may answer (none until the person allows them), and the vocabulary. Local, never tunneled.
+func (h *CloudHandler) LinkAsks(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || h.noLinkStore(w) {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if _, _, err := h.links.LinkOwnerOf(r.Context(), id); errors.Is(err, store.ErrNoCloudLink) {
+		errNotFound(w, "No such Hub link")
+		return
+	} else if err != nil {
+		errInternalServer(w, "Could not read the link")
+		return
+	}
+	kinds, err := h.links.LinkAsksAllowed(r.Context(), id)
+	if err != nil {
+		errInternalServer(w, "Could not read which asks this Hub may answer")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"allowed": kinds, "kinds": tunnel.AskKinds()})
+}
+
+// SetLinkAsk: PUT /api/cloud/links/{id}/asks {"kind": "agent_ask", "allow": true}. Allows or stops one kind for a Hub added here. A kind outside the vocabulary is refused whoever asks.
+func (h *CloudHandler) SetLinkAsk(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || !requireJSON(w, r) || h.noLinkStore(w) {
+		return
+	}
+	var body struct {
+		Kind  string `json:"kind"`
+		Allow *bool  `json:"allow"`
+	}
+	if err := decodeJSONStrict(r, &body); err != nil || body.Allow == nil {
+		errBadRequest(w, `send {"kind": "agent_ask" | "ask_button" | "message_reply", "allow": true or false}`)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	err := h.links.SetLinkAsk(r.Context(), id, body.Kind, *body.Allow)
+	switch {
+	case errors.Is(err, store.ErrAskKind):
+		errBadRequest(w, "that kind of ask cannot be answered through a Hub: the kinds are agent_ask, ask_button and message_reply")
+		return
+	case errors.Is(err, store.ErrNoCloudLink):
+		errNotFound(w, "No such Hub link")
+		return
+	case errors.Is(err, store.ErrAskListNotForLink):
+		errBadRequest(w, "this list is for a Hub added here; the first link answers as it always has")
+		return
+	case errors.Is(err, store.ErrBadLinkState):
+		errConflict(w, "This link is being removed")
+		return
+	case err != nil:
+		errInternalServer(w, "Could not save the change")
+		return
+	}
+	kinds, err := h.links.LinkAsksAllowed(r.Context(), id)
+	if err != nil {
+		errInternalServer(w, "Could not read which asks this Hub may answer")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"allowed": kinds, "kinds": tunnel.AskKinds()})
+}

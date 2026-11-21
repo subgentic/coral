@@ -162,6 +162,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/cloud/links/cancel":                   "cancel adding a Coral Hub",                                                 // #20385
 	"POST /api/cloud/links/confirm-owner":            "confirm the owner of an added Coral Hub",                                   // #20407
 	"PUT /api/cloud/links/{id}/cap":                  "change what one linked Coral Hub may do",                                   // #20346
+	"GET /api/cloud/links/{id}/asks":                 "read which asks a linked Coral Hub may answer",                             // #20413
+	"PUT /api/cloud/links/{id}/asks":                 "change which asks a linked Coral Hub may answer",                           // #20413
 	"DELETE /api/cloud/links/{id}":                   "remove one Coral Hub link",                                                 // #20346
 	"DELETE /api/cloud/devices/{kid}":                "remove one paired device",                                                  // #19669
 	"POST /api/cloud/devices/clear-clock":            "reset the clock mark for signed device messages",                           // #19669
