@@ -201,3 +201,36 @@ func TestSessionTokenFallsBackToTheAuthFile(t *testing.T) {
 	t.Setenv(agentenv.SessionAuthFileEnv, "")
 	assert.Empty(t, sessionToken())
 }
+
+// #20138: a check script's tools send its run token (CORAL_CHECK_TOKEN) to the Coral on this computer, and only when no agent session token is set; a request never carries both.
+func TestACheckScriptsTokenGoesOnlyWhereAndWhenItShould(t *testing.T) {
+	var got http.Header
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { got = r.Header.Clone() }))
+	defer srv.Close()
+	prev := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = prev })
+
+	t.Setenv("CORAL_SESSION_TOKEN", "")
+	t.Setenv("CORAL_CHECK_TOKEN", "ck1.run")
+	InstallIdentity("coral-board")
+	_, err := http.Get(srv.URL)
+	require.NoError(t, err)
+	assert.Equal(t, "ck1.run", got.Get(CheckTokenHeader))
+	assert.Empty(t, got.Get(SessionTokenHeader))
+
+	http.DefaultTransport = prev
+	t.Setenv("CORAL_SESSION_TOKEN", "agent-tok")
+	InstallIdentity("coral-board")
+	_, err = http.Get(srv.URL)
+	require.NoError(t, err)
+	assert.Equal(t, "agent-tok", got.Get(SessionTokenHeader))
+	assert.Empty(t, got.Get(CheckTokenHeader), "an agent's own token wins: never both")
+
+	http.DefaultTransport = prev
+	t.Setenv("CORAL_SESSION_TOKEN", "")
+	t.Setenv("CORAL_CHECK_TOKEN", "")
+	InstallIdentity("coral-board")
+	_, err = http.Get(srv.URL)
+	require.NoError(t, err)
+	assert.Empty(t, got.Get(CheckTokenHeader))
+}

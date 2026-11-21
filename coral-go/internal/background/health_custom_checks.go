@@ -14,7 +14,15 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/healthcheck"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/store"
 )
+
+// CheckTokens mints and ends the token of one run (store.DB is one).
+type CheckTokens interface {
+	MintCheckToken(ctx context.Context, sp store.CheckTokenSpec, now time.Time) (string, error)
+	RevokeCheckToken(ctx context.Context, token string, now time.Time) error
+	RevokeAllCheckTokens(ctx context.Context, now time.Time) error
+}
 
 // Concurrent check runs, in all (design v2 section 5.9). One check never runs twice at once.
 const maxConcurrentChecks = 2
@@ -33,7 +41,9 @@ type CustomChecks struct {
 	Redact   func(string) (string, bool)
 	BoardURL string // the loopback URL a script's coral-board talks to
 	// SnapDir is Coral's own folder of snapshots: a run's path is derived from the approved hash inside it, never read from the row (Security 4b).
-	SnapDir  string
+	SnapDir string
+	// Tokens mints a run's token (the member who added the check, read-only unless the record says it may write) and ends it with the run. nil: a run has no token.
+	Tokens   CheckTokens
 	Interval time.Duration
 	sem      chan struct{}
 	mu       sync.Mutex
@@ -53,6 +63,10 @@ func NewCustomChecks(bs *board.Store, rt AgentRuntime, discover func(context.Con
 
 // Run looks for due checks every Interval until ctx is done.
 func (c *CustomChecks) Run(ctx context.Context) error {
+	if c.Tokens != nil {
+		_ = c.Tokens.RevokeAllCheckTokens(ctx, c.now()) // a token of an earlier run of Coral is dead
+		defer c.Tokens.RevokeAllCheckTokens(context.Background(), c.now())
+	}
 	return runEvery(ctx, c.Interval, c.Interval, func() { c.RunOnce(ctx) })
 }
 
@@ -96,6 +110,14 @@ func Notice(name, text string) string {
 
 func (c *CustomChecks) runOne(ctx context.Context, hc board.HealthCheck) {
 	now := c.now()
+	// A check acts as the member who added it: a check whose member has left (an archived agent) is paused, and says so, rather than run as nobody.
+	if hc.ActsAs != "" && !c.isActiveMember(ctx, hc.Project, hc.ActsAs) {
+		if err := c.store.PauseHealthCheck(ctx, hc.Project, hc.Name, true, now); err == nil {
+			orch, _ := c.store.TeamOrchestrator(ctx, hc.Project)
+			c.send(ctx, c.liveAgents(ctx), hc, orch, Notice(hc.Name, fmt.Sprintf("Check %s is paused: %s is no longer on the team", hc.Name, board.OneLine(hc.ActsAs))))
+		}
+		return
+	}
 	res := c.execute(ctx, hc)
 	failed := res.Failed()
 	run := board.HealthCheckRun{At: now, Exit: res.ExitCode, Bad: res.Bad, Failed: failed}
@@ -185,8 +207,21 @@ func (c *CustomChecks) execute(ctx context.Context, hc board.HealthCheck) health
 	} else {
 		dir = filepath.Clean(dir)
 	}
+	token := ""
+	if c.Tokens != nil && hc.ActsAs != "" {
+		sub, err := c.store.GetProjectSubscription(ctx, hc.Project, hc.ActsAs)
+		if err != nil || sub == nil {
+			return healthcheck.Result{Err: fmt.Errorf("the member is not on the board")}
+		}
+		token, err = c.Tokens.MintCheckToken(ctx, store.CheckTokenSpec{SessionID: naming.SessionIDFromName(sub.SessionName), SessionName: sub.SessionName,
+			Project: hc.Project, Check: hc.Name, MayWrite: hc.MayWrite, TTL: healthcheck.MaxTimeout + 5*time.Second}, c.now())
+		if err != nil {
+			return healthcheck.Result{Err: err}
+		}
+		defer c.Tokens.RevokeCheckToken(context.Background(), token, c.now()) // the token ends with the run: finished, timed out or killed
+	}
 	return c.run(ctx, healthcheck.Spec{Path: path, Args: hc.Args, Dir: dir,
-		Env: healthcheck.Env(healthcheck.EnvInput{BoardURL: c.BoardURL, Board: hc.Project})})
+		Env: healthcheck.Env(healthcheck.EnvInput{BoardURL: c.BoardURL, Board: hc.Project, Token: token})})
 }
 
 func (c *CustomChecks) redact(s string) string {
@@ -197,6 +232,11 @@ func (c *CustomChecks) redact(s string) string {
 		return r
 	}
 	return "(withheld)"
+}
+
+func (c *CustomChecks) isActiveMember(ctx context.Context, project, name string) bool {
+	sub, err := c.store.GetProjectSubscription(ctx, project, name)
+	return err == nil && sub != nil && sub.IsActive != 0
 }
 
 func (c *CustomChecks) isMember(ctx context.Context, project, name string) bool {

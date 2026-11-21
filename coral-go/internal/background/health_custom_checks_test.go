@@ -17,6 +17,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/healthcheck"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/store"
 )
 
 type checkEnv struct {
@@ -237,4 +238,107 @@ func TestOneMemberGetsAtMost20CheckLinesADay(t *testing.T) {
 	}
 	e.c.RunOnce(context.Background())
 	assert.Len(t, e.sent["Dev"], board.CheckLinesPerDay, "25 lines from five checks: 20 reach the member in a day")
+}
+
+type fakeTokens struct {
+	mu      sync.Mutex
+	minted  []store.CheckTokenSpec
+	revoked []string
+	all     int
+	n       int
+}
+
+func (f *fakeTokens) MintCheckToken(_ context.Context, sp store.CheckTokenSpec, _ time.Time) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.n++
+	f.minted = append(f.minted, sp)
+	return fmt.Sprintf("ck1.tok%d", f.n), nil
+}
+func (f *fakeTokens) RevokeCheckToken(_ context.Context, tok string, _ time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.revoked = append(f.revoked, tok)
+	return nil
+}
+func (f *fakeTokens) RevokeAllCheckTokens(context.Context, time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.all++
+	return nil
+}
+
+func TestARunGetsATokenForTheAddingMemberAndItEndsWithTheRun(t *testing.T) {
+	e := newCheckEnv(t)
+	ft := &fakeTokens{}
+	e.c.Tokens = ft
+	hc := e.add(t, "tok", "", false)
+	_, err := e.s.ChangeHealthCheck(context.Background(), "team", "tok", func(c *board.HealthCheck) { c.ActsAs = "Dev"; c.MayWrite = true })
+	require.NoError(t, err)
+	require.NoError(t, e.s.ApproveHealthCheck(context.Background(), "team", "tok", "Operator", mustHash(t, e.s, "tok"), e.now))
+	_ = hc
+	var env []string
+	e.c.run = func(_ context.Context, sp healthcheck.Spec) healthcheck.Result {
+		env = sp.Env
+		return healthcheck.Result{ExitCode: 1} // a failed run: the token ends all the same
+	}
+	e.c.RunOnce(context.Background())
+	require.Len(t, ft.minted, 1)
+	assert.Equal(t, "claude-00000002-0000-0000-0000-000000000000", ft.minted[0].SessionName, "the member's own session: Dev")
+	assert.Equal(t, "00000002-0000-0000-0000-000000000000", ft.minted[0].SessionID)
+	assert.True(t, ft.minted[0].MayWrite, "the record's tick")
+	assert.Equal(t, "tok", ft.minted[0].Check)
+	assert.Contains(t, env, "CORAL_CHECK_TOKEN=ck1.tok1")
+	assert.Equal(t, []string{"ck1.tok1"}, ft.revoked, "ended with the run, a failed one too")
+}
+
+func TestAReadOnlyRecordMintsAReadOnlyToken(t *testing.T) {
+	e := newCheckEnv(t)
+	ft := &fakeTokens{}
+	e.c.Tokens = ft
+	e.add(t, "ro", "", false)
+	_, _ = e.s.ChangeHealthCheck(context.Background(), "team", "ro", func(c *board.HealthCheck) { c.ActsAs = "Dev" })
+	require.NoError(t, e.s.ApproveHealthCheck(context.Background(), "team", "ro", "Operator", mustHash(t, e.s, "ro"), e.now))
+	e.c.run = func(context.Context, healthcheck.Spec) healthcheck.Result { return healthcheck.Result{} }
+	e.c.RunOnce(context.Background())
+	require.Len(t, ft.minted, 1)
+	assert.False(t, ft.minted[0].MayWrite)
+}
+
+func TestACheckWhoseMemberLeftIsPausedAndNotRun(t *testing.T) {
+	e := newCheckEnv(t)
+	ft := &fakeTokens{}
+	e.c.Tokens = ft
+	e.add(t, "gone", "", false)
+	_, _ = e.s.ChangeHealthCheck(context.Background(), "team", "gone", func(c *board.HealthCheck) { c.ActsAs = "Dev" })
+	require.NoError(t, e.s.ApproveHealthCheck(context.Background(), "team", "gone", "Operator", mustHash(t, e.s, "gone"), e.now))
+	ok, err := e.s.Unsubscribe(context.Background(), "team", "Dev")
+	require.NoError(t, err)
+	require.True(t, ok)
+	e.c.RunOnce(context.Background())
+	assert.Zero(t, atomic.LoadInt32(&e.runs), "not run as nobody")
+	assert.Empty(t, ft.minted)
+	got, _ := e.s.GetHealthCheck(context.Background(), "team", "gone")
+	assert.Equal(t, board.CheckPaused, got.State)
+	require.Len(t, e.sent["Orchestrator"], 1)
+	assert.Contains(t, e.sent["Orchestrator"][0], "paused")
+}
+
+func TestCoralsStartAndExitEndEveryRunToken(t *testing.T) {
+	e := newCheckEnv(t)
+	ft := &fakeTokens{}
+	e.c.Tokens = ft
+	e.c.Interval = time.Hour
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _ = e.c.Run(ctx); close(done) }()
+	time.Sleep(100 * time.Millisecond)
+	ft.mu.Lock()
+	assert.Equal(t, 1, ft.all, "at start")
+	ft.mu.Unlock()
+	cancel()
+	<-done
+	ft.mu.Lock()
+	assert.Equal(t, 2, ft.all, "and at exit")
+	ft.mu.Unlock()
 }

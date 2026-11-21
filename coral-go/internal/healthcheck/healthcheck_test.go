@@ -191,6 +191,7 @@ func TestApprovedRecordChangesWithAnyField(t *testing.T) {
 		"acts":  func(r *Record) { r.ActsAs = "Someone" },
 		"env":   func(r *Record) { r.Env = nil },
 		"split": func(r *Record) { r.Args = []string{"a b"} },
+		"write": func(r *Record) { r.MayWrite = true },
 	} {
 		r := base
 		mut(&r)

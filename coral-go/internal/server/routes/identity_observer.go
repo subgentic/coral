@@ -176,8 +176,22 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, maxBoardBody)
 		}
-		if token := r.Header.Get(store.SessionTokenHeader); token != "" {
-			owner, err := o.db.SessionTokenOwnerOf(r.Context(), token)
+		// A custom health check's run token (#20138): admitted or refused by its own gate, then identified as the member who added the check, so every check below applies to it as to that member.
+		var via *store.CheckTokenOwner
+		if ct := r.Header.Get(store.CheckTokenHeader); ct != "" {
+			var gated bool
+			if via, r, gated = o.checkTokenGate(w, r, ct); !gated {
+				return
+			}
+		}
+		if token := r.Header.Get(store.SessionTokenHeader); token != "" || via != nil {
+			var owner *store.SessionTokenOwner
+			var err error
+			if via != nil {
+				owner = &store.SessionTokenOwner{SessionID: via.SessionID, SessionName: via.SessionName}
+			} else {
+				owner, err = o.db.SessionTokenOwnerOf(r.Context(), token)
+			}
 			if err != nil {
 				o.count(callerAgentBadToken)
 				o.logOnce("bad_token", "[identity] request with an unknown or revoked session token", "request", r.Method+" "+r.URL.Path, "tool", r.UserAgent(), "strict", o.strict)
@@ -261,6 +275,9 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 			// Who the request is from, decided here and read from here (#4244): the member name the
 			// token's session holds on this board. The claim is compared in log mode.
 			actor := Actor{Kind: ActorToken, Name: actorName, Session: owner.SessionName}
+			if via != nil {
+				actor.ViaCheck = via.Check
+			}
 			r = withActor(r, actor)
 			var given []string
 			var readErr error

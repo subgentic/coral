@@ -365,6 +365,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	// Custom health checks (#20137): only the ones the Operator approved run, each from its snapshot, and what they print reaches a member as Coral's notice.
 	customChecks := background.NewCustomChecks(srv.BoardStore(), agentRT, discoverFn)
 	customChecks.BoardURL = "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Port))
+	customChecks.Tokens = sessStore.DB()                                        // a run acts as the member who added the check, read-only unless the Operator ticked "may write"
 	customChecks.SnapDir = filepath.Join(cfg.CoralDir(), "checks", "snapshots") // a run's script is found by its approved hash in Coral's own folder
 	customChecks.Redact = func(s string) (string, bool) {
 		b, err := secrets.Redactor().Text([]byte(s))
