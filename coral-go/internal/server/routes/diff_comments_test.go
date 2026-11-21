@@ -71,6 +71,7 @@ func TestTheOperatorsCommentOnAnAgentsDiffGoesToThatAgentNamingTheFileAndLinesAn
 
 func TestAnAgentCannotStartAThreadOnADiffAndTheHubNeverReachesOne(t *testing.T) {
 	rig := newCmtRig(t)
+	withLabel(t, cmtHubUser, nil)
 	sid := rig.diffRig(1, "Dev", "pkg/a.go")
 	key := diffSubject("team-a", sid, "pkg/a.go")
 	body := map[string]any{"body": "I comment on myself", "anchor": diffAnchor("pkg/a.go", nil)}
@@ -80,6 +81,10 @@ func TestAnAgentCannotStartAThreadOnADiffAndTheHubNeverReachesOne(t *testing.T) 
 		code, out = rig.do("POST", cp(key), hdr, body)
 		assert.GreaterOrEqual(t, code, 400, name+": "+fmt.Sprint(out))
 		code, out = rig.do("GET", cp(key), hdr, nil)
+		if name == "hub owner" { // #20255: the stamped owner's READ of the thread is the one thing the Hub reaches
+			assert.Equal(t, http.StatusOK, code, name+": "+fmt.Sprint(out))
+			continue
+		}
 		assert.GreaterOrEqual(t, code, 400, name+": "+fmt.Sprint(out))
 	}
 	assert.Empty(t, rig.operatorMessages())
@@ -158,11 +163,15 @@ func TestAPathThatHidesCharactersIsKeptWrittenOut(t *testing.T) {
 	}
 }
 
-func TestTheHubsRouteTableDoesNotMatchADiffKey(t *testing.T) {
+func TestTheHubsRouteTableMatchesADiffKeyForTheOwnersCommentReadAlone(t *testing.T) {
 	key := diffSubject("team-a", sendSid(1), "pkg/a.go")
 	for _, method := range []string{"GET", "POST", "PUT", "DELETE"} {
 		for _, suffix := range []string{"", "/comments", "/comments/1/reply", "/comments/1/resolve", "/meta", "/readers", "/comment-images"} {
 			pattern, mode := tunnel.OwnerRoute(method, "/api/artifacts/"+key+suffix)
+			if method == "GET" && suffix == "/comments" { // #20255: the owner's read of the thread, the one row
+				assert.True(t, mode.Stamped() && pattern == "/api/artifacts/{diff}/comments", "%s: %q", suffix, pattern)
+				continue
+			}
 			assert.False(t, mode.Stamped(), "the Hub's table reaches %s %s: %q", method, "/api/artifacts/<diff key>"+suffix, pattern)
 		}
 	}

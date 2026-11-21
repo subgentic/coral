@@ -16,7 +16,7 @@ var shapeSegment32 = strings.Repeat("0", 32)
 func ShapeAllowed(method, shape string) bool {
 	// A {} is 64 hex digits (a {hex64} or any {param}) or 32 (a {hex32}, a skill's id): the shape is allowed when either fills it.
 	for _, seg := range []string{shapeSegment, shapeSegment32} {
-		path := strings.ReplaceAll(strings.ReplaceAll(shape, "{}", seg), "{goal}", "goal:coral-go-team:1")
+		path := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(shape, "{}", seg), "{goal}", "goal:coral-go-team:1"), "{diff}", "diff:coral-go-team:agent-12345:0123456789abcdef")
 		if Classify(method, path, "") != TierNever || ClassifyService(method, path, "") != TierNever { // a service route (hubservice.go) is the Hub service's: it keeps its query parameters in the table
 			return true
 		}

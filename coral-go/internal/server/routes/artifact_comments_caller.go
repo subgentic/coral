@@ -161,7 +161,7 @@ func cleanCommentName(s string) string {
 func ownerCommentRequest(r *http.Request) bool {
 	if r.Method == http.MethodGet {
 		pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)
-		return mode != tunnel.OwnerNone && mode.Refuses() && (pattern == "/api/artifacts/{hex64}/comments" || pattern == "/api/artifacts/{goal}/comments" || pattern == "/api/board/{project}/artifacts/{digest}/edit/send")
+		return mode != tunnel.OwnerNone && mode.Refuses() && (pattern == "/api/artifacts/{hex64}/comments" || pattern == "/api/artifacts/{goal}/comments" || pattern == "/api/artifacts/{diff}/comments" || pattern == "/api/board/{project}/artifacts/{digest}/edit/send")
 	}
 	return ownerCommentWrite(r)
 }
