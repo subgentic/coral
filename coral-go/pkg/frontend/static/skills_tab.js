@@ -11,7 +11,7 @@ import { keyLabel, sessionServer, serverFetch, isCloud } from './server_base.js'
 import { resolveSessionIdentity } from './session_state.js';
 import { SKILL_FOLDERS } from './routes.js';
 const { latestSkillRows, skillVersions } = await importOnce('./skill_versions.js');
-const { machineChoices, machineLabel, machineOnline } = await importOnce('./analytics_machine.js'); // the Computer picker, as the Queue has it (#19627)
+const { machineChoices, machineLabel, machineOnline, machineInventoryPending } = await importOnce('./analytics_machine.js'); // the Computer picker, as the Queue has it (#19627)
 const DT = await importOnce('./data_table.js');
 const PH = await importOnce('./page_header.js'); // the shared page header: title and count, the Primary at the far right (#15838, guidelines 4.2)
 const VL = await importOnce('./view_list.js'); // the folders in the sidebar (and a phone's strip), as Automations and the Inbox have them (#12997)
@@ -30,7 +30,8 @@ const short = h => String(h || '').slice(0, 12);
 // ── through a Coral Hub (#19627): the page READS one linked computer's skills, owner only, through the Hub. The Hub sends a list of rows without who published them or which teams use them, and a skill's page with its
 // SKILL.md text alone (scripts, other files and scanner lines stay on the computer). Import, approve, reject, remove and Use in a team are the person's act on the computer, so they are not drawn here. ──
 const cloud = () => isCloud();
-let chosenComputer = '';
+let chosenComputer = '', pendingInventory = null;
+document.addEventListener('coral:servers-updated', () => { if (pendingInventory && !machineInventoryPending()) { const opts = pendingInventory; pendingInventory = null; if (host()?.getClientRects().length) showSkillsTab(opts); } });
 const computers = () => machineChoices();
 const computer = () => (computers().includes(chosenComputer) ? chosenComputer : (computers()[0] || ''));
 /** One GET: on a computer's own page the dashboard's request; on a Hub's page the chosen computer's, with the status and message an error carries. */
@@ -102,6 +103,8 @@ async function loadOne(id) {
 
 export async function showSkillsTab(opts = {}) {
     showView('skills-view');
+    if (machineInventoryPending()) { pendingInventory = opts; const line = el('p', 'empty-state-line', 'Loading computers…'); line.setAttribute('role', 'status'); const head = el('div', 'skills-head'), title = el('h2', '', 'Skills'); title.hidden = isPhoneLayout(); head.append(title); host().replaceChildren(head, line); host().setAttribute('aria-busy', 'true'); return; }
+    host().removeAttribute('aria-busy');
     folder = SKILL_FOLDERS.includes(opts.folder) ? opts.folder : '';
     if (opts.id) { await loadList(); await loadOne(opts.id); return; }
     open = null;

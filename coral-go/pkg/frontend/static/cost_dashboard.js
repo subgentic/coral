@@ -18,7 +18,7 @@ const agentDetail = await importOnce('./analytics_agent.js'); // one agent over 
 const series = await importOnce('./analytics_series.js'); // the lines over time above By provider, By model, By team and By agent (#7857)
 const { syncEfficiency } = await importOnce('./analytics_efficiency.js'); // the Group by switch and the comparison of Tokens per commit and Task time (Goal #77)
 const { readCostTasks } = await importOnce('./analytics_cost_tasks.js');
-const { readNow, noComputerInCloud, LINK_A_COMPUTER, machineChoices, machineLabel, machineOnline, machineNow, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // in cloud every read goes to the chosen computer, none with no computer linked (#19569)
+const { readNow, noComputerInCloud, machineInventoryPending, LINK_A_COMPUTER, machineChoices, machineLabel, machineOnline, machineNow, pickMachine, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // in cloud every read goes to the chosen computer, none with no computer linked (#19569)
 const { showSpend } = await importOnce('./analytics_spend.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 // What an empty table says: where the numbers come from and what to try (#6975), not just that there are none.
@@ -348,6 +348,8 @@ export async function _recheckTotals(view) {
 }
 
 /** Coral Hub's own page (cloud, #19569): every number is one computer's, so the header has the Computer picker, and with no computer linked the page says so and reads nothing. True when there is nothing to read. */
+let waitingInventory = false;
+document.addEventListener('coral:servers-updated', () => { if (waitingInventory && !machineInventoryPending()) { waitingInventory = false; if (document.getElementById('cost-dashboard-view')?.getClientRects().length) _refreshCostDashboard(); } });
 function _syncComputerBar() {
     const cloud = isCloud(), choices = cloud ? machineChoices() : [];
     let line = document.getElementById('cost-no-computer');
@@ -356,10 +358,13 @@ function _syncComputerBar() {
     else document.getElementById('cost-computer-pick')?.remove();
     const none = noComputerInCloud();
     if (none && !line) { line = document.createElement('p'); line.id = 'cost-no-computer'; line.className = 'cost-note'; line.setAttribute('role', 'status'); line.textContent = LINK_A_COMPUTER; document.querySelector('#cost-page .cost-header')?.after(line); }
-    if (line) line.hidden = !none;
+    waitingInventory = machineInventoryPending();
+    if (line) { line.hidden = !none; line.textContent = waitingInventory ? 'Loading computers…' : LINK_A_COMPUTER; }
+    document.getElementById('cost-page')?.setAttribute('aria-busy', String(waitingInventory));
+    if (waitingInventory) document.querySelectorAll('#cost-page .cost-card-value').forEach(n => { n.textContent = '—'; });
     return none;
 }
-document.addEventListener(MACHINE_EVENT, () => { if (isCloud() && document.getElementById('cost-dashboard-view')?.offsetParent) _refreshCostDashboard(); }); // another computer picked: the page reads that one
+document.addEventListener(MACHINE_EVENT, () => { if (isCloud() && document.getElementById('cost-dashboard-view')?.getClientRects().length) _refreshCostDashboard(); }); // another computer picked: the page reads that one
 
 async function _readCostDashboard({ force = false } = {}) {
     _watchCostTables();

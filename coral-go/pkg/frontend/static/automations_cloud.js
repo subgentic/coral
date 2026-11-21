@@ -7,7 +7,7 @@ import { serverFetch, pathId } from './server_base.js';
 import { go, currentRoute } from './nav.js';
 import { showView } from './utils.js';
 import { importOnce } from './import_once.js';
-const { machineOnline, machineLabel, machineChoices, machineNow, machineIsAll, pickMachine } = await importOnce('./analytics_machine.js');
+const { machineOnline, machineLabel, machineChoices, machineNow, machineIsAll, pickMachine, machineInventoryPending } = await importOnce('./analytics_machine.js');
 const { computerCard, stateOfStatus, notShownText } = await importOnce('./computer_card.js'); // one plain card for every cannot state (#20207)
 const { computerBar, ALL_COMPUTERS } = await importOnce('./computer_bar.js'); // the one computer bar under the title (#20207)
 import { loadStyles } from './lazy_styles.js';
@@ -18,6 +18,8 @@ const { el } = DT;
 const OMITTED = 'Not shown through Coral Hub';
 const FOLDERS = [ ['jobs', 'Jobs'], ['workflows', 'Workflows'], ['recent', 'Recent runs'], ['running', 'Running now'], ['failed', 'Failed'] ];
 const names = new Map(FOLDERS);
+let waitingInventory = false;
+document.addEventListener('coral:servers-updated', () => { if (waitingInventory && !machineInventoryPending()) { waitingInventory = false; if (document.getElementById('scheduler-view')?.getClientRects().length) openAutomationsRoute(route); } });
 let route = { view: 'automations', folder: 'jobs' }, generation = 0, controller = null, query = '';
 const word = x => x == null || x === '' ? '—' : String(x);
 const dateOf = x => x ? new Date(x).toLocaleString() : '—';
@@ -117,6 +119,8 @@ export async function openAutomationsRoute(request = {}) {
     controller?.abort(); controller = new AbortController();
     const { signal } = controller, myGeneration = ++generation;
     const everyone = machineIsAll() && !(route.id && ['jobs', 'workflows'].includes(route.folder)), server = machineChoices().length ? machineNow() : '', panel = shell(everyone);
+    waitingInventory = machineInventoryPending();
+    if (waitingInventory) { panel.replaceChildren(el('p', 'empty-state-line', 'Loading computers…')); return true; }
     if (!server) { panel.replaceChildren(el('p', 'empty-state-line', 'Link a computer to see automations.')); panel.removeAttribute('aria-busy'); return true; }
     panel.append(el('p', 'goals-note', 'Loading automations…'));
     try {

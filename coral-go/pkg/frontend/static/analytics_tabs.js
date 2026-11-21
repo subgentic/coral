@@ -14,7 +14,7 @@ import { importOnce } from './import_once.js';
 await loadStyles('analytics_tabs.css');
 const V = await importOnce('./analytics_viz.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 const D = await importOnce('./analytics_tabs_data.js');
-const { machineChoices, machineLabel, machineNow, machineOnline, pickMachine, noComputerInCloud, LINK_A_COMPUTER, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer these tabs read (#15730)
+const { machineChoices, machineLabel, machineNow, machineOnline, pickMachine, noComputerInCloud, machineInventoryPending, LINK_A_COMPUTER, MACHINE_EVENT } = await importOnce('./analytics_machine.js'); // which computer these tabs read (#15730)
 const T = await importOnce('./analytics_tasks.js'); // the Tasks view (#17206)
 const Q = await importOnce('./analytics_queue.js'); // the Resource queue view (#13671) // not in the start's stylesheet: it arrives before the page is drawn (#10706)
 const { el } = V;
@@ -72,9 +72,11 @@ export async function showTab(key, host, force = false) {
     if (force || !m.data || m.stale) load(key);
 }
 
+const inventoryTabs = new Set();
+document.addEventListener('coral:servers-updated', () => { if (machineInventoryPending()) return; const waiting = [...inventoryTabs]; inventoryTabs.clear(); for (const key of waiting) if (hosts[key]?.getClientRects().length) load(key); });
 async function load(key) {
     const m = tabs[key], seq = ++m.seq, server = machineNow(); // the computer picked on a Hub-served dashboard (this one otherwise, #15730)
-    if (noComputerInCloud()) { m.status = 'nocomputer'; m.data = null; draw(key); return; } // Coral Hub's page with no computer linked: nothing is read (#19569)
+    if (noComputerInCloud()) { if (machineInventoryPending()) inventoryTabs.add(key); m.status = 'nocomputer'; m.data = null; draw(key); return; } // Coral Hub's page with no computer linked: nothing is read (#19569)
     m.status = m.data ? 'ok' : 'loading'; m.stale = false;
     try {
         if (key === 'usage') {
@@ -151,7 +153,7 @@ function draw(key) {
     const host = hosts[key]; if (!host || !host.isConnected) return;
     const m = tabs[key], root = el('div', 'atab' + (phone() ? ' atab-phone' : ''));
     root.append(filterBar(key));
-    if (m.status === 'nocomputer') root.append(say(LINK_A_COMPUTER));
+    if (m.status === 'nocomputer') root.append(say(machineInventoryPending() ? 'Loading computers…' : LINK_A_COMPUTER));
     else if (m.status === 'offline') root.append(say(`${machineLabel(machineNow())} is offline, so its numbers cannot be read.`));
     else if (m.status === 'refused') root.append(say(`${machineLabel(machineNow())} would not give these numbers. It may be an older Coral that needs an update, or you may only be a guest there.`));
     else if (m.status === 'guest') root.append(say(key === IVC ? INBOX_GUEST_LINE : key === RQ ? Q.QUEUE_GUEST_LINE : key === 'tasks' ? 'Tasks completed are visible to the owner of this Coral only.' : GUEST_LINE));
