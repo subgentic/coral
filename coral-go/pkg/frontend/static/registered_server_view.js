@@ -126,7 +126,7 @@ function nameDot(status) {
     return d;
 }
 function serverCell(s, live) {
-    if (isLocal(s)) { const w = DT.el('span', 'servers-name'); w.append(nameDot('online'), DT.el('span', 'dt-name-text servers-name-text', s.label || 'This computer')); return w; }
+    if (isLocal(s)) { const w = DT.el('span', 'servers-name'); w.append(nameDot('online'), DT.el('span', 'dt-name-text servers-name-text', s.label || 'This computer'), DT.tag('this computer')); return w; } // the row of this computer says so (mock #20111)
     const b = DT.primaryButton(s.label || s.id, `Open ${s.label || s.id}`);
     const wrap = DT.el('span', 'servers-name'); wrap.append(nameDot((live && live.status) || s.status), DT.el('span', 'dt-name-text servers-name-text', s.label || s.id)); b.replaceChildren(wrap);
     if (!isLocal(s) && s.warning) { const t = DT.tag('warning'); t.classList.add('servers-warn'); t.title = String(s.warning); const g = DT.el('span', 'material-icons servers-warn-icon', 'warning'); g.setAttribute('aria-hidden', 'true'); t.textContent = ''; t.append(g, DT.el('span', 'servers-warn-word', 'warning')); wrap.append(t); } // the unencrypted-key warning stays on the row at every width (#9679), by the name, not in a column a narrow list drops; a narrow list keeps its glyph and drops the word (the name wins the width), the sentence is the tag's tooltip and the button's name
@@ -161,13 +161,13 @@ function serversTable(local, remotes) {
         label: 'Registered computers', state: _dt, rows, oneLine: true, resize: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
         columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); Needs you and the name's warning never go; under 16 rem (a phone at 200% text) Status leaves and its dot moves before the name
             { key: 'server', label: 'Computer', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: s => serverCell(s, live(s)), title: s => s.label || s.id },
-            { key: 'tags', label: 'Tags', width: '11rem', dropAt: 36, cell: tagsCell },
+            { key: 'tags', label: 'Tags', width: '11rem', dropAt: 62, cell: tagsCell },
             { key: 'status', label: 'Status', width: '8rem', dropAt: 16, sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => { const w = statusDotWord(live(s).status || s.status), note = planWord(s); if (note) w.append(DT.el('span', 'servers-setup-note', ` \u00b7 ${note}`)); return w; } },
             { key: 'agents', label: 'Agents', width: '5rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => { const n = serverAgentCount(live(s)); return n ? String(n) : ''; } }, // the count alone under its header, nothing at zero (UI/UX #9679)
             { key: 'needs', label: 'Waiting', width: '6rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
-            { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
-            { key: 'version', label: 'Version', width: '7.5rem', dropAt: 52, tone: 'tertiary', sort: true, sortValue: s => versionWords(s, live(s)), cell: s => versionWords(s, live(s)) || '\u2014' },
-            { key: 'start', label: 'Start', line: 3, width: '22rem', fixed: true, align: 'end', cell: s => startCell(isLocal(s) ? 'local' : s.id, s.label || s.id, DT.el) },
+            { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 62, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
+            { key: 'version', label: 'Version', width: '7.5rem', dropAt: 62, tone: 'tertiary', sort: true, sortValue: s => versionWords(s, live(s)), cell: s => versionWords(s, live(s)) || '\u2014' },
+            { key: 'start', label: 'Start', line: 3, width: '17rem', fixed: true, dropAt: 36, align: 'end', cell: s => startCell(isLocal(s) ? 'local' : s.id, s.label || s.id, DT.el) },
         ],
         open: s => { if (!isLocal(s)) { _open = s.id; _confirmDelete = null; _focusNext = 'back'; render(); } },
     }, { rowId: s => `server-row-${isLocal(s) ? 'local' : s.id}` });
@@ -233,6 +233,7 @@ function pageHtml(s) {
         <div class="phone-title-row"><button type="button" class="back-link" id="servers-back" data-action="back"><span>&larr; Computers</span></button>
         <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="chip chip-tag servers-tag" title="Private network addresses are allowed for this computer">private network</span>' : ''}</h3></div>
         <p class="item-meta">${statusPill(status)}</p>
+        <div class="servers-page-start" data-start-host="${escHtml(s.id)}"></div>
         <dl class="facts servers-facts">
             ${factHtml('URL', escHtml(s.url || ''))}
             ${factHtml('Coral', `${escHtml(version ? `Coral ${version}` : 'Not known yet')}${s.transport === 'ssh' && version && state.localVersion && compareVersions(version, state.localVersion) !== 0 ? escHtml(` (this hub runs ${state.localVersion})`) : ''}${badge ? ' ' + badge : ''}`)}
@@ -341,6 +342,7 @@ function render() {
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
             ${body}`;
     fillWarnings(m);
+    const startHost = m.querySelector('[data-start-host]'); if (startHost && page) startHost.append(startCell(page.id, page.label || page.id, DT.el)); // the page's own starts, as the row's (mock #20111)
     const slot = m.querySelector('#servers-table-slot');
     if (slot) slot.replaceWith(serversTable(local, remotes));
     const title = document.getElementById('servers-tab-title');

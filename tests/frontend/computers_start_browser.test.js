@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
             const by = n => rows.find(r => r.name === n) || { buttons: [], note: '' };
             check(`${tag}: each computer has New agent, New team, New terminal in that order`, rows.length >= 2 && rows.every(r => JSON.stringify(r.buttons.map(b => b.text)) === JSON.stringify(['New agent', 'New team', 'New terminal'])), JSON.stringify(rows.map(r => r.buttons.map(b => b.text))));
             check(`${tag}: a computer with Interact access has the three starts on`, by('Desktop').buttons.length === 3 && by('Desktop').buttons.every(b => !b.disabled) && by('Desktop').note === '', JSON.stringify(by('Desktop')));
-            check(`${tag}: a computer with View access has them off and says why, with the way to change it`, by('Laptop').buttons.every(b => b.disabled) && /Hub access is View\./.test(by('Laptop').note) && /Change to Interact/.test(by('Laptop').note), JSON.stringify(by('Laptop')));
+            check(`${tag}: a computer with View access has them off and says why, with the way to change it`, by('Laptop').buttons.every(b => b.disabled) && /Hub access is View, so it cannot start things\./.test(by('Laptop').note) && /Change to Interact/.test(by('Laptop').note), JSON.stringify(by('Laptop')));
             if (mobile) check(`${tag}: on a phone the starts are 44 px tall`, by('Desktop').buttons.every(b => b.h >= 44), JSON.stringify(by('Desktop').buttons.map(b => b.h)));
             await shot(`after-computers-${w}`);
             for (const kind of ['agent', 'team', 'terminal']) {
@@ -38,6 +38,15 @@ const { coralReady } = require('./helpers/wait');
             const disabledClick = await click(`#servers-tab-body tr.cs-row[data-id="m1"] .computer-start-btn[data-computer-start="agent"]`);
             await sleep(300); // sleep-ok: a refused click must stay refused
             check(`${tag}: a click on an off start opens nothing`, disabledClick && !(await ev(`(() => { const m = document.getElementById('launch-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`)));
+            // an off New agent stays the primary button, dimmed (mock #20111); the other off buttons go flat
+            const look = await ev(`(() => { const bg = k => getComputedStyle(document.querySelector('#servers-tab-body tr.cs-row[data-id="m1"] .computer-start-btn[data-computer-start="' + k + '"]')).backgroundColor; return { agent: bg('agent'), team: bg('team') }; })()`);
+            check(`${tag}: an off New agent is still the dimmed blue button, the others are flat`, look.agent !== 'rgba(0, 0, 0, 0)' && look.team === 'rgba(0, 0, 0, 0)', JSON.stringify(look));
+            // the computer's own page carries the same starts, by Rename and More
+            await ev(`document.querySelector('#servers-tab-body tr.cs-row[data-id="m2"] .cs-open').click(); true`);
+            await waitFor(`!!document.querySelector('#servers-tab-body .cs-page')`, 'the computer page', 5000);
+            const pageStarts = await ev(`[...document.querySelectorAll('#servers-tab-body .cs-page .computer-start-btn')].map(b => b.textContent)`);
+            check(`${tag}: the computer's page has New agent, New team, New terminal`, JSON.stringify(pageStarts) === JSON.stringify(['New agent', 'New team', 'New terminal']), JSON.stringify(pageStarts));
+            await ev(`document.getElementById('servers-back').click(); true`);
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }

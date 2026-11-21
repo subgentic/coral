@@ -19,7 +19,7 @@ export function startCell(id, label, el, extra = {}) {
     const blocked = extra.reason || startBlockReason(id || LOCAL_SERVER);
     const group = el('div', 'computer-start-actions'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', `Start on ${label}`);
     for (const [kind, text] of START) {
-        const b = el('button', `btn${kind === 'agent' ? ' btn-primary' : ''} computer-start-btn`, text);
+        const b = el('button', `btn btn-small${kind === 'agent' ? ' btn-primary' : ''} computer-start-btn`, text);
         b.type = 'button'; b.dataset.computerStart = kind; b.dataset.computerId = id || LOCAL_SERVER;
         if (blocked) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); b.title = blocked; }
         b.addEventListener('click', e => { e.stopPropagation(); startOn(id, kind); }); // the row opens the computer's page: the button must not

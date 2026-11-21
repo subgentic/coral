@@ -302,11 +302,12 @@ const contrast = (a, b) => {
             const rows = [...v.querySelectorAll('.cs-row')];
             return {
                 doc: document.documentElement.scrollWidth - innerWidth, view: over(v), rows: Math.max(...rows.map(over)),
+                bad: rows.flatMap(r => [...r.querySelectorAll('button, select, a')].filter(b => { const x = b.getBoundingClientRect(); return !(x.width === 0 || (x.left >= -1 && x.right <= innerWidth + 1)); }).map(b => b.className + ':' + b.textContent.slice(0, 20) + ':' + Math.round(b.getBoundingClientRect().left) + '-' + Math.round(b.getBoundingClientRect().right))),
                 inside: rows.every(r => [...r.querySelectorAll('button, select, a')].every(b => { const x = b.getBoundingClientRect(); return x.width === 0 || (x.left >= -1 && x.right <= innerWidth + 1); })),
             };
         })()`);
         assert.ok(phone.doc <= 0 && phone.view <= 0 && phone.rows <= 0, `no horizontal overflow at 375 (${JSON.stringify(phone)})`);
-        assert.ok(phone.inside, 'every control is inside the viewport');
+        assert.ok(phone.inside, 'every control is inside the viewport ' + JSON.stringify(phone.bad));
         await openPage('m1');
         const pg = await ev(`(() => { const p = document.getElementById('server-row-m1'); const bar = p.querySelector('.cs-actions'); return { doc: document.documentElement.scrollWidth - innerWidth, page: p.scrollWidth - p.clientWidth, inside: [...p.querySelectorAll('button, select, a')].every(b => { const x = b.getBoundingClientRect(); return x.width === 0 || (x.left >= -1 && x.right <= innerWidth + 1); }), actions: bar ? [...bar.querySelectorAll('button')].filter(b => b.getClientRects().length).map(b => b.textContent) : null }; })()`);
         assert.ok(pg.doc <= 0 && pg.page <= 0 && pg.inside, `a machine's page: no horizontal overflow at 375 and every control inside the viewport (${JSON.stringify(pg)})`);
