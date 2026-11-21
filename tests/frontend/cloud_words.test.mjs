@@ -1,6 +1,6 @@
 // cloud_words.js: the closed permissions summary (permissive switches named, a protective one off marked), the Operator sentence and the spelled code.
 import assert from 'node:assert/strict';
-import { morePermsWords, operatorLine, hubAddressLine, spellCode, describe, enrolledRetrying, rekeyText, autoAcceptChangedText, severalAccountsText, codeExpired, codeUncollected, UNCOLLECTED_TEXT, OFF_TEXT, EXPIRED_TEXT, HUB_ACCESS_URL, LEVEL_NOW } from '../../coral-go/pkg/frontend/static/cloud_words.js';
+import { morePermsWords, operatorLine, hubAddressLine, linkRowWords, removeLinkConfirm, capSavedText, LINK_CAPS, spellCode, describe, enrolledRetrying, rekeyText, autoAcceptChangedText, severalAccountsText, codeExpired, codeUncollected, UNCOLLECTED_TEXT, OFF_TEXT, EXPIRED_TEXT, HUB_ACCESS_URL, LEVEL_NOW } from '../../coral-go/pkg/frontend/static/cloud_words.js';
 
 assert.deepEqual(morePermsWords({}, null), { text: 'More Coral Hub permissions: may change cross-team settings', warn: '' }, 'cross-team is on unless turned off');
 assert.equal(morePermsWords({ hub_cross_team_settings: false }, false).text, 'More Coral Hub permissions: none on');
@@ -18,6 +18,20 @@ assert.equal(hubAddressLine({ hub_address_warning: 'The saved Hub address (https
 assert.equal(hubAddressLine({}), '');
 assert.equal(hubAddressLine(null), '');
 assert.equal(hubAddressLine({ hub_address_warning: 5 }), '', 'only text is said');
+// Hub links (#20346): each row says which Hub, as text only, and what it may do; nothing from a Hub is trusted as markup or as an address that is not a bare https origin.
+assert.deepEqual(LINK_CAPS, ['view', 'interact', 'launch']);
+assert.deepEqual(linkRowWords({ link_id: 'lnk-0000000a', hub_origin: 'https://hub-a.example.com', label: 'Laptop', state: 'active', max_mode: 'interact' }), { id: 'lnk-0000000a', origin: 'https://hub-a.example.com', label: 'Laptop', state: 'Linked', cap: 'interact', grant: 'send and answer', removing: false });
+assert.equal(linkRowWords({ link_id: 'lnk-0000000a', hub_origin: 'https://hub-a.example.com', state: 'removing', max_mode: 'view' }).state, 'Being removed: waiting for the Hub to confirm');
+assert.equal(linkRowWords({ link_id: 'lnk-0000000a', hub_origin: 'https://hub-a.example.com', state: 'removing', max_mode: 'view' }).removing, true);
+assert.equal(linkRowWords({ link_id: 'lnk-0000000a', hub_origin: 'https://hub-a.example.com', state: 'paused', max_mode: 'view' }).state, 'Paused');
+assert.equal(linkRowWords({ link_id: 'lnk-0000000a', hub_origin: 'javascript:alert(1)', label: 'x', state: 'active', max_mode: 'view' }).origin, '', 'only a bare https address is shown');
+assert.equal(linkRowWords({ link_id: 'lnk-0000000a', hub_origin: 'https://h.example.com/path', state: 'active', max_mode: 'view' }).origin, '');
+assert.equal(linkRowWords({ link_id: 'lnk-0000000a', hub_origin: 'https://h.example.com', label: 'a\u202eb\u0007c', state: 'active', max_mode: 'view' }).label, 'abc', 'no bidi or control characters');
+assert.equal(linkRowWords({ link_id: 'bad id', hub_origin: 'https://h.example.com', state: 'active', max_mode: 'view' }).id, '', 'only a link id is shown as one');
+assert.equal(linkRowWords({ link_id: 'lnk-0000000a', hub_origin: 'https://h.example.com', state: 'active', max_mode: 'root' }).cap, 'view', 'an unknown cap reads as the least');
+assert.equal(removeLinkConfirm({ hub_origin: 'https://hub-a.example.com' }), 'Remove https://hub-a.example.com? This computer stops talking to that Hub at once and asks it to forget this computer.');
+assert.equal(capSavedText({ hub_origin: 'https://hub-a.example.com' }, 'launch'), 'https://hub-a.example.com may now: start agents.');
+assert.equal(capSavedText({ hub_origin: 'https://hub-a.example.com' }, 'root'), '', 'a word that is not a cap says nothing');
 assert.equal(spellCode('WXYZ-1234'), 'W X Y Z, 1 2 3 4');
 assert.equal(spellCode('H2XR-HS16'), 'H 2 X R, H S 1 6');
 assert.equal(spellCode(''), '');
