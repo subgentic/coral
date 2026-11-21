@@ -684,3 +684,6 @@ b POST /api/dropbox/share-chat/{project}
 b GET /api/thread
 b GET /api/threads
 b POST /api/launch/permission-args
+b DELETE /api/member-grants/{id}
+b GET /api/member-grants
+b POST /api/member-grants

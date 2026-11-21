@@ -147,13 +147,13 @@ func (h *BoardHandler) createMemberGrant(w http.ResponseWriter, r *http.Request,
 			return
 		}
 	}
-	if d := time.Since(time.Unix(ng.Ts, 0)); d > memberGrantWindow || d < -memberGrantWindow {
-		errBadRequest(w, "the signature is too old or too new: sign it again")
-		return
-	}
 	// The signature is checked before anything is written; the store checks the rest and spends the nonce.
 	if err := memberVerify(r.Context(), board.MemberGrantDigest(ng), in.Signature.KID, in.Signature.Sig); err != nil {
 		errForbidden(w, "that is not the signature of one of your own devices")
+		return
+	}
+	if d := time.Since(time.Unix(ng.Ts, 0)); d > memberGrantWindow || d < -memberGrantWindow {
+		errBadRequest(w, "the signature is too old or too new: sign it again")
 		return
 	}
 	g, err := h.bs.CreateMemberGrant(r.Context(), ng)
