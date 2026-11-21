@@ -411,7 +411,7 @@ export const promptDismiss = s => dismissWait(s, null);
 /** N7 (#17451): the wait is grey and short ("2 h"); the amber triangle only past the limit (a day), and the words say so too (never colour alone). */
 export function waitingCell(s, hidden, byAgent) {
     const t = hidden ? '' : shortWait(s.waiting_since); if (!t) return t;
-    const late = !byAgent && Date.now() - Date.parse(s.waiting_since) >= WAIT_LIMIT_MS, span = mk('span', late ? 'inbox-age inbox-age-late' : 'inbox-age');
+    const late = Date.now() - Date.parse(s.waiting_since) >= (byAgent ? 36e5 : WAIT_LIMIT_MS), /* Waiting on an agent: the mock flags an hour (3 h, 1 d) and not 25 min (#20147) */ span = mk('span', late ? 'inbox-age inbox-age-late' : 'inbox-age');
     span.append(...(late ? [mk('span', 'material-icons inbox-age-flag', 'warning')] : []), mk('span', 'inbox-age-t', t), mk('span', 'sr-only', late ? ' waiting, late' : ' waiting'));
     if (late) span.firstChild.setAttribute('aria-hidden', 'true');
     return span;

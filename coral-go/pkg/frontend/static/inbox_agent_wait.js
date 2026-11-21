@@ -97,7 +97,7 @@ export function decorateGroupHead(tr, info) {
     right.append(el('span', 'inbox-group-meta', `${info.count} waiting${since ? ` \u00b7 since ${since} ago` : ''}`));
     const wake = info.wake ? wakeButton(info.ws) : null;
     if (wake) { wake.textContent = info.ws.state === 'asleep' ? (isPhoneLayout() ? 'Wake' : `Wake ${markHidden(info.ws.who, { strict: true })}`) : 'Start agent'; /* a phone's heading says Wake, as mock v3 draws it: the name is in the aria-label (#20130) */ right.append(wake); }
-    const label = [...th.childNodes].find(n => n.nodeType === 3), chip = chipOf(info.ws); // the state is the row's own chip beside the name, "Awake · working" as the rows say it, not plain text in the title (final gap walk)
+    const label = [...th.childNodes].find(n => n.nodeType === 3), chip = chipOf(info.ws), slept = info.ws.state === 'asleep' && shortWait(info.ws.live?.last_timestamp || info.ws.live?.last_seen); if (chip && slept) chip.append(` \u00b7 ${slept}`); // Asleep \u00b7 2 h as the mock's heading says it (the agent's last activity stands for when it went to sleep); the state is the row's own chip beside the name, "Awake · working" as the rows say it, not plain text in the title (final gap walk)
     if (label && chip) { label.textContent = String(label.textContent).replace(/ \u00b7 (Awake|Asleep|Archived)$/, '') + ' '; label.after(chip); }
     th.classList.add('inbox-group-flex'); th.append(right);
 }
