@@ -223,6 +223,9 @@ func (h *BoardHandler) WaitingOnAgent(w http.ResponseWriter, r *http.Request) {
 				files[c.Board] = byID
 			}
 			if f, ok := byID[strings.ToLower(c.ArtifactID)]; ok {
+				one := []teamArtifact{f} // the kept list has no series numbers (the team route adds them to its page): the comment is on THIS version, not version 1 (#20430)
+				h.attachSeriesVersions(one, c.Board)
+				f = one[0]
 				v := f.Version
 				if v < 1 {
 					v = 1

@@ -347,7 +347,7 @@ function serversTable(shown) {
             { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: s => sortValue(s, 'name'), cell: cellOf.name },
             { key: 'status', foldLabel: true, label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
             { key: 'agents', foldLabel: true, label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
-            { key: 'needs', foldLabel: true, label: 'Needs you', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
+            { key: 'needs', foldLabel: true, label: 'Waiting', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
             { key: 'seen', foldLabel: true, label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
             { key: 'version', foldLabel: true, label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
             { key: 'access', foldLabel: true, label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },

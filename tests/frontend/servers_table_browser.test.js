@@ -152,7 +152,7 @@ const contrast = (a, b) => {
         await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(SESSIONS)}; (await import((window.__coralStatic || '/static/') + 'cloud_server_view.js')).serverView.render(); return true; })()`); // the live list reaches the page after its first draw: draw again with it (Needs you reads it)
         let t = await table();
         assert.equal(t.role, 'table'); assert.equal(t.label, 'Your computers');
-        assert.deepEqual(t.heads.map(h => h.text), ['Name', 'Status', 'Agents', 'Needs you', 'Last seen', 'Coral', 'Hub access']);
+        assert.deepEqual(t.heads.map(h => h.text), ['Name', 'Status', 'Agents', 'Waiting', 'Last seen', 'Coral', 'Hub access']);
         assert.ok(t.heads.every(h => h.scope === 'col' && h.button), 'every sortable header is a button in a column header');
         assert.equal(t.actionsHead, null, 'no Actions column: Rename and Revoke are on the machine\'s page');
         assert.deepEqual(t.heads.map(h => h.sort), ['ascending', 'none', 'none', 'none', 'none', 'none', 'none'], 'sorted by name, ascending, to start with');

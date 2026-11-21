@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -214,4 +216,29 @@ func TestWaitingOnAgentDropsAnAnsweredAskWhenItsLinkedTaskFinishes(t *testing.T)
 	closed, err := bs.AskIsClosed(ctx, "team", q.ID)
 	require.NoError(t, err)
 	require.False(t, closed, "the projection stays read only")
+}
+
+// #20430: a comment sent on version 2 of a file says "version 2" in Waiting on an agent, never "version 1".
+func TestWaitingOnAgentSaysTheVersionTheCommentWasMadeOn(t *testing.T) {
+	e := newReviewEnv(t, true)
+	series := strings.Repeat("d", 32)
+	up := uploadsDir(e.h.coralDir, "sA")
+	require.NoError(t, os.MkdirAll(up, 0o700))
+	for _, v := range []struct {
+		digest string
+		n      int
+	}{{strings.Repeat("9", 64), 1}, {e.id, 2}} {
+		rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Size: 9, Digest: "sha256:" + v.digest}, CreatedAt: "2026-11-06T09:00:00Z", Board: "alpha", SeriesID: series, Version: v.n})
+		require.NoError(t, os.WriteFile(filepath.Join(up, v.digest+".json"), rec, 0o600))
+	}
+	require.NoError(t, writeSeriesIndex(e.h.coralDir, seriesIndex{ID: series, Board: "alpha", Versions: []seriesVersionRow{{Digest: strings.Repeat("9", 64), N: 1, Session: "sA"}, {Digest: e.id, N: 2, Session: "sA"}}}))
+	e.h.SetWaitingComments(func(context.Context) ([]store.WaitingComment, error) {
+		return []store.WaitingComment{{CommentID: 9, RootID: 9, ArtifactID: e.id, Board: "alpha", AgentSession: "sess-1", AgentName: "Alice", Body: "tighten this", Since: time.Now().UTC().Add(-time.Hour)}}, nil
+	})
+	code, items := readWaiting(t, e.h, true)
+	require.Equal(t, http.StatusOK, code)
+	require.Len(t, items, 1)
+	art, _ := items[0]["artifact"].(map[string]any)
+	require.NotNil(t, art, "the file is named: %v", items[0])
+	assert.EqualValues(t, 2, art["version"])
 }
