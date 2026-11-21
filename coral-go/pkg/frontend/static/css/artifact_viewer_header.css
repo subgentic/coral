@@ -182,3 +182,19 @@
     .artifact-viewer-header > .artifact-viewer-morewrap { order: 1; }
     .artifact-viewer-header > .ac-toggle { order: 2; }
 }
+
+/* #20241 (the Operator: the header wrapped to two rows again once a review was waiting): on a computer a decision waiting keeps the whole header on ONE line. Refuse, Edit text and Mark up are items of the ⋯ menu then
+   (the buttons that stay are the ones a decision needs: Approve and Request changes), the status keeps its whole words and the name keeps a little less. */
+.artifact-review-refuse-item { display: none; }
+@media (min-width: 769px) {
+    .artifact-viewer[data-review-pending="1"] .artifact-review-refuse, .artifact-viewer[data-review-pending="1"] .artifact-viewer-edit, .artifact-viewer[data-review-pending="1"] .artifact-viewer-markup { display: none; }
+    .artifact-viewer[data-review-pending="1"] .artifact-review-refuse-item:not([hidden]), .artifact-viewer[data-review-pending="1"] .artifact-viewer-edit-item:not([hidden]), .artifact-viewer[data-review-pending="1"] .artifact-viewer-markup-item:not([hidden]) { display: flex; }
+    .artifact-viewer[data-review-pending="1"] .artifact-viewer-chips > .artifact-review-state { max-width: 13rem; }
+    .artifact-viewer[data-review-pending="1"] .artifact-viewer-header > .artifact-viewer-title { min-width: min(9rem, 100%); }
+}
+@media (min-width: 769px) and (max-width: 1140px) { /* a narrower computer window (1024) with a decision waiting: the file arrows and Details are items of ⋯ as on a phone (Details comes back only while it is open, to close it) */
+    .artifact-viewer[data-review-pending="1"] .artifact-viewer-chips > .artifact-review-state { max-width: 8rem; }
+    .artifact-viewer[data-review-pending="1"] .artifact-file-navigation { display: none; }
+    .artifact-viewer[data-review-pending="1"] .artifact-file-prev-item:not([hidden]), .artifact-viewer[data-review-pending="1"] .artifact-file-next-item:not([hidden]), .artifact-viewer[data-review-pending="1"] .artifact-viewer-details-item { display: flex; }
+    .artifact-viewer[data-review-pending="1"] .artifact-viewer-header .artifact-viewer-details[aria-expanded="false"] { display: none; }
+}
