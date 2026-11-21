@@ -123,6 +123,10 @@ type Message struct {
 	// or hub_operator (the Operator through Coral Hub), from the tunnel-stamped header the
 	// server validated (#3404). Set by the server only.
 	HubUser *string `db:"hub_user" json:"hub_user,omitempty"`
+	// ViaLink and ViaHubUser are the Hub link a message arrived on (lnk-<8 hex>) and the Hub person behind it (hub-user-<8 hex>), copied from the tunnel stamp LinkStamp checked (#20387):
+	// pseudonyms and attribution only, never authority. Set by the server only, absent for a local post and for every earlier message.
+	ViaLink    *string `db:"via_link" json:"via_link,omitempty"`
+	ViaHubUser *string `db:"via_hub_user" json:"via_hub_user,omitempty"`
 	// IsSystem is set by the server only, for Coral's own posts (the task queue, the
 	// health monitor), never inferred from the sender's name (#3387). The chat
 	// collapses these (#3343).
