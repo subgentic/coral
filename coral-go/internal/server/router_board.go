@@ -189,6 +189,9 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/member-grants", boardHandler.MemberGrants) // #20387: who a Hub's people may reach on this team: written only at this computer, never through a Hub
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/member-grants", boardHandler.MemberGrants)
 		r.With(routes.RefuseSignInLink).Delete("/api/board/{project}/member-grants/{id}", boardHandler.RevokeMemberGrant)
+		r.With(routes.RefuseSignInLink).Get("/api/member-grants", boardHandler.ComputerMemberGrants) // #20511: every grant of this computer, and a full one (shut until Security reads its commit)
+		r.With(routes.RefuseSignInLink).Post("/api/member-grants", boardHandler.ComputerMemberGrants)
+		r.With(routes.RefuseSignInLink).Delete("/api/member-grants/{id}", boardHandler.RevokeMemberGrant)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/wake", sessHandler.OrchestratorWake)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/sleep", sessHandler.OrchestratorSleep)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/restart", sessHandler.OrchestratorRestart)
