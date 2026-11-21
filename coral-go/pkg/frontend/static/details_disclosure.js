@@ -35,7 +35,7 @@ export function makeDetails({ panel = null, remember = true, hide = false } = {}
     };
     const toggle = () => { if (remember) browserLocal.set(KEY, isOpen() ? '0' : '1'); else local = !local; sync(); };
     button.addEventListener('click', toggle);
-    if (hideBtn) hideBtn.addEventListener('click', () => { toggle(); button.focus(); }); // closed: the keyboard goes back to the button that opens it
+    if (hideBtn) hideBtn.addEventListener('click', () => { toggle(); const menu = button.getClientRects().length ? null : p.closest('.artifact-viewer')?.querySelector('.artifact-viewer-more'); (menu || button).focus(); }); // closed: the keyboard goes back to the button that opens it, or to ⋯ where Details is an item of that menu (a phone, a computer under 1440 with a decision waiting, #20291)
     sync();
     return {
         button, panel: p,

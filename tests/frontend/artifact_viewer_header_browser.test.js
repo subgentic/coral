@@ -55,11 +55,11 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.querySelector('#artifact-viewer .details-toggle').click(); true`);
             await waitFor(`!document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden`, `${w}: Details opens`, 5000);
             const open = await names();
-            assert.deepEqual(w <= 390 ? open.filter(n => !/^details-toggle\./.test(n)) : open, rest, `${w}: opening Details hides none of the other header buttons (on a phone its own button comes back, to close it): ` + JSON.stringify([rest, open]));
+            assert.deepEqual(w < 1440 ? open.filter(n => !/^details-toggle\./.test(n)) : open, rest, `${w}: opening Details hides none of the other header buttons (on a phone, and on a computer under 1440 with a decision waiting, #20291, its own button comes back, to close it): ` + JSON.stringify([rest, open]));
             const hb = await ev(`(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-readers'), b = p.querySelector('.details-hide'), pr = p.getBoundingClientRect(), r = b.getBoundingClientRect(); return { text: b.textContent, right: Math.round(pr.right - r.right), top: Math.round(r.top - pr.top), shown: b.getClientRects().length > 0 }; })()`);
             assert.ok(hb.shown && hb.text === 'Hide details' && hb.right <= 24 && hb.top <= 12, `${w}: Hide details is at the top right of the box: ` + JSON.stringify(hb));
             await ev(`document.querySelector('#artifact-viewer .details-hide').click(); true`);
-            const closedAgain = await ev(`({ hidden: document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden, focus: document.activeElement && document.activeElement.classList.contains(window.innerWidth <= 768 ? 'artifact-viewer-more' : 'details-toggle') })`); // a phone: Details is in the ⋯ menu, the keyboard goes back to ⋯
+            const closedAgain = await ev(`({ hidden: document.querySelector('#artifact-viewer .artifact-viewer-readers').hidden, focus: document.activeElement && document.activeElement.classList.contains(window.innerWidth < 1440 ? 'artifact-viewer-more' : 'details-toggle') })`); // a phone: Details is in the ⋯ menu, the keyboard goes back to ⋯
             assert.deepEqual([closedAgain.hidden, closedAgain.focus], [true, true], `${w}: Hide details closes it and the keyboard goes back to Details`);
             assert.deepEqual(await names(), rest, `${w}: and the header is as it was`);
             // the ⋯ menu

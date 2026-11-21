@@ -192,8 +192,8 @@
     .artifact-viewer[data-review-pending="1"] .artifact-viewer-chips > .artifact-review-state { max-width: 13rem; }
     .artifact-viewer[data-review-pending="1"] .artifact-viewer-header > .artifact-viewer-title { min-width: min(9rem, 100%); }
 }
-@media (min-width: 769px) and (max-width: 1279px) { /* a narrower computer window (under 1280, 1024 and 1150 included) with a decision waiting: the file arrows and Details are items of ⋯ as on a phone (Details comes back only while it is open, to close it) */
-    .artifact-viewer[data-review-pending="1"] .artifact-viewer-chips > .artifact-review-state { max-width: 8rem; }
+@media (min-width: 769px) and (max-width: 1279px) { .artifact-viewer[data-review-pending="1"] .artifact-viewer-chips > .artifact-review-state { max-width: 8rem; } } /* under 1280 the status is shorter too */
+@media (min-width: 769px) and (max-width: 1439px) { /* a computer window under 1440 (1280, 1150 and 1024 included) with a decision waiting: the file arrows and Details are items of ⋯ as on a phone (Details comes back only while it is open, to close it). 1280 was one row on a Mac and two on Windows, whose fonts are wider (#20291) */
     .artifact-viewer[data-review-pending="1"] .artifact-file-navigation { display: none; }
     .artifact-viewer[data-review-pending="1"] .artifact-file-prev-item:not([hidden]), .artifact-viewer[data-review-pending="1"] .artifact-file-next-item:not([hidden]), .artifact-viewer[data-review-pending="1"] .artifact-viewer-details-item { display: flex; }
     .artifact-viewer[data-review-pending="1"] .artifact-viewer-header .artifact-viewer-details[aria-expanded="false"] { display: none; }
