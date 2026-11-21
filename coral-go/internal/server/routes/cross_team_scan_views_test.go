@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/subgentic/coral/internal/faketoken"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,8 +25,8 @@ import (
 // The sender-side scan against Security's #4438 matrix: each re-encoding of a token is either caught
 // or listed as not caught (cross-team.md says the same list).
 func TestScanAttachmentEncodingMatrix(t *testing.T) {
-	token := "ghp_" + "1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R"
-	awsKey := "AKIA" + "ZQ3XK7JD2MNB5RTP"
+	token := faketoken.GitHub("1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R")
+	awsKey := faketoken.AWS("ZQ3XK7JD2MNB5RTP")
 	wrap := func(s string) string { return "# notes\n" + s + "\nend\n" }
 	chunks := func(s string, n int) string {
 		var parts []string
@@ -74,7 +75,7 @@ func TestScanAttachmentEncodingMatrix(t *testing.T) {
 		"split by a comma":           token[:10] + "," + token[10:],
 		"fragments out of order":     token[10:] + "\n" + token[:10],
 		"base64 three layers deep":   base64.StdEncoding.EncodeToString([]byte(base64.StdEncoding.EncodeToString([]byte(b64)))),
-		"the documentation key":      "AKIA" + "IOSFODNN7" + "EXAMPLE",
+		"the documentation key":      faketoken.AWS("IOSFODNN7EXAMPLE"),
 		"ordinary prose":             "The release is tagged and the team checked everything twice.",
 		"a long word":                "internationalizationandlocalizationofthesoftware",
 		"a uuid and a sha":           "id 3f2b8c1e-9d4a-4b7e-8a61-5c2d9e0f1a3b sha 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",

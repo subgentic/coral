@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"github.com/subgentic/coral/internal/faketoken"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -165,7 +166,7 @@ func TestGoalLinksAnswersTheAcceptedRequestsOfThatAskerAndNothingElse(t *testing
 	l := got.Rows[0]
 	assert.EqualValues(t, task.ID, l["task_id"])
 	assert.Equal(t, "Build the importer "+redact.Marker, l["title"], "the title's token is redacted")
-	assert.NotContains(t, rec.Body.String(), "ghp"+"_abcdefghijklmnopqrstuvwxyz0123456789")
+	assert.NotContains(t, rec.Body.String(), faketoken.GitHub("abcdefghijklmnopqrstuvwxyz0123456789"))
 	assert.Equal(t, "pending", l["task_status"])
 	assert.Equal(t, "accepted", l["request_state"])
 	assert.Equal(t, "Dev B", l["assignee"])

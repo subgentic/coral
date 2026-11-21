@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"github.com/subgentic/coral/internal/faketoken"
 	"net/http"
 	"strings"
 	"testing"
@@ -167,7 +168,7 @@ func TestRelaySendWithOnlyRefusedAutoFilesIsAPlainMessage(t *testing.T) {
 // #5504 (Security): a file with a secret in it is never sent because the text links it (the scan --attach does applies), and a text of very many links is looked at only so far.
 func TestRelaySendAutoAttachSkipsASecretFileAndBoundsTheLinksConsidered(t *testing.T) {
 	e := newRelayAttachEnv(t, true)
-	token := "ghp_" + "1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R"
+	token := faketoken.GitHub("1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P7q8R")
 	dirty := e.upload(alphaOrchSID, "# notes\ndeploy with token="+token+"\n")
 	clean := e.upload(alphaOrchSID, "# clean notes\n")
 	code, out, _ := e.relayText(alphaOrchSID, "m1", "dirty "+uri(dirty)+" clean "+uri(clean))

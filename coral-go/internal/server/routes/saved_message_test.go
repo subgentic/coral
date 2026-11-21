@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"github.com/subgentic/coral/internal/faketoken"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,7 @@ const (
 	sessAway = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee9"
 )
 
-const savedFakeToken = "ghp_" + "abcdefghijklmnopqrstuvwxyz0123456789"
+var savedFakeToken = faketoken.GitHub("abcdefghijklmnopqrstuvwxyz0123456789")
 
 type savedSources struct {
 	boardCalls, agentCalls []string

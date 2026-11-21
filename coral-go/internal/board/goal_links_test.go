@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/subgentic/coral/internal/faketoken"
 	"regexp"
 	"strings"
 	"testing"
@@ -125,7 +126,7 @@ func TestGoalLinksTitlesAreRedactedBoundedAndTheRowIsExactlyTheseFields(t *testi
 	ctx := context.Background()
 	rid, _ := acceptedRequest(t, s, ctx, "alpha", "beta", "Rotate key ghp"+"_abcdefghijklmnopqrstuvwxyz0123456789", "Dev")
 	reply, err := s.GoalLinks(ctx, rid, "", "alpha", "", 50, func(s string) string {
-		return strings.ReplaceAll(s, "ghp"+"_abcdefghijklmnopqrstuvwxyz0123456789", "[redacted]")
+		return strings.ReplaceAll(s, faketoken.GitHub("abcdefghijklmnopqrstuvwxyz0123456789"), "[redacted]")
 	})
 	require.NoError(t, err)
 	require.Len(t, reply.Accepted, 1)

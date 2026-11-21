@@ -3,6 +3,7 @@ package betterleaks
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/subgentic/coral/internal/faketoken"
 	"os"
 	"strings"
 	"testing"
@@ -35,7 +36,7 @@ func gapCases() []gapCase {
 	add("Provider tokens", "Anthropic, short (sk-ant-, 40)", "sk-ant-api03-"+pseudo(40, alnum+"-_", 5), pseudo(40, alnum+"-_", 5))
 	add("Provider tokens", "OpenAI-style (sk-, 48)", "sk-"+hi(48, 6), hi(48, 6))
 	add("Provider tokens", "AWS access key id (AKIA)", "aws_access_key_id = AKIA"+pseudo(16, "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", 7), pseudo(16, "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", 7))
-	add("Provider tokens", "AWS documentation key", "AKIA"+"IOSFODNN7"+"EXAMPLE", "IOSFODNN7"+"EXAMPLE")
+	add("Provider tokens", "AWS documentation key", faketoken.AWS("IOSFODNN7EXAMPLE"), "IOSFODNN7"+"EXAMPLE")
 	add("Provider tokens", "Slack bot (real shape)", "xoxb-"+pseudo(11, "0123456789", 8)+"-"+pseudo(12, "0123456789", 9)+"-"+hi(24, 10), hi(24, 10))
 	add("Provider tokens", "Slack-like (xoxb-, loose)", "xoxb-"+pseudo(30, alnum+"-", 11), pseudo(30, alnum+"-", 11))
 	add("Provider tokens", "Stripe live key", "sk_live_"+hi(24, 12), hi(24, 12))

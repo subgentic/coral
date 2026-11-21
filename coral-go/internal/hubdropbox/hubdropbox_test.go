@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"github.com/subgentic/coral/internal/faketoken"
 	"io"
 	"net/http"
 	"strings"
@@ -83,7 +84,7 @@ func TestReadOnce_ReadsTheSourceOnlyToItsEnd(t *testing.T) {
 }
 
 // canaryPAT is built at run time so no token-shaped literal sits in the source (gitleaks).
-var canaryPAT = "ghp_" + "a1B2c3D4e5F6g7H8" + "i9J0k1L2m3N4o5P6q7R8"
+var canaryPAT = faketoken.GitHub("a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8")
 
 func TestFlagged_CanarySecretAndCleanText(t *testing.T) {
 	f, err := ReadOnce(strings.NewReader("notes\nAuthorization: Bearer " + canaryPAT + "\n"))
