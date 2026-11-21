@@ -49,7 +49,7 @@ type HealthSettings struct {
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
 	// Deviations flags, in the orchestrator's check, a task, a silence or a wait far past its own history (#11729): once at the crossing, again at each doubling.
-	Deviations HealthRuleOn `json:"deviations"`
+	Deviations HealthDeviations `json:"deviations"`
 	// ActionList holds the thresholds of the check's action list (#11729): a zero field is its default.
 	ActionList HealthActionList `json:"action_list"`
 	// Landing puts a line in the health check (off by default, #8942, goal #80) when the branch work lands on (Branch, "main" by default) has not moved for WaitMin although tasks were approved or completed
@@ -245,6 +245,19 @@ type HealthGoalSize struct {
 	Limit int  `json:"limit"`
 }
 
+// HealthDeviations is the deviation rule (#11729) with the knobs it did not have (#20398): a floor under which nothing is flagged however short the usual is (a task of a minute's usual was flagged at 22
+// minutes), how far past the usual a thing must be (a percent of the threshold the rule always used), and how much history it needs. The defaults are what the rule did before: no floor, 100 percent, and the
+// samples it always needed (5 finished tasks, 2 gaps, 3 earlier waits); MinSamples only raises those.
+type HealthDeviations struct {
+	HealthRuleOn
+	MinAgeMin  int `json:"min_age_min"`
+	FactorPct  int `json:"factor_pct"`
+	MinSamples int `json:"min_samples"`
+}
+
+// DeviationFactorDefault is 100 percent: the threshold the rule always used.
+const DeviationFactorDefault = 100
+
 // HealthRuleOn is a rule that is only on or off.
 type HealthRuleOn struct {
 	RuleRoute
@@ -367,7 +380,7 @@ func DefaultHealthSettings() HealthSettings {
 		StaleSweepHours: DefaultStaleSweepHours,
 		ParkLimit:       DefaultParkLimit,
 		AskReminder:     HealthMentionNudge{On: true, AfterMin: 15},
-		Deviations:      HealthRuleOn{On: true},
+		Deviations:      HealthDeviations{HealthRuleOn: HealthRuleOn{On: true}, FactorPct: DeviationFactorDefault},
 		ActionList:      HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
 		Landing:         HealthLanding{On: false, Branch: "main", WaitMin: 120},
 		Release:         HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},
@@ -449,6 +462,9 @@ func (h HealthSettings) Clamp() HealthSettings {
 	}
 	h.AutoRecommend.GraceMin = min(max(h.AutoRecommend.GraceMin, 1), AutoRecommendGraceMax)
 	h.UnownedTasks.MaxList = pickInt(h.UnownedTasks.MaxList, UnownedMaxListDefault, 1, 20)
+	h.Deviations.MinAgeMin = min(max(h.Deviations.MinAgeMin, 0), 1440)
+	h.Deviations.FactorPct = pickInt(h.Deviations.FactorPct, DeviationFactorDefault, 100, 1000)
+	h.Deviations.MinSamples = min(max(h.Deviations.MinSamples, 0), 50)
 	h.OffBooks.PostGraceMin = pickInt(h.OffBooks.PostGraceMin, OffBooksPostGraceDefault, 1, 30)
 	h.OffBooks.MaxLines = pickInt(h.OffBooks.MaxLines, OffBooksMaxLinesDefault, 1, 20)
 	h.PoolReview.AfterMin = pickInt(h.PoolReview.AfterMin, PoolReviewAfterDefault, 5, 1440)
