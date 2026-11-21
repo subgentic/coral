@@ -289,8 +289,8 @@ func (s *CloudStore) MirrorLegacyLink(ctx context.Context) error {
 }
 
 func (s *CloudStore) refreshLink(ctx context.Context, linkID string, row legacyRow) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE cloud_link SET label = ?, state = CASE WHEN state = ? THEN state ELSE ? END, owner_account = ?, owner_user = ?, owner_adopted_at = ?, last_error = ? WHERE link_id = ?`,
-		row.Label, LinkStatePaused, row.State, row.HubOwner.String, row.HubOwnerUser.String, nullStr(row.HubOwnerAdopt), nullStr(row.LastError), linkID)
+	_, err := s.db.ExecContext(ctx, `UPDATE cloud_link SET label = ?, state = CASE WHEN state IN (?, ?) THEN state ELSE ? END, owner_account = ?, owner_user = ?, owner_adopted_at = ?, last_error = ? WHERE link_id = ?`,
+		row.Label, LinkStatePaused, LinkStateRemoving, row.State, row.HubOwner.String, row.HubOwnerUser.String, nullStr(row.HubOwnerAdopt), nullStr(row.LastError), linkID)
 	return err
 }
 
