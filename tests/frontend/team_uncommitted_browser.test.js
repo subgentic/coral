@@ -1,4 +1,4 @@
-// A team's uncommitted work (#17203, slice 1): the team page says "Files changed in <folder>, not committed: N changed, M new" with Review changes and Commit; Commit asks for a message (the goal's title),
+// A team's uncommitted work (#17203, slice 1): the team page names the team in "Files changed in <team>, not committed: N changed, M new" and shows the exact folder separately (#20371) with Review changes and Commit; Commit asks for a message (the goal's title),
 // says "unsigned local commit; git hooks are not run", leaves secret-looking files out unless ticked, shows git's output when it fails, and makes one commit (POST commit). The routes are stubbed. Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -23,7 +23,8 @@ const TEAM = `qa-uncommitted-${Date.now() % 100000}`;
         await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM); await settle(500);
         const q = (s) => `document.querySelector('#team-page-uncommitted ${s}')`;
         await waitFor(`!!${q('.team-uncommitted-words')}`, 'the uncommitted line', 8000);
-        assert.equal(await ev(`${q('.team-uncommitted-words')}.textContent`), 'Files changed in shop, not committed: 2 changed, 1 new');
+        assert.equal(await ev(`${q('.team-uncommitted-words')}.textContent`), `Files changed in ${TEAM}, not committed: 2 changed, 1 new`);
+        assert.equal(await ev(`${q('.team-uncommitted-folder')}.textContent`), '/work/shop', 'the exact folder is shown separately from the team label');
         assert.equal(await ev(`${q('.team-uncommitted-files')}.hidden`), true, 'the list is closed until asked');
         await ev(`${q('.team-uncommitted-review')}.click(); true`);
         assert.match(await ev(`${q('.team-uncommitted-files')}.textContent`), /a\.go[\s\S]*b\.go/, 'Review changes lists the files');
