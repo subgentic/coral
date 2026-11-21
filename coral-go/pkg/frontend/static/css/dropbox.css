@@ -53,3 +53,4 @@ dialog.dropbox-share-dialog .dropbox-share-choice > span, dialog.dropbox-share-d
 #settings-dropbox-key ol { margin: 6px 0 0; padding-left: 20px; }
 #settings-dropbox-key li { margin: 2px 0; overflow-wrap: anywhere; }
 #settings-dropbox-key summary { cursor: pointer; }
+#settings-modal #settings-google-title { margin: 0 0 4px; font-size: var(--fs-lg); font-weight: var(--fw-strong); } /* the block's title on the type scale, the same as Dropbox backup (#20265) */

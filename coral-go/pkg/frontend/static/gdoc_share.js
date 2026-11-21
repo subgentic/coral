@@ -1,6 +1,6 @@
 /* Share to Google Docs (#19996, goal #265; slice A of #20010): the dialog the file's More actions menu opens, next to Share via Dropbox and built the same way: a native
  * <dialog> (Escape, its × and Cancel close it; the focus goes back to the opener), one primary action at a time, every word ours and set as text. It is this computer's
- * Operator only (the server refuses everyone else), only for a Markdown file, and only while the experimental switch "Share to Google (experimental)" is on in Settings.
+ * Operator only (the server refuses everyone else), only for a Markdown file, and only while the experimental switch "Google sharing (experimental)" is on in Settings.
  * First press: a new Doc is made from the file; a later press on a newer version changes only what differs in the same Doc. The sign-in is kept on this computer; where it
  * is not, the dialog says so. Google's own words never reach the page. */
 import { el as mk } from './dom_el.js';
@@ -70,7 +70,7 @@ export async function openGdocDialog(opts) {
     const res = await call('GET', '/api/gdoc/status?id=' + hex);
     if (!dialog.open) return;
     f.body.replaceChildren();
-    if (res.status !== 200 || res.body.enabled !== true) { f.body.append(mk('p', null, 'Sharing to Google Docs is turned off. Turn on “Share to Google (experimental)” in Settings to use it.')); return; }
+    if (res.status !== 200 || res.body.enabled !== true) { f.body.append(mk('p', null, 'Sharing to Google Docs is turned off. Turn on “Google sharing (experimental)” in Settings to use it.')); return; }
     f.h.textContent = `Share ${opts.filename || 'this file'} to Google Docs`;
     if (res.body.connected !== true) {
         f.body.append(mk('p', null, 'Google is not connected on this computer, so nothing can be shared yet.'));
