@@ -1,4 +1,5 @@
 const { liveServer: liveOf, buildServersTable } = await importOnce('./server_table.js');
+const { startCell } = await importOnce('./computer_start.js'); // New agent, New team, New terminal on every row (#20388)
 /* Servers settings view (multi-server hub).
  *
  * A self-contained dialog, built on demand, to list / add / edit / test /
@@ -14,7 +15,6 @@ import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
 import { showToast } from './utils.js';
 import { HUB_FEATURES_OFF } from './server_status.js';
-import { startCell } from './computer_start.js'; // New agent, New team, New terminal on every row (#20388)
 import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
     statusMeta, escHtml, describeServerError, formatLastSeen, isValidServerId,

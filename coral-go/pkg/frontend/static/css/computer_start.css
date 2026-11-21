@@ -1,0 +1,7 @@
+/* New agent, New team, New terminal on a Computers row (#20388, mock #20111): loaded with the module, not at startup. */
+.computer-start { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; } /* New agent, New team, New terminal on a Computers row (#20388, mock #20111) */
+.computer-start-actions { display: flex; gap: 8px; }
+.computer-start-change { background: none; border: 0; padding: 0 2px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.computer-start-actions .btn { margin: 0; white-space: nowrap; }
+.computer-start-note { margin: 0; max-width: 20rem; color: var(--text-muted); font-size: var(--fs-base); text-align: right; }
+@media (max-width: 600px) { .computer-start, .computer-start-actions { width: 100%; align-items: stretch; } .computer-start-actions .btn { flex: 1 1 0; min-height: 44px; } .computer-start-note { text-align: left; max-width: none; } }
