@@ -22,6 +22,7 @@ import { importOnce } from './import_once.js';
 import { h } from './cloud.js';
 import { formatLastSeen, updateNotice, RELEASES_URL, DOWNLOAD_URL, serverVersion, serverAgentCount, belowMinimumText } from './server_status.js';
 import { accessChanged } from './hub_access.js';
+import { startCell } from './computer_start.js'; // New agent, New team, New terminal on every row (#20388)
 import { state } from './state.js';
 import { note } from './nav.js';
 import { serverFetch, sessionServer } from './server_base.js';
@@ -340,6 +341,13 @@ function serversTable(shown) {
         needs: s => { const n = needsCount(s); if (!n) return ''; const e = h('span', { className: 'cs-needs', text: String(n) }); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; },
         seen: s => seenWords(s),
         access: s => accessPicker(s, busy.has(s.id), `${rowId(s.id)}-access-help`),
+        start: s => {
+            const el = (tag, cls, text) => h(tag, { className: cls || '', ...(text != null ? { text } : {}) });
+            const online = s.online === true, view = effectiveOf(s) === 'view';
+            // the reason in words, not only grey buttons (mock #20111): offline says it, View says it with the way to change it
+            const reason = !online ? `Offline${s.last_seen ? ` since ${formatLastSeen(s.last_seen)}` : ''}. It can't start things until it is back.` : view ? 'Hub access is View.' : '';
+            return startCell(s.id, s.label || 'this computer', el, { reason, change: online && view ? { label: 'Change to Interact', run: () => setAccess(s, 'interact') } : null });
+        },
     };
     return buildServersTable(DT, {
         label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed computer',
@@ -351,6 +359,7 @@ function serversTable(shown) {
             { key: 'seen', foldLabel: true, label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
             { key: 'version', foldLabel: true, label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
             { key: 'access', foldLabel: true, label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
+            { key: 'start', label: 'Start', line: 3, width: '22rem', fixed: true, align: 'end', cell: cellOf.start },
         ],
         // The names the deep links, the focus keep and the suites read: the table keeps its own classes, these are hooks only (no rule in any stylesheet); they are put back whenever a sort draws the rows again.
         decorateHead: (th, c) => { th.classList.add('cs-th', `cs-col-${c.key}`); th.querySelector('.dt-sort')?.classList.add('cs-sort'); },
