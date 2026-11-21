@@ -181,6 +181,7 @@
 /* #20239: phone review metadata wraps before the earlier-versions link instead of clipping at the card edge. */
 @media (max-width: 760px) {
     .inbox-v4-row .inbox-phone-meta { white-space: normal; overflow-wrap: anywhere; }
+    .inbox-v4-row .inbox-phone-meta .inbox-review-earlier::before { content: none; }
 }
 
 /* #20239: four-line message previews; permission command boxes retain their separate reading gate. */
