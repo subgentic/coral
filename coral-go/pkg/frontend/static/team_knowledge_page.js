@@ -1,3 +1,4 @@
+import { responseUpdateError, splitKey } from './server_base.js';
 /* The team page's Knowledge tab (#7453 stage 3): what the team knows as a table (Entry, Updated, From), "Distill knowledge" in the bar, and a row opens the right sidebar with the entry (#7761).
  * An entry is the team's index or one agent's distilled notes (GET /api/teams/detail/{team}/knowledge), Markdown with a YAML front matter. The pane shows the front matter as a block of facts (type, title, tags as chips, the
  * time as words with the exact one on hover) and the rest through the safe renderer (safe_markdown.js, as the Inbox and a task's text): distilled from agents' words, it is never run as HTML here, and a link to another
@@ -44,13 +45,13 @@ async function load() {
     await loadStyles('knowledge_note.css'); // the two actions' margins and the note form, not at start (page_weight)
     if (team !== model.team) return;
     if (!model.data) { model.loading = true; draw(); }
-    let refused = false;
+    let refused = false, update = '';
     const data = await teamFetch(team, n => `/api/teams/detail/${encodeURIComponent(n)}/knowledge`)
-        .then(async r => { if (r.ok) return r.json(); refused = await refusedTooLarge(r); return null; }).catch(() => null);
+        .then(async r => { if (r.ok) return r.json(); update = (await responseUpdateError(r, splitKey(team).server))?.message || ''; refused = await refusedTooLarge(r); return null; }).catch(() => null);
     if (team !== model.team) return;
     model.loading = false; model.refused = refused;
     if (data) { model.data = data; model.failed = ''; hooks.onCount?.(entriesOf(data).length); }
-    else if (!refused) model.failed = 'The knowledge could not be read.';
+    else if (!refused) model.failed = update || 'The knowledge could not be read.';
     draw();
 }
 

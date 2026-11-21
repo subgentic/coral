@@ -80,8 +80,8 @@ export async function loadSessionNotes(sessionId) {
     } catch (e) {
         if (e.name === 'AbortError') return;
         console.error("Failed to load session notes:", e);
-        document.getElementById("notes-rendered").innerHTML =
-            '<div class="empty-notes">Failed to load notes</div>';
+        const note = document.createElement('div'); note.className = 'empty-notes'; note.textContent = e.code === 'coral_too_old' ? e.message : 'Failed to load notes';
+        document.getElementById('notes-rendered').replaceChildren(note);
     }
 }
 

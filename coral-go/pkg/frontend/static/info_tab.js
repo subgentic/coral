@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* The right sidebar's Info tab (#13917, goals #217 and #218): everything the Info dialog showed, in a tab of the agent's page, and the MCP servers (#9769), the skills the agent loaded (#13209) and its instruction and memory files
  * under it. The fields come from the info route for any computer, as they did in the dialog; the three sections are this computer's own agents only (their routes are the Operator's and never through Coral Hub), and a
  * refusal, a failure or an unread CLI leaves a section out. Read-only: a memory file opens on a click, as text. The Info button (the agent row's menu) opens this tab (openInfoTab); there is no dialog any more.
@@ -99,6 +100,9 @@ export async function showInfoTab() {
         if (sid) params.set('session_id', sid);
         const qs = params.toString() ? `?${params}` : '';
         const resp = await serverFetch(server, `/api/sessions/live/${encodeURIComponent(name)}/info${qs}`);
+        const update = await responseUpdateError(resp, server);
+        if (!current()) return;
+        if (update) { say(update.message); return; }
         const info = await resp.json();
         if (!current()) return;
         if (info.error) { showToast(info.error, true); say(info.error); return; }

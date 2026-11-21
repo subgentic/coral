@@ -1,3 +1,5 @@
+import { responseUpdateError } from './server_base.js';
+
 import { openTask } from './task_navigation.js';
 /* Token Usage Dashboard — token usage and cost UI */
 
@@ -250,9 +252,11 @@ async function _refreshCallMetrics(period, hours) {
     const el = document.getElementById('call-metrics-summary');
     if (!el) return;
     const label = (document.querySelector(`#cost-time-range option[value="${period}"]`)?.textContent || 'Last 24 hours').toLowerCase();
+    const readServer = machineNow();
     try {
         const response = await readNow(`/api/call-metrics/summary?hours=${hours}`, { cache: 'no-store' });
-        if (!response.ok) throw new Error('metrics unavailable');
+        if (!response.ok) throw await responseUpdateError(response, readServer) || new Error('metrics unavailable');
+        if (readServer !== machineNow()) return;
         const data = await response.json();
         const rows = shownCallMetrics(data.rows || []);
         // Metrics past the raw-row cap are not stored (#5359): say so, so a gap after a burst is not read as quiet (#5368).
@@ -275,7 +279,7 @@ async function _refreshCallMetrics(period, hours) {
             _numCol('errors', 'Errors', r => r.errors || 0, String, { foldFirst: true }),
             _numCol('avg_ms', 'Avg ms', r => Math.round(r.avg_duration_ms || 0), String, { foldFirst: true }),
         ], ['calls']) }).el);
-    } catch { emptyState(el, 'Call metrics unavailable', 'empty-state'); }
+    } catch (e) { if (readServer !== machineNow()) return; emptyState(el, e.code === 'coral_too_old' ? e.message : 'Call metrics unavailable', 'empty-state'); }
 }
 
 export function stopCostDashboard() {
@@ -391,6 +395,7 @@ async function _readCostDashboard({ force = false } = {}) {
     importOnce('./analytics_servers.js').then(m => m.showByComputer(document.getElementById('cost-by-computer'), sinceParam, period)).catch(e => console.error('[cost-dashboard] by computer:', e)); // this computer and each linked one (#16017): its own read, its own errors
     if (!isCloud()) showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time'), force); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors
 
+    const readServer = machineNow();
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([
             readNow(`/api/token-usage/summary${sinceParam}`).catch(() => null),
@@ -401,6 +406,14 @@ async function _readCostDashboard({ force = false } = {}) {
         ]);
 
         if (isCloud()) { const grantee = !!summaryResp && summaryResp.status === 403; _ownerOnly(grantee); if (grantee) return; }
+        const updateErrors = (await Promise.all([summaryResp, tsResp, teamResp, branchResp].filter(Boolean).map(r => responseUpdateError(r, readServer)))).filter(Boolean);
+        if (readServer !== machineNow()) return;
+        document.getElementById('cost-update-required')?.remove();
+        if (updateErrors.length) {
+            const line = document.createElement('p'); line.id = 'cost-update-required'; line.className = 'cost-note'; line.setAttribute('role', 'status');
+            line.textContent = [...new Set(updateErrors.map(e => e.message))].join('. ');
+            document.querySelector('#cost-page .cost-header')?.after(line);
+        }
         if (summaryResp && summaryResp.ok) {
             const data = await summaryResp.json();
             const t = data.totals || {};
@@ -524,12 +537,14 @@ async function _refreshSeries(view = _currentView()) {
     const host = document.getElementById(`cost-series-${view}`);
     if (!host) return;
     const untilMs = Date.now(), sinceMs = untilMs - _periodHours() * 3600000, interval = _periodInterval();
+    const readServer = machineNow();
     try {
         const resp = await readNow(`/api/token-usage/timeseries?since=${encodeURIComponent(new Date(sinceMs).toISOString())}&interval=${interval}&group_by=${v.group}`, { cache: 'no-store' });
-        if (!resp.ok) throw new Error('unavailable');
+        if (!resp.ok) throw await responseUpdateError(resp, readServer) || new Error('unavailable');
+        if (readServer !== machineNow()) return;
         const data = await resp.json();
         series.setData(view, { buckets: data.buckets || [], interval, sinceMs, untilMs });
-    } catch { series.setData(view, null, 'There is no chart to show right now. The table below is complete.'); }
+    } catch (e) { if (readServer !== machineNow()) return; series.setData(view, null, e.code === 'coral_too_old' ? e.message : 'There is no chart to show right now. The table below is complete.'); }
     const drawn = _seriesDraws[view] || 0;
     _rerender(view); // the table, whose draw ends with the chart's (and the swatches)
     if ((_seriesDraws[view] || 0) === drawn) _drawSeries(view); // no table was drawn (no rows, or a filter left none): the chart alone. One draw, not two: each reads the chart's width, a layout of the whole page (#9450: 70 of By agent's 270 ms of long tasks)
@@ -577,7 +592,8 @@ async function _refreshOverview() {
     const host = document.getElementById('cost-series-overview');
     if (!host) return;
     const hours = _periodHours(), untilMs = Date.now(), sinceMs = untilMs - hours * 3600000, interval = _periodInterval(), iso = ms => encodeURIComponent(new Date(ms).toISOString());
-    const read = async url => { const resp = await readNow(url, { cache: 'no-store' }); if (!resp.ok) throw new Error('unavailable'); return (await resp.json()).buckets || []; };
+    const readServer = machineNow();
+    const read = async url => { const resp = await readNow(url, { cache: 'no-store' }); if (!resp.ok) throw await responseUpdateError(resp, readServer) || new Error('unavailable'); return (await resp.json()).buckets || []; };
     try {
         const [now, byTeam, prior] = await Promise.all([
             read(`/api/token-usage/timeseries?since=${iso(sinceMs)}&interval=1d`),
@@ -589,10 +605,11 @@ async function _refreshOverview() {
         for (const [field, id] of Object.entries(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`), t = series.changeText(cur[field], before[field]); if (e) e.textContent = t; if (t) compared = true; }
         _setCompare(compared ? `Change against ${word}` : ''); // said once here, not on each tile
         series.setData('overview', { buckets: byTeam, interval, sinceMs, untilMs });
-    } catch {
+    } catch (e) {
+        if (readServer !== machineNow()) return;
         for (const id of Object.values(_CHANGE_CARDS)) { const e = document.getElementById(`cost-change-${id}`); if (e) e.textContent = ''; }
         _setCompare('');
-        series.setData('overview', null, 'There is no chart to show right now. The figures above are complete.');
+        series.setData('overview', null, e.code === 'coral_too_old' ? e.message : 'There is no chart to show right now. The figures above are complete.');
     }
     series.drawOverviewPanel(host, { phone: isPhoneLayout() });
 }

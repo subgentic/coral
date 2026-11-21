@@ -1,3 +1,4 @@
+const { computerUpdateMessage } = await importOnce('./computer_update_error.js');
 /* One plain card for every "cannot" state of a computer (#20207, mock #20178): what is true (the headline names the computer), why in a sentence, the next step as a button,
  * and the raw code folded into "Details for support", never the headline. The words are text, never markup. */
 import { importOnce } from './import_once.js';
@@ -66,4 +67,4 @@ export function computerCard({ state, server, what, detail = '', min = '', retry
 export const stateOfStatus = (server, status) => !machineOnline(server) ? 'offline' : status === 403 ? 'not-shared' : status === 404 ? 'old' : 'no-answer';
 
 /** One short phrase for a computer whose rows are left out of a merged list ("lab-pc may need a newer Coral"). */
-export const notShownText = (e, what) => { const name = machineLabel(e.server); return e.state === 'update-required' ? `${name} needs an update to share ${what}` : e.state === 'offline' ? `${name} is offline` : e.state === 'not-shared' ? `${name} does not share ${what}` : e.state === 'old' ? `${name} may need a newer Coral` : `${name} did not answer`; };
+export const notShownText = (e, what) => { const name = machineLabel(e.server); return e.state === 'update-required' ? computerUpdateMessage(e.server, e.min) : e.state === 'offline' ? `${name} is offline` : e.state === 'not-shared' ? `${name} does not share ${what}` : e.state === 'old' ? `${name} may need a newer Coral` : `${name} did not answer`; };

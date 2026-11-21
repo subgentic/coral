@@ -77,13 +77,13 @@ registerActions({
 });
 
 /** Replace the last chat immediately; a failed read must never leave another transcript on screen. */
-export function showHistoryReadState(retry = null) {
+export function showHistoryReadState(retry = null, message = '') {
     win = null;
     const c = box();
     if (!c) return;
     const line = document.createElement('div');
     line.className = 'empty-state empty-state-tight';
-    line.textContent = retry ? 'Could not load this chat. ' : 'Loading chat…';
+    line.textContent = message || (retry ? 'Could not load this chat. ' : 'Loading chat…');
     if (retry) {
         const button = document.createElement('button');
         button.type = 'button'; button.className = 'btn btn-small';

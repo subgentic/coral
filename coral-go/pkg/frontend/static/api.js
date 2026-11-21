@@ -1,3 +1,4 @@
+import { importOnce } from './import_once.js';
 /* REST API fetch functions */
 
 /* Multi-server routing (hub mode)
@@ -59,30 +60,19 @@ export async function apiFetch(url, options) {
         target = serverUrl(url, server);
     }
     const resp = await fetch(target, init);
-    if (!resp.ok) throw await httpError(resp);
+    if (!resp.ok) throw await httpError(resp, options?.server);
     return resp.json();
 }
 
 // The error for a refused answer: the server's own reason when it gives one ({"error": "..."}),
 // e.g. a per-action limit's "too many workflow runs, try again in 30 s" (#3435); otherwise the
 // status and the body.
-async function httpError(resp) {
-    const text = await resp.text().catch(() => '');
-    let reason = '';
-    try { const body = JSON.parse(text); if (body && typeof body.error === 'string') reason = body.error; } catch { /* not JSON */ }
-    const error = new Error(reason || `${resp.status}: ${text || resp.statusText}`);
-    error.status = resp.status;
-    error.body = text;
-    return error;
-}
+async function httpError(resp, server) { return (await importOnce('./computer_update_error.js')).httpError(resp, server); }
 
 /** Send JSON to a same-origin route and read the answer without throwing for an HTTP refusal (#3948, moved here from password_ui.js so a startup module can use it). Resolves
  *  {ok, status, data, retryAfter}; data is the parsed body or {}. A DELETE sends no body. */
 export async function sendJson(method, url, body) {
-    const resp = await fetch(url, { method, headers: method === 'DELETE' ? {} : { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: method === 'DELETE' ? undefined : JSON.stringify(body || {}) });
-    let data = {};
-    try { data = await resp.json(); } catch { /* an empty or non-JSON body */ }
-    return { ok: resp.ok, status: resp.status, data: data || {}, retryAfter: resp.headers.get('Retry-After') };
+    return (await importOnce('./json_requests.js')).sendJson(method, url, body);
 }
 
 export function postJson(url, body) { return sendJson('POST', url, body); }
@@ -156,27 +146,14 @@ export async function loadHistorySessionsPaged(page = 1, pageSize = 50) {
         if (isCloud()) {
             renderHistorySessions([], 0, page, pageSize);
             const empty = document.querySelector('#history-sessions-list .empty-state');
-            if (empty) empty.textContent = historyServer() ? 'Could not load chats from this computer.' : 'No computers online.';
+            if (empty) empty.textContent = e.code === 'coral_too_old' ? e.message : historyServer() ? 'Could not load chats from this computer.' : 'No computers online.';
         }
         return null;
     }
 }
 
 export async function loadHistoryMessages(sessionId, options = {}) {
-    try {
-        const params = new URLSearchParams();
-        if (options.limit != null) params.set('limit', String(options.limit));
-        if (options.offset != null) params.set('offset', String(options.offset));
-        const qs = params.toString() ? `?${params}` : '';
-        const source = historyServer();
-        const response = await historyFetch(`/api/sessions/history/${encodeURIComponent(sessionId)}${qs}`);
-        if (!response.ok) throw await httpError(response);
-        const data = await response.json();
-        return source === historyServer() ? data : null;
-    } catch (e) {
-        if (e.name === 'AbortError') return;
-        if (options.throwOnError) throw e;
-        console.error("Failed to load history messages:", e);
-        return null;
-    }
+    const source = historyServer(), reader = await importOnce('./history_message_api.js');
+    if (source !== historyServer()) return;
+    return reader.loadHistoryMessages(sessionId, options);
 }

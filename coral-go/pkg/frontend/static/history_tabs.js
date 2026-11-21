@@ -12,6 +12,7 @@ const historyFilterHidden = historyEventsView.hidden;
 let historyEvents = [];
 let historyTasks = [];
 let historyAgentNotes = [];
+let eventsUpdate = '', tasksUpdate = '', notesUpdate = '';
 
 function isEventVisible(ev) {
     return eventVisible(ev, historyFilterHidden);
@@ -22,13 +23,14 @@ function isEventVisible(ev) {
 export async function loadHistoryEvents(sessionId) {
     setHistoryEventsSession(sessionId);
     historyFilterHidden.clear();
-    historyEvents = [];
+    historyEvents = []; eventsUpdate = '';
     historyEventsView.events = historyEvents;
     try {
         const resp = await historyFetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/events?limit=200`);
         historyEvents = await resp.json();
     } catch (e) {
         if (e.name === 'AbortError') return;
+        eventsUpdate = e.code === 'coral_too_old' ? e.message : '';
         historyEvents = [];
     }
     historyEventsView.events = historyEvents;
@@ -48,6 +50,7 @@ function renderHistoryEventTimeline() {
     const container = document.getElementById('history-events-list');
     if (!container) return;
 
+    if (eventsUpdate) { container.replaceChildren(Object.assign(document.createElement('p'), { className: 'empty-state', textContent: eventsUpdate })); return; }
     // A search of the session's events (the bar above the list) shows its results in place of the list
     if (syncHistoryEventSearch(renderHistoryEventTimeline)) return;
 
@@ -68,12 +71,13 @@ function renderHistoryEventTimeline() {
 // ── Tasks ─────────────────────────────────────────────────────────────────
 
 export async function loadHistoryTasks(sessionId) {
-    historyTasks = [];
+    historyTasks = []; tasksUpdate = '';
     try {
         const resp = await historyFetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/tasks`);
         historyTasks = await resp.json();
     } catch (e) {
         if (e.name === 'AbortError') return;
+        tasksUpdate = e.code === 'coral_too_old' ? e.message : '';
         historyTasks = [];
     }
 
@@ -90,6 +94,7 @@ function renderHistoryTaskList() {
     const list = document.getElementById('history-task-list');
     if (!list) return;
 
+    if (tasksUpdate) { list.replaceChildren(Object.assign(document.createElement('p'), { className: 'empty-state', textContent: tasksUpdate })); return; }
     if (historyTasks.length === 0) {
         list.innerHTML = '<div class="empty-state empty-state-tight">No tasks recorded</div>';
         return;
@@ -111,12 +116,13 @@ function renderHistoryTaskList() {
 // ── Agent Notes ───────────────────────────────────────────────────────────
 
 export async function loadHistoryAgentNotes(sessionId) {
-    historyAgentNotes = [];
+    historyAgentNotes = []; notesUpdate = '';
     try {
         const resp = await historyFetch(`/api/sessions/history/${encodeURIComponent(sessionId)}/agent-notes`);
         historyAgentNotes = await resp.json();
     } catch (e) {
         if (e.name === 'AbortError') return;
+        notesUpdate = e.code === 'coral_too_old' ? e.message : '';
         historyAgentNotes = [];
     }
 
@@ -130,6 +136,7 @@ function renderHistoryAgentNotes() {
     const container = document.getElementById('history-note-list');
     if (!container) return;
 
+    if (notesUpdate) { container.replaceChildren(Object.assign(document.createElement('p'), { className: 'empty-state', textContent: notesUpdate })); return; }
     if (historyAgentNotes.length === 0) {
         container.innerHTML = '<div class="empty-notes">No agent notes recorded</div>';
         return;

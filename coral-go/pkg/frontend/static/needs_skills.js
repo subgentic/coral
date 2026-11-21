@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* A skill waiting for the Operator's approval is an item of the Inbox's Needs you (#12139, goal #191): one row for each, from the Skills Store's own list (this computer only: the Hub has no such route). A row says
  * which skill and who published it (the agent and team from the session) and opens the Skills tab at that skill. */
 // Only the no-import gap module: inbox_tab.js sums the count at load, and a module this one imported could be loading it (a circle left the count uninitialised).
@@ -19,7 +20,7 @@ export async function loadPendingSkills({ hub = false, sources = [], urlOf = nul
         await Promise.all(servers.map(async server => {
             try {
                 const r = await fetch(urlOf ? urlOf('/api/needs-you?kind=skill', server) : '/api/needs-you?kind=skill');
-                if (!r.ok) { gap('skills', server, false); if (r.status === 401 || r.status === 403) byServer.set(server, { rows: [], count: 0 }); return; } // access taken away: none drawn, and the note says so
+                if (!r.ok) { gap('skills', server, false, false, (await responseUpdateError(r, server))?.message || ''); if (r.status === 401 || r.status === 403) byServer.set(server, { rows: [], count: 0 }); return; } // access taken away: none drawn, and the note says so
                 const d = await r.json();
                 if (!d || !Array.isArray(d.items)) { gap('skills', server, false); return; } // not a list: not "nothing waiting"
                 const rows = d.items.filter(i => i && i.kind === 'skill' && typeof i.id === 'string').map(i => ({ id: i.id, hub: true, server, line: String(i.line || ''), publisher_agent: i.from || '', publisher_team: i.team || '', created_at: i.at || '' }));

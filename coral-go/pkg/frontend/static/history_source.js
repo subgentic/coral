@@ -1,3 +1,4 @@
+import { responseUpdateError } from './server_base.js';
 /* A linked computer's read-only history on Coral Hub. Local dashboards keep
  * their own history; a remote selection is explicit in the picker and URL. */
 import { state } from './state.js';
@@ -49,6 +50,12 @@ export async function historyFetch(url, options) {
         if (server !== historyServer()) throw new DOMException('The selected computer changed.', 'AbortError');
     };
     checkSource();
+    if (response.status === 409) {
+
+        const update = await responseUpdateError(response, server);
+        checkSource();
+        if (update) throw update;
+    }
     // The source can change while the body is being decoded as well as while
     // waiting for headers. Never paint an old computer's reply into a new one.
     for (const method of ['json', 'text']) {
