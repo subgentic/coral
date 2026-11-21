@@ -15,8 +15,6 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
-	{"device_keys", "link", "TEXT NOT NULL DEFAULT ''"},            // #20513 M1: the Hub link the computer set for this key; '' is the owner's own key, made at this computer
-	{"device_keys", "hub_user", "TEXT NOT NULL DEFAULT ''"},        // #20513 M1: the Hub label of the person it belongs to
 	{"cloud_link", "source", "TEXT NOT NULL DEFAULT 'enrollment'"}, // #20368: 'enrollment' is the link the one enrollment mirrors (its cap is the setting), 'added' a link added at this computer (its own cap); the enrollment's save, delete and mirror touch only the first kind
 	{"gdoc_comment_map", "seen", "INTEGER NOT NULL DEFAULT 1"},     // the last pull saw this Google comment (#20012): an upgrade from a build that made the table without it
 	{"chief_checks", "origin", "TEXT NOT NULL DEFAULT 'chief'"},    // who set the check (#19162): 'chief' for Chief's own checks, else 'operator', 'agent' or 'orchestrator' for a reminder

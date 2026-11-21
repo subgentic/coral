@@ -145,7 +145,7 @@ func (m *Manager) recordBootstrapDevice(ctx context.Context, pkB64 string) {
 	if err != nil || len(raw) != 65 {
 		return
 	}
-	_, err = m.o.Devices.AddDeviceKey(ctx, store.DeviceKey{KID: devicekey.KIDOf(raw), PK: raw, Label: "Bootstrap device", Mode: "view", Origin: store.DeviceOriginBootstrap, Kind: store.DeviceKindDevice}, m.o.Now())
+	_, err = m.o.Devices.AddDeviceKey(ctx, store.DeviceKey{KID: devicekey.KIDOf(raw), PK: raw, Label: "Bootstrap device", Mode: "view", Origin: store.DeviceOriginBootstrap, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}, m.o.Now())
 	if err != nil {
 		m.o.Logger.Warn("cloud: could not list the bootstrap device key")
 	}

@@ -77,7 +77,7 @@ func newRig(t *testing.T) *rig {
 func (r *rig) add(s signer, mode, origin, kind string) {
 	r.t.Helper()
 	raw, _ := b64.DecodeString(s.pk)
-	_, err := r.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: s.kid, PK: raw, Label: "dev", Mode: mode, Origin: origin, Kind: kind}, t0.Add(-time.Hour))
+	_, err := r.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: s.kid, PK: raw, Label: "dev", Mode: mode, Origin: origin, Kind: kind, Link: store.PairOwner, HubUser: store.PairOwner}, t0.Add(-time.Hour))
 	require.NoError(r.t, err)
 }
 
@@ -423,7 +423,7 @@ func TestNonceRepeatSurvivesARestart(t *testing.T) {
 	for i, k := range []signer{s, target} {
 		raw, _ := b64.DecodeString(k.pk)
 		mode := []string{"interact", "view"}[i]
-		_, err = ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: k.kid, PK: raw, Label: "d", Mode: mode, Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, t0.Add(-time.Hour))
+		_, err = ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: k.kid, PK: raw, Label: "d", Mode: mode, Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}, t0.Add(-time.Hour))
 		require.NoError(t, err)
 	}
 	comp := devicekey.ComputerFingerprint([]byte("0123456789abcdef0123456789abcdef"))
@@ -601,7 +601,7 @@ func TestRemovalIsNeverRefusedForTheCeiling(t *testing.T) {
 	for i := 0; i < 1000 && !full; i++ {
 		s := newSigner(t)
 		raw, _ := b64.DecodeString(s.pk)
-		if _, err := r.ss.AddDeviceKey(ctx, store.DeviceKey{KID: s.kid, PK: raw, Label: "d", Mode: "view", Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, t0); err != nil {
+		if _, err := r.ss.AddDeviceKey(ctx, store.DeviceKey{KID: s.kid, PK: raw, Label: "d", Mode: "view", Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}, t0); err != nil {
 			require.ErrorIs(t, err, store.ErrKeyLimit)
 			full = true
 			break

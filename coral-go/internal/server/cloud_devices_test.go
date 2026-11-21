@@ -22,7 +22,7 @@ func seedDevice(t *testing.T, ss *store.SessionStore, n byte, mode string) strin
 	pk[0], pk[1] = 0x04, n
 	sum := sha256.Sum256(pk)
 	kid := base64.RawURLEncoding.EncodeToString(sum[:])
-	_, err := ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: kid, PK: pk, Label: "Laptop", Mode: mode, Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, time.Now())
+	_, err := ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: kid, PK: pk, Label: "Laptop", Mode: mode, Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}, time.Now())
 	require.NoError(t, err)
 	return kid
 }

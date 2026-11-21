@@ -33,7 +33,7 @@ func dkKey(n int, kind, origin string) store.DeviceKey {
 	pk[1] = byte(n)
 	pk[2] = byte(n >> 8)
 	sum := sha256.Sum256(pk)
-	return store.DeviceKey{KID: base64.RawURLEncoding.EncodeToString(sum[:]), PK: pk, Label: fmt.Sprintf("dev %d", n), Mode: "launch", Origin: origin, Kind: kind}
+	return store.DeviceKey{KID: base64.RawURLEncoding.EncodeToString(sum[:]), PK: pk, Label: fmt.Sprintf("dev %d", n), Mode: "launch", Origin: origin, Kind: kind, Link: store.PairOwner, HubUser: store.PairOwner}
 }
 
 func TestDeviceKeyAddAndReadBack(t *testing.T) {
@@ -488,4 +488,37 @@ func TestDeviceClearPendingIsKeptUntilAClearWorks(t *testing.T) {
 	require.NoError(t, ss.SetDeviceClearPending(ctx, true), "setting twice is fine")
 	require.NoError(t, ss.SetDeviceClearPending(ctx, false))
 	assert.False(t, ss.DeviceClearPending(ctx))
+}
+
+// #20513: a key listed before the pair existed was made at this computer; the columns are added once and those rows are marked as the owner's. A row added later with no pair is never marked.
+func TestDeviceKeysListedBeforeThePairExistedBecomeTheOwnersOnceOnly(t *testing.T) {
+	path := t.TempDir() + "/s.db"
+	db, err := storetest.Open(t, path)
+	require.NoError(t, err)
+	ctx := context.Background()
+	// the old shape: no link and hub_user columns
+	for _, q := range []string{`ALTER TABLE device_keys RENAME TO device_keys_new`,
+		`CREATE TABLE device_keys (kid TEXT PRIMARY KEY, pk BLOB NOT NULL, label TEXT NOT NULL, mode TEXT NOT NULL, origin TEXT NOT NULL, kind TEXT NOT NULL, created_at INTEGER NOT NULL, last_used_at INTEGER, removed_at INTEGER, removed_reason TEXT)`,
+		`DROP TABLE device_keys_new`} {
+		_, err := db.ExecContext(ctx, q)
+		require.NoError(t, err, q)
+	}
+	k := dkKey(1, store.DeviceKindDevice, store.DeviceOriginPairing)
+	_, err = db.ExecContext(ctx, `INSERT INTO device_keys VALUES (?, ?, 'old', 'view', 'pairing', 'device', ?, NULL, NULL, NULL)`, k.KID, k.PK, dkT0.Unix())
+	require.NoError(t, err)
+
+	db, err = storetest.Open(t, path)
+	require.NoError(t, err)
+	ss := store.NewSessionStore(db)
+	got, err := ss.ActiveDeviceKey(ctx, k.KID, dkT0)
+	require.NoError(t, err)
+	assert.Equal(t, [2]string{store.PairOwner, store.PairOwner}, [2]string{got.Link, got.HubUser})
+	// a row left empty afterwards stays empty across another open
+	_, err = db.ExecContext(ctx, `UPDATE device_keys SET link = '', hub_user = ''`)
+	require.NoError(t, err)
+	db, err = storetest.Open(t, path)
+	require.NoError(t, err)
+	got, err = store.NewSessionStore(db).ActiveDeviceKey(ctx, k.KID, dkT0)
+	require.NoError(t, err)
+	assert.Equal(t, [2]string{"", ""}, [2]string{got.Link, got.HubUser}, "the backfill runs once, when the columns are added")
 }

@@ -176,6 +176,15 @@
    "body_sha256": "6c81a0225dfb1fbb0d33ace5a9bc524c35efac698f097876d60e1008c71b8191"
   },
   {
+   "name": "v3 send-to-agent as the Hub sends it (stripped path, query as sent)",
+   "action": "send-to-agent",
+   "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\":1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"link\":\"lnk_1\",\"hub_user\":\"hub-user-0a1b2c3d\",\"method\":\"POST\",\"path\":\"/api/board/team1/send?b=2\u0026a=%2F1\u0026a=0\",\"body_sha256\":\"6c81a0225dfb1fbb0d33ace5a9bc524c35efac698f097876d60e1008c71b8191\"}",
+   "signing_input_hex": "636f72616c2d6875622f6465766963652d6b6579732f332f73656e642d746f2d6167656e74007b226b6964223a22516d6d496c44486a45786c6d5f4b3971525846426c443753773174626b58726d4c4c4d35564739534e5645222c22636f6d7075746572223a226e336f722d6a326e53505956746d6d696666746e5f66364b2d3149477549596451665a496d5762654a4b67222c227473223a313830303030303030302c226e6f6e6365223a22626d3975593255744d545974596e6c305a584d684951222c226c696e6b223a226c6e6b5f31222c226875625f75736572223a226875622d757365722d3061316232633364222c226d6574686f64223a22504f5354222c2270617468223a222f6170692f626f6172642f7465616d312f73656e643f623d3226613d2532463126613d30222c22626f64795f736861323536223a2236633831613032323564666231666262306433336163653561396263353234633335656661633639386630393738373664363065313030386337316238313931227d",
+   "version": 3,
+   "request_body": "{\"text\":\"run the tests\",\"agent\":\"Backend Dev\"}",
+   "body_sha256": "6c81a0225dfb1fbb0d33ace5a9bc524c35efac698f097876d60e1008c71b8191"
+  },
+  {
    "name": "v3 refused: body is not the signed one",
    "action": "send-to-agent",
    "body": "{\"kid\":\"QmmIlDHjExlm_K9qRXFBlD7Sw1tbkXrmLLM5VG9SNVE\",\"computer\":\"n3or-j2nSPYVtmmifftn_f6K-1IGuIYdQfZImWbeJKg\",\"ts\":1800000000,\"nonce\":\"bm9uY2UtMTYtYnl0ZXMhIQ\",\"link\":\"lnk_1\",\"hub_user\":\"hub-user-0a1b2c3d\",\"method\":\"POST\",\"path\":\"/api/x\",\"body_sha256\":\"6c81a0225dfb1fbb0d33ace5a9bc524c35efac698f097876d60e1008c71b8191\"}",

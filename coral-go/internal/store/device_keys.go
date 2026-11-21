@@ -20,6 +20,9 @@ const (
 	DeviceOriginBootstrap = "bootstrap" // added by the bootstrap credential: never approves or raises
 	DeviceOriginNoProof   = "noproof"   // added without proof: neither adds passkeys nor approves
 
+	// PairOwner is the explicit marker, in both columns of the pair, of a key made at this computer by its owner (#20513). A pair that is empty or half a marker fails closed everywhere: nothing is assumed to be the owner's.
+	PairOwner = "(owner)"
+
 	DeviceRemoved = "removed"
 	DeviceExpired = "expired"
 
@@ -66,7 +69,21 @@ type DeviceKey struct {
 	HubUser string
 }
 
+// PairState says what the row's pair is: owner (both columns the marker), bound (a link and a Hub label, neither the marker) or neither (anything else, which every check refuses).
+func (k DeviceKey) PairState() (owner, bound bool) {
+	switch {
+	case k.Link == PairOwner && k.HubUser == PairOwner:
+		return true, false
+	case k.Link != "" && k.HubUser != "" && k.Link != PairOwner && k.HubUser != PairOwner && len(k.Link) <= 64 && len(k.HubUser) <= 25:
+		return false, true
+	}
+	return false, false
+}
+
 func (k DeviceKey) formOK() bool {
+	if o, b := k.PairState(); !o && !b {
+		return false
+	}
 	if len(k.PK) != 65 || k.PK[0] != 0x04 || len(k.Label) > deviceLabelMax || !validDeviceMode(k.Mode) {
 		return false
 	}

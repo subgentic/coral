@@ -246,6 +246,12 @@ func TestVectorsFile(t *testing.T) {
 		want = append(want, vector{Name: "v3 " + string(k), Action: string(k), Version: 3, Body: string(c), RequestBody: relayedVectorBody, BodySHA256: devicekey.BodySHA256([]byte(relayedVectorBody)),
 			SigningInputHex: hex.EncodeToString(devicekey.RelayedSigningInput(k, c))})
 	}
+	hubStyle := f.relayed(devicekey.SendToAgent, relayedVectorBody)
+	hubStyle.Method, hubStyle.Path = "POST", "/api/board/team1/send?b=2&a=%2F1&a=0" // browser: /api/remote/srv1/api/board/team1/send?...; the tunnel strips /api/remote/srv1; query as sent, not reordered or decoded
+	hc, err := hubStyle.Canonical()
+	require.NoError(t, err)
+	want = append(want, vector{Name: "v3 send-to-agent as the Hub sends it (stripped path, query as sent)", Action: "send-to-agent", Version: 3, Body: string(hc), RequestBody: relayedVectorBody, BodySHA256: devicekey.BodySHA256([]byte(relayedVectorBody)),
+		SigningInputHex: hex.EncodeToString(devicekey.RelayedSigningInput(devicekey.SendToAgent, hc))})
 	v3good, _ := f.relayed(devicekey.SendToAgent, relayedVectorBody).Canonical()
 	want = append(want,
 		vector{Name: "v3 refused: body is not the signed one", Action: "send-to-agent", Version: 3, Body: string(v3good), RequestBody: strings.Replace(relayedVectorBody, "run the tests", "run the tests ", 1), BodySHA256: devicekey.BodySHA256([]byte(relayedVectorBody)), Mismatch: true},

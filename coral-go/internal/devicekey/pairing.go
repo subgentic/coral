@@ -131,7 +131,7 @@ func CompletePairing(ctx context.Context, st PairingStore, secret []byte, userCo
 	if err != nil {
 		return "", err
 	}
-	added, err := st.AddDeviceKey(ctx, store.DeviceKey{KID: a.KID, PK: pk, Label: label, Mode: mode, Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice}, now)
+	added, err := st.AddDeviceKey(ctx, store.DeviceKey{KID: a.KID, PK: pk, Label: label, Mode: mode, Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}, now)
 	if err != nil {
 		return "", mapStoreErr(err)
 	}
