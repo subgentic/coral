@@ -88,26 +88,34 @@ const STUB = `(() => {
    assert.equal(await ev(`!!document.querySelector('#phone-fab')?.getClientRects().length`),false,'cloud Automations has no phone New button');
    fs.writeFileSync(dir+'/automations-phone.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));
   }
+  const CARDS = { 403: ['not-shared', 'Second computer does not share its automations with the Hub', 'Open Computers'], 404: ['old', "Second computer can't show automations here", 'Retry'], 500: ['no-answer', 'Second computer did not answer', 'Try again'] };
   for (const status of [403, 404, 500]) {
+   const [kind, headline, button] = CARDS[status];
    await ev(`window.__automationDeny=${status};true`); await route({view:'automations',folder:'jobs'});
-   await ready("Second computer can't show automations here. It may need a newer Coral.");
-   assert.equal(await ev(`document.querySelector('#scheduler-view .notice-error').textContent`), "Second computer can't show automations here. It may need a newer Coral.");
-   assert.ok(await ev(`!![...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Retry')`),'failed reads offer Retry');
+   await ready(headline);
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card')?.dataset.computerCard`), kind, `${status} is the ${kind} card`);
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`), headline);
+   assert.equal(await ev(`!!document.querySelector('#scheduler-view .notice-error') || /HTTP \\d{3}/.test(document.querySelector('#scheduler-view .computer-card').textContent.replace(/Details for support[\\s\\S]*/, ''))`), false, 'the headline and sentence never print an HTTP code or a red error');
+   assert.ok((await ev(`document.querySelector('#scheduler-view .computer-card-details').textContent`)).includes(String(status)), 'the raw code is folded into Details for support');
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-details').open`), false, 'Details for support is closed');
+   assert.ok(await ev(`!![...document.querySelectorAll('#scheduler-view .computer-card button')].find(b=>b.textContent===${JSON.stringify(button)})`), `${kind} offers ${button}`);
+   assert.ok(await ev(`!![...document.querySelectorAll('#scheduler-view .computer-card button')].find(b=>b.textContent==='Switch computer')`), 'the card offers Switch computer');
   }
   await ev('window.__automationDeny=0;true');
-  await ev(`document.querySelector('#scheduler-view .notice-error').nextElementSibling.click();true`); await ready('two job');
+  await ev(`window.__automationDeny=0;true`); await route({view:'automations',folder:'jobs'}); await ready('two job');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers.find(s=>s.id==='two').status='offline';window.__automationReads=[];return true;})`);
   for (const request of [{folder:'jobs'}, {folder:'workflows'}, {folder:'recent'}, {folder:'running'}, {folder:'failed'}, {folder:'jobs',id:1}, {folder:'workflows',id:2,run:9}]) {
-   await route({view:'automations',...request}); await ready("Second computer is offline, so its automations can't be read now.");
+   await route({view:'automations',...request}); await ready("Second computer is offline");
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card')?.dataset.computerCard`),'offline');
   }
   assert.deepEqual(await ev('window.__automationReads'),[],'an offline computer sends no list, detail, or run read');
   assert.equal(await ev(`document.querySelector('#cloud-automation-computer .computer-chip').textContent`),'Offline','an offline computer shows the one-word chip on the bar');
   assert.equal(await ev(`!!document.querySelector('#cloud-automation-computer .computer-bar-option[data-computer="two"]')`),true,'offline computers remain named and pickable in the list');
-  await ev(`[...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Retry').click();true`);
-  await ready("Second computer is offline, so its automations can't be read now.");
+  await ev(`[...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Try again').click();true`);
+  await ready("Second computer is offline");
   assert.deepEqual(await ev('window.__automationReads'),[],'Retry while offline sends no read');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers.find(s=>s.id==='two').status='online';return true;})`);
-  await ev(`[...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Retry').click();true`); await ready('Run 9');
+  await ev(`[...document.querySelectorAll('#scheduler-view button')].find(b=>b.textContent==='Try again').click();true`); await ready('Run 9');
   assert.ok((await ev('window.__automationReads')).length>0,'Retry after reconnect reads the selected computer');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers=[];window.__automationReads=[];return true;})`);
   await route({view:'automations',folder:'workflows'}); await ready('Link a computer');
