@@ -77,14 +77,15 @@ func (s *Store) SetSwitchByHub(ctx context.Context, project, key string, on bool
 	}
 	old := raw.Valid && raw.String == "true"
 	at := time.Now().UTC().Format(time.RFC3339)
+	via, _ := ActionViaFrom(ctx)
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO board_settings (project, key, value) VALUES (?, ?, ?)
 		 ON CONFLICT (project, key) DO UPDATE SET value = excluded.value`, project, key, fmt.Sprint(on)); err != nil {
 		return c, false, err
 	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO hub_operator_actions (at, hub_user, hub_user_id, method, path, project, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		at, hubUser, hubUserID, method, path, project, 200); err != nil {
+		`INSERT INTO hub_operator_actions (at, hub_user, hub_user_id, via_link, via_hub_user, method, path, project, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		at, hubUser, hubUserID, via.LinkID, via.HubUser, method, path, project, 200); err != nil {
 		return c, false, err
 	}
 	c = SwitchChange{Project: project, Key: key, Old: old, New: on, Via: SwitchViaHub, Who: hubUser, WhoID: hubUserID, At: at}
@@ -156,8 +157,9 @@ func (s *Store) RecordHubSettingsChange(ctx context.Context, project, hubUser, h
 	defer tx.Rollback()
 	at := time.Now().UTC().Format(time.RFC3339)
 	if recordAction { // not when the identity guard admitted the request as the Hub's Operator: it records that row itself, and one use of the Operator identity is one row
-		if _, err := tx.ExecContext(ctx, `INSERT INTO hub_operator_actions (at, hub_user, hub_user_id, method, path, project, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			at, hubUser, hubUserID, method, path, project, 200); err != nil {
+		via, _ := ActionViaFrom(ctx)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO hub_operator_actions (at, hub_user, hub_user_id, via_link, via_hub_user, method, path, project, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			at, hubUser, hubUserID, via.LinkID, via.HubUser, method, path, project, 200); err != nil {
 			return err
 		}
 	}

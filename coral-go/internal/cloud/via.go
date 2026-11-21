@@ -5,26 +5,20 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // Via is who a tunneled action is for (#20312, multi-Hub design v2 2.5, 2.6): the link it arrived on and the Hub person behind it. The link is the connector's own (it names the cloud_link whose
-// token opened the tunnel); the person is the stream's label and is attribution only: no tier, owner, grant or Allow answer reads it as authority.
-type Via struct {
-	LinkID  string // lnk-<8 hex>
-	HubUser string // hub-user-<8 hex>, or "" when the stream named no one (a read, or a Hub that did not say)
-}
-
-type viaKey struct{}
+// token opened the tunnel); the person is the stream's label and is attribution only: no tier, owner, grant or Allow answer reads it as authority. The type is the board's, where the records
+// that carry it are written.
+type Via = board.ActionVia
 
 // ViaFrom returns the pair a request carries. ok is false for a local request (no tunnel): a writer then records an empty pair, and a tunneled request that has none was already refused.
-func ViaFrom(ctx context.Context) (Via, bool) {
-	v, ok := ctx.Value(viaKey{}).(Via)
-	return v, ok
-}
+func ViaFrom(ctx context.Context) (Via, bool) { return board.ActionViaFrom(ctx) }
 
 // WithVia returns ctx carrying v (for the middleware and for tests of a writer).
-func WithVia(ctx context.Context, v Via) context.Context { return context.WithValue(ctx, viaKey{}, v) }
+func WithVia(ctx context.Context, v Via) context.Context { return board.WithActionVia(ctx, v) }
 
 // AllowFunc is the one check point for a tunneled action (design v2 2.3): the link and person, what is being done (the method) and to what (the path). It returns whether to go on and, when
 // not, a short reason. Today it allows every action; limits later go behind it with no route change.

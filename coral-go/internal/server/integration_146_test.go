@@ -61,7 +61,7 @@ func newInteg(t *testing.T) *integ {
 	}))
 	t.Cleanup(ths.Close)
 	cs, err := tunnel.Dial(ctx, "ws"+strings.TrimPrefix(ths.URL, "http"), "tok", tunnel.ClientOptions{
-		Handler:       &tunnel.LocalHandler{Redactor: secrets.Redactor(), BaseURL: local.URL, AllowRequest: tunnel.AllowRequest(cur), MaxMode: cur, ViaValue: cloud.ViaSecret()},
+		Handler:       &tunnel.LocalHandler{Redactor: secrets.Redactor(), BaseURL: local.URL, AllowRequest: tunnel.AllowRequest(cur), MaxMode: cur, ViaValue: cloud.ViaSecret(), LinkID: testLinkID},
 		AllowInsecure: true,
 	})
 	require.NoError(t, err)
@@ -276,6 +276,11 @@ func TestV146CrossTeamRoutesThroughTheRealConnectorAndTheRealRouter(t *testing.T
 	acts, err := g.srv.boardStore.RecentHubOperatorActions(context.Background(), 50)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(acts), 2, "recorded with the hub user")
+	// #20312: and with the link the real connector stamped, and the Hub person it took from the stream
+	for _, a := range acts[:2] {
+		assert.Equal(t, testLinkID, a.ViaLink, "the connection's own link: %+v", a)
+		assert.Equal(t, integOwner, a.ViaHubUser, "the person the stream named: %+v", a)
+	}
 	// everyone else is refused and nothing changes
 	forged := map[string]string{tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: integOwner, tunnel.ViaHeader: cloud.ViaSecret()}
 	for name, c := range map[string][3]any{
