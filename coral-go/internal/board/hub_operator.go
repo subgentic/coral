@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -47,6 +48,25 @@ func ActionViaFrom(ctx context.Context) (ActionVia, bool) {
 	return v, ok
 }
 
+// actionRecorded is a flag a request carries so the one wrapper that records tunneled writes (routes.RecordPairWrites, #20369) knows a handler already wrote the Operator-actions row for it and
+// records nothing a second time. It is set only by a writer of that row.
+type actionRecorded struct{ done atomic.Bool }
+
+type actionRecordedKey struct{}
+
+// WithActionRecordFlag returns ctx carrying a fresh flag and the flag itself.
+func WithActionRecordFlag(ctx context.Context) (context.Context, *atomic.Bool) {
+	f := &actionRecorded{}
+	return context.WithValue(ctx, actionRecordedKey{}, f), &f.done
+}
+
+// markActionRecorded says that the row for this request was written.
+func markActionRecorded(ctx context.Context) {
+	if f, ok := ctx.Value(actionRecordedKey{}).(*actionRecorded); ok {
+		f.done.Store(true)
+	}
+}
+
 // hubOperatorActionsKept bounds the table: the newest actions are kept.
 const hubOperatorActionsKept = 1000
 
@@ -83,6 +103,7 @@ func (s *Store) RecordHubOperatorAction(ctx context.Context, a HubOperatorAction
 	if v, ok := ActionViaFrom(ctx); ok && a.ViaLink == "" {
 		a.ViaLink, a.ViaHubUser = v.LinkID, v.HubUser
 	}
+	markActionRecorded(ctx)
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO hub_operator_actions (at, hub_user, hub_user_id, via_link, via_hub_user, method, path, project, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.At, a.HubUser, a.HubUserID, a.ViaLink, a.ViaHubUser, a.Method, a.Path, a.Project, a.Status)

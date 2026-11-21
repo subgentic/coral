@@ -78,6 +78,7 @@ func (s *Store) SetSwitchByHub(ctx context.Context, project, key string, on bool
 	old := raw.Valid && raw.String == "true"
 	at := time.Now().UTC().Format(time.RFC3339)
 	via, _ := ActionViaFrom(ctx)
+	markActionRecorded(ctx)
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO board_settings (project, key, value) VALUES (?, ?, ?)
 		 ON CONFLICT (project, key) DO UPDATE SET value = excluded.value`, project, key, fmt.Sprint(on)); err != nil {
