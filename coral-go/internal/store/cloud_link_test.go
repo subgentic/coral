@@ -325,8 +325,8 @@ func twoLinks(t *testing.T) (*CloudStore, string, string) {
 	links, err := cs.ListLinks(ctx)
 	require.NoError(t, err)
 	require.Len(t, links, 1)
-	_, err = db.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, owner_account, owner_user, created_at)
-		VALUES ('lnk-0000000b', 'https://hub-b.example.com', 'srv_b', 'Laptop B', 'v1:b-sealed', 'active', 'interact', 'all', 'acct-b', 'hub-user-0000000b', '2026-01-01T00:00:00Z')`)
+	_, err = db.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, owner_account, owner_user, created_at, source)
+		VALUES ('lnk-0000000b', 'https://hub-b.example.com', 'srv_b', 'Laptop B', 'v1:b-sealed', 'active', 'interact', 'all', 'acct-b', 'hub-user-0000000b', '2026-01-01T00:00:00Z', 'added')`)
 	require.NoError(t, err)
 	return cs, links[0].LinkID, "lnk-0000000b"
 }

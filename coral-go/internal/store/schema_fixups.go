@@ -15,12 +15,13 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
-	{"gdoc_comment_map", "seen", "INTEGER NOT NULL DEFAULT 1"},  // the last pull saw this Google comment (#20012): an upgrade from a build that made the table without it
-	{"chief_checks", "origin", "TEXT NOT NULL DEFAULT 'chief'"}, // who set the check (#19162): 'chief' for Chief's own checks, else 'operator', 'agent' or 'orchestrator' for a reminder
-	{"chief_checks", "created_by", "TEXT NOT NULL DEFAULT ''"},  // the name of whoever set it, as the reminder's notice says it
-	{"chief_checks", "paused", "INTEGER NOT NULL DEFAULT 0"},    // the Operator switched this agent's reminders off (#19288): the row stays, nothing is delivered until it is switched back on
-	{"agent_asks", "open_page", "TEXT NOT NULL DEFAULT ''"},     // the page of Coral the card offers a button for (#18768)
-	{"agent_asks", "dismissed_at", "TEXT"},                      // set when the Operator dismissed it: only such a question can be brought back by Undo (#18714)
+	{"cloud_link", "source", "TEXT NOT NULL DEFAULT 'enrollment'"}, // #20368: 'enrollment' is the link the one enrollment mirrors (its cap is the setting), 'added' a link added at this computer (its own cap); the enrollment's save, delete and mirror touch only the first kind
+	{"gdoc_comment_map", "seen", "INTEGER NOT NULL DEFAULT 1"},     // the last pull saw this Google comment (#20012): an upgrade from a build that made the table without it
+	{"chief_checks", "origin", "TEXT NOT NULL DEFAULT 'chief'"},    // who set the check (#19162): 'chief' for Chief's own checks, else 'operator', 'agent' or 'orchestrator' for a reminder
+	{"chief_checks", "created_by", "TEXT NOT NULL DEFAULT ''"},     // the name of whoever set it, as the reminder's notice says it
+	{"chief_checks", "paused", "INTEGER NOT NULL DEFAULT 0"},       // the Operator switched this agent's reminders off (#19288): the row stays, nothing is delivered until it is switched back on
+	{"agent_asks", "open_page", "TEXT NOT NULL DEFAULT ''"},        // the page of Coral the card offers a button for (#18768)
+	{"agent_asks", "dismissed_at", "TEXT"},                         // set when the Operator dismissed it: only such a question can be brought back by Undo (#18714)
 	// Dropbox stage 4b, retention (#14703): a database made by a build of stages 3 and 4 has these tables without the columns.
 	{"dropbox_connection", "retention_days", "INTEGER NOT NULL DEFAULT 0"},
 	{"dropbox_connection", "retention_since", "TEXT"},

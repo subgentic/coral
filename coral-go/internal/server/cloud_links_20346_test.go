@@ -3,6 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"net"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -277,4 +282,62 @@ func TestTheLinkListShowsTheLiveCapHoweverItWasSet(t *testing.T) {
 	ls, err := cs.ListLinks(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, "interact", ls[0].MaxMode, "the store's own list agrees")
+}
+
+// #20368: with two links, one link's removal never touches the other: its row, sealed token, cap and (for the enrollment's link) the enrollment itself stay, and the Manager keeps the other's connector.
+func twoLinkedRemote(t *testing.T) (*e2eRemote, *store.CloudStore, *cloud.Manager, store.CloudLink, store.CloudLink, *fakeRevoker) {
+	t.Helper()
+	rev := &fakeRevoker{answer: routes.RevokeRemoved}
+	r, cs, a := linkedRemote(t, rev)
+	store.AllowSecondLinkForTest(t)
+	b, err := cs.AddLink(context.Background(), "https://hub-b.example.com", "srv_b", "Laptop B", "tok-b", "interact")
+	require.NoError(t, err)
+	refuse := &http.Client{Transport: &http.Transport{DialContext: func(context.Context, string, string) (net.Conn, error) {
+		return nil, errors.New("no network in this test")
+	}}}
+	m := cloud.New(cloud.Options{HubURL: a.HubOrigin, Store: cs, HTTPClient: refuse, LocalBaseURL: "http://127.0.0.1:1", Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Backoff: tunnel.Backoff{Min: time.Hour, Max: time.Hour}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { m.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	require.Eventually(t, func() bool { return !m.Status().Loading }, 5*time.Second, 5*time.Millisecond)
+	r.srv.cloudHandler.SetManager(m)
+	return r, cs, m, a, *b, rev
+}
+
+func TestRemovingTheAddedLinkLeavesTheEnrollmentsLinkAndItsToken(t *testing.T) {
+	r, cs, m, a, b, rev := twoLinkedRemote(t)
+	ctx := context.Background()
+	js := map[string]string{"Content-Type": "application/json"}
+	require.Equal(t, 200, call(r.srv.Router(), "DELETE", "/api/cloud/links/"+b.LinkID, "", js).Code)
+	require.Equal(t, []string{b.HubOrigin + "|srv_b|tok-b"}, rev.calls, "only B's own token, to B's own Hub")
+	ls, _ := cs.ListLinks(ctx)
+	require.Len(t, ls, 1)
+	assert.Equal(t, a.LinkID, ls[0].LinkID)
+	tok, err := cs.LinkToken(ctx, a.LinkID)
+	require.NoError(t, err)
+	assert.Equal(t, "tok-a", tok)
+	conn, err := cs.Get(ctx)
+	require.NoError(t, err, "the enrollment of A is not disconnected by B's removal")
+	assert.Equal(t, "srv_a", conn.ServerID)
+	assert.NotEqual(t, cloud.StateOff, m.Status().State)
+	assert.Equal(t, cloud.StateIdle, m.LinkStatus(b.LinkID).State)
+}
+
+func TestRemovingTheEnrollmentsLinkLeavesTheAddedLink(t *testing.T) {
+	r, cs, m, a, b, rev := twoLinkedRemote(t)
+	ctx := context.Background()
+	js := map[string]string{"Content-Type": "application/json"}
+	require.Equal(t, 200, call(r.srv.Router(), "DELETE", "/api/cloud/links/"+a.LinkID, "", js).Code)
+	require.Equal(t, []string{a.HubOrigin + "|srv_a|tok-a"}, rev.calls)
+	ls, _ := cs.ListLinks(ctx)
+	require.Len(t, ls, 1)
+	assert.Equal(t, b.LinkID, ls[0].LinkID)
+	tok, err := cs.LinkToken(ctx, b.LinkID)
+	require.NoError(t, err)
+	assert.Equal(t, "tok-b", tok)
+	assert.Equal(t, "interact", ls[0].MaxMode)
+	assert.NotEqual(t, cloud.StateIdle, m.LinkStatus(b.LinkID).State, "B keeps its own connector")
+	assert.Equal(t, store.LinkStateActive, ls[0].State)
 }

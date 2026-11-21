@@ -167,6 +167,10 @@ type Manager struct {
 
 	devicePK atomic.Pointer[string] // the device public key this Coral redeemed with (#16726); memory only, public
 
+	// lmu guards extras: the connectors of the links added at this computer (manager_links.go, #20368), one each, apart from the enrollment's tunnel above.
+	lmu    sync.Mutex
+	extras map[string]*linkConn
+
 	mu       sync.Mutex
 	redeemMu sync.Mutex // one redeem at a time
 	root     context.Context
@@ -294,6 +298,7 @@ func (m *Manager) Run(ctx context.Context) {
 		m.startTunnel(conn)
 	}
 	m.markLoaded()
+	m.LinksChanged(ctx) // every other active link gets its own connector
 	<-ctx.Done()
 	m.mu.Lock()
 	m.stopLocked()
