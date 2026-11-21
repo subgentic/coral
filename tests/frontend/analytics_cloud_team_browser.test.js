@@ -27,6 +27,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`window.__seen.some(p => /^\\/api\\/remote\\/m1\\/api\\/analytics\\/activity\\?team=alpha-team&/.test(p))`, "the first computer's team is read through its tunnel", 10000);
         assert.ok(!/No team has a board yet/.test(await ev(`document.getElementById('cost-dashboard-view')?.textContent || document.body.textContent`)), 'the page does not say no team has a board');
         // a pick of the other computer: its team is read instead
+        await waitFor(`!!document.querySelector('#cost-computer-pick .computer-bar-option')`, 'the computer bar is drawn', 10000);
         await ev(`window.__seen.length = 0; (() => { const p = document.getElementById('cost-computer-pick'); p.querySelector('.computer-bar-button').click(); p.querySelector('.computer-bar-option[data-computer="m2"]').click(); return true; })()`);
         await waitFor(`window.__seen.some(p => /^\\/api\\/remote\\/m2\\/api\\/analytics\\/activity\\?team=beta-team&/.test(p))`, "the pick moves the read to the second computer's team", 10000);
         assert.ok(!(await ev(`window.__seen`)).some(p => /\/m1\/api\/analytics\/activity/.test(p)), 'the first computer is not read again after the pick');

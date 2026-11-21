@@ -67,7 +67,7 @@ function runTable(rows, kind, openRun, withComputer) {
     return DT.dataTable({ label: 'Runs', fold: 'labeled', rows, rowKey: r => `${r.kind || kind}-${r.id}`, rowName: r => itemName(r, kind), open: openRun,
         columns: [
             { key: 'name', label: 'Run', primary: true, width: 'grow', cell: r => { const b = primary(`Run ${word(r.id)} · ${itemName(r, r.kind || kind)}`, () => openRun(r)); b.dataset.cloudRun = ''; return b; } },
-            ...(withComputer ? [{ key: 'computer', label: 'Computer', width: '9rem', cell: r => machineLabel(r._server) }] : []),
+            ...(withComputer ? [{ key: 'which', label: 'Computer', width: '9rem', cell: r => machineLabel(r._server) }] : []),
             { key: 'status', label: 'Status', width: '8rem', cell: r => word(r.status) },
             { key: 'started', label: 'Started', width: '14rem', cell: r => dateOf(r.started_at || r.scheduled_at), dropAt: 28 },
         ], empty: 'No runs yet.' }).el;
@@ -139,7 +139,7 @@ export async function openAutomationsRoute(request = {}) {
                 panel.append(DT.dataTable({ label: names.get(folder), fold: 'labeled', rows, rowKey: r => r.id, rowName: r => String(r.name || ''), open,
                     columns: [
                         { key: 'name', label: folder === 'jobs' ? 'Job' : 'Workflow', primary: true, width: 'grow', cell: r => primary(String(r.name || ''), () => open(r)) },
-                        ...(everyone ? [{ key: 'computer', label: 'Computer', width: '9rem', cell: r => machineLabel(r._server) }] : []),
+                        ...(everyone ? [{ key: 'which', label: 'Computer', width: '9rem', cell: r => machineLabel(r._server) }] : []),
                         { key: 'state', label: 'State', width: '7rem', cell: r => r.paused ? 'Paused' : r.enabled ? 'On' : 'Off' },
                         { key: 'last', label: 'Last run', width: '9rem', cell: r => word(r.last_run?.status) },
                     ], empty: 'No automations found.' }).el, ...[notShown()].filter(Boolean));

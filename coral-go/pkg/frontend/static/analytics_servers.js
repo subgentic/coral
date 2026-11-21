@@ -69,7 +69,7 @@ function recall(id, period) {
     return memory.get(keyOf(id, period));
 }
 
-const computersNow = () => machineChoices().map(id => ({ id, label: machineLabel(id), online: machineOnline(id), lastSeen: id === 'local' ? '' : ((state.servers || []).find(s => s && s.id === id) || {}).last_seen || '' }));
+const computersNow = () => [...machineChoices()].sort((a, b) => (a === 'local' ? -1 : b === 'local' ? 1 : machineLabel(a).localeCompare(machineLabel(b)))).map(id => ({ id, label: machineLabel(id), online: machineOnline(id), lastSeen: id === 'local' ? '' : ((state.servers || []).find(s => s && s.id === id) || {}).last_seen || '' }));
 
 let reading = null, seq = 0;
 const tstate = tableState();
