@@ -14,6 +14,7 @@ import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
 import { showToast } from './utils.js';
 import { HUB_FEATURES_OFF } from './server_status.js';
+import { startCell } from './computer_start.js'; // New agent, New team, New terminal on every row (#20388)
 import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
     statusMeta, escHtml, describeServerError, formatLastSeen, isValidServerId,
@@ -166,6 +167,7 @@ function serversTable(local, remotes) {
             { key: 'needs', label: 'Needs you', width: '6rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
             { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 36, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
             { key: 'version', label: 'Version', width: '7.5rem', dropAt: 52, tone: 'tertiary', sort: true, sortValue: s => versionWords(s, live(s)), cell: s => versionWords(s, live(s)) || '\u2014' },
+            { key: 'start', label: 'Start', line: 3, width: '22rem', fixed: true, align: 'end', cell: s => startCell(isLocal(s) ? 'local' : s.id, s.label || s.id, DT.el) },
         ],
         open: s => { if (!isLocal(s)) { _open = s.id; _confirmDelete = null; _focusNext = 'back'; render(); } },
     }, { rowId: s => `server-row-${isLocal(s) ? 'local' : s.id}` });
