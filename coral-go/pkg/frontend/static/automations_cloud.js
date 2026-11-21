@@ -50,7 +50,7 @@ async function read(server, path, signal) {
     const response = await serverFetch(server, path, { signal });
     // Read error bodies too: failed reads must not leave streams in the pool.
     const data = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(`Could not read automations (HTTP ${response.status}).`);
+    if (!response.ok) throw new Error(`${titleOf(computers().find(s => s.id === server) || { id: server })} can't show automations here. It may need a newer Coral.`);
     if (!data || typeof data !== 'object') throw new Error('Could not read automations.');
     return data;
 }
