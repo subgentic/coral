@@ -8,3 +8,8 @@
 .dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-time { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: var(--fs-md); color: var(--text-secondary); }
 .dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-avatar:not(.dt-mail-tick) { width: 40px; height: 40px; color: var(--text-secondary); background: none !important; }
 .dt-box.dt-mail-on tr.dt-mailed .dt-mail-cell:has(> .dt-mail-open[data-goal-id]) .dt-mail-open.dt-primary { padding-block: 8px; }
+
+/* In phone selection mode, a tap anywhere in the card reaches its row toggle (#20309). */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
+    .inbox-needs-results .dt-selecting tr.dt-row :is(button, a) { pointer-events: none; }
+}
