@@ -356,6 +356,11 @@ b POST /api/board/{project}/goals/{goalID}/driver
 b POST /api/board/{project}/goals/{goalID}/move
 b POST /api/board/{project}/groups/{groupID}/members
 a POST /api/board/{project}/health/ack
+a DELETE /api/board/{project}/health/checks/{name}
+a GET /api/board/{project}/health/checks
+a POST /api/board/{project}/health/checks
+a POST /api/board/{project}/health/checks/{name}/pause
+a PUT /api/board/{project}/health/checks/{name}
 c POST /api/board/{project}/hub-notice
 a POST /api/board/{project}/messages
 a POST /api/board/{project}/messages/mark-read

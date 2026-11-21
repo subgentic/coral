@@ -12,6 +12,7 @@ DELETE /api/board/{project} launch
 DELETE /api/board/{project}/artifacts/{id}/review interact
 DELETE /api/board/{project}/cross-team-links never
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} never
+DELETE /api/board/{project}/health/checks/{name} never
 DELETE /api/board/{project}/messages/{messageID} launch
 DELETE /api/board/{project}/reminder interact
 DELETE /api/board/{project}/seats/{subscriberID} never
@@ -109,6 +110,7 @@ GET /api/board/{project}/groups never
 GET /api/board/{project}/groups/{groupID}/members never
 GET /api/board/{project}/guide-asks view
 GET /api/board/{project}/guide-roster launch
+GET /api/board/{project}/health/checks never
 GET /api/board/{project}/lifecycle-log launch
 GET /api/board/{project}/messages view
 GET /api/board/{project}/messages/all view
@@ -380,6 +382,8 @@ POST /api/board/{project}/goals/{goalID}/driver interact
 POST /api/board/{project}/goals/{goalID}/move interact
 POST /api/board/{project}/groups/{groupID}/members never
 POST /api/board/{project}/health/ack never
+POST /api/board/{project}/health/checks never
+POST /api/board/{project}/health/checks/{name}/pause never
 POST /api/board/{project}/hub-notice interact
 POST /api/board/{project}/messages interact
 POST /api/board/{project}/messages/mark-read never
@@ -574,6 +578,7 @@ PUT /api/auth/hub-signin never
 PUT /api/board/{project}/artifacts/{id}/review interact
 PUT /api/board/{project}/artifacts/{id}/tags interact
 PUT /api/board/{project}/guide-roster launch
+PUT /api/board/{project}/health/checks/{name} never
 PUT /api/board/{project}/orchestrator-grant launch
 PUT /api/board/{project}/settings launch
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never

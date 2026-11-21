@@ -18,6 +18,7 @@ var identityWords = map[string]bool{"subscriber": true, "session": true, "sender
 // notIdentityFields are decoded fields that look like an identity but do not say who a request is
 // from or for: each with why. A new one needs a line here, or to be added to identityKeys.
 var notIdentityFields = map[string]string{
+	"acts_as":            "custom health checks (#20176): the member a check speaks as; the route stores the board member's own spelling of it and refuses the Operator and any name that is not a member, so the request's spelling is never kept",
 	"promoted_by":        "written by the server into the upload record of an edit made in Dropbox that the Operator chose to use (#14714): the word operator, or auto_sync when auto-sync promoted it; read back from the data folder, never from a request",
 	"keep_assigned":      "task release (#11660): a flag, whether the released task stays with its owner; the owner is the task's own, never a name from the request",
 	"agent_type":         "which CLI to launch, not a participant",
