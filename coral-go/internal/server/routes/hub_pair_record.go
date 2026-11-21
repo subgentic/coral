@@ -69,7 +69,7 @@ func RecordPairWrites(bs *board.Store, set PairRecorded) func(http.Handler) http
 				return
 			}
 			if err := bs.RecordHubOperatorAction(context.WithoutCancel(ctx), board.HubOperatorAction{
-				HubUser: via.HubUser, Method: r.Method, Path: rc.RoutePattern(), Status: status,
+				HubUser: via.HubUser, Kind: board.HubActionKindWrite, Method: r.Method, Path: rc.RoutePattern(), Status: status,
 			}); err != nil {
 				slog.Warn("[cloud] could not record a Coral Hub write", "error", err)
 			}

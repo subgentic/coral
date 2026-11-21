@@ -21,10 +21,13 @@ type HubOperatorAction struct {
 	// Both are "" for an action recorded before this and for a local action. The pair is attribution only, never authority.
 	ViaLink    string `db:"via_link" json:"via_link,omitempty"`
 	ViaHubUser string `db:"via_hub_user" json:"via_hub_user,omitempty"`
-	Method     string `db:"method" json:"method"`
-	Path       string `db:"path" json:"path"`
-	Project    string `db:"project" json:"project"`
-	Status     int    `db:"status" json:"status"`
+	// Kind is "" for the security rows (a use of the Operator identity, a switch, a device key, the cloud link) and HubActionKindWrite for the one-line row the write wrapper leaves for a tunneled write
+	// (#20369). Each kind has its own bound, so a flood of writes can never push a security row out.
+	Kind    string `db:"kind" json:"kind,omitempty"`
+	Method  string `db:"method" json:"method"`
+	Path    string `db:"path" json:"path"`
+	Project string `db:"project" json:"project"`
+	Status  int    `db:"status" json:"status"`
 }
 
 // ActionVia is the pair the connector stamped on a tunneled request (#20312): the cloud_link it arrived on (lnk-<8 hex>) and the Hub person behind it (hub-user-<8 hex>, or "" when the stream
@@ -67,7 +70,10 @@ func markActionRecorded(ctx context.Context) {
 	}
 }
 
-// hubOperatorActionsKept bounds the table: the newest actions are kept.
+// HubActionKindWrite is the Kind of a row left by routes.RecordPairWrites.
+const HubActionKindWrite = "write"
+
+// hubOperatorActionsKept bounds each kind of the table: the newest actions of that kind are kept (the write rows are many; the security rows must outlast them).
 const hubOperatorActionsKept = 1000
 
 func (s *Store) ensureHubOperatorActionsSchema(ctx context.Context) error {
@@ -87,7 +93,7 @@ func (s *Store) ensureHubOperatorActionsSchema(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `ALTER TABLE hub_operator_actions ADD COLUMN hub_user_id TEXT NOT NULL DEFAULT ''`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 		return err
 	}
-	for _, col := range []string{"via_link", "via_hub_user"} { // the link pair (#20312)
+	for _, col := range []string{"via_link", "via_hub_user", "kind"} { // the link pair (#20312)
 		if _, err := s.db.ExecContext(ctx, `ALTER TABLE hub_operator_actions ADD COLUMN `+col+` TEXT NOT NULL DEFAULT ''`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}
@@ -105,22 +111,27 @@ func (s *Store) RecordHubOperatorAction(ctx context.Context, a HubOperatorAction
 	}
 	markActionRecorded(ctx)
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO hub_operator_actions (at, hub_user, hub_user_id, via_link, via_hub_user, method, path, project, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.At, a.HubUser, a.HubUserID, a.ViaLink, a.ViaHubUser, a.Method, a.Path, a.Project, a.Status)
+		`INSERT INTO hub_operator_actions (at, hub_user, hub_user_id, via_link, via_hub_user, kind, method, path, project, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.At, a.HubUser, a.HubUserID, a.ViaLink, a.ViaHubUser, a.Kind, a.Method, a.Path, a.Project, a.Status)
 	if err != nil {
 		return err
 	}
-	if id, err := res.LastInsertId(); err == nil && id > hubOperatorActionsKept {
-		_, err = s.db.ExecContext(ctx, `DELETE FROM hub_operator_actions WHERE id <= ?`, id-hubOperatorActionsKept)
-		return err
+	if _, err := res.LastInsertId(); err != nil {
+		return nil
 	}
-	return nil
+	// keep the newest hubOperatorActionsKept of THIS kind: the Nth newest row's id is the line, and nothing of this kind at or below it stays
+	var line int64
+	if err := s.db.GetContext(ctx, &line, `SELECT id FROM hub_operator_actions WHERE kind = ? ORDER BY id DESC LIMIT 1 OFFSET ?`, a.Kind, hubOperatorActionsKept); err != nil {
+		return nil // fewer rows than the bound (sql.ErrNoRows), or nothing to prune
+	}
+	_, err = s.db.ExecContext(ctx, `DELETE FROM hub_operator_actions WHERE kind = ? AND id <= ?`, a.Kind, line)
+	return err
 }
 
 // RecentHubOperatorActions returns up to limit actions, newest first.
 func (s *Store) RecentHubOperatorActions(ctx context.Context, limit int) ([]HubOperatorAction, error) {
 	out := []HubOperatorAction{}
 	err := s.db.SelectContext(ctx, &out,
-		`SELECT id, at, hub_user, hub_user_id, via_link, via_hub_user, method, path, project, status FROM hub_operator_actions ORDER BY id DESC LIMIT ?`, limit)
+		`SELECT id, at, hub_user, hub_user_id, via_link, via_hub_user, kind, method, path, project, status FROM hub_operator_actions ORDER BY id DESC LIMIT ?`, limit)
 	return out, err
 }
