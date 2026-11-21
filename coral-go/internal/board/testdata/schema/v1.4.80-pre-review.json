@@ -842,7 +842,7 @@
     },
     {
       "name": "hub_operator_actions",
-      "sql": "CREATE TABLE hub_operator_actions (\n\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat       TEXT NOT NULL,\n\t\thub_user TEXT NOT NULL,\n\t\tmethod   TEXT NOT NULL,\n\t\tpath     TEXT NOT NULL,\n\t\tproject  TEXT NOT NULL,\n\t\tstatus   INTEGER NOT NULL\n\t, hub_user_id TEXT NOT NULL DEFAULT '')",
+      "sql": "CREATE TABLE hub_operator_actions (\n\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat       TEXT NOT NULL,\n\t\thub_user TEXT NOT NULL,\n\t\tmethod   TEXT NOT NULL,\n\t\tpath     TEXT NOT NULL,\n\t\tproject  TEXT NOT NULL,\n\t\tstatus   INTEGER NOT NULL\n\t, hub_user_id TEXT NOT NULL DEFAULT '', via_link TEXT NOT NULL DEFAULT '', via_hub_user TEXT NOT NULL DEFAULT '')",
       "tbl_name": "hub_operator_actions",
       "type": "table"
     },
@@ -7558,6 +7558,24 @@
           "dflt_value": "''",
           "hidden": 0,
           "name": "hub_user_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "via_link",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "via_hub_user",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"

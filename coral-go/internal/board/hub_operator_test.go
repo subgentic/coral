@@ -152,3 +152,37 @@ func TestSwitchLogKeepsTheStableUserID(t *testing.T) {
 	got, _ = s.LastSwitchChanges(ctx, "p")
 	assert.Empty(t, got[SwitchFiles].WhoID, "a change made here has none")
 }
+
+// #20312: an action records the link and the Hub person the connector stamped, next to the label; an older table gets both columns once and an old row reads with none.
+func TestHubOperatorActionsKeepTheLinkPair(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	require.NoError(t, s.RecordHubOperatorAction(ctx, HubOperatorAction{HubUser: "hub-user-1234abcd", ViaLink: "lnk-0123abcd", ViaHubUser: "hub-user-1234abcd", Method: "POST", Path: "/api/board/p/messages", Project: "p", Status: 200}))
+	require.NoError(t, s.RecordHubOperatorAction(ctx, HubOperatorAction{HubUser: "this computer", Method: "EVENT", Path: "sign-in", Status: 200}))
+	recent, err := s.RecentHubOperatorActions(ctx, 2)
+	require.NoError(t, err)
+	require.Len(t, recent, 2)
+	assert.Empty(t, recent[0].ViaLink, "a local action has no pair")
+	assert.Empty(t, recent[0].ViaHubUser)
+	assert.Equal(t, "lnk-0123abcd", recent[1].ViaLink)
+	assert.Equal(t, "hub-user-1234abcd", recent[1].ViaHubUser)
+}
+
+func TestHubOperatorActionsTableGainsTheLinkColumnsOnUpgrade(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	raw, err := sqlx.Open("sqlite", path)
+	require.NoError(t, err)
+	_, err = raw.Exec(`CREATE TABLE hub_operator_actions (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, hub_user TEXT NOT NULL, hub_user_id TEXT NOT NULL DEFAULT '', method TEXT NOT NULL, path TEXT NOT NULL, project TEXT NOT NULL, status INTEGER NOT NULL);
+		INSERT INTO hub_operator_actions (at, hub_user, method, path, project, status) VALUES ('2026-01-01T00:00:00Z', 'hub-user-1234abcd', 'POST', '/x', 'p', 200)`)
+	require.NoError(t, err)
+	raw.Close()
+	for i := 0; i < 2; i++ { // the second open is the "duplicate column" case
+		s, err := NewStoreWithKey(path, "")
+		require.NoError(t, err)
+		recent, err := s.RecentHubOperatorActions(context.Background(), 5)
+		require.NoError(t, err)
+		require.Len(t, recent, 1)
+		assert.Empty(t, recent[0].ViaLink, "an old row has no pair")
+		s.Close()
+	}
+}
