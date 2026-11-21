@@ -164,6 +164,18 @@ func (h *CloudHandler) AddLink(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "send {\"hub\": the Hub's address, \"cap\": \"view\", \"interact\" or \"launch\"}")
 		return
 	}
+	// The switch and the cap on links are the store's to answer, with or without a connector.
+	switch cerr := h.links.CheckCanAddLink(r.Context()); {
+	case errors.Is(cerr, store.ErrSecondLinkNotYet):
+		writeError(w, http.StatusConflict, "second_link_not_yet", "This Coral links to one Hub for now. Remove that link first.")
+		return
+	case errors.Is(cerr, store.ErrTooManyLinks):
+		writeError(w, http.StatusConflict, "too_many_links", "This computer is linked to the most Hubs it can be.")
+		return
+	case cerr != nil:
+		errInternalServer(w, "Could not check the Hub links")
+		return
+	}
 	m := h.manager()
 	if m == nil {
 		errInternalServer(w, "The Coral Hub connector is not available")
