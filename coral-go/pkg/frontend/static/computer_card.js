@@ -4,7 +4,6 @@ import { importOnce } from './import_once.js';
 const { loadStyles } = await importOnce('./lazy_styles.js');
 await loadStyles('computer_card.css');
 const { machineLabel, machineOnline, machineSeen } = await importOnce('./analytics_machine.js');
-const { formatLastSeen } = await importOnce('./server_status.js');
 const { go } = await importOnce('./nav.js');
 
 const node = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -12,6 +11,17 @@ const button = (text, onClick, primary) => { const b = node('button', primary ? 
 /** Open the computer bar's list on the page, so "Switch computer" is one click away from the card. */
 const switchComputer = barId => () => document.querySelector(`#${barId} .computer-bar-button`)?.click();
 const openComputers = id => () => go(id ? { view: 'servers', id } : { view: 'servers' });
+
+/** 'today at 09:12', 'yesterday at 18:40' or '3 Nov' (the mock's wording). */
+export function connectedWords(seen, now = new Date()) {
+    const d = new Date(typeof seen === 'number' && seen < 1e12 ? seen * 1000 : seen);
+    if (Number.isNaN(d.getTime())) return 'a while ago';
+    const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(), gap = Math.round((day(now) - day(d)) / 864e5);
+    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    if (gap === 0) return `today at ${hm}`;
+    if (gap === 1) return `yesterday at ${hm}`;
+    return `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}`;
+}
 
 /** The card for one computer and one state. state: 'offline' | 'not-shared' | 'no-answer' | 'old' (the hedged 404 words until the Hub says why);
  *  what names the thing that could not be read ('automations'); detail is the support line; retry re-reads; barId is the page's computer bar. */
@@ -22,7 +32,7 @@ export function computerCard({ state, server, what, detail = '', retry, barId, o
     if (state === 'offline') {
         const seen = machineSeen(server);
         headline = `${name} is offline`;
-        why = `${seen ? `It was last seen ${formatLastSeen(seen)}. ` : ''}It reconnects by itself when its network is back. Its ${what} only run while it is on.`;
+        why = `${seen ? `It was last connected ${connectedWords(seen)}. ` : ''}It reconnects by itself when its network is back. Its ${what} only run while it is on.`;
         actions = [retry && button('Try again', retry, true), button('Show another computer', switchComputer(barId)), onAll ? button('See all computers', onAll) : button('See all computers', openComputers())];
     } else if (state === 'not-shared') {
         headline = `${name} does not share its ${what} with the Hub`;
