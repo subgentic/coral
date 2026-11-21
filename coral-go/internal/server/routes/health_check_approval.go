@@ -82,7 +82,11 @@ func (h *BoardHandler) runCheckButton(w http.ResponseWriter, r *http.Request, pr
 	}
 	if b.Action == board.ActionApproveCheck {
 		if err := h.bs.ApproveHealthCheck(ctx, project, name, "Operator", hash, time.Now()); err != nil {
-			_, _ = h.bs.ReleaseAskButton(ctx, project, askID, b.ID)
+			_, _ = h.bs.ReleaseAskButton(ctx, project, askID, b.ID) // the question stays, to be clicked again
+			if errors.Is(err, board.ErrCheckPaused) {
+				writeError(w, http.StatusConflict, "check_paused", "This check is paused. Resume it first, then approve it.")
+				return
+			}
 			errInternalServer(w, "could not approve the check")
 			return
 		}
@@ -101,6 +105,7 @@ func (h *BoardHandler) runCheckButton(w http.ResponseWriter, r *http.Request, pr
 			slog.Warn("check removed, live tokens not ended", "board", project, "check", name, "error", err)
 		}
 		out["result"] = "denied"
+		h.pruneSnapshots(ctx)
 	}
 	out["ran"] = true
 	_ = h.bs.CloseAsk(ctx, project, askID, "Operator", out["result"].(string)+" check "+name)

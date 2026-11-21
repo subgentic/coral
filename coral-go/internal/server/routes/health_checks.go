@@ -38,6 +38,19 @@ type checkView struct {
 	board.HealthCheck
 	RecordHash    string `json:"record_hash"`
 	ApprovalWords string `json:"approval_words"`
+	ScriptText    string `json:"script_text,omitempty"` // the Operator's list only: the script as it was snapshotted, escaped (#20220)
+}
+
+// pruneSnapshots drops the snapshots no check holds (#20220). It runs under snapMu, so a snapshot just taken for a check that is not stored yet is not dropped.
+func (h *BoardHandler) pruneSnapshots(ctx context.Context) {
+	if h.checkSnapDir == "" {
+		return
+	}
+	h.snapMu.Lock()
+	defer h.snapMu.Unlock()
+	if in, err := h.bs.ScriptHashesInUse(ctx); err == nil {
+		healthcheck.Prune(h.checkSnapDir, in)
+	}
 }
 
 func viewOf(c board.HealthCheck) checkView {
@@ -168,7 +181,7 @@ func checkErr(w http.ResponseWriter, err error) {
 
 // ListHealthChecksRoute answers GET /api/board/{project}/health/checks.
 func (h *BoardHandler) ListHealthChecksRoute(w http.ResponseWriter, r *http.Request) {
-	project, _, ok := h.checkAdmin(w, r)
+	project, who, ok := h.checkAdmin(w, r)
 	if !ok {
 		return
 	}
@@ -179,7 +192,11 @@ func (h *BoardHandler) ListHealthChecksRoute(w http.ResponseWriter, r *http.Requ
 	}
 	out := make([]checkView, 0, len(cs))
 	for _, c := range cs {
-		out = append(out, viewOf(c))
+		v := viewOf(c)
+		if who == "Operator" { // the person reads the script beside its hash; an agent chose it and is not shown it back
+			v.ScriptText, _ = healthcheck.ShownText(h.checkSnapDir, c.ScriptHash)
+		}
+		out = append(out, v)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"checks": out})
 }
@@ -203,11 +220,14 @@ func (h *BoardHandler) AddHealthCheckRoute(w http.ResponseWriter, r *http.Reques
 		errBadRequest(w, "acts_as: the member this check speaks as")
 		return
 	}
+	h.snapMu.Lock() // the snapshot and the stored check are one step to the pruner
 	if why := h.applyCheckBody(r.Context(), project, b, &c); why != "" {
+		h.snapMu.Unlock()
 		errBadRequest(w, why)
 		return
 	}
 	c, err := h.bs.AddHealthCheck(r.Context(), c, time.Now())
+	h.snapMu.Unlock()
 	if err != nil {
 		checkErr(w, err)
 		return
@@ -234,12 +254,15 @@ func (h *BoardHandler) ChangeHealthCheckRoute(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var why string
+	h.snapMu.Lock()
 	c, err := h.bs.ChangeHealthCheckOrRefuse(r.Context(), project, name, func(c *board.HealthCheck) error {
 		if why = h.applyCheckBody(r.Context(), project, b, c); why != "" {
 			return errRefusedChange
 		}
 		return nil
 	})
+	h.snapMu.Unlock()
+	defer h.pruneSnapshots(r.Context()) // the superseded snapshot goes (after the answer is decided, whatever it is)
 	if why != "" {
 		errBadRequest(w, why)
 		return
@@ -308,6 +331,7 @@ func (h *BoardHandler) RemoveHealthCheckRoute(w http.ResponseWriter, r *http.Req
 		checkErr(w, err)
 		return
 	}
+	h.pruneSnapshots(r.Context())
 	h.closeCheckApprovalAsks(r.Context(), project, name, "the check was removed")
 	if err := h.revokeCheck(r.Context(), project, name); err != nil {
 		errInternalServer(w, "the check is removed, but its live tokens could not be ended")

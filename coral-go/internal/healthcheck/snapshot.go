@@ -9,6 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/fsreplace"
 )
@@ -98,4 +101,67 @@ func SnapshotPath(dir, hash string) (string, bool) {
 		return "", false
 	}
 	return filepath.Join(dir, hash), true
+}
+
+// maxShown is how much of a script is shown to the Operator.
+const maxShown = 16 << 10
+
+// ShownText reads the snapshot with this hash for the Operator to read beside the hash: only if the file still has that hash, cut at 16 KB, with every control, bidirectional and format
+// character and every invalid byte written as an escape (\u{202e}, \x{ff}), so what is shown is what is there. Newlines and tabs stay. ok is false if there is no such snapshot.
+func ShownText(dir, hash string) (text string, ok bool) {
+	path, ok := SnapshotPath(dir, hash)
+	if !ok {
+		return "", false
+	}
+	if got, err := HashFile(path); err != nil || got != hash {
+		return "", false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+	b, err := io.ReadAll(io.LimitReader(f, maxShown+1))
+	if err != nil {
+		return "", false
+	}
+	cut := len(b) > maxShown
+	if cut {
+		b = b[:maxShown]
+	}
+	var sb strings.Builder
+	for len(b) > 0 {
+		r, n := utf8.DecodeRune(b)
+		switch {
+		case r == utf8.RuneError && n == 1:
+			fmt.Fprintf(&sb, `\x{%02x}`, b[0])
+		case r == '\n' || r == '\t':
+			sb.WriteRune(r)
+		case r == '\\':
+			sb.WriteString(`\\`)
+		case unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r):
+			fmt.Fprintf(&sb, `\u{%x}`, r)
+		default:
+			sb.WriteRune(r)
+		}
+		b = b[n:]
+	}
+	if cut {
+		sb.WriteString("\n... (cut: the script is longer)")
+	}
+	return sb.String(), true
+}
+
+// Prune removes every snapshot in dir whose hash is not in use: only a file named as a SHA-256 is ever touched, and a leaf that is not a plain file is left alone.
+func Prune(dir string, inUse map[string]bool) {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range ents {
+		if !hashRE.MatchString(e.Name()) || inUse[e.Name()] || !e.Type().IsRegular() {
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, e.Name()))
+	}
 }
