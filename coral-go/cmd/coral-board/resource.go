@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/pkg/resourcequeue"
 )
 
 const resourceUsageText = `Usage: coral-board resource <subcommand> [args]
@@ -342,7 +343,7 @@ func resourceClaim(rest []string) {
 	wait := fs.Bool("wait", false, "wait in line until the slot is yours")
 	timeout := fs.Duration("timeout", 0, "give up waiting after this long (0: wait as long as it takes)")
 	note := fs.String("note", "", "why, for the others to read")
-	run := fs.Bool("run", false, "after the grant, run the command that follows -- here, keep the slot while it runs and give it back when it ends (#18488)")
+	run := fs.Bool("run", false, "after the grant, run the command that follows -- where the resource says (here, or sent to its machine over ssh as heavy run does), keep the slot while it runs and give it back when it ends (#18488)")
 	clihelp.ParseFlags(fs, rest[1:], func() string { return resourceUsageText })
 	cmdArgs := fs.Args()
 	if *run && len(cmdArgs) == 0 {
@@ -363,6 +364,7 @@ func resourceClaim(rest []string) {
 		Entry   struct {
 			Member     string `json:"member"`
 			Machine    string `json:"machine"`
+			Where      string `json:"where"`
 			LeaseUntil string `json:"lease_until"`
 		} `json:"entry"`
 	}
@@ -371,7 +373,7 @@ func resourceClaim(rest []string) {
 		fmt.Printf("You hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
 		claimHowTo(name)
 		if *run {
-			runUnderClaim(name, me, cmdArgs, res.Entry.LeaseUntil)
+			runUnderClaim(name, me, cmdArgs, res.Entry.LeaseUntil, res.Entry.Where, res.Entry.Machine)
 		}
 		return
 	}
@@ -400,7 +402,7 @@ func resourceClaim(rest []string) {
 			fmt.Printf("Your turn: you hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
 			claimHowTo(name)
 			if *run {
-				runUnderClaim(name, me, cmdArgs, res.Entry.LeaseUntil)
+				runUnderClaim(name, me, cmdArgs, res.Entry.LeaseUntil, res.Entry.Where, res.Entry.Machine)
 			}
 			return
 		}
@@ -420,8 +422,30 @@ func resourceClaim(rest []string) {
 // runUnderClaim runs the command of `resource claim --run -- <command>` here, after the slot is granted, and ties the slot to the run itself (#18488): it renews the lease while the command runs (a run longer than the
 // lease keeps its slot), stops the command if the slot is lost (kicked, or the lease ran out), and gives the slot back when the command ends, whatever started this process: the shell that launched it ending, a
 // background script or a tool call finishing does not matter, because this process is the one the claim follows. The exit code is the command's own (1 when the slot was lost).
-func runUnderClaim(name, me string, args []string, leaseUntil string) {
+func runUnderClaim(name, me string, args []string, leaseUntil, where, machine string) {
 	command := heavyCommand(args)
+	if where == "" { // the claim's answer said nothing of where: the resource's own definition does (an older server, #14262)
+		var rv struct {
+			Machine string `json:"machine"`
+			Where   string `json:"where"`
+		}
+		if data, status, err := resourceCall("GET", "/"+name, nil); err == nil && status == http.StatusOK && json.Unmarshal(data, &rv) == nil {
+			where = rv.Where
+			if machine == "" {
+				machine = rv.Machine
+			}
+		}
+	}
+	remote := where == resourcequeue.WhereRemote // a resource defined remote sends the run there, as heavy run does (#20221); one that says here, or nothing, runs here as before
+	if remote && heavyMacOnly.MatchString(command) {
+		_, _, _ = resourceCall("POST", "/"+name+"/release", map[string]any{"subscriber_id": me})
+		fmt.Printf("%s is on another machine (%s) and this command is for this machine only (it names ~/.coral or port 8420): nothing was run and the slot is given back. Run it here, with a resource of this machine.\n", plainText(name), plainText(machine))
+		exitFn(2)
+		return
+	}
+	if remote {
+		fmt.Printf("%s: running on %s (over ssh)\n", plainText(name), plainText(machine))
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 	runCtx, cancelRun := context.WithCancel(ctx)
@@ -448,7 +472,12 @@ func runUnderClaim(name, me string, args []string, leaseUntil string) {
 			}
 		}
 	}()
-	code := heavyRunLocal(runCtx, command)
+	var code int
+	if remote {
+		code = heavyRunRemote(runCtx, command, 0, machine)
+	} else {
+		code = heavyRunLocal(runCtx, command)
+	}
 	wasLost := false
 	select {
 	case <-lost:
