@@ -48,8 +48,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`(() => { const real=window.fetch; window.__activityReads=[]; window.__activityDeny=false;
             window.fetch=(u,o={})=>{ const p=new URL(String(u),location.href); if(p.pathname.endsWith('/api/activity')) {
                 window.__activityReads.push({path:p.pathname,method:o.method||'GET'});
-                const denied=window.__activityDeny;
-                return Promise.resolve(new Response(JSON.stringify(denied?{code:'owner_only',error:'owner_only'}:{actions:[{id:1,at:'2026-11-21T10:00:00Z',action:'approve',item_kind:'file',item_id:'report',title:'Owner report',team:'release',source:'hub',actor:'Operator'}],check:{intact:true,rows:1},more:false}),{status:denied?403:200,headers:{'Content-Type':'application/json'}}));
+                const denied=window.__activityDeny===true || (window.__activityDeny==='m1'&&p.pathname.includes('/m1/'));
+                return Promise.resolve(new Response(JSON.stringify(denied?{code:'owner_only',error:'owner_only'}:{actions:window.__activityEmpty?[]:[{id:1,at:'2026-11-21T10:00:00Z',action:'approve',item_kind:'file',item_id:'report',title:'Owner report',team:'release',source:'hub',actor:'Operator'}],check:{intact:true,rows:1},more:false}),{status:denied?403:200,headers:{'Content-Type':'application/json'}}));
             } return real(u,o);}; return true; })()`);
         await ev(`document.querySelector('nav.view-list-nav [data-key="activity"]').click(); true`);
         await waitFor(`document.querySelectorAll('#group-table-view .al-row').length===2`, 'owner Activity records from the two computers',10000);
@@ -66,6 +66,24 @@ const { coralReady, framesJs } = require('./helpers/wait');
         assert.equal(refused.length, 2);
         assert.ok(refused.every(r=>r.why.startsWith('refused to give its record')), 'both reads were owner-only refusals');
         await shot('hub-inbox-activity-refused');
+        const desktopDenied = await ev(`document.querySelector('#group-table-view').textContent`);
+        await Emulation.setDeviceMetricsOverride({width:390,height:844,deviceScaleFactor:1,mobile:true}); await Emulation.setTouchEmulationEnabled({enabled:true});
+        await ev(`import(${S}+'inbox_tab.js').then(m=>m.selectInboxTab('activity')).then(()=>true)`);
+        await shot('hub-inbox-activity-refused-phone');
+        const phoneDenied = await ev(`document.querySelector('#group-table-view').textContent`);
+        for (const text of [desktopDenied, phoneDenied]) {
+            assert.match(text,/Partial multi-computer view/,'all refused keeps the existing missing-computer notice');
+            assert.match(text,/Laptop.*refused to give its record.*Desktop.*refused to give its record/,'both missing records are named');
+            assert.doesNotMatch(text,/Nothing yet|Owner report/,'a refused record is neither empty nor a retained owner row');
+        }
+        assert.equal(await ev(`document.documentElement.scrollWidth>innerWidth+1`),false,'the refusal notice fits a phone');
+        await ev(`window.__activityDeny=false;window.__activityEmpty=true;import(${S}+'inbox_activity.js').then(m=>m.refresh()).then(()=>true)`);
+        await waitFor(`/Nothing yet/.test(document.querySelector('#group-table-view').textContent)&&!document.querySelector('.activity-check-partial')`,'a successful empty record is still empty');
+        await shot('hub-inbox-activity-empty-phone');
+        await ev(`window.__activityDeny='m1';window.__activityEmpty=false;import(${S}+'inbox_activity.js').then(m=>m.refresh()).then(()=>true)`);
+        await waitFor(`document.querySelectorAll('#group-table-view .al-row').length===1&&!!document.querySelector('.activity-check-partial')`,'the accessible computer keeps its row beside the refused source');
+        await shot('hub-inbox-activity-partial-phone');
+        await Emulation.setDeviceMetricsOverride({width:1280,height:844,deviceScaleFactor:1,mobile:false}); await Emulation.setTouchEmulationEnabled({enabled:false});
         console.log('   ✓');
 
         console.log('4. A Hub folder still opens its page: Saved frames the Hub page, Artifacts is the native list');
