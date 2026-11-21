@@ -20,16 +20,20 @@ const testLinkID = "lnk-00000001"
 
 func init() {
 	routerTestWrap = func(db *store.DB) func(http.Handler) http.Handler {
-		// Seeded for each request: a test that saves an enrollment replaces the links (a new enrollment is a new link), and its requests still arrive on a link.
+		// Seeded for each connector request: a test that saves an enrollment replaces the links (a new enrollment is a new link), and its requests still arrive on a link.
 		seed := func() {
 			_, _ = db.ExecContext(context.Background(), `INSERT OR IGNORE INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, created_at)
 				VALUES (?, 'https://test.invalid', 'srv_test', 'test', '', 'active', 'launch', '2026-01-01T00:00:00Z')`, testLinkID)
 		}
 		return func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if cloud.TunneledAuthentic(r) && len(r.Header.Values(tunnel.LinkHeader)) == 0 {
-					seed()
-					r.Header.Set(tunnel.LinkHeader, testLinkID)
+				if cloud.TunneledAuthentic(r) {
+					if r.Header.Get(tunnel.LinkHeader) == testLinkID || len(r.Header.Values(tunnel.LinkHeader)) == 0 {
+						seed()
+					}
+					if len(r.Header.Values(tunnel.LinkHeader)) == 0 {
+						r.Header.Set(tunnel.LinkHeader, testLinkID)
+					}
 				}
 				next.ServeHTTP(w, r)
 			})
