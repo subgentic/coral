@@ -91,6 +91,7 @@ export function rekeyText(sk) {
     const lost = [];
     if (sk.hub_url) lost.push('the Coral Hub connection to ' + sk.hub_url + ' (connect again afterwards, and remove this computer in Coral Hub)');
     if (sk.remote_server_keys) lost.push(sk.remote_server_keys === 1 ? "1 remote computer's API key (enter it again)" : sk.remote_server_keys + " remote computers' API keys (enter them again)");
+    if (sk.added_links) lost.push(sk.added_links === 1 ? '1 added Coral Hub link (add it again afterwards)' : sk.added_links + ' added Coral Hub links (add them again afterwards)');
     const why = sk.exposed ? 'Other accounts on this computer could read the secret key file, so what it protects must be treated as known.'
         : "Coral can't use its secret key file" + (sk.message ? ' (' + sk.message + ')' : '') + '.';
     return why + ' Replacing it makes a new key and discards ' + (lost.length ? lost.join(' and ') : 'nothing stored yet') + '.';

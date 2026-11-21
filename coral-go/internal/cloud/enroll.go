@@ -140,6 +140,7 @@ type DeviceCode struct {
 	DeviceCode      string // secret: only ever sent back to the hub's poll endpoint
 	UserCode        string
 	VerificationURL string
+	OffSite         bool // the hub named a link that is not on its own origin: it was replaced by the hub's /enroll page
 	Interval        time.Duration
 	ExpiresAt       time.Time
 }
@@ -254,9 +255,10 @@ func StartEnrollment(ctx context.Context, hc *http.Client, hubURL string, now ti
 	}
 	interval := time.Duration(min(max(r.Interval, 2), 30)) * time.Second
 	expires := time.Duration(min(max(r.ExpiresIn, 30), 900)) * time.Second
+	vu := safeVerificationURL(hubURL, r.VerificationURL)
 	return &DeviceCode{
 		DeviceCode: r.DeviceCode, UserCode: r.UserCode, Interval: interval, ExpiresAt: now.Add(expires),
-		VerificationURL: safeVerificationURL(hubURL, r.VerificationURL),
+		VerificationURL: vu, OffSite: r.VerificationURL != "" && vu != r.VerificationURL,
 	}, nil
 }
 

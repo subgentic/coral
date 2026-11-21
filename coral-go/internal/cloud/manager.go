@@ -170,6 +170,9 @@ type Manager struct {
 	// lmu guards extras: the connectors of the links added at this computer (manager_links.go, #20368), one each, apart from the enrollment's tunnel above.
 	lmu    sync.Mutex
 	extras map[string]*linkConn
+	// pmu guards pending: the enrollments of Hubs being added by address (link_enroll.go, #20385), one per Hub, in memory only.
+	pmu     sync.Mutex
+	pending map[string]*linkPending
 
 	mu       sync.Mutex
 	redeemMu sync.Mutex // one redeem at a time

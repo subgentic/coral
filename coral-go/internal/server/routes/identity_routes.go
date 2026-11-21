@@ -159,6 +159,7 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/cloud/devices/{kid}/mode":              "change one paired device's access",                                         // #19669
 	"GET /api/cloud/links":                           "list the Coral Hubs this computer is linked to",                            // #20346
 	"POST /api/cloud/links":                          "add a Coral Hub link",                                                      // #20346
+	"POST /api/cloud/links/cancel":                   "cancel adding a Coral Hub",                                                 // #20385
 	"PUT /api/cloud/links/{id}/cap":                  "change what one linked Coral Hub may do",                                   // #20346
 	"DELETE /api/cloud/links/{id}":                   "remove one Coral Hub link",                                                 // #20346
 	"DELETE /api/cloud/devices/{kid}":                "remove one paired device",                                                  // #19669

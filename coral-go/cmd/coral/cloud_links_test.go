@@ -85,3 +85,36 @@ func TestLinksRemoveReportsTheOutcome(t *testing.T) {
 		assert.Contains(t, out, c.want, name)
 	}
 }
+
+// #20385: `links add` names the cap in words, shows the code and the Hub's page, waits, and says it is linked; a missing or unknown cap calls nothing; the Hub's words never carry control characters.
+func TestLinksAddShowsTheCodeAndWaitsForTheApproval(t *testing.T) {
+	f := newFakeCoral(t, ready, enrolled)
+	f.linkReply = `{"links":[],"enrollment":{"hub":"https://hub-b.example.com","cap":"interact","state":"pending","user_code":"ABCD-EFGH","verification_url":"https://hub-b.example.com/enroll?code=ABCD-EFGH","note":"x\u001b[31m"},` +
+		`"adding":[{"hub":"https://hub-b.example.com","cap":"interact","state":"linked"}]}`
+	code, out, errb := runLinks(t, f, "add", "https://hub-b.example.com", "interact")
+	require.Equal(t, 0, code, out+errb)
+	assert.Equal(t, []string{`POST /api/cloud/links {"cap":"interact","hub":"https://hub-b.example.com"}`}, mutating(f))
+	assert.Contains(t, out, "ABCD-EFGH")
+	assert.Contains(t, out, "https://hub-b.example.com/enroll?code=ABCD-EFGH")
+	assert.Contains(t, out, "send to and answer your agents")
+	assert.Contains(t, out, "Linked https://hub-b.example.com")
+	assert.NotContains(t, out, "\x1b")
+
+	for _, bad := range [][]string{{"add"}, {"add", "https://hub-b.example.com"}, {"add", "https://hub-b.example.com", "root"}} {
+		g := newFakeCoral(t, ready, enrolled)
+		code, _, errb := runLinks(t, g, bad...)
+		assert.Equal(t, 2, code, "%v", bad)
+		assert.Contains(t, errb, "usage:")
+		assert.Empty(t, mutating(g), "%v", bad)
+	}
+}
+
+// A denied or expired code is a failure with the Hub's plain sentence, and nothing more is called.
+func TestLinksAddReportsADeniedCode(t *testing.T) {
+	f := newFakeCoral(t, ready, enrolled)
+	f.linkReply = `{"links":[],"enrollment":{"hub":"https://hub-b.example.com","cap":"view","state":"pending","user_code":"ABCD-EFGH","verification_url":"https://hub-b.example.com/enroll"},` +
+		`"adding":[{"hub":"https://hub-b.example.com","cap":"view","state":"denied","message":"The request was denied in the Hub."}]}`
+	code, _, errb := runLinks(t, f, "add", "https://hub-b.example.com", "view")
+	assert.Equal(t, 4, code)
+	assert.Contains(t, errb, "denied in the Hub")
+}
