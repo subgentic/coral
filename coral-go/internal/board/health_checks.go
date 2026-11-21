@@ -397,7 +397,7 @@ func (s *Store) NoteHealthCheckKeys(ctx context.Context, checkID int64, keys []s
 		}
 	}
 	// Absent keys over the cap make room: the oldest go first.
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM health_check_keys WHERE check_id = ? AND present = 0 AND key NOT IN (SELECT key FROM health_check_keys WHERE check_id = ? AND present = 0 ORDER BY said_at DESC LIMIT ?)`,
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM health_check_keys WHERE check_id = ? AND present = 0 AND key NOT IN (SELECT key FROM health_check_keys WHERE check_id = ? AND present = 0 ORDER BY said_at DESC, rowid DESC LIMIT ?)`,
 		checkID, checkID, MaxHealthCheckKeys); err != nil {
 		return nil, err
 	}
