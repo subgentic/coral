@@ -1,5 +1,55 @@
 # Release Notes
 
+## v2.1.2 — A new Inbox layout, Share to Google (experimental, off), and tunable health checks
+
+Task numbers in brackets. Built on v2.1.1. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **The Inbox has the v4 layout** (#20203, #20200, #20190): the decisions sit on the left of each message and Save, Star and More on the right; a message with one extra action shows it as a button, not a menu; Copy for an agent sits beside Filters. The author and the kind are above the message, on the left.
+- **Needs you has two tabs, Waiting on you and Waiting on an agent** (#19904, #19916, #19923): the second lists your answered asks and sent comments that an agent still has to act on, each with the agent's state, Nudge, and Wake (Asleep) or Start agent (Archived). One number counts Waiting on you in the sidebar, the red badge and the tab (#20017).
+- **Group by Agent or Goal on Waiting on an agent** (#20123, #20147, #20177): a heading per agent or goal with its state and a Wake or Start agent button, in the approved mock's sizes; rows do not overlap at 390 px.
+- **A file you open in any surface records its opened version** (#20190, #20200): the next version then shows New version; a first version with no series yet keeps its open by digest.
+- **The Inbox list, Activity and the permission card match the approved mocks** (#19812, #19824, #19833, #19841, #19870, #19871, #19816, #19828): Activity is a decision ledger with a Versions popover and Reopen goal in More; a permission shows the command in a box under the agent's name, and a single action such as Dismiss is a button; the agent's name lines up with the top of its icon, and the Claude runtime and folder sit on their own line (#20203).
+- **The review header is one row at every width under 1280 px** (#20241).
+- **Inbox polish at 390 px and in the review viewer** (#20239, #20285, #20290): the version line shows in full; Save, Star and More sit with More at the right; a row preview is capped at 4 lines with Show all; a question from another board or a Hub shows its header on the top row; Closes goal is muted; the review viewer header stays on one line; on a narrow phone the Inbox rows, the two Needs-you tabs and the review pins keep their layout without overlap (#20290).
+- **A team's own Needs you page uses the Inbox's tabs and cards**, so its counts agree with the Inbox (#20018, #20050).
+- **An answer, a send-back or a comment wakes a sleeping agent** (#19897, #19901): a reopened review wakes a parked reviewer and is nudged each round (a Claude agent that ends a turn with an assigned task unclaimed is told again, #19802).
+
+#### Share to Google (experimental, off by default)
+
+- **Share to Google Docs** (#19996, #20008, #20010, #20011, #20012, #20013, #20044, #20047, #20022, #20212): behind the setting "Google sharing (experimental)", off for every install. When it is on and you have signed in once (sealed in-app sign-in, `drive.file` scope only, Settings > Google), a Markdown artifact can be shared to a Google Doc from the viewer's More menu; the Doc updates in place on a later version, comments made in the Doc come back as artifact comments (names only, "via Google Docs"), an agent's reply goes back, and edits made in the Doc come back as a new version, uploaded as Google, never the owner.
+- **The switch is named "Google sharing (experimental)"** (#20265): the Google sign-in block in Settings shows only while it is on, its copy is shorter, and the off state says how to turn it on.
+- **While the switch is off nothing runs**: sign-in and its callback answer 409 `gdoc_share_off` (no client file is read, no sign-in starts), the sync loop does not start, and the share routes refuse. The routes are owner-only. The OAuth helper `gdoc-login` is a developer tool under `coral-go/tools` and is not shipped.
+
+#### Health checks you can tune
+
+- **Health settings and custom checks** (#20136, #20137, #20138, #20139, #20176): `coral-board health settings show/set/reset` for the thresholds (slice 1); a team's own checks with a store, snapshot, scheduler and runner (slice 2); per-check run tokens and delivery limits, 6 an hour per check and 20 a day per member, the rest folded into one line (slice 3); `coral-board health check add/list/change/pause/resume/remove`, where a refused change writes nothing (slice 4); and the Operator approves a custom check in one click from Needs you (slice 5).
+
+#### Device keys and the Hub
+
+- **Device keys shipped in this release** (#19969, #19970, #19971): the computer's key fingerprint is shown while a Hub pairing waits, Connect carries the pairing secret as `coral cloud connect` does, and the owner can list trusted devices through the Hub. `coral-go/internal/devicekey/codes.go` is unchanged since v2.1.1.
+- **Hub**: the Analytics tab shows in cloud mode (#19958, #20000); an agent stuck at a terminal dialog is a Needs-you row with the menu's own options (#19864, #19872); a remote recovers after the Hub's Mac sleeps (#19885).
+
+#### For the team
+
+- OpenCode shows in Settings and in the supported-provider pickers (#20110).
+- Mac: a click on Open Coral brings the window to the front, also while it starts (#19789); the SIGUSR1 raise handler is installed before main runs (#19801).
+- Release tooling: the fail-fast picks its browser suites from the diff (#19845); `pre-tag-steps.sh` prints the dry run's result or NO-DRYRUN (#19780).
+
+### Test and gate fixes in this release
+
+- Go census and pin tests cover the new listeners, joins, goroutines and header keys of the Google and health work (#20259).
+- The b12 and b13 test fixes: `task_counts_kind_browser` asserts a kind with no questions has no pill (#20204); `artifact_preview_safety` counts reads of the file apart from the one opened-version POST and waits up to 5 s for it before counting, so a slower Windows runner passes (#20216, #20226); ptymanager Windows tests read the handle count and the terminal's processes until they settle (#20081, #20088, #20097, #20103); `inbox_needs_filters_browser` no longer leaves `inbox_welcome_done` (#19980).
+
+### Known issues
+
+- Share to Google needs a one-time Google sign-in and is off until you turn it on.
+- Goal-done rows keep a Mark read button.
+- Gate notes for the release record: the `TestCodexWalkStopsWhenItsContextEnds` Windows test was re-run once on the same commit and passed; the cause named was runner load (it failed once in 25 runs). On an earlier candidate one `cdp` part 1/6 run failed `goal_done_uncommitted_browser` once and passed on its re-run (a redraw between the test's two reads in `team_uncommitted.js`); one go-race package retry-passed after a proxy.golang.org stream error fetching a module.
+
 ## v2.1.1 — Coral Hub shows the Queue, Analytics, Automations and Skills pages, and an agent is Awake, Asleep or Archived
 
 Task numbers in brackets. Built on v2.1.0. A prerelease until the Operator promotes it.
