@@ -120,6 +120,7 @@ const STUB = `(() => {
    assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'the update card fits the phone or desktop');
   }
   const refused = [
+   ...['please update','1.2','v1.2.3','1.2.3 please update',' 1.2.3','1.2.3\n','12345678901234567.1.1'].map(min=>[409,{error:'coral_too_old',min},'no-answer']),
    [409,{},'no-answer'],[409,{error:'coral_too_old'},'no-answer'],[409,{error:'coral_too_old',min:0},'no-answer'],
    [409,{error:'coral_too_old',min:''},'no-answer'],[409,{error:'coral_too_old',min:'  '},'no-answer'],[409,{error:'coral_too_old',min:'9.7.3',extra:true},'no-answer'],[409,{error:'other',min:'9.7.3'},'no-answer'],
    [403,{error:'coral_too_old',min:'9.7.3'},'not-shared'],[404,{error:'coral_too_old',min:'9.7.3'},'old'],[500,{error:'coral_too_old',min:'9.7.3'},'no-answer']
@@ -131,10 +132,16 @@ const STUB = `(() => {
    assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card').dataset.computerCard`),kind,'other statuses and malformed bodies preserve the existing card');
    assert.ok(!(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`)).startsWith('Update Coral on '),'a grantee/stranger refusal or unknown failure never claims an update is known');
   }
+  for(const min of ['0.0.0','1234567890123456.1.1']){
+   await ev(`window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:${JSON.stringify(min)}};true`);
+   await route({view:'automations',folder:'jobs'}); await ready('Update Coral on ');
+   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),`Update Coral on Second computer (needs ${min}+)`,'valid floors including the 20-character boundary are retained');
+  }
   const unsafeName='<img src=x onerror="window.__updatePwn=1">', unsafeMin='<svg onload="window.__updatePwn=2">';
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{state.servers.find(s=>s.id==='two').label=${JSON.stringify(unsafeName)};window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:${JSON.stringify(unsafeMin)}};return true;})`);
-  await route({view:'automations',folder:'jobs'}); await ready('Update Coral on ');
-  assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),`Update Coral on ${unsafeName} (needs ${unsafeMin}+)`,'computer name and minimum version are literal text');
+  await route({view:'automations',folder:'jobs'}); await ready('did not answer');
+  assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card').dataset.computerCard`),'no-answer','markup-like minimum versions use the existing fallback card');
+  assert.ok((await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`)).includes(unsafeName),'computer names remain literal text even on fallback cards');
   assert.equal(await ev(`!!window.__updatePwn || !!document.querySelector('#scheduler-view .computer-card img, #scheduler-view .computer-card svg')`),false,'response and computer labels never become markup');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{delete state.servers.find(s=>s.id==='two').label;window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:'8.6.4'};window.__automationDenyServer='two';state.machineChosen='all';return true;})`);
   await route({view:'automations',folder:'jobs'}); await ready('one job');
