@@ -22,6 +22,7 @@ export function pickMachine(id) { state.machineChosen = id || 'local'; document.
 
 /** Coral Hub's own page (cloud) has no computer of its own: with none linked there is nothing to read, and nothing is asked of this origin (coral-hub §7.2). */
 export const noComputerInCloud = () => isCloud() && machineChoices().length === 0;
+export const machineInventoryPending = () => isCloud() && !state.serversKnown && machineChoices().length === 0;
 export const LINK_A_COMPUTER = 'Link a computer to see usage';
 /** One Analytics read: this computer's own route off a Hub's page, the chosen computer's through /api/remote/<id>/ in cloud, never the same origin there and never with no computer chosen (the read is refused, not sent). */
 export const readNow = (path, init) => !isCloud() ? fetch(path, init) : noComputerInCloud() ? Promise.reject(new Error(LINK_A_COMPUTER)) : serverFetch(machineNow(), path, init);

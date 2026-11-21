@@ -150,6 +150,7 @@ const { providerName } = await importOnce('./model_labels.js'); // a CLI by its 
 const { proposalItems, pendingProposals, refreshProposals, onProposalsChanged, proposalActions, openProposalDialog, proposalSummary, proposalSnippet, markedText, carriesInstructions } = await importOnce('./inbox_proposals.js'); // what agents asked to add, waiting for the Operator (#11389)
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
 
+const goalInventoryPending = () => isCloud() && !state.serversKnown && !serverChoices().length;
 const $ = id => document.getElementById(id);
 /** The Hub-served dashboard's own Inbox (Goal #100, nativeInbox()): Needs you, Tasks and Saved are the Hub's own pages, drawn in the centre in a frame at the constant addresses below (the addresses coral-hub gave on the board, Oct 27);
  *  the chat folders are native, and so are Goals (GET /api/goals, a View route of every online computer) and Artifacts (GET /api/team-artifacts: a View route the Hub answers owner_only for a grantee, who then has no Artifacts folder, #11071). */
@@ -980,10 +981,11 @@ function inboxActivityToolbar() {
     return { node, signature: JSON.stringify([activityFilters, teams, AC.countsKey(activityFilters), groupMode, serverChoices()]) };
 }
 function refreshGoals(force = true) {
+    if (goalInventoryPending()) return null;
     if (_goalsReading) return _goalsReading; // one in flight: whoever asks during it gets it
     if (!force && (document.hidden || isPaused() || Date.now() - _goalsAt < goalsGap())) return null;
     _goalsAt = Date.now();
-    _goalsReading = readGoals().then(ok => { _goalsFails = ok ? 0 : Math.min(_goalsFails + 1, 8); }, () => { _goalsFails = Math.min(_goalsFails + 1, 8); }).finally(() => { _goalsReading = null; });
+    _goalsReading = readGoals().then(ok => { _goalsFails = ok ? 0 : Math.min(_goalsFails + 1, 8); }, () => { _goalsFails = Math.min(_goalsFails + 1, 8); }).finally(() => { _goalsReading = null; if (group === 'goals') renderInboxNav(true); });
     return _goalsReading;
 }
 document.addEventListener('coral:team-removed', e => { // Remove team: its closed-goal rows and goals leave the Inbox now, not at the next read, which would list a Reopen for a team that is gone (#16895)
@@ -1667,9 +1669,10 @@ registerGroupSource('hub-inbox', {
             const waitingNote = [waitingNote0, goalFilters.state === 'done' && doneGoalsCapped() ? 'Each computer shows up to 100 finished goals, oldest first. Newer goals may be missing when this limit is reached.' : ''].filter(Boolean).join(' ');
             const hasDone = goals.some(g => String(g.state || '').toLowerCase() === 'done');
             const narrowed = GF.isFiltered({ ...goalFilters, state: goalFilters.state === 'active' ? '' : goalFilters.state }); // the list opens on Active (#16371): that chip alone is the default, not a narrowing
-            const emptyLine = narrowed ? 'No goal matches the search and filters.' : goalFilters.state === 'done' ? 'No finished goals.' : hasDone ? 'All goals are done.' : 'No open goals.';
-            return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: emptyLine, hint: waitingNote || (narrowed ? undefined : goalFilters.state === 'done' || hasDone ? undefined : "Press New goal to create one, or an Orchestrator can propose one too.") },
-                signature: JSON.stringify(rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])),
+            const pendingGoals = goalInventoryPending() || (!!_goalsReading && !openAt && !goals.length);
+            const emptyLine = pendingGoals ? 'Loading goals…' : narrowed ? 'No goal matches the search and filters.' : goalFilters.state === 'done' ? 'No finished goals.' : hasDone ? 'All goals are done.' : 'No open goals.';
+            return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: emptyLine, hint: pendingGoals ? undefined : waitingNote || (narrowed ? undefined : goalFilters.state === 'done' || hasDone ? undefined : "Press New goal to create one, or an Orchestrator can propose one too.") },
+                signature: JSON.stringify([pendingGoals, rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])]),
                 node: () => { const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); if (phone) bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
                     selectable: { contextKey: 'inbox-goals', canSelect: g => ['proposed', 'active', 'blocked'].includes(String(g.state || '').toLowerCase()), actions: closeGoalsActions(), onChange: () => mountBar(), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // the tick column of the team page's Goals too (#16371); a phone: a long press selects, as in Needs you (#12230)
                     open: g => {
@@ -1728,6 +1731,7 @@ document.addEventListener('coral:servers-updated', () => {
     tasks = tasks.filter(t => personalInboxAllowed(t.server));
     saved.savedInventoryChanged();
     if (!document.getElementById('nav-tab-hub-inbox')?.classList.contains('active')) return;
+    if (group === 'goals' && !goalInventoryPending()) refreshGoals(true);
     if (group === 'tasks' && nativeTasks()) refreshTasks();
     if (group === 'saved' && nativeSaved()) { saved.loadSaved(); activateSavedReviews(); }
     renderInboxNav(true);
