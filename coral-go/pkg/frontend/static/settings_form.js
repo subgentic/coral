@@ -53,6 +53,7 @@ export function readSettingsForm(all = false) {
     const telemetryEnabled = document.getElementById("settings-telemetry-enabled")?.checked ?? settingBool(state.settings?.telemetry_enabled, true);
     const boardAutoAttach = document.getElementById("settings-board-auto-attach")?.checked ?? settingBool(state.settings?.board_auto_attach || undefined, false);
     const launchInWorktree = document.getElementById("settings-launch-in-worktree")?.checked ?? settingBool(state.settings?.launch_in_worktree || undefined, false);
+    const gdocShare = document.getElementById("settings-gdoc-share")?.checked ?? settingBool(state.settings?.gdoc_share || undefined, false); // off unless turned on (#19996, #20286)
     const nudgeClaudeArtifacts = document.getElementById("settings-nudge-claude-artifacts")?.checked ?? settingBool(state.settings?.nudge_claude_artifacts || undefined, true);
     const boardHealthMonitor = document.getElementById("settings-board-health-monitor")?.checked ?? settingBool(state.settings?.board_health_monitor || undefined, true);
     const autoResume = document.getElementById("settings-auto-resume")?.checked ?? settingBool(state.settings?.auto_resume_after_api_error || undefined, false);
@@ -111,6 +112,7 @@ export function readSettingsForm(all = false) {
         telemetry_enabled: telemetryEnabled,
         board_auto_attach: boardAutoAttach,
         launch_in_worktree: launchInWorktree,
+        gdoc_share: gdocShare,
         ...readInboxSettings(state.settings),
         nudge_claude_artifacts: nudgeClaudeArtifacts,
         board_health_monitor: boardHealthMonitor,

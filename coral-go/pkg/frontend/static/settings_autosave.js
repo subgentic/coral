@@ -56,6 +56,7 @@ async function persist(e) {
             await (await importOnce('./update_settings.js')).saveUpdateRow(e.id);
         } else await saveSettingsRow(payload);
         remember(e); say(row,'Saved');
+        if (e.id === 'settings-gdoc-share') importOnce('./google_settings.js').then(m => m.loadGoogle()).catch(() => {}); // the Google block follows the switch in this same session, not only when Storage is next opened (#20286)
     } catch (error) {
         write(e,before); remember(e);
         e.dispatchEvent(new Event('input', {bubbles:true}));
