@@ -153,6 +153,8 @@ func (h *BoardHandler) revokeCheck(ctx context.Context, project, name string) er
 	return h.checkTokens.RevokeCheckTokensFor(ctx, project, name, time.Now())
 }
 
+var errRefusedChange = errors.New("change refused")
+
 func checkErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, board.ErrCheckMissing):
@@ -225,9 +227,17 @@ func (h *BoardHandler) ChangeHealthCheckRoute(w http.ResponseWriter, r *http.Req
 		errBadRequest(w, "send the fields to change (a check's name cannot change)")
 		return
 	}
+	before, err := h.bs.GetHealthCheck(r.Context(), project, name)
+	if err != nil {
+		checkErr(w, err)
+		return
+	}
 	var why string
-	c, err := h.bs.ChangeHealthCheck(r.Context(), project, name, func(c *board.HealthCheck) {
-		why = h.applyCheckBody(r.Context(), project, b, c)
+	c, err := h.bs.ChangeHealthCheckOrRefuse(r.Context(), project, name, func(c *board.HealthCheck) error {
+		if why = h.applyCheckBody(r.Context(), project, b, c); why != "" {
+			return errRefusedChange
+		}
+		return nil
 	})
 	if why != "" {
 		errBadRequest(w, why)
@@ -237,9 +247,11 @@ func (h *BoardHandler) ChangeHealthCheckRoute(w http.ResponseWriter, r *http.Req
 		checkErr(w, err)
 		return
 	}
-	if err := h.revokeCheck(r.Context(), project, name); err != nil {
-		errInternalServer(w, "the check changed, but its live tokens could not be ended")
-		return
+	if c.RecordHash() != before.RecordHash() { // whenever the stored record changed, a run that began under the old approval ends with it
+		if err := h.revokeCheck(r.Context(), project, name); err != nil {
+			errInternalServer(w, "the check changed, but its live tokens could not be ended")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, viewOf(c))
 }

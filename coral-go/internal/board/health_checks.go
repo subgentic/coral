@@ -216,12 +216,19 @@ func (s *Store) ApproveHealthCheck(ctx context.Context, project, name, by, recor
 
 // ChangeHealthCheck changes a check's record (script, arguments, folder, schedule, to, acts as): whatever changes, it is pending again and nothing runs until it is approved.
 func (s *Store) ChangeHealthCheck(ctx context.Context, project, name string, change func(*HealthCheck)) (HealthCheck, error) {
+	return s.ChangeHealthCheckOrRefuse(ctx, project, name, func(c *HealthCheck) error { change(c); return nil })
+}
+
+// ChangeHealthCheckOrRefuse is ChangeHealthCheck where the change may be refused: it works on a copy, and a refusal writes nothing.
+func (s *Store) ChangeHealthCheckOrRefuse(ctx context.Context, project, name string, change func(*HealthCheck) error) (HealthCheck, error) {
 	c, err := s.GetHealthCheck(ctx, project, name)
 	if err != nil {
 		return c, err
 	}
 	before := c.RecordHash()
-	change(&c)
+	if err := change(&c); err != nil {
+		return c, err
+	}
 	if err := c.Schedule().Validate(); err != nil {
 		return c, err
 	}

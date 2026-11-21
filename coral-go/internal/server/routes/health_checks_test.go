@@ -158,3 +158,19 @@ func TestTheChecksRoutesAreNeverThroughCoralHub(t *testing.T) {
 		assert.Equal(t, tunnel.TierNever, tunnel.Classify(c[0], c[1], ""), c[0]+" "+c[1])
 	}
 }
+
+func TestARefusedChangeWritesNothing(t *testing.T) {
+	rg := newChecksRig(t)
+	body := `{"name":"stale-prs","script":"` + rg.script(t) + `","dir":"` + rg.dir + `","every":"30m"}`
+	rg.call("POST", "/x", body, "", checkAsSession("claude-orch"), rg.h.AddHealthCheckRoute)
+	ctx := context.Background()
+	c, err := rg.h.bs.GetHealthCheck(ctx, "team", "stale-prs")
+	require.NoError(t, err)
+	require.NoError(t, rg.h.bs.ApproveHealthCheck(ctx, "team", "stale-prs", "Operator", c.RecordHash(), time.Now()))
+	code, _ := rg.call("PUT", "/x", `{"may_write":true,"to":"Operator"}`, "stale-prs", checkAsSession("claude-orch"), rg.h.ChangeHealthCheckRoute)
+	assert.Equal(t, http.StatusBadRequest, code)
+	after, err := rg.h.bs.GetHealthCheck(ctx, "team", "stale-prs")
+	require.NoError(t, err)
+	assert.Equal(t, c.RecordHash(), after.RecordHash(), "a refused change leaves the stored record as it was")
+	assert.Equal(t, "approved", after.State, "and its approval stands")
+}
