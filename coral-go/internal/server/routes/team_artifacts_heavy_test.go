@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -67,8 +68,9 @@ func timeHeavy(t *testing.T, srv *httptest.Server, q string) time.Duration {
 	start := time.Now()
 	resp, err := http.Get(srv.URL + "/api/team-artifacts?" + q)
 	require.NoError(t, err)
+	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "%s: %s", q, body)
 	return time.Since(start)
 }
 
