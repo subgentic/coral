@@ -28,3 +28,26 @@ export const readNow = (path, init) => !isCloud() ? fetch(path, init) : noComput
 
 /** When a linked computer was last seen, as the Hub reports it ('' for this computer or when unknown). */
 export const machineSeen = id => (state.servers || []).find(s => s && s.id === id)?.last_seen || '';
+
+const entryOf = id => (state.servers || []).find(s => s && s.id === id);
+/** The Coral version a linked computer reports (the Hub's coral_version, or a self-hosted hub's version) without its build suffix; '' when the Hub's list does not carry it: it is never guessed (#20319). */
+export const machineVersion = id => {
+    const e = entryOf(id), v = e && (e.coral_version || e.version), t = typeof v === 'string' ? v.trim() : '', i = t.indexOf('+'), short = (i > 0 ? t.slice(0, i) : t).replace(/^v/, '');
+    return /^\d{1,9}\.\d{1,9}\.\d{1,9}(?:-[0-9A-Za-z.]{1,40})?$/.test(short) ? short : '';
+};
+/** What the owner chose for the Hub's access to a computer: 'view', 'interact' or 'launch'; '' when the Hub's list carries no choice (it is not assumed). */
+export const machineAccess = id => { const m = entryOf(id)?.access_mode; return m === 'launch' || m === 'follow' ? 'launch' : m === 'interact' || m === 'view' ? m : ''; };
+/** An online computer the Hub says is too old (below its minimum, or an update that is required), or that a read just found too old (a 409 coral_too_old, markTooOld). */
+export const machineNeedsUpdate = id => { const e = entryOf(id); return !!e && machineOnline(id) && (e.below_minimum === true || e.update === 'required' || !!(state.machineTooOld && state.machineTooOld[id])); };
+export const markTooOld = id => { state.machineTooOld = { ...(state.machineTooOld || {}), [id]: true }; };
+
+/** 'today at 09:12', 'yesterday at 18:40' or '3 Nov' (the mock's wording): the card and the list say the same time the same way. */
+export function connectedWords(seen, now = new Date()) {
+    const d = new Date(typeof seen === 'number' && seen < 1e12 ? seen * 1000 : seen);
+    if (Number.isNaN(d.getTime())) return 'a while ago';
+    const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(), gap = Math.round((day(now) - day(d)) / 864e5);
+    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    if (gap === 0) return `today at ${hm}`;
+    if (gap === 1) return `yesterday at ${hm}`;
+    return `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}`;
+}
