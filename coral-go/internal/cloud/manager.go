@@ -244,6 +244,12 @@ func (m *Manager) isLoaded() bool {
 // Run starts the connector if this server is already enrolled, then waits for ctx.
 // With no hub URL it returns immediately: no goroutines, no network.
 func (m *Manager) Run(ctx context.Context) {
+	// Multi-Hub slice 1 (#20201): make the links table match the one enrollment. A failure warns and Coral runs as before; the enrollment is untouched.
+	if m.o.Store != nil {
+		if err := m.o.Store.MirrorLegacyLink(ctx); err != nil {
+			m.o.Logger.Warn("cloud: could not make the Hub link record; the connection is unchanged", "err", err)
+		}
+	}
 	if m.o.HubURL == "" {
 		return
 	}

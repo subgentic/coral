@@ -101,7 +101,14 @@ func (s *CloudStore) save(ctx context.Context, hubURL, serverID, label, token st
 		  token=excluded.token, state=excluded.state, created_at=excluded.created_at, last_error=NULL, route_key=NULL, hub_owner=NULL, hub_owner_user=NULL, hub_owner_adopted_at=NULL,
 		  hub_owner_kind=excluded.hub_owner_kind, hub_owner_org=excluded.hub_owner_org`,
 		strings.TrimRight(hubURL, "/"), serverID, label, env, CloudStateActive, nowUTC(), kind, org)
-	return err
+	if err != nil {
+		return err
+	}
+	// A new enrollment is a new link (its own id and sealed token), never the old one with a new token.
+	if _, derr := s.db.ExecContext(ctx, "DELETE FROM cloud_link"); derr == nil {
+		s.mirror(ctx)
+	}
+	return nil
 }
 
 // OwnerKindTeam and OwnerKindPersonal are what OwnerRecord reports as the kind.
@@ -183,6 +190,9 @@ func (s *CloudStore) SetState(ctx context.Context, state, msg string) error {
 		m = msg
 	}
 	_, err := s.db.ExecContext(ctx, "UPDATE cloud_connection SET state = ?, last_error = ? WHERE id = 1", state, m)
+	if err == nil {
+		s.mirror(ctx)
+	}
 	return err
 }
 
@@ -227,6 +237,7 @@ func (s *CloudStore) PinOwner(ctx context.Context, serverID, account string) (bo
 	if err != nil {
 		return false, err
 	}
+	s.mirror(ctx)
 	n, err := res.RowsAffected()
 	return n == 1, err
 }
@@ -259,6 +270,7 @@ func (s *CloudStore) AdoptOwnerUser(ctx context.Context, serverID, user, at stri
 	if err != nil {
 		return false, err
 	}
+	s.mirror(ctx)
 	n, err := res.RowsAffected()
 	return n == 1, err
 }
@@ -279,6 +291,7 @@ func (s *CloudStore) PinOwnerUser(ctx context.Context, serverID, user string) (b
 	if err != nil {
 		return false, err
 	}
+	s.mirror(ctx)
 	n, err := res.RowsAffected()
 	return n == 1, err
 }
@@ -286,11 +299,17 @@ func (s *CloudStore) PinOwnerUser(ctx context.Context, serverID, user string) (b
 // BlockOwner sets the pin of the enrollment with serverID to OwnerBlocked.
 func (s *CloudStore) BlockOwner(ctx context.Context, serverID string) error {
 	_, err := s.db.ExecContext(ctx, "UPDATE cloud_connection SET hub_owner = ? WHERE id = 1 AND server_id = ?", OwnerBlocked, serverID)
+	if err == nil {
+		s.mirror(ctx)
+	}
 	return err
 }
 
 // Delete forgets the enrollment and its sealed token.
 func (s *CloudStore) Delete(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM cloud_connection WHERE id = 1")
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM cloud_connection WHERE id = 1"); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, "DELETE FROM cloud_link") // the link goes with the enrollment (slice 1: they are one)
 	return err
 }
