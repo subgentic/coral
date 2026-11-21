@@ -306,5 +306,5 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
         rendered = false;
         if (error?.name === 'AbortError' || ctx.isStale()) return;
         body.innerHTML = `<div class="inline-preview-error">${escapeHtml(error.message)}</div>`;
-    } finally { if (rendered && !ctx.isStale()) ctx.opened?.(); }
+    } finally { if (rendered && !ctx.isStale()) { if (ctx.opened) ctx.opened(); else if (opened && options?.sourceNamed !== false && !isCloud()) importOnce('./inbox_reviews.js').then(m => m.recordOpenedVersion(opened[1], { server: options?.server || source.server, board: options?.board || '' })).catch(() => {}); } } // the viewer dialog says its own; any other surface (the file's page, the preview pane) records the version it showed, as it marks the file read (#20190: the New version chip needs the baseline whichever way v1 was opened)
 }

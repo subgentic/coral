@@ -329,7 +329,7 @@ const lastSeenLine = () => (LS ? LS.node(state.servers || []) : null);
 const markTitle = t => markHidden(t, { strict: true }); // a task's or a goal's title is an agent's text: what hides or reorders it is written out (#11442, #11399)
 const waitsOf = s => (BL ? BL.infoOf(s.review ? s.review.waits_on_this : s.waits_on_this) : null);
 const closesCallout = s => { const g = waitingOnAgent(s.review) ? waitsOf(s)?.closes : ''; if (!g) return []; const c = DT.el('span', 'inbox-closes-goal'); c.append(DT.el('span', 'inbox-closes-label', 'Closes goal'), DT.el('span', 'inbox-closes-text', `\u201c${markTitle(g)}\u201d`)); return [c]; }; // the goal a sent-back file would close, as the mock shows it
-const blocksOf = s => (BL && NF.kindOf(s) !== 'permission' ? BL.phraseOf(waitsOf(s), markTitle) : ''); // mock v3: a permission row has only its Task chip, no 'waits on this' (#20146)
+const blocksOf = s => { if (!BL || NF.kindOf(s) === 'permission') return ''; let info = waitsOf(s); if (info?.closes && waitingOnAgent(s.review)) { if (!info.count) return ''; info = { ...info, closes: '' }; } return BL.phraseOf(info, markTitle); }; /* a sent-back row's green Closes goal callout names the goal: the blockers line does not name it again (#20190, walk item 10; mock v3 .ib-callout-success) */ // mock v3: a permission row has only its Task chip, no 'waits on this' (#20146)
 const blocksShortOf = s => (BL ? BL.shortPhraseOf(waitsOf(s), markTitle) : ''); // a phone's one-line row
 function askBlockers() { // loaded once, when a row carries the field; the table is drawn again with the phrases
     if (BL || !allNeeds().some(s => (s.review || s).waits_on_this)) return;
@@ -399,9 +399,11 @@ let needsOrder = null; // what the person has seen, in its order (#12636): a com
 const needsKey = s => `${sessionServer(s)}:${s.session_id}`;
 const filteredNeeds = () => { const kept = NF.keepOrder(orderedNeeds(), needsKey, needsOrder, JSON.stringify([needsFilters, queries.needs]), s => sessionServer(s) !== 'local'); needsOrder = kept.memory; return kept.rows; };
 const needsOverflow = () => reviewGroups(filteredNeeds().filter(s => s.review && !s.review.starred).map(s => s.review)).filter(g => g.more.length);
+/** Grouped on Waiting on an agent, every row of one agent (or one goal) sits together, in the order of the group's first row: a divider is drawn where the group changes, so a thread row and a file row of one agent apart would each get a heading (#20190, walk item 9: two Writer headings). */
+const clusterAgentRows = rows => { if (needsTab !== 'agent' || !(agentGroup || agentGoal)) return rows; const keyOf = (r, i) => isAgentRow(r) && !r.review?.starred ? (agentGroup ? `agent:${AW.agentWaitState(refOf(r)).who}` : `goal:${r.goal?.id || 'none'}`) : `row:${i}`, by = new Map(); rows.forEach((r, i) => { const k = keyOf(r, i); if (!by.has(k)) by.set(k, []); by.get(k).push(r); }); return [...by.values()].flat(); };
 const needsRows = () => {
     const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review && !s.review.starred).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
-    return [...trustRows(arrangeReviewRows(all.filter(s => !s.review || s.review.starred || visible.has(s.review.reviewKey)), groupReviews), () => renderInboxNav(true)), ...(activeNeedsTeam || needsTab !== 'you' ? [] : welcomeRows())]; // Getting started: on Waiting on you only, last, untouched by search and filters (#19274); the tab counts them (walk #20009 item 5), the badges do not
+    return [...trustRows(clusterAgentRows(arrangeReviewRows(all.filter(s => !s.review || s.review.starred || visible.has(s.review.reviewKey)), groupReviews)), () => renderInboxNav(true)), ...(activeNeedsTeam || needsTab !== 'you' ? [] : welcomeRows())]; // Getting started: on Waiting on you only, last, untouched by search and filters (#19274); the tab counts them (walk #20009 item 5), the badges do not
 };
 /** The Needs you folder's toolbar (#8604): the search, the kind pills (All, Permission, Question, Needs input), the Filters icon (Team, Agent, Waiting longer than, Sort), the chips of what is on. */
 function inboxNeedsToolbar() {
