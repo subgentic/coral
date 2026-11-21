@@ -1,10 +1,10 @@
 /* The computer bar (#20207): sits under a page title; the list is a popover on a desktop and a bottom sheet on a phone. */
 .computer-bar { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .computer-bar-label { color: var(--text-muted); font-size: var(--fs-base); }
-.computer-bar > .btn { gap: 8px; max-width: min(22rem, 100%); }
+.computer-bar > .btn { display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px; max-width: min(22rem, 100%); }
 .computer-bar > .btn:focus-visible, .computer-bar-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .computer-bar-name, .computer-bar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.computer-bar-caret { width: 0; height: 0; border-inline: 4px solid transparent; border-top: 5px solid var(--text-muted); }
+.computer-bar-caret { margin-inline-start: auto; width: 0; height: 0; border-inline: 4px solid transparent; border-top: 5px solid var(--text-muted); }
 .computer-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
 .computer-dot[data-computer-state="offline"] { background: var(--text-muted); }
 .computer-chip { background: var(--bg-tertiary); color: var(--text-secondary); }

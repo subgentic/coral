@@ -6,9 +6,10 @@
 .computer-card-title { margin: 0 0 4px; font-size: var(--fs-title); overflow-wrap: anywhere; }
 .computer-card-why { margin: 0 0 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
 .computer-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.computer-card-actions .btn { margin: 0; }
 .computer-card-details { margin-top: 12px; color: var(--text-muted); font-size: var(--fs-base); }
 .computer-card-details summary { cursor: pointer; }
 .computer-card-details p { margin: 6px 0 0; overflow-wrap: anywhere; }
-@media (max-width: 600px) { .computer-card-actions .btn { flex: 1 1 auto; min-height: 44px; } }
+@media (max-width: 600px) { .computer-card-actions .btn { flex: 1 1 100%; min-height: 44px; } }
 .computer-not-shown { margin-top: 12px; color: var(--text-muted); font-size: var(--fs-base); }
 .computer-not-shown p { margin: 0 0 4px; overflow-wrap: anywhere; }

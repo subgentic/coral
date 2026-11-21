@@ -3,6 +3,7 @@
 .cloud-automation-facts { grid-template-columns: minmax(8rem, 1fr) 3fr; gap: 8px 16px; }
 .cloud-automation-facts dd { margin: 0; min-width: 0; }
 @media (max-width: 600px) {
+    .cloud-automation-bar .computer-bar { width: 100%; }
     .cloud-automation-facts { grid-template-columns: 1fr; gap: 4px; }
     .cloud-automation-facts dd { margin-bottom: 8px; }
 }
