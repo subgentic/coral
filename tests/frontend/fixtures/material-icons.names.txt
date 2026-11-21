@@ -125,6 +125,7 @@ radio_button_off
 radio_button_unchecked
 rate_review
 refresh
+remove
 replay
 reply
 restore
