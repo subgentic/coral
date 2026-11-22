@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -111,6 +112,31 @@ func TestAHubRefusingOneLinkRevokesOnlyThatLink(t *testing.T) {
 	m.LinksChanged(context.Background())
 	time.Sleep(200 * time.Millisecond)
 	assert.EqualValues(t, 1, hub2.tunnels.Load(), "a revoked link is not dialed again")
+}
+
+// #20581 (e): the Hub's revoke of one link calls LinkEnded for that link and no other, so the server can end the grants that came through it.
+func TestAHubRevokeCallsLinkEndedForThatLinkOnly(t *testing.T) {
+	var mu sync.Mutex
+	var ended []string
+	old := LinkEnded
+	LinkEnded = func(_ context.Context, id string) { mu.Lock(); ended = append(ended, id); mu.Unlock() }
+	t.Cleanup(func() { LinkEnded = old })
+
+	e := newEnv(t)
+	m, hub2, a, b := twoLinks(t, e, "view")
+	m.LinksChanged(context.Background())
+	waitLink(t, m, b.LinkID, StateConnected)
+	mu.Lock()
+	require.Empty(t, ended, "nothing ended while both links are up")
+	mu.Unlock()
+
+	hub2.revoked.Store(true)
+	m.StopLink(b.LinkID) // drop the live tunnel so the connector redials and meets the refusal
+	m.LinksChanged(context.Background())
+	waitLink(t, m, b.LinkID, StateRevoked)
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, []string{b.LinkID}, ended, "the revoked link, once; never link %s", a.LinkID)
 }
 
 // Each link has its own cap: B at view cannot do what A at interact can, and lowering B's cap closes B's tunnel at once.
