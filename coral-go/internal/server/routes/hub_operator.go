@@ -15,6 +15,12 @@ func HubOperatorPrefix(hubUser string) string {
 	return "[Operator via Coral Hub, " + hubUser + "] "
 }
 
+// HubUserNoAnswerPrefix starts the text of a post made through a Hub link that may not answer asks (#20413, #20498): the agent that reads it is told whose it is, a Hub person's, and that it is
+// not the Operator and answers nothing, so such a post cannot approve in words.
+func HubUserNoAnswerPrefix(hubUser string) string {
+	return "[Coral Hub user " + hubUser + ", not the Operator: this answers no ask] "
+}
+
 type hubOperatorKey struct{}
 
 // withHubOperator marks a request admitted to act as the Operator through Coral Hub,
