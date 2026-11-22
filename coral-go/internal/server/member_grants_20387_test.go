@@ -29,24 +29,31 @@ import (
 const grantPerson = "hub-user-bbbb2222"
 
 // ownerDevice wires an owner-device check for one test: a real P-256 key, and Verify accepts only its signature over the digest (P1363, base64url). It shuts the check when the test ends.
-type ownerDevice struct{ key *ecdsa.PrivateKey }
+type ownerDevice struct {
+	key  *ecdsa.PrivateKey
+	mode string // the mode the computer's device list gives this key: "" is launch
+}
 
 func wireOwnerDevice(t *testing.T) *ownerDevice {
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	routes.SetMemberVerify(func(_ context.Context, digest []byte, kid, sig string) error {
+	d := &ownerDevice{key: k}
+	routes.SetMemberVerify(func(_ context.Context, digest []byte, kid, sig string) (string, error) {
 		raw, err := base64.RawURLEncoding.DecodeString(sig)
 		if err != nil || len(raw) != 64 || kid != testOwnerKID {
-			return errors.New("no")
+			return "", errors.New("no")
 		}
 		h := sha256.Sum256(digest)
 		if !ecdsa.Verify(&k.PublicKey, h[:], new(big.Int).SetBytes(raw[:32]), new(big.Int).SetBytes(raw[32:])) {
-			return errors.New("no")
+			return "", errors.New("no")
 		}
-		return nil
+		if d.mode == "" {
+			return "launch", nil
+		}
+		return d.mode, nil
 	})
 	t.Cleanup(func() { routes.SetMemberVerify(nil) })
-	return &ownerDevice{key: k}
+	return d
 }
 
 const testOwnerKID = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -138,6 +145,15 @@ func TestMemberGrantsAreSignedByTheOwnersDeviceAndBoundedByTheLinkCap(t *testing
 	agent := board.NewMemberGrant{LinkID: l.LinkID, HubUser: "hub-user-cccc3333", Level: "view", ScopeKind: "agent", ScopeID: "a-1", BoardID: "team1", Days: 7}
 	assert.Equal(t, 400, call(h, "POST", path, d.sign(t, agent, time.Now(), false), js).Code, "one agent: shut")
 	board.AllowMemberGatesForTest(t)
+	// Security decision 7: a full grant is signed only by a launch-mode device. An interact or view device that signs one is refused, and nothing is written.
+	before := count()
+	for _, m := range []string{"view", "interact"} {
+		d.mode = m
+		rec = call(h, "POST", "/api/member-grants", d.sign(t, full, time.Now(), false), js)
+		assert.Equal(t, 403, rec.Code, m+" device signing full: "+rec.Body.String())
+		assert.Equal(t, before, count(), m+" device wrote nothing")
+	}
+	d.mode = ""
 	rec = call(h, "POST", "/api/member-grants", d.sign(t, full, time.Now(), false), js)
 	require.Equal(t, 200, rec.Code, "gates open and the link allows interact: "+rec.Body.String())
 	var fg struct {

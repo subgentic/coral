@@ -43,10 +43,10 @@ const memberGrantWindow = 5 * time.Minute
 
 // memberVerify checks that kid is a device of this computer's owner and that sig is its signature over the grant's digest (board.MemberGrantDigest): the Hub half of the signed `grant-member` message and the
 // owner-pair check (B2) are what make it. Nil until they exist, which refuses every grant: no grant is written without it, and nothing here accepts a signature it did not check.
-var memberVerify func(ctx context.Context, digest []byte, kid, sig string) error
+var memberVerify func(ctx context.Context, digest []byte, kid, sig string) (signerMode string, err error)
 
 // SetMemberVerify wires the owner-device signature check.
-func SetMemberVerify(f func(ctx context.Context, digest []byte, kid, sig string) error) {
+func SetMemberVerify(f func(ctx context.Context, digest []byte, kid, sig string) (string, error)) {
 	memberVerify = f
 }
 
@@ -148,8 +148,14 @@ func (h *BoardHandler) createMemberGrant(w http.ResponseWriter, r *http.Request,
 		}
 	}
 	// The signature is checked before anything is written; the store checks the rest and spends the nonce.
-	if err := memberVerify(r.Context(), board.MemberGrantDigest(ng), in.Signature.KID, in.Signature.Sig); err != nil {
+	signerMode, err := memberVerify(r.Context(), board.MemberGrantDigest(ng), in.Signature.KID, in.Signature.Sig)
+	if err != nil {
 		errForbidden(w, "that is not the signature of one of your own devices")
+		return
+	}
+	// A full grant is a shell on this computer: only a device at the top mode (launch) can sign one. The mode is read from the computer's own device list by the verifier, never from the request.
+	if in.Level == board.MemberLevelFull && signerMode != "launch" {
+		errForbidden(w, "giving full access needs a device with launch access: sign with one")
 		return
 	}
 	if d := time.Since(time.Unix(ng.Ts, 0)); d > memberGrantWindow || d < -memberGrantWindow {
