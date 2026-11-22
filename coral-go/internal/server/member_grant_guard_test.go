@@ -307,3 +307,69 @@ func TestAnAgentScopeOrAnEmptyScopeGivesNoViewRoute(t *testing.T) {
 	assert.False(t, viewScopeAllows([]board.MemberGrant{{Level: board.MemberLevelView, ScopeKind: board.MemberScopeBoard, ScopeID: ""}}, route), "an empty scope is nothing, not all")
 	assert.False(t, viewScopeAllows(nil, route))
 }
+
+// #20581 (b): a stream already open when its person's grant is revoked, expires, or when the link's cap falls under it, is ended by the next sweep; one that still passes is left alone; a person who never had a grant is not touched.
+func TestASweepEndsOpenStreamsWhoseGrantEndedExpiredOrWasLowered(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	ctx := context.Background()
+	bs := guardStore(t)
+	cp := &guardCap{}
+	cp.set(tunnel.TierLaunch)
+	var ended atomic.Int32
+	open := func(user string, need tunnel.Tier) func() {
+		return tunnel.RegisterOpenStream(guardLink, user, need, func() { ended.Add(1) })
+	}
+
+	full, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelFull))
+	require.NoError(t, err)
+	defer open(guardUser, tunnel.TierLaunch)() // a terminal
+	defer open("hub-user-eeee5555", tunnel.TierLaunch)()
+	now := time.Now()
+
+	assert.Zero(t, SweepOpenStreams(ctx, bs, cp.get, now), "a live full grant keeps its terminal; a person with no grants is not decided here")
+	assert.Zero(t, ended.Load())
+
+	cp.set(tunnel.TierInteract)
+	assert.Equal(t, 1, SweepOpenStreams(ctx, bs, cp.get, now), "the link's cap fell under the terminal's tier")
+	ended.Store(0)
+	cp.set(tunnel.TierLaunch)
+
+	exp, err := time.Parse(time.RFC3339, full.ExpiresAt)
+	require.NoError(t, err)
+	assert.Equal(t, 1, SweepOpenStreams(ctx, bs, cp.get, exp.Add(time.Second)), "the grant expired while the stream was open")
+	ended.Store(0)
+
+	_, err = bs.RevokeMemberGrant(ctx, full.GrantID, now)
+	require.NoError(t, err)
+	assert.Equal(t, 1, SweepOpenStreams(ctx, bs, cp.get, now), "revoked while open")
+	assert.EqualValues(t, 1, ended.Load(), "only the granted person's stream; the person with no grants kept theirs")
+}
+
+// The sweeper runs on a timer and stops with its context.
+func TestTheSweeperEndsAStreamWithinItsInterval(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	bs := guardStore(t)
+	cp := &guardCap{}
+	cp.set(tunnel.TierLaunch)
+	g, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelFull))
+	require.NoError(t, err)
+	ended := make(chan struct{}, 1)
+	defer tunnel.RegisterOpenStream(guardLink, guardUser, tunnel.TierLaunch, func() { ended <- struct{}{} })()
+	done := make(chan struct{})
+	go func() { RunMemberGrantSweeper(ctx, bs, cp.get, 20*time.Millisecond); close(done) }()
+	select {
+	case <-ended:
+		t.Fatal("ended while the grant was live")
+	case <-time.After(100 * time.Millisecond):
+	}
+	_, err = bs.RevokeMemberGrant(ctx, g.GrantID, time.Now())
+	require.NoError(t, err)
+	select {
+	case <-ended:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the stream was not ended after the revoke")
+	}
+	cancel()
+	<-done
+}
