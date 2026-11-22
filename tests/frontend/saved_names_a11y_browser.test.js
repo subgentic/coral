@@ -47,7 +47,8 @@ const { coralReady } = require('./helpers/wait');
             check(await names(), 'two that start alike');
             const lone = await ev(`[...document.querySelectorAll('#group-table-view .dt-quiet, #group-table-view .dt-mail-open[data-row-name]')].map(b => b.dataset.rowName || b.getAttribute('aria-label'))`); // a phone's Saved rows are mail rows with no Done column (#9583): the row's own name is what tells the pair apart
             // told apart by what the names say, not by where the list put them
-            const pair = lone.filter(n => /The same first words/.test(n)), single = lone.filter(n => !/The same first words/.test(n));
+            const rowNames = tag === 'phone' ? lone.filter(n => !/^(Mark done|Reopen)/.test(n)) : lone; // a row's Done is under its words since #20508 (the Inbox's row): the row's own name is what is told apart
+            const pair = rowNames.filter(n => /The same first words/.test(n)), single = rowNames.filter(n => !/The same first words/.test(n));
             assert.deepEqual(pair.map(n => n.slice(-8)).sort(), ['(1 of 2)', '(2 of 2)'], `${tag}: the pair is told apart (${JSON.stringify(lone)})`);
             assert.equal(single.length, 1, `${tag}: and the other item stands alone (${JSON.stringify(lone)})`);
             assert.ok(!/\(\d of/.test(single[0]), `${tag}: an item that starts alone has no number (${single[0]})`);
