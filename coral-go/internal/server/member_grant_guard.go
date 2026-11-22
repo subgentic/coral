@@ -19,7 +19,10 @@ const (
 )
 
 // grantRoute is the request a grant is checked against for its scope: nil to check the tier alone.
-type grantRoute struct{ method, path string }
+type grantRoute struct {
+	method, path string
+	viewOnly     bool // set by memberGrantAllows: the person holds View grants and no Full one
+}
 
 // memberGrantTier is the most a grant gives, as a tunnel tier. A view grant reads; a full grant is the link's cap and no more, so it is as high as the cap lets it be (the lower of the two is
 // taken by the caller, on every request).
@@ -69,8 +72,11 @@ func memberGrantAllows(ctx context.Context, bs *board.Store, linkCap func(contex
 		return false, memberGrantLowCode
 	}
 	// A person with only View grants reaches the closed View list, and only for a board they were given (V1, V4): the tier says what a route may do, the scope says whose it is. A Full grant is the whole computer.
-	if !full && route != nil && !viewScopeAllows(live, route) {
-		return false, memberGrantScopeCode
+	if !full && route != nil {
+		route.viewOnly = true
+		if !viewScopeAllows(live, route) {
+			return false, memberGrantScopeCode
+		}
 	}
 	return true, ""
 }
@@ -105,7 +111,8 @@ func MemberGrantGuard(bs *board.Store, linkCap func(context.Context, string) (tu
 				next.ServeHTTP(w, r)
 				return
 			}
-			if ok, code := memberGrantAllows(r.Context(), bs, linkCap, v, need, time.Now(), &grantRoute{r.Method, r.URL.Path}); !ok {
+			route := &grantRoute{method: r.Method, path: r.URL.Path}
+			if ok, code := memberGrantAllows(r.Context(), bs, linkCap, v, need, time.Now(), route); !ok {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
 				msg := "the access you were given has ended"
@@ -114,6 +121,9 @@ func MemberGrantGuard(bs *board.Store, linkCap func(context.Context, string) (tu
 				}
 				_, _ = w.Write([]byte(`{"error":"` + msg + `","code":"` + code + `"}`))
 				return
+			}
+			if route.viewOnly { // a View person is answered by a typed shape of allowlisted fields (V2)
+				r = r.WithContext(cloud.WithViewOnly(r.Context()))
 			}
 			next.ServeHTTP(w, r)
 		})
@@ -131,7 +141,7 @@ func SweepOpenStreams(ctx context.Context, bs *board.Store, linkCap func(context
 		if k.Need == tunnel.TierNever {
 			continue
 		}
-		if ok, _ := memberGrantAllows(ctx, bs, linkCap, cloud.Via{LinkID: k.Link, HubUser: k.User}, k.Need, now, &grantRoute{k.Method, k.Path}); !ok {
+		if ok, _ := memberGrantAllows(ctx, bs, linkCap, cloud.Via{LinkID: k.Link, HubUser: k.User}, k.Need, now, &grantRoute{method: k.Method, path: k.Path}); !ok {
 			n := tunnel.EndOpenStreams(k)
 			ended += n
 			slog.Info("[cloud] open streams of a Hub person were closed: their access ended", "link", k.Link, "streams", n)
