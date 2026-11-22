@@ -12,8 +12,7 @@
 .artifact-review-state { flex: none; white-space: nowrap; color: var(--text-secondary); font-size: var(--fs-sm); background: var(--bg-tertiary); border-radius: 999px; padding: 2px 10px; }
 .artifact-review-state[hidden] { display: none; }
 /* the sandbox chip and the one-line question (#12224) */
-.artifact-viewer-sandbox { flex: none; cursor: pointer; border: 0; background: var(--bg-tertiary); color: var(--text-secondary); font: inherit; font-size: var(--fs-sm); height: auto; padding: 2px 10px; }
-.artifact-viewer-sandbox[hidden], .artifact-linked-notice[hidden] { display: none; }
+.artifact-linked-notice[hidden] { display: none; }
 .artifact-viewer-scriptson { flex: none; background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); height: auto; padding: 2px 10px; } /* Scripts on (#14783): words only, not a button: Turn off is in the bar under the header and in the ⋯ menu */
 .artifact-viewer-scriptson[hidden] { display: none; }
 .artifact-viewer-source { flex: none; margin: 0; padding: 8px 16px; color: var(--text-secondary); font-size: var(--fs-sm); line-height: var(--lh-body); overflow-wrap: anywhere; }
@@ -46,8 +45,8 @@
     .artifact-viewer-details-item { display: flex; }
     .artifact-viewer-header .artifact-viewer-details[aria-expanded="false"] { display: none; }
     .artifact-viewer-chips .av-bar .av-prev, .artifact-viewer-chips .av-bar .av-next { display: none; }
-    .artifact-viewer-chips > :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden]) { background: none; padding: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .artifact-viewer-chips > :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden]) + :is(.artifact-viewer-sandbox, .artifact-review-state, .artifact-viewer-scriptson):not([hidden])::before { content: "\00b7"; margin-inline-end: 6px; }
+    .artifact-viewer-chips > :is(.artifact-review-state, .artifact-viewer-scriptson):not([hidden]) { background: none; padding: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .artifact-viewer-chips > :is(.artifact-review-state, .artifact-viewer-scriptson):not([hidden]) + :is(.artifact-review-state, .artifact-viewer-scriptson):not([hidden])::before { content: "\00b7"; margin-inline-end: 6px; }
 }
 /* the version bar, its list and the compare view (moved from the start CSS: only the viewer draws them, #12223) */
 /* Versions of an artifact (#6472, layout A): the bar under the title, its list, the compare view; and the comment groups of a later version. */
