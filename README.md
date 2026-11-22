@@ -1,7 +1,7 @@
 <p align="center">
-  <h1 align="center">Coral: The Inbox for Your Coding Agents</h1>
+  <h1 align="center">Coral: Your coding agents, one team.</h1>
   <p align="center">
-    <strong>Your agents do the work. Anything that needs <em>you</em> — a permission prompt, a question, a plan or file to review — lands in one Inbox on your laptop or phone, and the agent carries on the moment you answer.</strong>
+    <strong>Coral turns the coding agents you already pay for into one team that keeps working, checks itself, and reaches you on your phone. Anything that needs <em>you</em> lands in one Inbox on your laptop or phone, and the agent carries on the moment you answer.</strong>
   </p>
   <p align="center">
     <a href="https://github.com/subgentic/coral/releases/latest/download/Coral.dmg"><strong>macOS (<code>.dmg</code>)</strong></a> ·
@@ -11,7 +11,7 @@
     <a href="https://github.com/subgentic/coral/releases/latest"><strong>All releases</strong></a>
   </p>
   <p align="center">
-    <sub>Works with <strong>Claude Code</strong>, <strong>Codex</strong>, and <strong>Antigravity</strong> · <strong>Bring your own keys &amp; subscriptions</strong> · <strong>Apache-2.0</strong></sub>
+    <sub>Works with <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>Antigravity</strong>, and <strong>Pi</strong> · <strong>Bring your own keys &amp; subscriptions</strong> · <strong>Apache-2.0</strong></sub>
   </p>
   <p align="center">
     <a href="#quick-start">Quick Start</a> ·
@@ -41,17 +41,11 @@ curl -fsSL https://github.com/subgentic/coral/releases/latest/download/install.s
 
 ## Who Coral Is For
 
-Running one coding agent for ten minutes in a terminal is easy. Running four, six, or ten agents across a multi-hour or multi-day project is where ad-hoc workflows break down:
-- A **permission prompt** sits unseen for an hour in a background terminal tab.
-- An **architectural question** or finished plan gets buried in scrollback.
-- **Context compaction, agent restarts, or handoffs** wipe out why a decision was made two hours ago.
+Developers who run several coding agents at once, often from more than one vendor, and want them to keep working while they are away. One agent in one terminal is easy. Four, six or ten across a multi-hour project is where a permission prompt sits unseen in a background tab and a question gets buried in scrollback.
 
-Coral turns ad-hoc agent sessions into a structured workflow where **your agents report to you**:
-
-1. **Developers running multiple agents in parallel** who want one **Inbox** (`Needs you`) for every permission, question, and deliverable across every running session — instead of babysitting terminal windows.
-2. **Builders mixing the best agent and model for each role** — for example, a **Claude Code** Orchestrator breaking down work, **Codex** workers writing code in isolated git worktrees, and an **Antigravity** reviewer checking the diff.
-3. **Long-running sessions where you stay in control.** Coral's **Goals** (each with a clear `Done when` check) and **Tasks** let you break long-horizon projects into structured steps with review checkpoints — so multi-hour or multi-day work is completed with a high level of control.
-4. **Sessions that keep their memory across agents and compactions.** Because the **Board**, **Tasks**, and **Goals** live in Coral — backed by **universal search** across boards and chats plus automatic **Knowledge distillation** — your team keeps its context across agents, restarts, and context compactions instead of starting from scratch.
+- **Know which agent needs you, from anywhere.** One **Inbox** (`Needs you`) lists every permission prompt, question and file to review. Answer from your laptop or your phone and the agent carries on. Optional desktop, Slack or Discord alerts tell you when an agent is stuck.
+- **"Done" means checked.** Tasks wait on each other. A finished task can be held for review (`review_pending`), so a second agent, which can be from another vendor, checks the work before the next step starts. Each agent's changed files are one click away.
+- **Keeps working when you don't.** Run Coral on a spare Mac or a server. Put a whole team to sleep, then wake it later, or after an upgrade, with every session restored. Agents wait for a reply instead of polling, so a waiting agent uses no tokens, and a health monitor flags stuck work.
 
 ---
 
@@ -94,7 +88,7 @@ Behind the Inbox is the coordination and memory layer that keeps multi-agent ses
   - **Universal search across boards and chats:** When an agent's context compacts — or a teammate picks up a handoff — it can search past board decisions and conversation transcripts with `coral-board search` and `coral-agent history search`, while you can search every agent's conversations in **Inbox › All chats** and **Board history**.
   - **Automatic Knowledge distillation:** Coral distills the team's transcripts in three passes — extracting per-agent learnings, cross-referencing how teammates work together, and formatting a shared **Knowledge** bundle (overview + per-agent guides on the team's **Knowledge** tab) that is automatically injected when agents start or wake.
 - **High-control task queue with review gates.** Break long-horizon goals into sequential or parallel tasks with dependencies and required deliverables. Authors submit finished work for review (`review_pending`), and designated reviewers inspect the diff and approve or request changes before dependent tasks unlock.
-- **Mixed-vendor teams with unified permissions.** Run **Claude Code**, **Codex**, and **Antigravity** on the same board. Define permissions once (`file_read`, `git_write`, `shell:<pattern>`, or read-only review roles) and Coral translates them into each CLI's native flags and sandboxes.
+- **Mixed-vendor teams with unified permissions.** Run **Claude Code**, **Codex**, **Antigravity** and **Pi** on the same board. Define permissions once (`file_read`, `git_write`, `shell:<pattern>`, or read-only review roles) and Coral translates them into each CLI's native flags and sandboxes.
 - **Event-driven `wait`, never polling.** Workers run `coral-board wait` for a teammate, task, or commit and end their turn. Coral wakes the agent automatically the moment the reply or dependency lands — zero `sleep` loops and zero tokens burned waiting.
 - **Git worktree isolation & inline diffs.** Launch a team into an isolated git worktree (`~/.coral/worktrees/<team>`) or have agents work in per-task worktrees so your main checkout stays clean. Inspect each agent's uncommitted and committed changes file by file beside its chat.
 
@@ -149,13 +143,13 @@ When you run long-horizon sessions across multiple models and agent teams, you c
 
 Coral is not another coding agent — it is the control and memory layer around the coding agents you already use.
 
-- **Versus single-vendor agent tools (*Claude Code / Desktop, Codex App, Cursor*):** Vendor tools work well when you run one provider in one window. Coral coordinates **Claude Code, Codex, and Antigravity** together on one shared board, unifies permissions across CLIs, keeps long-running sessions on track with **Goals** and **Tasks**, preserves memory across compactions and restarts (via the board, universal search, and Knowledge distillation), and puts every agent's questions, permissions, and review files into one **Inbox** reachable from your phone.
+- **Versus single-vendor agent tools (*Claude Code / Desktop, Codex App, Cursor*):** Vendor tools work well when you run one provider in one window. Coral coordinates **Claude Code, Codex, Antigravity and Pi** together on one shared board, unifies permissions across CLIs, keeps long-running sessions on track with **Goals** and **Tasks**, preserves memory across compactions and restarts (via the board, universal search, and Knowledge distillation), and puts every agent's questions, permissions, and review files into one **Inbox** reachable from your phone.
 - **Versus terminal multiplexers & local plan files:** Running agents in raw `tmux` panes or tracking work in static markdown files requires you to manually relay context and check terminals. Coral provides a live **Inbox (`Needs you`)** with versioned artifact diffs and passage comments, **event-driven `coral-board wait`**, shared memory and **Knowledge distillation**, a task queue with review gates, and real-time cost analytics.
 - **Versus code-first agent SDKs (*CrewAI, AutoGen, LangGraph*):** Code frameworks help you write custom Python/TypeScript bots against raw LLM APIs. Coral runs the coding CLIs you already subscribe to — zero glue code required.
 
 | Capability | **Coral** | **Single-Vendor Agent Apps** *(Claude / Codex / Cursor)* | **Raw `tmux` / Manual Plan Files** |
 |---|:---:|:---:|:---:|
-| **Supported coding agents** | **Claude Code, Codex, Antigravity** | Single vendor only | Any CLI (uncoordinated) |
+| **Supported coding agents** | **Claude Code, Codex, Antigravity, Pi** | Single vendor only | Any CLI (uncoordinated) |
 | **Unified Inbox (`Needs you`) for permissions, questions & file reviews** | **Yes (Web + Phone)** | In-app per session | No |
 | **Versioned artifact review with inline `Compare` diffs & passage comments** | **Yes** | No | No |
 | **Long-running session control** | **Goals (`Done when`) + task queue + review gates** | Same-vendor subagents / threads | Manual |
@@ -178,6 +172,7 @@ Coral drives the agent CLIs installed on your machine; it does not install or au
 - [**Claude Code (`claude`)**](https://code.claude.com/docs/en/overview) — `npm install -g @anthropic-ai/claude-code`
 - [**Codex (`codex`)**](https://github.com/openai/codex) — `npm install -g @openai/codex`
 - [**Antigravity (`agy`)**](https://antigravity.google) — `curl -fsSL https://antigravity.google/cli/install.sh | bash`
+- [**Pi (`pi`)**](https://pi.dev) — `npm install -g --ignore-scripts @earendil-works/pi-coding-agent`
 
 ### 2. One-step install per platform
 
@@ -234,7 +229,7 @@ See the full **[Getting Started Guide](https://subgentic.github.io/coral/getting
 | **Long-Horizon Goals & Tasks** | Goals with checkable `Done when` lines and structured tasks with dependencies, required deliverables, and review gates so long-running sessions stay under your control |
 | **Shared Memory & Universal Search** | The Board, Tasks, and Goals persist in Coral across restarts and compactions, with full-text search across boards and agent transcripts (`coral-board search`, `coral-agent history search`, and **Inbox › All chats**) |
 | **Knowledge Distillation** | Automatically distills agent transcripts into a shared team **Knowledge** bundle (overview + per-agent guides) injected when agents start or wake |
-| **Mixed-Vendor Agent Teams** | Run **Claude Code**, **Codex**, and **Antigravity** on one shared board with unified permission translation |
+| **Mixed-Vendor Agent Teams** | Run **Claude Code**, **Codex**, **Antigravity** and **Pi** on one shared board with unified permission translation |
 | **Event-Driven `wait`** | Agents run `coral-board wait --from <agent>` (or `--task <id>`) and stop their turn; Coral wakes them when the event occurs |
 | **Sleep, Wake & Idle Parking** | Idle agents auto-sleep to save RAM and wake on new messages; sleep and wake entire teams across Coral restarts or upgrades |
 | **Git Worktrees & Diffs** | Opt-in team worktrees (`~/.coral/worktrees/<team>`), per-agent worktree modes, and live inline diffs per session |
