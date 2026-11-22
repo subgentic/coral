@@ -66,8 +66,11 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.servers = []; window.__seen.length = 0; const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             await waitFor(`!!document.getElementById('cost-no-computer') && !document.getElementById('cost-no-computer').hidden`, `${tag}: Overview says to link a computer`, 6000);
             assert.equal(await ev(`document.getElementById('cost-no-computer').textContent`), 'Link a computer to see usage');
+            const said = () => ev(`[...document.querySelectorAll('#cost-page *')].filter(e => e.children.length === 0 && e.getClientRects().length && /Link a computer to see usage/.test(e.textContent)).length`); // the lines a viewer can see
+            assert.equal(await said(), 1, `${tag}: Overview says to link a computer once`);
             assert.equal(await select('usage'), 'usage');
             await waitFor(`/Link a computer to see usage/.test(document.getElementById('cost-usage')?.textContent || '')`, `${tag}: Usage says it too`, 6000);
+            assert.equal(await said(), 1, `${tag}: Usage says it once too, not under Refresh and again under its filters`);
             await shot(`analytics-cloud-no-computer-${w}`);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: a request would have gone out by now; there is nothing to wait for
             assert.deepEqual(await ev(`window.__seen.filter(p => /^\\/api\\/(remote\\/[^/]+\\/api\\/)?(token-usage|call-metrics|analytics|board)(\\/|\\?|$)/.test(p))`), [], `${tag}: with no computer linked no Analytics request is sent anywhere`);

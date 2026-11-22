@@ -175,6 +175,7 @@
 
 .cost-card-hint { font-size: var(--fs-sm); color: var(--text-secondary); line-height: var(--lh-ui); }
 .cost-note { margin: 0 0 12px; font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); max-width: 70ch; }
+#cost-page:has([data-cview]:not([hidden]) .atab-say) #cost-no-computer { display: none; } /* a tab that says it itself (Usage) is not told twice, under Refresh and under its filters */
 .cost-help { margin: 0 0 12px; }
 .cost-help .cost-note { margin: 8px 0 0; }
 
