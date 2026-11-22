@@ -376,7 +376,7 @@ func TestSignerModeIsReadFromTheListNotTheBody(t *testing.T) {
 	low := newSigner(t)
 	r.add(low, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
 	// nothing in a body names the signer's mode; lowering it in the list lowers what the signer can do at once
-	require.NoError(t, r.ss.SetDeviceMode(context.Background(), r.signer.kid, "view", t0))
+	require.NoError(t, r.ss.SetDeviceMode(context.Background(), r.signer.kid, "view", "", t0))
 	r.refused(devicekey.ErrAboveSigner, r.approve(r.signer, newSigner(t), "interact"), r.signer, t0)
 }
 

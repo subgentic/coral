@@ -52,7 +52,7 @@ type Store interface {
 	ActiveDeviceKey(ctx context.Context, kid string, now time.Time) (store.DeviceKey, error)
 	AddDeviceKey(ctx context.Context, k store.DeviceKey, now time.Time) (bool, error)
 	RemoveDeviceKey(ctx context.Context, kid, reason string, now time.Time) error
-	SetDeviceMode(ctx context.Context, kid, mode string, now time.Time) error
+	SetDeviceMode(ctx context.Context, kid, mode, by string, now time.Time) error
 	TouchDeviceKey(ctx context.Context, kid string, now time.Time) error
 	RecordNonce(ctx context.Context, nonce, kid string, now time.Time, window time.Duration) error
 	NonceSeen(ctx context.Context, nonce string, now time.Time) error
@@ -329,7 +329,7 @@ func (v *Verifier) apply(ctx context.Context, m Message, signer, target store.De
 		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: base64.RawURLEncoding.EncodeToString(s[:]), PK: raw, Label: m.Label, Mode: tunnel.TierView.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindPasskey, Link: signer.Link, HubUser: signer.HubUser, ApprovedBy: signer.KID}, now)
 		return mapStoreErr(err)
 	case RaiseMode:
-		return mapStoreErr(v.Store.SetDeviceMode(ctx, m.TargetKID, mode.String(), now))
+		return mapStoreErr(v.Store.SetDeviceMode(ctx, m.TargetKID, mode.String(), signer.KID, now))
 	case RemoveDevice:
 		return mapStoreErr(v.Store.RemoveDeviceKey(ctx, m.TargetKID, store.DeviceRemoved, now))
 	}

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,9 +45,28 @@ func TestDeviceKeyNoticesShowANewKeyByItsFingerprintForADay(t *testing.T) {
 	assert.Contains(t, items[0].Line, "Owner laptop")
 	assert.NotContains(t, items[0].Line, "Phone", "the new key's own label is the sender's word, not shown")
 
-	require.NoError(t, ss.SetDeviceMode(ctx, fresh.KID, "interact", t0))
+	// A raise names who raised it, not who approved the key: "Second laptop" raises "Phone", which "Owner laptop" approved.
+	second := mk("Second laptop", "", t0.Add(-47*time.Hour))
+	require.NoError(t, ss.SetDeviceMode(ctx, fresh.KID, "interact", second.KID, t0))
 	items, _ = DeviceKeyNoticeItems(ss, func() time.Time { return t0 })(ctx)
 	require.Len(t, items, 1)
-	assert.Contains(t, items[0].Line, "raised")
+	assert.Contains(t, items[0].Line, "raised by \"Second laptop\"")
+	assert.NotContains(t, items[0].Line, "Owner laptop", "not the original approver")
 	assert.Contains(t, items[0].Line, "interact")
+
+	// A key made at this computer (no approver) that a signed message raised is told too.
+	require.NoError(t, ss.SetDeviceMode(ctx, owner.KID, "interact", fresh.KID, t0))
+	items, _ = DeviceKeyNoticeItems(ss, func() time.Time { return t0 })(ctx)
+	require.Len(t, items, 2, "the owner-made key's raise is in the list")
+	var lines []string
+	for _, it := range items {
+		lines = append(lines, it.Line)
+	}
+	assert.Contains(t, strings.Join(lines, "\n"), devicekey.DisplayFingerprint(owner.PK))
+	assert.Contains(t, strings.Join(lines, "\n"), "raised by \"Phone\"")
+
+	// A raise made at this computer, by the person here, is not news to them.
+	require.NoError(t, ss.SetDeviceMode(ctx, second.KID, "launch", "", t0))
+	items, _ = DeviceKeyNoticeItems(ss, func() time.Time { return t0 })(ctx)
+	assert.Len(t, items, 2)
 }

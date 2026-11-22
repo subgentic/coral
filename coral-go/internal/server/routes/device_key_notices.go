@@ -26,21 +26,31 @@ func DeviceKeyNoticeItems(ss *store.SessionStore, now func() time.Time) func(ctx
 		}
 		cutoff := now().Add(-deviceKeyNoticeWindow).Unix()
 		var items []NeedsYouItem
+		label := func(kid string) string {
+			if s, ok := byKID[kid]; ok {
+				return "\"" + s.Label + "\""
+			}
+			return "a device"
+		}
 		for _, k := range keys {
-			if k.RemovedAt != 0 || k.ApprovedBy == "" || k.ChangedAt < cutoff {
+			if k.RemovedAt != 0 || k.ChangedAt < cutoff {
 				continue
 			}
-			by := "a device"
-			if s, ok := byKID[k.ApprovedBy]; ok {
-				by = "\"" + s.Label + "\""
-			}
-			what := "A device key was added"
-			if k.Kind == store.DeviceKindPasskey {
-				what = "A passkey was trusted"
-			}
-			line := what + " by " + by + ": " + devicekey.DisplayFingerprint(k.PK) + ", access " + k.Mode
-			if k.ChangedAt > k.CreatedAt {
-				line = "A device key was raised by " + by + ": " + devicekey.DisplayFingerprint(k.PK) + ", access " + k.Mode
+			fp := devicekey.DisplayFingerprint(k.PK)
+			var line string
+			switch {
+			case k.RaisedBy == store.PairOwner:
+				continue // raised here, by the person at this computer: nothing to tell them
+			case k.RaisedBy != "": // a signed raise: the signer who raised it, whoever approved the key
+				line = "A device key was raised by " + label(k.RaisedBy) + ": " + fp + ", access " + k.Mode
+			case k.ApprovedBy == "":
+				continue // made at this computer
+			default:
+				what := "A device key was added"
+				if k.Kind == store.DeviceKindPasskey {
+					what = "A passkey was trusted"
+				}
+				line = what + " by " + label(k.ApprovedBy) + ": " + fp + ", access " + k.Mode
 			}
 			items = append(items, NeedsYouItem{Kind: "device_key", Line: needsYouLine(line), ID: "device_key:" + k.KID + ":" + strconv.FormatInt(k.ChangedAt, 10), At: time.Unix(k.ChangedAt, 0).UTC().Format(time.RFC3339)})
 		}

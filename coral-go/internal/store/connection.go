@@ -269,7 +269,10 @@ func (d *DB) addDevicePairColumns(ctx context.Context) error {
 	}
 	defer tx.Rollback() //nolint:errcheck // a committed transaction ignores it
 	if _, err := tx.ExecContext(ctx, "ALTER TABLE device_keys ADD COLUMN link TEXT NOT NULL DEFAULT ''"); err != nil {
-		return nil // the column is already there: nothing to add and nothing to mark
+		if strings.Contains(err.Error(), "duplicate column") {
+			return nil // the column is already there: nothing to add and nothing to mark
+		}
+		return err // a locked or failing database is not "already migrated"
 	}
 	if _, err := tx.ExecContext(ctx, "ALTER TABLE device_keys ADD COLUMN hub_user TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err

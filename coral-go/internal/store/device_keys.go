@@ -73,6 +73,8 @@ type DeviceKey struct {
 	ViaPasskey string
 	// ChangedAt is when the row was made or its mode last changed (unix seconds): what the owner's notice (M4) is dated by.
 	ChangedAt int64
+	// RaisedBy is who last raised this key's mode: the signer's kid for a signed raise, PairOwner for one made at this computer, empty if never raised (M4: the owner's notice names the raiser, not the approver).
+	RaisedBy string
 }
 
 // PairState says what the row's pair is: owner (both columns the marker), bound (a link and a Hub label, neither the marker) or neither (anything else, which every check refuses).
@@ -105,13 +107,13 @@ func (k DeviceKey) formOK() bool {
 	return k.Kind == DeviceKindDevice || k.Kind == DeviceKindPasskey
 }
 
-const deviceCols = `kid, pk, label, mode, origin, kind, created_at, last_used_at, removed_at, removed_reason, link, hub_user, approved_by, via_passkey, changed_at`
+const deviceCols = `kid, pk, label, mode, origin, kind, created_at, last_used_at, removed_at, removed_reason, link, hub_user, approved_by, via_passkey, changed_at, raised_by`
 
 func scanDeviceKey(row interface{ Scan(...any) error }) (DeviceKey, error) {
 	var k DeviceKey
 	var used, rem sql.NullInt64
 	var reason sql.NullString
-	if err := row.Scan(&k.KID, &k.PK, &k.Label, &k.Mode, &k.Origin, &k.Kind, &k.CreatedAt, &used, &rem, &reason, &k.Link, &k.HubUser, &k.ApprovedBy, &k.ViaPasskey, &k.ChangedAt); err != nil {
+	if err := row.Scan(&k.KID, &k.PK, &k.Label, &k.Mode, &k.Origin, &k.Kind, &k.CreatedAt, &used, &rem, &reason, &k.Link, &k.HubUser, &k.ApprovedBy, &k.ViaPasskey, &k.ChangedAt, &k.RaisedBy); err != nil {
 		return DeviceKey{}, err
 	}
 	k.LastUsedAt, k.RemovedAt, k.RemovedReason = used.Int64, rem.Int64, reason.String
@@ -168,7 +170,7 @@ func (s *SessionStore) AddDeviceKey(ctx context.Context, k DeviceKey, now time.T
 	if active >= max {
 		return false, ErrKeyLimit
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO device_keys (`+deviceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?)`, k.KID, k.PK, k.Label, k.Mode, k.Origin, k.Kind, now.Unix(), k.Link, k.HubUser, k.ApprovedBy, k.ViaPasskey, now.Unix()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO device_keys (`+deviceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, '')`, k.KID, k.PK, k.Label, k.Mode, k.Origin, k.Kind, now.Unix(), k.Link, k.HubUser, k.ApprovedBy, k.ViaPasskey, now.Unix()); err != nil {
 		return false, err
 	}
 	return true, tx.Commit()
@@ -245,15 +247,18 @@ func (s *SessionStore) PromoteDeviceOrigin(ctx context.Context, kid string, now 
 // validDeviceMode: coral-hub's wire format has exactly these three modes.
 func validDeviceMode(m string) bool { return m == "view" || m == "interact" || m == "launch" }
 
-// SetDeviceMode changes the stored mode of an active key. Who may ask is the verifier's rule, not this method's.
-func (s *SessionStore) SetDeviceMode(ctx context.Context, kid, mode string, now time.Time) error {
+// SetDeviceMode changes the stored mode of an active key and records who raised it: by is the signer's kid, or "" for a change made at this computer (stored as PairOwner). Who may ask is the verifier's rule, not this method's.
+func (s *SessionStore) SetDeviceMode(ctx context.Context, kid, mode, by string, now time.Time) error {
+	if by == "" {
+		by = PairOwner
+	}
 	if !validDeviceMode(mode) {
 		return ErrDeviceKeyForm
 	}
 	if _, err := s.ActiveDeviceKey(ctx, kid, now); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, `UPDATE device_keys SET mode = ?, changed_at = ? WHERE kid = ? AND removed_at IS NULL`, mode, now.Unix(), kid)
+	_, err := s.db.ExecContext(ctx, `UPDATE device_keys SET mode = ?, changed_at = ?, raised_by = ? WHERE kid = ? AND removed_at IS NULL`, mode, now.Unix(), by, kid)
 	return err
 }
 
