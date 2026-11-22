@@ -153,13 +153,13 @@ const AGENTS_FIELDS = host => [
     { key: 'permission_mode', type: 'select', id: 'settings-permission-mode', wide: true, labelId: 'settings-permission-mode-label', label: 'Default permission mode', options: PERMISSION_OPTIONS,
         help: { text: 'Everything; safety checks on Claude only.', about: 'Default permission mode', docs: { topic: 'how-do-i', answer: 'What the permission modes allow' } }, helpTextClass: 'perm-mode-desc',
         setup: el => { el.setAttribute('data-on-change', 'm-perm-mode-describe'); const warn = document.createElement('span'); warn.className = 'perm-mode-warn sv-help'; warn.hidden = true; warn.textContent = 'Agents cannot start workers in this mode.'; el.closest('.sv-row').querySelector('.sv-text').append(warn); } }, // the line under the select is the chosen mode's meaning, said once; the three modes side by side are the row's More (#10266, after #10000)
-    { key: 'working_dir', type: 'text', id: 'settings-working-dir', label: 'Default working directory', help: moreOnly('The folder a new agent starts in.'), placeholder: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' } },
+    { key: 'working_dir', type: 'text', id: 'settings-working-dir', label: 'Default working directory', help: moreOnly('New agents start here.'), placeholder: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' } },
     { key: 'agents_behaviour', type: 'heading', id: 'settings-agents-behaviour', label: 'Behaviour' },
-    { key: 'auto_resume', type: 'toggle', id: 'settings-auto-resume', label: 'Resume after API errors', help: moreOnly('Wakes an agent again after a rate limit or API error.', "When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") },
+    { key: 'auto_resume', type: 'toggle', id: 'settings-auto-resume', label: 'Resume after API errors', help: moreOnly('Resumes agents automatically.', "When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") },
     { key: 'auto_sleep', type: 'toggle', id: 'settings-auto-sleep', label: 'Auto-sleep' }, // no help line: the Agents tab is at its word budget; what it does is in the release notes and the line Coral posts the first time it sleeps one (#12111)
     { key: 'auto_sleep_idle_minutes', type: 'number', id: 'settings-auto-sleep-minutes', label: 'After', unit: 'min', min: 15, max: 1440, step: 5, default: 60, attrs: { inputmode: 'numeric', 'aria-label': 'Minutes idle before an agent is put to sleep' } },
-    { key: 'auto_goals', type: 'toggle', id: 'settings-auto-goals', label: "Name each agent's goal", help: helpLine('Haiku writes a short goal line from your requests.', "Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.") },
-    { key: 'agent_low_priority', type: 'toggle', id: 'settings-agent-low-priority', label: 'Run agents at lower priority', help: moreOnly('Keeps the dashboard quick while agents are busy.', 'Agents and everything they start (builds, test runs) run below Coral itself (nice +10 on Mac and Linux, below normal on Windows), so the dashboard, Coral Hub and your own apps stay quick while agents use every CPU. It changes scheduling only, never what an agent may do. Applies to agents started after the change.') },
+    { key: 'auto_goals', type: 'toggle', id: 'settings-auto-goals', label: "Name each agent's goal", help: helpLine('Haiku names goals.', "Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.") },
+    { key: 'agent_low_priority', type: 'toggle', id: 'settings-agent-low-priority', label: 'Run agents at lower priority', help: moreOnly('Keeps Coral responsive.', 'Agents and everything they start (builds, test runs) run below Coral itself (nice +10 on Mac and Linux, below normal on Windows), so the dashboard, Coral Hub and your own apps stay quick while agents use every CPU. It changes scheduling only, never what an agent may do. Applies to agents started after the change.') },
     { key: 'agents_team', type: 'heading', id: 'settings-agents-team', label: 'Team and board' },
     { key: 'board_auto_attach', type: 'toggle', id: 'settings-board-auto-attach', label: 'Attach files linked in posts', help: moreOnly('Saves an image or Markdown file an agent links in a post, so the team can open it.', "When on, an agent's own board post that links a local image (png, jpg, gif, webp) or Markdown file changed in the last day has it stored as an artifact, so the team and Coral Hub can open it. When off, links stay as written and agents upload with coral-agent artifact upload.") },
     { key: 'nudge_claude_artifacts', type: 'toggle', id: 'settings-nudge-claude-artifacts', label: 'Coral artifact reminders', help: moreOnly('Asks an agent to publish to Coral when it publishes to claude.ai.', 'When an agent publishes to claude.ai, Coral types one note into its terminal asking for a Coral artifact instead (coral-agent artifact upload) and a link to it. Once per artifact; Coral never uploads or posts for the agent. When off, nothing is typed.') },
@@ -301,10 +301,10 @@ const HELP_LINES = {
     fit_pane_width: 'Sizes the tmux terminal to this browser window.',
     tb_fixed: 'Agents run in terminals held by this Coral.',
     custom_models: 'Model ids are passed to the CLI as written.',
-    working_dir: 'The folder a new agent starts in.',
+    working_dir: 'New agents start here.',
     default_thinking_claude: 'How much Claude thinks before it answers.',
-    auto_resume: 'Wakes an agent again after a rate limit or API error.',
-    agent_low_priority: 'Keeps the dashboard quick while agents are busy.',
+    auto_resume: 'Resumes agents automatically.',
+    agent_low_priority: 'Keeps Coral responsive.',
     board_auto_attach: 'Stores recent local images and Markdown documents so teammates can open them.',
     nudge_claude_artifacts: 'Reminds agents to publish shared files to Coral.',
     launch_in_worktree: 'Isolated checkout per team. Experimental; off by default.',
@@ -316,7 +316,7 @@ const HELP_LINES = {
 
 // One definition per setting; layout chooses its home without copying a control.
 const TEAM_KEYS = new Set(['agents_team', 'board_auto_attach', 'nudge_claude_artifacts', 'board_health_monitor']);
-const ADVANCED_KEYS = new Set(['agents_experimental', 'launch_in_worktree', 'gdoc_share', 'agents_tools', 'live_settings-prompts-live']);
+const ADVANCED_KEYS = new Set(['agents_experimental', 'launch_in_worktree', 'gdoc_share', 'agents_tools', 'codex_trust_hooks', 'live_settings-prompts-live']);
 const pick = (fields, keys) => fields.filter(f => keys.has(f.key));
 const advanced = id => ({ key: id, id, type: 'heading', label: 'Advanced', fold: true });
 

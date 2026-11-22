@@ -35,7 +35,8 @@ const ITEMS = [
             await coralReady('startup', 'liveList', 'settings');
             await ev(`try { localStorage.removeItem('coral-saved-filters'); } catch {} true`);
             await ev(`(() => { const R = window.fetch; const ITEMS = ${JSON.stringify(ITEMS)};
-                window.fetch = (u, o) => { const url = new URL(String(u), location.href); if (url.pathname !== '/api/saved') return R(u, o);
+                window.fetch = (u, o) => { const url = new URL(String(u), location.href); if (url.pathname === '/api/team-artifacts') return Promise.resolve(Response.json({ artifacts: [], total: 0, has_more: false, versions: 'newest' })); // this suite counts messages, with no saved files
+                    if (url.pathname !== '/api/saved') return R(u, o);
                     const q = (url.searchParams.get('q') || '').toLowerCase(), kind = url.searchParams.get('kind'), conv = url.searchParams.get('conv');
                     const list = ITEMS.filter(i => (!q || (i.title + ' ' + i.snippet).toLowerCase().includes(q)) && (!kind || i.kind === kind) && (!conv || i.ref === conv));
                     return Promise.resolve(new Response(JSON.stringify({ items: list, open: ITEMS.filter(i => !i.done_at).length, done: ITEMS.filter(i => i.done_at).length }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }; return true; })()`);
@@ -45,6 +46,7 @@ const ITEMS = [
             else await ev(`document.querySelector('.view-list-item[data-key="saved"]').click(); true`);
             await waitRows(3, 'the three open saved messages');
             await waitFor(`/Saved3/.test(${FOLDER_ROWS}.join('|')) && /All chats/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
+            await waitFor(`import((window.__coralStatic || '/static/') + 'inbox_reviews.js').then(m => m.countSavedReviews().complete)`, 'saved file count is known to be zero');
             const before = await folders();
 
             check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box, not on the heading"}`, await ev(`(() => { const a = document.activeElement; const inSearch = !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : 'inSearch'}; })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));

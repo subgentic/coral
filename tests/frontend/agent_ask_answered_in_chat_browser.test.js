@@ -35,6 +35,8 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.__fail = true; ${chat('Notes builder')}.click(); true`);
                 await waitFor(`window.__failed === 1`, `${at}the refused close was sent`, 8000);
                 await waitFor(`/already closed/.test((${row('Notes builder')} || { textContent: '' }).querySelector('.inbox-review-error')?.textContent || '')`, `${at}the row says why it was refused`, 8000);
+                await ev(`import(${S} + 'inbox_sidebar.js').then(m=>m.showInbox({folder:'needs'})).then(()=>true)`);
+                await waitFor(`/already closed/.test((${row('Notes builder')} || { textContent: '' }).querySelector('.inbox-review-error')?.textContent || '')`, `${at}refusal survives a list redraw`, 8000);
                 assert.equal(await ev(`${chat('Notes builder')}.disabled`), false, `${at}Answered in chat is usable again after a refusal`);
                 assert.equal(await ev(`window.__dismissed.length`), 0, `${at}nothing was closed`);
                 await ev(`window.__fail = false; ${chat('Notes builder')}.click(); true`);

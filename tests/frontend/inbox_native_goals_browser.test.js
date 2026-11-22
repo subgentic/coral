@@ -22,10 +22,11 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`(${FOLDER_ROWS}).some(w => /^All chats/.test(w))`, 'the Inbox folders are on screen', 10000);
         await waitFor(`(${FOLDER_ROWS}).some(w => /^Goals\\d*$/.test(w)) && (${FOLDER_ROWS}).some(w => /^Artifacts\\d*$/.test(w))`, 'Goals and Artifacts are listed: ' + JSON.stringify(await ev(FOLDER_ROWS)), 10000);
-        await waitFor(`(${FOLDER_ROWS}).some(w => /^Goals2$/.test(w))`, 'Goals counts the goals of both computers: ' + JSON.stringify(await ev(FOLDER_ROWS)), 10000);
 
         console.log('2. Goals opens with the goals of both computers');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => true)`);
+        // #20397 reads goals when their folder opens, rather than reading hidden lists.
+        await waitFor(`(${FOLDER_ROWS}).some(w => /^Goals2$/.test(w))`, 'Goals counts the goals of both computers: ' + JSON.stringify(await ev(FOLDER_ROWS)), 10000);
         for (const title of ['Goal from m1', 'Goal from m2']) {
             await waitFor(`[...document.querySelectorAll('#group-table-view .dt-primary')].some(e => e.textContent.includes(${JSON.stringify(title)}))`, title + ' is listed', 10000);
         }

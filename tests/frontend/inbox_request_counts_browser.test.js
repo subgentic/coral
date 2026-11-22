@@ -15,7 +15,7 @@ const { BASE } = require('./test_base');
         const real=window.fetch; window.fetch=(u,o={})=>{
             const p=new URL(String(u),location.href), method=(o.method||'GET').toUpperCase();
             if(!p.pathname.startsWith('/api/'))return real(u,o);
-            const q=new URLSearchParams(p.search);q.sort();window.__wire.push({method,path:p.pathname,query:q.toString()});window.__wireOpen++;
+            const q=new URLSearchParams(p.search);q.sort();window.__wire.push({method,path:p.pathname,query:q.toString(),epoch:window.__artifactReadEpoch?.()??0});window.__wireOpen++;
             let result;
             if(p.pathname.endsWith('/api/team-artifacts')) result=new Promise((resolve,reject)=>{
                 const status=window.__artifactStatus||200, bad=window.__artifactBad;
@@ -35,7 +35,7 @@ const { BASE } = require('./test_base');
         await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD+spy});
         for(const width of [1280,390]){
             await Emulation.setDeviceMetricsOverride({width,height:844,deviceScaleFactor:1,mobile:width===390});
-            await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);await settled();
+            await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);await ev(`import((window.__coralStatic||'/static/')+'artifacts_feed.js').then(m=>{window.__artifactReadEpoch=m.artifactReadEpoch;return true})`);await settled();
             check((await reads('/api/settings')).length<=1,`${width} startup settings shared`,await reads('/api/settings'));
             check((await reads('/api/system/auth-status')).length<=1,`${width} startup auth status shared`,await reads('/api/system/auth-status'));
             const cold=await reads('/api/team-artifacts'), coldCounts={};for(const r of cold){const key=r.path+'?'+r.query;coldCounts[key]=(coldCounts[key]||0)+1;}
@@ -44,7 +44,8 @@ const { BASE } = require('./test_base');
             check(!(await ev(`performance.getEntriesByType('resource').some(r=>new URL(r.name).pathname.endsWith('/inbox_activity.js'))`)),`${width} Activity module deferred until its folder opens`,null);
             for(const folder of ['tasks','activity','artifacts','chats','needs']){
                 await ev(`window.__wire=[]; import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.showInbox({folder:${JSON.stringify(folder)}})).then(()=>true)`);await settled();
-                const wire=await ev(`window.__wire`), counts={};for(const r of wire)if(r.method==='GET'&&r.path==='/api/team-artifacts'){const key=r.path+'?'+r.query;counts[key]=(counts[key]||0)+1;}
+                // A real feed revision invalidates the warm answer; only same-epoch reads are duplicates.
+                const wire=await ev(`window.__wire`), counts={};for(const r of wire)if(r.method==='GET'&&r.path==='/api/team-artifacts'){const key=r.epoch+':'+r.path+'?'+r.query;counts[key]=(counts[key]||0)+1;}
                 check(Object.values(counts).every(n=>n<=1),`${width} ${folder}: no duplicate artifact query`,counts);
                 check((await reads('/api/settings')).length===0,`${width} ${folder}: no settings reload`,await reads('/api/settings'));
                 if(folder!=='needs')check((await reads('/api/goals')).length===0,`${width} ${folder}: no hidden goals read`,await reads('/api/goals'));

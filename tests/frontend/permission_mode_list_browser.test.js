@@ -1,5 +1,5 @@
 // The permission mode as a list of explained rows, one component in New agent, New team and Settings > Defaults (#15886, LA2; spec 695ed583).
-// Today: six equal buttons on two rows, and only the chosen mode is explained. Done when all six explanations are readable without choosing, the arrow keys move the choice, and the same component is in the three places.
+// #20522 amendment: selected explanation and risk remain visible; every other explanation can be read by focusing or hovering without changing the choice. The same shared component serves all three places.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -11,7 +11,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         const places = {
-            'New agent': { open: `(async () => { await window.showLaunchModal(); await window._selectLaunchType('agent'); return true; })()`, stage: `document.getElementById('launch-dir').value = '/tmp'; window._launchStage('agent'); true`, pane: `(() => { const m = document.getElementById('launch-step-agent'); const t = [...m.querySelectorAll('[role=tab]')].find(x => x.dataset.section === 'permissions'); if (t && t.getClientRects().length) t.click(); else { const s = m.querySelector('.settings-group-pick select'); if (s && s.value !== 'permissions') { s.value = 'permissions'; s.dispatchEvent(new Event('change', { bubbles: true })); } } return !!document.querySelector('#launch-step-agent .acf-permission-mode + .seg-list .seg-desc')?.getClientRects().length; })()`, root: '#launch-step-agent', sel: '.acf-permission-mode', modes: 6 },
+            'New agent': { open: `(async () => { await window.showLaunchModal(); await window._selectLaunchType('agent'); return true; })()`, stage: `document.getElementById('launch-dir').value = '/tmp'; window._launchStage('agent'); true`, pane: `(() => { const m = document.getElementById('launch-step-agent'); const t = [...m.querySelectorAll('[role=tab]')].find(x => x.dataset.section === 'permissions'); if (t && t.getClientRects().length) t.click(); else { const s = m.querySelector('.settings-group-pick select'); if (s && s.value !== 'permissions') { s.value = 'permissions'; s.dispatchEvent(new Event('change', { bubbles: true })); } } return !!document.querySelector('#launch-step-agent .acf-permission-mode + .seg-list [aria-checked=\"true\"] .seg-desc')?.getClientRects().length; })()`, root: '#launch-step-agent', sel: '.acf-permission-mode', modes: 6 },
             'New team (member)': { open: `(async () => { await window.showLaunchModal(); await window._selectLaunchType('team'); return true; })()`, ready: `typeof window.showTeamAgentModal === 'function'`, then: `(async () => { await window.showTeamAgentModal(); return true; })()`, stage: `window._launchStage('agent'); true`, pane: null, root: '#launch-step-agent', sel: '.acf-permission-mode', modes: 6 },
             'Settings > Defaults': { open: `(async () => { await window.showSettingsModal('agents'); return true; })()`, root: '#settings-modal', sel: '#settings-permission-mode', modes: 6 },
         };
@@ -36,7 +36,16 @@ const { coralReady } = require('./helpers/wait');
                 const tag = `${label} ${place}`;
                 assert.equal(r.list, true, tag + ': the mode is a list');
                 assert.deepEqual(r.rows.map(x => x.v).sort(), ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'plan'], tag + ': the six modes, in rows, and no Not set row');
-                assert.ok(r.rows.every(x => x.role === 'radio' && x.mark && x.name && x.desc && x.descVisible), `${tag}: every row is a radio with its name and a visible line on what it allows: ${JSON.stringify(r.rows.filter(x => !(x.desc && x.descVisible)))}`);
+                assert.ok(r.rows.every(x => x.role === 'radio' && x.mark && x.name && x.desc), `${tag}: every row is a radio with its name and a visible line on what it allows: ${JSON.stringify(r.rows.filter(x => !(x.desc && x.descVisible)))}`);
+                assert.deepEqual(r.rows.filter(x=>x.descVisible).map(x=>x.v), r.rows.filter(x=>x.checked==='true').map(x=>x.v), tag+': only the selected explanation is shown at rest');
+                const chosen = r.rows.find(x=>x.checked==='true').v;
+                for (const mode of r.rows) {
+                    await ev(`document.querySelector(${JSON.stringify(p.root + ' .seg-list [data-value="' + mode.v + '"]')}).focus();true`);
+                    assert.ok((await inspect(p)).rows.find(x=>x.v===mode.v).descVisible, tag+': focus reveals '+mode.v);
+                    assert.equal(await ev(`document.querySelector(${JSON.stringify(p.root+' '+p.sel)}).value || 'auto'`), chosen, tag+': reading an explanation does not select it');
+                }
+                await ev(`document.activeElement.blur();true`);
+                if(process.env.CORAL_SCREENSHOT_DIR){const fs=require('node:fs');fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR,{recursive:true});fs.writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/'+label+'-'+place.replace(/[^a-z]/gi,'-')+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}
                 assert.equal(new Set(r.rows.map(x => x.left)).size, 1, tag + ': one column');
                 assert.ok(r.rows.every((x, i) => i === 0 || x.top > r.rows[i - 1].top), tag + ': each row under the one before');
                 assert.equal(r.rows.filter(x => x.checked === 'true').length, 1, tag + ': one is chosen');

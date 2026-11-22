@@ -1,4 +1,4 @@
-/* The permission mode as a list of rows (#15886, LA2): a radio mark, the name, and one line on what the agent may do without asking, for all six modes at once. Lazy: loaded by segmented.js when a control is drawn as a list.
+/* The permission mode as a list of rows (#15886, LA2): a radio mark, the name, and one line on what the agent may do without asking, for the selected mode (other explanations appear on hover or focus, #20522). Lazy: loaded by segmented.js when a control is drawn as a list.
    One component in New agent, New team and Settings > Defaults. Bypass permissions and Don't ask carry an amber line. */
 .seg-group.seg-list { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: 2px 0 8px; }
 .seg-list .seg-btn { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-md, 8px); row-gap: 2px; align-items: start; justify-content: start; width: 100%; height: auto; min-height: var(--control-height, 36px); padding: 8px 12px; text-align: left; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: transparent; color: var(--text-primary); cursor: pointer; }
@@ -12,3 +12,10 @@
 .seg-list .seg-btn[data-value="bypassPermissions"], .seg-list .seg-btn[data-value="dontAsk"] { color: var(--text-primary); }
 @media (pointer: coarse), (max-width: 767px) { .seg-list .seg-btn { min-height: var(--control-touch-height, 44px); } }
 .perm-mode-desc[hidden] { display: none; } /* every row says it: modeList() hides the one-line hint under the select, which would say it a second time */
+
+/* #20522, Orchestrator's LA2 amendment: keep every explanation available without
+   adding all six to the visible Defaults prose. The selected risk stays amber. */
+.seg-list .seg-desc, .seg-list .seg-warn { display: none; }
+.seg-list .seg-btn[aria-checked="true"] :is(.seg-desc, .seg-warn),
+.seg-list .seg-btn:focus :is(.seg-desc, .seg-warn) { display: block; }
+@media (hover: hover) { .seg-list .seg-btn:hover :is(.seg-desc, .seg-warn) { display: block; } }

@@ -11,7 +11,9 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
     const open = async () => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard'); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
     const S = `(window.__coralStatic || '/static/')`;
     try {
-        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native' });
+        await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native', needs: true });
+
+        await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral.inbox.tab','needs'); localStorage.setItem('coral-inbox-needs-tab','you'); const real=window.fetch; window.fetch=(u,o)=>{const p=new URL(String(u),location.href).pathname;if(/^\\/api\\/remote\\/[^/]+\\/api\\/operator-asks$/.test(p))return Promise.resolve(Response.json([]));if(/^\\/api\\/remote\\/[^/]+\\/api\\/proposals$/.test(p))return Promise.resolve(Response.json({proposals:[]}));return real(u,o);};` });
 
         console.log('1. a healthy Hub: each computer is asked through /api/remote/<computer>/, the Hub origin is never asked, no "could not be read"');
         await open();

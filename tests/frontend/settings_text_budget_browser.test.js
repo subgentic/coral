@@ -52,17 +52,31 @@ const BUDGET = { ...Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+
         await ev(`document.querySelector('#settings-pane-general .settings-engine-more').open = false; true`);
         await ev(`document.getElementById('settings-tab-general').click(); true`);
         await waitFor(`!!document.querySelector('#settings-pane-general:not([hidden])')`, 'General open again', 6000);
+        // The shared lazy permission list must be drawn before measuring Defaults.
+        await ev(`import((window.__coralStatic || '/static/') + 'permission_mode_list.js').then(m => m.modeList(document.getElementById('settings-permission-mode'))).then(() => true)`);
+        await waitFor(`getComputedStyle(document.querySelector('#settings-permission-mode + .seg-list .seg-btn')).display === 'grid'`, 'permission list stylesheet ready');
         const groups = await ev(`[...document.querySelectorAll('#settings-tabs [role=tab]')].map(b => ({ id: b.id, name: b.querySelector('.settings-tab-name').textContent.trim() }))`);
         for (const g of groups) {
             await ev(`document.getElementById(${JSON.stringify(g.id)}).click(); true`);
             await waitFor(`(() => { const p = document.querySelector('#settings-modal .settings-pane:not([hidden])'); return !!p && p.dataset.group === ${JSON.stringify(g.id.replace('settings-tab-', ''))}; })()`, `${g.name} shown`, 4000);
             await waitFor(`!/Loading…|Couldn't read/.test(document.querySelector('#settings-modal .settings-pane:not([hidden])').textContent)`, `${g.name} loaded`, 6000).catch(() => {}); // the count is of the settled pane (a pane that never settles is counted as it is)
             await ev(`(() => { const r = document.getElementById('settings-tools-folder-row'); if (r) r.hidden = true; return true; })()`); // the normal state has no warning row: a Windows runner shows it for real (its tools folder is a temp folder), and the 64-word state with it is checked on its own
-            const words = await ev(`(() => { const pane = document.querySelector('#settings-modal .settings-pane:not([hidden])'); let n = 0;
+            const measureWords = () => ev(`(() => { const pane = document.querySelector('#settings-modal .settings-pane:not([hidden])'); let n = 0;
                 const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden) return false; const d = p.parentElement; if (d && d.tagName === 'DETAILS' && !d.open && p.tagName !== 'SUMMARY') return false; /* a closed disclosure hides what is in it */ } return true; };
                 const w = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT);
                 for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('select, option, script, style, .material-icons, .sv-fold-note') || !shown(e)) continue; n += t.nodeValue.trim().split(/\\s+/).filter(Boolean).length; }
                 return n; })()`);
+            const words = await measureWords();
+            if (g.name === 'Defaults') {
+                const initial = await ev(`document.getElementById('settings-permission-mode').value`);
+                for (const mode of ['default','plan','acceptEdits','auto','bypassPermissions','dontAsk']) {
+                    await ev(`document.getElementById('settings-permission-mode').value=${JSON.stringify(mode)};true`);
+                    const modeWords = await measureWords();
+                    console.log(`Defaults ${mode}: ${modeWords} words (budget ${BUDGET.Defaults})`);
+                    assert.ok(modeWords <= BUDGET.Defaults, `Defaults ${mode} exceeds the unchanged budget: ${modeWords}`);
+                }
+                await ev(`document.getElementById('settings-permission-mode').value=${JSON.stringify(initial)};true`);
+            }
             console.log(`${g.name}: ${words} words (budget ${BUDGET[g.name] ?? "none"})`);
             const seenText = words > (BUDGET[g.name] ?? Infinity) ? await ev(`(() => { const pane = document.querySelector('#settings-modal .settings-pane:not([hidden])'); const out = []; const shown = e => { for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || p.hidden) return false; const d = p.parentElement; if (d && d.tagName === 'DETAILS' && !d.open && p.tagName !== 'SUMMARY') return false; } return true; }; const w = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT); for (let t = w.nextNode(); t; t = w.nextNode()) { const e = t.parentElement; if (!e || e.closest('select, option, script, style, .material-icons, .sv-fold-note') || !shown(e)) continue; const v = t.nodeValue.trim(); if (v) out.push(v.slice(0, 80)); } return out; })()`) : null;
             if (!process.env.TB_DUMP && BUDGET[g.name] !== undefined) assert.ok(words <= BUDGET[g.name], `${g.name} shows ${words} words, budget ${BUDGET[g.name]}: ${JSON.stringify(seenText)}`);
