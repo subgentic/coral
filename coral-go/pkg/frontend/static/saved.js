@@ -11,6 +11,8 @@ import { whenText } from './when_text.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
 import { sessionServer, normServer, serverFetch, identityKey, LOCAL_SERVER, isCloud, nativeSaved, personalInboxSources, personalInboxAllowed, personalInboxNotice } from './server_base.js';
+import { savedRouteOpen, loadSavedRoutes } from './saved_routes.js';
+await loadSavedRoutes(); // the Hub's open bookmark write routes, read once
 import { savedChanged, setSavedCount, setScopedCount, wantAllScope, validSavedItem, savedShowing, savedViewShowing, currentScope } from './saved_marks.js';
 import { withScope, scopeHeading, scopeEmpty, ALL } from './saved_scope.js';
 import { effectiveLiveViewMode, setLiveViewMode, jumpToLiveMessage } from './live_chat.js';
@@ -433,7 +435,7 @@ export function savedInventoryChanged() {
 }
 /** Done or Reopen, Remove, Open: the same actions as the list's buttons (their focus and announcements are the list's own, which the Inbox does not show). */
 export async function savedSetDone(it, done) {
-    if (isCloud()) return false; // Native Hub Saved is read-only; its account gate grants no write permission.
+    if (!savedRouteOpen('done')) return false; // through the Hub only when it reports the route open
     const r = await serverFetch(it.server, `/api/saved/${it.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done }) });
     if (!r.ok) { showToast('Could not change the saved message', true); return false; }
     await refresh();
@@ -441,7 +443,7 @@ export async function savedSetDone(it, done) {
     return true;
 }
 export async function savedRemove(it) {
-    if (isCloud()) return false; // Keep this guard even when a stale caller retains an item action.
+    if (!savedRouteOpen('remove')) return false; // keep this guard even when a stale caller retains an item action
     const r = await serverFetch(it.server, `/api/saved/${it.id}`, { method: 'DELETE' });
     if (!r.ok && r.status !== 404) { showToast('Could not remove the saved message', true); return false; }
     await refresh();

@@ -260,7 +260,7 @@ export async function initCloud() {
     if (!s.authenticated) { goToSignIn(); return false; }
     await initCloudAccountFlags(); // settle per-account routing before Inbox modules read their initial flags
     if (nativeSaved()) {
-        document.body.classList.add('cloud-native-saved');
+        document.body.classList.add('cloud-native-saved'); importOnce('./saved_routes.js');
         // The shared Saved dock is read-only in Hub mode. Reveal it only after
         // this account's strict capability flag has been resolved.
         document.getElementById('agentic-tab-saved')?.removeAttribute('data-local-only');
