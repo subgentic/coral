@@ -9,9 +9,10 @@ import (
 // moment: a check made only when a stream opens would let a terminal run on after its grant ended. Each long stream (a WebSocket, an event stream or another long request) of a named Hub person records which link and person it is
 // for, the tier its route needs, and how to end it; the server's sweeper asks Coral's own grant table about each and ends the ones that no longer pass. Nothing here decides anything.
 type openStream struct {
-	link, user string
-	need       Tier
-	end        func()
+	link, user   string
+	need         Tier
+	method, path string
+	end          func()
 }
 
 var openStreams = struct {
@@ -20,11 +21,11 @@ var openStreams = struct {
 }{m: map[*openStream]struct{}{}}
 
 // RegisterOpenStream records an open stream of a Hub person and returns what removes it. A stream with no person (the owner's own) is not recorded: grants never decide it.
-func RegisterOpenStream(link, user string, need Tier, end func()) (unregister func()) {
+func RegisterOpenStream(link, user string, need Tier, method, path string, end func()) (unregister func()) {
 	if user == "" {
 		return func() {}
 	}
-	e := &openStream{link: link, user: user, need: need, end: end}
+	e := &openStream{link: link, user: user, need: need, method: method, path: path, end: end}
 	openStreams.mu.Lock()
 	openStreams.m[e] = struct{}{}
 	openStreams.mu.Unlock()
@@ -35,10 +36,12 @@ func RegisterOpenStream(link, user string, need Tier, end func()) (unregister fu
 	}
 }
 
-// OpenStreamKey is one kind of open stream: a person on a link and the tier their route needs.
+// OpenStreamKey is one kind of open stream: a person on a link, the tier their route needs, and the route itself (its method and decoded path, which carry the board), so a sweep decides it exactly as a new request is decided:
+// revoking the grant for board A ends the streams on A while a grant for board B keeps B's.
 type OpenStreamKey struct {
-	Link, User string
-	Need       Tier
+	Link, User   string
+	Need         Tier
+	Method, Path string
 }
 
 // OpenStreamKeys lists the distinct (link, person, tier) of the streams open now.
@@ -48,7 +51,7 @@ func OpenStreamKeys() []OpenStreamKey {
 	seen := map[OpenStreamKey]bool{}
 	var out []OpenStreamKey
 	for e := range openStreams.m {
-		k := OpenStreamKey{e.link, e.user, e.need}
+		k := OpenStreamKey{e.link, e.user, e.need, e.method, e.path}
 		if !seen[k] {
 			seen[k] = true
 			out = append(out, k)
@@ -62,7 +65,7 @@ func EndOpenStreams(k OpenStreamKey) int {
 	openStreams.mu.Lock()
 	var ending []*openStream
 	for e := range openStreams.m {
-		if (OpenStreamKey{e.link, e.user, e.need}) == k {
+		if (OpenStreamKey{e.link, e.user, e.need, e.method, e.path}) == k {
 			ending = append(ending, e)
 		}
 	}

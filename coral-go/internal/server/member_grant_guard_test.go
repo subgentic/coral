@@ -317,7 +317,7 @@ func TestASweepEndsOpenStreamsWhoseGrantEndedExpiredOrWasLowered(t *testing.T) {
 	cp.set(tunnel.TierLaunch)
 	var ended atomic.Int32
 	open := func(user string, need tunnel.Tier) func() {
-		return tunnel.RegisterOpenStream(guardLink, user, need, func() { ended.Add(1) })
+		return tunnel.RegisterOpenStream(guardLink, user, need, "GET", "/api/sessions/live/a/terminal", func() { ended.Add(1) })
 	}
 
 	full, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelFull))
@@ -355,7 +355,7 @@ func TestTheSweeperEndsAStreamWithinItsInterval(t *testing.T) {
 	g, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelFull))
 	require.NoError(t, err)
 	ended := make(chan struct{}, 1)
-	defer tunnel.RegisterOpenStream(guardLink, guardUser, tunnel.TierLaunch, func() { ended <- struct{}{} })()
+	defer tunnel.RegisterOpenStream(guardLink, guardUser, tunnel.TierLaunch, "GET", "/api/sessions/live/a/terminal", func() { ended <- struct{}{} })()
 	done := make(chan struct{})
 	go func() { RunMemberGrantSweeper(ctx, bs, cp.get, 20*time.Millisecond); close(done) }()
 	select {
@@ -393,4 +393,31 @@ func TestTheGrantCheckCostPerRequestIsMeasured(t *testing.T) {
 		}
 		t.Logf("%s: %v per request over %d", c.name, time.Since(start)/n, n)
 	}
+}
+
+// #20590 (1): the route's board is in the open-stream key, so revoking the grant for board A ends A's streams while a live grant for board B keeps B's.
+func TestRevokingOneBoardsGrantEndsThatBoardsStreamsAndLeavesTheOthers(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	ctx := context.Background()
+	bs := guardStore(t)
+	_, err := bs.Subscribe(ctx, "team2", "Dev", "Other Dev", "s", nil, "")
+	require.NoError(t, err)
+	cp := &guardCap{}
+	cp.set(tunnel.TierLaunch)
+	gA, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelView)) // team1
+	require.NoError(t, err)
+	gB := guardGrant(guardUser, board.MemberLevelView)
+	gB.ScopeID, gB.BoardID = "team2", "team2"
+	_, err = bs.CreateMemberGrant(ctx, gB)
+	require.NoError(t, err)
+	var endedA, endedB atomic.Int32
+	defer tunnel.RegisterOpenStream(guardLink, guardUser, tunnel.TierView, "GET", "/api/board/team1/messages", func() { endedA.Add(1) })()
+	defer tunnel.RegisterOpenStream(guardLink, guardUser, tunnel.TierView, "GET", "/api/board/team2/messages", func() { endedB.Add(1) })()
+
+	assert.Zero(t, SweepOpenStreams(ctx, bs, cp.get, time.Now()), "both grants live")
+	_, err = bs.RevokeMemberGrant(ctx, gA.GrantID, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, 1, SweepOpenStreams(ctx, bs, cp.get, time.Now()))
+	assert.EqualValues(t, 1, endedA.Load(), "board A's stream ended with its grant")
+	assert.Zero(t, endedB.Load(), "board B's grant is live, so its stream stays")
 }
