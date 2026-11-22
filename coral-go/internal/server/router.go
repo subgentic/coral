@@ -670,7 +670,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		}
 		return c.HubURL, c.ServerID, nil
 	}
-	routes.SetHubOwnerRecord(ownerRecordOf)       // and what it is enrolled as: a person's or an organisation's (#7061)
+	routes.SetHubOwnerRecord(ownerRecordOf)                                            // and what it is enrolled as: a person's or an organisation's (#7061)
 	routes.SetMemberLinkCap(func(ctx context.Context, id string) (tunnel.Mode, bool) { // the cap of an active link, for a member grant (#20387)
 		ls, err := ownerCloud.ListLinks(ctx)
 		if err != nil {
