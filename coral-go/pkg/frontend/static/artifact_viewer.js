@@ -198,9 +198,9 @@ function _build() {
     d.querySelector('.artifact-viewer-dropbox-share').addEventListener('click', e => { const b = e.currentTarget; importOnce('./dropbox_share.js').then(m => m.openShareDialog({ hex: b.dataset.hex, filename: b.dataset.name, opener: d.querySelector('.artifact-viewer-more') })).catch(() => {}); }); // Share via Dropbox (#14944): the dialog loads on the press
     d.querySelector('.artifact-viewer-gdoc-share').addEventListener('click', e => { const b = e.currentTarget; importOnce('./gdoc_share.js').then(m => m.openGdocDialog({ hex: b.dataset.hex, filename: b.dataset.name, opener: d.querySelector('.artifact-viewer-more') })).catch(() => {}); }); // Share to Google Docs (#20010, A): next to Dropbox; the dialog loads on the press
     d.querySelector('.artifact-viewer-copyid-item').addEventListener('click', e => { const id = e.currentTarget.dataset.fileId; copyFileId({ file_id: id }, showToast); }); // the menu closes itself on a choice // Copy file ID: the id alone; a failed copy says so (#14178)
-    const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('aria-expanded', 'false');
+    const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'menu-item artifact-viewer-sandbox'; chip.hidden = true; chip.setAttribute('role', 'menuitem'); chip.setAttribute('aria-expanded', 'false');
     chip.textContent = 'Sandboxed'; // words only: the icon font is a subset and has no shield
-    d.querySelector('.artifact-viewer-chips').append(chip);
+    d.querySelector('.artifact-viewer-scripts-item').after(chip); // an item of the ⋯ menu, not a chip on the bar (#20715, the Operator): an HTML file's header is the one bar a Markdown file has, same controls, same order
     const onChip = document.createElement('span'); onChip.className = 'chip artifact-viewer-scriptson'; onChip.hidden = true; onChip.textContent = 'Scripts on'; // while this version's scripts run (#14783); the bar under the header holds Turn off
     d.querySelector('.artifact-viewer-chips').append(onChip);
     d.querySelector('.artifact-viewer-scripts-item').addEventListener('click', () => { const body = d.querySelector('.artifact-viewer-body'); (body.querySelector('.artifact-scripts-off') || body.querySelector('.artifact-scripts-ask'))?.click(); }); // the same two buttons as the preview's own: one path, one confirmation
@@ -285,7 +285,7 @@ function _build() {
     return d;
 }
 
-/** The sandboxed HTML preview's banner: shown the first time, then the header's Sandboxed chip says it (its tooltip is the explanation, a tap shows or hides the banner). */
+/** The sandboxed HTML preview's banner: shown the first time, then the ⋯ menu's Sandboxed item says it (its tooltip is the explanation, a choice shows or hides the banner). */
 /** The "Scripts on" chip and the ⋯ menu's Run this page's scripts / Turn off scripts follow what the preview shows (#14783): scripts running (the bar), or offered (the button), or neither (any other file). */
 function syncScripts(d, body) {
     const running = !!body.querySelector('.artifact-scripts-bar'), offered = !!body.querySelector('.artifact-scripts-ask');

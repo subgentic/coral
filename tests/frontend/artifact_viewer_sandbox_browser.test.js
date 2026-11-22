@@ -24,13 +24,13 @@ const FROM = 'Writer A · launch-team · asks: Is the spring launch plan ready t
                 return orig(u, o); }; return true; })()`);
             const open = async () => { await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer('${HEX}', { filename: 'launch-plan.html', mediaType: 'text/html', from: ${JSON.stringify(FROM)} })).then(() => true)`); await waitFor(`!!document.querySelector('#artifact-viewer .artifact-linked-preview iframe')`, `${w}: the HTML preview`, 10000); };
             const read = () => ev(`(() => { const d = document.querySelector('.artifact-viewer-content'), from = d.querySelector('.artifact-viewer-from'), note = d.querySelector('.artifact-linked-notice'), chip = d.querySelector('.artifact-viewer-sandbox'), frame = d.querySelector('.artifact-linked-preview iframe'); const vis = e => !!e && !e.hidden && e.getClientRects().length > 0;
-                return { above: Math.round(frame.getBoundingClientRect().top - d.getBoundingClientRect().top), noteShown: vis(note), chip: !!chip && !chip.hidden && vis(chip), chipTitle: chip ? chip.title : '', chipExpanded: chip ? chip.getAttribute('aria-expanded') : null,
+                return { above: Math.round(frame.getBoundingClientRect().top - d.getBoundingClientRect().top), noteShown: vis(note), chip: !!chip && !chip.hidden && !!chip.closest('.artifact-viewer-menu'), chipTitle: chip ? chip.title : '', chipExpanded: chip ? chip.getAttribute('aria-expanded') : null,
                     fromH: Math.round(from.getBoundingClientRect().height), fromCut: from.scrollWidth > from.clientWidth + 1, fromTitle: from.title, fromTap: from.getAttribute('aria-expanded'), fromLines: Math.round(from.getBoundingClientRect().height / (parseFloat(getComputedStyle(from).lineHeight) || 18)) }; })()`);
             await open(); let a = await read();
             console.log(`   ${w}: first open: ${a.above} px from the dialog's top to the preview (banner ${a.noteShown ? 'shown' : 'hidden'}, question line ${a.fromLines} line(s))`);
             await shot('sandbox-first-' + w);
-            assert.ok(a.noteShown && a.chip, `${w}: the first time the banner is shown, and the Sandboxed chip is in the header: ` + JSON.stringify(a));
-            assert.ok(/scripts/i.test(a.chipTitle), `${w}: the chip's tooltip carries the explanation: ${a.chipTitle}`);
+            assert.ok(a.noteShown && a.chip, `${w}: the first time the banner is shown, and the Sandboxed item is in the ⋯ menu (#20715): ` + JSON.stringify(a));
+            assert.ok(/scripts/i.test(a.chipTitle), `${w}: the item's tooltip carries the explanation: ${a.chipTitle}`);
             assert.ok(a.fromH === 0 || a.fromLines === 0, `${w}: the question is not a line of the one-row header (it is in Details, #19771): ` + JSON.stringify({ h: a.fromH }));
             // the next time: the chip alone
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`); await open(); a = await read();
