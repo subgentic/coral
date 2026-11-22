@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
             const rowNames = pane => ev(`[...document.querySelectorAll('#settings-pane-${pane} .sv-row, #settings-pane-${pane} .prov-card-title')].map(r => { const c = (r.querySelector('.sv-label, .sv-heading, dt label, dt') || (r.matches('.prov-card-title') ? r : document.createElement('i'))).cloneNode(true); return c.textContent.trim().replace(/\\s+/g, ' ').slice(0, 40); })`).then(l => l.filter(Boolean)); // fields, headings, card titles and the live parts, in page order
             const prov = await rowNames('providers');
             const rows = ['Default model', 'Default thinking', 'Orchestrator model', 'Orchestrator thinking', 'CLI path'];
-            const want = ['Claude', ...rows, 'Codex', ...rows, 'Antigravity', ...rows, 'Pi', ...rows];
+            const want = ['Claude', ...rows, 'Codex', ...rows, "Skip Codex's review of Coral's hooks", 'Antigravity', ...rows, 'Pi', ...rows];
             assert.deepEqual(prov.slice(0, want.length), want, JSON.stringify(prov)); assert.ok(prov.includes('Custom models'), 'Custom models follow the cards');
             await open('agents');
             const names = await rowNames('agents');

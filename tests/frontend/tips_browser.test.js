@@ -5,7 +5,7 @@
 //  - The agent header's icons say what they do (Chat view, Terminal view, open in its own window, show or hide the side panel).
 // 1280 px; isolated dev server over CDP, through agent_view_harness.js.
 const { connect } = require('./agent_view_harness');
-const { install: installNA, openNewAgent } = require('./helpers/new_agent');
+const { install: installNA, openNewAgent, stubCliChecks } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
@@ -56,9 +56,16 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'Settings', 8000);
         await ev(`document.getElementById('settings-tab-agents').click(); true`);
         await sleep(600); // sleep-ok: the pane is drawn when its tab is picked
-        const rowsHelp = await ev(`Object.fromEntries(['settings-working-dir', 'settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority', 'settings-codex-trust-hooks'].map(id => { const e = document.getElementById(id), row = e && e.closest('.sv-row'), h = row && [...row.querySelectorAll('.sv-help')].find(x => x.getClientRects().length > 0 && x.textContent.trim()); return [id, h ? h.textContent.trim() : null]; }))`);
+        const rowsHelp = await ev(`Object.fromEntries(['settings-working-dir', 'settings-auto-resume', 'settings-auto-goals', 'settings-agent-low-priority'].map(id => { const e = document.getElementById(id), row = e && e.closest('.sv-row'), h = row && [...row.querySelectorAll('.sv-help')].find(x => x.getClientRects().length > 0 && x.textContent.trim()); return [id, h ? h.textContent.trim() : null]; }))`);
+        // Hook trust moved to Codex Advanced (#20522): read its help where the
+        // person can actually see it, and pin both the pane and the fold.
+        await stubCliChecks(ev); // description checks do not depend on host CLI installations
+        await ev(`document.getElementById('settings-tab-providers').click(); document.getElementById('settings-provider-advanced-codex').open = true; true`);
+        await waitFor(`document.getElementById('settings-codex-trust-hooks').getClientRects().length > 0`, 'Codex hook trust visible in Advanced');
+        const hook = await ev(`(() => { const e=document.getElementById('settings-codex-trust-hooks'), row=e.closest('.sv-row'), h=[...row.querySelectorAll('.sv-help')].find(x=>x.getClientRects().length>0&&x.textContent.trim()); return {pane:e.closest('.settings-pane').id, fold:e.closest('details').id, help:h&&h.textContent.trim()}; })()`);
+        rowsHelp['settings-codex-trust-hooks'] = hook.pane === 'settings-pane-providers' && hook.fold === 'settings-provider-advanced-codex' ? hook.help : null;
         // a row passes with a visible one-line hint OR a Learn more / More that holds it: the pane's word budget wins (simple to start, #10324; settings_text_budget_browser)
-        check('each Settings > Agents row has a one-line description, visible or behind Learn more', Object.values(rowsHelp).every(t => t && ((t.length > 15 && t.length < 110) || /^(learn )?more$/i.test(t))), JSON.stringify(rowsHelp));
+        check('each Agents row and Codex Advanced hook-trust row has a one-line description, visible or behind Learn more', Object.values(rowsHelp).every(t => t && ((t.length > 15 && t.length < 110) || /^(learn )?more$/i.test(t))), JSON.stringify(rowsHelp));
         await shot('tips-settings-agents-1280');
     } finally { await client.close(); }
     if (results.some(x => !x)) { console.error(`${results.filter(x => !x).length} of ${results.length} failed`); process.exit(1); }
