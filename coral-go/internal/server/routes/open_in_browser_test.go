@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 	"net/http"
@@ -25,7 +26,7 @@ func TestOpenInBrowserLocalOperatorAndFiles(t *testing.T) {
 	_, h, _, ss := setupSessionsTestServer(t)
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
-	require.NoError(t, exec.Command("git", "init", "-q", root).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", root).Run())
 	for _, p := range []string{"page.HTML", "image.svg", "text.txt", ".hidden.html"} {
 		require.NoError(t, os.WriteFile(filepath.Join(root, p), []byte("sample"), 0600))
 	}
