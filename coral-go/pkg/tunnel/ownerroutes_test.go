@@ -155,7 +155,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if (m == http.MethodGet && (p == "/api/operator-asks" || p == "/api/needs-you" || p == "/api/activity")) || (strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/orchestrator-grant") && (m == http.MethodGet || m == http.MethodPut) || strings.HasSuffix(p, "/lifecycle-log") && m == http.MethodGet || strings.HasSuffix(p, "/guide-roster") && (m == http.MethodGet || m == http.MethodPut)) || strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/private")) { // the owner-only routes of #11417 and #11432: the old list never had them
 				continue
 			}
-			if m == http.MethodGet && p == "/api/analytics/activity" {
+			if m == http.MethodGet && strings.HasPrefix(p, "/api/analytics/") { // the Analytics reads the Hub owner has (#11225, coral-hub #261001): the old list never had them
 				continue
 			}
 			// The owner's version list and series reads, comment edit, delete and lock, and the change-request send are the owner's alone through the hub (#11354): the old list never had them.

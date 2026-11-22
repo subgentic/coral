@@ -10,10 +10,8 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
-	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/resources"
 	"github.com/subgentic/coral/pkg/resourcequeue"
-	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // GET /api/analytics/resource-queue?days= (#13671, the Operator's Analytics tab): how much the resource queue is used and whether it improves coordination. NUMBERS ONLY: per resource, per agent and per matched
@@ -133,11 +131,7 @@ type rqSpan struct {
 }
 
 // Read answers the read.
-func (h *ResourceQueueAnalyticsHandler) Read(w http.ResponseWriter, r *http.Request) {
-	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
-		commentRefuse(w, http.StatusForbidden, "not_through_hub", "the resource queue's analytics are on this computer only")
-		return
-	}
+func (h *ResourceQueueAnalyticsHandler) Read(w http.ResponseWriter, r *http.Request) { // through Coral Hub the owner's alone (operatorOnlyRead; coral-hub #261001): numbers only
 	if !operatorOnlyRead(w, r) {
 		return
 	}

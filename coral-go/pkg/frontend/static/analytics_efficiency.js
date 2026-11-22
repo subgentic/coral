@@ -17,7 +17,7 @@ const SECTIONS = {
     'per-commit': { section: 'cost-spend-section', old: 'cost-spend', metric: 'tokens_per_commit', unit: 'commit', units: 'commits', value: v => `${fmtTokens(v)}`, low: 'cheaper', best: 'Most efficient', word: 'tokens per commit', key: 'coral-eff-group-commit' },
     'task-time': { section: 'cost-task-time-section', old: 'cost-task-time', metric: 'task_time', unit: 'task', units: 'tasks', value: v => fmtDur(v), low: 'faster', best: 'Fastest', word: 'median task time', key: 'coral-eff-group-time' },
 };
-const groupsOf = cfg => (cfg.metric === 'task_time' ? GROUPS.filter(g => g[0] !== 'task') : GROUPS); // every task is a group of one: a task has no comparison to make with itself
+const groupsOf = cfg => GROUPS.filter(g => !(cfg.metric === 'task_time' && g[0] === 'task') && !(isCloud() && g[0] === 'all')); // on Coral Hub's page All (the team's spend picker, one more route) is not offered: the comparison is the page // every task is a group of one: a task has no comparison to make with itself
 const state = {}; // view key -> { group, data, loading, error, seq }
 let range = '24h';
 const RANGE_WORDS = { '24h': 'in the last 24 hours', '7d': 'in the last 7 days', '30d': 'in the last 30 days' };
@@ -36,7 +36,7 @@ function build(key) {
     const cfg = SECTIONS[key], section = document.getElementById(cfg.section);
     if (!section || section.dataset.effBuilt) return !!section;
     section.dataset.effBuilt = '1';
-    let saved = 'all'; try { const v = browserLocal.get(cfg.key); if (groupsOf(cfg).some(g => g[0] === v)) saved = v; } catch { /* the choice lasts until the page closes */ }
+    let saved = isCloud() ? groupsOf(cfg)[0][0] : 'all'; try { const v = browserLocal.get(cfg.key); if (groupsOf(cfg).some(g => g[0] === v)) saved = v; } catch { /* the choice lasts until the page closes */ }
     state[key] = { group: saved, data: null, loading: false, error: '', seq: 0 };
     const bar = el('div', 'eff-switch');
     bar.append(el('div', 'eff-switch-label', 'Group by'));

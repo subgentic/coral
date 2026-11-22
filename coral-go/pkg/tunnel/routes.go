@@ -606,6 +606,9 @@ var routeTable = cat(
 	// the OWNER's alone (OwnerRefuse): Launch is a tier a Hub grantee can hold, and the reply says what each agent did and how much the Operator touched it. A grantee gets 403 owner_only and the
 	// page says so in one line. Only team and range pass; no text is in the reply.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/analytics/activity")),
+	// The rest of the Analytics page on the Hub (coral-hub #261001): Inbox vs chat, the resource queue, tokens per commit and task time (efficiency) and Tasks completed. Numbers and the names of the team's own agents, teams, models and
+	// branches, no folder and no message text; Launch and the OWNER's alone, like the activity counts beside them (a grantee gets 403 owner_only, and the tab says so in one line). Only the keys each handler reads pass (routes_query.go).
+	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/analytics/inbox-vs-chat", "/api/analytics/resource-queue", "/api/analytics/efficiency", "/api/analytics/tasks")),
 	// The questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417), are the OWNER's alone through the hub: they are the Operator's own board text, and answering them is the board post only the owner makes.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/operator-asks")),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/needs-you")),

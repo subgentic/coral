@@ -5,7 +5,6 @@ import { escapeHtml, escapeAttr } from './utils.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { setText } from './dom_write.js';
 import { state } from './state.js';
-import { isCloud } from './server_base.js';
 import { note } from './nav.js';
 import { importOnce } from './import_once.js';
 
@@ -34,9 +33,7 @@ export const VIEWS = [
 ];
 export const GROUPS = [['all', 'All'], ['provider', 'Provider'], ['model', 'Model'], ['thinking', 'Thinking level'], ['team', 'Team'], ['agent', 'Agent'], ['branch', 'Branch'], ['task', 'Task'], ['goal', 'Goal']];
 
-// Coral Hub's page (cloud) does not show Tasks, Tokens per commit, Task time or Inbox vs chat: their routes are closed on the Hub (#19569, Security). Their addresses open Overview.
-const CLOUD_CLOSED = new Set(['tasks', 'per-commit', 'task-time', 'inbox-' + 'chat', 'resource-queue', 'comm']);
-const closed = v => isCloud() && CLOUD_CLOSED.has(v.key);
+// Coral Hub's page shows every view (coral-hub #261001): the reads of Tasks, Tokens per commit, Task time, Inbox vs chat, the resource queue and Team communication are the computer owner's through the Hub (pkg/tunnel).
 let current = 'overview';
 let query = '';
 let advancedOpen = false; // the Advanced entry of the list is open: the views that are not a person's first questions
@@ -45,7 +42,7 @@ const page = () => document.getElementById('cost-dashboard-view');
 
 function shown() {
     const q = query.trim().toLowerCase();
-    const listed = VIEWS.filter(v => !v.hidden && !closed(v) && (q || !v.advanced || advancedOpen || current === v.key)); // a search finds an advanced view too; the open one stays listed
+    const listed = VIEWS.filter(v => !v.hidden && (q || !v.advanced || advancedOpen || current === v.key)); // a search finds an advanced view too; the open one stays listed
     return q ? listed.filter(v => v.label.toLowerCase().includes(q)) : listed;
 }
 
@@ -102,7 +99,7 @@ export function syncRangeLine() {
 
 /** Shows a view: the page's data-view, its title and the list's marks; on a phone it is the screen after the list. */
 export function selectView(key, { focus = false, fromHistory = false } = {}) {
-    const v = VIEWS.find(x => x.key === key && !closed(x)) || VIEWS[0];
+    const v = VIEWS.find(x => x.key === key) || VIEWS[0];
     current = v.key;
     state.analyticsView = v.key;
     if (!fromHistory) note({ view: 'analytics', sub: v.key }); // the page is in the address (#8606): a click and Back stay in step

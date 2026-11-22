@@ -75,6 +75,9 @@ type efficiencyUsage struct {
 
 // Efficiency answers the read.
 func (h *EfficiencyHandler) Efficiency(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // through Coral Hub the owner's alone (coral-hub #261001): the names of the team's own agents, teams, models and branches
+		return
+	}
 	q := r.URL.Query()
 	metric, dim, rng := q.Get("metric"), q.Get("group_by"), q.Get("range")
 	if rng == "" {

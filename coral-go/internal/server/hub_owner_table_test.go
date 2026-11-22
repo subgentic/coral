@@ -126,6 +126,10 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/dropbox/push":                        "owner-only-hub",
 		"POST /api/dropbox/shared":                      "owner-only-hub",
 		"GET /api/analytics/activity":                   "owner-only", // the activity counts of the Analytics tabs (#11225)
+		"GET /api/analytics/efficiency":                 "owner-only", // the rest of the Analytics page on the Hub (coral-hub #261001)
+		"GET /api/analytics/inbox-vs-chat":              "owner-only",
+		"GET /api/analytics/resource-queue":             "owner-only",
+		"GET /api/analytics/tasks":                      "owner-only",
 		"POST /api/sessions/live/{name}/notices/pause":  "owner-only", // pausing Coral's notices to an agent (#11387)
 		"POST /api/sessions/live/{name}/notices/resume": "owner-only",
 		"GET /api/operator-asks":                        "owner-only",                                   // the questions agents asked the Operator, for Needs you (#11417)
