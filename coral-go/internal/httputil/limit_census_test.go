@@ -22,6 +22,7 @@ var tooManyRequestsSites = map[string]struct {
 	count  int
 	reason string
 }{
+	"internal/server/routes/open_in_browser.go":         {1, "local browser launch limit: WriteActionLimit marks every refusal"},
 	"internal/httputil/limit.go":                        {1, "WriteActionLimit itself: always sends X-Coral-Limit: action"},
 	"internal/auth/middleware.go":                       {1, "too many wrong API keys: marked by hand (X-Coral-Limit set just before), plain-text body"},
 	"internal/cloud/enroll.go":                          {2, "client side: reads Coral Hub's 429, never writes one"},

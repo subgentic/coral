@@ -277,6 +277,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/sessions/live/{name}/keys":                                  "input typed into an agent's terminal: it goes to the agent, not kept for others to read",
 	"POST /api/sessions/live/{name}/kill":                                  "a control: no text is kept",
 	"POST /api/sessions/live/{name}/model":                                 "a model's name and level: no text for others",
+	"POST /api/sessions/live/{name}/open-in-browser":                       "opens a resolved project file; the log records only its relative name",
 	"POST /api/sessions/live/{name}/open-in-editor":                        "a path opened on this computer: no text kept",
 	"POST /api/sessions/live/{name}/resize":                                "a control: no text is kept",
 	"POST /api/sessions/live/{name}/restart":                               "a control: no text is kept",

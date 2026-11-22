@@ -255,6 +255,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/sessions/live/{name}/notes":                                 "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/sessions/live/{name}/notices/pause":                         "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/sessions/live/{name}/notices/resume":                        "an agent's own page: its controls, notes and tasks, not the Inbox",
+	"POST /api/sessions/live/{name}/open-in-browser":                       "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/sessions/live/{name}/open-in-editor":                        "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/sessions/live/{name}/pending-tool":                          "an agent's own page: its controls, notes and tasks, not the Inbox",
 	"POST /api/sessions/live/{name}/resize":                                "an agent's own page: its controls, notes and tasks, not the Inbox",
