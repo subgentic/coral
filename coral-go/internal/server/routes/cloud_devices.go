@@ -132,7 +132,7 @@ func (h *CloudHandler) SetDeviceMode(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "No such device")
 		return
 	}
-	if err := h.ss.SetDeviceMode(ctx, kid, body.Mode, time.Now()); err != nil {
+	if err := h.ss.SetDeviceMode(ctx, kid, body.Mode, "", time.Now()); err != nil {
 		errInternalServer(w, "Could not change the device")
 		return
 	}

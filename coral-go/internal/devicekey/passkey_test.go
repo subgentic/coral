@@ -301,7 +301,7 @@ func TestACertificateSignatureWithTrailingBytesIsRefused(t *testing.T) {
 
 func TestACertificateNeverStartsAboveViewWhateverThePasskeyMode(t *testing.T) {
 	r := newPkRig(t)
-	require.NoError(t, r.ss.SetDeviceMode(context.Background(), r.passkey.kid, "interact", t0))
+	require.NoError(t, r.ss.SetDeviceMode(context.Background(), r.passkey.kid, "interact", "", t0))
 	dev := newSigner(t)
 	require.NoError(t, r.handle(r.cert(dev, nil), t0))
 	k, _ := r.listed(dev.kid)
