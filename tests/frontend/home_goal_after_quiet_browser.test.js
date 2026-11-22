@@ -20,8 +20,8 @@ const { coralReady } = require('./helpers/wait');
         await ev(`for (const at of [350, 1150]) setTimeout(() => fetch('/static/theme_init.js?late=' + at, { cache: 'no-store' }), at); true`); // two requests of the page's own that finish late
         await waitFor(`window.__reads.length >= 1`, 'the teams read is made', 20000);
         const at = await ev(`window.__reads[0]`);
-        const lastBefore = await ev(`(() => { const t = window.__reads[0]; return Math.max(0, ...performance.getEntriesByType('resource').filter(e => e.responseEnd <= t && !/\\/(api\\/board\\/projects|home_goal\\.js)/.test(e.name)).map(e => e.responseEnd)); })()`);
-        console.log(`teams read at ${Math.round(at)} ms; the last other request (the card's own module aside) finished at ${Math.round(lastBefore)} ms`);
+        const lastBefore = await ev(`(() => { const t = window.__reads[0]; return Math.max(0, ...performance.getEntriesByType('resource').filter(e => e.responseEnd <= t && !/\\/(api\\/board\\/projects|home_goal\\.js|board_bulk_reads\\.js)/.test(e.name)).map(e => e.responseEnd)); })()`);
+        console.log(`teams read at ${Math.round(at)} ms; the last other request (the card's own module and the read's own lazy module, board_bulk_reads.js (#20440), aside) finished at ${Math.round(lastBefore)} ms`);
         assert.ok(at - lastBefore >= 900, `the teams read waits for the page's requests to go quiet: ${Math.round(at - lastBefore)} ms after the last one`);
         console.log('PASS');
     } finally { try { client.close(); } catch (e) {} }
