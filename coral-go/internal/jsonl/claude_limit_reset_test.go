@@ -1,10 +1,12 @@
 package jsonl
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAClaudeLimitErrorSaysWhenItResets(t *testing.T) {
@@ -33,4 +35,18 @@ func TestAClaudeLimitErrorSaysWhenItResets(t *testing.T) {
 			assert.True(t, got.Equal(c.want), "%s: got %s want %s", c.name, got, c.want)
 		}
 	}
+}
+
+// #20692: the reset is read from the whole message when the error is recorded, so the 300-character cap on its text cannot cut it off.
+func TestAClaudeLimitResetSurvivesTheTextCap(t *testing.T) {
+	long := strings.Repeat("x", 400)
+	line := `{"type":"assistant","isApiErrorMessage":true,"error":"rate_limit","timestamp":"2026-11-22T20:00:00.000Z","message":{"role":"assistant","content":[{"type":"text","text":"` + long + ` resets 11:15pm (UTC)"}]}}`
+	var e ClaudeAPIError
+	updateClaudeAPIError(&e, []byte(line))
+	assert.Equal(t, claudeAPIErrorTextMax, len(e.Text), "the text is capped")
+	assert.NotContains(t, e.Text, "resets", "and the time is cut off it")
+	at, ok := e.ResetsAt()
+	require.True(t, ok)
+	assert.True(t, at.Equal(time.Date(2026, 11, 22, 23, 15, 0, 0, time.UTC)), at.String())
+	assert.True(t, e.UsageLimit())
 }
