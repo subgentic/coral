@@ -148,7 +148,9 @@ const STUB = `(() => {
   assert.equal(await ev(`!!window.__updatePwn || !!document.querySelector('#scheduler-view .computer-card img, #scheduler-view .computer-card svg')`),false,'response and computer labels never become markup');
   await ev(`import((window.__coralStatic||'/static/')+'state.js').then(({state})=>{delete state.servers.find(s=>s.id==='two').label;window.__automationDeny=409;window.__automationErrorBody={error:'coral_too_old',min:'8.6.4'};window.__automationDenyServer='two';state.machineChosen='all';return true;})`);
   await route({view:'automations',folder:'jobs'}); await ready('one job');
-  assert.ok((await ev(`document.querySelector('.computer-not-shown').textContent`)).includes('Second computer needs an update to share automations'),'All computers names the unreadable computer beside readable rows');
+  assert.deepEqual(await ev(`document.querySelector('.computer-not-shown > p').textContent.replace(/^Not shown: /,'').replace(/\\.$/,'').split(' · ').sort()`),['Fourth computer is offline','Third computer is offline','Update Coral on Second computer to 8.6.4 to see this'],'All computers names every unreadable computer and the required version beside readable rows');
+  assert.ok(await ev(`document.querySelector('.cloud-automation-content table').textContent.includes('one job')`),'the readable computer keeps its automation rows');
+  assert.equal(await ev(`document.querySelector('.cloud-automation-content table').textContent.includes('two job')`),false,'the unreadable computer contributes no rows');
   await ev(`import((window.__coralStatic||'/static/')+'analytics_machine.js').then(m=>{m.pickMachine('two');window.__automationDenyPath='/api/scheduled/jobs/1/runs';return true;})`);
   await route({view:'automations',folder:'jobs',id:1}); await ready('Second computer needs an update to share its automations');
   assert.equal(await ev(`document.querySelector('#scheduler-view .computer-card-title').textContent`),'Second computer needs an update to share its automations','a nested run-history read keeps the update card too');
