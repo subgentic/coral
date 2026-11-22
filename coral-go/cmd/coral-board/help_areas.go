@@ -208,6 +208,7 @@ var healthRules = []struct{ groups, watches string }{
 	{"landing, release", "approved work that has not landed; a release that waits"},
 	{"action_list", "stuck waits, overloaded agents, stale reviews and mentions in the Operator's list"},
 	{"compact_context, dialog_timeout, auto_recommend", "agents with too much context; a dialog waiting too long; recommending an answer after a grace"},
+	{"operator_wait", "a post that waits on the Operator but is not in their Needs you (grace, how old a chat may be, which authors are exempt, on/off)"},
 	{"off_books, post_no_task, upload_no_task, deviations", "work done with no task; a post or upload that names none; deviations from the plan"},
 	{"pool_review, wait_escalate, default_reviewers, reviewer_pool", "review picking from a pool; waits that escalate; who reviews by default"},
 	{"assign_limit, park_limit, stale_sweep_hours, auto_delegate, all_clear, on", "limits on assigned and parked work, the stale-task sweep, and on/off switches"},
