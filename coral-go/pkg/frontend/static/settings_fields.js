@@ -122,6 +122,7 @@ const claudeThinking = { key: 'default_thinking_claude', type: 'select', id: 'se
     help: moreOnly('How hard Claude thinks before it answers, when a launch does not say.', 'How much Claude thinks before it answers, for agents launched with no choice of their own. A model that does not take a level uses the nearest one it does.') };
 
 // Settings > Providers (ST4): one card per provider, the rows that used to be spread over Defaults. A provider that is not installed folds to one line, "Set up Codex" (settings_providers.js, which draws it after the check of that CLI answers); every row keeps its id.
+const CODEX_TRUST_HOOKS = { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Skip Codex's review of Coral's hooks", help: helpLine('Turns off a safety check: Codex will not ask you to review Coral\'s hooks.', "Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on, Coral trusts its own hooks, and only those exact commands, for each Codex agent it launches, so the agent starts without that question; your own hooks, a repository's and a plugin's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") };
 const PROVIDER_CARDS = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode']];
 const providerCard = (type, name) => [
     { key: `provider_${type}`, type: 'heading', card: true, provider: type, id: `settings-provider-${type}`, label: name },
@@ -129,12 +130,13 @@ const providerCard = (type, name) => [
         { ...modelRow(type, name), label: 'Default model', help: moreOnly(type === 'claude' ? 'Pick one, or type any model id.' : 'Pick one, or type any model id; leave it blank for the CLI\'s own.') },
         type === 'claude' ? { ...claudeThinking, label: 'Default thinking' } : { ...workersThinking(type, name), label: 'Default thinking', options: thinkingOptions(type, 'Default (recommended)') },
     ]),
-    { key: `provider_advanced_${type}`, type: 'heading', fold: true, id: `settings-provider-advanced-${type}`, label: type === 'opencode' ? 'Advanced' : 'Advanced (3)' },
+    { key: `provider_advanced_${type}`, type: 'heading', fold: true, id: `settings-provider-advanced-${type}`, label: type === 'opencode' ? 'Advanced' : type === 'codex' ? 'Advanced (4)' : 'Advanced (3)' },
     ...(type === 'opencode' ? [] : [
         { ...orchestratorModel(type, name), label: 'Orchestrator model' },
         { ...orchestratorThinking(type, name), label: 'Orchestrator thinking' },
     ]),
     { ...cliPath(type, name), label: 'CLI path', attrs: { 'aria-label': `${name} CLI path` } },
+    ...(type === 'codex' ? [CODEX_TRUST_HOOKS] : []),
 ];
 const PROVIDERS_FIELDS = [
     { key: 'default_models_notice', type: 'notice', render: slot => { slot.innerHTML = '<span id="settings-default-models-notice" class="settings-hint" role="status"></span>'; } },
@@ -168,7 +170,6 @@ const AGENTS_FIELDS = host => [
     { key: 'gdoc_share', type: 'toggle', id: 'settings-gdoc-share', label: 'Google sharing (experimental)', help: moreOnly('Off until you turn it on: share a Markdown file to a Google Doc. Mac only.') },
     { key: 'launch_in_worktree', type: 'toggle', id: 'settings-launch-in-worktree', label: 'Enable launch into git worktree (experimental)', help: moreOnly('Experimental, and off until you turn it on: a team can then be launched into its own git worktree.') },
     { key: 'agents_tools', type: 'heading', id: 'settings-agents-tools', label: 'Tools' },
-    { key: 'codex_trust_hooks', type: 'toggle', id: 'settings-codex-trust-hooks', label: "Skip Codex's review of Coral's hooks", help: helpLine('Turns off a safety check: Codex will not ask you to review Coral\'s hooks.', "Codex asks you to review new hooks before it runs them, because a trusted hook runs outside its sandbox. When this is on, Coral trusts its own hooks, and only those exact commands, for each Codex agent it launches, so the agent starts without that question; your own hooks, a repository's and a plugin's still ask. Off, Codex asks every time. Applies to Codex agents launched after the change, and can only be changed on this computer.") },
     live('settings-prompts-live'),
 ];
 
@@ -316,7 +317,7 @@ const HELP_LINES = {
 
 // One definition per setting; layout chooses its home without copying a control.
 const TEAM_KEYS = new Set(['agents_team', 'board_auto_attach', 'nudge_claude_artifacts', 'board_health_monitor']);
-const ADVANCED_KEYS = new Set(['agents_experimental', 'launch_in_worktree', 'gdoc_share', 'agents_tools', 'codex_trust_hooks', 'live_settings-prompts-live']);
+const ADVANCED_KEYS = new Set(['agents_experimental', 'launch_in_worktree', 'gdoc_share', 'agents_tools', 'live_settings-prompts-live']);
 const pick = (fields, keys) => fields.filter(f => keys.has(f.key));
 const advanced = id => ({ key: id, id, type: 'heading', label: 'Advanced', fold: true });
 

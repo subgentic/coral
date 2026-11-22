@@ -44,7 +44,8 @@ const AGENT_PARTS = {
             assert.deepEqual(under, ids.map(() => head), `${head}: ${JSON.stringify(under)}`);
         }
         assert.equal(await paneOf('settings-board-auto-attach'), 'chief', 'team setting has one home');
-        assert.equal(await paneOf('settings-codex-trust-hooks'), 'agents', 'hook trust remains in Defaults');
+        assert.equal(await paneOf('settings-codex-trust-hooks'), 'providers', 'hook trust belongs to Providers');
+        assert.equal(await ev(`document.getElementById('settings-codex-trust-hooks').closest('details').id`), 'settings-provider-advanced-codex', 'hook trust belongs to Codex Advanced');
         console.log('2. Appearance has the render engine and Customize Theme beside Theme; About has one home');
         assert.equal(await paneOf('settings-renderer-select'), 'general');
         await open('general');
