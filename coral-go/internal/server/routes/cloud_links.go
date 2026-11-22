@@ -520,7 +520,7 @@ func (h *CloudHandler) LinkAsks(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "Could not read which asks this Hub may answer")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"allowed": kinds, "kinds": tunnel.AskKinds()})
+	writeJSON(w, http.StatusOK, map[string]any{"allowed": kinds, "kinds": tunnel.AskKinds(), "text": askKindTexts()})
 }
 
 // SetLinkAsk: PUT /api/cloud/links/{id}/asks {"kind": "agent_ask", "allow": true}. Allows or stops one kind for a Hub added here. A kind outside the vocabulary is refused whoever asks.
@@ -560,5 +560,14 @@ func (h *CloudHandler) SetLinkAsk(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "Could not read which asks this Hub may answer")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"allowed": kinds, "kinds": tunnel.AskKinds()})
+	writeJSON(w, http.StatusOK, map[string]any{"allowed": kinds, "kinds": tunnel.AskKinds(), "text": askKindTexts()})
+}
+
+// askKindTexts is the Settings line of each kind of ask, by kind.
+func askKindTexts() map[string]string {
+	out := map[string]string{}
+	for _, k := range tunnel.AskKinds() {
+		out[k] = tunnel.AskKindText(k)
+	}
+	return out
 }

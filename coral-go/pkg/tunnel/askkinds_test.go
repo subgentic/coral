@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,4 +64,21 @@ func TestNonCanonicalPathsUnderTheAskPrefixesFailClosed(t *testing.T) {
 	}
 	// A legitimate encoded segment (a team name with a space) still maps.
 	assert.Equal(t, AskKindAskButton, AskRouteKind("POST", "/api/board/My%20Team/asks/1/close"))
+}
+
+func TestEveryAskKindHasItsSettingsSentenceAndMessageReplyNamesTheLabel(t *testing.T) {
+	for _, k := range AskKinds() {
+		if AskKindText(k) == "" {
+			t.Errorf("%s has no sentence", k)
+		}
+	}
+	if AskKindText("nope") != "" {
+		t.Error("a kind that is not in the vocabulary has no sentence")
+	}
+	got := AskKindText(AskKindMessageReply)
+	for _, want := range []string{"hub-user", "never as the Operator", "answers nothing"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("message_reply sentence lacks %q: %s", want, got)
+		}
+	}
 }

@@ -467,13 +467,17 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 			return nil, false
 		}
 		asksOperator := strings.EqualFold(strings.TrimSpace(subscriberID), operatorIdentity) || strings.EqualFold(strings.TrimSpace(body.As), operatorIdentity)
-		if hubOrigin == board.OriginHubUser && asksOperator && h.hubOperatorAllowed != nil && h.hubOperatorAllowed(r) {
+		noAnswer := board.NoAnswerFrom(r.Context()) // an added link that may not answer asks (#20413): the post is a Hub person's and never the Operator's, even if it asks to be
+		if hubOrigin == board.OriginHubUser && asksOperator && !noAnswer && h.hubOperatorAllowed != nil && h.hubOperatorAllowed(r) {
 			subscriberID, origin, hubUser, hubOperator = operatorIdentity, board.OriginHubOperator, user, true
 			body.Content = HubOperatorPrefix(user) + body.Content
 		} else {
 			subscriberID, origin = user, hubOrigin
 			if hubOrigin == board.OriginHubUser {
 				hubUser = user
+				if noAnswer {
+					body.Content = HubUserNoAnswerPrefix(user) + body.Content
+				}
 			}
 		}
 		// Neither a Coral Hub user nor the Operator is subscribed by a post through the

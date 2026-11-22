@@ -20,6 +20,19 @@ const AskKindLocalOnly = "local_only"
 // AskKinds is the vocabulary, in a stable order.
 func AskKinds() []string { return []string{AskKindAgentAsk, AskKindAskButton, AskKindMessageReply} }
 
+// AskKindText is the plain sentence the Settings line for a kind says (and the asks route returns), so the screen and the agent's label use the same words. "" for a kind that is not in the vocabulary.
+func AskKindText(kind string) string {
+	switch kind {
+	case AskKindAgentAsk:
+		return "People on this Hub may answer questions your agents ask."
+	case AskKindAskButton:
+		return "People on this Hub may press the buttons of a team's questions."
+	case AskKindMessageReply:
+		return "People on this Hub may answer a question by posting. Without this, their post still reaches the agent as text labelled with their hub-user name, never as the Operator, and answers nothing."
+	}
+	return ""
+}
+
 // ValidAskKind says kind is in the vocabulary.
 func ValidAskKind(kind string) bool {
 	for _, k := range AskKinds() {
