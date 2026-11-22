@@ -279,14 +279,15 @@ var operatorOnlyRoutes = map[string]string{
 	// and the mock agent found no agent-side use of any of them): the terminal stream (and with it typing into and
 	// resizing any agent's terminal), turning every agent's auto-accept off, the dashboard's file upload and
 	// opening a file in the Operator's editor are the Operator's.
-	"GET /ws/terminal/{name}":                       "read or type into an agent's terminal",
-	"POST /api/auto-accept/disable-all":             "turn off auto-accept for every agent",
-	"POST /api/upload":                              "upload a file from the dashboard",
-	"DELETE /api/upload/{name}":                     "remove an uploaded file",
-	"GET /api/upload/{name}":                        "read an uploaded file", // #5028
-	"POST /api/sessions/live/{name}/open-in-editor": "open a file in the Operator's editor",
-	"GET /api/system/terminal-logs":                 "see the terminal logs",
-	"POST /api/system/terminal-logs/delete-ended":   "delete the terminal logs of ended agents",
+	"GET /ws/terminal/{name}":                        "read or type into an agent's terminal",
+	"POST /api/auto-accept/disable-all":              "turn off auto-accept for every agent",
+	"POST /api/upload":                               "upload a file from the dashboard",
+	"DELETE /api/upload/{name}":                      "remove an uploaded file",
+	"GET /api/upload/{name}":                         "read an uploaded file", // #5028
+	"POST /api/sessions/live/{name}/open-in-browser": "open a project page in the local browser",
+	"POST /api/sessions/live/{name}/open-in-editor":  "open a file in the Operator's editor",
+	"GET /api/system/terminal-logs":                  "see the terminal logs",
+	"POST /api/system/terminal-logs/delete-ended":    "delete the terminal logs of ended agents",
 	// #4780 (Security's identity read): the dashboard's request for an Agent UI panel types its text, as the
 	// user's request, into the live agent named by session_id: any agent, of any team. No agent tool calls it
 	// (grep of coral-board, coral-agent, the hooks and the mock agent), and with an agent's token it was a way

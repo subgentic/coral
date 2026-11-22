@@ -403,6 +403,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/live/{name}/file-content", sessHandler.GetFileContent)
 	r.Get("/api/sessions/live/{name}/resolve-path", sessHandler.ResolvePath)
 	r.Post("/api/sessions/live/{name}/open-in-editor", sessHandler.OpenInEditor)
+	r.Post("/api/sessions/live/{name}/open-in-browser", sessHandler.OpenInBrowser)
 	r.Get("/api/system/editors", sessHandler.ListEditors)
 	r.Get("/api/sessions/live/{name}/file-original", sessHandler.GetFileOriginal)
 	r.Put("/api/sessions/live/{name}/file-content", sessHandler.SaveFileContent)

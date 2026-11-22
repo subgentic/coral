@@ -61,6 +61,10 @@ func writeResolveErr(w http.ResponseWriter, err error) {
 }
 
 func (h *SessionsHandler) resolveFileRef(ctx context.Context, name, sessionID, ref string, strict bool) (resolvedFileRef, error) {
+	return h.resolveFileRefPolicy(ctx, name, sessionID, ref, strict, false)
+}
+
+func (h *SessionsHandler) resolveFileRefPolicy(ctx context.Context, name, sessionID, ref string, strict, noLinks bool) (resolvedFileRef, error) {
 	fp, line := strings.TrimSpace(ref), 0
 	if unescaped, err := url.PathUnescape(fp); err == nil {
 		fp = unescaped
@@ -107,6 +111,9 @@ func (h *SessionsHandler) resolveFileRef(ctx context.Context, name, sessionID, r
 	}
 
 	check := func(c string) (resolvedFileRef, bool) {
+		if noLinks && !browserPathWithoutLinks(root, c) {
+			return resolvedFileRef{}, false
+		}
 		real, err := safefs.Resolve(c)
 		if err != nil {
 			return resolvedFileRef{}, false
