@@ -424,6 +424,7 @@ func (h *CloudHandler) askAndSettle(ctx context.Context, link store.CloudLink, n
 		return removalDone, "", err
 	}
 	h.setRetry(link.LinkID, removalRetry{})
+	cloud.LinkEnded(ctx, link.LinkID)
 	h.linkAction(ctx, link.LinkID, how, note)
 	if m := h.manager(); m != nil {
 		if link.Source == store.LinkSourceEnrollment {
