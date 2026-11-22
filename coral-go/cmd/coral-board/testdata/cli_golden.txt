@@ -80,8 +80,9 @@ Commands:
   queue [--json]               The merge queue: approved tasks whose patches have not landed
   resource list|status|claim|release|renew|define|remove|move|kick
                                Claim a slot of a shared resource (this machine, a remote one) and wait your turn; see: coral-board resource
-  health ack <id>              Mark a health-check item handled: the item that ends
+  health ack <id>              Mark a health-check item handled: the item that starts
                                with [ack <id>] (orchestrator or Operator)
+  health list                  Print every open health-check item with its [ack <id>]
   search "<text>" [--source messages,tasks,goals,history] [--state S] [--goal N] [--assignee NAME] [--from NAME] [--mentions NAME]
                 [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--system] [--json]
                                Search the messages, tasks (title, body, completion message), goals (title, outcome,
@@ -294,8 +295,9 @@ Commands:
   queue [--json]               The merge queue: approved tasks whose patches have not landed
   resource list|status|claim|release|renew|define|remove|move|kick
                                Claim a slot of a shared resource (this machine, a remote one) and wait your turn; see: coral-board resource
-  health ack <id>              Mark a health-check item handled: the item that ends
+  health ack <id>              Mark a health-check item handled: the item that starts
                                with [ack <id>] (orchestrator or Operator)
+  health list                  Print every open health-check item with its [ack <id>]
   search "<text>" [--source messages,tasks,goals,history] [--state S] [--goal N] [--assignee NAME] [--from NAME] [--mentions NAME]
                 [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--system] [--json]
                                Search the messages, tasks (title, body, completion message), goals (title, outcome,
@@ -509,8 +511,9 @@ Commands:
   queue [--json]               The merge queue: approved tasks whose patches have not landed
   resource list|status|claim|release|renew|define|remove|move|kick
                                Claim a slot of a shared resource (this machine, a remote one) and wait your turn; see: coral-board resource
-  health ack <id>              Mark a health-check item handled: the item that ends
+  health ack <id>              Mark a health-check item handled: the item that starts
                                with [ack <id>] (orchestrator or Operator)
+  health list                  Print every open health-check item with its [ack <id>]
   search "<text>" [--source messages,tasks,goals,history] [--state S] [--goal N] [--assignee NAME] [--from NAME] [--mentions NAME]
                 [--agent NAME] [--author user|assistant] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--system] [--json]
                                Search the messages, tasks (title, body, completion message), goals (title, outcome,
