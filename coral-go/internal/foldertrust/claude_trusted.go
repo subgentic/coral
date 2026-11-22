@@ -3,7 +3,10 @@ package foldertrust
 import (
 	"encoding/json"
 	"os"
+	pathpkg "path"
 	"path/filepath"
+	"runtime"
+	"strings"
 )
 
 // ClaudeTrusted says whether Claude's settings file at cfg already trusts path or a folder above it (a read, for the launch's setup check, #20388): Claude asks nothing in a folder it has been told to trust.
@@ -25,13 +28,32 @@ func ClaudeTrusted(cfg, path string) (trusted, known bool) {
 	if json.Unmarshal(raw, &top) != nil || top.Projects == nil {
 		return false, false
 	}
-	for p := filepath.Clean(path); ; p = filepath.Dir(p) {
-		if e, ok := top.Projects[p]; ok && e.Accepted != nil && *e.Accepted {
-			return true, true
-		}
-		if parent := filepath.Dir(p); parent == p {
-			break
+	// Compare in one form: forward slashes, no trailing slash, and on Windows (a case-insensitive disk) lower case, so a key Claude wrote as C:/Users/me/app matches C:\Users\Me\app.
+	trusted = false
+	seen := map[string]bool{}
+	for k, e := range top.Projects {
+		if e.Accepted != nil && *e.Accepted {
+			seen[trustKey(k)] = true
 		}
 	}
+	for p := trustKey(path); ; {
+		if seen[p] {
+			return true, true
+		}
+		parent := pathpkg.Dir(p)
+		if parent == p || parent == "." {
+			break
+		}
+		p = parent
+	}
 	return false, true
+}
+
+// trustKey is the form two paths are compared in (see ClaudeTrusted).
+func trustKey(p string) string {
+	p = filepath.ToSlash(filepath.Clean(filepath.FromSlash(p)))
+	if runtime.GOOS == "windows" {
+		p = strings.ToLower(p)
+	}
+	return p
 }

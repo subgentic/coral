@@ -221,7 +221,7 @@ func TestLaunchCheckReadsFolderTrustAndTheNewWorktreeFolder(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"projects":{}}`), 0o600))
 	c = checkOf(ask(nil), "trusted")
 	assert.Contains(t, c["reason"], "will ask")
-	require.NoError(t, os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"projects":{"`+realOf(t, repo)+`":{"hasTrustDialogAccepted":true}}}`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".claude.json"), trustFile(t, realOf(t, repo)), 0o600))
 	c = checkOf(ask(nil), "trusted")
 	assert.Equal(t, true, c["ok"])
 	assert.Empty(t, c["reason"])
@@ -235,6 +235,14 @@ func TestLaunchCheckReadsFolderTrustAndTheNewWorktreeFolder(t *testing.T) {
 	bad := checkOf(ask(url.Values{"new_worktree": {"x"}, "worktree_path": {"relative"}}), "worktree_free")
 	assert.Equal(t, false, bad["ok"])
 	assert.NotContains(t, bad["reason"], home, "no path in a sentence")
+}
+
+// trustFile is Claude's settings with p trusted, written as JSON would be (a Windows path has backslashes to escape).
+func trustFile(t *testing.T, p string) []byte {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{"projects": map[string]any{p: map[string]any{"hasTrustDialogAccepted": true}}})
+	require.NoError(t, err)
+	return b
 }
 
 func realOf(t *testing.T, p string) string {
