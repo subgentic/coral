@@ -301,7 +301,7 @@ func TestAViewGranteeReachesOnlyTheBoardMessagesOfTheirOwnBoard(t *testing.T) {
 
 // An agent-scope grant, or a board grant with no board, gives no View route at all (V5, B5).
 func TestAnAgentScopeOrAnEmptyScopeGivesNoViewRoute(t *testing.T) {
-	route := &grantRoute{"GET", "/api/board/team1/messages"}
+	route := &grantRoute{method: "GET", path: "/api/board/team1/messages"}
 	assert.True(t, viewScopeAllows([]board.MemberGrant{{Level: board.MemberLevelView, ScopeKind: board.MemberScopeBoard, ScopeID: "team1"}}, route))
 	assert.False(t, viewScopeAllows([]board.MemberGrant{{Level: board.MemberLevelView, ScopeKind: board.MemberScopeAgent, ScopeID: "team1"}}, route), "agent scope is off")
 	assert.False(t, viewScopeAllows([]board.MemberGrant{{Level: board.MemberLevelView, ScopeKind: board.MemberScopeBoard, ScopeID: ""}}, route), "an empty scope is nothing, not all")
@@ -383,7 +383,7 @@ func TestTheGrantCheckCostPerRequestIsMeasured(t *testing.T) {
 	cp.set(tunnel.TierLaunch)
 	_, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelView))
 	require.NoError(t, err)
-	route := &grantRoute{"GET", "/api/board/team1/messages"}
+	route := &grantRoute{method: "GET", path: "/api/board/team1/messages"}
 	const n = 2000
 	for _, c := range []struct{ name, user string }{{"granted (table read; the link read is a stub here)", guardUser}, {"no grant rows (table read)", "hub-user-zzzz9999"}} {
 		v := cloud.Via{LinkID: guardLink, HubUser: c.user}
@@ -420,4 +420,26 @@ func TestRevokingOneBoardsGrantEndsThatBoardsStreamsAndLeavesTheOthers(t *testin
 	assert.Equal(t, 1, SweepOpenStreams(ctx, bs, cp.get, time.Now()))
 	assert.EqualValues(t, 1, endedA.Load(), "board A's stream ended with its grant")
 	assert.Zero(t, endedB.Load(), "board B's grant is live, so its stream stays")
+}
+
+// #20590 (2): the guard marks a View-only person's request so the route answers with the typed shape, and does not mark a Full person's.
+func TestTheGuardMarksAViewOnlyPersonsRequestAndNotAFullPersons(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	ctx := context.Background()
+	bs := guardStore(t)
+	cp := &guardCap{}
+	cp.set(tunnel.TierLaunch)
+	_, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelView))
+	require.NoError(t, err)
+	_, err = bs.CreateMemberGrant(ctx, guardGrant("hub-user-cccc3333", board.MemberLevelFull))
+	require.NoError(t, err)
+	var marked bool
+	h := MemberGrantGuard(bs, cp.get)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { marked = cloud.ViewOnlyFrom(r.Context()) }))
+	for user, want := range map[string]bool{guardUser: true, "hub-user-cccc3333": false} {
+		marked = false
+		req := httptest.NewRequest("GET", "/api/board/team1/messages", nil)
+		req = req.WithContext(cloud.WithVia(req.Context(), cloud.Via{LinkID: guardLink, HubUser: user}))
+		h.ServeHTTP(httptest.NewRecorder(), req)
+		assert.Equal(t, want, marked, user)
+	}
 }
