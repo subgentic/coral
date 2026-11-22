@@ -373,3 +373,24 @@ func TestTheSweeperEndsAStreamWithinItsInterval(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// #20581 (f): what the grant check costs one tunneled request (the grant table read and the link read), measured and logged, never limited. A person with no grant row pays the table read only.
+func TestTheGrantCheckCostPerRequestIsMeasured(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	ctx := context.Background()
+	bs := guardStore(t)
+	cp := &guardCap{}
+	cp.set(tunnel.TierLaunch)
+	_, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelView))
+	require.NoError(t, err)
+	route := &grantRoute{"GET", "/api/board/team1/messages"}
+	const n = 2000
+	for _, c := range []struct{ name, user string }{{"granted (table read; the link read is a stub here)", guardUser}, {"no grant rows (table read)", "hub-user-zzzz9999"}} {
+		v := cloud.Via{LinkID: guardLink, HubUser: c.user}
+		start := time.Now()
+		for i := 0; i < n; i++ {
+			memberGrantAllows(ctx, bs, cp.get, v, tunnel.TierView, time.Now(), route)
+		}
+		t.Logf("%s: %v per request over %d", c.name, time.Since(start)/n, n)
+	}
+}
