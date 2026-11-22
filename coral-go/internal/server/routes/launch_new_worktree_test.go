@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/consoletest"
+	"github.com/subgentic/coral/internal/store"
 )
 
 func placeOn(t *testing.T, h *SessionsHandler, dir string, nw *launchNewWorktree, checkout string, confirm bool) (string, bool, int, map[string]any) {
@@ -116,4 +117,28 @@ func gitOut(t *testing.T, dir string, args ...string) string {
 	out, err := consoletest.HiddenCommand("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)
+}
+
+// Security r4: an agent running in the folder is told before its branch changes under it, and a repository's own post-checkout hook never runs on the launch's checkout.
+func TestSwitchingABranchUnderARunningAgentAsksFirstAndRunsNoRepositoryHook(t *testing.T) {
+	rig := setupAgyTestRig(t)
+	repo, git := repoOn(t, "main", true)
+	git("branch", "other")
+	marker := filepath.Join(t.TempDir(), "hook-ran")
+	hook := filepath.Join(repo, ".git", "hooks", "post-checkout")
+	require.NoError(t, os.WriteFile(hook, []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o755))
+	require.NoError(t, rig.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "s-live", AgentType: "claude", AgentName: "Dev One", WorkingDir: repo}))
+
+	_, ok, code, out := placeOn(t, rig.h, repo, nil, "other", false)
+	assert.False(t, ok)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, true, out["confirm_checkout"])
+	assert.Contains(t, out["error"], "Dev One is running in this folder")
+	assert.Equal(t, "main", strings.TrimSpace(git("rev-parse", "--abbrev-ref", "HEAD")), "nothing moved before the answer")
+
+	_, ok, _, out = placeOn(t, rig.h, repo, nil, "other", true)
+	require.True(t, ok, "%v", out)
+	assert.Equal(t, "other", strings.TrimSpace(git("rev-parse", "--abbrev-ref", "HEAD")))
+	_, err := os.Stat(marker)
+	assert.True(t, os.IsNotExist(err), "the post-checkout hook must not run on a launch checkout")
 }

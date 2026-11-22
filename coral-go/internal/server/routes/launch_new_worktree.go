@@ -81,6 +81,17 @@ func (h *SessionsHandler) placeLaunchOnBranch(w http.ResponseWriter, r *http.Req
 		if c := branchFreeCheck(ctx, workingDir, root, checkout); !c.OK {
 			return refuse("checkout_branch", c.Reason)
 		}
+		if !confirm {
+			// an agent already running in this folder would find its branch changed under it: say so, and switch only when the person agrees
+			if live, err := h.ss.GetAllLiveSessions(ctx); err == nil {
+				for _, s := range live {
+					if samePath(s.WorkingDir, workingDir) {
+						writeJSON(w, http.StatusConflict, map[string]any{"error": s.AgentName + " is running in this folder: switching branch changes the files under it", "field": "checkout_branch", "confirm_checkout": true})
+						return "", false
+					}
+				}
+			}
+		}
 		if out, err := gitutil.Command(ctx, workingDir, "status", "--porcelain=v1", "--untracked-files=normal").Output(); err == nil && strings.TrimSpace(string(out)) != "" && !confirm {
 			writeJSON(w, http.StatusConflict, map[string]any{"error": "this folder has uncommitted changes: switching branch may carry them along or stop on a conflict", "field": "checkout_branch", "confirm_checkout": true})
 			return "", false
