@@ -159,6 +159,20 @@ func worktreesOf(ctx context.Context, dir, root string) []launchWorktree {
 // defaultWorktreeDir is the folder a new worktree is made in unless the person edits it: <repo>-worktrees next to the repository (mock #20111).
 func defaultWorktreeDir(root string) string { return filepath.Clean(root) + "-worktrees" }
 
+// underDefaultWorktreeDir is <repo>-worktrees/name, the one place a name is joined to that folder, and "" unless name is one plain folder name (a letter, digit or underscore first, then letters, digits, dots, dashes
+// or underscores: no separator, never . or ..) whose folder sits directly in it; callers that get "" refuse the name (#20614, the join census).
+func underDefaultWorktreeDir(root, name string) string {
+	def := defaultWorktreeDir(root)
+	if !suggestedDirName.MatchString(name) {
+		return ""
+	}
+	p := filepath.Join(def, name)
+	if filepath.Dir(p) != def || filepath.Base(p) != name {
+		return ""
+	}
+	return p
+}
+
 // worktreeLaunchOn reports the "launch into git worktree" setting (off unless turned on, #12746).
 func (h *SystemHandler) worktreeLaunchOn(r *http.Request) bool {
 	if h.ss == nil {
@@ -313,7 +327,7 @@ func worktreePathFor(root, name, custom string) string {
 	if custom != "" {
 		return filepath.Clean(custom)
 	}
-	return filepath.Join(defaultWorktreeDir(root), name)
+	return underDefaultWorktreeDir(root, name)
 }
 
 // folderTrustCheck says whether the agent's CLI already trusts the folder, so it will not stop to ask. Only Claude's settings are read (a read of one file, never written); any other CLI, or a file that cannot be

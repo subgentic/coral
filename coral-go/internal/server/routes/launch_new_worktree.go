@@ -19,7 +19,10 @@ func worktreeTarget(r *http.Request, root, name, custom string) (path, reason, f
 		return "", "that name cannot be a branch and a folder", "use letters, numbers, dots, dashes or underscores"
 	}
 	def := defaultWorktreeDir(root)
-	path = filepath.Join(def, name)
+	path = underDefaultWorktreeDir(root, name)
+	if path == "" {
+		return "", "that name cannot be a branch and a folder", "use letters, numbers, dots, dashes or underscores"
+	}
 	if custom != "" {
 		path = custom
 		if !filepath.IsAbs(custom) || filepath.Clean(custom) != strings.TrimRight(custom, `/\`) {
