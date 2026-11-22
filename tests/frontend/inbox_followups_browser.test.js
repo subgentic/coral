@@ -85,12 +85,12 @@ const AGENTS = (waiting) => waiting ? [
             });
             if (!mobile) await step('a saved message page starts at its title; Escape goes back to the Saved table with the focus on that message, not to another tab', async () => {
                 await ev(`window.switchNavTab('hub-inbox'); true`); await click('Saved', `${pane} .view-list-item[data-key="saved"]`); await settle(400);
-                const id = await ev(`document.querySelectorAll('#group-table-view .dt-primary')[1].dataset.id`);
-                await click('the message', `#group-table-view .dt-primary[data-id="${id}"]`); await settle(500);
+                const key = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key^="msg:"]')][1].dataset.key`); // the one Saved list keys a message row msg:<id>
+                await click('the message', `#group-table-view tr[data-key="${key}"] .dt-primary`); await settle(500);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'a message page starts at its title');
                 await escape(); await settle(500);
                 assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Saved', 'back at the Saved table');
-                const a = await active(); assert.equal(a.data.id, id, 'with the focus on that message (' + JSON.stringify(a) + ')');
+                const a = await active(); assert.equal(await ev(`document.activeElement.closest('tr')?.dataset.key`), key, 'with the focus on that message (' + JSON.stringify(a) + ')');
                 assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`), 'hub-inbox', 'still in the Inbox');
             });
             if (mobile) await step('the phone: a task opens at its Back link (not a ring round the title) and Back puts the focus on its row in the table', async () => {

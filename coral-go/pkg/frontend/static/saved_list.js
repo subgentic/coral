@@ -1,6 +1,6 @@
 /* Saved as one list in the Inbox's row (#20508): files and messages together, newest saved first. Each row is the Needs you row's shape (a tile, the sender and team line, the words in a 4-line preview, the buttons under them), so it takes the Inbox's own css (.inbox-needs-results). Lazy: the Inbox loads it when Saved opens.
  * entries: [{ kind: 'file', at, a } | { kind: 'message', at, f }], already in order. The Inbox hands in what it owns (inbox_sidebar.js is loaded through importOnce, which a lazy module may not import). */
-export function fillSavedList(host, entries, { DT, decorateMessage, decorateKindRow, addStar, fileTile, messageTile, fileActions, messageActions, openFile, openMessage, fileFrom, fileWords, shown }) {
+export function fillSavedList(host, entries, { DT, decorateMessage, decorateKindRow, addStar, fileTile, messageTile, fileActions, messageActions, openFile, openMessage, fileFrom, fileWords, shown, serverCols = [] }) {
     const tile = e => (e.kind === 'file' ? fileTile(e.a) : messageTile());
     const nameOf = e => (e.kind === 'file' ? shown(e.a) : e.f.which), shownOf = e => (e.kind === 'file' ? shown(e.a) : e.f.title || e.f.which); // a message's button is named by the whole words, as before ("Agent, the words"); the row draws the sender
     const table = DT.dataTable({ label: `Saved, ${entries.length}`, compact: true, bare: true, fold: 'always', rows: entries, rowKey: e => (e.kind === 'file' ? `file:${e.a.reviewKey}` : `msg:${e.f.id}`), rowName: nameOf, sortBar: false,
@@ -27,6 +27,7 @@ export function fillSavedList(host, entries, { DT, decorateMessage, decorateKind
                 if (e.kind === 'file' && e.a.new_comments > 0) meta.append(DT.tag('New comments'));
                 wrap.prepend(tile(e));
                 return wrap; } },
+            ...serverCols, // the Computer when more than one computer is linked: the table says it in the Team cell, as the Needs you card does
             { key: 'team', label: 'Team', width: 'content', line: 1, cell: e => e.team || '' },
             { key: 'waiting', label: 'Saved', tone: 'tertiary', align: 'end', width: 'content', line: 1, cell: e => e.when },
             ...(entries.some(e => e.kind === 'message' && e.f.gone) ? [{ key: 'state', label: 'State', width: 'content', line: 1, cell: e => (e.kind === 'message' && e.f.gone ? DT.tag('Gone') : '') }] : []), // a message that is gone says so (its page says why)
