@@ -36,6 +36,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("health line to a member", typedHealthLine("you have 2 tasks off the books"), typedHealthLine(h)),
 		typedcensus.C("the monitor's deliver, a check", typedHealth("Since 08:00: fine."), typedHealth(composed)),
 		typedcensus.C("stale-task sweep", typedHealth(staleSample("a task title")), typedHealth(staleSample(h))), // the sweep's text, a task title in it (#14863)
+		typedcensus.C("limit reset resume", limitResumeText, limitResumeText),                                    // one fixed notice, nothing from an agent or a task (#20691)
 		typedcensus.C("context cleared, next task", clearedText(12), clearedText(12)),                            // a fixed template with a task number only (#14849)
 		typedcensus.C("context cleared, no next task", clearedText(0), clearedText(0)),
 		typedcensus.C("context cleared, handoff asked", askHandoffText(), askHandoffText()),
@@ -82,6 +83,8 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("health_nudges_goal_done.go", `goalDoneNudgeText(`, 1, "census"),
 		typedcensus.S("health_remind.go", `board.OneLine(text), "task reminder"`, 1, "the reminders' deliver: forwards taskReminderText"),
 		typedcensus.S("health_remind.go", `taskReminderText(`, 1, "census"),
+		typedcensus.S("limit_resume.go", `text, "limit reset resume", false, false)`, 1, "the limit resumer's own send: forwards limitResumeText, in the census (limit reset resume)"),
+		typedcensus.S("limit_resume.go", `r.deliver(ctx, p.a, limitResumeText)`, 1, "the resume of an agent whose limit reset: limitResumeText, in the census (limit reset resume)"),
 		typedcensus.S("launcher.go", `prompt, "initial prompt"`, 1, "exception: the launch's own prompt (the person's, or a scheduled job's), the agent's first input"),
 		typedcensus.S("notifier.go", `deliver()`, 2, "the nudge's own closure: types nudgeText and the cross-board hint (census: board nudge)"),
 		typedcensus.S("notifier.go", `text, what, requireInputBox, mention, wanted)`, 1, "deliverNudge: forwards nudgeText (census: board nudge)"),

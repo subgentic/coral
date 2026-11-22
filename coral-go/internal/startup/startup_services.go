@@ -347,6 +347,14 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		safeGo(ctx, "health_nudges", func() { healthNudges.Run(ctx) })
 	}
 
+	// An agent a usage limit stopped is resumed when the limit resets, once the Operator turns the setting on (off by default, #20691). It runs whatever the health monitor setting says: it reads its own.
+	limitResumer := background.NewLimitResumer(time.Minute)
+	limitResumer.SetAgents(taskStore, agentRT, discoverFn, func(ctx context.Context) bool {
+		st, err := sessStore.GetSettings(ctx)
+		return err == nil && background.AutoResumeAtLimitResetEnabled(st)
+	})
+	safeGo(ctx, "limit_resume", func() { limitResumer.Run(ctx) })
+
 	// A large context is compacted at a quiet moment, for every team that has not turned it off (on by default since #15066, #14849).
 	var pausedFn func(string) bool
 	if bh := srv.BoardHandler(); bh != nil {

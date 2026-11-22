@@ -195,6 +195,15 @@ func PersonTypedWithin(sessionID string, d time.Duration) bool {
 	return ok && time.Since(time.Unix(0, v.(int64))) <= d
 }
 
+// PersonTypedSince reports whether a person's own input went to the session after since.
+func PersonTypedSince(sessionID string, since time.Time) bool {
+	if sessionID == "" {
+		return false
+	}
+	v, ok := personBySession.Load(sessionID)
+	return ok && time.Unix(0, v.(int64)).After(since)
+}
+
 // notePersonTyped stamps the session a target names (claude-<uuid>, or a tmux pane claude-<uuid>:0.0); a target that names none (a plain terminal's) is ignored.
 func notePersonTyped(target string) {
 	if i := strings.IndexByte(target, ':'); i >= 0 {

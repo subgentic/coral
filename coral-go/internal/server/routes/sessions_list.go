@@ -602,6 +602,9 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	if b := blockedField(sid, agent.AgentType, sleeping); b != nil {
 		entry["blocked"] = b // only a row that is blocked has the key (#13486)
 	}
+	if at, ok := ptymanager.LimitResumeAt(sid); ok && !sleeping {
+		entry["limit_resume_at"] = at.UTC().Format(time.RFC3339) // only a row Coral will resume at its limit's reset has the key (#20691)
+	}
 	withDisplayActivityHint(entry, displayHint, displayHintAt)
 	// Always present (false/""/null too): the dashboard merges entries, so
 	// an omitted false would leave the AUTO chip on after it was turned off.

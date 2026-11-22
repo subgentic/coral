@@ -47,6 +47,7 @@ const (
 	IdentityActor            = "identity_actor"
 	AgentLaunchLimit         = "agent_launch_limit"
 	AutoResumeAfterAPIError  = "auto_resume_after_api_error"
+	AutoResumeAtLimitReset   = "auto_resume_at_limit_reset"
 	AutoWakeAfterRestart     = "auto_wake_after_restart"
 	AutoWakeCap              = "auto_wake_cap"
 	AutoSleep                = "auto_sleep"
@@ -184,6 +185,7 @@ func init() {
 	ownCheck(AutoGoals)
 	boolOff(AutoResumeAfterAPIError, ApplyLive, "Resume an agent after an API error.")
 	ownCheck(AutoResumeAfterAPIError)
+	boolOff(AutoResumeAtLimitReset, ApplyLive, "Resume an agent stopped by a usage limit when the limit resets (only when the reset time is known).")
 	boolOn(AutoWakeAfterRestart, ApplyLive, "Wake agents after Coral restarts.")
 	ownCheck(AutoWakeAfterRestart)
 	register(whole(AutoWakeCap, "8", 1, 50, ReadDefault, ApplyLive, "Most agents woken after a restart."))
