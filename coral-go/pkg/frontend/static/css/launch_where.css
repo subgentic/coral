@@ -12,17 +12,42 @@
 .launch-where-tag-ok { color: var(--success-text, var(--text-secondary)); }
 .launch-where-tag-warn { color: var(--warning-text); }
 .launch-where-tag-info { color: var(--accent); }
-.launch-where-branchline { margin: 0 0 8px; }
-.launch-where-wts { display: flex; flex-direction: column; gap: 4px; }
-.launch-where-sub { color: var(--text-secondary); font-size: var(--fs-base); }
-.launch-where-check { position: relative; padding: 10px 12px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); }
-.launch-where-summary { position: absolute; top: 10px; right: 12px; color: var(--text-muted); font-size: var(--fs-base); }
+.launch-where-check { position: sticky; bottom: 0; z-index: 1; max-height: 45vh; overflow-y: auto; padding: 10px 12px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); }
 .launch-where-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.launch-where-item { display: grid; grid-template-columns: 1.4em 1fr; column-gap: 8px; }
-.launch-where-item-detail { grid-column: 2; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: anywhere; }
+.launch-where-item { display: grid; grid-template-columns: 1.4em minmax(0, 1fr) auto; align-items: start; column-gap: 8px; }
+.launch-where-item-detail { color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: anywhere; }
 .launch-where-mark { font-weight: var(--fw-strong); }
 .launch-where-item-ok .launch-where-mark { color: var(--success-text, var(--text-secondary)); }
 .launch-where-item-warn .launch-where-mark { color: var(--warning-text); }
 .launch-where-item-fail .launch-where-mark { color: var(--error-text); }
 .launch-where-item-info .launch-where-mark { color: var(--accent); }
 .launch-where-note { margin: 0; color: var(--text-muted); }
+/* the computer it runs on, above the folder (mock #20111) */
+.launch-where-computer { margin-bottom: 12px; }
+.launch-where-computer[hidden] { display: none; }
+.launch-where-computer-line { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.launch-where-computer-chip { display: inline-flex; align-items: center; gap: 6px; }
+.launch-where-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success-text, var(--accent)); }
+.launch-where-label { font-weight: var(--fw-strong); color: var(--text-secondary); font-size: var(--fs-base); }
+.launch-where-hint { color: var(--text-muted); font-size: var(--fs-base); margin-left: 6px; }
+.launch-where-change { background: none; border: 0; padding: 0 2px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+/* the branch list: a radio row says what it does under its title */
+.launch-where-opt-title { font-weight: var(--fw-strong); }
+.launch-where-opt-sub { display: block; color: var(--text-muted); font-size: var(--fs-base); margin-top: 2px; }
+.launch-where-opt-off { opacity: 1; cursor: not-allowed; color: var(--text-muted); }
+.launch-where-branches > .launch-where-hint { display: inline; margin: 0 0 6px; }
+.launch-where-fields { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; align-items: flex-end; }
+.launch-where-field { display: flex; flex-direction: column; gap: 6px; flex: 1 1 140px; min-width: 0; }
+.launch-where-field-wide { flex: 2 1 220px; }
+.launch-where-input { font-family: var(--font-mono, monospace); width: 100%; }
+/* the setup check stays above the footer while the body scrolls (mock #20111) */
+.launch-where-check-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.launch-where-check-head .launch-where-h { margin: 0; }
+.launch-where-summary { position: static; display: inline-flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.launch-where-item-body { display: flex; flex-direction: column; min-width: 0; }
+.launch-where-fix { align-self: center; white-space: nowrap; }
+.launch-where-item-unknown .launch-where-mark { color: var(--text-muted); }
+.launch-where-tag-fail { color: var(--error-text); }
+.launch-where-why { margin: 10px 0 0; font-weight: var(--fw-strong); color: var(--error-text); }
+.launch-where-why[hidden] { display: none; }
+@media (max-width: 600px) { .launch-where-item { grid-template-columns: 1.4em minmax(0, 1fr); } .launch-where-fix { grid-column: 2; justify-self: start; min-height: 44px; } .launch-where-check { max-height: 55vh; } }

@@ -39,3 +39,10 @@ export function startOn(id, kind) {
     window.showLaunchModal?.(id === LOCAL_SERVER || !id ? undefined : id);
     window._selectLaunchType?.(kind);
 }
+
+/** The three starts of a linked computer s (Coral Hub's list): off with the reason in words when it is offline (since: when it was last seen) or its Hub access is View (interact: the way to raise it). */
+export function computerStart(s, el, { view, since, interact }) {
+    const online = s.online === true;
+    const reason = !online ? `Offline${since ? ` since ${since}` : ''}. It can't start things until it is back.` : view ? 'Hub access is View, so it cannot start things.' : '';
+    return startCell(s.id, s.label || 'this computer', el, { reason, change: online && view ? { label: 'Change to Interact', run: interact } : null });
+}

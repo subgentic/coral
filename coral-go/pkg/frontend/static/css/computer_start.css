@@ -8,5 +8,3 @@
 /* an off New agent stays the primary button, dimmed (mock #20111): the others go flat, a state told by color and by the sentence under it, not by opacity alone */
 .computer-start-btn.btn-primary:disabled { background: var(--accent-dim); border-color: var(--accent-dim); color: var(--text-on-accent); }
 .servers-page-start { margin: 0 0 12px; } .servers-page-start .computer-start { align-items: flex-start; } .servers-page-start .computer-start-note { text-align: left; }
-/* the phone's card is the mock's (#20111, the Operator's choice): name and status, then the three starts; Agents, Last seen and Hub access are on the computer's page, behind the card's open button */
-@media (max-width: 600px) { #servers-view .dt-box.dt-folded td.dt-td[data-key="agents"], #servers-view .dt-box.dt-folded td.dt-td[data-key="seen"], #servers-view .dt-box.dt-folded td.dt-td[data-key="access"] { display: none; } }
