@@ -104,9 +104,9 @@
    "covered_by": "artifacts (live Inbox)"
   },
   {
-   "file": "saved_files.js",
+   "file": "saved_list.js",
    "calls": 1,
-   "surface": "Files for review (dock)",
+   "surface": "Saved for later: files and messages in one list",
    "covered_by": "files"
   },
   {

@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
             const check = (rows, when) => {
                 const all = rows.flat().map(b => b.name);
                 assert.deepEqual([...new Set(all.filter((n, i) => all.indexOf(n) !== i))], [], `${tag}, ${when}: no two buttons in the list share a name`);
-                for (const b of rows.flat()) assert.ok(inOrder(words(b.name), words(b.visible)), `${tag}, ${when}: "${b.name}" contains its visible words "${b.visible}"`);
+                for (const b of rows.flat().filter(b => b.visible)) assert.ok(inOrder(words(b.name), words(b.visible)), `${tag}, ${when}: "${b.name}" contains its visible words "${b.visible}"`);
             };
             check(await names(), 'closed');
             // a message's page: More and Open name the message too (the whole text is on the page, #7660)

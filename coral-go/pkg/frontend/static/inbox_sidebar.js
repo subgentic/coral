@@ -826,10 +826,7 @@ function unrecordedActions() {
     const b = DT.el('button', 'btn btn-small', 'Record for all agents'); b.type = 'button';
     b.setAttribute('aria-label', "Record for all agents: check each program before they are recorded");
     b.addEventListener('click', () => recordAllAgents());
-    const mark = DT.el('button', 'btn btn-quiet btn-small inbox-bookmark inbox-bookmark-saved', 'Saved'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-pressed', 'true'); mark.setAttribute('aria-label', `Saved for later: ${f.which}. Remove from saved`); mark.title = 'Saved for later: press to remove it from Saved'; if (isPhoneLayout()) { mark.className = 'btn btn-quiet btn-icon inbox-bookmark inbox-bookmark-saved'; mark.textContent = ''; mark.append(bookmarkIcon()); } // the right-hand Save, pressed: an icon on a phone (#20508)
-    mark.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (it && await saved.savedRemove(it)) sayLive('Removed from saved'); });
-    const common = DT.el('span', 'inbox-common-actions'); common.append(mark);
-    box.append(b, common); return box;
+    box.append(b); return box;
 }
 
 const dockSavedState = DT.tableState();
@@ -1307,10 +1304,15 @@ function addFileStar(a, tr) {
 /** A saved message's buttons, under its words like a file's decisions: Done or Reopen (a Hub list is read-only). */
 function savedMessageActions(f) {
     const box = DT.el('div', 'inbox-review-actions inbox-slots');
-    if (f.gone || isCloud()) return box;
+    if (f.gone) return box;
     const b = DT.el('button', 'btn btn-small dt-quiet inbox-saved-done', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('data-slot', 'done'); b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`);
     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
-    box.append(b); return box;
+    const mark = DT.el('button', 'btn btn-quiet btn-small inbox-bookmark inbox-bookmark-saved', 'Saved'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-pressed', 'true'); mark.setAttribute('aria-label', `Saved for later: ${f.which}. Remove from saved`); mark.title = 'Saved for later: press to remove it from Saved'; // the right-hand Save, pressed (#20508)
+    if (isPhoneLayout()) { mark.className = 'btn btn-quiet btn-icon inbox-bookmark inbox-bookmark-saved'; mark.textContent = ''; mark.append(bookmarkIcon()); }
+    mark.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (it && await saved.savedRemove(it)) sayLive('Removed from saved'); });
+    if (savedRouteOpen('done')) box.append(b); // through the Hub a write is offered only for the routes it reports open (#20437): Done by its done route, Saved (remove) by its remove route
+    if (savedRouteOpen('remove')) { const common = DT.el('span', 'inbox-common-actions'); common.append(mark); box.append(common); }
+    return box;
 }
 function savedListSpec(where = '') {
     activateSavedReviews();
