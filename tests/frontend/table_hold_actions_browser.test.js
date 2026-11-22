@@ -59,7 +59,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes
             // 2) a REFUSED Dismiss: an error, the row stays, and nothing is released
             await ev(`window.__refuse = true; document.querySelector('.saved-files button[aria-label="Dismiss: plan-1.md"]').click(); true`);
-            await waitFor(`!!(document.querySelector('.saved-files .inbox-review-error') || {}).textContent`, at + 'a refused Dismiss says why', 8000);
+            await waitFor(`!![...document.querySelectorAll('.saved-files tbody tr')].find(r => /plan-1/.test(r.textContent))?.querySelector('.inbox-review-error')?.textContent`, at + 'a refused Dismiss says why', 8000);
             await arrive(3);
             check(await rows() === 2 && await kept() === 2 && await heldNote(), at + 'after the menu and a refused Dismiss an unrelated new row is still held (rows ' + await rows() + ', kept ' + await kept() + ', note ' + await heldNote() + ')');
             { // the held note must not sit over a row's buttons (#15142): More, Download and Open were clipped by the full-width bar, and a click on them hit the bar
