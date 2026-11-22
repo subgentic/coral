@@ -9,7 +9,7 @@ export function fillSavedList(host, entries, { DT, decorateMessage, decorateKind
             decorateKindRow(tr);
             if (e.kind === 'file') addStar(e.a, tr);
             if (e.kind === 'message') tr.classList.remove('inbox-file-row'); // a message's Saved mark is a bookmark too, but the row is not a file's
-            tr.classList.add('inbox-kind-row', ...(tr.classList.contains('dt-mailed') ? [] : ['inbox-card-tr']), e.kind === 'file' ? 'inbox-file-row' : 'inbox-saved-message-row');
+            tr.classList.add('inbox-kind-row', 'inbox-saved-row', ...(tr.classList.contains('dt-mailed') ? [] : ['inbox-card-tr']), e.kind === 'file' ? 'inbox-file-row' : 'inbox-saved-message-row');
             tr.querySelector('td[data-key="review"]')?.classList.add('inbox-v4-footer');
             decorateMessage({ review: e.kind === 'file' ? e.a : null }, tr);
             if (tr.classList.contains('dt-mailed')) tr.querySelectorAll('.inbox-preview-toggle').forEach(n => n.remove()); // a phone's whole row is the open button (its name is the words): a Show all inside it would be a button in a button, and the tap opens the whole message

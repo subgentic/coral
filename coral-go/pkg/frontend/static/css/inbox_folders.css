@@ -42,3 +42,6 @@
 @media (max-width: 767px) { :root #group-table-view .inbox-starred-folder .inbox-folder-text > button { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; } } /* a starred file's name is cut with an ellipsis on a phone (#19870, MUST-2) */
 .inbox-mail-star { margin-inline-end: 6px; font-size: var(--fs-lg); vertical-align: middle; } /* a starred chat's star on a phone, before its date (#19870, MUST-2) */
 .inbox-kind-icon[data-kind="saved_message"]::before { content: 'chat_bubble_outline'; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-saved-row .inbox-review-name { font-weight: var(--fw-strong); } /* the one Saved list: the sender is the strong title, 15/600 (mock #19808 v1, #19841, #20508) */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-saved-row .inbox-row-words { color: var(--text-secondary); }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-saved-row.inbox-message-row .inbox-message { color: var(--text-secondary); } /* a Needs you message is drawn in the primary colour (inbox_footer.css); a Saved one is the sender's second line, in the secondary */ /* and the message after it is in the secondary colour */
