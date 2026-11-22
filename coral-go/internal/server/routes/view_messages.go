@@ -49,7 +49,7 @@ func viewMessages(in []board.Message) (out []viewMessage, ok bool) {
 func writeViewMessages(w http.ResponseWriter, in []board.Message) {
 	out, ok := viewMessages(in)
 	if !ok {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "messages cannot be shown right now", "code": "redactor_unavailable"})
+		writeError(w, http.StatusServiceUnavailable, "redactor_unavailable", "messages cannot be shown right now")
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
