@@ -458,3 +458,34 @@ func (s *Store) MemberGrantAuditCount(ctx context.Context, grantID string) (int,
 	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant_audit WHERE grant_id = ?`, grantID)
 	return n, err
 }
+
+// NoteMemberGrantFirstUse records, once for a grant, that the person it was given to used it (#20590 (4), Security F5): the first request that a live grant let through. It is an audit row written only when none exists for the grant, so
+// a second call, or a second process, adds nothing; first says whether this call wrote it.
+func (s *Store) NoteMemberGrantFirstUse(ctx context.Context, g MemberGrant) (first bool, err error) {
+	res, err := s.db.ExecContext(ctx, `INSERT INTO member_grant_audit (at, grant_id, event, link_id, hub_user, level, scope_kind, scope_id, board_id, signed_by)
+		SELECT ?, ?, 'first_use', ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM member_grant_audit WHERE grant_id = ? AND event = 'first_use')`,
+		nowUTC(), g.GrantID, g.LinkID, g.HubUser, g.Level, g.ScopeKind, g.ScopeID, g.BoardID, g.SignedBy, g.GrantID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// MemberGrantUse is one first use of a grant, from the audit.
+type MemberGrantUse struct {
+	At        string `db:"at"`
+	GrantID   string `db:"grant_id"`
+	LinkID    string `db:"link_id"`
+	HubUser   string `db:"hub_user"`
+	Level     string `db:"level"`
+	ScopeKind string `db:"scope_kind"`
+	ScopeID   string `db:"scope_id"`
+}
+
+// MemberGrantFirstUses lists the first uses recorded at or after since, newest first.
+func (s *Store) MemberGrantFirstUses(ctx context.Context, since time.Time) ([]MemberGrantUse, error) {
+	out := []MemberGrantUse{}
+	err := s.db.SelectContext(ctx, &out, `SELECT at, grant_id, link_id, hub_user, level, scope_kind, scope_id FROM member_grant_audit WHERE event = 'first_use' AND at >= ? ORDER BY id DESC`, since.UTC().Format(time.RFC3339))
+	return out, err
+}
