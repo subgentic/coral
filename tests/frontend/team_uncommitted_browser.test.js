@@ -23,7 +23,10 @@ const TEAM = `qa-uncommitted-${Date.now() % 100000}`;
         await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM); await settle(500);
         const q = (s) => `document.querySelector('#team-page-uncommitted ${s}')`;
         await waitFor(`!!${q('.team-uncommitted-words')}`, 'the uncommitted line', 8000);
-        assert.equal(await ev(`${q('.team-uncommitted-words')}.textContent`), `Files changed in ${TEAM}, not committed: 2 changed, 1 new`);
+        // the label can arrive after the folders do (a slower runner): the words wait for it, and say a label that changes later too
+        await waitFor(`${q('.team-uncommitted-words')}.textContent === ${JSON.stringify(`Files changed in ${TEAM}, not committed: 2 changed, 1 new`)}`, 'the words name the team', 8000);
+        await ev(`import((window.__coralStatic || '/static/') + 'server_base.js').then(m => { m.noteBoardLabels([{ board_project: ${JSON.stringify(TEAM)}, board_label: 'Renamed shop' }]); return true; })`);
+        await waitFor(`${q('.team-uncommitted-words')}.textContent === 'Files changed in Renamed shop, not committed: 2 changed, 1 new'`, 'a label that arrives later reaches the words', 5000);
         assert.equal(await ev(`${q('.team-uncommitted-folder')}.textContent`), '/work/shop', 'the exact folder is shown separately from the team label');
         assert.equal(await ev(`${q('.team-uncommitted-files')}.hidden`), true, 'the list is closed until asked');
         await ev(`${q('.team-uncommitted-review')}.click(); true`);

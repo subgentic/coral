@@ -1,10 +1,12 @@
 /* The team page's line about work an agent left uncommitted (#17203): "Files changed in <folder>, not committed: N changed, M new" with Review changes (the list) and Commit (one local commit, never pushed). Lazy, loaded by the team page. */
-import { teamFetch, boardFetch, splitKey, isCloud, boardLabel, hasBoardLabel } from './server_base.js';
+import { teamFetch, boardFetch, splitKey, isCloud, boardLabel, hasBoardLabel, onBoardLabelsChanged } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('team_uncommitted.css'); // the line's layout: not at start
 
 const $ = (id) => document.getElementById(id);
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+
+onBoardLabelsChanged(() => { for (const w of document.querySelectorAll('.team-uncommitted-words')) w._say?.(); });
 
 const countWords = (r) => [r.changed ? `${r.changed} changed` : '', r.new ? `${r.new} new` : ''].filter(Boolean).join(', ');
 
@@ -39,9 +41,9 @@ function drawRepo(team, repo) {
     const row = mk('div', 'team-uncommitted-row');
     const folderName = repo.folder.split(/[\\/]/).filter(Boolean).pop() || repo.folder;
     const line = mk('div', 'team-uncommitted-line');
-    const label = hasBoardLabel(team) ? boardLabel(team) : folderName;
     const description = mk('div', 'team-uncommitted-description');
-    const words = mk('span', 'team-uncommitted-words', `Files changed in ${label}, not committed: ${countWords(repo)}${repo.truncated ? ' or more' : ''}`);
+    const words = mk('span', 'team-uncommitted-words');
+    words._say = () => { words.textContent = `Files changed in ${hasBoardLabel(team) ? boardLabel(team) : folderName}, not committed: ${countWords(repo)}${repo.truncated ? ' or more' : ''}`; }; words._say(); // the team's label may arrive after the folders do (a slow machine): the words say it then, never the folder's name for good
     words.title = repo.folder;
     const review = mk('button', 'btn team-uncommitted-review', 'Review changes'); review.type = 'button'; review.setAttribute('aria-expanded', 'false');
     const commit = mk('button', 'btn btn-primary team-uncommitted-commit', 'Commit'); commit.type = 'button';
