@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -116,7 +117,7 @@ func TestAHermesFirstMessageWaitsForTheWelcomeLine(t *testing.T) {
 	h.terminal = term
 	h.hermesSettle = 10 * time.Millisecond
 	data := h.cfg.CoralDir()
-	sid := "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+	sid := uuid.NewString() // its own session each run: the delivery gate remembers what it typed to a session name (-count=30 shared one)
 	name := naming.SessionName("hermes", sid)
 	mock.mu.Lock()
 	mock.sessions[name] = &ptymanager.PaneInfo{SessionName: name, Target: name, CurrentPath: "/tmp/p"}
@@ -154,7 +155,7 @@ func TestAHermesThatNeverShowsItsWelcomeLineGetsANoticeAndNothingTyped(t *testin
 	h.hermesFirstWait = 300 * time.Millisecond
 	data := h.cfg.CoralDir()
 	ctx := context.Background()
-	sid := "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+	sid := uuid.NewString() // its own session each run: the delivery gate remembers what it typed to a session name (-count=30 shared one)
 	name := naming.SessionName("hermes", sid)
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "hermes", AgentName: "repo", WorkingDir: "/tmp/p"}))
 	mock.mu.Lock()
@@ -220,7 +221,7 @@ func TestAHermesFirstMessageRecordsTheAgentAgainOnceItIsUp(t *testing.T) {
 	h.terminal = term
 	h.hermesSettle = 10 * time.Millisecond
 	data := h.cfg.CoralDir()
-	sid := "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c5a"
+	sid := uuid.NewString() // its own session each run: the delivery gate remembers what it typed to a session name (-count=30 shared one)
 	name := naming.SessionName("hermes", sid)
 	mock.mu.Lock()
 	mock.sessions[name] = &ptymanager.PaneInfo{SessionName: name, Target: name, CurrentPath: "/tmp/p"}
@@ -259,7 +260,7 @@ func TestAHermesWhoseGatewayWasRefusedEndsTheFirstMessageWaitWithoutANotice(t *t
 	h.hermesFirstWait = 20 * time.Second // long: the refusal must end it, not the clock
 	data := h.cfg.CoralDir()
 	ctx := context.Background()
-	sid := "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c6b"
+	sid := uuid.NewString() // its own session each run: the delivery gate remembers what it typed to a session name (-count=30 shared one)
 	name := naming.SessionName("hermes", sid)
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "hermes", AgentName: "repo", WorkingDir: "/tmp/p"}))
 	mock.mu.Lock()
