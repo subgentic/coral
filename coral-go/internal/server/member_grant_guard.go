@@ -15,7 +15,11 @@ import (
 const (
 	memberGrantEndedCode = "member_grant_ended"
 	memberGrantLowCode   = "member_grant_too_low"
+	memberGrantScopeCode = "member_grant_out_of_scope"
 )
+
+// grantRoute is the request a grant is checked against for its scope: nil to check the tier alone.
+type grantRoute struct{ method, path string }
 
 // memberGrantTier is the most a grant gives, as a tunnel tier. A view grant reads; a full grant is the link's cap and no more, so it is as high as the cap lets it be (the lower of the two is
 // taken by the caller, on every request).
@@ -32,7 +36,7 @@ func memberGrantTier(level string) tunnel.Mode {
 // memberGrantAllows decides one request of a Hub person who has been given a grant: the person's best live grant, lowered by the link's cap now, must reach the tier the route needs. A person who
 // never had a grant on the link is not decided here (the owner and the Hub's own roles are as before until the owner pin lands), but one whose grants were all ended, expired or whose link is no
 // longer active gets nothing: ending a grant must close access, not hand the person back an unbounded one. Nothing is cached: the table and the link are read again on every request.
-func memberGrantAllows(ctx context.Context, bs *board.Store, linkCap func(context.Context, string) (tunnel.Mode, bool), v cloud.Via, need tunnel.Tier, now time.Time) (ok bool, code string) {
+func memberGrantAllows(ctx context.Context, bs *board.Store, linkCap func(context.Context, string) (tunnel.Mode, bool), v cloud.Via, need tunnel.Tier, now time.Time, route *grantRoute) (ok bool, code string) {
 	if bs == nil || v.HubUser == "" {
 		return true, ""
 	}
@@ -52,15 +56,38 @@ func memberGrantAllows(ctx context.Context, bs *board.Store, linkCap func(contex
 		return false, memberGrantEndedCode // the link is removed or revoked: a grant never outlives it
 	}
 	best := tunnel.TierNever
+	full := false
 	for _, g := range live {
 		if t := memberGrantTier(g.Level); t > best {
 			best = t
+		}
+		if g.Level == board.MemberLevelFull {
+			full = true
 		}
 	}
 	if tunnel.Lower(best, capMode) < need {
 		return false, memberGrantLowCode
 	}
+	// A person with only View grants reaches the closed View list, and only for a board they were given (V1, V4): the tier says what a route may do, the scope says whose it is. A Full grant is the whole computer.
+	if !full && route != nil && !viewScopeAllows(live, route) {
+		return false, memberGrantScopeCode
+	}
 	return true, ""
+}
+
+// viewScopeAllows is true when the request is on the View list and its board is the board of one of the person's live board grants. An agent-scope grant gives nothing here (that scope stays off, V5), and an empty or unknown
+// scope gives nothing, never everything (B5).
+func viewScopeAllows(live []board.MemberGrant, route *grantRoute) bool {
+	b, ok := tunnel.ViewGrantBoard(route.method, route.path)
+	if !ok {
+		return false
+	}
+	for _, g := range live {
+		if g.Level == board.MemberLevelView && g.ScopeKind == board.MemberScopeBoard && g.ScopeID != "" && g.ScopeID == b {
+			return true
+		}
+	}
+	return false
 }
 
 // MemberGrantGuard is the S2 check on every tunneled request: after the link stamp (so the pair is the connector's own) and before any route. A local request has no pair and is not touched. Cloud.Guard
@@ -78,11 +105,11 @@ func MemberGrantGuard(bs *board.Store, linkCap func(context.Context, string) (tu
 				next.ServeHTTP(w, r)
 				return
 			}
-			if ok, code := memberGrantAllows(r.Context(), bs, linkCap, v, need, time.Now()); !ok {
+			if ok, code := memberGrantAllows(r.Context(), bs, linkCap, v, need, time.Now(), &grantRoute{r.Method, r.URL.Path}); !ok {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
 				msg := "the access you were given has ended"
-				if code == memberGrantLowCode {
+				if code == memberGrantLowCode || code == memberGrantScopeCode {
 					msg = "the access you were given does not include this"
 				}
 				_, _ = w.Write([]byte(`{"error":"` + msg + `","code":"` + code + `"}`))
