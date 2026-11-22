@@ -137,7 +137,7 @@ func TestASignedRemovalThroughTheRouteRemovesAndIsAudited(t *testing.T) {
 	assert.JSONEq(t, `{"status":"ok"}`, rec.Body.String())
 	_, err := d.ss.ActiveDeviceKey(context.Background(), target, time.Now())
 	assert.ErrorIs(t, err, store.ErrSignerRemoved)
-	assert.Contains(t, d.logs.String(), "cloud: device removed")
+	assert.Contains(t, d.logs.String(), "cloud: device key changed")
 	assert.Contains(t, d.logs.String(), target)
 	assert.NotContains(t, d.logs.String(), "Phone", "no label in the audit line")
 }

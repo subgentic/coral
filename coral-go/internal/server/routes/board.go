@@ -152,6 +152,8 @@ type BoardHandler struct {
 	needsYouRemotes *NeedsYouRemotes
 	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.
 	needsYouSkills func(ctx context.Context) ([]NeedsYouItem, error)
+	// needsYouDeviceKeys lists the device keys a signed message added or raised in the last day (#20515 M4). Nil: none.
+	needsYouDeviceKeys func(ctx context.Context) ([]NeedsYouItem, error)
 	// uploads caches per-session upload records for the artifact views.
 	uploads uploadDirCache
 	// taskCounts keeps each board's artifact count per task for a few seconds (taskArtifactCounts, #8591).

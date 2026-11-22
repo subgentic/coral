@@ -67,6 +67,12 @@ type DeviceKey struct {
 	// Link and HubUser are the pair the computer set when it made the row (M1, #20514): the Hub link and the Hub label of the person whose key this is. Both empty is the owner's own key, made at this computer.
 	Link    string
 	HubUser string
+	// ApprovedBy is the kid of the key (or passkey) whose signed message or certificate made this row; empty for a key made at this computer (M3, #20514).
+	ApprovedBy string
+	// ViaPasskey is the passkey kid whose certificate made this device; such a device acts only on itself (M5).
+	ViaPasskey string
+	// ChangedAt is when the row was made or its mode last changed (unix seconds): what the owner's notice (M4) is dated by.
+	ChangedAt int64
 }
 
 // PairState says what the row's pair is: owner (both columns the marker), bound (a link and a Hub label, neither the marker) or neither (anything else, which every check refuses).
@@ -99,13 +105,13 @@ func (k DeviceKey) formOK() bool {
 	return k.Kind == DeviceKindDevice || k.Kind == DeviceKindPasskey
 }
 
-const deviceCols = `kid, pk, label, mode, origin, kind, created_at, last_used_at, removed_at, removed_reason, link, hub_user`
+const deviceCols = `kid, pk, label, mode, origin, kind, created_at, last_used_at, removed_at, removed_reason, link, hub_user, approved_by, via_passkey, changed_at`
 
 func scanDeviceKey(row interface{ Scan(...any) error }) (DeviceKey, error) {
 	var k DeviceKey
 	var used, rem sql.NullInt64
 	var reason sql.NullString
-	if err := row.Scan(&k.KID, &k.PK, &k.Label, &k.Mode, &k.Origin, &k.Kind, &k.CreatedAt, &used, &rem, &reason, &k.Link, &k.HubUser); err != nil {
+	if err := row.Scan(&k.KID, &k.PK, &k.Label, &k.Mode, &k.Origin, &k.Kind, &k.CreatedAt, &used, &rem, &reason, &k.Link, &k.HubUser, &k.ApprovedBy, &k.ViaPasskey, &k.ChangedAt); err != nil {
 		return DeviceKey{}, err
 	}
 	k.LastUsedAt, k.RemovedAt, k.RemovedReason = used.Int64, rem.Int64, reason.String
@@ -162,7 +168,7 @@ func (s *SessionStore) AddDeviceKey(ctx context.Context, k DeviceKey, now time.T
 	if active >= max {
 		return false, ErrKeyLimit
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO device_keys (`+deviceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)`, k.KID, k.PK, k.Label, k.Mode, k.Origin, k.Kind, now.Unix(), k.Link, k.HubUser); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO device_keys (`+deviceCols+`) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?)`, k.KID, k.PK, k.Label, k.Mode, k.Origin, k.Kind, now.Unix(), k.Link, k.HubUser, k.ApprovedBy, k.ViaPasskey, now.Unix()); err != nil {
 		return false, err
 	}
 	return true, tx.Commit()
@@ -247,7 +253,7 @@ func (s *SessionStore) SetDeviceMode(ctx context.Context, kid, mode string, now 
 	if _, err := s.ActiveDeviceKey(ctx, kid, now); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, `UPDATE device_keys SET mode = ? WHERE kid = ? AND removed_at IS NULL`, mode, kid)
+	_, err := s.db.ExecContext(ctx, `UPDATE device_keys SET mode = ?, changed_at = ? WHERE kid = ? AND removed_at IS NULL`, mode, now.Unix(), kid)
 	return err
 }
 
@@ -459,4 +465,14 @@ func (s *SessionStore) DeviceClearPending(ctx context.Context) bool {
 		return false
 	}
 	return err != nil || v != 0
+}
+
+// WasRemoved reports whether kid is on the list as removed by a person (reason "removed"), as opposed to expired from disuse or not listed. A key a person removed is not paired again by a signed message (#20514 SHOULD).
+func (s *SessionStore) WasRemoved(ctx context.Context, kid string) (bool, error) {
+	var reason sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT removed_reason FROM device_keys WHERE kid = ? AND removed_at IS NOT NULL`, kid).Scan(&reason)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return reason.String == DeviceRemoved, err
 }

@@ -564,8 +564,9 @@ func TestRemoveDeviceAuthority(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = r.handle(r.remove(np, np.kid), np, t0)
 	assert.NoError(t, err)
-	_, err = r.handle(r.remove(view, victim.kid), view, t0)
-	assert.NoError(t, err, "same mode")
+	r.refused(devicekey.ErrAboveSigner, r.remove(view, victim.kid), view, t0) // a peer at the same mode is not removed (#20514 SHOULD)
+	_, err = r.handle(r.remove(inter, victim.kid), inter, t0)
+	assert.NoError(t, err, "a device above it removes it")
 	_, err = r.handle(r.remove(r.signer, inter.kid), r.signer, t0)
 	assert.NoError(t, err, "a launch pairing device removes a lower one")
 }
@@ -680,7 +681,8 @@ func TestAuditLineNamesTheKidsAndTheMode(t *testing.T) {
 	var b strings.Builder
 	lg := slog.New(slog.NewTextHandler(&b, nil))
 	devicekey.AuditLine(lg)(devicekey.RemoveDevice, "SIGNER", "TARGET", "interact")
-	assert.Contains(t, b.String(), "device removed")
+	assert.Contains(t, b.String(), "device key changed")
+	assert.Contains(t, b.String(), "action=remove-device")
 	assert.Contains(t, b.String(), "signer=SIGNER")
 	assert.Contains(t, b.String(), "kid=TARGET")
 	assert.Contains(t, b.String(), "mode=interact")
