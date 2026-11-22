@@ -29,7 +29,6 @@
 .inbox-saved-card .saved-files { padding: 0; }
 .inbox-saved-card .saved-files .inbox-review-actions.inbox-slots { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; }
 .inbox-saved-card .saved-files .inbox-slots > .btn { width: auto; padding-inline: 12px; }
-.inbox-saved-file { display: inline-flex; align-items: center; gap: 12px; }
 .inbox-saved-card .inbox-review-more { padding-inline: 14px; border-top: 1px solid var(--border); }
 /* The Saved page's Open and Done are outlined pills, the one that is on in the accent (#19841, the approved list) */
 .inbox-folder-toolbar:has([id^="inbox-saved"]) .goals-chips { gap: 8px; border: 0; border-radius: 0; overflow: visible; }
