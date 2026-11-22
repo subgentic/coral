@@ -267,6 +267,12 @@ func (l *LocalHandler) serveHTTP(ctx context.Context, s *Stream) {
 	} else {
 		body = rb
 	}
+	{ // an open request of a Hub person (an event stream, a long download or poll) ends when their grant does (#20581 b)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
+		defer RegisterOpenStream(l.LinkID, h.HubUser, streamNeed(h.Method, dec, h.Query), cancel)()
+	}
 	req, err := http.NewRequestWithContext(ctx, h.Method, l.target(h, dec).String(), body)
 	if err != nil {
 		s.Reject(CodeBadRequest, "bad request", 0)

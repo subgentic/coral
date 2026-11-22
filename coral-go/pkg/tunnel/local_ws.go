@@ -84,6 +84,12 @@ func (l *LocalHandler) serveWS(ctx context.Context, s *Stream) {
 		down.Close(websocket.StatusPolicyViolation, "access mode lowered by this computer")
 	})
 	defer unregister()
+	// And for the owner's grants to reach it: a grant that ends closes this stream too (#20581 b).
+	endGrant := func() {
+		up.Close(websocket.StatusPolicyViolation, "access ended by this computer")
+		down.Close(websocket.StatusPolicyViolation, "access ended by this computer")
+	}
+	defer RegisterOpenStream(l.LinkID, h.HubUser, streamNeed(http.MethodGet, dec, h.Query), endGrant)()
 	pumpWS(ctx, up, down, gate, toHub)
 }
 

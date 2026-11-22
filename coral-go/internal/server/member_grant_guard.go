@@ -119,3 +119,40 @@ func MemberGrantGuard(bs *board.Store, linkCap func(context.Context, string) (tu
 		})
 	}
 }
+
+// memberGrantSweepEvery is how often the open streams of Hub people are checked against the grant table: a revoked or expired grant closes its streams within this long.
+const memberGrantSweepEvery = 2 * time.Second
+
+// SweepOpenStreams asks, for every open stream of a Hub person, the same question a new request is asked (the grant table and the link's cap, read now), and ends the streams that no longer pass. It returns how many it
+// ended. A person who never had a grant is not decided here, as for a request.
+func SweepOpenStreams(ctx context.Context, bs *board.Store, linkCap func(context.Context, string) (tunnel.Mode, bool), now time.Time) int {
+	ended := 0
+	for _, k := range tunnel.OpenStreamKeys() {
+		if k.Need == tunnel.TierNever {
+			continue
+		}
+		if ok, _ := memberGrantAllows(ctx, bs, linkCap, cloud.Via{LinkID: k.Link, HubUser: k.User}, k.Need, now, nil); !ok {
+			n := tunnel.EndOpenStreams(k)
+			ended += n
+			slog.Info("[cloud] open streams of a Hub person were closed: their access ended", "link", k.Link, "streams", n)
+		}
+	}
+	return ended
+}
+
+// RunMemberGrantSweeper sweeps every interval until ctx ends.
+func RunMemberGrantSweeper(ctx context.Context, bs *board.Store, linkCap func(context.Context, string) (tunnel.Mode, bool), every time.Duration) {
+	if bs == nil {
+		return
+	}
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			SweepOpenStreams(ctx, bs, linkCap, time.Now())
+		}
+	}
+}
