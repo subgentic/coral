@@ -319,7 +319,7 @@ export function toggleAgenticPanel(forceState) {
  * what differs is what the search is for, whether the tab has Display options and groups, and its one pinned action. Hide turns the column into the rail; the choice is one for
  * every tab (#11629), kept in this browser. */
 const SIDEBAR_PANES = {
-    agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent' } },
+    agents: { search: 'Search agents', action: { name: 'launch-show', label: 'New agent', title: 'New agent (Alt+N)' } },
     history: { search: 'Search chats' },
     automations: { search: 'Search jobs' }, // Workflows and Jobs as one screen (Goal #74): its folders' toolbars carry the create action
     'hub-inbox': { search: 'Search the Inbox' },
@@ -360,7 +360,7 @@ export function showSidebarPane(tab) {
     const add = document.getElementById('sidebar-rail-new');
     if (add) {
         setHidden(add, !cfg.action);
-        if (cfg.action) { setTitle(add, cfg.action.label); setAttr(add, 'aria-label', cfg.action.label); setAttr(add, 'data-on-click', cfg.action.name); }
+        if (cfg.action) { setTitle(add, cfg.action.title || cfg.action.label); setAttr(add, 'aria-label', cfg.action.label); setAttr(add, 'data-on-click', cfg.action.name); }
     }
     const collapsed = readRail(pane);
     if (layout.classList.contains('sidebar-collapsed') !== collapsed) applyRail(collapsed);
