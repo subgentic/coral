@@ -266,3 +266,36 @@ func TestRelayedBodiesAreCappedAndABodylessKindSignsTheEmptyHash(t *testing.T) {
 		assert.ErrorIs(t, err, devicekey.ErrBodyHash, "one byte where none was signed: %s", k)
 	}
 }
+
+// countingStore counts the key lookups the verifier makes.
+type countingStore struct {
+	devicekey.Store
+	lookups int
+}
+
+func (c *countingStore) ActiveDeviceKey(ctx context.Context, kid string, now time.Time) (store.DeviceKey, error) {
+	c.lookups++
+	return c.Store.ActiveDeviceKey(ctx, kid, now)
+}
+
+// A relayed text whose link is not the link it arrived on is refused before the signer's key is looked up, so a listed kid and an unknown one get the same code and no lookup-time difference (coral-hub #261197).
+func TestWrongLinkAnswersTheSameForAnUnknownAndAListedKidAndLooksUpNoKey(t *testing.T) {
+	r := newRig(t)
+	cs := &countingStore{Store: r.ss}
+	r.v.Store = cs
+	body := []byte("b")
+	stranger := newSigner(t) // not on the device list
+	for name, s := range map[string]signer{"listed": r.signer, "unknown": stranger} {
+		m := r.relayedMsg(devicekey.SendToAgent, s, body) // names lnk_1
+		c, err := m.Canonical()
+		require.NoError(t, err)
+		_, err = r.v.HandleRelayedOn(context.Background(), "lnk_2", "POST", "/api/x", m.Kind, c, body, s.signRelayed(t, m.Kind, c), t0, allow)
+		assert.ErrorIs(t, err, devicekey.ErrWrongLink, name)
+		assert.Equal(t, "wrong_link", err.Error(), name)
+	}
+	assert.Zero(t, cs.lookups, "no key lookup happens on the wrong_link path")
+	// the check is not vacuous: the right link does look the key up
+	_, err := r.handleRelayed(r.relayedMsg(devicekey.SendToAgent, r.signer, body), r.signer, body, t0, allow)
+	require.NoError(t, err)
+	assert.Positive(t, cs.lookups)
+}
