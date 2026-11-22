@@ -13,7 +13,7 @@
 import { copyText } from './utils.js';
 import { isSignedOut } from './overload.js';
 import { importOnce } from './import_once.js';
-const { morePermsWords, operatorLine, hubAddressLine, linkRowWords, removeLinkConfirm, capSavedText, LINK_CAPS, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
+const { morePermsWords, operatorLine, hubAddressLine, linkRowWords, linkedElsewhereText, removeLinkConfirm, capSavedText, LINK_CAPS, spellCode, OFF_TEXT, LEVEL_NOW, HUB_ACCESS_URL, EXPIRED_TEXT, codeExpired, autoAcceptChangedText, severalAccountsText } = await importOnce('./cloud_words.js');
 export const { enrolledRetrying, rekeyText, describe } = await importOnce('./cloud_words.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH, HUB_RELAUNCH_OFF_AT_LAUNCH, HUB_RELAUNCH_OFF_TOAST_AT_LAUNCH } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
 
@@ -123,7 +123,14 @@ class CloudPanel {
     render(st) {
         // A control the person was on may leave with the state (Connect when the code appears, Cancel when it is approved): focus is put on the one that took its place, never left on a removed button.
         const had = document.activeElement && this.root.contains(document.activeElement) ? document.activeElement : null;
-        this.say(describe(st));
+        this.lastSt = st;
+        // The first link gone with another still there (#20704): Settings says where the links are and offers to add a Hub, not 'Connect to Coral Hub' as if none were linked.
+        const linksOnly = this.hasLinks && st.state === 'idle' && !st.last_error && !st.last_error_code;
+        this.say(linksOnly ? linkedElsewhereText(this.linkCount) : describe(st));
+        const connectBtn = this.part('connect');
+        if (connectBtn) { connectBtn.dataset.firstWords ??= connectBtn.textContent; connectBtn.textContent = this.hasLinks ? 'Add a Hub' : connectBtn.dataset.firstWords; }
+        const statusBtn = this.root.id === 'settings-cloud' ? document.querySelector('#settings-pane-network .settings-editions-btn') : null; // the Status group's own way in to the same screen
+        if (statusBtn) { statusBtn.dataset.firstWords ??= statusBtn.textContent; statusBtn.textContent = this.hasLinks ? 'Add a Hub…' : statusBtn.dataset.firstWords; }
         if (codeExpired(st)) this.sayExpired();
         const enrolling = st.state === 'enrolling';
         if (!enrolling) this.pairingSecret = null; // a secret is for one pairing: gone with it
@@ -247,7 +254,7 @@ class CloudPanel {
         // Operator setting with it, so read it again.
         const enrolled = ENROLLED.includes(st.state);
         if (enrolled !== this.enrolled) { this.enrolled = enrolled; this.loadHubOperator(); this.loadLinks(); }
-        else if (enrolled && Date.now() - (this.linksAt || 0) > 15000) this.loadLinks();
+        else if ((enrolled || this.hasLinks || (!this.linksAt && st.state !== 'off')) && Date.now() - (this.linksAt || 0) > 15000) this.loadLinks();
         this.syncMorePerms(st, enrolled);
         document.dispatchEvent(new CustomEvent('coral-cloud-state', { detail: { state: st.state } })); // the setup code is offered while a link is being made (setup_code_setting.js)
         this.restoreFocus(had, st);
@@ -297,6 +304,9 @@ class CloudPanel {
         const list = this.part('links-list');
         const say = this.part('links-say');
         box.hidden = links.length === 0;
+        const count = links.filter(l => linkRowWords(l).id).length, before = this.linkCount || 0;
+        this.hasLinks = count > 0; this.linkCount = count;
+        if (before !== count && this.lastSt) this.render(this.lastSt);
         list.replaceChildren();
         for (const l of links) {
             const w = linkRowWords(l);

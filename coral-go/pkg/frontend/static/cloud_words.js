@@ -33,9 +33,9 @@ export function hubAddressLine(st) {
 
 export const LINK_CAPS = ['view', 'interact', 'launch'];
 const LINK_STATE = { active: 'Linked', paused: 'Paused', removing: 'Being removed: waiting for the Hub to confirm', revoked: 'Revoked by the Hub' };
-const bareOrigin = v => (typeof v === 'string' && /^https:\/\/[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/i.test(v) ? v : '');
+const bareOrigin = v => (typeof v === 'string' && /^https?:\/\/[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/i.test(v) ? v : '');
 
-/** One Hub link as a row of plain text (#20346): the Hub's address only when it is a bare https origin, its label with control and bidi characters removed, the cap, and what that cap lets it do. */
+/** One Hub link as a row of plain text (#20346): the Hub's address only when it is a bare origin (https, or http for a Hub on a private network: it is shown, never opened, #20704), its label with control and bidi characters removed, the cap, and what that cap lets it do. */
 export function linkRowWords(l) {
     l = l && typeof l === 'object' ? l : {};
     const cap = LINK_CAPS.includes(l.max_mode) ? l.max_mode : 'view';
@@ -95,6 +95,11 @@ export function rekeyText(sk) {
     const why = sk.exposed ? 'Other accounts on this computer could read the secret key file, so what it protects must be treated as known.'
         : "Coral can't use its secret key file" + (sk.message ? ' (' + sk.message + ')' : '') + '.';
     return why + ' Replacing it makes a new key and discards ' + (lost.length ? lost.join(' and ') : 'nothing stored yet') + '.';
+}
+
+/** The status line of a computer whose own connection is not up while Hub links remain (the first one removed, a second still linked, #20704): says where the links are, not that nothing is linked. */
+export function linkedElsewhereText(n) {
+    return `This computer is linked to ${n === 1 ? 'one Coral Hub' : n + ' Coral Hubs'}, listed below.`;
 }
 
 export function describe(st) {
