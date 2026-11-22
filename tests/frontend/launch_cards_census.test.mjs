@@ -1,4 +1,4 @@
-// The cards that start something say the same on every screen (#9998, the phone triage): the phone's empty Agents page (render.js draws it from launch_cards.js), the desktop's welcome page
+// The cards that start something say the same on every screen (#9998, the phone triage): the phone's empty Agents page (agent_list_empty.js draws it from launch_cards.js), the desktop's welcome page
 // and the New dialog's chooser carry the same icons, labels, descriptions and order; the dialog adds Terminal after them. A word changed in one place and not the others fails here.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,5 +16,6 @@ assert.deepEqual(welcome, want, 'the desktop welcome page');
 const chooser = [...read('templates/includes/modals.html').matchAll(/<button class="launch-type-card"[\s\S]*?launch-type-glyph" aria-hidden="true">([^<]*)<\/span>[\s\S]*?launch-type-label">([^<]*)<\/div>\s*<div class="launch-type-desc">([^<]*)<\/div>/g)].map(m => [m[1], m[2], m[3]]);
 assert.deepEqual(chooser, [...want.slice(0, 2), ['create_new_folder', 'Open folder', 'Add a project folder to start agents in later.'], ['terminal', 'Terminal', 'Open a shell next to your agents.']], "the New dialog's chooser: New agent and New team as the home screen has them, then Open folder (which left the home screen for New goal, #13012), then Terminal");
 
-assert.ok(/LAUNCH_CARDS\.map\(phoneCard\)/.test(read('static/render.js')), "the phone's empty page is drawn from the table");
+assert.ok(/LAUNCH_CARDS\.map\(phoneCard\)/.test(read('static/agent_list_empty.js')), "the phone's empty page is drawn from the table");
+assert.ok(read('static/render.js').includes("importOnce('./agent_list_empty.js')"), 'the real list loads the empty cards');
 console.log('launch_cards_census: ok (3 cards on 3 screens, Terminal only in the dialog)');

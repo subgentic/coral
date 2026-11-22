@@ -183,7 +183,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				}
 				if resets, blocked := m.blockedByLimit(ctx, a); blocked {
 					r.Counts[teamhealth.StateBlocked]++
-					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Resets: resets})
+					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Resets: resets, Vendor: a.AgentType, ResetAt: limitResetClock(m.now(), resets)})
 					attention++
 					break
 				}
@@ -197,7 +197,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				}
 				if resets, blocked := m.blockedByLimit(ctx, a); blocked {
 					r.Counts[teamhealth.StateBlocked]++
-					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Resets: resets})
+					r.Blocked = append(r.Blocked, teamhealth.BlockedEntry{Name: name, Resets: resets, Vendor: a.AgentType, ResetAt: limitResetClock(m.now(), resets)})
 					attention++
 					break
 				}
@@ -371,4 +371,12 @@ func waitReason(w board.RegisteredWait) string {
 		return `"` + t + `"`
 	}
 	return ""
+}
+
+// Preserve the known reset clock for the health message, rather than only a countdown.
+func limitResetClock(now time.Time, resets time.Duration) time.Time {
+	if resets <= 0 {
+		return time.Time{}
+	}
+	return now.Add(resets).Truncate(time.Minute)
 }

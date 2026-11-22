@@ -37,14 +37,14 @@ func TestHealthCheckShowsAQuotaBlockedAgentAsBlocked(t *testing.T) {
 	require.Contains(t, out, "1 BLOCKED by a usage limit", out)
 	assert.Contains(t, out, "1 idle", "the other is still idle")
 	assert.NotContains(t, out, "2 idle")
-	assert.Contains(t, out, "Quota is blocked by a usage limit (resets in 103 h 13 min)")
+	assert.Contains(t, out, "1 Claude agent is stopped by a usage limit until "+h.m.now().Add(103*time.Hour+13*time.Minute+54*time.Second).Truncate(time.Minute).Format("Jan 2 15:04 MST")+": Quota.")
 	assert.NotContains(t, out, "Quota: idle", "a blocked agent is not named as one that needs work")
 	assert.Contains(t, out, "Idler: idle", "an idle one still is")
 	assert.False(t, strings.Contains(out, "\n"))
 
 	// A limit with no time shown.
 	h.m.limit = func(_ context.Context, a AgentInfo) (time.Duration, bool) { return 0, a.SessionID == quotaSID }
-	assert.Contains(t, h.check(), "Quota is blocked by a usage limit: nothing to nudge")
+	assert.Contains(t, h.check(), "1 Claude agent is stopped by a usage limit, reset time unknown: Quota. Nothing to nudge")
 }
 
 type screenRT struct {
@@ -99,7 +99,7 @@ func TestHealthCheckShowsAnInTurnAgentWithALimitAsBlocked(t *testing.T) {
 	out := h.check()
 	assert.Contains(t, out, "1 BLOCKED by a usage limit", out)
 	assert.Contains(t, out, "0 working", out)
-	assert.Contains(t, out, "Dev is blocked by a usage limit (resets in 120 h)")
+	assert.Contains(t, out, "1 Claude agent is stopped by a usage limit until "+h.m.now().Add(120*time.Hour).Truncate(time.Minute).Format("Jan 2 15:04 MST")+": Dev.")
 }
 
 func TestSendUnlessBlockedTypesNothingToABlockedAgent(t *testing.T) {
@@ -151,7 +151,7 @@ func TestABlockedAgentIsNotWorkingWithNoTask(t *testing.T) {
 	assert.Contains(t, out, "Dev: has been working for 15 min with no task in progress", "an agent that really works is still named")
 	assert.NotContains(t, out, "Codex: has been working", "a blocked agent is not working")
 	assert.Contains(t, out, "1 BLOCKED by a usage limit")
-	assert.Contains(t, out, "Codex is blocked by a usage limit (resets in 134 h)")
+	assert.Contains(t, out, "1 Claude agent is stopped by a usage limit until "+h.m.now().Add(134*time.Hour).Truncate(time.Minute).Format("Jan 2 15:04 MST")+": Codex.")
 
 	// an occurrence noted before the limit was seen (a check ran while the screen showed no notice) is dropped when the limit shows, and not said when it lifts
 	require.NoError(t, h.s.AddOffBooks(context.Background(), "team", board.OffBooksBusy, "Codex", "Codex|early", "has been working for 20 min with no task in progress", h.now))
@@ -186,7 +186,7 @@ func TestACodexAgentAtItsLimitIsNeverWorkingWithNoTaskEndToEnd(t *testing.T) {
 	assert.Contains(t, out, "Dev: has been working for 12 min with no task in progress", "an agent that really works is named")
 	assert.NotContains(t, out, "Codex Dev: has been working", "a Codex agent at its limit is not working")
 	assert.Contains(t, out, "1 BLOCKED by a usage limit")
-	assert.Contains(t, out, "Codex Dev is blocked by a usage limit (resets in ")
+	assert.Regexp(t, `1 Codex agent is stopped by a usage limit until .*: Codex Dev\.`, out)
 
 	// a second check, later, with the same screen: still not named, and the finding is not noted behind the person's back
 	h.now = h.now.Add(11 * time.Minute)

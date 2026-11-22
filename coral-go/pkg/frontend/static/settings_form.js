@@ -116,6 +116,7 @@ export function readSettingsForm(all = false) {
         ...readInboxSettings(state.settings),
         nudge_claude_artifacts: nudgeClaudeArtifacts,
         board_health_monitor: boardHealthMonitor,
+        auto_resume_at_limit_reset: document.getElementById("settings-auto-resume-limit")?.checked ?? settingBool(state.settings?.auto_resume_at_limit_reset || undefined, false),
         auto_resume_after_api_error: autoResume,
         auto_sleep: autoSleep,
         auto_sleep_idle_minutes: autoSleepMinutes,

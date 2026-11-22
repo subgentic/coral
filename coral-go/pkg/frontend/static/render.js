@@ -4,7 +4,7 @@
 import './model_labels.js';
 import { importOnce, loadedModule } from './import_once.js';
 import { state } from './state.js';
-import { LAUNCH_CARDS, goalDesc, refreshGoalCardSoon } from './launch_cards.js';
+import { refreshGoalCardSoon } from './launch_cards.js';
 import './settings_lists.js';
 import './hub_access.js';
 import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js';
@@ -32,7 +32,7 @@ import { buildSessionTooltip } from './session_state.js';
 import './board_accents.js';
 import { followServerOrder } from './list_order.js';
 import { _isServerCollapsed, _openServerDetails } from './server_rows.js';
-import { _attachDragListeners, _renderArchivedSection, _within, syncDisplayMenu, isGroupedByServer } from './session_rows.js';
+import { _attachDragListeners, _renderArchivedSection, _renderSessionItem, _within, syncDisplayMenu, isGroupedByServer } from './session_rows.js';
 import './confirm_dialog.js';
 import { getAgentFilter, setAgentFilter, getListFilters, setListFilters } from './agent_filter.js';
 import { isFiltered as _listFiltered, EMPTY as _NO_LIST_FILTERS } from './agent_list_filters.js';
@@ -280,12 +280,9 @@ function _refreshTeamBadges(sessions) {
 }
 
 /** The list with nothing in it because of what is typed or chosen: it says which, and has the button that undoes it (#10357: it said "Clear the filters" with none set, while words from another page sat in the search box). */
-function emptyListHtml(unfilteredCount) {
-    if (!unfilteredCount) return 'No live sessions';
-    const words = (document.getElementById('agent-search-input')?.value || '').trim();
-    if (words) return `No agents match ${escapeHtml(words.length > 40 ? words.slice(0, 40) + '\u2026' : words)}. <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-search-clear">Clear search</button>`;
-    return 'No agents match these filters. <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-filters-clear">Clear filters</button>';
-}
+const emptyList = () => loadedModule('./agent_list_empty.js') || (importOnce('./agent_list_empty.js').then(() => { redrawLiveList(); refreshGoalCardSoon(); }), null);
+const emptyListHtml = n => emptyList()?.emptyListHtml(n) || 'Loading…';
+const phoneWelcome = () => emptyList()?.phoneWelcome() || '';
 
 // One Tab stop for the whole agent list (#10579, like the Inbox's list): the row the keyboard was last on, else the open agent, else the first row that is shown; Up, Down, Home and End move between the rows.
 // It is written into the markup (the same string is drawn and parsed again), so a redraw never has two stops.
@@ -350,19 +347,26 @@ function _renderLiveSessions(sessions) {
     // The servers UI (#3085): with two or more servers the groups below are
     // wrapped in collapsible server headers (the search-row pill was removed, #4932).
 
-    let html = '';
+    const usage = loadedModule('./usage_limit.js');
+    if (!usage && sessions.some(s => s.blocked?.kind === 'usage_limit')) importOnce('./usage_limit.js').then(() => redrawLiveList());
+    usage?.scheduleUsageLimitRefresh(sessions, redrawLiveList);
+    const limits = usage?.usageLimitList(sessions, _renderSessionItem, escapeHtml);
+    const regularAgents = limits?.regular || sessions;
+    let html = limits?.summary || '';
     const shownServers = serversShown();
     if (isGroupedByServer()) {
         for (const e of shownServers) {
-            const own = sessions.filter(x => sessionServer(x) === e.id);
+            const own = regularAgents.filter(x => sessionServer(x) === e.id);
             const collapsed = _isServerCollapsed(e.id);
             html += serverGroupHeaderHtml(e, own.length, collapsed, _openServerDetails.has(e.id));
             if (!collapsed) html += _renderGroups(own, groupByTeam, e.id === LOCAL_SERVER);
         }
     } else {
-        html += _renderGroups(sessions, groupByTeam);
+        html += _renderGroups(regularAgents, groupByTeam);
     }
 
+    html += limits?.waiting || '';
+    if (limits?.sleeping.length) html += _renderGroups(limits.sleeping, groupByTeam);
     html += _renderArchivedSection(archived);
     html = oneRowStop(html);
     // A row's open menu stays open across the redraw (#10786, Beta #10775): the list is drawn again every few seconds and the new row's menu starts closed, so a person who looked at the open menu and then clicked Rename clicked what was under it.
@@ -377,20 +381,6 @@ function _renderLiveSessions(sessions) {
     syncGroupToggle(); // the header's Collapse / Expand toggle reads the headers just drawn (#4947)
     _refreshTeamBadges(sessions);
 }
-
-// A phone has no welcome screen (the agent list is its Home): with nothing running, the list says what Coral is for and offers the launches the desktop welcome has (#5990, #9998).
-// The desktop's sidebar keeps its plain line; the CSS shows one or the other.
-// what each card does, as whole attributes (an action name is written out, never built, #3645)
-const PHONE_CARD_ACTION = {
-    agent: 'data-on-click="m-show-launch-modal-then-select-launch-type" data-arg="agent"',
-    team: 'data-on-click="m-show-launch-modal-then-select-launch-type" data-arg="team"',
-    goal: 'data-on-click="m-new-goal-from-home"',
-};
-const phoneCard = c => `<button type="button" class="empty-launch" ${PHONE_CARD_ACTION[c.key]}><span class="empty-launch-icon material-icons" aria-hidden="true">${c.icon}</span><span class="empty-launch-copy"><strong>${c.label}</strong><span${c.key === 'goal' ? ' data-goal-desc' : ''}>${c.key === 'goal' ? goalDesc() : c.desc}</span></span><span class="material-icons empty-launch-arrow" aria-hidden="true">arrow_forward</span></button>`;
-const phoneWelcome = () => `<li class="empty-state empty-welcome"><h2>What do you want to work on?</h2><p>Start one agent in a folder, or a team that works together.</p>
-<div class="empty-launch-list">
-${LAUNCH_CARDS.map(phoneCard).join('\n')}
-</div></li>`;
 
 // Hidden tabs skip availability polls; catch up as soon as the tab is shown.
 document.addEventListener('visibilitychange', () => {

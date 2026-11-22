@@ -189,6 +189,8 @@ export async function loadSettings() {
         const healthMonitor = document.getElementById('settings-board-health-monitor');
         // On unless the Operator turned it off (#5128); an empty value is unset.
         if (healthMonitor) healthMonitor.checked = settingBool(s.board_health_monitor || undefined, true);
+        const limitResume = document.getElementById('settings-auto-resume-limit');
+        if (limitResume) limitResume.checked = settingBool(s.auto_resume_at_limit_reset || undefined, false);
         const autoResume = document.getElementById('settings-auto-resume');
         // Off unless the Operator turned it on (#3613).
         if (autoResume) autoResume.checked = settingBool(s.auto_resume_after_api_error || undefined, false);

@@ -1,3 +1,4 @@
+import { loadedModule } from './import_once.js';
 import { hasWorkingDisplayHint, trackDisplayHint } from './display_activity_hint.js';
 import { dialogOf } from './at_dialog.js';
 /* Moved out of render.js as it was (#3795): no behaviour change. */
@@ -182,7 +183,8 @@ function waitingOnLabel(w) {
 // UI classification only. deriveSessionState remains the authoritative resolver
 // used by send/queue/approval helpers and must never consume screen evidence.
 export function presentationSessionState(s, opts) {
-    const key = deriveSessionState(s, opts);
+    let key = deriveSessionState(s, opts);
+    key = loadedModule('./usage_limit.js')?.usageLimitPresentation(s, key, deriveSessionState, opts) || key;
     trackDisplayHint(s);
     if (['idle', 'your_turn', 'task_idle', 'waiting_on'].includes(key) && dialogOf(s)) return 'at_dialog'; // not Idle while it stands at a dialog (#11430)
     return key === 'needs_input' && hasWorkingDisplayHint(s) ? 'working' : key;
@@ -207,6 +209,7 @@ export function sessionStateInfo(s, opts) {
         info.label = why === 'Blocked' ? 'Blocked' : `Blocked: ${why}`;
         info.short = why === 'Blocked' ? 'Blocked' : 'Blocked: Codex refuses its model'; // a phone row's one line has no room for a 64-character model name: the name stays in the label (the dot's name, the row's title)
     }
+    if (key === 'usage_limit') Object.assign(info, loadedModule('./usage_limit.js').usageLimitState(s, escapeHtml));
     // What the agent itself says it waits on (#3481): its permission, question, plan or
     // input request. A prompt Coral only saw on the screen has no kind: plain Needs input.
     // waiting_kind comes from the agent's own event: only an own key of the table counts

@@ -1,0 +1,27 @@
+/* Shared calm usage-limit state, in the desktop list and the phone's Agents page. */
+.usage-limit-summary { margin: var(--space-md); padding: var(--space-lg); border: 1px solid var(--border); border-left: 3px solid var(--warning); border-radius: var(--radius-md); color: var(--text-primary); background: var(--bg-primary); font-size: var(--fs-md); }
+.usage-limit-summary p { margin: var(--space-xs) 0 0; overflow-wrap: anywhere; }
+.usage-limit-summary small { display: block; margin-top: var(--space-xs); color: var(--text-secondary); font-size: var(--fs-sm); }
+.usage-limit-mark { color: var(--warning-text); font-weight: var(--fw-strong); }
+.usage-limit-summary > div { min-width: 0; }
+.usage-limit-phone { display: none; }
+#mobile-session-list .usage-limit-phone { display: block; }
+#mobile-session-list .usage-limit-desktop { display: none; }
+.usage-limit-heading { padding: var(--space-sm) var(--space-lg); color: var(--text-secondary); background: var(--bg-tertiary); border-top: 1px solid var(--border); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: var(--ls-caps); }
+.session-dot.usage-limit { background: var(--warning); }
+.session-state-pill.usage-limit { color: var(--warning-text); background: rgba(var(--warning-rgb), .12); white-space: normal; }
+.usage-limit-detail { display: block; color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.session-group-item[data-state="usage_limit"] .session-name-row { flex-wrap: wrap; height: auto; padding-right: var(--space-2xl); }
+#mobile-session-list .session-group-item[data-state="usage_limit"] .session-status-line { position: static; width: auto; height: auto; overflow: visible; clip-path: none; color: var(--warning-text); }
+#mobile-session-list .session-group-item[data-state="usage_limit"] .session-preview, #mobile-session-list .usage-limit-detail { display: none; }
+@media (forced-colors: active) { .session-dot.usage-limit { outline: 2px solid CanvasText; } }
+.session-list li.usage-limit-summary { display: flex; gap: var(--space-md); align-items: flex-start; }
+.session-list li.usage-limit-heading { display: block; }
+.session-group-item[data-state="usage_limit"] .session-info { overflow: visible; }
+.chat-usage-limit-notice { margin: var(--space-lg) 0; }
+
+.session-group-item[data-state="usage_limit"] .session-name-row .sidebar-kebab-wrapper { position: absolute; right: 0; top: 0; }
+.session-group-item[data-state="usage_limit"] .session-name-spacer, .session-group-item[data-state="usage_limit"] .session-time { display: none; }
+.usage-limit-vendor { display: inline-block; margin-left: var(--space-xs); padding: 0 var(--space-xs); border: 1px solid var(--border); border-radius: var(--radius-xs); font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); }
+
+.session-group-item[data-state="usage_limit"] { position: relative; }

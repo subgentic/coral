@@ -473,3 +473,5 @@ node queue_cloud.test.mjs
 node skills_hub_read_source.test.mjs
 node computer_update_error.test.js
 node fail_fast_suites.test.mjs
+
+node usage_limit.test.mjs

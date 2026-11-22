@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { usageLimit, resetClock, usageLimitSummaries, usageLimitDetail, usageLimitChat } from '../../coral-go/pkg/frontend/static/usage_limit.js';
+const now = Date.parse('2026-11-22T12:00:00Z');
+const limited = (vendor, at) => ({ blocked: {kind:'usage_limit',vendor,reset_at:at} });
+assert.equal(usageLimit({...limited('codex',null),sleeping:true},now),null);
+assert.equal(usageLimit(limited('codex','2026-11-22T11:59:00Z'),now),null);
+assert.equal(usageLimit(limited('agy','not a date'),now).at,null);
+assert.match(usageLimitDetail(limited('agy',null),now),/Reset time unknown/);
+assert.deepEqual(usageLimitSummaries([limited('codex',null),limited('codex',null),limited('claude',null)],now),['2 Codex agents are limited, reset time unknown','1 Claude agent is limited, reset time unknown']);
+assert.match(resetClock(now+86400000,now),/^tomorrow /);
+assert.match(resetClock(now+3*86400000,now),/Nov/);
+assert.match(usageLimitChat({sleeping:true,sleep_reason:'agent_exited'},'limit'),/asleep.*not be resumed/);
+assert.match(usageLimitChat({sleeping:true,sleep_reason:'agent_exited'},'Codex refuses its model.'),/^Codex refuses its model\./,'an exited CLI never changes another refusal into a usage limit');
+const root = new URL('../../coral-go/pkg/frontend/static/',import.meta.url);
+for(const [f,words] of [['usage_limit.js','Waiting for a usage limit to reset'],['settings_fields.js','Resume at limit reset'],['settings_fields.js','Off by default.']])assert.ok(readFileSync(new URL(f,root),'utf8').includes(words),f+': '+words);
+for(const f of ['settings_form.js','settings_fill.js','settings_core.js','settings_saved_words.js'])assert.ok(readFileSync(new URL(f,root),'utf8').includes('auto_resume_at_limit_reset'),f);
+console.log('usage_limit: clocks, unknowns, expiry, vendor summaries, asleep wording and Settings labels pinned');
+
+const future = new Date(Date.now()+3600000).toISOString();
+assert.match(usageLimitChat(limited('codex',future),''),/This agent can’t work.*Coral won’t send it anything until then\. No automatic resume is scheduled\./);
+assert.match(usageLimitChat(limited('agy',null),''),/This CLI doesn’t say when\./);

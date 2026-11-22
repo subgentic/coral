@@ -17,7 +17,7 @@ const { framesJs } = require('./helpers/wait');
         base({ session_id: 'b2', display_name: 'No name', blocked: { kind: 'model_refused', model: '' } }),
         base({ session_id: 'b3', display_name: 'Asking', waiting_for_input: true, waiting_kind: 'question', blocked: { kind: 'model_refused', model: 'gpt-6.1-sol' } }),
         base({ session_id: 'b4', display_name: 'Asleep', sleeping: true, blocked: { kind: 'model_refused', model: 'gpt-6.1-sol' } }),
-        base({ session_id: 'b5', display_name: 'Later kind', blocked: { kind: 'usage_limit' } }),
+        base({ session_id: 'b5', display_name: 'Later kind', blocked: { kind: 'future_block' } }),
         base({ session_id: 'b6', display_name: 'Hostile', blocked: { kind: 'model_refused', model: '<img src=x onerror=window.__pwned=1>' } }),
         base({ session_id: 'b7', display_name: 'Fine', awaiting_user: true, done: true }),
     ];

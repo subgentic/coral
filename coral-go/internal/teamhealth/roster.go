@@ -48,8 +48,10 @@ type WaitGroup struct {
 
 // BlockedEntry is an agent stopped by a usage limit; Resets is how long until it resets, 0 when the CLI did not say. Model is set instead for a Codex agent whose model is refused (#13480): it is not a limit and nothing resets.
 type BlockedEntry struct {
-	Name   string
-	Resets time.Duration
+	Vendor  string
+	ResetAt time.Time
+	Name    string
+	Resets  time.Duration
 	// ModelRefused: a Codex agent whose model its login refuses (#13480), not a usage limit; Model is the model's name when it has a safe one, "" otherwise.
 	ModelRefused bool
 	Model        string

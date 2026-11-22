@@ -14,6 +14,11 @@
 1	agent_config_form.js	topHTML
 1	agent_config_form.js	uid
 2	agent_link.js	c
+1	agent_list_empty.js	LAUNCH_CARDS.map(phoneCard).join('\n')
+1	agent_list_empty.js	PHONE_CARD_ACTION[c.key]
+1	agent_list_empty.js	c.icon
+1	agent_list_empty.js	c.key === 'goal' ? goalDesc() : c.desc
+1	agent_list_empty.js	c.label
 1	artifact_item.js	renderMarkdownStrict(content)
 1	artifact_preview.js	rows
 1	artifact_viewer.js	renderMarkdownStrict(content)
@@ -319,11 +324,6 @@
 1	registered_server_view.js	upgradeControl(s, version, busy)
 1	registered_server_view.js	value
 1	registered_server_view.js	warningHtml(s)
-1	render.js	LAUNCH_CARDS.map(phoneCard).join('\n')
-1	render.js	PHONE_CARD_ACTION[c.key]
-1	render.js	c.icon
-1	render.js	c.key === 'goal' ? goalDesc() : c.desc
-1	render.js	c.label
 1	render.js	emptyListHtml(unfilteredCount)
 1	render.js	unfilteredCount ? '' : phoneWelcome()
 1	sandbox_frame.js	DOC_CSP
@@ -555,6 +555,9 @@
 1	update_check.js	downloadBtn
 1	update_check.js	items.join("")
 1	update_check.js	notesHtml
+1	usage_limit.js	desktop
+1	usage_limit.js	phone
+1	usage_limit.js	summary
 1	view_sandbox.js	JSON.stringify(ctx).replace(/</g, '\\u003c')
 1	view_sandbox.js	VIEW_CSP
 1	view_sandbox.js	html

@@ -8,7 +8,7 @@ const DEFAULTS = {
     'settings-check-updates': true, 'settings-fit-pane-width': false,
     'settings-terminal-scrollback': '20000', 'settings-notify-needs-input': false,
     'settings-working-dir': '', 'settings-permission-mode': 'auto',
-    'settings-auto-resume': false, 'settings-auto-sleep': true,
+    'settings-auto-resume-limit': false, 'settings-auto-resume': false, 'settings-auto-sleep': true,
     'settings-auto-sleep-minutes': '60', 'settings-auto-goals': true,
     'settings-agent-low-priority': true, 'settings-board-auto-attach': false,
     'settings-nudge-claude-artifacts': true, 'settings-board-health-monitor': true,

@@ -1,3 +1,4 @@
+import { loadedModule } from './import_once.js';
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { getDotClass, resolveSessionIdentity, sessionGoalText, sessionStateInfo, sessionUnreadCount } from './session_state.js';
 import { _saveSessionOrder } from './list_order.js';
@@ -263,8 +264,9 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const dotClass = getDotClass(s);
     const isActive = !state.selectedTeam && !state.atWelcome && state.currentSession && state.currentSession.type === "live" && state.currentSession.session_id === s.session_id;
 
-    // Spec: remove agent type from the default row layout
-    const typeTag = "";
+    // Default rows omit the CLI; a usage-limit row names its vendor as the mock does.
+    const stateInfo = sessionStateInfo(s);
+    const typeTag = stateInfo.vendorTag || '';
 
     // Directory override chip
     // Directory override now lives in the tooltip (Directory row), not the row.
@@ -273,10 +275,9 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // One pill at most, from the shared state table. The attention states carry a
     // warning pill; "Task assigned · idle" a neutral one (#3227). "Ready for input"
     // has none: the tooltip and the aria-label carry that state (no dot) (task #175).
-    const stateInfo = sessionStateInfo(s);
     const pillKind = stateInfo.attention ? 'waiting-badge session-state-pill session-attention-pill' : 'session-state-pill';
-    const waitingBadge = stateInfo.pill && stateInfo.attention // one row, one line: the one chip is for an agent that needs you (the dot says every other state, #9686)
-        ? ` <span class="chip chip-caps ${pillKind}${stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''}"${stateInfo.label !== stateInfo.pill.split(' · ')[0] ? ` title="${escapeAttr(stateInfo.label)}"` : ''}>${escapeHtml(stateInfo.pill.split(' · ')[0])}</span>` // one chip, one word: the reason (Question, Permission) is the chip's hover and the row's name, not in the pill (UI/UX, #9784)
+    const waitingBadge = stateInfo.pill && (stateInfo.attention || stateInfo.key === 'usage_limit') // one row, one line: the one chip is for an agent that needs you (the dot says every other state, #9686)
+        ? ` <span class="chip chip-caps ${pillKind}${stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''}"${stateInfo.label !== stateInfo.pill.split(' · ')[0] ? ` title="${escapeAttr(stateInfo.label)}"` : ''}>${escapeHtml(stateInfo.key === 'usage_limit' ? stateInfo.pill : stateInfo.pill.split(' · ')[0])}</span>` // one chip, one word: the reason (Question, Permission) is the chip's hover and the row's name, not in the pill (UI/UX, #9784)
         : '';
     // Context is secondary: any state pill owns line 1 and the ctx pill
     // collapses to the dot's ring, which survives on every glyph.
@@ -353,6 +354,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
                 ${stale ? '' : waitingBadge + heldChip + sleepChip + restartBtn + wakeBtn + sleepBtn}
                 ${stale ? '' : kebabMenu}
             </div>
+            ${stateInfo.key === 'usage_limit' ? `<span class="usage-limit-detail">${escapeHtml(loadedModule('./usage_limit.js')?.usageLimitDetail(s) || '')}</span>` : ''}
             <span class="session-status-line">${escapeHtml(stateInfo.short || stateInfo.label)}</span>
             <span class="session-preview" aria-hidden="true">${escapeHtml(previewOf(s, identity))}</span>
             ${rowLinesHtml(s)}

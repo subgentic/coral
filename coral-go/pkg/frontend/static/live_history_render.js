@@ -1,3 +1,5 @@
+import { sessionServer } from './server_base.js';
+import { importOnce } from './import_once.js';
 /* Live history reply helpers: message indexes, page stitching, prompt state and post-render sync. Moved from live_chat.js (#8353). */
 
 import { syncHooksComposer } from './hooks_review.js';
@@ -67,6 +69,7 @@ export function _noteReplyState(session, data) {
 /** After a reply: the usage notice, the kept page's age, the pending bubbles, the working row, the empty state and the scroll. */
 export function _syncAfterHistory(container, session, data) {
     syncUsageLimitNotice(container, data.limit_notice || '');
+    importOnce('./usage_limit.js').then(m => m.paintUsageLimitNotice(container, session, data, state, sessionServer, syncUsageLimitNotice));
     // The agent is still on screen: its kept page is as fresh as this reply, so the time limit counts from when it left.
     const keptNow = keptPages.get(session.session_id);
     if (keptNow) keptNow.at = Date.now();

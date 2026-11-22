@@ -114,7 +114,13 @@ func (in CheckInput) actions(items []Item) []action {
 		l := ItemText(it)
 		out = append(out, action{age: it.Age, rank: it.Rank, pinned: it.Rank == 0, text: l})
 	}
+	for _, line := range usageLimitHealthLines(r.Blocked) {
+		out = append(out, action{rank: 5, text: line})
+	}
 	for _, b := range r.Blocked {
+		if b.Vendor != "" && !b.ModelRefused {
+			continue
+		}
 		if b.ModelRefused {
 			model := "its model"
 			if b.Model != "" {
@@ -254,4 +260,50 @@ func composeActionList(in CheckInput) []string {
 		}
 	}
 	return []string{strings.ToValidUTF8(stamp[:min(len(stamp), MaxCheck)], "")}
+}
+
+// One line per vendor and known reset; unknown times are never guessed.
+func usageLimitHealthLines(entries []BlockedEntry) []string {
+	type group struct {
+		vendor string
+		at     time.Time
+		names  []string
+	}
+	groups := map[string]*group{}
+	for _, b := range entries {
+		if b.ModelRefused || b.Vendor == "" {
+			continue
+		}
+		vendor := map[string]string{"claude": "Claude", "codex": "Codex", "agy": "Antigravity", "antigravity": "Antigravity", "gemini": "Antigravity"}[b.Vendor]
+		if vendor == "" {
+			vendor = "Agent"
+		}
+		key := vendor + ":" + b.ResetAt.UTC().Format(time.RFC3339)
+		g := groups[key]
+		if g == nil {
+			g = &group{vendor: vendor, at: b.ResetAt}
+			groups[key] = g
+		}
+		g.names = append(g.names, b.Name)
+	}
+	keys := make([]string, 0, len(groups))
+	for k := range groups {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var out []string
+	for _, k := range keys {
+		g := groups[k]
+		sort.Strings(g.names)
+		noun, verb := "agent", "is"
+		if len(g.names) != 1 {
+			noun, verb = "agents", "are"
+		}
+		when := ", reset time unknown"
+		if !g.at.IsZero() {
+			when = " until " + g.at.Format("Jan 2 15:04 MST")
+		}
+		out = append(out, fmt.Sprintf("%d %s %s %s stopped by a usage limit%s: %s. Nothing to nudge until it resets.", len(g.names), g.vendor, noun, verb, when, strings.Join(g.names, ", ")))
+	}
+	return out
 }
