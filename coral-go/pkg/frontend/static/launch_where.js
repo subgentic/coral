@@ -180,7 +180,7 @@ function drawBranch(p, where, here) {
         const lab = (t, hint) => { const r = node('div', 'launch-where-labelrow'); r.append(node('label', 'launch-where-label', t)); if (hint) r.append(node('span', 'launch-where-hint', hint)); return r; };
         const a = node('div', 'launch-where-field'); a.append(lab('Branch name', ''), nameIn);
         const b = node('div', 'launch-where-field launch-where-field-wide'); b.append(lab('Folder', 'edit if you like'), dirIn);
-        a.firstChild.setAttribute('for', nameId); b.firstChild.setAttribute('for', dirId);
+        a.querySelector('label').setAttribute('for', nameId); b.querySelector('label').setAttribute('for', dirId);
         f.append(a, b); sec.append(f);
     } else if (p.choice === 'exists') {
         const pick = node('div', 'launch-where-list'); pick.setAttribute('role', 'radiogroup'); pick.setAttribute('aria-label', 'Worktrees');

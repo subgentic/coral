@@ -80,6 +80,7 @@ const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'user.email=
             // a new worktree: the name and the folder (<repo>-worktrees/<name>), checked free, carried to the launch
             check(`${at}New worktree can be picked`, await radio('agent', 'new'));
             await waitFor(`!!document.querySelector(${JSON.stringify(panel('agent') + ' .launch-where-fields')}) && /Worktree folder is free/.test(document.querySelector(${JSON.stringify(panel('agent'))}).textContent)`, 'the new worktree fields and its check', 8000);
+            check(`${at}Branch name and Folder labels are bound to their fields`, await ev(`(() => { const ls = [...document.querySelectorAll(${JSON.stringify(panel('agent'))} + ' .launch-where-fields label')]; return ls.length === 2 && ls.every(l => { const f = l.htmlFor && document.getElementById(l.htmlFor); return !!f && f.tagName === 'INPUT'; }); })()`));
             const nm = await ev(`document.querySelector(${JSON.stringify(panel('agent') + ' [aria-label="New branch name"]')}).value`);
             const fld = await ev(`document.querySelector(${JSON.stringify(panel('agent') + ' [aria-label="Worktree folder"]')}).value`);
             check(`${at}the folder is next to the repository and the name is a branch name`, !!nm && fld === repo + '-worktrees/' + nm, `${nm} ${fld}`);
