@@ -12,10 +12,10 @@ const LABEL = 'Trust this folder: its settings and tools can run';
 export function mountAgentTrust() {
     const dir = document.getElementById('launch-dir'), at = dir?.closest('.sv-row');
     if (!dir || !at || document.getElementById('launch-agent-trust-row')) return;
-    const row = document.createElement('div'); row.id = 'launch-agent-trust-row'; row.className = 'sv-row'; row.hidden = true;
+    const row = document.createElement('div'); row.id = 'launch-agent-trust-row'; row.className = 'launch-trust-tick'; row.hidden = true;
     const label = document.createElement('label'), box = document.createElement('input'), help = document.createElement('p');
-    box.type = 'checkbox'; box.id = 'launch-agent-trust'; help.id = 'launch-agent-trust-help'; help.className = 'sv-help';
-    label.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:flex-start;text-align:left'; label.append(box, document.createTextNode(LABEL));
+    box.type = 'checkbox'; box.id = 'launch-agent-trust'; help.id = 'launch-agent-trust-help'; help.className = 'launch-trust-help';
+    label.className = 'launch-trust-label'; label.append(box, document.createTextNode(LABEL));
     row.append(label, help); at.after(row);
     const sync = () => {
         const d = document.getElementById('launch-dir'), f = d?.value.trim() || '';

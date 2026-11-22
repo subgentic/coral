@@ -3,8 +3,8 @@
 .launch-where[hidden] { display: none; }
 .launch-where-h { margin: 0 0 6px; font-size: var(--fs-base); font-weight: var(--fw-strong); color: var(--text-secondary); text-transform: none; }
 .launch-where-list { display: flex; flex-direction: column; gap: 6px; }
-.launch-where-opt { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); cursor: pointer; min-height: 44px; }
-.launch-where-opt input { margin: 3px 0 0; }
+.modal-content .launch-where-opt { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); cursor: pointer; min-height: 44px; }
+.modal-content .launch-where-opt input { width: auto; flex: none; margin: 3px 0 0; }
 .launch-where-opt:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card-fill)); }
 .launch-where-opt-text { min-width: 0; overflow-wrap: anywhere; }
 .launch-where-path, .launch-where-branch { font-family: var(--font-mono, monospace); }
@@ -12,7 +12,7 @@
 .launch-where-tag-ok { color: var(--success-text, var(--text-secondary)); }
 .launch-where-tag-warn { color: var(--warning-text); }
 .launch-where-tag-info { color: var(--accent); }
-.launch-where-check { position: sticky; bottom: 0; z-index: 1; max-height: 45vh; overflow-y: auto; padding: 10px 12px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); }
+.launch-where-check { position: sticky; bottom: 0; z-index: 1; max-height: 34vh; overflow-y: auto; padding: 10px 12px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); }
 .launch-where-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .launch-where-item { display: grid; grid-template-columns: 1.4em minmax(0, 1fr) auto; align-items: start; column-gap: 8px; }
 .launch-where-item-detail { color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: anywhere; }
@@ -50,4 +50,12 @@
 .launch-where-tag-fail { color: var(--error-text); }
 .launch-where-why { margin: 10px 0 0; font-weight: var(--fw-strong); color: var(--error-text); }
 .launch-where-why[hidden] { display: none; }
-@media (max-width: 600px) { .launch-where-item { grid-template-columns: 1.4em minmax(0, 1fr); } .launch-where-fix { grid-column: 2; justify-self: start; min-height: 44px; } .launch-where-check { max-height: 55vh; } }
+@media (max-width: 600px) { .launch-where-item { grid-template-columns: 1.4em minmax(0, 1fr); } .launch-where-fix { grid-column: 2; justify-self: start; min-height: 44px; } .launch-where-check { max-height: 34vh; } }
+.launch-where-labelrow { display: flex; align-items: baseline; gap: 8px; }
+.launch-where-labelrow .launch-where-hint { margin-left: 0; }
+/* New agent's Trust this folder tick, under the folder: the box beside its words, from the left */
+.launch-trust-tick { margin: 10px 0 0; }
+.launch-trust-tick[hidden] { display: none; }
+.modal-content .launch-trust-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.modal-content .launch-trust-label input { margin: 0; flex: none; }
+.launch-trust-help { margin: 6px 0 0; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: anywhere; }
