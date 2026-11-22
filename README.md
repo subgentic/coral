@@ -46,6 +46,7 @@ Developers who run several coding agents at once, often from more than one vendo
 - **Know which agent needs you, from anywhere.** One **Inbox** (`Needs you`) lists every permission prompt, question and file to review. Answer from your laptop or your phone and the agent carries on. Optional desktop, Slack or Discord alerts tell you when an agent is stuck.
 - **"Done" means checked.** Tasks wait on each other. A finished task can be held for review (`review_pending`), so a second agent, which can be from another vendor, checks the work before the next step starts. Each agent's changed files are one click away.
 - **Keeps working when you don't.** Run Coral on a spare Mac or a server. Put a whole team to sleep, then wake it later, or after an upgrade, with every session restored. Agents wait for a reply instead of polling, so a waiting agent uses no tokens, and a health monitor flags stuck work.
+- **Long projects stay on track and remembered.** Goals with a `Done when` check and Tasks with review steps keep multi-hour work in order. The board, tasks and goals live in Coral, with search across boards and chats and Knowledge distillation, so your team keeps its context across restarts and compactions.
 
 ---
 
