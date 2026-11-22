@@ -31,7 +31,9 @@ const MD = ['# Plan', '', 'First paragraph of the plan that says what we build.'
         await ev(`import(${S} + 'safe_storage.js').then(({ browserLocal }) => { browserLocal.set('coral-artifact-comments-open', 'open'); browserLocal.set('coral-artifact-comments:text/markdown', 'open'); return true; })`);
         await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'kb-team' })); true`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
-        await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-body').getAttribute('tabindex') === '0'`, 'the document is a tab stop', 6000).catch(() => {});
+        await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-body').getAttribute('tabindex') === '0'`, 'the document is a tab stop', 6000);
+        // the panel draws when the comments come back (the document is a tab stop first, by design): wait for its empty line, and let a timeout fail the suite with its own words
+        await waitFor(`!!(document.querySelector('.ac-panel .empty-state') || {}).textContent`, 'the empty panel draws its line', 8000);
         const hint = await ev(`(document.querySelector('.ac-panel .empty-state') || {}).textContent || ''`);
         check(/Enter/.test(hint) && /passage/.test(hint), 'the empty panel names the keyboard way: ' + JSON.stringify(hint));
         // Tab until the document has the keyboard (a handful of stops: the header's buttons come first)
