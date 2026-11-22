@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
@@ -21,7 +22,8 @@ const (
 // grantRoute is the request a grant is checked against for its scope: nil to check the tier alone.
 type grantRoute struct {
 	method, path string
-	viewOnly     bool // set by memberGrantAllows: the person holds View grants and no Full one
+	viewOnly     bool               // set by memberGrantAllows: the person holds View grants and no Full one
+	used         *board.MemberGrant // set by memberGrantAllows: the best live grant, the one that let the request through
 }
 
 // memberGrantTier is the most a grant gives, as a tunnel tier. A view grant reads; a full grant is the link's cap and no more, so it is as high as the cap lets it be (the lower of the two is
@@ -72,6 +74,13 @@ func memberGrantAllows(ctx context.Context, bs *board.Store, linkCap func(contex
 		return false, memberGrantLowCode
 	}
 	// A person with only View grants reaches the closed View list, and only for a board they were given (V1, V4): the tier says what a route may do, the scope says whose it is. A Full grant is the whole computer.
+	if route != nil {
+		for i := range live {
+			if route.used == nil || memberGrantTier(live[i].Level) > memberGrantTier(route.used.Level) {
+				route.used = &live[i]
+			}
+		}
+	}
 	if !full && route != nil {
 		route.viewOnly = true
 		if !viewScopeAllows(live, route) {
@@ -122,6 +131,7 @@ func MemberGrantGuard(bs *board.Store, linkCap func(context.Context, string) (tu
 				_, _ = w.Write([]byte(`{"error":"` + msg + `","code":"` + code + `"}`))
 				return
 			}
+			noteGrantUse(r.Context(), bs, route.used)
 			if route.viewOnly { // a View person is answered by a typed shape of allowlisted fields (V2)
 				r = r.WithContext(cloud.WithViewOnly(r.Context()))
 			}
@@ -164,5 +174,22 @@ func RunMemberGrantSweeper(ctx context.Context, bs *board.Store, linkCap func(co
 		case <-t.C:
 			SweepOpenStreams(ctx, bs, linkCap, time.Now())
 		}
+	}
+}
+
+// firstUseSeen holds the grants whose first use this process has already noted, so the table is written once per grant and a request pays nothing more.
+var firstUseSeen sync.Map
+
+// noteGrantUse records the first use of a grant that let a request through (F5): the owner sees it in Needs you. A failure to record is logged and never refuses the request.
+func noteGrantUse(ctx context.Context, bs *board.Store, g *board.MemberGrant) {
+	if bs == nil || g == nil {
+		return
+	}
+	if _, seen := firstUseSeen.LoadOrStore(g.GrantID, true); seen {
+		return
+	}
+	if _, err := bs.NoteMemberGrantFirstUse(context.WithoutCancel(ctx), *g); err != nil {
+		firstUseSeen.Delete(g.GrantID) // try again on the next request
+		slog.Warn("[cloud] could not record the first use of a Hub person's access", "link", g.LinkID, "error", err)
 	}
 }
