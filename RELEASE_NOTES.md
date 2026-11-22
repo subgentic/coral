@@ -1,5 +1,50 @@
 # Release Notes
 
+## v2.1.4 — Groundwork for several Hubs, a faster Inbox, and a new version that comes back to you
+
+Task numbers in brackets. Built on v2.1.3. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **A new version of a file you reviewed or approved comes back to your Inbox** (#20401, #20450, #20479): an agent that sends a new version of a file you already reviewed or approved puts it back in front of you, and a file you denied is refused. The review route caps re-sends, answers 409 when it should, and checks the newest version's digest before filing it.
+- **The Inbox loads faster for a heavy user** (#20396, #20397): the cross-team file list reads each row's version key once and sorts with each key made once; on a heavy user (2 teams, 1,000 chats) the first Waiting-on-you read went from 424 to 95 ms. Inbox reads are shared and requests for hidden folders wait until they are needed.
+- **Waiting on an agent says which version a comment was made on** (#20430): and the Computers column is named Waiting, not Needs you.
+- **Comments on every file, and uncommitted team work is labelled** (#20371): bundled comments are offered on every file, and a team's uncommitted files say "Files changed in <team>, not committed".
+- **The permission picker shows the selected mode's explanation** (#20522, #20555): in Settings and in New agent, the explanation of the mode you picked shows under the list and the others appear on hover or focus (before, all six showed at rest, #15886). The Codex hook-trust control is now a Codex row under Advanced, with its full safety text.
+- **Phone fixes** (#20366, #20378, #20383, #20432): short Inbox reply sheets are sized to their content; live Inbox prompt choices work with native phone touches; the phone subject link ("Task #1") is a 44 x 44 target.
+
+#### Groundwork for several Hubs (the switch for a second link stays off)
+
+- **Hub links with a cap** (#20346): `coral cloud links` lists, caps and removes links by id or full Hub address, and Settings shows the same list with a cap per link and Remove with its confirm. Everything a Hub supplies is shown as text only. A removal the Hub has not confirmed is asked again about every hour for 7 days, then its token is deleted. The Hub's remove-me call is dark behind a setting only Coral writes.
+- **One connector per active link** (#20368): a second link is its own record in the code; a Hub you already have is refused with a plain sentence before anything is asked or written. A second link is still refused today.
+- **Add a Hub by its address** (#20385): the cap on links is chosen out loud, and a Rekey tells the connector its links are gone.
+- **Each Operator action names the Hub it came through** (#20346) and, for a Hub owner, `confirm-owner` and `arm-owner` are on the command line (#20407).
+- **Every tunneled write records the link and the Hub person** (#20369, #20405, #20449): five batches of routes plus WebSocket open and close rows, with their own bound so they never push out the security rows. A second link stays off until Security's items are closed (#20444).
+- **Hub screens** (#20427, #20428): Hub loading states show until the computer inventory arrives; Hub Analytics opens on the first computer with spend when none was picked, and says "This is this computer's list".
+
+#### Help
+
+- **`coral-board help` and `coral-agent help`** (#20399) print an overview and a page for each area.
+
+#### For the team
+
+- Release tooling: the fail-fast adds gofmt to every run, and the census and golden tests of every package a commit adds a 429 or a goroutine to (#20497).
+
+### Test and gate fixes in this release
+
+- Census and pin tests cover the new listeners and joins: the pair census golden, the shell never-route census, the safefs join census, and the activity census (#20346, #20369, #20397, #20450).
+- `team_uncommitted_browser` expects the approved team label (#20448) and waits for the label when it arrives after the folders (#20556); a gofmt-only fix to `link_enroll_test.go` (#20484).
+- The Hub link cap tests, the httputil 429 census and the safego goroutine census follow the new link code (#20497); three `test:cloud` static pins follow the Inbox and Analytics text (#20502).
+- The Settings, Inbox goals and `tips` browser suites follow the Settings move and the picker change, and the Settings trace fixture follows the moved hook-trust control and the new link-list fetch; the 82-word Terminal and 112-word Settings budgets and the start-CSS cap are unchanged (#20522, #20555).
+- Gate note: the Encryption verification's `macos-amd64` job failed once in "Install isolated native dependencies" (`curl: (6) Could not resolve host: www.openssl.org`, a runner network fault before any test ran) and passed when only that job was re-run on the same commit.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- A second Hub link is refused until Security's items are closed; this release ships the groundwork and the list, cap and remove screens for one link.
+
 ## v2.1.3 — A Computers page and bar that work across machines, the Hub reads an owner needs, and the first Multi-Hub link
 
 Task numbers in brackets. Built on v2.1.2. A prerelease until the Operator promotes it.
