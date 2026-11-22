@@ -179,7 +179,7 @@ function applyAnswer(container, agentType, got) {
 }
 
 /** Load the list for the form's current agent type: the cached one at once, then the server's, polling while it says it is refreshing. */
-export async function loadModelPicker(container, agentType) {
+export async function loadModelPicker(container, agentType, { keepCurrent = false } = {}) {
     const { wrap, input, select } = parts(container);
     if (!container || !wrap || !select) return;
     const token = container._modelToken = (container._modelToken || 0) + 1;
@@ -188,7 +188,11 @@ export async function loadModelPicker(container, agentType) {
     if (agentType === 'terminal') { wrap.hidden = true; container._thinkingLevels = []; syncThinking(container); return; }
     if ((container.querySelector('.acf-agent-type')?.value || 'claude') !== agentType) return; // a load asked for a CLI the form is no longer on draws nothing (a refresh that outlived a switch of type)
     const cached = readModelsCache(_acfServer(container), agentType);
-    if (cached) fill(container, agentType, cached); else { wrap.hidden = true; if (input) input.hidden = false; }
+    // A CLI recheck refreshes an already displayed list. Its cache omits errors: keep the current
+    // list and status until the fresh reply, rather than erasing a failure note (#20578).
+    if (!keepCurrent) {
+        if (cached) fill(container, agentType, cached); else { wrap.hidden = true; if (input) input.hidden = false; }
+    }
     const server = _acfServer(container); // #5996: a hub grantee cannot add models
     if (familyOf(agentType)) probeCanAdd(server, () => { if (container._modelToken === token && container.isConnected) select.querySelector(`option[value="${ADD}"]`)?.remove(); });
     for (let i = 0; i <= POLL_MAX; i++) {
@@ -253,7 +257,7 @@ function onChecked(e) {
         if (!container || !container.isConnected) { pickers.delete(ref); continue; }
         const type = container.querySelector('.acf-agent-type')?.value || 'claude';
         const note = container.querySelector('.acf-model-note');
-        if (e.detail.type === type && note && note.textContent.trim()) loadModelPicker(container, type);
+        if (e.detail.type === type && note && note.textContent.trim()) loadModelPicker(container, type, { keepCurrent: true });
     }
 }
 

@@ -121,7 +121,9 @@ const { coralReady } = require('./helpers/wait');
         // a list the server could not fetch says so in words with a next step, not the server's bare reason (#11401, from the Mobile Beta Tester's walk)
         await ev(`{ window.__serve.agy = { models: [${JSON.stringify(OPUS)}], refreshing: false, error: "the CLI didn't answer in time" }; const t = document.querySelector('#acf-t .acf-agent-type'); t.value = 'agy'; t.dispatchEvent(new Event('change', { bubbles: true })); true }`);
         await waitFor(`/^Couldn.t load the model list/.test(document.querySelector('#acf-t .acf-model-note').textContent)`, 'the note for a list that failed', 4000); // its own words, not any text: a note that was there for another reason had changed again by the read below (#14318, a Windows retry)
-        const failNote = await ev(`document.querySelector('#acf-t .acf-model-note').textContent`);
+        // A late CLI availability reply reloads this same picker. Its cached models omit the error;
+        // that cache must not erase the current failure while the fresh list is still pending (#20578).
+        const failNote = await ev(`(() => { window.__delay = 600; document.dispatchEvent(new CustomEvent('cli-checked', { detail: { type: 'agy', found: true } })); return document.querySelector('#acf-t .acf-model-note').textContent; })()`);
         assert.match(failNote, /^Couldn.t load the model list \(the CLI didn.t answer in time\)\. .*refresh.*Other/i, `a failed list says what happened and what to do: ${failNote}`);
         // a refresh the person pressed for one CLI that is still polling when they switch to another does not draw its list over the other's (#14872: the failed list's note went empty a moment after it showed, and the options
         // were the first CLI's): claude's refresh is out and says it is still refreshing, the form moves to agy, whose list failed
