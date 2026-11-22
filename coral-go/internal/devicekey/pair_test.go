@@ -87,8 +87,10 @@ func TestRaiseAndRemoveActOnlyInsideTheSignersPair(t *testing.T) {
 	assert.ErrorIs(t, r.handleOn(linkA, r.remove(a, other.kid), a), devicekey.ErrOutsidePair)
 	_, ok := r.listed(other.kid)
 	assert.True(t, ok, "the other pair's key is untouched")
-	require.NoError(t, r.handleOn(linkA, r.raise(a, mine.kid, "interact"), a))
 	require.NoError(t, r.handleOn(linkA, r.remove(a, mine.kid), a))
+	mine2 := newSigner(t)
+	r.addPaired(mine2, "view", linkA, userA)
+	require.NoError(t, r.handleOn(linkA, r.raise(a, mine2.kid, "interact"), a))
 }
 
 func TestSameLinkOtherHubLabelIsAnotherPair(t *testing.T) {

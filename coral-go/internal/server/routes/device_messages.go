@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/devicekey"
 )
 
@@ -73,16 +74,26 @@ var deviceMsgLimiter deviceMsgLimit
 
 // limiterKey is the bucket a message's failures are charged to: its claimed kid when that kid is on the device list, "unknown" for any other kid, "form" when the body names none.
 func limiterKey(r *http.Request, v *devicekey.Verifier, body string, now time.Time) string {
+	link := arrivalLink(r)
 	var m struct {
 		KID string `json:"kid"`
 	}
 	if json.Unmarshal([]byte(body), &m) != nil || m.KID == "" || len(m.KID) > 64 {
-		return "form"
+		return link + "|form"
 	}
 	if _, err := v.Store.ActiveDeviceKey(r.Context(), m.KID, now); err != nil {
-		return "unknown"
+		return link + "|unknown"
 	}
-	return m.KID
+	return link + "|" + m.KID
+}
+
+// arrivalLink is the Hub link this request came through, from the computer's own link stamp (never from the body or a header the caller set), or "" for a request that came by no link. It is what the verifier holds a bound key to,
+// and part of every failed-check bucket, so one link's flood cannot spend another link's budget (#20514 SHOULD).
+func arrivalLink(r *http.Request) string {
+	if v, ok := cloud.ViaFrom(r.Context()); ok {
+		return v.LinkID
+	}
+	return ""
 }
 
 // deviceReply writes {"error": code} (the closed list) or {"status":"ok"}, at most 1 KB, and nothing else.
@@ -153,7 +164,7 @@ func (h *CloudHandler) DeviceKeyMessage(w http.ResponseWriter, r *http.Request) 
 		Sig    string `json:"sig"`
 	}
 	if err := readDeviceBody(w, r, &req); err != nil {
-		deviceMsgLimiter.failed("form", time.Now())
+		deviceMsgLimiter.failed(arrivalLink(r)+"|form", time.Now())
 		deviceReply(w, err)
 		return
 	}
@@ -162,7 +173,7 @@ func (h *CloudHandler) DeviceKeyMessage(w http.ResponseWriter, r *http.Request) 
 		deviceReply(w, errors.New("rate limited"))
 		return
 	}
-	_, err := v.Handle(r.Context(), devicekey.Action(req.Action), []byte(req.Body), req.Sig, time.Now())
+	_, err := v.HandleOn(r.Context(), arrivalLink(r), devicekey.Action(req.Action), []byte(req.Body), req.Sig, time.Now())
 	if err != nil {
 		deviceMsgLimiter.failed(key, time.Now())
 	}

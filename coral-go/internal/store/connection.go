@@ -176,11 +176,9 @@ func (d *DB) ensureSchema(ctx context.Context) error {
 	}
 
 	// The pair of a device key (#20513): a key listed before the pair existed was made at this computer, so it is marked as the owner's, once, when the columns are added. The columns default to '', which fails closed.
-	if _, err := d.ExecContext(ctx, "ALTER TABLE device_keys ADD COLUMN link TEXT NOT NULL DEFAULT ''"); err == nil {
-		d.ExecContext(ctx, "ALTER TABLE device_keys ADD COLUMN hub_user TEXT NOT NULL DEFAULT ''")
-		if _, err := d.ExecContext(ctx, "UPDATE device_keys SET link = ?, hub_user = ?", PairOwner, PairOwner); err != nil {
-			slog.Warn("could not mark the device keys that were already listed as the owner's; they are refused until paired again", "error", err)
-		}
+	// One transaction (QA, #20513): a crash between the ALTERs and the marking cannot leave old keys unmarked and the columns present. ALTER succeeds only when the column is new, so the marking runs once.
+	if err := d.addDevicePairColumns(ctx); err != nil {
+		slog.Warn("could not mark the device keys that were already listed as the owner's; they are refused until paired again", "error", err)
 	}
 
 	// When a person opened a run (#9315): the column is added here, not in columnMigrations, because the runs that are over when it is added are all given the time: nobody is told about a history
@@ -262,3 +260,22 @@ func (d *DB) ensureSchema(ctx context.Context) error {
 // journalSizeLimitParam: the writer's WAL is truncated back to JournalSizeLimit after a
 // checkpoint (#4142).
 var journalSizeLimitParam = fmt.Sprintf("&_pragma=journal_size_limit(%d)", JournalSizeLimit)
+
+// addDevicePairColumns adds link and hub_user to device_keys and marks every row already there as the owner's, in one transaction. When the columns exist it does nothing.
+func (d *DB) addDevicePairColumns(ctx context.Context) error {
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // a committed transaction ignores it
+	if _, err := tx.ExecContext(ctx, "ALTER TABLE device_keys ADD COLUMN link TEXT NOT NULL DEFAULT ''"); err != nil {
+		return nil // the column is already there: nothing to add and nothing to mark
+	}
+	if _, err := tx.ExecContext(ctx, "ALTER TABLE device_keys ADD COLUMN hub_user TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE device_keys SET link = ?, hub_user = ?", PairOwner, PairOwner); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

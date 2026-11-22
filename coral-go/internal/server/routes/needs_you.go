@@ -97,6 +97,11 @@ func (h *BoardHandler) SetNeedsYouSkills(fn func(ctx context.Context) ([]NeedsYo
 	h.needsYouSkills = fn
 }
 
+// SetNeedsYouDeviceKeys tells the board how to list the device keys a signed message added or raised lately, so the owner sees each new key by its fingerprint. Nil: none.
+func (h *BoardHandler) SetNeedsYouDeviceKeys(fn func(ctx context.Context) ([]NeedsYouItem, error)) {
+	h.needsYouDeviceKeys = fn
+}
+
 // SetAgentAsks tells the board how to list the open questions of single agents (#18106).
 func (h *BoardHandler) SetAgentAsks(fn func(r *http.Request) []operatorAskRow) { h.agentAsks = fn }
 
@@ -546,6 +551,14 @@ func (h *BoardHandler) needsYouItemsOf(r *http.Request, onlySkills bool) (items 
 	if h.needsYouSkills != nil { // the skills that wait for the Operator's approval (#12139)
 		if rows, err := h.needsYouSkills(ctx); err != nil {
 			unread = appendOnce(unread, "skills")
+		} else {
+			items = append(items, rows...)
+		}
+	}
+
+	if h.needsYouDeviceKeys != nil && !onlySkills { // a device key a signed message added or raised (#20515 M4)
+		if rows, err := h.needsYouDeviceKeys(ctx); err != nil {
+			unread = appendOnce(unread, "device_keys")
 		} else {
 			items = append(items, rows...)
 		}

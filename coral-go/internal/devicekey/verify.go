@@ -57,6 +57,7 @@ type Store interface {
 	RecordNonce(ctx context.Context, nonce, kid string, now time.Time, window time.Duration) error
 	NonceSeen(ctx context.Context, nonce string, now time.Time) error
 	CheckClock(ctx context.Context, now time.Time) error
+	WasRemoved(ctx context.Context, kid string) (bool, error)
 	ListDeviceKeys(ctx context.Context) ([]store.DeviceKey, error)
 }
 
@@ -73,16 +74,19 @@ type Verifier struct {
 	// Refuse, when set, is asked first of all: while it returns true (a device-key clear is pending) every message is refused with ErrListUnavailable before anything of it is read.
 	Refuse func() bool
 
-	// Audit, when set, is called after each applied removal with the signer's kid, the target's, and the mode the target had.
+	// Audit, when set, is called after each applied message (M3, #20514) with the signer's kid, the target's, and the mode the target has now (for a removal, the mode it had).
 	Audit func(a Action, signerKID, targetKID, targetMode string)
+	// Notice, when set, is called after an applied approve-device, raise-mode or trust-passkey with what the owner must be shown: who signed, the key it concerns by its fingerprint, and where the message came from.
+	Notice func(Notice)
 	// AuditCert, when set, is called after a passkey certificate added a device: the passkey's kid, the new device's kid and its mode (never a label or key bytes).
 	AuditCert func(passkeyKID, deviceKID, mode string)
 
 	mu sync.Mutex // one message at a time: the nonce check and the apply are not racing each other
 }
 
-func window(a Action) time.Duration {
-	if a == ApproveDevice || a == RaiseMode {
+// windowFor is how old a message's ts may be. A message that came through a Hub link has five minutes whatever its action (M6, #20514: the plan's window for every relayed kind); one that did not (a local call) keeps the step-2 windows.
+func windowFor(a Action, arrivedLink string) time.Duration {
+	if arrivedLink != "" || a == ApproveDevice || a == RaiseMode {
 		return shortWindow
 	}
 	return longWindow
@@ -110,7 +114,7 @@ func (v *Verifier) HandleOn(ctx context.Context, arrivedLink string, a Action, b
 		return Message{}, ErrWrongComputer
 	}
 	ts := time.Unix(m.Ts, 0)
-	if ts.Before(now.Add(-window(a))) || ts.After(now.Add(aheadSkew)) {
+	if ts.Before(now.Add(-windowFor(a, arrivedLink))) || ts.After(now.Add(aheadSkew)) {
 		return Message{}, ErrTsWindow
 	}
 	if !v.RefuseBefore.IsZero() && ts.Before(v.RefuseBefore) {
@@ -145,7 +149,7 @@ func (v *Verifier) HandleOn(ctx context.Context, arrivedLink string, a Action, b
 	if err != nil {
 		return Message{}, err
 	}
-	if err := v.Store.RecordNonce(ctx, m.Nonce, m.KID, now, window(a)); err != nil {
+	if err := v.Store.RecordNonce(ctx, m.Nonce, m.KID, now, windowFor(a, arrivedLink)); err != nil {
 		return Message{}, mapStoreErr(err)
 	}
 	if err := v.Store.TouchDeviceKey(ctx, m.KID, now); err != nil {
@@ -154,10 +158,54 @@ func (v *Verifier) HandleOn(ctx context.Context, arrivedLink string, a Action, b
 	if err := v.apply(ctx, m, signer, target, targetMode, now); err != nil {
 		return m, err
 	}
-	if m.Action == RemoveDevice && v.Audit != nil {
-		v.Audit(m.Action, m.KID, m.TargetKID, target.Mode)
-	}
+	v.afterApply(m, signer, target, targetMode)
 	return m, nil
+}
+
+// Notice is what the owner is told when a signed message added or raised a key (M4): never a label's meaning, only the fingerprint (the same grouping the pairing screen shows) and the names the computer itself recorded.
+type Notice struct {
+	Action      Action
+	SignerKID   string
+	SignerLabel string
+	TargetKID   string
+	Fingerprint string // of the target key, from this computer's own reading of the key, never a Hub field
+	Label       string
+	Mode        string
+	Link        string
+	HubUser     string
+}
+
+// keyFingerprint is the fingerprint the owner is shown for a key, read from its own bytes.
+func keyFingerprint(pk []byte) string { return DisplayFingerprint(pk) }
+
+func (v *Verifier) afterApply(m Message, signer, target store.DeviceKey, mode tunnel.Mode) {
+	targetKID, tmode := m.TargetKID, mode.String()
+	switch m.Action {
+	case RemoveDevice:
+		tmode = target.Mode
+	case TrustPasskey:
+		raw, _ := b64.DecodeString(m.PasskeyPK)
+		s := sha256.Sum256(raw)
+		targetKID, tmode = base64.RawURLEncoding.EncodeToString(s[:]), tunnel.TierView.String()
+	}
+	if v.Audit != nil {
+		v.Audit(m.Action, m.KID, targetKID, tmode)
+	}
+	if v.Notice == nil || m.Action == RemoveDevice {
+		return
+	}
+	n := Notice{Action: m.Action, SignerKID: m.KID, SignerLabel: signer.Label, TargetKID: targetKID, Label: m.Label, Mode: tmode, Link: signer.Link, HubUser: signer.HubUser}
+	switch m.Action {
+	case ApproveDevice:
+		raw, _ := b64.DecodeString(m.TargetPK)
+		n.Fingerprint = keyFingerprint(raw)
+	case TrustPasskey:
+		raw, _ := b64.DecodeString(m.PasskeyPK)
+		n.Fingerprint = keyFingerprint(raw)
+	case RaiseMode:
+		n.Label, n.Fingerprint = target.Label, keyFingerprint(target.PK)
+	}
+	v.Notice(n)
 }
 
 func mapStoreErr(err error) error {
@@ -181,6 +229,9 @@ func mapStoreErr(err error) error {
 // authorize applies the rules of who may do what. It returns the target row for raise and remove and the parsed target mode for approve and raise.
 func (v *Verifier) authorize(ctx context.Context, m Message, signer store.DeviceKey, now time.Time) (store.DeviceKey, tunnel.Mode, error) {
 	var none store.DeviceKey
+	if signer.ViaPasskey != "" && !(m.Action == RemoveDevice && m.TargetKID == m.KID) { // a device a passkey certified acts only on itself (M5)
+		return none, 0, ErrSignerNoProof
+	}
 	switch m.Action {
 	case ApproveDevice, RaiseMode, TrustPasskey:
 		if signer.Origin == store.DeviceOriginBootstrap {
@@ -215,6 +266,12 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 			return none, 0, ErrBadForm
 		} else if !errors.Is(err, store.ErrUnknownSigner) && !errors.Is(err, store.ErrSignerRemoved) {
 			return none, 0, err
+		} else if errors.Is(err, store.ErrSignerRemoved) { // one a person removed is not paired again by a message; one that only expired may be
+			if gone, werr := v.Store.WasRemoved(ctx, m.TargetKID); werr != nil {
+				return none, 0, werr
+			} else if gone {
+				return none, 0, ErrBadForm
+			}
 		}
 	}
 	var target store.DeviceKey
@@ -229,7 +286,7 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 		if o, _ := signer.PairState(); !o && (target.Link != signer.Link || target.HubUser != signer.HubUser) { // acts only inside the signer's own pair; the owner's key acts on any
 			return none, 0, ErrOutsidePair
 		}
-		if m.Action == RemoveDevice && m.TargetKID != m.KID { // anyone may remove itself; another device only by a pairing signer at or above its mode
+		if m.Action == RemoveDevice && m.TargetKID != m.KID { // anyone may remove itself; another device only by a pairing signer strictly above its mode
 			switch signer.Origin {
 			case store.DeviceOriginBootstrap:
 				return none, 0, ErrSignerBootstrap
@@ -238,7 +295,7 @@ func (v *Verifier) authorize(ctx context.Context, m Message, signer store.Device
 			}
 			sm, ok := tunnel.ParseMode(signer.Mode)
 			tm, tok := tunnel.ParseMode(target.Mode)
-			if !ok || !tok || tm > sm {
+			if !ok || !tok || tm > sm || (tm == sm && sm < topMode) { // never a peer at the signer's own mode: only a device above the target removes it (at the top mode, which only the owner sets at the computer, a launch device may remove another)
 				return none, 0, ErrAboveSigner
 			}
 		}
@@ -264,12 +321,12 @@ func (v *Verifier) apply(ctx context.Context, m Message, signer, target store.De
 	switch m.Action {
 	case ApproveDevice:
 		raw, _ := b64.DecodeString(m.TargetPK)
-		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: m.TargetKID, PK: raw, Label: m.Label, Mode: mode.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: signer.Link, HubUser: signer.HubUser}, now)
+		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: m.TargetKID, PK: raw, Label: m.Label, Mode: mode.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: signer.Link, HubUser: signer.HubUser, ApprovedBy: signer.KID}, now)
 		return mapStoreErr(err)
 	case TrustPasskey:
 		raw, _ := b64.DecodeString(m.PasskeyPK)
 		s := sha256.Sum256(raw)
-		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: base64.RawURLEncoding.EncodeToString(s[:]), PK: raw, Label: m.Label, Mode: tunnel.TierView.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindPasskey, Link: signer.Link, HubUser: signer.HubUser}, now)
+		_, err := v.Store.AddDeviceKey(ctx, store.DeviceKey{KID: base64.RawURLEncoding.EncodeToString(s[:]), PK: raw, Label: m.Label, Mode: tunnel.TierView.String(), Origin: store.DeviceOriginPairing, Kind: store.DeviceKindPasskey, Link: signer.Link, HubUser: signer.HubUser, ApprovedBy: signer.KID}, now)
 		return mapStoreErr(err)
 	case RaiseMode:
 		return mapStoreErr(v.Store.SetDeviceMode(ctx, m.TargetKID, mode.String(), now))
@@ -296,7 +353,7 @@ func verifyP1363(pk []byte, msg []byte, sig string) bool {
 // AuditLine is the Verifier.Audit that writes the removal to the log: the kids (public hashes) and the mode, never a label or a message.
 func AuditLine(lg *slog.Logger) func(a Action, signerKID, targetKID, targetMode string) {
 	return func(a Action, signerKID, targetKID, targetMode string) {
-		lg.Info("cloud: device removed", "action", string(a), "signer", signerKID, "kid", targetKID, "mode", targetMode)
+		lg.Info("cloud: device key changed", "action", string(a), "signer", signerKID, "kid", targetKID, "mode", targetMode)
 	}
 }
 
