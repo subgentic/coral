@@ -174,6 +174,9 @@ func (s *Store) setArtifactTags(ctx context.Context, boardID, hex string, tags, 
 	if err := noteReviewTag(ctx, tx, boardID, hex, slices.Contains(have, tagForReview), slices.Contains(tags, tagForReview), time.Now()); err != nil { // when it was sent for review (#13231)
 		return err
 	}
+	if err := noteSavedTag(ctx, tx, boardID, hex, slices.Contains(have, tagSaved), slices.Contains(tags, tagSaved), time.Now()); err != nil { // when it was saved for later (#20519)
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
 		return tagsWriteErr(check, err) // a writer committed after this transaction's read: the snapshot is stale, which is the same answer as a changed list (#13138)
 	}
@@ -253,6 +256,7 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 		return nil, err
 	}
 	hadReview := slices.Contains(have, tagForReview)
+	hadSaved := slices.Contains(have, tagSaved)
 	var rows int
 	if err := tx.GetContext(ctx, &rows, `SELECT COUNT(*) FROM artifact_tags WHERE board_id = ?`, boardID); err != nil {
 		return nil, err
@@ -275,6 +279,9 @@ func (s *Store) AddArtifactTags(ctx context.Context, boardID, hex string, add []
 		}
 	}
 	if err := noteReviewTag(ctx, tx, boardID, hex, hadReview, slices.Contains(have, tagForReview), time.Now()); err != nil { // when it was sent for review (#13231)
+		return nil, err
+	}
+	if err := noteSavedTag(ctx, tx, boardID, hex, hadSaved, slices.Contains(have, tagSaved), time.Now()); err != nil { // when it was saved for later (#20519)
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

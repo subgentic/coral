@@ -106,6 +106,9 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	if err := s.ensureArtifactReviewSentSchema(ctx); err != nil {
 		return err
 	}
+	if err := s.ensureArtifactSavedSchema(ctx); err != nil {
+		return err
+	}
 	if err := s.ensureArtifactQuestionsSchema(ctx); err != nil {
 		return err
 	}

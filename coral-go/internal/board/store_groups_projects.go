@@ -259,6 +259,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM artifact_task_files WHERE board_id = ?", 1},  // nor a task's open file of each name (#15159)
 		{"DELETE FROM artifact_reviews WHERE board_id = ?", 1},     // nor the decisions on its artifacts (#136584)
 		{"DELETE FROM artifact_review_sent WHERE board_id = ?", 1}, // nor when its files were sent for review (#13231)
+		{"DELETE FROM artifact_saved_at WHERE board_id = ?", 1},    // nor when its files were saved (#20519)
 		{"DELETE FROM board_message_sessions WHERE project = ?", 1},
 		{"DELETE FROM chief_check_messages WHERE project = ?", 1},
 		{"DELETE FROM board_messages WHERE project = ?", 1},
