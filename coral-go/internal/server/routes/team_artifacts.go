@@ -58,6 +58,8 @@ type teamArtifact struct {
 	CreatedAt     string `json:"created_at"`
 	// ReviewSentAt is when the file was sent for review (RFC 3339, UTC), present only while it carries the tag "for review" and was sent after the time was kept (#13231): "waiting for review" counts from it, a re-send starts it again.
 	ReviewSentAt string `json:"review_sent_at,omitempty"`
+	// SavedAt is when the file was saved for later (RFC 3339, UTC), present only while it carries the tag "saved" and was saved after the time was kept (#20519): the Saved list orders files and messages by it.
+	SavedAt string `json:"saved_at,omitempty"`
 	// ReviewSentBy is "operator" when the person sent the file for review themselves (Send for review, #17819): the row says it came from them, not from whoever produced the file. Absent for an agent's own upload.
 	ReviewSentBy string `json:"review_sent_by,omitempty"`
 	TaskID       int64  `json:"task_id"`

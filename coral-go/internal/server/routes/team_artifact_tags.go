@@ -40,6 +40,7 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 	questions, _ := h.bs.ArtifactQuestions(ctx, project)   // what each upload for review asks (#11555); a read that fails leaves the rows without it
 	reviews, _ := h.bs.ArtifactReviews(ctx, project)       // when a review was decided (#136584); a read that fails leaves the rows without it
 	sent, _ := h.bs.ArtifactReviewSent(ctx, project)       // when each file was sent for review (#13231); a read that fails leaves the rows without it
+	savedAt, _ := h.bs.ArtifactSavedAt(ctx, project)       // when each file was saved for later (#20519); a read that fails leaves the rows without it
 	senders, _ := h.bs.ArtifactReviewSenders(ctx, project) // who sent a file for review when it was the Operator (#17819); a read that fails leaves the rows as an agent's
 	for i := range items {
 		if items[i].managed != "" {
@@ -55,6 +56,9 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 				if senders[items[i].managed] == board.OperatorName {
 					items[i].ReviewSentBy = "operator"
 				}
+			}
+			if at, ok := savedAt[items[i].managed]; ok && hasTag(items[i].Tags, "saved") {
+				items[i].SavedAt = at
 			}
 			if rv, ok := reviews[items[i].managed]; ok {
 				rv := rv

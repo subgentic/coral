@@ -560,6 +560,9 @@ func (s *Store) SaveArtifactReview(ctx context.Context, boardID, hex string, sav
 	if err != nil {
 		return ch, nil, err
 	}
+	if err := noteSavedTag(ctx, tx, boardID, hex, !save, save, time.Now()); err != nil { // when it was saved for later (#20519)
+		return ch, nil, err
+	}
 	var tags []string
 	if err := tx.SelectContext(ctx, &tags, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
 		return ch, nil, err

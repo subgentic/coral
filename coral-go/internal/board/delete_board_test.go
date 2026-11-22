@@ -25,6 +25,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"artifact_reviews", "board_id"},     // #136584: when the Operator decided a review of a team's artifact
 	{"artifact_questions", "board_id"},   // #11555: what an upload for review asks the Operator
 	{"artifact_review_sent", "board_id"}, // #13231: when a file was sent for review
+	{"artifact_saved_at", "board_id"},    // #20519: when a file was saved for later
 	{"artifact_kinds", "board_id"},       // #12144: the kind of a file for review
 	{"artifact_task_chains", "board_id"}, // #12144: the latest file for review of a task chain
 	{"artifact_task_files", "board_id"},  // #15159: a task's open file of each name
@@ -127,6 +128,8 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, s.SetTaskGoal(ctx, project, first.ID, &goal.ID))
 	require.NoError(t, s.SetArtifactTags(ctx, project, strings.Repeat("a", 64), []string{"for review"}))  // a tag the team put on an artifact
 	_, _, err = s.DecideArtifactReview(ctx, project, strings.Repeat("a", 64), ReviewApproved, time.Now()) // and the Operator's decision on it (#136584)
+	require.NoError(t, err)
+	_, err = s.AddArtifactTags(ctx, project, strings.Repeat("a", 64), []string{"saved"}) // and when it was saved for later (#20519)
 	require.NoError(t, err)
 	require.NoError(t, s.SetGoalImages(ctx, project, goal.ID, []GoalImage{{Hex: strings.Repeat("b", 64), Name: "shot.png", ContentType: "image/png"}})) // and the pictures of its goal (#11650)
 	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now())                                          // and what its upload asked (#11555)
