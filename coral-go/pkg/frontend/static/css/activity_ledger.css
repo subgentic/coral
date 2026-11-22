@@ -18,6 +18,7 @@
 .al-row:hover { background: var(--bg-hover); }
 .al-row.is-noise { opacity: 0.72; }
 .al-tile { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); }
+.al-tile-file, .al-tile-image:not(.al-tile-thumb) { color: var(--needs-icon-blue-fg); background: var(--needs-icon-blue-bg); border-color: color-mix(in srgb, var(--needs-icon-blue-fg) 28%, transparent); } /* File reviews share one palette; glyphs still identify their type (#20714). */
 .al-tile .material-icons { font-size: var(--fs-lg); }
 .al-tile-question, .al-tile-proposal { color: var(--accent); background: rgba(var(--accent-rgb), 0.14); border-color: rgba(var(--accent-rgb), 0.3); }
 .al-tile-goal, .al-tile-task { color: var(--success-text); background: rgba(var(--success-rgb), 0.14); border-color: rgba(var(--success-rgb), 0.3); }
@@ -73,10 +74,6 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-vnewer { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.14); }
 .al-ask { margin-top: var(--space-xs); font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); overflow-wrap: anywhere; }
 .al-glyph { font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: 0; }
-.al-fk-html, .al-fk-code { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.14); border-color: rgba(var(--warning-rgb), 0.3); }
-.al-fk-video, .al-fk-audio { color: var(--error-text); background: rgba(var(--error-rgb), 0.14); border-color: rgba(var(--error-rgb), 0.3); }
-.al-fk-markdown, .al-fk-pdf { color: var(--accent); background: rgba(var(--accent-rgb), 0.14); border-color: rgba(var(--accent-rgb), 0.3); }
-.al-fk-image, .al-fk-sheet { color: var(--success-text); background: rgba(var(--success-rgb), 0.14); border-color: rgba(var(--success-rgb), 0.3); }
 .al-pop-row .al-pop-state { white-space: normal; }
 .al-more { position: relative; }
 .al-more > summary { list-style: none; cursor: pointer; }
@@ -87,6 +84,6 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 /* Activity has no selection bar, so its toolbar keeps no empty actions line under it (the 50 px band at 1280, QA's #19816 note) */
 #group-table-view .inbox-folder-toolbar.list-bar-bar:has(+ .activity-folder) { padding-bottom: var(--space-md); }
 .al-ans-label { font-weight: var(--fw-strong); color: var(--text-primary); }
-.al-tile-thumb { padding: 0; overflow: hidden; background: none; }
+.al-tile-thumb { padding: 0; overflow: hidden; background: none; color: var(--success-text); border-color: rgba(var(--success-rgb), 0.3); }
 .al-tile-thumb .artifact-thumbnail { width: 100%; height: 100%; }
 .al-via { color: var(--accent); border-color: var(--accent); background: none; }
