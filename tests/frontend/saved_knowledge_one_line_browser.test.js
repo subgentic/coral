@@ -40,6 +40,7 @@ const board = 'saved-line-' + Date.now().toString(36);
                     assert.ok(rows.length >= 1, at + 'rows');
                     for (const r of rows) {
                         assert.ok(r.title, at + 'the title is on the row');
+                        if (name === 'Saved') continue; // Saved is the Inbox's row since #20508 (the words and the buttons under the title, not one line): one_list_browser pins its shape
                         assert.deepEqual(r.off, [], at + 'every other cell shares the title\'s line: ' + JSON.stringify(r));
                         assert.ok(r.h <= 64, at + 'one line (a folded compact row is about 61 px; two lines were 76 and more): ' + r.h + ' px: ' + JSON.stringify(r)); assert.ok(r.scrolls <= 1, at + 'no sideways scroll');
                     }
