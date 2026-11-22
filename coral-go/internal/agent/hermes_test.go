@@ -27,7 +27,7 @@ func hookToolFile(dir string) string {
 
 func hermesRig(t *testing.T) hermesRigT {
 	t.Helper()
-	r := hermesRigT{data: t.TempDir(), person: t.TempDir(), tools: t.TempDir()}
+	r := hermesRigT{data: tmpDir(t), person: tmpDir(t), tools: tmpDir(t)}
 	require.NoError(t, os.WriteFile(hookToolFile(r.tools), []byte("#!/bin/sh\n"), 0o755))
 	t.Setenv("CORAL_DATA_DIR", r.data)
 	t.Setenv("HERMES_HOME", r.person)

@@ -26,7 +26,7 @@ const minimalPath = "/usr/bin:/bin"
 // answers with a version, so the CLI's own run can be checked). Folders are 0755, as npm and Homebrew make them.
 func npmLayout(t *testing.T, shebang string, withNode bool) (prefix, cli string) {
 	t.Helper()
-	prefix = t.TempDir()
+	prefix = tmpDir(t)
 	pkg := filepath.Join(prefix, "lib", "node_modules", "pkg")
 	require.NoError(t, os.MkdirAll(pkg, 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(prefix, "bin"), 0o755))
@@ -46,7 +46,7 @@ func minimalEnv(t *testing.T) []string {
 	if _, err := exec.LookPath("node"); err == nil {
 		t.Skip("this machine has a node in /usr/bin or /bin")
 	}
-	return []string{"PATH=" + minimalPath, "HOME=" + t.TempDir()}
+	return []string{"PATH=" + minimalPath, "HOME=" + tmpDir(t)}
 }
 
 func real(t *testing.T, p string) string {
@@ -92,17 +92,17 @@ func TestNodeDirForFindsTheNodeInTheLayoutsNpmMakes(t *testing.T) {
 	env := minimalEnv(t)
 	prefix, _ := npmLayout(t, "#!/usr/bin/env node", true)
 	// linked from another folder: the node is only in <prefix>/bin, found from where the link points (<prefix>/lib/node_modules/...)
-	link := filepath.Join(t.TempDir(), "claude")
+	link := filepath.Join(tmpDir(t), "claude")
 	require.NoError(t, os.Symlink(filepath.Join(prefix, "lib", "node_modules", "pkg", "cli.js"), link))
 	dir, err := NodeDirFor(link, env)
 	require.NoError(t, err)
 	assert.Equal(t, real(t, filepath.Join(prefix, "bin")), real(t, dir))
 
 	// a standalone install: the script and its node share a folder
-	home := t.TempDir()
+	home := tmpDir(t)
 	require.NoError(t, os.WriteFile(filepath.Join(home, "claude-cli"), []byte("#!/usr/bin/env node\n"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(home, "node"), []byte("#!/bin/sh\n"), 0o755))
-	link2 := filepath.Join(t.TempDir(), "claude")
+	link2 := filepath.Join(tmpDir(t), "claude")
 	require.NoError(t, os.Symlink(filepath.Join(home, "claude-cli"), link2))
 	dir, err = NodeDirFor(link2, env)
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestNodeDirForRefusesAFolderOthersCanWrite(t *testing.T) {
 func TestNodeDirForRefusesANodeThatIsALinkIntoAnUnsafeFolder(t *testing.T) {
 	env := minimalEnv(t)
 	prefix, cli := npmLayout(t, "#!/usr/bin/env node", false)
-	cellar := t.TempDir()
+	cellar := tmpDir(t)
 	require.NoError(t, os.WriteFile(filepath.Join(cellar, "node"), []byte("#!/bin/sh\n"), 0o755))
 	require.NoError(t, os.Symlink(filepath.Join(cellar, "node"), filepath.Join(prefix, "bin", "node"))) // the Homebrew shape: bin/node -> Cellar/.../bin/node
 	dir, err := NodeDirFor(cli, env)
@@ -153,7 +153,7 @@ func TestNodeDirForRefusesANodeThatIsALinkIntoAnUnsafeFolder(t *testing.T) {
 func TestNodeDirForDoesNotSearchFoldersAboveTheCLI(t *testing.T) {
 	env := minimalEnv(t)
 	// a node in some bin folder two levels above a CLI that is neither beside it nor in a lib/node_modules package: not Node's layout, not used
-	top := t.TempDir()
+	top := tmpDir(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(top, "bin"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(top, "bin", "node"), []byte("#!/bin/sh\n"), 0o755))
 	deep := filepath.Join(top, "a", "b")
@@ -184,11 +184,11 @@ func TestNodeDirForChangesNothingWhenItShouldNot(t *testing.T) {
 		"a node script with an absolute node":     func(t *testing.T) string { _, cli := npmLayout(t, "#!/opt/somewhere/bin/node", true); return cli },
 		"an env script of another program":        func(t *testing.T) string { _, cli := npmLayout(t, "#!/usr/bin/env python3", true); return cli },
 		"a binary (no shebang)": func(t *testing.T) string {
-			p := filepath.Join(t.TempDir(), "claude")
+			p := filepath.Join(tmpDir(t), "claude")
 			require.NoError(t, os.WriteFile(p, []byte("\x7fELF\x02\x01\x01\x00 not a script"), 0o755))
 			return p
 		},
-		"a missing file": func(t *testing.T) string { return filepath.Join(t.TempDir(), "nope") },
+		"a missing file": func(t *testing.T) string { return filepath.Join(tmpDir(t), "nope") },
 		"an empty path":  func(t *testing.T) string { return "" },
 	}
 	for name, make := range cases {
@@ -197,7 +197,7 @@ func TestNodeDirForChangesNothingWhenItShouldNot(t *testing.T) {
 		assert.Empty(t, dir, name)
 	}
 	// a PATH that already has a node: that one is used
-	own := t.TempDir()
+	own := tmpDir(t)
 	require.NoError(t, os.WriteFile(filepath.Join(own, "node"), []byte("#!/bin/sh\n"), 0o755))
 	_, cli := npmLayout(t, "#!/usr/bin/env node", true)
 	withNode := []string{"PATH=" + minimalPath + string(os.PathListSeparator) + own}
@@ -219,7 +219,7 @@ func TestNeedsEnvNodeShebangForms(t *testing.T) {
 		"/usr/bin/env node":             false,
 		"":                              false,
 	} {
-		p := filepath.Join(t.TempDir(), "f")
+		p := filepath.Join(tmpDir(t), "f")
 		require.NoError(t, os.WriteFile(p, []byte(line+"\nrest\n"), 0o755))
 		assert.Equal(t, want, needsEnvNode(p), "%q", line)
 	}
@@ -240,7 +240,7 @@ func TestNodePathPrefixInTheAgentsLaunchLine(t *testing.T) {
 	assert.Contains(t, out, "run by its own node")
 
 	// the shell has a node of its own (a login shell's nvm): the line adds nothing
-	own := t.TempDir()
+	own := tmpDir(t)
 	require.NoError(t, os.WriteFile(filepath.Join(own, "node"), []byte("#!/bin/sh\necho \"the shell's own node\"\n"), 0o755))
 	out, err = run(minimalPath+string(os.PathListSeparator)+own, WrapWithCLINode(cli+" --version", cli))
 	require.NoError(t, err, out)
@@ -317,7 +317,7 @@ func TestNodeDirForRefusesWhatPathWritersNamesOrCannotExamine(t *testing.T) {
 // Codex Test's controls (#5899 round 2), end to end through NodeDirFor: a link in the middle of the chain that anyone can replace, and an access list on the node's folder.
 func TestNodeDirForRefusesALinkChainThroughAFolderAnyoneCanWrite(t *testing.T) {
 	env := minimalEnv(t)
-	base := t.TempDir()
+	base := tmpDir(t)
 	safe, target, bad := filepath.Join(base, "safe"), filepath.Join(base, "target"), filepath.Join(base, "bad")
 	for _, d := range []string{safe, target, bad} {
 		require.NoError(t, os.MkdirAll(d, 0o755))
@@ -404,4 +404,14 @@ func TestNodeNotFoundKeepsTheInstallAdviceOnlyWhenThereIsNoNode(t *testing.T) {
 	require.True(t, errors.As(err, &nf), "%v", err)
 	assert.Contains(t, nf.Error(), "Install Node.js")
 	assert.Contains(t, nf.Error(), "PATH has node's folder")
+}
+
+// tmpDir is t.TempDir() with a mode of its own: the folder is made with the umask applied (0775 under 0002, which names the group as a writer of the node path), so the tests chmod it and pass under any umask (#20036).
+func tmpDir(t *testing.T) string {
+	t.Helper()
+	d := t.TempDir()
+	if err := os.Chmod(d, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return d
 }

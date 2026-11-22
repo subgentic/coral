@@ -24,7 +24,7 @@ func chmodACL(t *testing.T, path, entry string) {
 }
 
 func TestPathWritersReadsAccessLists(t *testing.T) {
-	base := t.TempDir()
+	base := tmpDir(t)
 	me, err := user.Current()
 	require.NoError(t, err)
 	mk := func(name string) (d, node string) {
