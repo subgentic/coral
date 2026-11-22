@@ -292,7 +292,9 @@ func (h *SystemHandler) LaunchCheck(w http.ResponseWriter, r *http.Request) {
 		if name != "" {
 			where = worktreePathFor(root, name, wtPath)
 		}
-		checks = append(checks, folderTrustCheck(t, where))
+		if where != "" { // a refused name has no folder; worktree_free already says why, and a trust line beside it would be stray (#20618)
+			checks = append(checks, folderTrustCheck(t, where))
+		}
 	}
 	done()
 }
