@@ -87,10 +87,10 @@ async function load(key) {
             if (!r.ok) throw new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
         } else if (key === 'tasks') {
-            if (isCloud()) throw new Error('closed on Coral Hub'); // this computer's own route: never asked of Coral Hub's origin (#19591)
-            const r = await serverFetch('local', `/api/analytics/tasks?range=${encodeURIComponent(m.range)}&group_by=${encodeURIComponent(m.group)}${m.reviews ? '&reviews=1' : ''}`);
+            if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
+            const r = await serverFetch(server, `/api/analytics/tasks?range=${encodeURIComponent(m.range)}&group_by=${encodeURIComponent(m.group)}${m.reviews ? '&reviews=1' : ''}`);
             if (seq !== m.seq) return;
-            if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = 'guest'; m.data = null; draw(key); return; }
+            if (r.status === 401 || r.status === 403 || (r.status === 404 && server !== 'local')) { m.status = server === 'local' ? 'guest' : 'refused'; m.data = null; draw(key); return; }
             if (!r.ok) throw new Error(String(r.status));
             m.data = await r.json(); m.status = 'ok';
         } else if (key === RQ) {
@@ -333,5 +333,5 @@ document.addEventListener('cost-view-change', () => { for (const k of Object.key
 window.addEventListener('resize', () => { for (const k of Object.keys(tabs)) if (hosts[k] && hosts[k].isConnected && hosts[k].offsetParent) draw(k); });
 
 // A different computer was picked: what the three tabs hold belongs to the other one, so it is dropped and the open tabs read again (#15730).
-document.addEventListener(MACHINE_EVENT, () => { if (isCloud()) for (const key of ['operator', 'comm']) { const m = tabs[key], list = teams(); if (m.team && list.includes(m.team)) continue; m.team = list[0] || ''; m.data = null; m.status = 'loading'; if (hosts[key]?.isConnected) { draw(key); load(key); } } // on Coral Hub's page the team tabs follow the picked computer's teams (#20000)
+document.addEventListener(MACHINE_EVENT, () => { if (isCloud()) for (const key of ['operator', 'comm', IVC]) { const m = tabs[key], list = teams(); if (key === IVC ? (!m.team || list.includes(m.team)) : (m.team && list.includes(m.team))) continue; m.team = key === IVC ? '' : list[0] || ''; m.data = null; m.status = 'loading'; if (hosts[key]?.isConnected) { draw(key); load(key); } } // on Coral Hub's page the team tabs follow the picked computer's teams (#20000)
     for (const key of MACHINE_TABS) { const m = tabs[key]; m.data = null; m.status = 'loading'; m.day = -1; m.turns = null; if (hosts[key]?.isConnected) { draw(key); load(key); } } });

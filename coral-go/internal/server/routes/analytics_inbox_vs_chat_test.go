@@ -92,7 +92,7 @@ func TestTheInboxVsChatReadCutsDaysToNinetyAndRefusesWhatIsNotValid(t *testing.T
 
 const readRefusal = "only the person at this computer, or its Hub owner, can read this"
 
-func TestTheInboxVsChatReadIsThePersonsAloneAndThisComputers(t *testing.T) {
+func TestTheInboxVsChatReadIsThePersonsAloneAndTheHubOwners(t *testing.T) {
 	withLabel(t, "hub-user-1234abcd", nil)
 	rig := newCmtRig(t)
 	notPerson := ivcServer(t, rig, false) // an agent token or a script
@@ -101,11 +101,13 @@ func TestTheInboxVsChatReadIsThePersonsAloneAndThisComputers(t *testing.T) {
 	assert.Equal(t, readRefusal, out["error"], "a read says it is a read that was refused, not a file share (#15740)")
 	srv := ivcServer(t, rig, true)
 	for name, hdr := range map[string]map[string]string{
-		"a Hub stamp":     {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},
-		"the Hub's owner": {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
-		"a forged stamp":  {tunnel.ViaHeader: "not-the-secret", tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
+		"a Hub stamp":    {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: "someone"},
+		"a forged stamp": {tunnel.ViaHeader: "not-the-secret", tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"},
 	} {
 		code, _ := getIVC(t, srv.URL, "", hdr)
 		assert.Equal(t, http.StatusForbidden, code, name)
 	}
+	// coral-hub #261001: the Hub's owner (the label pinned to this computer) reads it through the Hub; a stamp of another label does not
+	code, _ = getIVC(t, srv.URL, "", map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"})
+	assert.Equal(t, http.StatusOK, code, "the Hub's owner")
 }

@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
-	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
-	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // GET /api/analytics/inbox-vs-chat?days=&team= (#12158, the Operator's Analytics tab): how much of what the Operator did they did in the Inbox and how much in a chat or terminal. COUNTS ONLY: day buckets, kinds,
@@ -37,11 +35,7 @@ func (h *InboxVsChatHandler) clock() time.Time {
 }
 
 // Read answers the read.
-func (h *InboxVsChatHandler) Read(w http.ResponseWriter, r *http.Request) {
-	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
-		commentRefuse(w, http.StatusForbidden, "not_through_hub", "the Inbox-versus-chat counts are on this computer only")
-		return
-	}
+func (h *InboxVsChatHandler) Read(w http.ResponseWriter, r *http.Request) { // through Coral Hub the owner's alone (operatorOnlyRead; coral-hub #261001): numbers only, no text
 	if !operatorOnlyRead(w, r) {
 		return
 	}

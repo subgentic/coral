@@ -29,6 +29,11 @@ FILE_PARAMS = {'filepath', 'dir', 'path', 'working_directory', 'file', 'ref', 'c
 # against this table (coral-hub internal/e2e TestChromeUIPass records them). Add here, with the reason, never
 # loosen the table any other way.
 EXTRA = {
+    # The Analytics reads the Hub owner has (coral-hub #261001): router_board.go registers them on a handler made in the same line (routes.NewEfficiencyHandler(...).Efficiency), which the registration scan above does not follow.
+    # What each handler reads: efficiency metric, group_by, range and team; inbox-vs-chat days and team; tasks range, group_by and reviews (a plain flag).
+    'GET /api/analytics/efficiency': {'metric', 'group_by', 'range', 'team'},
+    'GET /api/analytics/inbox-vs-chat': {'days', 'team'},
+    'GET /api/analytics/tasks': {'range', 'group_by', 'reviews'},
     # The all-boards goals read (#7260): ListAllGoals reads state and board from a url.Values it parsed itself (a mistyped query string is refused, not dropped), which the scan above does not follow.
     'GET /api/goals': {'state', 'board'},
     # Which artifact a shortened link means (#9841): resolveArtifactRefs reads the repeatable link from the query map, which the scan above does not follow (not named ref: that name is a file reference here).

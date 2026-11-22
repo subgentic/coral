@@ -64,10 +64,10 @@ GET /api/agent/ui/{id}/content view
 GET /api/agent/ui/{id}/events view
 GET /api/agents/models launch
 GET /api/analytics/activity launch
-GET /api/analytics/efficiency never
-GET /api/analytics/inbox-vs-chat never
-GET /api/analytics/resource-queue never
-GET /api/analytics/tasks never
+GET /api/analytics/efficiency launch
+GET /api/analytics/inbox-vs-chat launch
+GET /api/analytics/resource-queue launch
+GET /api/analytics/tasks launch
 GET /api/artifacts view
 GET /api/artifacts/resolve view
 GET /api/artifacts/series/{series_id} view

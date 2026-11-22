@@ -173,6 +173,10 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/dropbox/shared"):                                             textHubDropboxOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/hub-auto-accept"):                                            textHubAutoAcceptOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/analytics/activity"):                                          textActivityOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/analytics/efficiency"):                                        textAnalyticsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/analytics/inbox-vs-chat"):                                     textAnalyticsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/analytics/resource-queue"):                                    textAnalyticsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/analytics/tasks"):                                             textAnalyticsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/chief"):                                                       "through Coral Hub Chief is for the account this computer is linked to only (#11470)",
 	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/notices/pause"):                         textNoticesOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/notices/resume"):                        textNoticesOwnerOnly,
@@ -223,6 +227,7 @@ const textOperatorAsksOwnerOnly = "through Coral Hub the questions asked of the 
 const textArtifactPrivateOwnerOnly = "through Coral Hub marking an artifact private to the manager is for the account this computer is linked to only (#11457)"
 const textGuideRosterOwnerOnly = "through Coral Hub the guides' names on a board are for the account this computer is linked to only (#11457)"
 const textOrchGrantOwnerOnly = "through Coral Hub what a board's orchestrator may do, and the log of it, are for the account this computer is linked to only (#11432)"
+const textAnalyticsOwnerOnly = "through Coral Hub these Analytics numbers are for the account this computer is linked to only (coral-hub #261001)"
 const textActivityOwnerOnly = "through Coral Hub the activity counts are for the account this computer is linked to only (#11225)"
 
 const textCustomModesOwnerOnly = "through Coral Hub only the account this computer is linked to can add or change custom permission modes (#15950)"

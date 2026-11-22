@@ -1,5 +1,5 @@
 // Hub 3.0, Analytics in cloud (#19569, coral-hub §7.2): on Coral Hub's page every Analytics read goes to a computer through /api/remote/<id>/, never the Hub's own origin; with no computer linked nothing is read
-// and the page says "Link a computer to see usage"; Tasks, Tokens per commit, Task time and Inbox vs chat are not shown (their addresses open Overview); "By computer" keeps nothing in localStorage. The stubbed
+// and the page says "Link a computer to see usage"; Tasks, Tokens per commit, Task time, Inbox vs chat, the resource queue and Team communication are shown and read the picked computer (coral-hub #261001); "By computer" keeps nothing in localStorage. The stubbed
 // two-computer Hub (helpers/hub_world), 1280 and 390 px. Screenshots with CORAL_SCREENSHOT_DIR.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -40,15 +40,21 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('#cost-computer-pick .computer-bar-option')`, `${tag}: the computer bar is drawn`, 10000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-computer-pick .computer-bar-option')].map(o => o.dataset.computer)`), ['m1', 'm2'], `${tag}: the Computer picker names the linked computers`);
             await shot(`analytics-cloud-overview-${w}`);
-            // 7.2.3: the four closed views are not listed, and their addresses open Overview
+            // coral-hub #261001: every view is listed, and each opens (their reads are the owner's through the Hub)
             const names = () => ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].map(b => b.textContent.trim())`);
             const list = await names();
-            for (const gone of ['Tasks', 'Tokens per commit', 'Task time', 'Inbox vs chat', 'Resource queue', 'Team communication']) assert.ok(!list.includes(gone), `${tag}: no ${gone} in cloud: ${JSON.stringify(list)}`);
-            for (const kept of ['Overview', 'Usage']) assert.ok(list.includes(kept), `${tag}: ${kept} stays: ${JSON.stringify(list)}`);
-            for (const closed of ['tasks', 'per-commit', 'task-time', 'inbox-chat', 'resource-queue', 'comm']) assert.equal(await select(closed), 'overview', `${tag}: ${closed} opens Overview`);
+            for (const kept of ['Overview', 'Usage', 'Tasks', 'Tokens per commit', 'Task time', 'Inbox vs chat', 'Resource queue', 'Team communication']) assert.ok(list.includes(kept), `${tag}: ${kept} is listed in cloud: ${JSON.stringify(list)}`);
+            await ev(`window.__seen.length = 0; true`);
+            for (const key of ['tasks', 'per-commit', 'task-time', 'inbox-chat', 'resource-queue', 'comm']) {
+                assert.equal(await select(key), key, `${tag}: ${key} opens, not Overview`);
+                await waitFor(`!document.querySelector('#cost-dashboard-view [data-cview="${key}"]')?.hidden`, `${tag}: ${key} is shown`, 5000);
+            }
+            const owner = ['/api/analytics/tasks', '/api/analytics/efficiency', '/api/analytics/inbox-vs-chat', '/api/analytics/resource-queue'];
+            await waitFor(`${JSON.stringify(owner)}.every(a => window.__seen.some(p => p.startsWith('/api/remote/m1' + a + '?')))`, `${tag}: Tasks, the efficiency views, Inbox vs chat and the resource queue read the first computer`, 8000);
+            assert.deepEqual(await ev(own), [], `${tag}: and none of them reads this origin`);
             // 7.2.1: opening every remaining view sends nothing to this origin; every read starts with /api/remote/<id>/
             await ev(`window.__seen.length = 0; true`);
-            for (const key of ['overview', 'usage', 'operator', 'calls', 'provider', 'model', 'team', 'agent', 'branch', 'task', 'goal', 'thinking']) {
+            for (const key of ['overview', 'usage', 'tasks', 'per-commit', 'task-time', 'inbox-chat', 'resource-queue', 'comm', 'operator', 'calls', 'provider', 'model', 'team', 'agent', 'branch', 'task', 'goal', 'thinking']) {
                 assert.equal(await select(key), key, `${tag}: ${key} opens`);
                 await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
             }
