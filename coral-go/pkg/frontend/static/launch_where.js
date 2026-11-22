@@ -329,11 +329,12 @@ export function wherePayload(kind) {
     return {};
 }
 
-/** The words for the recap above the footer: "new worktree fix-login from main", "branch other", or '' (the folder as it is). */
+/** (window.launchWhereWords: launch_recap.js, which is loaded at start, reads it without importing this module.) The words appended to the folder in the recap above the footer: " (new worktree fix-login from main)", " (branch other)", or '' (the folder as it is). */
 export function whereRecap(kind) {
     const p = panels[kind];
     if (!p?.host.isConnected || p.host.hidden) return '';
-    if (p.choice === 'new' && p.name) return `new worktree ${p.name}${p.base ? ` from ${p.base}` : ''}`;
-    if (p.choice === 'other' && p.other) return `branch ${p.other}`;
+    if (p.choice === 'new' && p.name) return ` (new worktree ${p.name}${p.base ? ` from ${p.base}` : ''})`;
+    if (p.choice === 'other' && p.other) return ` (branch ${p.other})`;
     return '';
 }
+if (typeof window !== 'undefined') window.launchWhereWords = whereRecap; // the recap reads it once this lazy module is loaded; until then the folder alone

@@ -113,7 +113,7 @@ function _selectLaunchType(type) {
     wireEnterAdvances(document.getElementById('launch-step-agent')); wireEnterAdvances(document.getElementById('launch-step-team')); // Enter in a single-line field is Next, and Launch on the last step (#11289)
     { const ti = document.getElementById('launch-team-instead'); if (ti) ti.hidden = !!(launch.member || launch.addTo); } // the way to a team from the agent's first step: not for a team's own member or an agent added to a team
     _showLaunchStep(type);
-    if (['agent', 'team', 'terminal'].includes(type) && !launch.member) importOnce('./launch_where.js').then(m => m.mountLaunchWhere(type)).catch(() => {});
+    if (!launch.member) importOnce('./launch_where.js').then(m => m.mountLaunchWhere(type)).catch(() => {});
     _preselectBackend(); // the Backend select starts on the backend this server runs, not on its first option (#16409)
     if (type === "agent") {
         if (!launch.addTo && !launch.member) { // New Agent: its own title and no team (Add agent and a member set both below, #7778, #7861)
