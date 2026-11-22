@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Coral",
   "short_name": "Coral",
-  "description": "The Inbox for your agents: a question, a permission or a file to review lands in one place, on your laptop or your phone.",
+  "description": "Your coding agents, one team: a question, a permission or a file to review lands in one Inbox, on your laptop or your phone.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
