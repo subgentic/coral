@@ -42,7 +42,7 @@ func DeviceKeyNoticeItems(ss *store.SessionStore, now func() time.Time) func(ctx
 			if k.ChangedAt > k.CreatedAt {
 				line = "A device key was raised by " + by + ": " + devicekey.DisplayFingerprint(k.PK) + ", access " + k.Mode
 			}
-			items = append(items, NeedsYouItem{Kind: "device_key", Line: needsYouLine(line), ID: "device_key:" + k.KID + ":" + strconv.FormatInt(k.ChangedAt, 10), At: time.Unix(k.ChangedAt, 0).UTC().Format(time.RFC3339Nano)})
+			items = append(items, NeedsYouItem{Kind: "device_key", Line: needsYouLine(line), ID: "device_key:" + k.KID + ":" + strconv.FormatInt(k.ChangedAt, 10), At: time.Unix(k.ChangedAt, 0).UTC().Format(time.RFC3339)})
 		}
 		return items, nil
 	}
