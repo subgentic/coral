@@ -628,6 +628,10 @@ func (h *BoardHandler) ReadMessages(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, err.Error())
 			return
 		}
+		if cloud.ViewOnlyFrom(r.Context()) { // a View grant: a typed, redacted, capped answer (#20590)
+			writeViewMessages(w, messages)
+			return
+		}
 		writeJSON(w, http.StatusOK, emptyIfNil(messages))
 		return
 	}
