@@ -233,6 +233,7 @@ func (m *Manager) runLink(ctx context.Context, lc *linkConn, origin string) {
 	case errors.Is(err, tunnel.ErrUnauthorized):
 		// The Hub does not accept this link's token: this link is revoked and stops; every other link is untouched.
 		_ = m.o.Store.MarkLinkRevoked(context.Background(), lc.id, "revoked by the hub")
+		LinkEnded(context.Background(), lc.id)
 		lc.set(StateRevoked, "the hub revoked this link; remove it and add it again to reconnect")
 	case errors.Is(err, tunnel.ErrUnsupportedVersion):
 		lc.set(StateUpgrade, "this Coral version is too old for the hub; update Coral")

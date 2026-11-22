@@ -374,6 +374,24 @@ func (s *Store) MemberGrantLive(ctx context.Context, linkID, hubUser, scopeKind,
 	return &g, nil
 }
 
+// MemberGrantsOfPerson is every live grant of one person on one link, and whether the person has ever had a grant there (a revoked or expired one counts): a person the owner has granted
+// and then ended is never "no grant, so as before". An error is a store failure the caller refuses on.
+func (s *Store) MemberGrantsOfPerson(ctx context.Context, linkID, hubUser string, now time.Time) (live []MemberGrant, ever bool, err error) {
+	live = []MemberGrant{}
+	if err = s.db.SelectContext(ctx, &live, `SELECT `+memberGrantCols+` FROM member_grant WHERE link_id = ? AND hub_user = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC, grant_id`,
+		linkID, hubUser, now.UTC().Format(time.RFC3339)); err != nil {
+		return nil, false, err
+	}
+	if len(live) > 0 {
+		return live, true, nil
+	}
+	var n int
+	if err = s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE link_id = ? AND hub_user = ?`, linkID, hubUser); err != nil {
+		return nil, false, err
+	}
+	return live, n > 0, nil
+}
+
 // ListMemberGrants is the live grants of a board (its board scope and its agents' scopes), or of every scope when board is "" (the full grants too), newest first.
 func (s *Store) ListMemberGrants(ctx context.Context, board string, now time.Time) ([]MemberGrant, error) {
 	out := []MemberGrant{}
