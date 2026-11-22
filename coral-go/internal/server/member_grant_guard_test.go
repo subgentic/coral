@@ -443,3 +443,30 @@ func TestTheGuardMarksAViewOnlyPersonsRequestAndNotAFullPersons(t *testing.T) {
 		assert.Equal(t, want, marked, user)
 	}
 }
+
+// #20590 (4): the guard records a person's first use of a grant, once, whatever the request.
+func TestTheGuardRecordsTheFirstUseOfAGrantOnce(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	ctx := context.Background()
+	bs := guardStore(t)
+	cp := &guardCap{}
+	cp.set(tunnel.TierLaunch)
+	g, err := bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelView))
+	require.NoError(t, err)
+	firstUseSeen.Delete(g.GrantID)
+	h := MemberGrantGuard(bs, cp.get)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	call := func() {
+		req := httptest.NewRequest("GET", "/api/board/team1/messages", nil)
+		req = req.WithContext(cloud.WithVia(req.Context(), cloud.Via{LinkID: guardLink, HubUser: guardUser}))
+		h.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	uses, err := bs.MemberGrantFirstUses(ctx, time.Now().Add(-time.Minute))
+	require.NoError(t, err)
+	assert.Empty(t, uses, "granted, not used")
+	call()
+	call()
+	uses, err = bs.MemberGrantFirstUses(ctx, time.Now().Add(-time.Minute))
+	require.NoError(t, err)
+	require.Len(t, uses, 1, "two requests, one first use")
+	assert.Equal(t, g.GrantID, uses[0].GrantID)
+}
