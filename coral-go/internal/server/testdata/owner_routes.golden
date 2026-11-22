@@ -7,6 +7,10 @@ DELETE /api/board/{project}/artifacts/{id}/review interact owner-only
 DELETE /api/saved/{id} interact owner-only
 GET /api/activity view owner-only
 GET /api/analytics/activity launch owner-only
+GET /api/analytics/efficiency launch owner-only
+GET /api/analytics/inbox-vs-chat launch owner-only
+GET /api/analytics/resource-queue launch owner-only
+GET /api/analytics/tasks launch owner-only
 GET /api/artifacts view owner-only
 GET /api/artifacts/resolve view owner-only
 GET /api/artifacts/series/{series_id} view owner-only

@@ -10,7 +10,7 @@ import (
 
 // #20257 (coral-hub's ask #256265, Security's rulings of 07:21Z): the class A read routes are owner rows at tier view, one row each, with the query list the handler reads closed (any other key is refused). They are
 // the computer OWNER's alone (OwnerRefuse: the machine refuses a grantee, a viewer and the Hub service), and a row is exactly its own path: never a neighbour, never another method.
-// Held with #19968 (spendTeamKeys) and NOT here: analytics/efficiency, inbox-vs-chat, resource-queue, tasks and board/{project}/spend. GET /api/goal-links stays the Hub service's own row (hubservice.go).
+// Held with #19968 (spendTeamKeys) and NOT here: board/{project}/spend (the four Analytics reads are launch-tier owner rows since coral-hub #261001, with the activity counts). GET /api/goal-links stays the Hub service's own row (hubservice.go).
 // 14 more are NOT here because their handler refuses the Hub owner on purpose (see heldForTheirHandler below); a row there would only ever answer 403.
 var parityARows = []struct {
 	method, pattern string
@@ -78,9 +78,9 @@ func firstPattern(method, path string) string {
 	return p
 }
 
-// The five rows held with #19968 are still refused, and the goal-links read is still the Hub service's alone.
+// The spend row held with #19968 is still refused, and the goal-links read is still the Hub service's alone.
 func TestTheHeldAnalyticsAndSpendRowsAreStillRefusedAndGoalLinksStaysTheServices(t *testing.T) {
-	for _, p := range []string{"/api/analytics/efficiency", "/api/analytics/inbox-vs-chat", "/api/analytics/resource-queue", "/api/analytics/tasks", "/api/board/x1/spend"} {
+	for _, p := range []string{"/api/board/x1/spend"} {
 		assert.Equal(t, TierNever, Classify("GET", p, ""), p)
 		if _, m := OwnerRoute("GET", p); m != OwnerNone {
 			t.Errorf("%s has an owner row", p)

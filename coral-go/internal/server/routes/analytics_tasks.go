@@ -70,6 +70,9 @@ type tasksAnswer struct {
 
 // Tasks answers the read.
 func (h *TasksAnalyticsHandler) Tasks(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // through Coral Hub the owner's alone (coral-hub #261001): the names of the team's own agents, teams, models and branches
+		return
+	}
 	q := r.URL.Query()
 	rng, dim := q.Get("range"), q.Get("group_by")
 	if rng == "" {
