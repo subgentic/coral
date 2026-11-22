@@ -53,15 +53,15 @@ func TestAClaudeLimitResetSurvivesTheTextCap(t *testing.T) {
 	assert.True(t, e.UsageLimit())
 }
 
-// #20697 (b): two limit records Claude Code really wrote (scrubbed of ids, paths and names; the text, kind, status and times are as written). The wording of a real weekly limit has "at" between
+// #20697 (b): two limit records Claude Code really wrote (scrubbed of ids, paths and names, moved to Europe/Berlin and ten days on; the text, kind, status and times are as written). The wording of a real weekly limit has "at" between
 // the date and the hour, and the record carries the exact reset in apiErrorParams.rate_limit_info.resetsAt.
 func TestRealClaudeLimitRecordsGiveTheirResetFromTheTextAndFromTheRecord(t *testing.T) {
 	for _, c := range []struct {
 		file, text string
 		reset      time.Time
 	}{
-		{"claude_limit_5h.jsonl", "You've hit your 5-hour limit · resets 11:10am (America/Los_Angeles)", time.Unix(1793819400, 0)},
-		{"claude_limit_weekly.jsonl", "You've hit your weekly limit · resets Nov 15 at 11pm (America/Los_Angeles)", time.Unix(1794812400, 0)},
+		{"claude_limit_5h.jsonl", "You've hit your 5-hour limit · resets 8:10pm (Europe/Berlin)", time.Unix(1794683400, 0)},
+		{"claude_limit_weekly.jsonl", "You've hit your weekly limit · resets Nov 26 at 8am (Europe/Berlin)", time.Unix(1795676400, 0)},
 	} {
 		line, err := os.ReadFile(filepath.Join("testdata", c.file))
 		require.NoError(t, err)
