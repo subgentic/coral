@@ -150,6 +150,8 @@ type BoardHandler struct {
 	waitingComments func(ctx context.Context) ([]store.WaitingComment, error)
 	// needsYouRemotes: on a self-hosted Hub, how GET /api/needs-you reads its computers too (SetNeedsYouRemotes, #15380). Nil: this Coral's own answer alone.
 	needsYouRemotes *NeedsYouRemotes
+	// needsYouMemberFull lists the live Full grants of Hub people for GET /api/needs-you (SetNeedsYouMemberFull, #20581). Nil: none.
+	needsYouMemberFull func(ctx context.Context) ([]NeedsYouItem, error)
 	// needsYouSkills lists the skills waiting for approval for GET /api/needs-you (SetNeedsYouSkills). Nil: none.
 	needsYouSkills func(ctx context.Context) ([]NeedsYouItem, error)
 	// needsYouDeviceKeys lists the device keys a signed message added or raised in the last day (#20515 M4). Nil: none.
