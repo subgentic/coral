@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -72,6 +73,30 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	r.Use(cloud.LinkStamp(linkStamps.LinkExists, cloud.AskAllow(linkStamps))) // a request that answers an ask passes only for a link that may answer that kind (#20413)
 	// A tunneled write on a route in pairRecordedRoutes leaves one Operator-actions row with the link and the Hub person, after its handler (#20369); the census (pair_census_test.go) proves each one.
 	r.Use(routes.RecordPairWrites(s.boardStore, pairRecordedRoutes, pairUpgradeRoutes, r))
+	// What the owner's signed grants give a Hub person (#20473, S2): the better of their live grants, lowered by the link's cap read now, must reach the route's tier; the table is read on every request.
+	cloud.LinkEnded = func(ctx context.Context, linkID string) {
+		if s.boardStore == nil {
+			return
+		}
+		if n, err := s.boardStore.RevokeMemberGrantsOfLink(context.WithoutCancel(ctx), linkID, time.Now()); err != nil {
+			slog.Warn("[cloud] could not end the access given through a link that ended", "link", linkID, "error", err)
+		} else if n > 0 {
+			slog.Info("[cloud] the access given through a link that ended was ended with it", "link", linkID, "grants", n)
+		}
+	}
+	r.Use(MemberGrantGuard(s.boardStore, func(ctx context.Context, id string) (tunnel.Mode, bool) {
+		ls, err := store.NewCloudStore(s.db, nil).ListLinks(ctx)
+		if err != nil {
+			return tunnel.TierNever, false
+		}
+		for _, l := range ls {
+			if l.LinkID == id && l.State == store.LinkStateActive {
+				m, ok := tunnel.ParseMode(l.MaxMode)
+				return m, ok
+			}
+		}
+		return tunnel.TierNever, false
+	}))
 	// Through Coral Hub, no path under the home directory and no hidden file names (#3559).
 	r.Use(routes.HubPaths)
 	// NOTE: middleware.RealIP was intentionally removed. It rewrites r.RemoteAddr

@@ -24,6 +24,10 @@ func WithVia(ctx context.Context, v Via) context.Context { return board.WithActi
 // not, a short reason. Today it allows every action; limits later go behind it with no route change.
 type AllowFunc func(ctx context.Context, v Via, action, resource string) (bool, string)
 
+// LinkEnded is called when a link stops being usable for good: the person removed it, or the Hub revoked its token. The server wires it to end every grant that came through the link
+// (RevokeMemberGrantsOfLink, #20473), so a grant never outlives the link it names. It does nothing until wired.
+var LinkEnded = func(ctx context.Context, linkID string) {}
+
 // AllowAll is the first build's Allow.
 func AllowAll(context.Context, Via, string, string) (bool, string) { return true, "" }
 
