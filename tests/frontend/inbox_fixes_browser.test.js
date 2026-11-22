@@ -48,8 +48,8 @@ const { coralReady } = require('./helpers/wait');
         // Saved: a message whose transcript is gone says Gone in the table (one word, not a sentence on every row) and says why once, on its own page
         await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')); true`);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three saved', 10000);
-        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].every(tr => tr.cells[2].textContent.trim() === 'Gone')`, 'the rows are marked gone from the list\'s own answer', 10000);
-        const saved = await ev(`({ gone: [...document.querySelectorAll('#group-table-view tbody tr')].filter(tr => tr.cells[2].textContent.trim() === 'Gone').length, sentences: document.querySelectorAll('#group-table-view .inbox-saved-why, #group-table-view .why').length, buttons: document.querySelectorAll('#group-table-view .dt-quiet').length })`);
+        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].every(tr => tr.querySelector('td[data-key="state"]')?.textContent.trim() === 'Gone')`, 'the rows are marked gone from the list\'s own answer', 10000);
+        const saved = await ev(`({ gone: [...document.querySelectorAll('#group-table-view tbody tr')].filter(tr => tr.querySelector('td[data-key="state"]')?.textContent.trim() === 'Gone').length, sentences: document.querySelectorAll('#group-table-view .inbox-saved-why, #group-table-view .why').length, buttons: document.querySelectorAll('#group-table-view .dt-quiet').length })`);
         assert.equal(saved.gone, 3, 'three gone rows: ' + JSON.stringify(saved));
         assert.equal(saved.sentences, 0, 'the sentence is not repeated on the rows: ' + JSON.stringify(saved));
         await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);

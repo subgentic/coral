@@ -65,8 +65,8 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
      continue;
     }
     // Artifacts (#9408): a Computer column of its own (th data-key server) beside the plain Team, one line each; the row's hover and preview name it where a narrow list drops both; the Server filter stays in the panel
-    const artifacts=folder==='artifacts',col='server',is=t=>`e.textContent==='${t}'`;
-    await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')`,'Server column in '+folder,5000);
+    const artifacts=folder==='artifacts',saved=folder==='saved',col=saved?'team':'server',is=t=>saved?`e.textContent.includes('${t}')`:`e.textContent==='${t}'`; // the one Saved list (#20508) names the computer inside its Team cell, as the Needs you card does, so its cells are read there
+    if(!saved)await waitFor(`!!document.querySelector('#group-table-view th[data-key="server"]')`,'Server column in '+folder,5000);
     if(artifacts)assert.ok(await ev(`[...document.querySelectorAll('#group-table-view th[data-key="server"]')].every(h=>h.textContent.trim().startsWith('Computer'))&&[...document.querySelectorAll('#group-table-view td[data-key="team"]')].every(e=>!/This computer|Remote box/.test(e.textContent))`),'the column is called Computer and Team is the plain team name');
     if(['tasks','goals','needs'].includes(folder))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('server')>0&&keys.indexOf('server')===keys.indexOf('team')-1;})()`),'Server immediately precedes Team');
     if(folder.startsWith('chats'))assert.ok(await ev(`(()=>{const keys=[...document.querySelectorAll('#group-table-view th[data-key]')].map(e=>e.dataset.key);return keys.indexOf('when')>=0&&keys.indexOf('server')===keys.indexOf('when')+1;})()`),'Server follows When (#8961: one line a chat, Title, Agent, When, then Server; Server and then Agent drop first)');
