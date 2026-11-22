@@ -50,7 +50,7 @@
 .launch-where-tag-fail { color: var(--error-text); }
 .launch-where-why { margin: 10px 0 0; font-weight: var(--fw-strong); color: var(--error-text); }
 .launch-where-why[hidden] { display: none; }
-@media (max-width: 600px) { .launch-where-item { grid-template-columns: 1.4em minmax(0, 1fr); } .launch-where-fix { grid-column: 2; justify-self: start; min-height: 44px; } .launch-where-check { max-height: 34vh; } }
+@media (max-width: 600px) { .launch-where-item { grid-template-columns: 1.4em minmax(0, 1fr); } .launch-where-fixes { grid-column: 2; justify-self: start; } .launch-where-fix { min-height: 44px; } .launch-where-check { max-height: 34vh; } }
 .launch-where-labelrow { display: flex; align-items: baseline; gap: 8px; }
 .launch-where-labelrow .launch-where-hint { margin-left: 0; }
 /* New agent's Trust this folder tick, under the folder: the box beside its words, from the left */
@@ -59,3 +59,4 @@
 .modal-content .launch-trust-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .modal-content .launch-trust-label input { margin: 0; flex: none; }
 .launch-trust-help { margin: 6px 0 0; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: anywhere; }
+.launch-where-fixes { display: flex; gap: 6px; flex-wrap: wrap; align-self: center; justify-content: flex-end; }
