@@ -109,6 +109,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`[...document.querySelectorAll('#agentic-detail-pane .detail-foot .btn')].find(b => b.textContent === 'Open').click(); true`); // the sheet's own Open: the Team Artifacts path into the viewer
             await waitFor(`!!document.getElementById('artifact-viewer') && !document.getElementById('artifact-viewer').hidden`, at + 'Open shows the viewer', 8000);
             await waitFor(`document.querySelector('#artifact-viewer .artifact-viewer-versionline')?.textContent === ${JSON.stringify(headOf(3))}`, at + 'the header says the line', 8000);
+            await waitFor(`!!document.querySelector('#artifact-viewer .av-current')`, at + 'the version chip is drawn (the bar is drawn when the version list has come, after the header says the line; the Inbox path above waits for it too)', 8000);
             await ev(`document.querySelector('#artifact-viewer .av-current').click(); true`);
             await waitFor(vis('#artifact-viewer .av-list'), at + 'the version list', 4000);
             await ev(`document.querySelector('#artifact-viewer .av-option[data-version="1"]').click(); true`);
