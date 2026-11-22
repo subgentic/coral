@@ -31,6 +31,8 @@
 .launch-where-label { font-weight: var(--fw-strong); color: var(--text-secondary); font-size: var(--fs-base); }
 .launch-where-hint { color: var(--text-muted); font-size: var(--fs-base); margin-left: 6px; }
 .launch-where-change { background: none; border: 0; padding: 0 2px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+[data-theme="light"] .launch-where-change { color: var(--accent-dim); } /* the light accent on the dialog panel is 4.44:1; the dim one clears 4.5:1 (contrast census) */
+@media (max-width: 767px), (pointer: coarse) { .launch-where-change { min-height: var(--control-touch-height); min-width: var(--control-touch-height); } } /* a touch target is 44 px both ways */
 /* the branch list: a radio row says what it does under its title */
 .launch-where-opt-title { font-weight: var(--fw-strong); }
 .launch-where-opt-sub { display: block; color: var(--text-muted); font-size: var(--fs-base); margin-top: 2px; }

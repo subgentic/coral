@@ -170,15 +170,17 @@ const UNDERSIZED = `(() => {
             showView(body.closest('.view, [id$=-view]')?.id || 'servers-view');
             await cs.renderServersInto(body, { source: 'cloud' });
             await ${framesJs(2)};
-            const hasSelect = !!body.querySelector('.cs-row select');
+            const hasSelect = !!body.querySelector('.cs-row select'); const hasButtons = body.querySelectorAll('.cs-row button').length;
             const small = ${UNDERSIZED};
             cs.hideServersModal();
             window.fetch = real;
-            return { hasSelect, small };
+            return { hasSelect, hasButtons, small };
         })()`);
-        assert.ok(serversSmall.hasSelect, 'the Servers row shows its Access select');
+        // on a phone the row drops its Hub access picker (a desktop control, cloud_server_view.js onPhone) and keeps its buttons
+        assert.equal(serversSmall.hasSelect, false, 'the phone Servers row shows no Access select');
+        assert.ok(serversSmall.hasButtons > 0, 'the phone Servers row keeps its buttons (they are measured below)');
         assert.deepEqual(serversSmall.small, [], 'phone 390, Servers tab: every control is at least 44x44: ' + JSON.stringify(serversSmall.small));
-        console.log('PASS phone 390 coarse: Servers tab (Access select) at least 44x44');
+        console.log('PASS phone 390 coarse: Servers tab (row buttons, no Access select) at least 44x44');
 
         // #5053: the Cost view's tables (their sort headers and filter icons), with rows in By Model and By Thinking Level and the request table the server fills.
         const costSmall = await ev(`(async () => {
