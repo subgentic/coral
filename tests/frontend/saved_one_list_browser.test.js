@@ -49,6 +49,8 @@ const { setTheme } = require('./helpers/contrast');
             check(JSON.stringify(shape.order) === JSON.stringify(['message', 'file', 'file', 'message']), at + 'newest saved first, files and messages mixed (the older message last): ' + JSON.stringify(shape.order));
             const plans = (await rowsOf0()).filter(Boolean);
             check(JSON.stringify(plans) === JSON.stringify(['plan-1', 'plan-2']), at + 'a file saved later sorts first, by saved_at not by its version time: ' + JSON.stringify(plans));
+            const age = await ev(`(() => { const r = [...document.querySelectorAll('.saved-files tbody tr')].find(x => /plan-1/.test(x.textContent)); return r ? r.textContent : ''; })()`);
+            check(/1 min ago/.test(age) && !/8 min ago/.test(age), at + 'the time a Saved file shows is saved_at (1 min ago), not its version time (8 min ago): ' + age.replace(/\s+/g, ' ').slice(0, 160));
             check(shape.inbox && shape.footers.every(Boolean) && shape.previews.every(Boolean), at + 'every row is an Inbox row: kind row, message row, preview, buttons under it: ' + JSON.stringify(shape));
             check(shape.done === 2 && shape.heads.length === 1, at + 'a message has Done under its words, and the list has one head: ' + JSON.stringify([shape.done, shape.heads]));
             for (const theme of ['light', 'dark']) { await setTheme(ev, theme); await ev(framesJs(3)); await shot(`saved-one-list-${w}-${theme}`); }
