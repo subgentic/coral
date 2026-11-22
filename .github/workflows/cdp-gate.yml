@@ -1,7 +1,7 @@
 name: cdp-gate
 # The full CDP set (tests/frontend/run_cdp_suites.mjs) on GitHub-hosted runners, so a release gate doesn't
-# depend on one machine (#4383: epoch dropped three gates on 2026-10-17). Six parts of the default-mode suites
-# (--part K/6, each suite in exactly one part, on the default terminal backend, the built-in terminal), the sequences, the strict phase, the prod-tier phase (--prod-tier, #15407: the strict suites on a build without the dev tag) and the tmux phase (--tmux, #6064: the suites that drive tmux itself and a cross-check set) run as separate jobs; each
+# depend on one machine (#4383: epoch dropped three gates on 2026-10-17). Nine parts of the default-mode suites
+# (--part K/9, each suite in exactly one part, on the default terminal backend, the built-in terminal), the sequences, the strict phase, the prod-tier phase (--prod-tier, #15407: the strict suites on a build without the dev tag) and the tmux phase (--tmux, #6064: the suites that drive tmux itself and a cross-check set) run as separate jobs; each
 # uploads its results.json and Coral logs, and one summary job is the check. Same rules as the epoch gate: one
 # retry per suite, and a suite that passes only on its retry (FLAKY) fails its part (runner exit 3).
 #
@@ -52,17 +52,20 @@ jobs:
     name: cdp (${{ matrix.name }})
     if: github.event_name != 'workflow_dispatch' || inputs.suites == ''
     runs-on: ubuntu-24.04
-    timeout-minutes: 50 # was 40: part 2/6 on 74e537cfa8 hit it after two retries of a 200 s suite (#19012); --retry-max-secs below stops that
+    timeout-minutes: 50 # was 40: part 2/6 (then six parts) on 74e537cfa8 hit it after two retries of a 200 s suite (#19012); --retry-max-secs below stops that
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: "part 1/6", args: "--part 1/6" }
-          - { name: "part 2/6", args: "--part 2/6" }
-          - { name: "part 3/6", args: "--part 3/6" }
-          - { name: "part 4/6", args: "--part 4/6" }
-          - { name: "part 5/6", args: "--part 5/6" }
-          - { name: "part 6/6", args: "--part 6/6" }
+          - { name: "part 1/9", args: "--part 1/9" }
+          - { name: "part 2/9", args: "--part 2/9" }
+          - { name: "part 3/9", args: "--part 3/9" }
+          - { name: "part 4/9", args: "--part 4/9" }
+          - { name: "part 5/9", args: "--part 5/9" }
+          - { name: "part 6/9", args: "--part 6/9" }
+          - { name: "part 7/9", args: "--part 7/9" }
+          - { name: "part 8/9", args: "--part 8/9" }
+          - { name: "part 9/9", args: "--part 9/9" }
           - { name: "sequences", args: "--sequences" }
           - { name: "strict", args: "--strict" }
           - { name: "tmux", args: "--tmux" }
