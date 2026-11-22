@@ -18,8 +18,11 @@ const goalDoneNudgeEvery = 24 * time.Hour
 
 // goalDoneNudgeText is the notice: a fixed template with the goal's number and the quiet period's minutes (a number the setting goal_done_quiet_minutes gave, never text): no title, no name is typed (Security's rule 1
 // of the health nudges).
-func goalDoneNudgeText(goalID int64, minutes int) string {
-	return fmt.Sprintf("[Coral] Goal #%d's tasks are all done. If more work is planned, add it with coral-board task add \"...\" --goal %d; otherwise do nothing: it goes to the Operator in %d minutes.", goalID, goalID, minutes)
+func goalDoneNudgeText(rt board.RuleRoute, goalID int64, minutes int) string {
+	return fmt.Sprintf(rt.Pick(
+		"[Coral] Goal #%d's tasks are all done. More work: coral-board task add \"...\" --goal %d. Else it goes to the Operator in %d minutes.",
+		"[Coral] Goal #%d's tasks are all done. If more work is planned, add it with coral-board task add \"...\" --goal %d; otherwise do nothing: it goes to the Operator in %d minutes.",
+		"[Coral] Goal #%d's tasks are all done. If more work is planned, add it with coral-board task add \"...\" --goal %d; otherwise do nothing: it goes to the Operator in %d minutes, who then decides whether the goal is done. Check the goal's own done-when line first."), goalID, goalID, minutes)
 }
 
 // quiet is the quiet period the notice names: the setting's, 15 minutes when it is not read.
@@ -87,7 +90,7 @@ func (h *HealthNudges) nudgeGoalDone(ctx context.Context, project string, bySess
 		if !r.take(ctx, ruleGoalDoneNudge, who, time.Minute) {
 			continue
 		}
-		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, fmt.Sprintf("health-goal-done:%s:%d", project, g.ID), goalDoneNudgeText(g.ID, int(window/time.Minute))) != nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, fmt.Sprintf("health-goal-done:%s:%d", project, g.ID), goalDoneNudgeText(hs.GoalsReady.RuleRoute, g.ID, int(window/time.Minute))) != nil {
 			continue
 		}
 		_ = h.store.RecordHealthAction(ctx, project, ruleGoalDoneNudge+"-goal", key, now)

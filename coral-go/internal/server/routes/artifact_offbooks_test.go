@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -109,4 +110,26 @@ func TestAnUploadFromAnAgentWithOpenWorkInReviewIsNotOffTheBooks(t *testing.T) {
 	require.Equal(t, http.StatusCreated, code, out)
 	assert.NotContains(t, out, "task_id")
 	assert.Empty(t, l.offBooks(), "it has open work: not noted as off the books")
+}
+
+// upload_no_task.text (#20496): the line the check shows for an upload with no task reads the rule's text level; normal is the phrase above.
+func TestTheUploadLineReadsItsTextLevel(t *testing.T) {
+	for level, want := range map[string]string{
+		board.TextShort: "uploaded an artifact (%s) with no task",
+		board.TextLong:  "uploaded an artifact (%s) with no task in progress: upload it with --task, or take a task first",
+	} {
+		l := newLinkRig(t)
+		ctx := context.Background()
+		require.NoError(t, l.h.bs.SetHealthOn(ctx, "alpha", true))
+		_, err := l.h.bs.Subscribe(ctx, "alpha", "Frontend", "Orchestrator", "agent-s2", nil, "all")
+		require.NoError(t, err)
+		hs := l.h.bs.GetHealthSettings(ctx, "alpha")
+		hs.UploadNoTask.Text = level
+		require.NoError(t, l.h.bs.SetHealthSettings(ctx, "alpha", hs))
+		code, out := l.post("s1", "off the books "+level, nil)
+		require.Equal(t, http.StatusCreated, code, out)
+		got := l.offBooks()
+		require.Len(t, got, 1, level)
+		assert.Equal(t, fmt.Sprintf(want, out["digest"].(string)[7:15]), got[0].Detail, level)
+	}
 }

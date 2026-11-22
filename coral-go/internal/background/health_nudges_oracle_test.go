@@ -415,7 +415,7 @@ func (h *HealthNudges) runProjectBefore4599(ctx context.Context, project string,
 					escalated = append(escalated, fmt.Sprintf("%s has not claimed #%d after %d nudges", teamhealth.Name(sub.SubscriberID), t.ID, c.Count))
 				}
 			case take(ruleClaimNudge, sub.SubscriberID, claimAfter):
-				if h.deliver(ctx, a, "health-claim:"+project, claimNudgeText(t.ID)) == nil {
+				if h.deliver(ctx, a, "health-claim:"+project, claimNudgeText(board.RuleRoute{}, t.ID)) == nil {
 					h.store.BumpHealthCounter(ctx, project, ruleClaimNudge, sub.SubscriberID, subject, now)
 					claimed = append(claimed, fmt.Sprintf("%s (#%d)", teamhealth.Name(sub.SubscriberID), t.ID))
 				}
@@ -456,7 +456,7 @@ func (h *HealthNudges) runProjectBefore4599(ctx context.Context, project string,
 				}
 			}
 			if silent := now.Sub(last); silent >= statusAfter && take(ruleStatusNudge, sub.SubscriberID, statusAfter) {
-				if h.deliver(ctx, a, "health-status:"+project, statusNudgeText(t.ID, int(silent.Minutes()))) == nil {
+				if h.deliver(ctx, a, "health-status:"+project, statusNudgeText(board.RuleRoute{}, t.ID, int(silent.Minutes()))) == nil {
 					h.store.BumpHealthCounter(ctx, project, ruleStatusNudge, sub.SubscriberID, subject, now)
 					statused = append(statused, fmt.Sprintf("%s (#%d)", teamhealth.Name(sub.SubscriberID), t.ID))
 				}
@@ -467,7 +467,7 @@ func (h *HealthNudges) runProjectBefore4599(ctx context.Context, project string,
 	// Re-nudge the orchestrator, once, for agents' @-mentions it has not acted on (#4176 rule 9):
 	// once per message, one nudge per sender per window, never for Coral's own lines.
 	if orch, err := h.store.TeamOrchestrator(ctx, project); err == nil && hs.MentionRenudge.On {
-		h.renudgeMentions(ctx, project, orch, subs, bySession, now, minutes(hs.MentionRenudge.AfterMin), take, &renudged)
+		h.renudgeMentions(ctx, project, orch, subs, bySession, board.RuleRoute{}, now, minutes(hs.MentionRenudge.AfterMin), take, &renudged)
 	}
 
 	// An agent whose messages wait at a dialog: tell the Operator (#4175 step 3).

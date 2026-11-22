@@ -107,7 +107,7 @@ func (h *SessionsHandler) noteOffBooksUpload(ctx context.Context, taskID int64, 
 	if len(short) > 8 {
 		short = short[:8]
 	}
-	_ = h.bs.AddOffBooks(ctx, sub.Project, board.OffBooksUpload, sub.SubscriberID, digest, "uploaded an artifact ("+short+") with no task in progress", time.Now())
+	_ = h.bs.AddOffBooks(ctx, sub.Project, board.OffBooksUpload, sub.SubscriberID, digest, hs.UploadNoTask.Pick("uploaded an artifact ("+short+") with no task", "uploaded an artifact ("+short+") with no task in progress", "uploaded an artifact ("+short+") with no task in progress: upload it with --task, or take a task first"), time.Now())
 }
 
 // linkedTaskTitle is the title of task id on the board of the verified agent in ctx, "" when it cannot be read: the upload's reply names the task it landed on, so a wrong target is seen at once (#16139).

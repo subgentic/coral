@@ -27,7 +27,7 @@ type deviationSaid struct {
 
 // deviationItems returns the findings not said yet at their current level, and notes them to be marked said once a check has been delivered with them.
 func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string, rcpt *board.Subscriber, tasks []board.Task, parked map[string]bool, waits []board.RegisteredWait, subs []board.Subscriber, now time.Time) []teamhealth.Item {
-	dev := m.store.GetHealthSettings(ctx, project).Deviations
+	dev := m.store.GetHealthSettings(ctx, project).Deviations // its text level (deviations.text, #20496) picks the wording of each finding
 	if !dev.On {
 		return nil
 	}
@@ -84,7 +84,7 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 				whose = fmt.Sprintf("the team's last %d (it has under %d of its own)", u.N, teamhealth.MinOwnSamples)
 			}
 			flag("A", id, agent, level(age, u.TaskOverdue()), teamhealth.Item{Agent: name, Age: age,
-				Problem: fmt.Sprintf("#%d has been in progress for %s; the usual is %s (median of %s, 90th percentile %s)", t.ID, teamhealth.Age(age), teamhealth.Age(u.Median), whose, teamhealth.Age(u.P90)),
+				Problem: fmt.Sprintf(dev.Pick("#%d in progress for %s; the usual is %s", "#%d has been in progress for %s; the usual is %s (median of %s, 90th percentile %s)", "#%d has been in progress for %s; the usual is %s (median of %s, 90th percentile %s): longer than its own history, not a deadline"), devArgs(dev.RuleRoute, t.ID, teamhealth.Age(age), teamhealth.Age(u.Median), whose, teamhealth.Age(u.P90))...),
 				Suggest: "check on it"})
 		}
 		// B: silent longer than its usual gap between posts
@@ -100,7 +100,7 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 			usual := teamhealth.Median(gaps)
 			silent := now.Sub(events[len(events)-1])
 			flag("B", id, agent, level(silent, 3*usual), teamhealth.Item{Agent: name, Age: silent,
-				Problem: fmt.Sprintf("silent on #%d for %s; its usual gap between posts on it is %s (median of %d)", t.ID, teamhealth.Age(silent), teamhealth.Age(usual), len(gaps)),
+				Problem: fmt.Sprintf(dev.Pick("silent on #%d for %s; the usual gap is %s", "silent on #%d for %s; its usual gap between posts on it is %s (median of %d)", "silent on #%d for %s; its usual gap between posts on it is %s (median of %d): longer than its own history, not a deadline"), devArgs(dev.RuleRoute, t.ID, teamhealth.Age(silent), teamhealth.Age(usual), len(gaps))...),
 				Suggest: "ask for a status"})
 		}
 	}
@@ -140,7 +140,7 @@ func (m *BoardHealthMonitor) deviationItems(ctx context.Context, project string,
 		usual := teamhealth.Median(prior)
 		age := now.Sub(at)
 		flag("C", fmt.Sprint(w.ID), w.SubscriberID, level(age, 2*usual), teamhealth.Item{Agent: teamhealth.Name(w.SubscriberID), Age: age,
-			Problem: fmt.Sprintf("has waited %s on %s; an answer usually takes %s (median of %d earlier waits)", teamhealth.Age(age), on, teamhealth.Age(usual), len(prior)),
+			Problem: fmt.Sprintf(dev.Pick("has waited %s on %s; usually %s", "has waited %s on %s; an answer usually takes %s (median of %d earlier waits)", "has waited %s on %s; an answer usually takes %s (median of %d earlier waits): longer than its own history, not a deadline"), devArgs(dev.RuleRoute, teamhealth.Age(age), on, teamhealth.Age(usual), len(prior))...),
 			Suggest: "ask who it waits on, or check on it"})
 	}
 	m.clearGoneDeviations(ctx, project, live)
@@ -186,4 +186,12 @@ func (m *BoardHealthMonitor) markDeviationsShown(ctx context.Context, project, t
 			_ = m.store.MarkHealthEscalated(ctx, project, d.rule, d.target, d.subject, now)
 		}
 	}
+}
+
+// devArgs is a finding's arguments at the rule's text level: the short wording says the first three (what, how long, the usual) and leaves the sample sizes out (#20496).
+func devArgs(rt board.RuleRoute, args ...any) []any {
+	if rt.Level() == board.TextShort && len(args) > 3 {
+		return args[:3]
+	}
+	return args
 }

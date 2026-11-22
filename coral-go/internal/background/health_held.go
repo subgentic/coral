@@ -30,11 +30,13 @@ func (h *HealthNudges) heldNotices(ctx context.Context, project string, subs []b
 		return
 	}
 	after := time.Duration(hs.HeldNotice.AfterMin) * time.Minute
-	h.heldNotice(ctx, project, subs, now, after, take, h.heldDialogs, ruleHeldNotice+"-msg",
-		"@Operator [Coral health] waiting at a dialog: %s. Coral's messages to them are held until someone answers the dialog at their terminal.")
+	dialog := "@Operator [Coral health] waiting at a dialog: %s. Coral's messages to them are held until someone answers the dialog at their terminal."
+	draft := "@Operator [Coral health] Coral's messages to %s are waiting behind text in their input box that Coral didn't type. " +
+		"Coral never sends or clears that text. Send or clear it in their terminal, and the waiting messages are delivered."
+	h.heldNotice(ctx, project, subs, now, after, take, h.heldDialogs, ruleHeldNotice+"-msg", // the rule's text level (held_notice.text, #20496): normal is the line above
+		hs.HeldNotice.Pick("@Operator [Coral health] waiting at a dialog: %s.", dialog, dialog+" The agent's card shows the dialog."))
 	h.heldNotice(ctx, project, subs, now, after, take, h.heldDrafts, ruleHeldNotice+"-draft",
-		"@Operator [Coral health] Coral's messages to %s are waiting behind text in their input box that Coral didn't type. "+
-			"Coral never sends or clears that text. Send or clear it in their terminal, and the waiting messages are delivered.")
+		hs.HeldNotice.Pick("@Operator [Coral health] Coral's messages to %s are waiting behind text in their input box.", draft, draft+" The agent's card shows the waiting text."))
 }
 
 // heldNotice is one kind of heldNotices: the agents held (by held) for at least after, told once per episode under action.

@@ -110,7 +110,7 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 	if hs.BusyNoTask.On {
 		m.noteBusyNoTask(ctx, project, orch, subs, bySession, inProgress, time.Duration(hs.BusyNoTask.AfterMin)*time.Minute, hs.BusyNoTask.RuleRoute, now)
 	}
-	m.scanOffBooksPosts(ctx, project, orch, subs, hs.PostNoTask.On, time.Duration(hs.OffBooks.PostGraceMin)*time.Minute, now)
+	m.scanOffBooksPosts(ctx, project, orch, subs, hs.PostNoTask.On, hs.PostNoTask.RuleRoute, time.Duration(hs.OffBooks.PostGraceMin)*time.Minute, now)
 	m.noteOperatorWaits(ctx, project, orch, subs, bySession, now)     // a post that waits on the Operator and is not in their Needs you (#12138)
 	m.noteChatOperatorWaits(ctx, project, orch, subs, bySession, now) // and a chat reply that does (#12138 part 2)
 	if hs.GoalSize.On {
@@ -232,7 +232,7 @@ func (m *BoardHealthMonitor) noteBusyNoTask(ctx context.Context, project, orch s
 
 // scanOffBooksPosts (b): the board's messages since the last scan (the first scan only marks where the board is: nothing before it is judged). A post by a member other than the
 // orchestrator, not Coral's, not a reply to a task, with no task number in it, that offers a commit or a patch, and whose author had no task in progress when it was posted.
-func (m *BoardHealthMonitor) scanOffBooksPosts(ctx context.Context, project, orch string, subs []board.Subscriber, on bool, grace time.Duration, now time.Time) {
+func (m *BoardHealthMonitor) scanOffBooksPosts(ctx context.Context, project, orch string, subs []board.Subscriber, on bool, route board.RuleRoute, grace time.Duration, now time.Time) {
 	cursor, known := m.store.OffBooksPostCursor(ctx, project)
 	if !known {
 		if latest, err := m.store.LatestMessageID(ctx, project); err == nil {
@@ -268,7 +268,7 @@ func (m *BoardHealthMonitor) scanOffBooksPosts(ctx context.Context, project, orc
 		if had, err := m.store.HadTaskInProgress(ctx, project, msg.SubscriberID, at, grace); err != nil || had {
 			continue
 		}
-		_ = m.store.AddOffBooks(ctx, project, board.OffBooksPost, msg.SubscriberID, strconv.FormatInt(msg.ID, 10), "posted "+what+" with no task number and no task in progress", at)
+		_ = m.store.AddOffBooks(ctx, project, board.OffBooksPost, msg.SubscriberID, strconv.FormatInt(msg.ID, 10), route.Pick("posted "+what+" with no task", "posted "+what+" with no task number and no task in progress", "posted "+what+" with no task number and no task in progress: post it with --task, or take a task first"), at)
 	}
 	_ = m.store.SetOffBooksPostCursor(ctx, project, last)
 }

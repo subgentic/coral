@@ -166,7 +166,7 @@ func (w *LandingWatch) note(ctx context.Context, project string, ls board.Health
 		if len(short) > 9 {
 			short = short[:9]
 		}
-		detail := fmt.Sprintf("%s has not moved for %s and %s since it did: not landed", ls.Branch, teamhealth.Age(stood), taskCount(n))
+		detail := fmt.Sprintf(ls.Pick("%s has not moved for %s: not landed", "%s has not moved for %s and %s since it did: not landed", "%s has not moved for %s and %s since it did: not landed. Land the approved work, or say what holds it"), landingArgs(ls.RuleRoute, ls.Branch, teamhealth.Age(stood), taskCount(n))...)
 		if added, err := w.store.AddOffBooksOnce(ctx, project, board.OffBooksLanding, "Board", fmt.Sprintf("%s|%s|%s|%d", repo, ls.Branch, short, waits), detail, now); err == nil && added {
 			fresh = append(fresh, detail)
 		}
@@ -265,7 +265,7 @@ func (w *LandingWatch) noteRelease(ctx context.Context, project string, rs board
 		if err != nil || n == 0 {
 			continue
 		}
-		detail := fmt.Sprintf("%s is %s and %s past %s for %d h", rs.Branch, plural(st.Commits, "commit"), plural(n, "task"), st.Tag, max(int(ahead.Hours()), 1))
+		detail := fmt.Sprintf(rs.Pick("%s is %s past %s for %d h", "%s is %s and %s past %s for %d h", "%s is %s and %s past %s for %d h: cut the release, or say what holds it"), releaseArgs(rs.RuleRoute, rs.Branch, plural(st.Commits, "commit"), plural(n, "task"), st.Tag, max(int(ahead.Hours()), 1))...)
 		ref := fmt.Sprintf("%s|%s|%s|%d", st.Repo, rs.Branch, st.Tag, int(ahead/wait))
 		if added, err := w.store.AddOffBooksOnce(ctx, project, board.OffBooksRelease, "Board", ref, detail, now); err == nil && added {
 			fresh = append(fresh, detail)
@@ -279,4 +279,20 @@ func plural(n int, noun string) string {
 		return "1 " + noun
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// landingArgs is the arguments of the landing line at the rule's text level: the short line names the branch and how long it stood, and no count of tasks (#20496).
+func landingArgs(rt board.RuleRoute, branch, age, tasks string) []any {
+	if rt.Level() == board.TextShort {
+		return []any{branch, age}
+	}
+	return []any{branch, age, tasks}
+}
+
+// releaseArgs is the arguments of the release line at the rule's text level: the short line leaves the count of tasks out.
+func releaseArgs(rt board.RuleRoute, branch, commits, tasks, tag string, hours int) []any {
+	if rt.Level() == board.TextShort {
+		return []any{branch, commits, tag, hours}
+	}
+	return []any{branch, commits, tasks, tag, hours}
 }

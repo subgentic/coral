@@ -90,16 +90,16 @@ func TestTheOrchestratorTunesEveryHealthSettingAndNoOneElseDoes(t *testing.T) {
 
 	// Refused, in words: out of range, not a number, an unknown key, a bad level, a non-member, the Operator, a rule that does not read it.
 	for body, want := range map[string]string{
-		`{"key":"landing.wait_min","value":"5"}`:     "outside",
-		`{"key":"goal_size.limit","value":"2"}`:      "not accepted",
-		`{"key":"goal_size.limit","value":"many"}`:   "not a whole number",
-		`{"key":"nope.x","value":"1"}`:               "not a health setting",
-		`{"key":"goal_size.text","value":"loud"}`:    "short, normal or long",
-		`{"key":"goal_size.to","value":"Stranger"}`:  "not a member",
-		`{"key":"goal_size.to","value":"Operator"}`:  "never the Operator",
-		`{"key":"claim_nudge.to","value":"Dev"}`:     "does not read a recipient yet",
-		`{"key":"claim_nudge.text","value":"short"}`: "does not read a text level yet",
-		`{"health":{"landing":{"wait_minutes":9}}}`:  "unknown field",
+		`{"key":"landing.wait_min","value":"5"}`:    "outside",
+		`{"key":"goal_size.limit","value":"2"}`:     "not accepted",
+		`{"key":"goal_size.limit","value":"many"}`:  "not a whole number",
+		`{"key":"nope.x","value":"1"}`:              "not a health setting",
+		`{"key":"goal_size.text","value":"loud"}`:   "short, normal or long",
+		`{"key":"goal_size.to","value":"Stranger"}`: "not a member",
+		`{"key":"goal_size.to","value":"Operator"}`: "never the Operator",
+		`{"key":"claim_nudge.to","value":"Dev"}`:    "does not read a recipient yet",
+		`{"key":"claim_nudge.text","value":"loud"}`: "short, normal or long",
+		`{"health":{"landing":{"wait_minutes":9}}}`: "unknown field",
 	} {
 		code, out = call(http.MethodPut, body, "", orch)
 		assert.Equal(t, http.StatusBadRequest, code, body)

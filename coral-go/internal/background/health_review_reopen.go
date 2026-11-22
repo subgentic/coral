@@ -99,7 +99,7 @@ func (r *healthRun) reviewNudge(ctx context.Context, sub board.Subscriber, a Age
 	if parked {
 		h.store.CancelActiveWait(ctx, project, sub.SubscriberID)
 	}
-	if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-review:"+project, claimNudgeText(t.ID)) == nil {
+	if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-review:"+project, claimNudgeText(r.hs.ClaimNudge.RuleRoute, t.ID)) == nil {
 		h.store.BumpHealthCounter(ctx, project, ruleReviewNudge, sub.SubscriberID, subject, r.now)
 		r.claimed = append(r.claimed, fmt.Sprintf("%s (#%d)", teamhealth.Name(sub.SubscriberID), t.ID))
 	}

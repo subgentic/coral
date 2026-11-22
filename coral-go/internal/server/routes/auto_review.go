@@ -63,9 +63,11 @@ func (h *BoardHandler) autoDelegateReview(ctx context.Context, project string, i
 	for _, rt := range reviews {
 		list = append(list, fmt.Sprintf("%s (#%d)", teamhealth.Name(*rt.AssignedTo), rt.ID))
 	}
-	h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf(
+	ad := h.bs.GetHealthSettings(ctx, project).AutoDelegate // its text level (auto_delegate.text, #20496): the line to the Orchestrator
+	h.bs.PostSystemMessage(ctx, project, "Coral Task Queue", fmt.Sprintf(ad.Pick(
+		"[Task #%d delegated for review by Coral] to %s. @%s",
 		"[Task #%d delegated for review by Coral] to %s, %s. @%s change them with coral-board task review %d --to \"...\"",
-		id, strings.Join(list, ", "), source, teamhealth.Name(orch), id), nil)
+		"[Task #%d delegated for review by Coral] to %s, %s. @%s change them with coral-board task review %d --to \"...\" if they are not the right reviewers; each is told to claim the review and approve or reject it."), autoDelegateArgs(ad.RuleRoute, id, strings.Join(list, ", "), source, teamhealth.Name(orch))...), nil)
 	for _, rt := range reviews {
 		if h.reviewerBusy(ctx, project, *rt.AssignedTo, rt.ID) {
 			// a reviewer at work on their own task is not interrupted: no mention, no nudge. The review waits in their queue and is offered when their task ends (nudgeNextTask, #8875)
@@ -122,4 +124,12 @@ func (h *BoardHandler) claimIdentity(r *http.Request, project, claimed string) s
 		return "operator"
 	}
 	return "claimed"
+}
+
+// autoDelegateArgs is the arguments of the delegation line at the rule's text level: the short line says who was asked and leaves out the reason and the way to change them.
+func autoDelegateArgs(rt board.RuleRoute, id int64, who, source, orch string) []any {
+	if rt.Level() == board.TextShort {
+		return []any{id, who, orch}
+	}
+	return []any{id, who, source, orch, id}
 }

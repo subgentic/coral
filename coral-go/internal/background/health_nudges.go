@@ -117,19 +117,33 @@ const (
 	ruleAskReminder    = "ask-reminder"
 )
 
-func claimNudgeText(id int64) string {
-	return fmt.Sprintf("[Coral] #%d is assigned to you and waiting. Run 'coral-board task claim %d' to start it.", id, id)
+// The five nudges below read their rule's text level (claim_nudge.text and the like, #20496): normal is the line every team has always had, short and long are Coral's own other templates. The numbers and the
+// sender's name are the only variable parts, as before.
+func claimNudgeText(rt board.RuleRoute, id int64) string {
+	return fmt.Sprintf(rt.Pick(
+		"[Coral] #%[1]d is waiting for you: coral-board task claim %[1]d.",
+		"[Coral] #%[1]d is assigned to you and waiting. Run 'coral-board task claim %[1]d' to start it.",
+		"[Coral] #%[1]d is assigned to you and waiting. Run 'coral-board task claim %[1]d' to start it, then 'coral-board task detail %[1]d' for what it asks. Nothing has been claimed yet."), id)
 }
 
-func mentionRenudgeText(sender string, n int, since time.Time) string {
+func mentionRenudgeText(rt board.RuleRoute, sender string, n int, since time.Time) string {
 	if n == 1 {
-		return fmt.Sprintf("[Coral] %s mentioned you at %s and has no answer yet. Run 'coral-board read'.", board.TypedLabel(sender), since.Format("15:04"))
+		return fmt.Sprintf(rt.Pick(
+			"[Coral] %s mentioned you at %s: coral-board read.",
+			"[Coral] %s mentioned you at %s and has no answer yet. Run 'coral-board read'.",
+			"[Coral] %s mentioned you at %s and has no answer yet. Run 'coral-board read', and answer on the board so they know it was seen."), board.TypedLabel(sender), since.Format("15:04"))
 	}
-	return fmt.Sprintf("[Coral] %s mentioned you %d times since %s and has no answer yet. Run 'coral-board read'.", board.TypedLabel(sender), n, since.Format("15:04"))
+	return fmt.Sprintf(rt.Pick(
+		"[Coral] %s mentioned you %d times since %s: coral-board read.",
+		"[Coral] %s mentioned you %d times since %s and has no answer yet. Run 'coral-board read'.",
+		"[Coral] %s mentioned you %d times since %s and has no answer yet. Run 'coral-board read', and answer on the board so they know it was seen."), board.TypedLabel(sender), n, since.Format("15:04"))
 }
 
-func statusNudgeText(id int64, minutes int) string {
-	return fmt.Sprintf("[Coral] No activity on #%d for %d minutes. Post a one-line summary of progress or what you need and from whom: coral-board post --task %d \"...\"", id, minutes, id)
+func statusNudgeText(rt board.RuleRoute, id int64, minutes int) string {
+	return fmt.Sprintf(rt.Pick(
+		"[Coral] No activity on #%d for %d minutes: coral-board post --task %d \"...\"",
+		"[Coral] No activity on #%d for %d minutes. Post a one-line summary of progress or what you need and from whom: coral-board post --task %d \"...\"",
+		"[Coral] No activity on #%d for %d minutes. Post a one-line summary of progress or what you need and from whom: coral-board post --task %d \"...\". If the task is blocked or done, say so there, so the team can move on."), id, minutes, id)
 }
 
 // RunOnce applies the rules to every board once.
@@ -221,7 +235,7 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 	// Re-nudge the orchestrator, once, for agents' @-mentions it has not acted on (#4176 rule 9):
 	// once per message, one nudge per sender per window, never for Coral's own lines.
 	if orch, err := h.store.TeamOrchestrator(ctx, project); err == nil && hs.MentionRenudge.On {
-		h.renudgeMentions(ctx, project, orch, subs, bySession, r.now, healthMinutes(hs.MentionRenudge.AfterMin), func(rule, target string, cooldown time.Duration) bool {
+		h.renudgeMentions(ctx, project, orch, subs, bySession, hs.MentionRenudge.RuleRoute, r.now, healthMinutes(hs.MentionRenudge.AfterMin), func(rule, target string, cooldown time.Duration) bool {
 			return r.take(ctx, rule, target, cooldown)
 		}, &r.renudged)
 	}
@@ -274,7 +288,7 @@ func (r *healthRun) claimNudge(ctx context.Context, sub board.Subscriber, a Agen
 			r.escalated = append(r.escalated, fmt.Sprintf("%s has not claimed #%d after %d nudges", teamhealth.Name(sub.SubscriberID), t.ID, c.Count))
 		}
 	case r.take(ctx, ruleClaimNudge, sub.SubscriberID, claimAfter):
-		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-claim:"+project, claimNudgeText(t.ID)) == nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-claim:"+project, claimNudgeText(r.hs.ClaimNudge.RuleRoute, t.ID)) == nil {
 			h.store.BumpHealthCounter(ctx, project, ruleClaimNudge, sub.SubscriberID, subject, r.now)
 			r.claimed = append(r.claimed, fmt.Sprintf("%s (#%d)", teamhealth.Name(sub.SubscriberID), t.ID))
 		}
@@ -319,7 +333,7 @@ func (r *healthRun) statusNudges(ctx context.Context, sub board.Subscriber, a Ag
 			}
 		}
 		if silent := r.now.Sub(last); silent >= statusAfter && r.take(ctx, ruleStatusNudge, sub.SubscriberID, statusAfter) {
-			if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-status:"+project, statusNudgeText(t.ID, int(silent.Minutes()))) == nil {
+			if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-status:"+project, statusNudgeText(r.hs.StatusNudge.RuleRoute, t.ID, int(silent.Minutes()))) == nil {
 				h.store.BumpHealthCounter(ctx, project, ruleStatusNudge, sub.SubscriberID, subject, r.now)
 				r.statused = append(r.statused, fmt.Sprintf("%s (#%d)", teamhealth.Name(sub.SubscriberID), t.ID))
 			}
@@ -377,7 +391,7 @@ func (r *healthRun) postLines(ctx context.Context) {
 // the orchestrator neither posted nor did anything (no hook event), and reminds it once per
 // sender, each message only once.
 func (h *HealthNudges) renudgeMentions(ctx context.Context, project, orch string, subs []board.Subscriber, bySession map[string]AgentInfo,
-	now time.Time, after time.Duration, take func(rule, target string, cooldown time.Duration) bool, renudged *[]string) {
+	rt board.RuleRoute, now time.Time, after time.Duration, take func(rule, target string, cooldown time.Duration) bool, renudged *[]string) {
 	var orchSub *board.Subscriber
 	for i := range subs {
 		if subs[i].SubscriberID == orch {
@@ -430,7 +444,7 @@ func (h *HealthNudges) renudgeMentions(ctx context.Context, project, orch string
 		if !take(ruleMentionRenudge, sender, 30*time.Minute) {
 			continue
 		}
-		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-mention:"+project, mentionRenudgeText(teamhealth.Name(sender), p.n, p.first)) != nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-mention:"+project, mentionRenudgeText(rt, teamhealth.Name(sender), p.n, p.first)) != nil {
 			continue
 		}
 		for _, id := range p.ids {
@@ -442,8 +456,11 @@ func (h *HealthNudges) renudgeMentions(ctx context.Context, project, orch string
 
 // askReminderText is the one reminder a member gets for a question: who asked, how long ago, which message, and how to answer it so it
 // is seen as an answer. The question itself is not typed: it is read on the board (goal #7).
-func askReminderText(asker string, minutes int, id int64) string {
-	return fmt.Sprintf("[Coral] %s asked you a question %d min ago and has no answer from you yet, message #%d. Run 'coral-board read' to see it, and answer with: coral-board post --reply-to %d \"...\"",
+func askReminderText(rt board.RuleRoute, asker string, minutes int, id int64) string {
+	return fmt.Sprintf(rt.Pick(
+		"[Coral] %s asked you %d min ago, message #%d: coral-board post --reply-to %d \"...\"",
+		"[Coral] %s asked you a question %d min ago and has no answer from you yet, message #%d. Run 'coral-board read' to see it, and answer with: coral-board post --reply-to %d \"...\"",
+		"[Coral] %s asked you a question %d min ago and has no answer from you yet, message #%d. Run 'coral-board read' to see it, and answer with: coral-board post --reply-to %d \"...\" so the answer is seen as an answer to it, not a new post."),
 		board.TypedLabel(teamhealth.Name(asker)), minutes, id, id)
 }
 
@@ -485,7 +502,7 @@ func (h *HealthNudges) remindAsks(ctx context.Context, project string, bySession
 		if !r.take(ctx, ruleAskReminder, o.Member, time.Minute) {
 			continue
 		}
-		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-ask:"+project, askReminderText(o.Asker, int(now.Sub(o.At).Minutes()), o.MessageID)) != nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-ask:"+project, askReminderText(hs.AskReminder.RuleRoute, o.Asker, int(now.Sub(o.At).Minutes()), o.MessageID)) != nil {
 			continue
 		}
 		_ = h.store.RecordHealthAction(ctx, project, ruleAskReminder+"-msg", key, now)

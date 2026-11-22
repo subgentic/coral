@@ -153,8 +153,11 @@ func (h HealthSettings) RouteMembers() map[string]string {
 
 // routeWired says which rules read their To and their Text in this build (#20136): a setting a rule does not read is refused when saved and shown as unused, never accepted and ignored.
 var routeWired = map[string][2]bool{ // {to, text}
-	"landing": {true, false}, "release": {true, false}, "unowned_tasks": {true, true}, "goal_size": {true, true},
-	"busy_no_task": {true, true}, "post_no_task": {true, false}, "upload_no_task": {true, false}, "pool_review": {false, true},
+	"landing": {true, true}, "release": {true, true}, "unowned_tasks": {true, true}, "goal_size": {true, true},
+	"busy_no_task": {true, true}, "post_no_task": {true, true}, "upload_no_task": {true, true}, "pool_review": {false, true},
+	// the lines that go to the agent they are about (or to the Operator): they read a text level (#20496); a second recipient for them is not a thing yet
+	"claim_nudge": {false, true}, "status_nudge": {false, true}, "mention_renudge": {false, true}, "ask_reminder": {false, true},
+	"goals_ready": {false, true}, "held_notice": {false, true}, "deviations": {false, true}, "auto_delegate": {false, true},
 }
 
 // RouteWired reports whether the rule reads its recipient (to) and its text level (text).
