@@ -92,6 +92,11 @@ type needsYouAnswer struct {
 	Unread      []string          `json:"unread_sources,omitempty"` // a source that could not be read this time: its things are missing from the count, not zero
 }
 
+// SetNeedsYouMemberFull tells the board how to list the live Full grants of Hub people, so the owner sees each one as long as it is live. Nil: none.
+func (h *BoardHandler) SetNeedsYouMemberFull(fn func(ctx context.Context) ([]NeedsYouItem, error)) {
+	h.needsYouMemberFull = fn
+}
+
 // SetNeedsYouSkills tells the board how to list the skills that wait for the Operator (the Skills Store owns them). Nil: none.
 func (h *BoardHandler) SetNeedsYouSkills(fn func(ctx context.Context) ([]NeedsYouItem, error)) {
 	h.needsYouSkills = fn
@@ -540,6 +545,14 @@ func (h *BoardHandler) needsYouItemsOf(r *http.Request, onlySkills bool) (items 
 				kept = append(kept, items[i])
 			}
 			items = kept
+		}
+	}
+
+	if h.needsYouMemberFull != nil && !onlySkills { // a live Full grant of a Hub person (#20581 d)
+		if rows, err := h.needsYouMemberFull(ctx); err != nil {
+			unread = appendOnce(unread, "member_grants")
+		} else {
+			items = append(items, rows...)
 		}
 	}
 

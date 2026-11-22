@@ -63,6 +63,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetCommentReadStamp(sessHandler.StampCommentReads)                    // the Operator's comment says when the asked agent read it (#14130)
 	boardHandler.SetIdleWaker(sessHandler.WakeIdleForDelivery)                         // any typed delivery to an auto-asleep agent wakes it first (#12111)
 	boardHandler.SetOperatorWaker(sessHandler.WakeForOperator)                         // the Operator's answer to an agent's question wakes a sleeping asker, whoever put it to sleep (#19901)
+	boardHandler.SetNeedsYouMemberFull(routes.MemberGrantNoticeItems(s.boardStore, time.Now)) // a live Full grant of a Hub person stays in Needs you until it ends (#20581 d)
 	boardHandler.SetNeedsYouSkills(routes.NewSkillsHandler(s.db, s.cfg).NeedsYouItems) // the skills that wait for the Operator are items of Needs you (#12139)
 	boardHandler.SetSessionThinkingLookup(routes.SessionThinkingLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetTaskArtifactWriter(s.cfg.CoralDir(), sessHandler.PersistTaskChanges)
