@@ -601,6 +601,8 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	}
 	if b := blockedField(sid, agent.AgentType, sleeping); b != nil {
 		entry["blocked"] = b // only a row that is blocked has the key (#13486)
+	} else if b := h.usageLimitBlocked(sid, agent.WorkingDir, agent.AgentType, sleeping, skipExpensive); b != nil {
+		entry["blocked"] = b // a usage limit, with its vendor and when it resets (#20692)
 	}
 	if at, ok := ptymanager.LimitResumeAt(sid); ok && !sleeping {
 		entry["limit_resume_at"] = at.UTC().Format(time.RFC3339) // only a row Coral will resume at its limit's reset has the key (#20691)

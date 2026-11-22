@@ -214,6 +214,8 @@ type ClaudeAPIError struct {
 	Kind string // "authentication_failed", "oauth_org_not_allowed", "rate_limit", "billing_error", ...
 	Text string // the CLI's message, capped
 	At   time.Time
+	// ResetAt is when a usage limit resets, read from the whole message before Text was capped (#20692); the zero time when the message names none or this is not a usage limit.
+	ResetAt time.Time
 }
 
 // NeedsLogin reports whether the error means the user must sign in. Older CLIs wrote no kind:
@@ -277,11 +279,13 @@ func updateClaudeAPIError(e *ClaudeAPIError, line []byte) {
 	}
 	_ = json.Unmarshal(line, &msg)
 	text := claudeMessageText(msg.Message.Content)
+	ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
+	full := ClaudeAPIError{Kind: kind, Text: strings.TrimSpace(text), At: ts}
+	resetAt, _ := full.parseReset() // from the whole text: the cap below must not cut the time off
 	if len(text) > claudeAPIErrorTextMax {
 		text = strings.ToValidUTF8(text[:claudeAPIErrorTextMax], "")
 	}
-	ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
-	*e = ClaudeAPIError{Kind: kind, Text: strings.TrimSpace(text), At: ts}
+	*e = ClaudeAPIError{Kind: kind, Text: strings.TrimSpace(text), At: ts, ResetAt: resetAt}
 }
 
 // claudeMessageText is a message's text: the content itself when it is a string, or its text

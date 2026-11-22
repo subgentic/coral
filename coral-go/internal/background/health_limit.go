@@ -47,17 +47,24 @@ func screenLimit(rt AgentRuntime) func(ctx context.Context, a AgentInfo) (time.D
 			return 0, false
 		}
 		var resets time.Duration
-		var ok bool
+		var ok, refusedOnly bool
 		if a.AgentType == at.Codex {
 			resets, ok = ptymanager.CodexLimitOnScreen(screen, time.Now())
 			if _, refused := ptymanager.CodexModelRefusedOnScreen(screen); !ok && refused {
-				resets, ok = 0, true // its model is refused (#13480): no turn it is given does any work, so it is blocked for every gate that skips a usage-limited agent
+				resets, ok, refusedOnly = 0, true, true // its model is refused (#13480): no turn it is given does any work, so it is blocked for every gate that skips a usage-limited agent
 			}
 		} else {
 			resets, ok = ptymanager.AgyQuotaOnScreen(screen)
 		}
+		now := time.Now()
+		limited := ok && !refusedOnly
+		var resetAt time.Time
+		if limited && resets > 0 {
+			resetAt = now.Add(resets)
+		}
+		ptymanager.NoteUsageLimit(a.SessionID, limited, resetAt, now) // the live row says it from this read (#20692), and the resumer reads the same time
 		mu.Lock()
-		cache[a.SessionID] = seen{time.Now(), resets, ok}
+		cache[a.SessionID] = seen{now, resets, ok}
 		mu.Unlock()
 		return resets, ok
 	}

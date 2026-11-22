@@ -24,6 +24,53 @@ func blockedField(sessionID, agentType string, sleeping bool) map[string]any {
 	return map[string]any{"kind": blockedModelRefused, "model": model}
 }
 
+// A row blocked by a usage limit (#20692): {kind: "usage_limit", vendor: "claude"|"codex"|"agy", reset_at: RFC 3339 UTC or null}. reset_at is null when the CLI printed no time (or none that reads as one). Claude's comes from its transcript's
+// rate-limit error (read when the error was recorded, so the transcript's text cap cannot cut it off), Codex's and agy's from the health monitor's last screen read (a mark lives usageLimitMaxAge). A limit whose reset has come is over: no mark.
+// Only an awake agent; a first paint that skips expensive reads leaves the Claude read out (a later row fills it).
+const (
+	blockedUsageLimit = "usage_limit"
+	usageLimitMaxAge  = 10 * time.Minute
+)
+
+func (h *SessionsHandler) usageLimitBlocked(sessionID, workingDir, agentType string, sleeping, skipExpensive bool) map[string]any {
+	if sleeping {
+		return nil
+	}
+	var vendor string
+	var resetAt time.Time
+	var limited bool
+	now := time.Now()
+	switch agentType {
+	case at.Claude, "":
+		if skipExpensive || h.jsonl == nil || sessionID == "" {
+			return nil
+		}
+		e, ok := h.jsonl.ReadClaudeAPIError(sessionID, workingDir)
+		if !ok || !e.UsageLimit() {
+			return nil
+		}
+		vendor, limited = "claude", true
+		resetAt, _ = e.ResetsAt()
+		if !resetAt.IsZero() && !resetAt.After(now) {
+			return nil // the reset has come: the agent may work again
+		}
+	case at.Codex:
+		vendor = "codex"
+		resetAt, limited = ptymanager.UsageLimitOf(sessionID, usageLimitMaxAge, now)
+	case at.Agy, at.Antigravity:
+		vendor = "agy"
+		resetAt, limited = ptymanager.UsageLimitOf(sessionID, usageLimitMaxAge, now)
+	}
+	if !limited {
+		return nil
+	}
+	var when any
+	if !resetAt.IsZero() {
+		when = resetAt.UTC().Format(time.RFC3339)
+	}
+	return map[string]any{"kind": blockedUsageLimit, "vendor": vendor, "reset_at": when}
+}
+
 // modelRefusedNotice is the chat's limit_notice for a Codex agent whose model is refused: the fact in a sentence (#13486). "" when it is not.
 func modelRefusedNotice(sessionID, agentType string) string {
 	b := blockedField(sessionID, agentType, false)

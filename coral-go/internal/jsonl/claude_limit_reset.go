@@ -13,6 +13,14 @@ var claudeResetRe = regexp.MustCompile(`(?i)\bresets?\s+(?:([a-z]{3,9})\.?\s+(\d
 // ResetsAt is when the limit this error reports resets, and whether the text says. Older CLIs wrote "Claude AI usage limit reached|<unix seconds>"; newer ones name a clock time, in the zone they print (the
 // local one when they print none), with a date only when it is not the next such time. A time with no date is the first one after the error was written. false: the text names no time that reads as one (the caller resumes nothing).
 func (e ClaudeAPIError) ResetsAt() (time.Time, bool) {
+	if !e.ResetAt.IsZero() {
+		return e.ResetAt, true // read when the error was recorded, from the whole message
+	}
+	return e.parseReset()
+}
+
+// parseReset reads the reset from Text (ResetsAt's fallback, and what the capture uses on the uncapped text).
+func (e ClaudeAPIError) parseReset() (time.Time, bool) {
 	if !e.UsageLimit() {
 		return time.Time{}, false
 	}
