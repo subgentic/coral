@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// claudeResetRe reads the reset a Claude usage-limit notice names: "resets 5pm (America/New_York)", "resets 7:30pm (UTC)", "resets Nov 24, 5pm".
-var claudeResetRe = regexp.MustCompile(`(?i)\bresets?\s+(?:([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\b(?:\s*\(([^)]{1,40})\))?`)
+// claudeResetRe reads the reset a Claude usage-limit notice names: "resets 5pm (America/New_York)", "resets 7:30pm (UTC)", "resets Nov 24, 5pm", "resets Nov 15 at 11pm (America/Los_Angeles)".
+var claudeResetRe = regexp.MustCompile(`(?i)\bresets?\s+(?:([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?(?:\s+at)?\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\b(?:\s*\(([^)]{1,40})\))?`)
 
 // ResetsAt is when the limit this error reports resets, and whether the text says. Older CLIs wrote "Claude AI usage limit reached|<unix seconds>"; newer ones name a clock time, in the zone they print (the
 // local one when they print none), with a date only when it is not the next such time. A time with no date is the first one after the error was written. false: the text names no time that reads as one (the caller resumes nothing).

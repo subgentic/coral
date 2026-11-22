@@ -38,7 +38,7 @@ type LimitResumer struct {
 	working func(ctx context.Context, sessionID string) bool
 	// touched says a person typed to the session since t.
 	touched func(sessionID string, since time.Time) bool
-	deliver func(ctx context.Context, a AgentInfo, text string) error
+	deliver func(ctx context.Context, a AgentInfo, text string) (skipped bool, err error)
 
 	mu      sync.Mutex
 	pending map[string]*limitPending // by session id
@@ -107,9 +107,8 @@ func (r *LimitResumer) SetAgents(ts *store.TaskStore, rt AgentRuntime, discover 
 		return known && sig.InTurn
 	}
 	r.touched = func(sid string, since time.Time) bool { return personTypedSince(sid, since) }
-	r.deliver = func(ctx context.Context, a AgentInfo, text string) error {
-		_, err := deliverAutomated(ctx, rt, r.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, text, "limit reset resume", false, false)
-		return err
+	r.deliver = func(ctx context.Context, a AgentInfo, text string) (bool, error) {
+		return deliverAutomated(ctx, rt, r.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, text, "limit reset resume", false, false)
 	}
 }
 
@@ -287,8 +286,20 @@ func (r *LimitResumer) resume(ctx context.Context, p *limitPending, now time.Tim
 	r.cancelLocked(sid, p, now)
 	r.sent[sid] = append(r.sent[sid], now)
 	r.mu.Unlock()
-	if err := r.deliver(ctx, p.a, limitResumeText); err != nil {
+	skipped, err := r.deliver(ctx, p.a, limitResumeText)
+	if err != nil {
 		r.logger.Warn("limit resume: not sent", "session_id", sid, "err", err)
+		return
+	}
+	if skipped {
+		// The gate typed nothing (a menu or prompt is open, a draft is in the box, the screen is unreadable, the agent exited): that is not a resume,
+		// so it is not logged as one and does not use the agent's cap. The event stays closed: Coral does not type into it later.
+		r.mu.Lock()
+		if n := len(r.sent[sid]); n > 0 {
+			r.sent[sid] = r.sent[sid][:n-1]
+		}
+		r.mu.Unlock()
+		r.logger.Info("limit resume: not typed, the agent's terminal was not at an empty input box", "session_id", sid)
 		return
 	}
 	r.logger.Info("limit resume: sent", "session_id", sid)

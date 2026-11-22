@@ -1,6 +1,8 @@
 package jsonl
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -49,4 +51,33 @@ func TestAClaudeLimitResetSurvivesTheTextCap(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, at.Equal(time.Date(2026, 11, 22, 23, 15, 0, 0, time.UTC)), at.String())
 	assert.True(t, e.UsageLimit())
+}
+
+// #20697 (b): two limit records Claude Code really wrote (scrubbed of ids, paths and names; the text, kind, status and times are as written). The wording of a real weekly limit has "at" between
+// the date and the hour, and the record carries the exact reset in apiErrorParams.rate_limit_info.resetsAt.
+func TestRealClaudeLimitRecordsGiveTheirResetFromTheTextAndFromTheRecord(t *testing.T) {
+	for _, c := range []struct {
+		file, text string
+		reset      time.Time
+	}{
+		{"claude_limit_5h.jsonl", "You've hit your 5-hour limit · resets 11:10am (America/Los_Angeles)", time.Unix(1793819400, 0)},
+		{"claude_limit_weekly.jsonl", "You've hit your weekly limit · resets Nov 15 at 11pm (America/Los_Angeles)", time.Unix(1794812400, 0)},
+	} {
+		line, err := os.ReadFile(filepath.Join("testdata", c.file))
+		require.NoError(t, err)
+		var e ClaudeAPIError
+		updateClaudeAPIError(&e, line)
+		assert.Equal(t, c.text, e.Text, c.file)
+		assert.True(t, e.UsageLimit(), c.file)
+
+		got, ok := e.ResetsAt()
+		require.True(t, ok, c.file)
+		assert.True(t, got.Equal(c.reset), "%s: the record's own resetsAt: got %s want %s", c.file, got, c.reset)
+
+		// The words alone (an older record with no resetsAt) give the same time.
+		e.ResetAt = time.Time{}
+		got, ok = e.ResetsAt()
+		require.True(t, ok, c.file+" from the text")
+		assert.True(t, got.Equal(c.reset), "%s: from the text: got %s want %s", c.file, got, c.reset)
+	}
 }
