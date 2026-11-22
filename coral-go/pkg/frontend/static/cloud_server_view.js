@@ -35,7 +35,7 @@ import { healthDot, healthCard, healthStatusText } from './machine_health.js';
 // This module is loaded lazily, so its search box is loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { syncRelaunchReads, resetRelaunchReads, relaunchBadge } = await importOnce('./relaunch_badge.js'); // the "Updating" badge of a hub relaunch (#5355, behind the update flag)
 const { syncServersBar, serverVisible, serversFiltered } = await importOnce('./server_search.js');
-const { startCell } = await importOnce('./computer_start.js'); // New agent, New team, New terminal on every row (#20388)
+const { computerStart } = await importOnce('./computer_start.js'); // New agent, New team, New terminal on every row (#20388)
 const DT = await importOnce('./data_table.js'); // the one table (#7903)
 const { agentCopyBeside } = await importOnce('./agent_copy_button.js'); // the robot beside the Computers page's title (#15152)
 
@@ -303,13 +303,11 @@ function launchDisclosureLine(s) {
     return line;
 }
 
-/** New agent, New team and New terminal for one linked computer, with the reason in words when they are off (mock #20111): offline says it, View says it with the way to change it. Used by the list row and the computer's page. */
-function startFor(s) {
-    const el = (tag, cls, text) => h(tag, { className: cls || '', ...(text != null ? { text } : {}) });
-    const online = s.online === true, view = effectiveOf(s) === 'view';
-    const reason = !online ? `Offline${s.last_seen ? ` since ${formatLastSeen(s.last_seen)}` : ''}. It can't start things until it is back.` : view ? 'Hub access is View, so it cannot start things.' : '';
-    return startCell(s.id, s.label || 'this computer', el, { reason, change: online && view ? { label: 'Change to Interact', run: () => setAccess(s, 'interact') } : null });
-}
+/** The phone's card leaves Agents, Last seen and Hub access to the computer's page (the Operator's choice on #20468): their cells are empty there, so the table drops the columns. */
+const onPhone = () => matchMedia('(max-width: 600px)').matches;
+
+/** The three starts of one linked computer: on the list row and on the computer's page (mock #20111). */
+const startFor = s => computerStart(s, (tag, cls, text) => h(tag, { className: cls || '', ...(text != null ? { text } : {}) }), { view: effectiveOf(s) === 'view', since: s.last_seen ? formatLastSeen(s.last_seen) : '', interact: () => setAccess(s, 'interact') });
 
 /** A machine's page (Goal #79, #9722): the machine's name (the rename form while renaming), its facts, the details the row used to expand to (health, what applies, the update notice, the relink help, the revoke question), and its actions in a foot bar: the relink help, Rename, and Revoke behind More. */
 function machinePage(s) {
@@ -357,11 +355,11 @@ function serversTable(shown) {
         columns: [
             { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: s => sortValue(s, 'name'), cell: cellOf.name },
             { key: 'status', foldLabel: true, label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
-            { key: 'agents', foldLabel: true, label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
+            { key: 'agents', foldLabel: true, label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: s => (onPhone() ? '' : cellOf.agents(s)) },
             { key: 'needs', foldLabel: true, label: 'Waiting', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
-            { key: 'seen', foldLabel: true, label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
+            { key: 'seen', foldLabel: true, label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: s => (onPhone() ? '' : cellOf.seen(s)) },
             { key: 'version', foldLabel: true, label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
-            { key: 'access', foldLabel: true, label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
+            { key: 'access', foldLabel: true, label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: s => (onPhone() ? '' : cellOf.access(s)) },
             { key: 'start', label: 'Start', line: 3, width: '19rem', fixed: true, align: 'end', cell: cellOf.start },
         ],
         // The names the deep links, the focus keep and the suites read: the table keeps its own classes, these are hooks only (no rule in any stylesheet); they are put back whenever a sort draws the rows again.

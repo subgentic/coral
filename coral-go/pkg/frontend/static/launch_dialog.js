@@ -113,7 +113,7 @@ function _selectLaunchType(type) {
     wireEnterAdvances(document.getElementById('launch-step-agent')); wireEnterAdvances(document.getElementById('launch-step-team')); // Enter in a single-line field is Next, and Launch on the last step (#11289)
     { const ti = document.getElementById('launch-team-instead'); if (ti) ti.hidden = !!(launch.member || launch.addTo); } // the way to a team from the agent's first step: not for a team's own member or an agent added to a team
     _showLaunchStep(type);
-    if (['agent', 'team', 'terminal'].includes(type) && !launch.member) importOnce('./launch_where.js').then(m => m.mountLaunchWhere(type).then(() => m.refreshLaunchWhere(type))).catch(() => {}); // the Where step under the folder (#20388): recent repos, branch state, worktrees, the setup check, asked of this computer
+    if (['agent', 'team', 'terminal'].includes(type) && !launch.member) importOnce('./launch_where.js').then(m => m.mountLaunchWhere(type)).catch(() => {});
     _preselectBackend(); // the Backend select starts on the backend this server runs, not on its first option (#16409)
     if (type === "agent") {
         if (!launch.addTo && !launch.member) { // New Agent: its own title and no team (Add agent and a member set both below, #7778, #7861)
@@ -577,6 +577,7 @@ export async function launchSession() {
     }
 
     const payload = { working_dir: dir, agent_type: type };
+    Object.assign(payload, launch.where?.[launch.mode]); // a new worktree or another branch, from the Where step (launch_where.js)
     if (launch.mode !== 'terminal' && usesSuggestion(document.getElementById('launch-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
     else if (launch.mode !== 'terminal' && document.getElementById('launch-dir')?.dataset.createNew === dir) payload.create_new_folder = true; // a new folder the person typed, which step 1 said Coral makes (#16351, #12833)
     { const t = document.getElementById('launch-agent-trust'); if (launch.mode !== 'terminal' && !isHub() && t?.checked && !document.getElementById('launch-agent-trust-row')?.hidden && t.dataset.trustFor === dir) payload.trust_folder = true; } // the person ticked Trust this folder for this path: an existing folder is trusted only then (#19216, #19176)

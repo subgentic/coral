@@ -15,7 +15,7 @@ export function mountAgentTrust() {
     const row = document.createElement('div'); row.id = 'launch-agent-trust-row'; row.className = 'sv-row'; row.hidden = true;
     const label = document.createElement('label'), box = document.createElement('input'), help = document.createElement('p');
     box.type = 'checkbox'; box.id = 'launch-agent-trust'; help.id = 'launch-agent-trust-help'; help.className = 'sv-help';
-    label.style.cssText = 'display:flex;gap:8px;align-items:center'; label.append(box, document.createTextNode(LABEL));
+    label.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:flex-start;text-align:left'; label.append(box, document.createTextNode(LABEL));
     row.append(label, help); at.after(row);
     const sync = () => {
         const d = document.getElementById('launch-dir'), f = d?.value.trim() || '';
