@@ -3,7 +3,7 @@
  * computer the launch is for (through the per-computer routes: GET /api/launch/where and /api/launch/check, and cli-check for the agent's CLI), never of this one. Words from a computer are text, never markup.
  * What the person chose goes to the launch as wherePayload(kind): new_worktree {name, base, path} or checkout_branch, which the server turns into a worktree or a switch before the agent starts. */
 import { importOnce } from './import_once.js';
-import { serverFetch } from './server_base.js';
+import { serverFetch, isLocalServer, isCloud } from './server_base.js';
 import { serverLabel } from './launch_server.js';
 import { state } from './state.js';
 import { loadStyles } from './lazy_styles.js';
@@ -231,7 +231,7 @@ function checkItems(p, where, cli, type, checks) {
         const name = type.charAt(0).toUpperCase() + type.slice(1);
         if (cli.supported === false) items.push({ tone: 'fail', title: `${name} is not offered on ${here}`, detail: cli.message || '' });
         else if (cli.found === false) items.push({ tone: 'fail', title: `${name} is not installed on ${here}`, detail: 'Install it there, then check again.' });
-        else if (cli.signed_in === false) items.push({ tone: 'fail', title: `${name} is installed but not signed in on ${here}`, detail: 'Launching now would stop at the CLI’s sign-in.', fix: { label: `Sign in on ${here}`, primary: true, signin: type } });
+        else if (cli.signed_in === false) { const server = _effectiveServer(launch.server); items.push({ tone: 'fail', title: `${name} is installed but not signed in on ${here}`, detail: isLocalServer(server) && !isCloud() ? 'Launching now would stop at the CLI’s sign-in.' : `Sign in on ${here} itself, then check again: launching now would stop at the CLI’s sign-in.`, fix: isLocalServer(server) && !isCloud() ? { label: `Sign in on ${here}`, primary: true, signin: type } : null }); }
         else if (cli.signed_in === true) items.push({ tone: 'ok', title: `${name} is installed and signed in`, detail: cli.version ? `version ${cli.version} on ${here}` : `on ${here}` });
         else items.push({ tone: 'unknown', title: `${name} sign-in: not checked`, detail: cli.signin_timeout ? 'Its sign-in did not answer: not checked, and it does not block.' : `${name} cannot be asked. If it needs you to sign in, it says so in its terminal and the agent waits there.` });
     }
