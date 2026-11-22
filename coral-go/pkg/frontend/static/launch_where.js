@@ -68,8 +68,9 @@ function drawComputer(p) {
     const dot = node('span', 'launch-where-dot'); dot.setAttribute('aria-hidden', 'true');
     const chip = node('span', 'chip launch-where-computer-chip'); chip.append(dot, node('span', '', here));
     const change = node('button', 'btn-link launch-where-change', 'change'); change.type = 'button'; change.dataset.launchComputer = 'change'; change.setAttribute('aria-label', `Change the computer (now ${here})`);
-    p.computer.replaceChildren(node('label', 'launch-where-label', 'Computer'), ' ', node('span', 'launch-where-hint', 'where it runs'), node('div', 'launch-where-computer-line'));
-    p.computer.lastChild.append(chip, change);
+    const labels = node('div', 'launch-where-labelrow'); labels.append(node('span', 'launch-where-label', 'Computer'), node('span', 'launch-where-hint', 'where it runs'));
+    const line = node('div', 'launch-where-computer-line'); line.append(chip, change);
+    p.computer.replaceChildren(labels, line);
     p.computer.hidden = p.kind === 'team'; // New team has its own computer line
 }
 
@@ -236,7 +237,7 @@ function checkItems(p, where, cli, type, checks) {
         else items.push({ tone: 'unknown', title: `${name} sign-in: not checked`, detail: cli.signin_timeout ? 'Its sign-in did not answer: not checked, and it does not block.' : `${name} cannot be asked. If it needs you to sign in, it says so in its terminal and the agent waits there.` });
     }
     const trust = (checks?.checks || []).find(c => c.id === 'trusted');
-    if (trust) items.push(trust.reason ? { tone: /^not checked/.test(trust.reason) ? 'unknown' : 'warn', title: /^not checked/.test(trust.reason) ? 'Folder trust: not checked' : 'Folder is not trusted yet', detail: trust.reason } : { tone: 'ok', title: 'Folder is trusted', detail: 'the agent will not stop to ask' });
+    if (trust) items.push(trust.reason ? { tone: /^not checked/.test(trust.reason) ? 'unknown' : 'warn', title: /^not checked/.test(trust.reason) ? 'Folder trust: not checked' : 'Folder is not trusted yet', detail: trust.reason.replace(/^not checked: /, '') } : { tone: 'ok', title: 'Folder is trusted', detail: 'the agent will not stop to ask' });
     return items;
 }
 
