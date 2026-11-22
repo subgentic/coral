@@ -83,7 +83,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 			slog.Info("[cloud] the access given through a link that ended was ended with it", "link", linkID, "grants", n)
 		}
 	}
-	r.Use(MemberGrantGuard(s.boardStore, func(ctx context.Context, id string) (tunnel.Mode, bool) {
+	linkCap := func(ctx context.Context, id string) (tunnel.Mode, bool) {
 		ls, err := store.NewCloudStore(s.db, nil).ListLinks(ctx)
 		if err != nil {
 			return tunnel.TierNever, false
@@ -95,7 +95,10 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 			}
 		}
 		return tunnel.TierNever, false
-	}))
+	}
+	r.Use(MemberGrantGuard(s.boardStore, linkCap))
+	// A stream already open when a grant ends, expires or is lowered is closed within a moment, not left to run on (#20581 b, B4).
+	s.goBackground(func(ctx context.Context) { RunMemberGrantSweeper(ctx, s.boardStore, linkCap, memberGrantSweepEvery) })
 	// Through Coral Hub, no path under the home directory and no hidden file names (#3559).
 	r.Use(routes.HubPaths)
 	// NOTE: middleware.RealIP was intentionally removed. It rewrites r.RemoteAddr
