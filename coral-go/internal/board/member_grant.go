@@ -364,7 +364,7 @@ func memberAudit(ctx context.Context, tx execer, event string, g MemberGrant) er
 func (s *Store) MemberGrantLive(ctx context.Context, linkID, hubUser, scopeKind, scopeID string, now time.Time) (*MemberGrant, error) {
 	var g MemberGrant
 	err := s.db.GetContext(ctx, &g, `SELECT `+memberGrantCols+` FROM member_grant
-		WHERE link_id = ? AND hub_user = ? AND scope_kind = ? AND scope_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1`, linkID, hubUser, scopeKind, scopeID, now.UTC().Format(time.RFC3339))
+		WHERE link_id = ? AND hub_user = ? AND scope_kind = ? AND scope_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC, rowid LIMIT 1`, linkID, hubUser, scopeKind, scopeID, now.UTC().Format(time.RFC3339))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoMemberGrant
 	}
@@ -378,7 +378,7 @@ func (s *Store) MemberGrantLive(ctx context.Context, linkID, hubUser, scopeKind,
 // and then ended is never "no grant, so as before". An error is a store failure the caller refuses on.
 func (s *Store) MemberGrantsOfPerson(ctx context.Context, linkID, hubUser string, now time.Time) (live []MemberGrant, ever bool, err error) {
 	live = []MemberGrant{}
-	if err = s.db.SelectContext(ctx, &live, `SELECT `+memberGrantCols+` FROM member_grant WHERE link_id = ? AND hub_user = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC, grant_id`,
+	if err = s.db.SelectContext(ctx, &live, `SELECT `+memberGrantCols+` FROM member_grant WHERE link_id = ? AND hub_user = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC, rowid`,
 		linkID, hubUser, now.UTC().Format(time.RFC3339)); err != nil {
 		return nil, false, err
 	}
@@ -401,7 +401,7 @@ func (s *Store) ListMemberGrants(ctx context.Context, board string, now time.Tim
 		q += ` AND board_id = ?`
 		args = append(args, board)
 	}
-	err := s.db.SelectContext(ctx, &out, q+` ORDER BY created_at DESC, grant_id`, args...)
+	err := s.db.SelectContext(ctx, &out, q+` ORDER BY created_at DESC, rowid`, args...)
 	return out, err
 }
 
