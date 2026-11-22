@@ -70,3 +70,41 @@ func TestALiveFullGrantIsAStandingNeedsYouItemUntilItEnds(t *testing.T) {
 	items, _ = list(ctx)
 	assert.Empty(t, items, "expired: gone (%s)", full2.ExpiresAt)
 }
+
+// #20590 (4): the first request a live grant lets through is written once to the audit and shows in Needs you for a day; a second request adds nothing.
+func TestTheFirstUseOfAGrantIsRecordedOnceAndShownInNeedsYou(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	ctx := context.Background()
+	bs, err := board.NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { bs.Close() })
+	_, err = bs.Subscribe(ctx, "team1", "Dev", "Backend Dev", "s", nil, "")
+	require.NoError(t, err)
+	g, err := bs.CreateMemberGrant(ctx, board.NewMemberGrant{LinkID: "lnk-aaaa1111", HubUser: "hub-user-bbbb2222", Level: board.MemberLevelView, ScopeKind: board.MemberScopeBoard, ScopeID: "team1", BoardID: "team1",
+		Label: "Ada", Days: 7, SignedBy: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", Nonce: "0000000000000000000009", Ts: time.Now().Unix()})
+	require.NoError(t, err)
+	clock := time.Now()
+	list := MemberGrantNoticeItems(bs, func() time.Time { return clock })
+
+	items, _ := list(ctx)
+	assert.Empty(t, items, "granted but not yet used: nothing to tell")
+
+	first, err := bs.NoteMemberGrantFirstUse(ctx, *g)
+	require.NoError(t, err)
+	assert.True(t, first)
+	first, err = bs.NoteMemberGrantFirstUse(ctx, *g)
+	require.NoError(t, err)
+	assert.False(t, first, "recorded once per grant")
+
+	items, err = list(ctx)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "member_first_use", items[0].Kind)
+	assert.Equal(t, "member_first_use:"+g.GrantID, items[0].ID)
+	assert.Contains(t, items[0].Line, "hub-user-bbbb2222")
+	assert.Contains(t, items[0].Line, "team1")
+
+	clock = clock.Add(25 * time.Hour)
+	items, _ = list(ctx)
+	assert.Empty(t, items, "a day later it is no longer shown")
+}
