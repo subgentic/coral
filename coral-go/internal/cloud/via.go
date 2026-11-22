@@ -111,3 +111,13 @@ func AskAllow(a AskAnswerer) AllowFunc {
 		return true, ""
 	}
 }
+
+type viewOnlyKey struct{}
+
+// WithViewOnly marks a request as one of a Hub person who holds View grants and nothing more (#20590): the route that answers it builds a typed answer of allowlisted fields, never the stored row. Set by the grant guard only.
+func WithViewOnly(ctx context.Context) context.Context {
+	return context.WithValue(ctx, viewOnlyKey{}, true)
+}
+
+// ViewOnlyFrom reports whether the guard marked the request View-only.
+func ViewOnlyFrom(ctx context.Context) bool { v, _ := ctx.Value(viewOnlyKey{}).(bool); return v }
