@@ -177,8 +177,9 @@ function drawBranch(p, where, here) {
         let t = 0; const again = () => { clearTimeout(t); t = setTimeout(() => refresh(p), 350); };
         nameIn.addEventListener('input', () => { p.name = nameIn.value.trim(); if (!p.folderEdited) dirIn.value = defaultDir(); again(); publish(p); });
         dirIn.addEventListener('input', () => { p.folder = dirIn.value.trim(); p.folderEdited = !!p.folder && p.folder !== defaultDir(); again(); publish(p); });
-        const a = node('div', 'launch-where-field'); a.append(node('label', 'launch-where-label', 'Branch name'), nameIn);
-        const b = node('div', 'launch-where-field launch-where-field-wide'); b.append(node('label', 'launch-where-label', 'Folder'), node('span', 'launch-where-hint', 'edit if you like'), dirIn);
+        const lab = (t, hint) => { const r = node('div', 'launch-where-labelrow'); r.append(node('label', 'launch-where-label', t)); if (hint) r.append(node('span', 'launch-where-hint', hint)); return r; };
+        const a = node('div', 'launch-where-field'); a.append(lab('Branch name', ''), nameIn);
+        const b = node('div', 'launch-where-field launch-where-field-wide'); b.append(lab('Folder', 'edit if you like'), dirIn);
         a.firstChild.setAttribute('for', nameId); b.firstChild.setAttribute('for', dirId);
         f.append(a, b); sec.append(f);
     } else if (p.choice === 'exists') {
