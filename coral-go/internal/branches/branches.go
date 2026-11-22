@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -345,6 +346,10 @@ func (c *Collector) repoKey(ctx context.Context, root string) string {
 func (c *Collector) read(ctx context.Context, root string) *Repo {
 	repo := &Repo{At: c.now(), Worktrees: []Worktree{}}
 	out, err := c.run(ctx, root, "worktree", "list", "--porcelain", "-z")
+	if err != nil && refusedFlag(err) {
+		// git before 2.36 has no -z for worktree list (exit 129, "unknown switch"): the tab reads the newline form instead, never none (#20036).
+		out, err = c.run(ctx, root, "worktree", "list", "--porcelain")
+	}
 	if err != nil {
 		repo.Unreadable = true
 		return repo
@@ -534,8 +539,19 @@ func statusPaths(out []byte) []string {
 	return paths
 }
 
+// refusedFlag says git turned a flag down as unknown: its usage exit, 129.
+func refusedFlag(err error) bool {
+	var ee *exec.ExitError
+	return errors.As(err, &ee) && ee.ExitCode() == 129
+}
+
 // parseWorktrees reads `worktree list --porcelain -z`: blocks of NUL-ended "key value" lines, a block ended by an empty one. A bare repository's entry is not a worktree.
+// Output with no NUL is the newline form of an older git (no -z): the same blocks, line-ended. A path that form had to quote starts with a quote mark, is not an absolute path and so is shown as not local, never opened.
 func parseWorktrees(out []byte) []Worktree {
+	sep := []byte{0}
+	if !bytes.Contains(out, sep) {
+		sep = []byte{'\n'}
+	}
 	var trees []Worktree
 	var cur *Worktree
 	bare := false
@@ -545,8 +561,8 @@ func parseWorktrees(out []byte) []Worktree {
 		}
 		cur, bare = nil, false
 	}
-	for _, field := range bytes.Split(out, []byte{0}) {
-		line := string(field)
+	for _, field := range bytes.Split(out, sep) {
+		line := strings.TrimSuffix(string(field), "\r")
 		switch {
 		case line == "":
 			flush()

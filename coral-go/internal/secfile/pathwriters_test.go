@@ -16,6 +16,14 @@ import (
 // PathWriters walks a path hop by hop (every folder, file and link on the way, and each link's target) and names who besides the user and root could change it (#5899 round 3,
 // from Codex Test's two reproductions and the Orchestrator's ruling: one check for symlink chains and access lists, here).
 
+// tmpDir is t.TempDir() with a mode of its own: the folder is made with the umask applied (0775 under 0002, which names the group as a writer), so the tests chmod it and pass under any umask (#20036).
+func tmpDir(t *testing.T) string {
+	t.Helper()
+	d := t.TempDir()
+	require.NoError(t, os.Chmod(d, 0o755))
+	return d
+}
+
 // dir makes a folder with the given mode (Mkdir is cut by the umask, so chmod after).
 func dir(t *testing.T, path string, mode os.FileMode) string {
 	t.Helper()
@@ -39,7 +47,7 @@ func mustWriters(t *testing.T, path string) []string {
 }
 
 func TestPathWritersNamesNobodyForAPathOnlyTheUserCanChange(t *testing.T) {
-	root := dir(t, filepath.Join(t.TempDir(), "safe"), 0o755)
+	root := dir(t, filepath.Join(tmpDir(t), "safe"), 0o755)
 	assert.Empty(t, mustWriters(t, file(t, filepath.Join(root, "node"), 0o755)))
 }
 
@@ -63,14 +71,14 @@ func TestPathWritersFindsWhatModeBitsAllow(t *testing.T) {
 			return file(t, filepath.Join(d, "node"), 0o755)
 		},
 	} {
-		assert.NotEmpty(t, mustWriters(t, build(t.TempDir())), name)
+		assert.NotEmpty(t, mustWriters(t, build(tmpDir(t))), name)
 	}
 }
 
 // Codex Test's first reproduction: safe/node -> bad/bridge/node -> target/node, where bad is 0777 and bad/bridge links to the target. safe and the target are fine; the link in the
 // middle of the chain is not (anyone can replace bad/bridge).
 func TestPathWritersFollowsEveryLinkOnTheWay(t *testing.T) {
-	base := t.TempDir()
+	base := tmpDir(t)
 	safe := dir(t, filepath.Join(base, "safe"), 0o755)
 	target := dir(t, filepath.Join(base, "target"), 0o755)
 	file(t, filepath.Join(target, "node"), 0o755)
@@ -95,7 +103,7 @@ func joined(s []string) string {
 }
 
 func TestPathWritersChecksTheFolderOfALinkAndTheFolderItPointsInto(t *testing.T) {
-	base := t.TempDir()
+	base := tmpDir(t)
 	cellar := dir(t, filepath.Join(base, "cellar"), 0o755)
 	file(t, filepath.Join(cellar, "node"), 0o755)
 	bin := dir(t, filepath.Join(base, "bin"), 0o755)
@@ -110,7 +118,7 @@ func TestPathWritersChecksTheFolderOfALinkAndTheFolderItPointsInto(t *testing.T)
 }
 
 func TestPathWritersFollowsRelativeLinksAndDotDot(t *testing.T) {
-	base := t.TempDir()
+	base := tmpDir(t)
 	prefix := dir(t, filepath.Join(base, "prefix"), 0o755)
 	pkg := dir(t, filepath.Join(prefix, "lib", "pkg"), 0o755)
 	file(t, filepath.Join(pkg, "cli.js"), 0o755)
@@ -123,7 +131,7 @@ func TestPathWritersFollowsRelativeLinksAndDotDot(t *testing.T) {
 }
 
 func TestPathWritersErrorsForWhatItCannotExamine(t *testing.T) {
-	base := t.TempDir()
+	base := tmpDir(t)
 	_, err := PathWriters(filepath.Join(base, "missing", "node"))
 	assert.Error(t, err, "a missing step")
 	require.NoError(t, os.Symlink("b", filepath.Join(base, "a")))
@@ -134,12 +142,12 @@ func TestPathWritersErrorsForWhatItCannotExamine(t *testing.T) {
 
 // A sticky folder that is root's (like /tmp) only matters for entries that are not the user's or root's; this user's own sticky folder is no exception.
 func TestPathWritersStickyFolders(t *testing.T) {
-	base := t.TempDir()
+	base := tmpDir(t)
 	own := dir(t, filepath.Join(base, "own"), 0o777|os.ModeSticky)
 	assert.NotEmpty(t, mustWriters(t, file(t, filepath.Join(own, "node"), 0o755)), "a sticky folder the user owns is still writable by others for what is not the user's: it is not root's")
 	if fi, err := os.Stat("/tmp"); err == nil && fi.Mode()&os.ModeSticky != 0 {
 		// the test folders live under /tmp (root's, sticky) on most machines, and the safe-path tests above pass through it: a sticky root folder is not itself a finding
-		assert.Empty(t, mustWriters(t, file(t, filepath.Join(dir(t, filepath.Join(t.TempDir(), "s"), 0o755), "node"), 0o755)))
+		assert.Empty(t, mustWriters(t, file(t, filepath.Join(dir(t, filepath.Join(tmpDir(t), "s"), 0o755), "node"), 0o755)))
 	}
 }
 
@@ -148,7 +156,7 @@ func TestPathWritersForAnotherUser(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root's files are everyone's trusted")
 	}
-	d := dir(t, filepath.Join(t.TempDir(), "d"), 0o755)
+	d := dir(t, filepath.Join(tmpDir(t), "d"), 0o755)
 	node := file(t, filepath.Join(d, "node"), 0o755)
 	who, err := PathWritersFor(node, os.Geteuid())
 	require.NoError(t, err)
@@ -160,7 +168,7 @@ func TestPathWritersForAnotherUser(t *testing.T) {
 
 // An access list that can't be read is not shown safe: the walk fails, and the caller refuses. One that names a writer is reported with the path it is on.
 func TestPathWritersFailsClosedWhenAnAccessListCannotBeRead(t *testing.T) {
-	d := dir(t, filepath.Join(t.TempDir(), "d"), 0o755)
+	d := dir(t, filepath.Join(tmpDir(t), "d"), 0o755)
 	node := file(t, filepath.Join(d, "node"), 0o755)
 	old := readACL
 	t.Cleanup(func() { readACL = old })
@@ -181,7 +189,7 @@ func TestPathWritersFailsClosedWhenAnAccessListCannotBeRead(t *testing.T) {
 
 // A group write bit on the user's own folder passes only when the caller says the group is the user's alone; every other finding stays (#5899, Homebrew's group-writable folders).
 func TestPathWritersTrustingGroupLetsOnlyTheUsersAloneGroupPass(t *testing.T) {
-	dir := t.TempDir()
+	dir := tmpDir(t)
 	bin := filepath.Join(dir, "bin")
 	require.NoError(t, os.Mkdir(bin, 0o755))
 	f := filepath.Join(bin, "tool")
@@ -225,7 +233,7 @@ func evalDir(t *testing.T, p string) string {
 
 // The group is forgiven only on the user's OWN entries: for a program run as someone else the same folder's group bit counts, however the caller answers.
 func TestAGroupWriteBitOnAnotherUsersFolderIsNeverForgiven(t *testing.T) {
-	dir := t.TempDir()
+	dir := tmpDir(t)
 	bin := filepath.Join(dir, "bin")
 	require.NoError(t, os.Mkdir(bin, 0o755))
 	f := filepath.Join(bin, "tool")

@@ -1,6 +1,8 @@
 package machinelaunch
 
 import (
+	"bytes"
+	"errors"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -140,6 +142,10 @@ func TestEgressRulesetIsValidNftables(t *testing.T) {
 	out, err := exec.Command(nft, "-c", "-f", f).CombinedOutput()
 	if err != nil && regexp.MustCompile(`(?i)operation not permitted|permission denied`).Match(out) {
 		t.Skipf("nft cannot check without privileges here: %s", out)
+	}
+	var ee *exec.ExitError
+	if err != nil && os.Geteuid() != 0 && len(bytes.TrimSpace(out)) == 0 && errors.As(err, &ee) && ee.ExitCode() == 1 {
+		t.Skip("nft exits 1 with no output when it cannot check without privileges (a real ruleset error prints a message)") // #20036
 	}
 	assert.NoError(t, err, string(out))
 }
