@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
         // 1. the sidebar's second entry
         const btns = await ev(`[...document.querySelectorAll('.sidebar-footer .sidebar-new-btn-full')].map(b => b.textContent.trim())`);
-        assert.deepEqual(btns, ['New agent', 'New team'], 'New team is beside New agent in the sidebar: ' + JSON.stringify(btns));
+        assert.deepEqual(btns, ['New agent', 'New team', 'More'], 'New team is beside New agent in the sidebar: ' + JSON.stringify(btns));
         await ev(`[...document.querySelectorAll('.sidebar-footer .sidebar-new-btn-full')].find(b => b.textContent.trim() === 'New team').click(); true`);
         await require('./helpers/new_agent').passComputerStep(ev, waitFor);
         await waitFor(`!!window.__nt.dlg(${N.team})`, 'New team opens from the sidebar button', 8000);
