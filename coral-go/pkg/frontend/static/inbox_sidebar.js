@@ -649,6 +649,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     const bookmark = !inSaved && !decisionNeedsPerson(splitKey(row.team).server); // Save and Star remain separate footer controls at both widths (#20203)
     let saveButton = null; // Save for later is an icon on phones and a word on desktop.
     if (bookmark) { const mark = DT.el('button', 'btn btn-quiet btn-icon inbox-bookmark'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-label', `Save for later: ${file}`); mark.title = 'Save for later'; if (isPhoneLayout()) mark.append(bookmarkIcon()); else { mark.className = 'btn btn-quiet btn-small inbox-bookmark'; mark.textContent = 'Save'; } /* a computer's row says it in a word (#15722) */ mark.addEventListener('click', () => save(mark)); saveButton = mark; }
+    if (inSaved && !decisionNeedsPerson(splitKey(row.team).server)) { const mark = DT.el('button', 'btn btn-quiet btn-small inbox-bookmark inbox-bookmark-saved'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-pressed', 'true'); mark.setAttribute('aria-label', `Saved for later: ${file}. Move back to Needs you`); mark.title = 'Saved for later: press to move it back to Needs you'; if (isPhoneLayout()) { mark.className = 'btn btn-quiet btn-icon inbox-bookmark inbox-bookmark-saved'; mark.append(bookmarkIcon()); } else mark.textContent = 'Saved'; mark.addEventListener('click', () => unsave(mark)); saveButton = mark; } // a saved file keeps its place in the row's right-hand trio, Save, Star, More: Saved is the Save pressed (#20508)
     const menu = [];
     if (decidedWithNews(row)) { menu.push({ label: 'Got it', title: 'Take it out of Needs you; nobody is told', run: ignore }); } // already decided: the reply is to be read (the row opens the file at its thread), not decided on again (#16399)
     else if (!inSaved && stillWaitingOnAgent(row) && !decisionNeedsPerson(splitKey(row.team).server)) { // Waiting on an agent (#19904): the quiet set, not the Approve / Request changes the Operator already used on this file
@@ -825,7 +826,10 @@ function unrecordedActions() {
     const b = DT.el('button', 'btn btn-small', 'Record for all agents'); b.type = 'button';
     b.setAttribute('aria-label', "Record for all agents: check each program before they are recorded");
     b.addEventListener('click', () => recordAllAgents());
-    box.append(b); return box;
+    const mark = DT.el('button', 'btn btn-quiet btn-small inbox-bookmark inbox-bookmark-saved', 'Saved'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-pressed', 'true'); mark.setAttribute('aria-label', `Saved for later: ${f.which}. Remove from saved`); mark.title = 'Saved for later: press to remove it from Saved'; if (isPhoneLayout()) { mark.className = 'btn btn-quiet btn-icon inbox-bookmark inbox-bookmark-saved'; mark.textContent = ''; mark.append(bookmarkIcon()); } // the right-hand Save, pressed: an icon on a phone (#20508)
+    mark.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (it && await saved.savedRemove(it)) sayLive('Removed from saved'); });
+    const common = DT.el('span', 'inbox-common-actions'); common.append(mark);
+    box.append(b, common); return box;
 }
 
 const dockSavedState = DT.tableState();
@@ -1292,6 +1296,22 @@ function appendReviewPaging(host, savedPage = false) {
 /** The Saved page's head words, as the approved list draws them: "1 file · 3 messages" (#19841). */
 const savedHeadWords = (files, messages) => `${files} file${files === 1 ? '' : 's'} \u00b7 ${messages} message${messages === 1 ? '' : 's'}`;
 const folderHead = (title, note, mark) => { const h = DT.el('h3', `saved-files-title inbox-card-head inbox-card-head-${mark}`, title); h.append(DT.el('span', 'inbox-card-head-note', note)); return h; };
+/** A saved file's Star, between its Saved mark and the dots, as a Needs you row has it (#20508). */
+function addFileStar(a, tr) {
+    const bar = tr.querySelector('.inbox-review-actions'); if (!bar) return;
+    const star = starControl(a, { labelled: !isPhoneLayout(), hex: a.hex, name: markHidden(a.name, { strict: true }), reviewPin: true, onChange: on => { reviewStarChanged(a, on); renderInboxNav(true); } });
+    if (!star) return;
+    star.classList.add('inbox-review-star'); const dots = bar.querySelector('[data-slot="dots"]'); if (dots) dots.before(star); else bar.append(star);
+    const common = DT.el('span', 'inbox-common-actions'), controls = [...bar.children].filter(n => n.matches('.inbox-bookmark, .inbox-review-star, .inbox-row-more')); if (controls.length) { controls[0].before(common); common.append(...controls); }
+}
+/** A saved message's buttons, under its words like a file's decisions: Done or Reopen (a Hub list is read-only). */
+function savedMessageActions(f) {
+    const box = DT.el('div', 'inbox-review-actions inbox-slots');
+    if (f.gone || isCloud()) return box;
+    const b = DT.el('button', 'btn btn-small dt-quiet inbox-saved-done', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('data-slot', 'done'); b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`);
+    b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
+    box.append(b); return box;
+}
 function savedListSpec(where = '') {
     activateSavedReviews();
     const v = saved.savedView();
@@ -1325,11 +1345,10 @@ function savedListSpec(where = '') {
                     b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
                     return b; } },
             ] }).el };
-    if (!files.length) {
-        if (dock) return spec;
-        return { ...spec, empty: savedReviewPages().some(p => p.has_more || p.error || (p.loading && !p.loaded) || p.truncated) ? null : spec.empty, signature: JSON.stringify([spec.signature, reviewPagingSignature(), loadingEmpty()]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'); if (rows.length) { wrap.classList.add('inbox-saved-card'); wrap.append(folderHead('Saved messages', `${v.tab === 'done' ? 'Done' : 'Open'} \u00b7 newest saved first`, 'chat')); } wrap.append(spec.node()); appendReviewPaging(wrap, true); return wrap; } };
-    }
-    return { ...spec, count: savedHeadWords(files.length, rows.length), empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, reviewPagingSignature(), loadingEmpty(), files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap inbox-saved-card'), host = DT.el('div', 'saved-files'); wrap.append(folderHead('Saved files', `${files.length} file${files.length === 1 ? '' : 's'} saved for later`, 'saved'), host); appendReviewPaging(wrap, true); if (rows.length) wrap.append(folderHead('Saved messages', `${v.tab === 'done' ? 'Done' : 'Open'} \u00b7 newest saved first`, 'chat'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions: a => isCloud() ? '' : hoverWrap(a, reviewActions(a, true)), openReview, fileTile: a => NF.fileTile(a, splitKey(a.team).server), shown: a => markHidden(a.name, { strict: true }), subtitleOf: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true) })).catch(() => {}); return wrap; } };
+    if (dock) return spec;
+    const entries = [...files.map(a => ({ kind: 'file', a, at: Date.parse(a.updated_at || a.created_at || '') || 0, team: reviewSourceLabel(a.team), when: saved.ago(a.updated_at || a.created_at || '') })), ...v.shown.map(it => ({ kind: 'message', f: saved.savedItemFacts(it), at: Date.parse(it.saved_at || '') || 0, team: String(it.team || ''), when: saved.savedItemFacts(it).saved }))].sort((x, y) => (saved.savedFiltersNow().sort === 'oldest' ? -1 : 1) * (y.at - x.at)); // one list, newest saved first, or oldest when the toolbar says so (#20508): a file has no saved time of its own yet, so its newest version's time stands in
+    const loadingMore = savedReviewPages().some(p => p.has_more || p.error || (p.loading && !p.loaded) || p.truncated);
+    return { ...spec, count: savedHeadWords(files.length, rows.length), empty: entries.length || loadingMore ? null : spec.empty, signature: JSON.stringify([spec.signature, reviewPagingSignature(), loadingEmpty(), files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap inbox-needs-results'), host = DT.el('div', 'inbox-saved-card'); wrap.append(host); appendReviewPaging(wrap, true); if (entries.length) { host.append(folderHead('Saved', `${files.length} file${files.length === 1 ? '' : 's'} \u00b7 ${rows.length} message${rows.length === 1 ? '' : 's'} \u00b7 newest saved first`, 'saved')); const list = DT.el('div', 'saved-files'); host.append(list); importOnce('./saved_list.js').then(m => m.fillSavedList(list, entries, { DT, decorateMessage, decorateKindRow: NF.decorateKindRow, fileTile: a => NF.fileTile(a, splitKey(a.team).server), messageTile: () => { const i = DT.el('span', 'material-icons inbox-kind-icon'); i.dataset.kind = 'saved_message'; i.setAttribute('role', 'img'); i.setAttribute('aria-label', 'Saved message'); return i; }, fileActions: a => (isCloud() ? '' : hoverWrap(a, reviewActions(a, true))), addStar: addFileStar, messageActions: savedMessageActions, openFile: openReview, openMessage: id => openSavedPage(id), fileFrom: a => DT.el('span', 'inbox-review-from', markHidden(a.produced_by || 'sender unknown', { strict: true })), fileWords: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true), shown: a => markHidden(a.name, { strict: true }) })).catch(e => console.error('saved list', e)); } return wrap; } };
 }
 
 /** A message of the agent's Saved tab, as a sheet over the dock panel (the pane the Artifacts tab uses, detail_pane.js): what the Inbox's page holds (the text, why it cannot be opened, Read the whole message) with Open (the chat) and Remove from saved in its bar. Back, the close button and Escape return to the Saved table, the focus on the row. */
@@ -1649,7 +1668,7 @@ onSigninChange(() => { if (document.body.getAttribute('data-nav-tab') === 'hub-i
 matchMedia(PHONE_QUERY).addEventListener('change', () => { if (document.body.getAttribute('data-nav-tab') === 'hub-inbox') renderInboxNav(true); }); // a window that becomes a phone's (or stops being) draws Needs you's rows as that layout's (#15162)
 registerGroupSource('hub-inbox', {
     holdRedraw: true, // not redrawn under a held pointer (#12636): a row answered elsewhere would move the one under the finger
-    newCount: () => document.querySelector('.inbox-needs-results') ? needsListSpec().rows.filter(r => !drawnNeedsKeys.has(`${sessionServer(r)}:${r.session_id}`)).length : undefined, // rows that arrived while a pointer rested on the list (#15339, walk 23 M9)
+    newCount: () => document.querySelector('.inbox-needs-results:not(.saved-files-wrap)') ? needsListSpec().rows.filter(r => !drawnNeedsKeys.has(`${sessionServer(r)}:${r.session_id}`)).length : undefined, // rows that arrived while a pointer rested on the list (#15339, walk 23 M9)
     signature: () => JSON.stringify([state.hub, state.servers, claudeSignedIn()]),
     toolbar: key => hubFrame(key) ? null : key === 'needs' ? inboxNeedsToolbar() : key === 'tasks' ? inboxTaskToolbar() : key === 'goals' ? inboxGoalsToolbar() : key === 'saved' ? inboxSavedToolbar() : key === 'activity' ? inboxActivityToolbar() : CH.CHAT_KEY.test(key) ? inboxChatsToolbar(key) : key === 'artifacts' ? IA.artifactsToolbar(() => renderFolderCounts()) : ({ search: { id: 'inbox-search', label: 'Search the Inbox' } }), // the page's toolbar line, the same shape for Needs you, Tasks and Saved (#7723)
     keys: () => GROUPS.map(g => g.key),

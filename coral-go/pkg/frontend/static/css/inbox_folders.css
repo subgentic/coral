@@ -42,3 +42,4 @@
 @media (max-width: 767px) { .inbox-saved-card, .inbox-starred-folder { margin-inline: calc(-1 * var(--space-2xl)); border-inline: 0; border-radius: 0; } } /* a phone: the folders run edge to edge like the list under them (inbox_phone_edge) */
 @media (max-width: 767px) { :root #group-table-view .inbox-starred-folder .inbox-folder-text > button { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; } } /* a starred file's name is cut with an ellipsis on a phone (#19870, MUST-2) */
 .inbox-mail-star { margin-inline-end: 6px; font-size: var(--fs-lg); vertical-align: middle; } /* a starred chat's star on a phone, before its date (#19870, MUST-2) */
+.inbox-kind-icon[data-kind="saved_message"]::before { content: 'chat_bubble_outline'; }

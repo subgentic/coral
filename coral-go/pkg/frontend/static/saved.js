@@ -53,7 +53,7 @@ function when(iso) {
     return iso ? (whenText(iso) || String(iso)) : ''; // the one format of every list (when_text.js, #6961)
 }
 
-function ago(iso) {
+export function ago(iso) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
     const min = Math.round((Date.now() - d.getTime()) / 60000);
