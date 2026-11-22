@@ -6,7 +6,6 @@ import { loadStyles } from './lazy_styles.js';
 await loadStyles('launch_recap_phone.css'); // the phone's one-line recap and its toggle: not at start (#18082)
 const { TYPE, fetchFlags, flagsNodes } = await importOnce('./permission_flags_line.js'); // the flags line is shared with Restart and Resume (#15761)
 const { permissionDescription, PI_NO_PERMISSIONS } = await importOnce('./permission_flags.js');
-const { whereRecap } = await importOnce('./launch_where.js'); // "new worktree fix-login from main": where the agent works when it is not the folder as it is (#20388) // lazy like launch_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
 const container = () => document.getElementById('launch-agent-acf');
 
@@ -24,7 +23,7 @@ function recapParts() {
         name: (document.getElementById('launch-agent-name-input')?.value || '').trim(),
         type,
         provider: TYPE[type] || type,
-        folder: ((document.getElementById('launch-dir')?.value || '').trim() || 'no folder yet') + (whereRecap('agent') ? ` (${whereRecap('agent')})` : ''),
+        folder: ((document.getElementById('launch-dir')?.value || '').trim() || 'no folder yet') + (window.launchWhereWords?.('agent') || ''),
         model: model ? modelName(type, model) : 'default model',
         mode: modeSel ? (modeSel.options[modeSel.selectedIndex]?.textContent.trim() || '') : '',
         modeNote: modeSel ? modeNote(type, modeSel.value) : '',

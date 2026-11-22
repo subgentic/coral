@@ -128,7 +128,7 @@ const NONE = ['srv-current', 'srv-unknown', 'srv-odd'];
                     links: [...note.querySelectorAll('a')].map(a => ({ href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), text: a.textContent })),
                     foreign: li.querySelectorAll('img, script, iframe').length,
                 } : null;
-                out[id + ':disabled'] = [...li.querySelectorAll('button, select')].filter(b => b.disabled).length;
+                out[id + ':disabled'] = [...li.querySelectorAll('button:not([data-computer-start]), select')].filter(b => b.disabled).length; // the update notice disables nothing; the Start buttons (#20388) are off, with the reason in words, for a computer this fixture leaves without online:true, which has nothing to do with the notice
                 document.getElementById('servers-back').click(); await wait(80);
             }
             cs.hideServersModal();
