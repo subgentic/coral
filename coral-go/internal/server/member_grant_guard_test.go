@@ -62,7 +62,7 @@ func TestAGrantedPersonReachesOnlyTheLowerOfTheirGrantAndTheLinksCapNow(t *testi
 	v := cloud.Via{LinkID: guardLink, HubUser: guardUser}
 	cp := &guardCap{}
 	allow := func(need tunnel.Tier, now time.Time) (bool, string) {
-		return memberGrantAllows(ctx, bs, cp.get, v, need, now)
+		return memberGrantAllows(ctx, bs, cp.get, v, need, now, nil)
 	}
 	now := time.Now()
 
@@ -119,7 +119,7 @@ func TestAGrantedPersonReachesOnlyTheLowerOfTheirGrantAndTheLinksCapNow(t *testi
 	assert.False(t, ok, "every grant ended: not 'no grant, so as before'")
 	assert.Equal(t, memberGrantEndedCode, code)
 
-	other, _ := memberGrantAllows(ctx, bs, cp.get, cloud.Via{LinkID: guardLink, HubUser: "hub-user-cccc3333"}, tunnel.TierLaunch, now)
+	other, _ := memberGrantAllows(ctx, bs, cp.get, cloud.Via{LinkID: guardLink, HubUser: "hub-user-cccc3333"}, tunnel.TierLaunch, now, nil)
 	assert.True(t, other, "another person is not touched by this person's grants")
 }
 
@@ -174,7 +174,7 @@ func TestConcurrentRequestsNeverPassTheLowerOfTheGrantAndTheCap(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for !stop.Load() {
-					if ok, _ := memberGrantAllows(ctx, bs, cp.get, v, need, time.Now()); ok {
+					if ok, _ := memberGrantAllows(ctx, bs, cp.get, v, need, time.Now(), nil); ok {
 						allowed.Add(1)
 					}
 				}
@@ -217,7 +217,7 @@ func TestConcurrentRequestsNeverPassTheLowerOfTheGrantAndTheCap(t *testing.T) {
 			defer wg.Done()
 			for !stop.Load() {
 				after := revoked.Load() // read before the check: a request that began after the revoke returned
-				if ok, _ := memberGrantAllows(ctx, bs, cp.get, v, tunnel.TierInteract, time.Now()); ok && after {
+				if ok, _ := memberGrantAllows(ctx, bs, cp.get, v, tunnel.TierInteract, time.Now(), nil); ok && after {
 					late.Add(1)
 				}
 			}
@@ -255,4 +255,55 @@ func TestRemovingALinkEndsTheGrantsThatCameThroughIt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, live, "the grant did not outlive its link")
 	assert.True(t, ever)
+}
+
+// #20581 (a): a person with only a View grant reaches the closed View list, and only for the board they were given; a Full grant is the whole computer; an agent scope gives nothing.
+func TestAViewGranteeReachesOnlyTheBoardMessagesOfTheirOwnBoard(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	ctx := context.Background()
+	bs := guardStore(t)
+	_, err := bs.Subscribe(ctx, "team2", "Dev", "Other Dev", "s", nil, "")
+	require.NoError(t, err)
+	cp := &guardCap{}
+	cp.set(tunnel.TierLaunch)
+	_, err = bs.CreateMemberGrant(ctx, guardGrant(guardUser, board.MemberLevelView)) // board team1
+	require.NoError(t, err)
+	hits := 0
+	h := MemberGrantGuard(bs, cp.get)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits++ }))
+	call := func(user, method, path string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, nil)
+		req = req.WithContext(cloud.WithVia(req.Context(), cloud.Via{LinkID: guardLink, HubUser: user}))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	assert.Equal(t, 200, call(guardUser, "GET", "/api/board/team1/messages").Code, "its own board's messages")
+	for _, p := range []string{
+		"/api/board/team2/messages",     // another board
+		"/api/board/team1/messages/all", // a View route that is not on the list
+		"/api/board/team1/subscribers",  // likewise
+		"/api/board/team1/tasks",        // likewise
+		"/api/sessions/live",            // the agent list: not on the list yet
+		"/api/board/projects",           // every board's name
+	} {
+		rec := call(guardUser, "GET", p)
+		assert.Equal(t, 403, rec.Code, p)
+		assert.Contains(t, rec.Body.String(), memberGrantScopeCode, p)
+	}
+	assert.Equal(t, 1, hits, "only the one listed request reached a route")
+
+	// A Full grant for another person is the whole computer, at the link's cap.
+	_, err = bs.CreateMemberGrant(ctx, guardGrant("hub-user-cccc3333", board.MemberLevelFull))
+	require.NoError(t, err)
+	assert.Equal(t, 200, call("hub-user-cccc3333", "GET", "/api/sessions/live").Code)
+	assert.Equal(t, 200, call("hub-user-cccc3333", "GET", "/api/board/team2/messages").Code)
+}
+
+// An agent-scope grant, or a board grant with no board, gives no View route at all (V5, B5).
+func TestAnAgentScopeOrAnEmptyScopeGivesNoViewRoute(t *testing.T) {
+	route := &grantRoute{"GET", "/api/board/team1/messages"}
+	assert.True(t, viewScopeAllows([]board.MemberGrant{{Level: board.MemberLevelView, ScopeKind: board.MemberScopeBoard, ScopeID: "team1"}}, route))
+	assert.False(t, viewScopeAllows([]board.MemberGrant{{Level: board.MemberLevelView, ScopeKind: board.MemberScopeAgent, ScopeID: "team1"}}, route), "agent scope is off")
+	assert.False(t, viewScopeAllows([]board.MemberGrant{{Level: board.MemberLevelView, ScopeKind: board.MemberScopeBoard, ScopeID: ""}}, route), "an empty scope is nothing, not all")
+	assert.False(t, viewScopeAllows(nil, route))
 }
