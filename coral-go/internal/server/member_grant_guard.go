@@ -131,7 +131,7 @@ func SweepOpenStreams(ctx context.Context, bs *board.Store, linkCap func(context
 		if k.Need == tunnel.TierNever {
 			continue
 		}
-		if ok, _ := memberGrantAllows(ctx, bs, linkCap, cloud.Via{LinkID: k.Link, HubUser: k.User}, k.Need, now, nil); !ok {
+		if ok, _ := memberGrantAllows(ctx, bs, linkCap, cloud.Via{LinkID: k.Link, HubUser: k.User}, k.Need, now, &grantRoute{k.Method, k.Path}); !ok {
 			n := tunnel.EndOpenStreams(k)
 			ended += n
 			slog.Info("[cloud] open streams of a Hub person were closed: their access ended", "link", k.Link, "streams", n)

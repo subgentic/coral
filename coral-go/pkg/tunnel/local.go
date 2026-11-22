@@ -271,7 +271,7 @@ func (l *LocalHandler) serveHTTP(ctx context.Context, s *Stream) {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithCancel(ctx)
 		defer cancel()
-		defer RegisterOpenStream(l.LinkID, h.HubUser, streamNeed(h.Method, dec, h.Query), cancel)()
+		defer RegisterOpenStream(l.LinkID, h.HubUser, streamNeed(h.Method, dec, h.Query), h.Method, dec, cancel)()
 	}
 	req, err := http.NewRequestWithContext(ctx, h.Method, l.target(h, dec).String(), body)
 	if err != nil {

@@ -89,7 +89,7 @@ func (l *LocalHandler) serveWS(ctx context.Context, s *Stream) {
 		up.Close(websocket.StatusPolicyViolation, "access ended by this computer")
 		down.Close(websocket.StatusPolicyViolation, "access ended by this computer")
 	}
-	defer RegisterOpenStream(l.LinkID, h.HubUser, streamNeed(http.MethodGet, dec, h.Query), endGrant)()
+	defer RegisterOpenStream(l.LinkID, h.HubUser, streamNeed(http.MethodGet, dec, h.Query), http.MethodGet, dec, endGrant)()
 	pumpWS(ctx, up, down, gate, toHub)
 }
 
