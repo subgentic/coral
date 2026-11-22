@@ -236,7 +236,7 @@
     },
     {
       "name": "idx_member_grant_pair",
-      "sql": "CREATE INDEX idx_member_grant_pair ON member_grant(link_id, hub_user, board_id)",
+      "sql": "CREATE INDEX idx_member_grant_pair ON member_grant(link_id, hub_user, scope_kind, scope_id)",
       "tbl_name": "member_grant",
       "type": "index"
     },
@@ -476,6 +476,12 @@
     },
     {
       "name": "sqlite_autoindex_member_grant_1",
+      "sql": null,
+      "tbl_name": "member_grant",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_member_grant_2",
       "sql": null,
       "tbl_name": "member_grant",
       "type": "index"
@@ -860,13 +866,13 @@
     },
     {
       "name": "member_grant",
-      "sql": "CREATE TABLE member_grant (\n\t\t\tgrant_id   TEXT PRIMARY KEY,\n\t\t\tlink_id    TEXT NOT NULL,\n\t\t\thub_user   TEXT NOT NULL,\n\t\t\tboard_id   TEXT NOT NULL,\n\t\t\tlevel      TEXT NOT NULL,\n\t\t\tlabel      TEXT NOT NULL,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\texpires_at TEXT NOT NULL,\n\t\t\trevoked_at TEXT\n\t\t)",
+      "sql": "CREATE TABLE member_grant (\n\t\t\tgrant_id       TEXT PRIMARY KEY,\n\t\t\tlink_id        TEXT NOT NULL,\n\t\t\thub_user       TEXT NOT NULL,\n\t\t\tlevel          TEXT NOT NULL CHECK (level IN ('view', 'full')),\n\t\t\tscope_kind     TEXT NOT NULL CHECK (scope_kind IN ('board', 'agent', 'computer')),\n\t\t\tscope_id       TEXT NOT NULL,\n\t\t\tboard_id       TEXT NOT NULL,\n\t\t\tflag_artifacts INTEGER NOT NULL DEFAULT 0 CHECK (flag_artifacts IN (0, 1)),\n\t\t\tflag_files     INTEGER NOT NULL DEFAULT 0 CHECK (flag_files IN (0, 1)),\n\t\t\tpinned_folder  TEXT NOT NULL DEFAULT '',\n\t\t\tlabel          TEXT NOT NULL,\n\t\t\tsigned_by      TEXT NOT NULL CHECK (length(signed_by) = 43),\n\t\t\tsigned_nonce   TEXT NOT NULL UNIQUE CHECK (length(signed_nonce) = 22),\n\t\t\tsigned_digest  TEXT NOT NULL CHECK (length(signed_digest) = 64),\n\t\t\tcreated_at     TEXT NOT NULL,\n\t\t\texpires_at     TEXT NOT NULL,\n\t\t\trevoked_at     TEXT,\n\t\t\tCHECK (\n\t\t\t\t(level = 'view' AND scope_kind IN ('board', 'agent') AND scope_id \u003c\u003e '' AND board_id \u003c\u003e '' AND (scope_kind \u003c\u003e 'board' OR scope_id = board_id))\n\t\t\t\tOR (level = 'full' AND scope_kind = 'computer' AND scope_id = '' AND board_id = '' AND flag_artifacts = 0 AND flag_files = 0)\n\t\t\t),\n\t\t\tCHECK (flag_files = 0 OR pinned_folder \u003c\u003e ''),\n\t\t\tCHECK (pinned_folder = '' OR flag_files = 1)\n\t\t)",
       "tbl_name": "member_grant",
       "type": "table"
     },
     {
       "name": "member_grant_audit",
-      "sql": "CREATE TABLE member_grant_audit (\n\t\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tat       TEXT NOT NULL,\n\t\t\tgrant_id TEXT NOT NULL,\n\t\t\tevent    TEXT NOT NULL,\n\t\t\tlink_id  TEXT NOT NULL,\n\t\t\thub_user TEXT NOT NULL,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\tlevel    TEXT NOT NULL\n\t\t)",
+      "sql": "CREATE TABLE member_grant_audit (\n\t\t\tid        INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tat        TEXT NOT NULL,\n\t\t\tgrant_id  TEXT NOT NULL,\n\t\t\tevent     TEXT NOT NULL,\n\t\t\tlink_id   TEXT NOT NULL,\n\t\t\thub_user  TEXT NOT NULL,\n\t\t\tlevel     TEXT NOT NULL,\n\t\t\tscope_kind TEXT NOT NULL,\n\t\t\tscope_id  TEXT NOT NULL,\n\t\t\tboard_id  TEXT NOT NULL,\n\t\t\tsigned_by TEXT NOT NULL\n\t\t)",
       "tbl_name": "member_grant_audit",
       "type": "table"
     },
@@ -7658,7 +7664,7 @@
           "cid": 3,
           "dflt_value": null,
           "hidden": 0,
-          "name": "board_id",
+          "name": "level",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
@@ -7667,7 +7673,7 @@
           "cid": 4,
           "dflt_value": null,
           "hidden": 0,
-          "name": "level",
+          "name": "scope_kind",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
@@ -7676,7 +7682,7 @@
           "cid": 5,
           "dflt_value": null,
           "hidden": 0,
-          "name": "label",
+          "name": "scope_id",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
@@ -7685,13 +7691,85 @@
           "cid": 6,
           "dflt_value": null,
           "hidden": 0,
-          "name": "created_at",
+          "name": "board_id",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
         },
         {
           "cid": 7,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "flag_artifacts",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "flag_files",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "pinned_folder",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "label",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 11,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "signed_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "signed_nonce",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "signed_digest",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 14,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 15,
           "dflt_value": null,
           "hidden": 0,
           "name": "expires_at",
@@ -7700,7 +7778,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 8,
+          "cid": 16,
           "dflt_value": null,
           "hidden": 0,
           "name": "revoked_at",
@@ -7729,12 +7807,20 @@
               "seqno": 1
             },
             {
-              "cid": 3,
+              "cid": 4,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
-              "name": "board_id",
+              "name": "scope_kind",
               "seqno": 2
+            },
+            {
+              "cid": 5,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "scope_id",
+              "seqno": 3
             },
             {
               "cid": -1,
@@ -7742,7 +7828,7 @@
               "desc": 0,
               "key": 0,
               "name": null,
-              "seqno": 3
+              "seqno": 4
             }
           ],
           "name": "idx_member_grant_pair",
@@ -7772,6 +7858,31 @@
           ],
           "name": "sqlite_autoindex_member_grant_1",
           "origin": "pk",
+          "partial": 0,
+          "seq": 2,
+          "unique": 1
+        },
+        {
+          "columns": [
+            {
+              "cid": 12,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "signed_nonce",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_member_grant_2",
+          "origin": "u",
           "partial": 0,
           "seq": 1,
           "unique": 1
@@ -7838,7 +7949,7 @@
           "cid": 6,
           "dflt_value": null,
           "hidden": 0,
-          "name": "board_id",
+          "name": "level",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
@@ -7847,7 +7958,34 @@
           "cid": 7,
           "dflt_value": null,
           "hidden": 0,
-          "name": "level",
+          "name": "scope_kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 8,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "scope_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "signed_by",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"
