@@ -15,7 +15,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
-        assert.match(await ev(`document.querySelector('.sidebar-new-btn-full').title`), /Alt\+N/, 'the New agent button says its key');
+        assert.match(await ev(`document.getElementById('sidebar-rail-new').title`), /Alt\+N/, 'the New agent button says its key');
         // ? in the page lists the shortcuts
         await ev(`document.activeElement && document.activeElement.blur(); true`);
         await key('?', { text: '?', modifiers: 8 }); await settle(300);

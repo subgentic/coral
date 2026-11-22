@@ -1,4 +1,4 @@
-// "+ New Agent" stays in view with many agents (#6159, coral-hub's ask): with 25 agents the sidebar scrolls, and the button used to sit at the end of the scrolled content, below the fold. It is pinned to the
+// "More" stays in view with many agents (#6159, coral-hub's ask): with 25 agents the sidebar scrolls, and the button used to sit at the end of the scrolled content, below the fold. It is pinned to the
 // bottom of the sidebar now and the last agent row can still be scrolled clear of it. At 1280 px (the sidebar) and 390 px (the + button, which opened the New menu since the phone UI of #11116), in both themes, with the dashboard's mocked agents
 // (agent_view_harness.js) drawn into the real list; against the isolated dev server.
 const assert = require('node:assert/strict');
@@ -29,10 +29,10 @@ const { coralReady } = require('./helpers/wait');
             for (const theme of ['light', 'dark']) {
                 await ev(`${themeJs(theme)}; true`);
                 await ev(`(() => { const s = document.querySelector('.sidebar'); if (s) s.scrollTop = 0; window.scrollTo(0, 0); return true; })()`);
-                const m = await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(mobile ? '#phone-fab' : '[data-on-click="launch-show"]')})].filter(e => e.getClientRects().length); const r = b[0] && b[0].getBoundingClientRect();
+                const m = await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(mobile ? '#phone-fab' : '.sidebar-footer [data-on-click="launch-chooser-show"]')})].filter(e => e.getClientRects().length); const r = b[0] && b[0].getBoundingClientRect();
                     return { n: b.length, text: b[0] && b[0].textContent.trim(), top: r && Math.round(r.top), bottom: r && Math.round(r.bottom), left: r && Math.round(r.left), right: r && Math.round(r.right), vh: innerHeight, vw: innerWidth,
                         hit: !!r && (t => !!t && (t === b[0] || b[0].contains(t)))(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)) }; })()`);
-                check(`${tag} ${theme}: ${mobile ? 'the + button' : '"+ New Agent"'} is in the viewport at the top of the list, not scrolled to, and nothing covers it`, m.n >= 1 && m.top >= 0 && m.bottom <= m.vh && m.left >= 0 && m.right <= m.vw && m.hit, JSON.stringify(m));
+                check(`${tag} ${theme}: ${mobile ? 'the + button' : '"More"'} is in the viewport at the top of the list, not scrolled to, and nothing covers it`, m.n >= 1 && m.top >= 0 && m.bottom <= m.vh && m.left >= 0 && m.right <= m.vw && m.hit, JSON.stringify(m));
                 if (!mobile) {
                     // a row the keyboard focuses just below the fold is scrolled clear of the pinned button, not left under it
                     const f = await ev(`(() => { const s = document.querySelector('.sidebar'); document.activeElement && document.activeElement.blur(); s.scrollTop = 0; const footer = document.querySelector('.sidebar-footer').getBoundingClientRect();
@@ -43,9 +43,9 @@ const { coralReady } = require('./helpers/wait');
                         return { focused: document.activeElement === target, bottom: Math.round(r.bottom), footerTop: Math.round(ft.top), top: Math.round(r.top) }; })()`);
                     check(`${tag} ${theme}: a row focused by the keyboard below the fold is scrolled clear of the pinned button`, f.focused && f.bottom <= f.footerTop + 1 && f.top >= 0, JSON.stringify(f));
                     // scrolled to the end, the last agent row is whole and clear of the button
-                    const e = await ev(`(() => { const s = document.querySelector('.sidebar'); s.scrollTop = s.scrollHeight; const rows = [...document.querySelectorAll('[data-section="live-sessions"] .session-list > li')], last = rows[rows.length - 1].getBoundingClientRect(), f = document.querySelector('.sidebar-footer').getBoundingClientRect(), b = document.querySelector('.sidebar-footer [data-on-click="launch-show"]').getBoundingClientRect();
+                    const e = await ev(`(() => { const s = document.querySelector('.sidebar'); s.scrollTop = s.scrollHeight; const rows = [...document.querySelectorAll('[data-section="live-sessions"] .session-list > li')], last = rows[rows.length - 1].getBoundingClientRect(), f = document.querySelector('.sidebar-footer').getBoundingClientRect(), b = document.querySelector('.sidebar-footer [data-on-click="launch-chooser-show"]').getBoundingClientRect();
                         const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-                        return { lastBottom: Math.round(last.bottom), footerTop: Math.round(f.top), btnTop: Math.round(b.top), btnBottom: Math.round(b.bottom), vh: innerHeight, btnHit: !!t && !!t.closest('[data-on-click="launch-show"]'), canScroll: s.scrollHeight > s.clientHeight }; })()`);
+                        return { lastBottom: Math.round(last.bottom), footerTop: Math.round(f.top), btnTop: Math.round(b.top), btnBottom: Math.round(b.bottom), vh: innerHeight, btnHit: !!t && !!t.closest('.sidebar-footer [data-on-click="launch-chooser-show"]'), canScroll: s.scrollHeight > s.clientHeight }; })()`);
                     check(`${tag} ${theme}: with the sidebar scrolled to the end the last agent is clear of the button and the button is still in view`, e.canScroll && e.lastBottom <= e.footerTop + 1 && e.btnTop >= 0 && e.btnBottom <= e.vh && e.btnHit, JSON.stringify(e));
                 }
             }

@@ -262,7 +262,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         const dlg = async (name, { opener, open }) => { try { const bad = await kb.dialogCheck(ev, client.Input, { opener, box: '[data-census-box]', open: async () => { await open(); for (let i = 0; i < 30 && !(await tagVisibleModal()); i++) await new Promise(r => setTimeout(r, 100)); } }); results.push({ name, stops: 0, path: '' }); found.push(...bad.map(b => `${name}: ${b}`)); } catch (e) { results.push({ name, error: String(e && e.message || e).replace(/.*description":"/, '').slice(0, 400) }); } };
         await load();
         await ev(`window.switchNavTab('agents'); true`);
-        await dlg('dialog: launch', { opener: '[data-on-click="launch-show"]', open: () => ev(`[...document.querySelectorAll('[data-on-click="launch-show"]')].find(e => e.getClientRects().length).click(); true`) });
+        await dlg('dialog: launch', { opener: '[data-on-click="launch-chooser-show"]', open: () => ev(`[...document.querySelectorAll('[data-on-click="launch-chooser-show"]')].find(e => e.getClientRects().length).click(); true`) });
         await load(); await ev(`window.switchNavTab('agents'); true`);
         await dlg('dialog: settings', { opener: '[aria-controls="top-bar-settings-menu"]', open: () => ev(`(async () => { await window.showSettingsModal(); return true; })()`) });
         await load(); await ev(`window.switchNavTab('agents'); true`); await showUpdateReady(ev, waitFor, { ...UPDATE_STAGED, staged: { ...UPDATE_STAGED.staged, version: '1.4.161' } }); // a new version: the notice is said once per version

@@ -26,7 +26,7 @@ const S = `(window.__coralStatic || '/static/')`;
         assert.deepEqual(await text('#launch-team-title'), ['New team']);
         await ev(`window.hideLaunchModal(); true`);
         console.log('2. the sidebar button and the welcome cards (desktop)');
-        assert.deepEqual(await text('.sidebar-pane[data-pane="agents"] .sidebar-new-btn-full'), ['New agent', 'New team', 'More']); // the Agents pane's button: the Jobs pane has its own, "+ New job" (#7443)
+        assert.deepEqual(await text('.sidebar-pane[data-pane="agents"] .sidebar-new-btn-full'), ['New team', 'More']); // the Agents pane's button: the Jobs pane has its own, "+ New job" (#7443)
         assert.deepEqual((await text('.welcome-launch-copy strong')).slice(0, 2), ['New agent', 'New team']);
         console.log('4. a sleeping agent says it once: the bar, with an empty box');
         await ev(`(async () => { const m = await import(${S} + 'sleeping_view.js'); window.__sleep = m; return true; })()`);

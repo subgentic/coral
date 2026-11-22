@@ -46,7 +46,7 @@ const shots=process.env.CORAL_GUIDE_SHOTS; if(shots)fs.mkdirSync(shots,{recursiv
  else assert.ok(!JSON.stringify(request.body).includes('getting-started-team'),'cleared team guide is absent from launch request');
  }
  await ev(`window.hideLaunchModal();true`);
- await ev(`document.querySelector('${kind==='agent'?'.sidebar-new-btn-full[data-on-click="launch-show"]':'.sidebar-new-btn-full[data-arg="team"]'}').click();true`);
+ await ev(`document.querySelector('${kind==='agent'?'.sidebar-new-btn-full[data-on-click="launch-chooser-show"]':'.sidebar-new-btn-full[data-arg="team"]'}').click();true`);
  if(kind==='agent')await ev(`window._selectLaunchType('agent');true`);
  await waitFor(`!!document.querySelector('${selector}')`,'ordinary launch field');
  assert.equal(await ev(`document.querySelector('${selector}').value`),'',`${width}: ordinary ${kind} launch stays empty after the guide`);

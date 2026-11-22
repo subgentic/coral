@@ -26,12 +26,12 @@ const { guardSettings } = require('./helpers/settings_guard');
                 return { slot: !!document.getElementById('sidebar-chief-slot'), chiefLinks: side.querySelectorAll('a[href^="/chief"], .sidebar-chief-link').length, kids: [...f.children].map(c => c.tagName + '.' + c.className.split(' ')[0]), btns, foot: r(f), search: search ? r(search) : null, footPad: pad(f), headPad: pad(head), fs: parseFloat(getComputedStyle(document.documentElement).fontSize) }; })()`);
             const at = label + ': ';
             if (s.slot || s.chiefLinks) problems.push(`${at}no Chief card in the sidebar (slot ${s.slot}, links ${s.chiefLinks})`);
-            if (s.btns.length !== 3 || s.kids.length !== 3) problems.push(`${at}the footer holds only New agent, New team and More: ${JSON.stringify(s.kids)}`);
+            if (s.btns.length !== 2 || s.kids.length !== 2) problems.push(`${at}the footer holds only New team and More: ${JSON.stringify(s.kids)}`);
             else {
                 const gap = s.btns[1].l - s.btns[0].r;
                 if (gap < 7.5 || gap > 12) problems.push(`${at}the first two buttons have an 8 px gap (${gap})`);
                 if (s.footPad[0] !== s.headPad[0] || s.footPad[1] !== s.headPad[1]) problems.push(`${at}the footer has the same side padding as the search box's header: ${JSON.stringify([s.footPad, s.headPad])}`);
-                if (s.search && (Math.abs(s.btns[0].l - s.search.l) > 1.5 || Math.abs(s.btns[0].l - (s.foot.l + s.footPad[0])) > 1.5 || Math.abs(s.btns[2].r - (s.foot.r - s.footPad[1])) > 1.5)) problems.push(`${at}the buttons line up with the search box above and fill the footer: ${JSON.stringify([s.btns, s.search, s.foot])}`);
+                if (s.search && (Math.abs(s.btns[0].l - s.search.l) > 1.5 || Math.abs(s.btns[0].l - (s.foot.l + s.footPad[0])) > 1.5 || Math.abs(s.btns[1].r - (s.foot.r - s.footPad[1])) > 1.5)) problems.push(`${at}the buttons line up with the search box above and fill the footer: ${JSON.stringify([s.btns, s.search, s.foot])}`);
                 if (!zoom && s.foot.h > 84) problems.push(`${at}no reserved room for Chief: the footer is ${s.foot.h} px tall`);
             }
         }

@@ -30,8 +30,8 @@ const { coralReady } = require('./helpers/wait');
                 assert.deepEqual(await ev(`[...document.querySelectorAll('#mobile-agent-list .empty-launch strong')].map(e => e.textContent.trim()).slice(0, 2)`), ['New agent', 'New team'], at + 'the create cards are the verb and the thing, no plus sign');
             } else {
                 const label = '.sidebar-new-btn-full';
-                await waitFor(`[...document.querySelectorAll(${JSON.stringify(label)})].some(e => e.getClientRects().length)`, at + 'the New agent button', 8000);
-                assert.equal(await ev(`[...document.querySelectorAll(${JSON.stringify(label)})].filter(e => e.getClientRects().length)[0].textContent.trim()`), 'New agent', at + 'the create button is the verb and the thing, no plus sign');
+                await waitFor(`[...document.querySelectorAll(${JSON.stringify(label)})].some(e => e.getClientRects().length)`, at + 'the New team button', 8000);
+                assert.equal(await ev(`[...document.querySelectorAll(${JSON.stringify(label)})].filter(e => e.getClientRects().length)[0].textContent.trim()`), 'New team', at + 'the create button is the verb and the thing, no plus sign');
             }
             await shot(`words-home-${w}`);
             await Page.navigate({ url: BASE + `/team/${B}/tasks` }); await Page.loadEventFired(); await install(); await coralReady(ev);

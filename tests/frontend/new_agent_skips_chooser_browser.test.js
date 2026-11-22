@@ -1,4 +1,4 @@
-// LA4 (#15888): "New agent" opens the one-page form, not the four-card chooser (the review's 5.3 point 1). The sidebar's New agent button and Alt+N open the form; the chooser stays one step back, behind the form's arrow. At 1440 and 390
+// LA4 (#15888): "New agent" opens the one-page form, not the four-card chooser (the review's 5.3 point 1). Choosing New agent in More and Alt+N open the form; the chooser stays one step back, behind the form's arrow. At 1440 and 390
 // (200% text), dark and light. Against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -24,7 +24,9 @@ const { coralReady } = require('./helpers/wait');
             for (const theme of ['light', 'dark']) {
                 await ev(`${themeJs(theme)}; true`);
                 if (!mobile) {
-                    await ev(`[...document.querySelectorAll('[data-on-click="launch-show"]')].find(e => e.getClientRects().length).click(); true`);
+                    await ev(`document.querySelector('.sidebar-footer [data-on-click="launch-chooser-show"]').click(); true`);
+                    await waitFor(shown('launch-step-chooser'), `${tag} ${theme}: More opens the chooser`, 8000);
+                    await ev(`document.querySelector('#launch-step-chooser [data-arg="agent"]').click(); true`);
                     await waitFor(shown('launch-dir'), `${tag} ${theme}: the New agent button opens the form (the folder field)`, 8000);
                     const s = await state();
                     check(`${tag} ${theme}: New agent opens the form with the folder field, and no chooser`, s.form && s.folder && !s.chooser, JSON.stringify(s));

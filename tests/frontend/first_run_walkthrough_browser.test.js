@@ -154,9 +154,7 @@ setInterval(() => {}, 1 << 30);
         // 3. New Agent in two steps: the choice, then the form
         const before = (await live()).map(x => x.session_id);
         if (!mobile) {
-            await clickVisible('[data-on-click="launch-show"]');
-            await waitFor(visible('#launch-dir'), `${tag}: New agent opens the form (#15888)`, { timeout: 8000 });
-            await ev(`document.querySelector('.launch-back-btn').click(); true`); // the choice of what to launch is one step back
+            await clickVisible('[data-on-click="launch-chooser-show"]');
             await waitFor(visible('#launch-step-chooser .launch-type-card'), `${tag}: the choice of what to launch`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             const cards = await ev(`[...document.querySelectorAll('#launch-step-chooser .launch-type-card')].map(c => c.querySelector('.launch-type-label').textContent.trim() + ' ' + c.querySelector('.launch-type-desc').textContent.trim())`);
             assert.deepEqual(cards.slice(0, 3), ['New agent One agent in a folder you choose.', 'New team Launch a team of agents collaborating on a shared board.', 'Open folder Add a project folder to start agents in later.'], `${tag}: step one offers the kinds in this order, each with what it opens (#9253) (${JSON.stringify(cards)})`);
@@ -185,13 +183,11 @@ setInterval(() => {}, 1 << 30);
         const teamName = `${tag}-first-team`, GOAL = `first task from the ${tag} walkthrough`;
         const beforeTeam = (await live()).map(x => x.session_id);
         if (!mobile) {
-            if (!await ev(visible('[data-on-click="launch-show"]'))) {
+            if (!await ev(visible('[data-on-click="launch-chooser-show"]'))) {
                 await ev(`window.switchNavTab('agents'); true`);
-                await waitFor(visible('[data-on-click="launch-show"]'), `${tag}: the Agents list with its New button`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
+                await waitFor(visible('[data-on-click="launch-chooser-show"]'), `${tag}: the Agents list with More`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             }
-            await clickVisible('[data-on-click="launch-show"]');
-            await waitFor(visible('#launch-dir'), `${tag}: New agent opens the form again`, { timeout: 8000 });
-            await ev(`document.querySelector('.launch-back-btn').click(); true`);
+            await clickVisible('[data-on-click="launch-chooser-show"]');
             await waitFor(visible('#launch-step-chooser .launch-type-card[data-arg="team"]'), `${tag}: the choice of what to launch, again`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             await ev(`document.querySelector('#launch-step-chooser .launch-type-card[data-arg="team"]').click(); true`);
         } else { // on a phone the opened agent fills the page: back to the Agents list, where the + menu has New team
