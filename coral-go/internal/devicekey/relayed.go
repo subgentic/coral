@@ -20,7 +20,7 @@ import (
 // Device signing step 4(b) (#20513, coral-hub #260094, version 3 of the signed text). A relayed kind is a request the Hub carries from a person's signed-in device to this computer: a send to an agent, a board post, a roster or a
 // grant. Each carries a body, and the signature covers that body by hash, so the Hub (or anything between) cannot keep the signature and swap the words. The four step-2 actions are not touched: they keep the v2 label and their bytes.
 
-// Kind is a relayed kind. Every kind signs one text of one shape: a kind with no body (grant-member, input-grant, keep-full-access, hub-auto-accept) signs the hash of the empty body, and what it acts on is in the signed path.
+// Kind is a relayed kind. Every kind signs one text of one shape: a kind with no body (input-grant, keep-full-access, a DELETE of grant-member) signs the hash of the empty body, and what it acts on is in the signed path. grant-member's POST and hub-auto-accept are not bodyless: the grant's fields are the body, covered by body_sha256 (grant_member.go), and the toggle's value is in the signed query.
 type Kind string
 
 const (

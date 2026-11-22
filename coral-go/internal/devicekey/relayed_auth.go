@@ -62,6 +62,11 @@ func MatchRoute(k Kind, method, target string) (map[string]string, bool) {
 			}
 		}
 		if ok {
+			if k == HubAutoAccept { // the value it sets is in the signed query: any other query (or none) signs nothing the computer will accept (#20649)
+				if _, qok := AutoAcceptQuery(target); !qok {
+					return nil, false
+				}
+			}
 			return params, true
 		}
 	}
