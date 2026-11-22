@@ -23,6 +23,7 @@ type limitRig struct {
 	typed   map[string]time.Time // session id -> when a person last typed
 	working map[string]bool
 	sent    []string // "sid:text" in order
+	refuse  bool     // the gate types nothing (a menu is open)
 }
 
 func newLimitRig(t *testing.T, ids ...string) *limitRig {
@@ -41,9 +42,12 @@ func newLimitRig(t *testing.T, ids ...string) *limitRig {
 	}
 	r.working = func(_ context.Context, sid string) bool { return g.working[sid] }
 	r.touched = func(sid string, since time.Time) bool { return g.typed[sid].After(since) }
-	r.deliver = func(_ context.Context, a AgentInfo, text string) error {
+	r.deliver = func(_ context.Context, a AgentInfo, text string) (bool, error) {
+		if g.refuse {
+			return true, nil
+		}
 		g.sent = append(g.sent, a.SessionID+":"+text)
-		return nil
+		return false, nil
 	}
 	g.r = r
 	t.Cleanup(func() {
@@ -216,4 +220,18 @@ func TestAResetReadWithSecondsOfDriftIsOneEvent(t *testing.T) {
 	}
 	g.tick(time.Hour + 5*time.Minute)
 	assert.Equal(t, []string{"lim-drift:" + limitResumeText}, g.sent)
+}
+
+// #20697 (e): a send the gate refuses (a menu, a prompt, a draft) is not a resume: it does not use the agent's cap of three, and nothing is typed later.
+func TestARefusedSendDoesNotUseTheCapAndIsNotRetried(t *testing.T) {
+	g := newLimitRig(t, "lim-refused")
+	g.refuse = true
+	g.resets["lim-refused"] = g.now.Add(time.Hour)
+	g.tick(0)
+	g.tick(2 * time.Hour)
+	assert.Empty(t, g.sent)
+	assert.Empty(t, g.r.sent["lim-refused"], "nothing was typed, so nothing counts")
+	g.refuse = false
+	g.tick(time.Minute)
+	assert.Empty(t, g.sent, "the event is closed: it is not typed into later")
 }

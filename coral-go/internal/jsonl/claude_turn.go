@@ -259,6 +259,11 @@ func updateClaudeAPIError(e *ClaudeAPIError, line []byte) {
 		Error      json.RawMessage `json:"error"`
 		Status     int             `json:"apiErrorStatus"`
 		Timestamp  string          `json:"timestamp"`
+		Params     struct {
+			Info struct {
+				ResetsAt int64 `json:"resetsAt"`
+			} `json:"rate_limit_info"`
+		} `json:"apiErrorParams"`
 	}
 	if json.Unmarshal(line, &entry) != nil || entry.Type != "user" && entry.Type != "assistant" {
 		return
@@ -282,6 +287,9 @@ func updateClaudeAPIError(e *ClaudeAPIError, line []byte) {
 	ts, _ := time.Parse(time.RFC3339Nano, entry.Timestamp)
 	full := ClaudeAPIError{Kind: kind, Text: strings.TrimSpace(text), At: ts}
 	resetAt, _ := full.parseReset() // from the whole text: the cap below must not cut the time off
+	if n := entry.Params.Info.ResetsAt; n >= 1e9 && n < 1e11 && full.UsageLimit() {
+		resetAt = time.Unix(n, 0) // the record's own exact reset (#20697): newer CLIs write it, and it is better than the words
+	}
 	if len(text) > claudeAPIErrorTextMax {
 		text = strings.ToValidUTF8(text[:claudeAPIErrorTextMax], "")
 	}
