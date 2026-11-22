@@ -338,3 +338,40 @@ func TestAStreamWhoseRowCannotBeWrittenIsRefused(t *testing.T) {
 	}
 	require.Error(t, err, "the open is refused when its row cannot be written")
 }
+
+// QA SHOULD on #20604: the pair row middleware sits above the member grant guard, so a tunneled write the guard refuses still leaves its row (with the refusal's status). Swapping the two in router.go makes this fail.
+func TestAGuardRefusedTunneledWriteStillLeavesItsPairRow(t *testing.T) {
+	board.AllowMemberGatesForTest(t)
+	g := newInteg(t)
+	ctx := context.Background()
+	const person = "hub-user-aaaa0001"
+	_, err := g.srv.boardStore.Subscribe(ctx, "team1", "Dev", "Backend Dev", "s", nil, "")
+	require.NoError(t, err)
+	ng := guardGrant(person, board.MemberLevelView)
+	ng.LinkID = testLinkID
+	made, err := g.srv.boardStore.CreateMemberGrant(ctx, ng)
+	require.NoError(t, err)
+	_, err = g.srv.boardStore.RevokeMemberGrant(ctx, made.GrantID, time.Now()) // had grants, none live: the guard gives this person nothing
+	require.NoError(t, err)
+
+	const route = "PUT /api/settings/git-diff-mode"
+	require.True(t, pairRecordedRoutes[route], "the route this test uses is one the wrapper records")
+	method, pattern, _ := strings.Cut(route, " ")
+	before, err := g.srv.boardStore.RecentHubOperatorActions(ctx, 1000)
+	require.NoError(t, err)
+	code, body := g.hub("owner", person, method, pattern, `{"mode":"x"}`, nil)
+	require.Equal(t, http.StatusForbidden, code, body)
+	require.Contains(t, body, "member_grant_ended", "the guard, not another check, refused it")
+	after, err := g.srv.boardStore.RecentHubOperatorActions(ctx, 1000)
+	require.NoError(t, err)
+	var mine []board.HubOperatorAction
+	for _, a := range after[:len(after)-len(before)] {
+		if a.Method == method && a.Path == pattern {
+			mine = append(mine, a)
+		}
+	}
+	require.Len(t, mine, 1, "a refused tunneled write leaves one pair row; rows added: %+v", after[:len(after)-len(before)])
+	assert.Equal(t, person, mine[0].ViaHubUser)
+	assert.Equal(t, testLinkID, mine[0].ViaLink)
+	assert.Equal(t, http.StatusForbidden, mine[0].Status)
+}
