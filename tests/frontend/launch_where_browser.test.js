@@ -58,6 +58,17 @@ const git = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'user.email=
             await waitFor(`document.getElementById('launch-dir').value === ${JSON.stringify(side)}`, 'picking a worktree puts its folder in the field', 4000);
             await waitFor(`/fix-login/.test(document.querySelector(${JSON.stringify(panel('agent'))})?.textContent || '')`, 'the worktree is read', 8000);
             check(`${at}picking a worktree launches in its folder, on its branch`, (await text('agent')).includes('fix-login'));
+            // a worktree an agent is working in: said, with the agent named, and the two ways out
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.liveSessions = [{ session_id: 'r1', name: 'Reviewer', display_name: 'Reviewer', agent_type: 'claude', working_dir: ${JSON.stringify(side)} }]; return true; })`);
+            await ev(`(() => { const r = document.querySelector(${JSON.stringify(panel('agent') + ' input[name="launch-where-branch-agent"][value="exists"]')}); if (r) r.click(); return true; })()`);
+            await type('launch-dir', repo);
+            await waitFor(`!!document.querySelector(${JSON.stringify(panel('agent') + ' input[name="launch-where-branch-agent"][value="exists"]')})`, 'the branch list again', 8000);
+            await ev(`document.querySelector(${JSON.stringify(panel('agent') + ' input[name="launch-where-branch-agent"][value="exists"]')}).click(); true`);
+            await waitFor(`!!document.querySelector(${JSON.stringify(panel('agent') + ' input[name="launch-where-wt-agent"]')})`, 'the worktrees are listed again', 8000);
+            await ev(`[...document.querySelectorAll(${JSON.stringify(panel('agent') + ' input[name="launch-where-wt-agent"]')})].find(x => x.value === ${JSON.stringify(side)}).click(); true`);
+            await waitFor(`/This worktree is in use/.test(document.querySelector(${JSON.stringify(panel('agent'))})?.textContent || '')`, 'in use is said', 8000);
+            check(`${at}a worktree an agent works in is in use: it names the agent, offers to open it or to pick a free one, and holds Next`, await ev(`(() => { const p = document.querySelector(${JSON.stringify(panel('agent'))}); const t = p.textContent, b = [...p.querySelectorAll('.launch-where-item-fail .launch-where-fix')].map(x => x.textContent).join('|'); return /Reviewer is working here/.test(t) && b === 'Open Reviewer|Pick a free one' && document.getElementById('launch-agent-next').disabled; })()`));
+            await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.liveSessions = []; return true; })`);
             await type('launch-dir', plain);
             await waitFor(`/Not a git repository/.test(document.querySelector(${JSON.stringify(panel('agent'))})?.textContent || '')`, 'a plain folder is read', 8000);
             check(`${at}a folder that is not a repository says so and offers no branch`, !/Use this folder as it is/.test(await text('agent')));

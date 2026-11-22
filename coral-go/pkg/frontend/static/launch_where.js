@@ -114,11 +114,11 @@ function kindType(kind) {
 const pickFolder = (p, path) => { p.input.value = path; p.input.dispatchEvent(new Event('input', { bubbles: true })); p.choice = 'here'; p.existing = ''; p.folderEdited = false; p.folder = ''; refresh(p); };
 
 /** The agent working in a worktree folder, by the dashboard's own live list (this computer's sessions only: a folder is a computer's own). */
-function agentIn(path) {
+function sessionIn(path) {
     const srv = _effectiveServer(launch.server) || 'local';
-    const s = (state.liveSessions || []).find(x => x && x.working_dir === path && ((x.server || 'local') === srv));
-    return s ? (s.display_name || s.name || s.session_name || 'an agent') : '';
+    return (state.liveSessions || []).find(x => x && x.working_dir === path && ((x.server || 'local') === srv));
 }
+const agentIn = path => { const s = sessionIn(path); return s ? (s.display_name || s.name || s.session_name || 'an agent') : ''; };
 
 function drawRecents(p, where, recents, here) {
     if (!recents.length) return null;
@@ -224,7 +224,7 @@ function checkItems(p, where, cli, type, checks) {
             else if (c.id === 'worktree_free') items.push(c.ok ? { tone: 'ok', title: 'Worktree folder is free', detail: `${p.name} does not exist yet` } : { tone: 'fail', title: c.reason, detail: c.fix });
         }
         if (p.choice === 'new') items.push({ tone: 'info', title: 'A new branch', detail: `${p.name || 'The worktree'} is made from ${p.base || where.branch || 'the current commit'}.` });
-        if (p.choice === 'exists' && p.existing) { const who = agentIn(p.existing); if (who) items.push({ tone: 'fail', title: 'This worktree is in use', detail: `Two agents on the same files overwrite each other. ${who} is working here.`, fix: { label: 'Pick a free one', run: () => { p.existing = ''; p.input.value = where.path; refresh(p); } } }); }
+        if (p.choice === 'exists' && p.existing) { const who = agentIn(p.existing); if (who) items.push({ tone: 'fail', title: 'This worktree is in use', detail: `Two agents on the same files overwrite each other. ${who} is working here.`, why: 'pick a free worktree, or open the agent already there', fixes: [{ label: `Open ${who}`, run: () => { const s = sessionIn(p.existing); window.hideLaunchModal?.(); importOnce('./sessions.js').then(m => m.selectLiveSession(s.name || s.session_name, s.agent_type, s.session_id, _effectiveServer(launch.server))).catch(() => {}); } }, { label: 'Pick a free one', run: () => { p.existing = ''; p.input.value = where.path; refresh(p); } }] }); }
         if (p.choice === 'other' && p.other && where.changed && !p.confirmCheckout) items.push({ tone: 'fail', title: `${where.changed} uncommitted change${where.changed === 1 ? '' : 's'} in this folder`, detail: `Switching to ${p.other} may carry them along or stop on a conflict.`, fix: { label: 'Switch anyway', run: () => { p.confirmCheckout = true; refresh(p); } }, confirm: true });
         if (p.choice === 'other' && !p.other) items.push({ tone: 'fail', title: 'Pick the branch to switch to', detail: '' });
     }
@@ -268,7 +268,7 @@ function draw(p, where, recents, cli, type, checks) {
             body.append(node('span', 'sr-only', { ok: 'Passed: ', fail: 'Problem: ', warn: 'Warning: ', unknown: 'Not checked: ', info: '' }[c.tone] || ''), node('span', 'launch-where-item-title', c.title));
             if (c.detail) body.append(node('span', 'launch-where-item-detail', c.detail));
             li.append(mark, body);
-            if (c.fix) li.append(fixButton(p, c.fix));
+            const row = node('span', 'launch-where-fixes'); for (const f of c.fixes || (c.fix ? [c.fix] : [])) row.append(fixButton(p, f)); if (row.childNodes.length) li.append(row);
             ul.append(li);
         }
         sec.append(ul);
@@ -285,8 +285,8 @@ function draw(p, where, recents, cli, type, checks) {
 function blockerSentence(p, here) {
     const n = p.blockers.length;
     if (!n) return '';
-    const first = p.blockers[0];
-    const todo = first.fix && first.fix.signin ? `sign in to ${first.fix.signin.charAt(0).toUpperCase() + first.fix.signin.slice(1)} on ${here}` : first.fix?.label ? first.fix.label.charAt(0).toLowerCase() + first.fix.label.slice(1) : String(first.title).replace(/\.$/, '');
+    const first = p.blockers[0], f0 = first.fix || first.fixes?.[0];
+    const todo = first.why || (f0 && f0.signin ? `sign in to ${f0.signin.charAt(0).toUpperCase() + f0.signin.slice(1)} on ${here}` : f0?.label ? f0.label.charAt(0).toLowerCase() + f0.label.slice(1) : String(first.title).replace(/\.$/, ''));
     return `Fix ${n === 1 ? '1 thing' : `${n} things`} to continue: ${todo}.`;
 }
 
