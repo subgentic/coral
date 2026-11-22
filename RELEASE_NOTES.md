@@ -1,5 +1,45 @@
 # Release Notes
 
+## v2.1.5 — Start an agent on another computer, tighter Hub access, and a Saved list that follows the Inbox
+
+Task numbers in brackets. Built on v2.1.4. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **New agent, New team and New terminal start on any computer** (#20388, #20594, #20468): every Computers row has the starts, and a Where step under the folder lets you pick the computer, a branch or a new worktree, with a setup check ("not checked" until it runs). A worktree in use offers Open <agent> and Pick a free one; an agent running in the folder is told before its branch changes; a post-checkout hook never runs. Launch checks carry no home path through the Hub. Sign in is offered only for the computer's own Coral. A new worktree's name is one plain name, joined once under `<repo>-worktrees` (#20614, #20618). A folder you trusted in Claude is found on Windows too, whatever the slashes or letter case (#20653). The sidebar footer has New team and More; New agent is in the chooser and Alt+N still opens it. The Where step's Change link reads clearly in light mode and is a full-size touch target on a phone (#20647).
+- **Saved for later follows the Inbox row** (#20508, #20519, #20531): files and messages in one list, newest saved first by when each was saved, the sender in bold and the message in the secondary colour, the computer named on a Hub, and Back returns you to the row you opened (#20658, #20670); a Hub Save, Done and Remove work for messages only on the routes the Hub reports open (#20437).
+- **A computer on an older Coral says so** (#20440): Computers, Analytics, Automations and the other computer pages name a computer whose Coral is too old for the Hub and the version to update to ("Update Coral on <computer> to <version> to see this"), keeping what the other computers returned. A refused Inbox chat search still says Search failed (#20666).
+- **Open in browser** (#20553): a chat's local page opens in your default browser from its file menu.
+- **Hub Analytics pages** (#20562, #20423): Tasks, Tokens per commit, Task time, Inbox vs chat, Resource queue and Team communication open through the Hub; a closed route says "Not available through the Hub yet." and a View-only person gets one plain line.
+- **Health lists and tunes** (#20398, #20495): each open health item shows its text and ack id first; settings for the deviation floor, factor and sample minimum, the operator-wait switch, grace, chat age and exempt authors, and `action_list.max_items`.
+- **The model list keeps its error visible** while the CLI is checked again (#20578).
+- **Activity and the Hub Inbox** (#20414, #20394): Activity shows in the Hub Inbox sidebar and names a missing computer when every read is refused.
+
+#### Hub access and device keys
+
+- **Device signing** (#20513, #20515): keys are bound to the (link, Hub label) pair the computer set; relayed kinds sign the SHA-256 of the exact body; the owner is an explicit marker in the pair (a missing or half pair fails closed); every applied message has an audit row with `approved_by`; the owner gets a Needs-you notice with the new key's fingerprint and the raiser. **`coral-go/internal/devicekey/codes.go` changes in this release** (five relayed-kind reply codes: `body_hash`, `body_too_large`, `wrong_request`, `wrong_link`, `outside_pair`).
+- **A message records the Hub link and person it came through** (#20387); a post through an added link that may not answer asks is labelled as the Hub person and never the Operator (#20413, #20498).
+- **Hub sharing grants** (#20511, #20473, #20581, #20590): a Hub person gets a View or Full grant with a scope (board, agent, computer), with an expiry (30 or 7 days); every tunneled request is limited to the lower of the person's best grant and the link's cap; a revoke, expiry or lowering ends an open stream within two seconds; a View-only person reads only their own board's messages as a typed, redacted answer; a live Full grant is a standing Needs-you item. A Full grant is signable only by a launch-mode device. The Hub sharing switches stay off in this release.
+
+#### For the team
+
+- Release tooling: the fail-fast now includes `cmd/coral-board` and gofmt in every run (#20607, #20497).
+
+### Test and gate fixes in this release
+
+- Census and golden tests follow the new routes, joins and schema: the safefs join census (#20614, #20640), board schema goldens (`member_grant`, `no_answer`, `health_items.text`), the timestamp, envelope and ORDER BY census tests, and the `cmd/coral-board` help test (#20607).
+- Browser suites follow the new words: the update-notice suite does not count the Start buttons (#20623), the Automations list pins the approved update instruction (#20639), and two flaky waits are fixed (`file_version_surfaces`, #20579; the chat file-menu fixture).
+- Suites follow the approved sidebar footer (New agent through More and the chooser; the startup golden's three lines for the lazy file menu) with no assertion dropped (#20647, #20658, #20670); the startup golden waits for the launch notice module requested after first paint (#20673); `home_goal_after_quiet` does not count the teams read's own lazy module (#20666); the Windows Claude-settings fixture is written as JSON (#20653).
+- `artifact_passage_keyboard` waits for the empty comments panel's line and no longer swallows a failed wait (#20677).
+- The start path is net -5 gz bytes over the batch's base (#20619 offsets #20623); the start-CSS cap is unchanged.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- A second Hub link is refused until Security's items are closed; the Hub sharing switches stay off.
+
 ## v2.1.4 — Groundwork for several Hubs, a faster Inbox, and a new version that comes back to you
 
 Task numbers in brackets. Built on v2.1.3. A prerelease until the Operator promotes it.
