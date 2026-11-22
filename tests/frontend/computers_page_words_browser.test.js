@@ -26,20 +26,23 @@ const { coralReady } = require('./helpers/wait');
             const by = n => rows.find(r => r.name === n) || {};
             check(`${tag}: the busy computer's Status says so in words beside Online`, by('Laptop').status === 'Online, Busy (CPU)', JSON.stringify(by('Laptop').status));
             check(`${tag}: a computer with no health reading says only Online`, by('Desktop').status === 'Online', JSON.stringify(by('Desktop').status));
-            check(`${tag}: each Hub access choice carries its line`, ['Laptop', 'Desktop'].every(n => by(n).opts.length === 3 && by(n).opts.every(([v, t]) => t.length > 20) && new Set(by(n).opts.map(o => o[1])).size === 3), JSON.stringify(by('Laptop').opts));
-            check(`${tag}: the chosen access's line is shown under the select (View, Interact)`, /^Look at terminals, chats, files and boards\. Changes nothing\.$/.test(by('Laptop').line) && /^Also type into running agents and post on boards\.$/.test(by('Desktop').line), JSON.stringify([by('Laptop').line, by('Desktop').line]));
-            check(`${tag}: the select is described by that line`, / [^ ]+-line$/.test(by('Laptop').described), by('Laptop').described);
-            const lineShown = () => ev(`[...document.querySelectorAll('#servers-tab-body .cs-access-line')].map(e => getComputedStyle(e).display !== 'none')`);
-            check(`${tag}: at rest every row shows the access line, the words a closed picker needs (#13921)`, (await lineShown()).length >= 1 && (await lineShown()).every(v => v === true), JSON.stringify(await lineShown()));
-            await ev(`document.querySelector('#servers-tab-body .cs-launch select').focus(); true`);
-            check(`${tag}: focusing a picker leaves every row's line shown`, (await lineShown()).every(v => v === true), JSON.stringify(await lineShown()));
-            await ev(`document.activeElement.blur(); true`);
-            // 200% text (and a phone at it): the line wraps inside its column, is not cut, and the page does not scroll sideways (#13921)
-            await ev(`document.documentElement.style.fontSize = '200%'; true`); await sleep(300); // sleep-ok: the layout settles
-            const big = await ev(`(() => ({ over: document.documentElement.scrollWidth > innerWidth + 1, lines: [...document.querySelectorAll('#servers-tab-body .cs-access-line')].map(e => { const r = e.getBoundingClientRect(), p = e.closest('td, .cs-access-wrap').getBoundingClientRect(); return { shown: getComputedStyle(e).display !== 'none', inside: r.right <= p.right + 1 && e.scrollWidth <= e.clientWidth + 1, h: Math.round(r.height) }; }) }))()`);
-            check(`${tag}: at 200% text every line is shown, whole and inside its column, with no sideways scroll`, !big.over && big.lines.length >= 1 && big.lines.every(l => l.shown && l.inside && l.h > 0), JSON.stringify(big));
-            await shot(`after-200-${w}`);
-            await ev(`document.documentElement.style.fontSize = ''; true`);
+            if (mobile) check(`${tag}: the phone's list leaves Hub access to the computer's page (the Operator's choice on #20468): no picker, no line in a row`, rows.every(r => r.opts.length === 0 && r.line === ''), JSON.stringify(rows.map(r => [r.name, r.opts.length, r.line])));
+            else { // the access choices live in the row at desktop width
+                check(`${tag}: each Hub access choice carries its line`, ['Laptop', 'Desktop'].every(n => by(n).opts.length === 3 && by(n).opts.every(([v, t]) => t.length > 20) && new Set(by(n).opts.map(o => o[1])).size === 3), JSON.stringify(by('Laptop').opts));
+                check(`${tag}: the chosen access's line is shown under the select (View, Interact)`, /^Look at terminals, chats, files and boards\. Changes nothing\.$/.test(by('Laptop').line) && /^Also type into running agents and post on boards\.$/.test(by('Desktop').line), JSON.stringify([by('Laptop').line, by('Desktop').line]));
+                check(`${tag}: the select is described by that line`, / [^ ]+-line$/.test(by('Laptop').described), by('Laptop').described);
+                const lineShown = () => ev(`[...document.querySelectorAll('#servers-tab-body .cs-access-line')].map(e => getComputedStyle(e).display !== 'none')`);
+                check(`${tag}: at rest every row shows the access line, the words a closed picker needs (#13921)`, (await lineShown()).length >= 1 && (await lineShown()).every(v => v === true), JSON.stringify(await lineShown()));
+                await ev(`document.querySelector('#servers-tab-body .cs-launch select').focus(); true`);
+                check(`${tag}: focusing a picker leaves every row's line shown`, (await lineShown()).every(v => v === true), JSON.stringify(await lineShown()));
+                await ev(`document.activeElement.blur(); true`);
+                // 200% text (and a phone at it): the line wraps inside its column, is not cut, and the page does not scroll sideways (#13921)
+                await ev(`document.documentElement.style.fontSize = '200%'; true`); await sleep(300); // sleep-ok: the layout settles
+                const big = await ev(`(() => ({ over: document.documentElement.scrollWidth > innerWidth + 1, lines: [...document.querySelectorAll('#servers-tab-body .cs-access-line')].map(e => { const r = e.getBoundingClientRect(), p = e.closest('td, .cs-access-wrap').getBoundingClientRect(); return { shown: getComputedStyle(e).display !== 'none', inside: r.right <= p.right + 1 && e.scrollWidth <= e.clientWidth + 1, h: Math.round(r.height) }; }) }))()`);
+                check(`${tag}: at 200% text every line is shown, whole and inside its column, with no sideways scroll`, !big.over && big.lines.length >= 1 && big.lines.every(l => l.shown && l.inside && l.h > 0), JSON.stringify(big));
+                await shot(`after-200-${w}`);
+                await ev(`document.documentElement.style.fontSize = ''; true`);
+            }
             const clicked = await click('#servers-tab-body .cs-name');
             await sleep(500); // sleep-ok: the page draws
             check(`${tag}: a real click on the computer's name opens its page`, clicked && (await ev(`!!document.querySelector('#servers-tab-body .cs-page-name')`)), String(clicked));
