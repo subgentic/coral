@@ -9,11 +9,16 @@ const CodeInternal = "internal"
 var ReplyCodes = []string{
 	"bad_form", "bad_signature", "bad_mode", "top_mode", "above_signer", "self_target", "unknown_target", "target_bootstrap",
 	"signer_bootstrap", "signer_no_proof", "nonce_repeat", "nonce_store_full", "list_unavailable", "key_limit",
-	"ts_window", "before_start", "clock_back", CodeInternal,
+	"ts_window", "before_start", "clock_back",
+	"body_hash", "body_too_large", "wrong_request", "wrong_link", "outside_pair", // the relayed (v3) kinds, relayed.go (#20563)
+	CodeInternal,
 }
 
 // FoldedCodes are verifier codes that a reply never carries as themselves: they would tell a sender who has not yet proved a key whether a kid is listed, was removed, or which computer this is. They reply bad_signature.
 var FoldedCodes = map[string]bool{"unknown_signer": true, "signer_removed": true, "wrong_computer": true}
+
+// InternalOnlyCodes are verifier errors that are the computer's own wiring fault, not anything about the message: a reply says only "internal" for them, never the name.
+var InternalOnlyCodes = map[string]bool{"no_authority": true}
 
 // InReplyCodes reports whether code is in the closed list.
 func InReplyCodes(code string) bool {
