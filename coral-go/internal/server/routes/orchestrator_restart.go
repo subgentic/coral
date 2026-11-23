@@ -128,6 +128,7 @@ func (h *SessionsHandler) restartAsSeat(ctx context.Context, project string, tar
 	plan.keepSource = store.KeepSourceLocal
 	plan.restartSettings()
 	if plan.stored != nil {
+		plan.prompt = h.withInstructionPictures(lctx, plan.stored.SessionID, plan.prompt)
 		h.modelSwitches.end(plan.stored.SessionID, "The agent was restarted before the change was confirmed.")
 		h.stopOpencode(plan.stored.SessionID)
 	}

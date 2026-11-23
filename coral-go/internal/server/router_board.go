@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/server/routes"
@@ -142,6 +143,9 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	})
 	s.boardHandler = boardHandler
 	sessHandler.SetBoardHandler(boardHandler)
+	h.sched.SetPictures(boardHandler) // the pictures of a scheduled job's prompt (#20750), and the lines a run is given after the words
+	jobLines := h.sched.JobPictureLines
+	background.JobPictureLines.Store(&jobLines)
 	sessHandler.SetScheduleStore(store.NewScheduleStore(s.db))
 	sessHandler.SetTeamStore(teamsHandler.Store())
 	sessHandler.SetAgentOperatorGate(s.identity.AgentOperatorAction)

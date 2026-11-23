@@ -9,6 +9,7 @@ import (
 
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/safego"
@@ -44,8 +45,10 @@ const maxInstructionsBytes = 20000
 // PUT /api/sessions/live/{name}/instructions  {"session_id": "...", "instructions": "..."}
 func (h *SessionsHandler) SetInstructions(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		SessionID    string `json:"session_id"`
-		Instructions string `json:"instructions"`
+		SessionID    string              `json:"session_id"`
+		Instructions string              `json:"instructions"`
+		Images       map[string][]string `json:"images"` // the instructions' pictures (#20750): {"instructions": [hex]}
+		ImagesDraft  string              `json:"images_draft"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -62,6 +65,10 @@ func (h *SessionsHandler) SetInstructions(w http.ResponseWriter, r *http.Request
 	if trimmed := strings.TrimSpace(body.Instructions); trimmed != "" {
 		prompt = &trimmed
 	}
+	pictures, ok := h.instructionPictures(w, r, body.SessionID, body.ImagesDraft, body.Images)
+	if !ok {
+		return
+	}
 	found, err := h.ss.SetPrompt(r.Context(), body.SessionID, prompt)
 	if err != nil {
 		errInternalServer(w, err.Error())
@@ -71,7 +78,17 @@ func (h *SessionsHandler) SetInstructions(w http.ResponseWriter, r *http.Request
 		errNotFound(w, "no such agent")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "applies": "at the next restart"})
+	out := map[string]any{"ok": true, "applies": "at the next restart"}
+	if prompt == nil && pictures == nil { // instructions replaced by nothing take their pictures with them
+		pictures = map[string][]board.GoalImage{"instructions": {}}
+	}
+	if !h.keepInstructionPictures(r.Context(), body.SessionID, pictures) {
+		out["pictures_not_saved"], out["pictures_warning"] = true, picturesNotSavedWords
+	}
+	if m := h.instructionImages(r.Context(), body.SessionID); len(m) > 0 {
+		out["images"] = m
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // SetIcon sets or clears the emoji icon for a live session.

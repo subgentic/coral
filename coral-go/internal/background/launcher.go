@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -365,6 +366,17 @@ func (l *AgentLauncher) startPromptDeliveryReporting(ctx context.Context, sessio
 	return done
 }
 
+// JobPictureLines gives the coral://artifacts lines of the pictures a scheduled job's prompt carries (#20750), set by the server (the pictures are the board store's); nil: none.
+var JobPictureLines atomic.Pointer[func(ctx context.Context, jobID int64) string]
+
+// jobPrompt is the prompt a run is given: the job's words, then one line per picture it carries.
+func jobPrompt(ctx context.Context, job store.ScheduledJob) string {
+	if f := JobPictureLines.Load(); f != nil {
+		return job.Prompt + (*f)(ctx, job.ID)
+	}
+	return job.Prompt
+}
+
 // BuildSchedulerLaunchFn returns a function suitable for scheduler.SetLaunchFn.
 // It integrates agent launching with the scheduler's job/run lifecycle.
 func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) func(ctx context.Context, job store.ScheduledJob, runID int64) error {
@@ -373,7 +385,7 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 
 		oneShot := oneShotJob(job.AgentType)
 		result, err := l.launchAgent(ctx, job.RepoPath, job.AgentType, job.Name,
-			"", flagsList, true, job.Prompt, "", "", oneShot)
+			"", flagsList, true, jobPrompt(ctx, job), "", "", oneShot)
 		if err != nil {
 			return err
 		}
@@ -390,7 +402,7 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 		// delivery (and an initial prompt held for a screen nobody answers) ends with it (#3999).
 		gaveUp := make(chan error, 1)
 		if !oneShot { // a one-shot run has its prompt on the command line
-			l.startPromptDeliveryReporting(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt, func(err error) { gaveUp <- err })
+			l.startPromptDeliveryReporting(ctx, result.SessionID, result.SessionName, job.AgentType, jobPrompt(ctx, job), func(err error) { gaveUp <- err })
 		}
 
 		// Monitor the tmux session — return when agent finishes or context expires; or when the prompt could not be typed: the run is failed with the reason, not left 'Running...' (#17520)
