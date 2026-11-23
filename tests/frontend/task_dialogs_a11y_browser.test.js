@@ -31,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('1. Create task: focus, a spoken refusal, a keyboard-reachable dependency picker');
         await ev(`document.querySelector('#board-task-bar .btn-create-task').focus(); document.querySelector('#board-task-bar .btn-create-task').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'`, 'the dialog', 8000);
+        await waitFor(`!!document.getElementById('create-task-modal') && getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'`, 'the dialog', 8000);
         assert.equal(await ev(`document.activeElement.id`), 'create-task-title', 'focus goes to the title on open');
         assert.equal(await ev(`document.getElementById('create-task-title').getAttribute('aria-required')`), 'true');
         await ev(`document.getElementById('create-task-submit').click(); true`);
@@ -88,7 +88,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.exitTeamPage && window.exitTeamPage({ force: true }); window.selectLiveSession('bt-agent', 'claude', 'bt-agent-id', 'local'); true`);
             await waitFor(`!!document.querySelector('#board-task-bar .btn-create-task') && document.querySelector('#board-task-bar .btn-create-task').getClientRects().length > 0`, 'the Tasks tab again', 8000);
             await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
-            await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'`, 'create', 5000);
+            await waitFor(`!!document.getElementById('create-task-modal') && getComputedStyle(document.getElementById('create-task-modal')).display !== 'none'`, 'create', 5000);
             const c = await auditRegion(ev, ['#create-task-modal']); await shot(`create-${theme}`);
             await ev(`[...document.querySelectorAll('#create-task-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
             assert.ok(c.checked > 0 && !c.fails.length, `${theme}: the Create task dialog holds 4.5:1: ` + JSON.stringify(c.fails).slice(0, 400));

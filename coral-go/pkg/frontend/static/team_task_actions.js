@@ -11,6 +11,7 @@ import { state } from './state.js';
 import { boardFetch, pathId, splitKey } from './server_base.js';
 import { showToast } from './utils.js';
 import { blockedReason } from './hub_access.js';
+const { mountFieldPictures, picturePayload, savedWords } = await importOnce('./field_pictures.js');
 const { el } = await importOnce('./team_table.js'); // lazy: its failure is retried
 const { readTaskGoalOptions, readGoal, fillGoalSelect, showGoalInvalid, chooseGoalLabel } = await importOnce('./task_goals.js');
 const { _renderDepPicker, _getSelectedDeps } = await importOnce('./task_dep_picker.js');
@@ -125,6 +126,8 @@ export async function editForm(task, ctx) {
         const picker = el('div', 'dep-picker'); picker.id = 'task-edit-deps';
         form.append(label, picker);
     }
+    const draft = 'pictures-' + crypto.randomUUID();
+    const pictures = [['task-edit-body', 'description'], ['task-edit-instructions', 'instructions'], ['task-edit-reason', 'reason']].map(([id, field]) => mountFieldPictures(form.querySelector('#' + id), { project, field, draft, initial: task.images?.[field] || [] }));
     const mount = (host) => { if (showDeps) _renderDepPicker('task-edit-deps', (task.blocked_by || []).map(d => d.task_id), task.id); return host; };
 
     const say = (text) => { error.textContent = text; error.hidden = !text; if (text) error.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); };
@@ -133,10 +136,12 @@ export async function editForm(task, ctx) {
         const title = value('task-edit-title').trim();
         if (!title) { say('Title is required'); return; }
         const body = value('task-edit-body').trim(), prio = value('task-edit-priority'), assigned = value('task-edit-assignee');
+        let imageWrite;
+        try { imageWrite = picturePayload(...pictures); } catch (e) { say(e.message); return; }
         const updates = {}, amendments = {}; // the edit route needs its actor for a title or priority too (the dialog sent it only with an assignee: a title edit was refused)
         if (title !== task.title) updates.title = title;
         const newInstructions = value('task-edit-instructions').trim();
-        if (body !== (task.body || '')) amendments.body = body;
+        if (body !== (task.body || '') || imageWrite.images) amendments.body = body;
         if (newInstructions !== instructions) amendments.workflow_instructions = newInstructions;
         if (prio !== task.priority) updates.priority = prio;
         if (assigned !== (task.assigned_to || '')) { updates.assigned_to = assigned; updates.subscriber_id = 'Operator'; }
@@ -149,13 +154,14 @@ export async function editForm(task, ctx) {
         if (!Object.keys(updates).length && !Object.keys(amendments).length && !goalChanged) { ctx.redraw(task, 'view'); return; }
         try {
             if (goalChanged && !goalValue && goalRead.requireGoal) { showGoalInvalid(goal, goalError, `${chooseGoalLabel}: this board needs a goal on every task.`); return; }
-            let textVersion = task.version;
+            let textVersion = task.version, pictureWarning = '';
             if (Object.keys(amendments).length) {
                 const reason = value('task-edit-reason').trim();
                 if (!reason) throw new Error('An amendment reason is required for description or instruction changes');
-                const r = await boardFetch(project, `/tasks/${pathId(task.id)}/amend`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', base_revision: revision, reason, changes: amendments }) });
+                const r = await boardFetch(project, `/tasks/${pathId(task.id)}/amend`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', base_revision: revision, reason, changes: amendments, ...imageWrite }) });
                 if (!r.ok) throw await failure(r);
                 const amended = await r.json(); textVersion = amended.version || textVersion;
+                if (amended.pictures_not_saved) pictureWarning = savedWords(amended, 'Task updated');
             }
             if (Object.keys(updates).length) {
                 const r = await boardFetch(project, `/tasks/${pathId(task.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', base_version: textVersion, ...updates }) });
@@ -165,7 +171,7 @@ export async function editForm(task, ctx) {
                 const r = await boardFetch(project, `/tasks/${pathId(task.id)}/goal`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal_id: goalValue ? Number(goalValue) : null, subscriber_id: 'Operator' }) });
                 if (!r.ok) throw await failure(r);
             }
-            ctx.reload('Task updated');
+            ctx.reload(pictureWarning || 'Task updated');
         } catch (e) { say(e.message || 'Failed to save'); }
     }
     return { node: form, mount, save };
@@ -207,6 +213,7 @@ export function completeForm(task, ctx) {
     const refresh = btn('btn task-completion-refresh', 'Refresh task before retrying', () => ctx.reload()); refresh.id = 'task-complete-refresh'; refresh.hidden = true;
     box.append(details, error, refresh);
     section.append(heading, box);
+    const pictures = mountFieldPictures(message, { project: ctx.project, field: 'completion_message' });
 
     async function submit() {
         try {
@@ -224,10 +231,10 @@ export function completeForm(task, ctx) {
             if (missing.length) throw new Error(`Required outputs missing: ${missing.join(', ')}`);
             const resp = await boardFetch(ctx.project, `/tasks/${pathId(task.id)}/complete`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ subscriber_id: 'Operator', message: message.value.trim() || undefined, outcome: outcome.value || 'success', artifacts, expected_revision: Number(task.revision || 1) }),
+                body: JSON.stringify({ subscriber_id: 'Operator', message: message.value.trim() || undefined, outcome: outcome.value || 'success', artifacts, expected_revision: Number(task.revision || 1), ...pictures.payload() }),
             });
             if (!resp.ok) { const e = await failure(resp); e.status = resp.status; throw e; }
-            ctx.reload('Task completed');
+            ctx.reload(savedWords(await resp.json(), 'Task completed'));
         } catch (e) {
             error.textContent = e.message || 'Failed to complete task'; error.hidden = false;
             if (e.status === 409) refresh.hidden = false;
@@ -237,15 +244,16 @@ export function completeForm(task, ctx) {
     /** "Changes" (send back): what is missing, written in the box, goes to the agent that has the task as an Operator message on the board; the task stays open. With nothing written it just goes back. */
     async function sendBack() {
         const text = message.value.trim();
-        if (!text || !task.assigned_to) { ctx.redraw(task, 'view'); return; }
+        if ((!text && !pictures.hexes().length) || !task.assigned_to) { ctx.redraw(task, 'view'); return; }
         try {
-            const resp = await boardFetch(ctx.project, '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', as: 'Operator', content: `@${task.assigned_to} Not done yet (task #${Number(task.id)}): ${text}` }) });
+            const resp = await boardFetch(ctx.project, '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', as: 'Operator', content: `@${task.assigned_to} Not done yet (task #${Number(task.id)}): ${text}`, ...(pictures.items().length ? await pictures.payloadFor('chat', 'content') : {}) }) });
             if (!resp.ok) throw await failure(resp);
-            showToast(`Sent back to ${task.assigned_to}`);
+            const sent = await resp.json();
+            showToast(savedWords(sent, `Sent back to ${task.assigned_to}`), !!sent.pictures_not_saved);
             ctx.redraw(task, 'view');
         } catch (e) { error.textContent = e.message || 'Could not send it back'; error.hidden = false; showToast(e.message || 'Could not send it back', true); }
     }
-    const dirty = () => [message, name, content, ...[...details.querySelectorAll('input[type=text], input:not([type])')]].some(f => f && String(f.value || '').trim() !== '') || !!(file.files && file.files.length); // something was written or chosen: leaving throws it away (#10633)
+    const dirty = () => pictures.items().length > 0 || [message, name, content, ...[...details.querySelectorAll('input[type=text], input:not([type])')]].some(f => f && String(f.value || '').trim() !== '') || !!(file.files && file.files.length); // something was written or chosen: leaving throws it away (#10633)
     return { node: section, sendBack, canSendBack: canSendBack(task, hubWhy), dirty, focus: () => { message.focus({ preventScroll: true }); message.scrollIntoView({ block: 'center' }); }, submit }; // the box is brought into view above the pinned bar, not left under it on a phone (#10064)
 }
 

@@ -118,10 +118,11 @@ export const coralInboxAdapter = {
         if (isCloud()) rememberReply(project, { ...task, id: pathId(id) });
         return task;
     },
-    async replyToTask({ project, taskId, content, replyTo }) {
+    async createPictureTray(task) { return (await importOnce('./field_pictures.js')).createFieldPictures({ project: task.project, field: 'content' }); },
+    async replyToTask({ project, taskId, content, replyTo, images, images_draft }) {
         if (isCloud() && (!replyContexts.has(`${project}#${taskId}`) || !this.canReply(replyContexts.get(`${project}#${taskId}`)).ok)) throw new Error('Reply is not available for this computer.');
-        const d = await json(await boardFetch(project, `/tasks/${pathId(taskId)}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, ...(Number(replyTo) > 0 ? { reply_to: Number(replyTo) } : {}) }) }));
-        return { ok: !!d.ok, notified: d.notified || [], warnings: d.warnings || [] };
+        const d = await json(await boardFetch(project, `/tasks/${pathId(taskId)}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, ...(images ? { images, images_draft } : {}), ...(Number(replyTo) > 0 ? { reply_to: Number(replyTo) } : {}) }) }));
+        return { ok: !!d.ok, notified: d.notified || [], warnings: d.warnings || [], pictures_not_saved: d.pictures_not_saved, pictures_warning: d.pictures_warning };
     },
     async listTaskMessages(project, taskId) { // the task's conversation (#7703): the person's replies and the agents' answers posted with --task, oldest first
         const d = await json(await boardFetch(project, `/messages/all?task_id=${pathId(taskId)}&limit=200`), splitKey(project).server);

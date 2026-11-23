@@ -36,7 +36,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                                 if (mode === 'other-refusal') return json({code:'words_not_supported',message:'Write refused.'},400);
                                 if (mode === 'unsupported-images' && body.text) return json({code:'images_not_in_this_slice',message:'Use a comment for pictures.'},400);
                                 if (mode === 'in-progress') return json({code:'already_in_progress',message:'retry in a moment'},409);
-                                if (mode.startsWith('older') || mode === 'pictures' || mode === 'cloud-older') return json({state:'changes requested',delivered:false});
+                                if (mode.startsWith('older') || mode === 'cloud-older') return json({state:'changes requested',delivered:false});
                                 return json({state:'changes requested',text_kept:true,comment_id:7,delivered:mode!=='not-delivered' && mode!=='already-sent' && mode!=='queued',...(mode==='queued'?{queued:'Writer A'}:mode==='not-delivered'?{reason:'agent_unavailable'}:mode==='already-sent'?{reason:'already_sent'}:{to:'Writer A'})});
                             }
                             if (path.endsWith('/comments') && mode === 'cloud-older') return json({error:'not_found'},404); // the Hub keeps comment writes closed until its flag is on (#14797)
@@ -47,7 +47,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                             if (path.endsWith('/send')) return json({ok:true,results:[{state:'sent',agent:'Writer A'}]});
                             return json({id:path.includes('${OTHER}')?8:7,body:body.body,images:body.images || []},201);
                         }
-                        if (method === 'POST' && path === prefix+'/api/artifacts/${HEX}/comment-images') return json({hex:'${PIC}',name:'example.png',content_type:'image/png',size:70});
+                        if (method === 'POST' && path === prefix+'/api/board/alpha/field-images') return json({hex:'${PIC}',name:'example.png',content_type:'image/png',size:70});
                         return real(input,opts);
                     };
                     const host = document.createElement('section'); host.id = 'one-call-review'; host.innerHTML='<div class="artifact-viewer-header"></div>'; document.body.append(host);
@@ -136,13 +136,14 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                 } else {
                     await waitFor(`window.__reloads === 1`, mode + ' finishes');
                     const writes = await ev(`window.__writes`);
-                    if (['one', 'not-delivered', 'queued', 'already-sent', 'hub', 'cloud'].includes(mode)) {
+                    if (['one', 'pictures', 'not-delivered', 'queued', 'already-sent', 'hub', 'cloud'].includes(mode)) {
                         assert.equal(writes.length,1,mode+' is one call');
                         assert.ok(writes[0].path.endsWith('/review')); assert.equal(writes[0].body.text,'Keep these exact words.');
                         assert.equal(writes[0].body.decision,'changes');
+                        if (mode === 'pictures') assert.deepEqual(writes[0].body.images.text,[PIC],'pictures ride the same decision as the words');
                     } else if (mode !== 'cloud-older') {
                         assert.equal(writes.length,mode==='unsupported-images'?4:3,mode+' counts every request, including the explicit unsupported refusal');
-                        if (mode === 'pictures') assert.ok(writes.every(w=>!Object.hasOwn(w.body,'text')),'pictures never send a one-call text request');
+
                         if (mode === 'unsupported-images') { assert.equal(writes[0].body.text,'Keep these exact words.'); assert.equal(Object.hasOwn(writes.at(-1).body,'text'),false,'the fallback decision carries no text'); }
                         if (mode === 'older') { assert.ok(writes[0].path.endsWith('/review')); assert.equal(writes[0].body.text,'Keep these exact words.','older computer is negotiated before falling back'); }
                         assert.equal(writes.filter(w=>w.path.endsWith('/review')).length,mode==='unsupported-images'?2:1,'no duplicate accepted decision');

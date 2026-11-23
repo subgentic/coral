@@ -5,6 +5,17 @@ import { splitKey, boardFetch } from './server_base.js';
 import { showToast, OPERATOR_ID } from './utils.js';
 import { isOutcomeUnknown, OUTCOME_UNKNOWN_LINE } from './outcome_unknown.js';
 import { bs } from './board_state.js';
+const { mountFieldPictures, savedWords } = await importOnce('./field_pictures.js');
+let pictures, pictureProject;
+export function mountBoardPictures(project) {
+    const input = document.getElementById('mb-post-input');
+    if (!input || (pictureProject === project && pictures?.node.isConnected)) return;
+    if (pictures) { pictures.destroy(); pictures.node.replaceWith(input); }
+    pictureProject = project;
+    pictures = mountFieldPictures(input, { project, scope: 'chat', field: 'content' });
+    const syncHint = () => { pictures.node.querySelector('.ac-images-hint').hidden = pictures.items().length === 0; };
+    pictures.listen(syncHint); syncHint(); // board composer only: keep the full placeholder, reveal privacy words with the first picture
+}
 const { setReplyStrip } = await importOnce('./board_reply_strip.js'); // a part of the board page's group
 const { _pollNewMessages } = await importOnce('./board_poll.js'); // a part of the board page's group: loaded with it
 
@@ -36,13 +47,13 @@ export async function postBoardMessage() {
     const content = input.value.trim();
     const hint = document.getElementById('mb-post-hint');
     if (hint) hint.textContent = content ? '' : 'Write a message first.';
-    if (!content) { input.focus(); return; }
+    if (!content && !pictures?.hexes().length) { input.focus(); return; }
 
     try {
         const resp = await boardFetch(bs.currentProject, `/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(bs._replyTo ? { reply_to: bs._replyTo.id } : {}) }),
+            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...pictures?.payload(), ...(bs._replyTo ? { reply_to: bs._replyTo.id } : {}) }),
         });
         if (!resp.ok) {
             // The draft stays; say why, in the server's words when it gives them (a per-sender rate
@@ -56,15 +67,16 @@ export async function postBoardMessage() {
             return;
         }
         input.value = '';
+        pictures?.clear();
         bs._replyTo = null; setReplyStrip(input, null);
         // A recipient that will not read it now (asleep, terminal gone, ended, archived) is said at once, in the server's words (#13189)
         const sent = await resp.json().catch(() => null);
         const resting = sent && Array.isArray(sent.asleep) ? sent.asleep.map(a => (a && typeof a.note === 'string' ? a.note : '')).filter(Boolean) : [];
-        showToast(resting.length ? resting.slice(0, 3).join(' ') + (resting.length > 3 ? ` (and ${resting.length - 3} more)` : '') : 'Sent'); // a send is always answered: the server's words for a recipient that will read it later, else 'Sent' (#15287)
+        showToast(savedWords(sent, resting.length ? resting.slice(0, 3).join(' ') + (resting.length > 3 ? ` (and ${resting.length - 3} more)` : '') : 'Sent'), !!sent?.pictures_not_saved); // a send is always answered: the server's words for a recipient that will read it later, else 'Sent' (#15287)
         // Fetch new messages since our last known total
         await _pollNewMessages();
         const list = document.getElementById('mb-messages'); if (list) list.scrollTop = list.scrollHeight; // the person's own message is the newest, and in view (#10088)
     } catch (e) {
-        console.error('Failed to post message:', e);
+        console.error('Failed to post message:', e); showToast(e.message || 'Message not sent. Your draft is still here.', true);
     }
 }

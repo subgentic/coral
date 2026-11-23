@@ -1,6 +1,8 @@
 import { openTask } from './task_navigation.js';
 import { authorLabel } from './board_author.js';
 import { importOnce, loadedModule } from './import_once.js';
+const { createFieldPictures, savedWords } = await importOnce('./field_pictures.js');
+let chatPictures, chatSending = false;
 const { agentLinkHtml } = await importOnce('./agent_link.js'); // an agent's name is one shared helper everywhere (#12168)
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { formatHourMinute } from './format.js';
@@ -106,6 +108,7 @@ export function showBoardChatTab(boardName, agent = null) {
     if (sameBoard) {
         _resetBoardPanelForSwitch(panel, boardName);
     } else {
+        chatPictures?.destroy();
         // The same board again (another agent of its team): the messages element, with its rendered messages, is carried over into
         // the rebuilt panel, so the render below keeps those nodes instead of building them again (#3881).
         const carried = _boardChatLoaded && _boardChatBoard === boardName && _boardChatScope === scope ? document.getElementById('board-panel-msgs') : null;
@@ -144,6 +147,9 @@ export function showBoardChatTab(boardName, agent = null) {
         if (carried) document.getElementById('board-panel-msgs').replaceWith(carried);
 
         initGrowingTextarea(document.getElementById('board-panel-input'));
+        chatPictures = createFieldPictures({ project: boardName, scope: 'chat', field: 'content' });
+        const text = document.getElementById('board-panel-input');
+        text.after(chatPictures.node); chatPictures.attach(text.parentElement, text); // keep the editor in its original focus-ring ancestry
         importOnce('./keep_gap.js').then(m => m.keepGap(document.getElementById('board-panel-msgs'), document.getElementById('board-panel-input')));
 
     panel.dataset.board = boardName;
@@ -184,6 +190,7 @@ export function hideBoardChatTab() {
     _boardChatSelectedIds.clear();
     if (_boardChatTimer) { clearInterval(_boardChatTimer); _boardChatTimer = null; }
     const panel = document.getElementById('agentic-panel-board');
+    chatPictures?.destroy(); chatPictures = null;
     if (panel) panel.innerHTML = '';
 }
 
@@ -624,31 +631,28 @@ async function _boardChatCopyLink(id) {
 onRowActions('.board-chat-messages', { reply: _boardChatReply, link: _boardChatCopyLink, task: (id, el) => openTask(_activeBoardChat, id, el) });
 
 async function _sendBoardChat(boardName) {
-    const inputEl = document.getElementById('board-panel-input');
-    if (!inputEl) return;
+    const inputEl = document.getElementById('board-panel-input'), pictures = chatPictures;
+    if (!inputEl || chatSending || boardName !== _activeBoardChat) return;
     const content = inputEl.value.trim();
-    if (!content) return;
-    inputEl.value = '';
-    let sent = false, unknown = '';
+    if (!content && !pictures?.hexes().length) return;
+    chatSending = true;
     try {
-        const resp = await boardFetch(boardName, `/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...(_boardChatReplyTo ? { reply_to: _boardChatReplyTo.id } : {}) }),
+        const payload = pictures?.payload();
+        const resp = await boardFetch(boardName, '/messages', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content, ...payload, ...(_boardChatReplyTo ? { reply_to: _boardChatReplyTo.id } : {}) }),
         });
-        sent = resp.ok;
-        if (!sent) unknown = await outcomeUnknownLine(resp); // the hub lost the answer: it may have reached the computer
-    } catch { /* not sent: said below */ }
-    if (!sent) {
-        // The words go back in the box (ahead of anything typed since) and the failure is said: a message that vanished with no word is the worst way to fail (#6275).
-        inputEl.value = inputEl.value ? `${content}\n${inputEl.value}` : content;
-        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-        showToast(unknown || 'Could not send to the team. Your message is back in the box.', true); // the words are back in the box either way; nothing is sent again by itself
-        return;
-    }
-    _boardChatReplyTo = null; setReplyStrip(inputEl, null);
-    announceNotice('Message sent'); // heard once, not drawn: the message itself appears in the list
-    _loadBoardPanelChat(boardName);
+        if (!resp.ok) throw new Error(await outcomeUnknownLine(resp) || 'Could not send to the team. Your draft is still here.');
+        const out = await resp.json().catch(() => ({}));
+        if (inputEl.isConnected && chatPictures === pictures) {
+            if (inputEl.value.trim() === content) inputEl.value = '';
+            pictures?.clear(); _boardChatReplyTo = null; setReplyStrip(inputEl, null);
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+            _loadBoardPanelChat(boardName);
+        }
+        if (out.pictures_not_saved) showToast(savedWords(out, ''), true); else announceNotice('Message sent');
+    } catch (e) { showToast(e.message || 'Could not send to the team. Your draft is still here.', true); }
+    finally { chatSending = false; }
 }
 (window.__coral ||= {})._sendBoardChat = _sendBoardChat;
 
