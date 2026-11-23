@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const PANELS = require('./helpers/list_bars_panels');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -23,6 +24,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 gone: ['.board-task-cost', '.board-task-priority-value', '.board-task-source', '.board-task-time'].filter(sel => !!list.querySelector(sel)), scrolls: list.scrollWidth - list.clientWidth,
                 name: !!row.querySelector('.board-task-name'), status: !!row.querySelector('.board-task-status-wrap'),
                 widths: Object.fromEntries([...list.querySelectorAll('thead th')].filter(h => h.getClientRects().length).map(h => [h.dataset.key, Math.round(h.getBoundingClientRect().width)])), chip: Math.round(list.querySelector('.board-task-status-wrap').getBoundingClientRect().width) }; })()`);
+        // The table lays its columns out over a few frames after a column appears or the dock is resized (the Agent column, the fonts): measure when the widths have stopped, the same in three frames in a row, not on the first frame (#20743, the v2.1.6 gate: Status 115 against a chip of 65 on the first frame, fine on the retry)
+        const settled = async () => { let last = '', same = 0; for (let i = 0; i < 60 && same < 3; i++) { await ev(framesJs(1)); const now = JSON.stringify(await measure()); same = now === last ? same + 1 : 0; last = now; } return measure(); };
         const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
         await ev(`document.querySelector('#board-task-bar .list-bar-toggle') && document.querySelector('#board-task-bar .list-bar-menu:not([hidden])') && document.querySelector('#board-task-bar .list-bar-toggle').click(); true`); // the filter menu out of the way
         let m = await measure();
@@ -32,7 +35,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const tasks = await import((window.__coralStatic || '/static/') + 'tasks.js'); await tasks.loadBoardTasks(B); return true; })()`); // one open task is taken: the Agent column has a doer to say
         await waitFor(`[...document.querySelectorAll('#board-task-list thead th')].some(h => h.dataset.key === 'who' && h.getClientRects().length)`, 'the Agent column once a task has a doer', 10000);
         await shot('tasks-dock-680-columns');
-        m = await measure();
+        m = await settled();
         assert.ok(m.list >= 560 && m.list < 790, 'the dock is the width in question: ' + m.list);
         assert.equal(m.folded, false, 'the wide dock is unfolded');
         assert.deepEqual(m.heads, ['state', 'task', 'who'], '680 px: the heads are Status, Task and Agent: ' + JSON.stringify(m));
@@ -43,7 +46,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`document.getElementById('agentic-state').style.width = '420px'; true`);
         await waitFor(`document.getElementById('board-task-list').getBoundingClientRect().width < 460`, 'the narrow dock');
         await shot('tasks-dock-420-columns');
-        m = await measure();
+        m = await settled();
         assert.ok(m.list < 560, 'a narrow list: ' + m.list); assert.equal(m.folded, false, '420 px: the dock rows are one line at every width, not folded (#8792)');
         assert.deepEqual(m.gone, [], 'the folded row has none of them either: ' + JSON.stringify(m)); assert.ok(m.cells.every(k => ['state', 'task', 'who'].includes(k)), 'only Status, Task and Agent cells: ' + JSON.stringify(m));
         assert.ok(m.scrolls <= 1, 'and it does not scroll sideways');
@@ -52,7 +55,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`document.getElementById('agentic-state').style.width = '680px'; document.documentElement.style.fontSize = '32px'; true`);
         await waitFor(`document.getElementById('board-task-list').getBoundingClientRect().width > 560`, 'the dock at 680 px again');
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows the text size
-        m = await measure(); await shot('tasks-dock-680-columns-200');
+        m = await settled(); await shot('tasks-dock-680-columns-200');
         const edge = await ev(`(() => { const b = document.querySelector('#board-task-list .dt-primary'), r = b.getBoundingClientRect(), l = document.getElementById('board-task-list').getBoundingClientRect(); return { right: Math.round(r.right), dock: Math.round(l.right), vw: innerWidth }; })()`);
         const sum = Object.values(m.widths).reduce((n, w) => n + w, 0);
         assert.ok(sum <= m.list + 1, '200% text: State, Task and Who add up to the dock, the name does not keep its 24 characters past the box (' + sum + ' of ' + m.list + '): ' + JSON.stringify(m.widths));
