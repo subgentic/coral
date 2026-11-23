@@ -31,6 +31,8 @@ var activityByHandler = map[string]string{
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim": "an ask button's click (answer)",
 	"POST /api/board/{project}/asks/{messageID}/close":                    "a question's Ignore and Put back (ignore, unignore)",
 	"POST /api/board/{project}/goal-images":                               "a picture for the goal being written: the goal's own row (goal_create or goal_edit) is the click",
+	"POST /api/board/{project}/field-images":                              "a picture for a task, chat or instruction field being written: the record's own row is the click (#20731)",
+	"POST /api/field-images":                                              "a picture for a task, chat or instruction field being written: the record's own row is the click (#20731)",
 	"POST /api/board/{project}/goals/{goalID}/close":                      "close a goal (goal_close)",
 	"POST /api/board/{project}/messages":                                  "a message or a typed answer by the Operator: PostMessage writes message or answer",
 	"POST /api/board/{project}/operator-artifacts/message":                "the message that tells the agent about the shared file: the same click as the upload, which has the row (file_share)",

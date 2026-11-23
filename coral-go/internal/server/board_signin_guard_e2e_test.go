@@ -178,6 +178,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/agent-asks/{id}/dismiss":                                    "the body is {} or {undo:true}: no text is kept; the line the agent is told is made by the server",
 	"POST /api/agent-asks/{id}/images":                                     "as goal-images: a picture checked by its bytes and stored as an artifact of the asking agent (#18668)",
 	"POST /api/board/{project}/goal-images":                                "as comment-images: a picture checked by its bytes, its name checked in the handler (hasSignInLink), stored as an artifact of the team (#11650)",
+	"POST /api/board/{project}/field-images":                               "as goal-images: a picture checked by its bytes, its name checked in the handler, stored as an artifact (#20731)",
 	"DELETE /api/saved/{id}":                                               "a delete by id: no text is kept",
 	"POST /api/board/{project}/clashes":                                    "the body is a target in a closed form and two message ids (#11457): the question to the Operator is written by Coral from the stored messages",
 	"POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim":  "no body: the ids are in the path and what runs is the stored button (#11643); the reply text is the stored label, which was refused at declaration if it held a link",

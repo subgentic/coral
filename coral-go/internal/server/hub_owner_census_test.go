@@ -25,6 +25,8 @@ import (
 // hubStampNotNeeded: Activity routes that are deliberately not stamped, with why.
 var hubStampNotNeeded = map[string]string{
 	"POST /api/board/{project}/goal-images":           "a picture is bigger than the stamp's 64 KB body cap and would never be stamped; it stays local-only until a bounded design exists (Security, #13694)",
+	"POST /api/board/{project}/field-images":          "a picture is bigger than the stamp's 64 KB body cap and would never be stamped; it stays local-only until a bounded design exists (Security, #13694)",
+	"POST /api/field-images":                          "a picture is bigger than the stamp's 64 KB body cap and would never be stamped; it stays local-only until a bounded design exists (Security, #13694)",
 	"POST /api/system/update/check-hub":               "the Hub owner's update check: it changes the computer itself (its own owner route)",
 	"POST /api/system/update/relaunch":                "the Hub owner's relaunch: it changes the computer itself (its own owner route)",
 	"PUT /api/settings":                               "this computer's settings (the Dismiss of a banner is local to its dashboard)",
