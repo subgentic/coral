@@ -586,6 +586,10 @@ func (h *SessionsHandler) Info(w http.ResponseWriter, r *http.Request) {
 				result["board_name"] = *info.BoardName
 			}
 		}
+		// The pictures saved with the instructions (#20845): the editor shows and removes them from this read, as the PUT answers them.
+		if m := h.instructionImages(ctx, sessionID); len(m) > 0 {
+			result["images"] = m
+		}
 	}
 
 	writeJSON(w, http.StatusOK, result)
