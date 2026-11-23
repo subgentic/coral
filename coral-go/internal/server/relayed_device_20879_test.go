@@ -1,0 +1,294 @@
+package server
+
+import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/devicekey"
+	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
+)
+
+// #20879: a request a Hub carries on a relayed kind's route is checked by this computer. The four Coral-Device-* headers carry the signer's kid, the signature, the time and the nonce; the computer REBUILDS the
+// signed text from its own state (its fingerprint, the link and Hub person its stamp names, the method and URI it received, the hash of the body it received), so nothing the Hub says can change what was signed.
+
+const (
+	relayPerson = "hub-user-aaaa1111" // the Hub person a bound key belongs to
+	relayOwner  = "hub-user-bbbb2222" // the owner label pinned on the link
+)
+
+type relayRig struct {
+	t     *testing.T
+	d     *dkRig
+	owner *ecdsa.PrivateKey
+	ownK  string
+	bound *ecdsa.PrivateKey
+	bndK  string
+	n     int
+}
+
+func newRelayRig(t *testing.T) *relayRig {
+	t.Helper()
+	r := newE2ERemote(t, "relay-20879", nil)
+	ss := store.NewSessionStore(r.db)
+	key, err := devicekey.LoadOrCreateComputerKey(t.TempDir())
+	require.NoError(t, err)
+	m := cloud.New(cloud.Options{HubURL: "https://app.coralhub.dev", Store: store.NewCloudStore(r.db, store.NewRemoteServerStore(r.db, r.dir)), MaxMode: func() tunnel.Mode { return tunnel.TierLaunch },
+		Devices: ss, ComputerKey: key, Logger: slog.New(slog.DiscardHandler)})
+	r.srv.SetCloud(m)
+	d := &dkRig{t: t, r: r, ss: ss, m: m, key: key}
+	// The test stamp link is an added link whose owner the Operator confirmed as relayOwner.
+	_, _ = r.db.ExecContext(context.Background(), `INSERT OR IGNORE INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, created_at) VALUES (?, 'https://test.invalid', 'srv_test', 'test', '', 'active', 'launch', '2026-01-01T00:00:00Z')`, testLinkID)
+	_, err = r.db.ExecContext(context.Background(), `UPDATE cloud_link SET source = ?, owner_user = ?, max_mode = 'launch' WHERE link_id = ?`, store.LinkSourceAdded, relayOwner, testLinkID)
+	require.NoError(t, err)
+	g := &relayRig{t: t, d: d}
+	g.owner, g.ownK = g.addKey(store.PairOwner, store.PairOwner)
+	g.bound, g.bndK = g.addKey(testLinkID, relayPerson)
+	return g
+}
+
+func (g *relayRig) addKey(link, user string) (*ecdsa.PrivateKey, string) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(g.t, err)
+	e, _ := priv.ECDH()
+	raw := e.PublicKey().Bytes()
+	kid := rb64.EncodeToString(sha(raw))
+	_, err = g.d.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: kid, PK: raw, Label: "Phone", Mode: "launch", Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: link, HubUser: user}, time.Now().Add(-time.Hour))
+	require.NoError(g.t, err)
+	return priv, kid
+}
+
+// req is one relayed request as the connector hands it to the server; each field can be changed to what a bad Hub or a bad signer would do.
+type relayReq struct {
+	kind    devicekey.Kind
+	method  string
+	target  string
+	body    string // what arrives
+	signed  string // what was signed (the body hash); "" means the same as body
+	priv    *ecdsa.PrivateKey
+	kid     string
+	actor   string // the Hub person the stamp names
+	signAs  string // the hub_user in the signed text; "" means actor
+	link    string // the link the signed text names; "" means the arrival link
+	comp    string // the computer in the signed text; "" means this one
+	ts      time.Time
+	nonce   string
+	signTgt string // the method+URI that was signed; "" means the received one
+	v2      bool   // signed with the v2 label (a message of the other form)
+}
+
+func (g *relayRig) signed(q relayReq) *httptest.ResponseRecorder {
+	g.t.Helper()
+	if q.actor == "" {
+		q.actor = relayPerson
+	}
+	if q.signAs == "" {
+		q.signAs = q.actor
+	}
+	if q.link == "" {
+		q.link = testLinkID
+	}
+	if q.comp == "" {
+		q.comp = g.d.key.Computer()
+	}
+	if q.ts.IsZero() {
+		q.ts = time.Now()
+	}
+	if q.nonce == "" {
+		g.n++
+		n := make([]byte, 16)
+		n[0], n[1], n[2] = byte(g.n), byte(g.n>>8), 9
+		q.nonce = rb64.EncodeToString(n)
+	}
+	if q.signed == "" {
+		q.signed = q.body
+	}
+	signTarget := q.target
+	if q.signTgt != "" {
+		signTarget = q.signTgt
+	}
+	m := devicekey.Relayed{Kind: q.kind, KID: q.kid, Computer: q.comp, Ts: q.ts.Unix(), Nonce: q.nonce, Link: q.link, HubUser: q.signAs, Method: q.method, Path: signTarget, BodySHA256: devicekey.BodySHA256([]byte(q.signed))}
+	canon, err := m.Canonical()
+	require.NoError(g.t, err)
+	input := devicekey.RelayedSigningInput(q.kind, canon)
+	if q.v2 {
+		input = devicekey.SigningInput(devicekey.RemoveDevice, canon)
+	}
+	sig := signP1363(g.t, q.priv, input)
+	return g.send(q, sig)
+}
+
+func (g *relayRig) send(q relayReq, sig string) *httptest.ResponseRecorder {
+	h := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.ActorHeader: q.actor, "Content-Type": "application/json",
+		tunnel.DeviceKeyHeader: q.kid, tunnel.DeviceSigHeader: sig, tunnel.DeviceTsHeader: fmt.Sprint(q.ts.Unix()), tunnel.DeviceNonceHeader: q.nonce}
+	return call(g.d.r.srv.Router(), q.method, q.target, q.body, h)
+}
+
+// relayTarget fills a route pattern's {name} segments.
+func relayTarget(pattern string) string {
+	r := strings.NewReplacer("{project}", "team1", "{name}", "agent1", "{id}", strings.Repeat("a", 64))
+	return r.Replace(pattern)
+}
+
+// A reply the guard itself wrote: {"error": code} with a code of the closed list.
+func relayCode(rec *httptest.ResponseRecorder) string {
+	var v map[string]string
+	if json.Unmarshal(rec.Body.Bytes(), &v) != nil || !devicekey.InReplyCodes(v["error"]) {
+		return ""
+	}
+	return v["error"]
+}
+
+// bodyFor is a body a kind's own rule accepts: a grant names the signer's kid, the toggle's body is empty.
+func bodyFor(k devicekey.Kind, method, kid string) string {
+	if k == devicekey.GrantMember && method == "POST" {
+		return fmt.Sprintf(`{"signature":{"kid":%q}}`, kid)
+	}
+	return ""
+}
+
+// every route of every kind: a valid signed request is let through and spends its nonce (a repeat is nonce_repeat), and what is wrong with it is refused with its code before any handler.
+func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
+	g := newRelayRig(t)
+	n := 0
+	for _, k := range devicekey.RelayedKinds {
+		for _, rt := range devicekey.KindRoutes[k] {
+			n++
+			target := relayTarget(rt.Pattern)
+			if k == devicekey.HubAutoAccept {
+				target += "?allow=true"
+			}
+			priv, kid, actor := g.bound, g.bndK, relayPerson
+			if devicekey.OwnerOnly(k) {
+				priv, kid, actor = g.owner, g.ownK, relayOwner
+			}
+			base := relayReq{kind: k, method: rt.Method, target: target, body: bodyFor(k, rt.Method, kid), priv: priv, kid: kid, actor: actor}
+			name := fmt.Sprintf("%s %s %s", k, rt.Method, rt.Pattern)
+
+			ok := base
+			ok.nonce = rb64.EncodeToString([]byte(fmt.Sprintf("ok-%013d", n))[:16])
+			first := g.signed(ok)
+			assert.Empty(t, relayCode(first), "%s: a valid signed request is not refused by the check: %d %s", name, first.Code, first.Body.String())
+			assert.Equal(t, "nonce_repeat", relayCode(g.signed(ok)), "%s: the nonce was spent before the action", name)
+
+			for _, c := range []struct {
+				what, code string
+				mut        func(q *relayReq)
+			}{
+				{"one changed body byte", "body_hash", func(q *relayReq) { q.body += "x" }},
+				{"another link in the signed text", "bad_signature", func(q *relayReq) { q.link = "lnk-0000ffff" }},
+				{"another computer", "bad_signature", func(q *relayReq) { q.comp = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }},
+				{"another hub_user in the signed text", "bad_signature", func(q *relayReq) { q.signAs = "hub-user-cccc3333" }},
+				{"another path", "bad_signature", func(q *relayReq) { q.signTgt = devicekey.RoutePath(q.target) + "/x" }},
+				{"another query", "bad_signature", func(q *relayReq) { q.signTgt = devicekey.RoutePath(q.target) + "?q=1" }},
+				{"ts outside the window", "ts_window", func(q *relayReq) { q.ts = time.Now().Add(-time.Hour) }},
+				{"an unknown kid", "bad_signature", func(q *relayReq) { q.kid = rb64.EncodeToString(sha([]byte("nobody"))) }},
+				{"a v2 signature on a v3 route", "bad_signature", func(q *relayReq) { q.v2 = true }},
+			} {
+				q := base
+				c.mut(&q)
+				rec := g.signed(q)
+				assert.Equal(t, c.code, relayCode(rec), "%s: %s: %d %s", name, c.what, rec.Code, rec.Body.String())
+				assert.Equal(t, http.StatusForbidden, rec.Code, "%s: %s", name, c.what)
+			}
+		}
+	}
+	assert.GreaterOrEqual(t, n, 15, "every route of the table was exercised")
+}
+
+// A key bound to a Hub person never signs an owner-only kind; the owner's key signs it only as the owner this link confirmed; and a person the stamp names must be the one the signature names.
+func TestARelayedOwnerKindNeedsTheOwnersKeyAndThePinnedLabel(t *testing.T) {
+	g := newRelayRig(t)
+	toggle := relayReq{kind: devicekey.HubAutoAccept, method: "POST", target: "/api/hub-auto-accept?allow=true"}
+	q := toggle
+	q.priv, q.kid, q.actor = g.bound, g.bndK, relayPerson
+	assert.Equal(t, "outside_pair", relayCode(g.signed(q)), "a Hub person's key never signs the owner's toggle")
+
+	q = toggle
+	q.priv, q.kid, q.actor = g.owner, g.ownK, relayPerson // the owner's key, a person who is not the pinned owner
+	assert.Equal(t, "outside_pair", relayCode(g.signed(q)), "the owner's key signs only as the pinned label")
+
+	q = toggle
+	q.priv, q.kid, q.actor, q.signAs = g.owner, g.ownK, relayOwner, relayPerson // the stamp names the owner, the text another person
+	assert.Equal(t, "bad_signature", relayCode(g.signed(q)), "the signed person is the one the stamp names")
+
+	_, err := g.d.r.db.ExecContext(context.Background(), `UPDATE cloud_link SET owner_user = '' WHERE link_id = ?`, testLinkID)
+	require.NoError(t, err)
+	q = toggle
+	q.priv, q.kid, q.actor = g.owner, g.ownK, relayOwner
+	assert.Equal(t, "outside_pair", relayCode(g.signed(q)), "a link with no pinned owner has no owner")
+}
+
+// A key bound to one person does not sign for another, nor through another link.
+func TestARelayedKeyIsHeldToItsOwnPair(t *testing.T) {
+	g := newRelayRig(t)
+	send := relayReq{kind: devicekey.SendToAgent, method: "POST", target: "/api/sessions/live/agent1/send", body: `{"text":"hi"}`, priv: g.bound, kid: g.bndK}
+	other := send
+	other.actor = "hub-user-cccc3333"
+	assert.Equal(t, "outside_pair", relayCode(g.signed(other)), "another person's key signature is refused")
+	_, err := g.d.r.db.ExecContext(context.Background(), `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, created_at) VALUES ('lnk-00000002', 'https://b.invalid', 'srv_b', 'b', '', 'active', 'launch', '2026-01-01T00:00:00Z')`)
+	require.NoError(t, err)
+	// The same key through the other link: the stamp names link 2, the key is bound to link 1.
+	m := devicekey.Relayed{Kind: send.kind, KID: g.bndK, Computer: g.d.key.Computer(), Ts: time.Now().Unix(), Nonce: rb64.EncodeToString(make([]byte, 16)), Link: "lnk-00000002", HubUser: relayPerson, Method: "POST", Path: send.target, BodySHA256: devicekey.BodySHA256([]byte(send.body))}
+	canon, err := m.Canonical()
+	require.NoError(t, err)
+	hdr := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.LinkHeader: "lnk-00000002", tunnel.ActorHeader: relayPerson, "Content-Type": "application/json",
+		tunnel.DeviceKeyHeader: g.bndK, tunnel.DeviceSigHeader: signP1363(t, g.bound, devicekey.RelayedSigningInput(send.kind, canon)), tunnel.DeviceTsHeader: fmt.Sprint(m.Ts), tunnel.DeviceNonceHeader: m.Nonce}
+	assert.Equal(t, "wrong_link", relayCode(call(g.d.r.srv.Router(), "POST", send.target, send.body, hdr)))
+}
+
+// One value of each header, or nothing: a repeated Coral-Device-* header is refused; and a request on a route that is not in the table ignores them (nothing is trusted, nothing spent).
+func TestRelayedHeadersAreOneEachAndOnlyOnTheTablesRoutes(t *testing.T) {
+	g := newRelayRig(t)
+	q := relayReq{kind: devicekey.SendToAgent, method: "POST", target: "/api/sessions/live/agent1/send", body: `{"text":"hi"}`, priv: g.bound, kid: g.bndK, actor: relayPerson, ts: time.Now(), nonce: rb64.EncodeToString(make([]byte, 16))}
+	hdr := func(extra map[string]string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", q.target, strings.NewReader(q.body))
+		req.Host, req.RemoteAddr = "127.0.0.1:8420", "127.0.0.1:50000"
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		req.Header.Set(tunnel.ViaHeader, cloud.ViaSecret())
+		req.Header.Set(tunnel.ActorHeader, q.actor)
+		for k, v := range map[string]string{tunnel.DeviceKeyHeader: q.kid, tunnel.DeviceSigHeader: "x", tunnel.DeviceTsHeader: fmt.Sprint(q.ts.Unix()), tunnel.DeviceNonceHeader: q.nonce} {
+			req.Header.Set(k, v)
+		}
+		for k, v := range extra {
+			req.Header.Add(k, v)
+		}
+		rec := httptest.NewRecorder()
+		g.d.r.srv.Router().ServeHTTP(rec, req)
+		return rec
+	}
+	assert.Equal(t, "bad_form", relayCode(hdr(map[string]string{tunnel.DeviceSigHeader: "y"})), "a repeated header is refused")
+	assert.Equal(t, "bad_form", relayCode(hdr(map[string]string{tunnel.DeviceNonceHeader: q.nonce})), "a repeated header is refused, even the same value")
+
+	// A route that is not in the table: the headers are ignored, whatever they say.
+	req := httptest.NewRequest("GET", "/api/health", nil)
+	req.Host, req.RemoteAddr = "127.0.0.1:8420", "127.0.0.1:50000"
+	req.Header.Set(tunnel.ViaHeader, cloud.ViaSecret())
+	req.Header.Set(tunnel.DeviceKeyHeader, "zzz")
+	rec := httptest.NewRecorder()
+	g.d.r.srv.Router().ServeHTTP(rec, req)
+	assert.Empty(t, relayCode(rec))
+	assert.Equal(t, 200, rec.Code)
+}
+
+// A request that did not come through the connector carries no Hub person and no link: its Coral-Device-* headers are not read.
+func TestALocalRequestsRelayedHeadersAreNotRead(t *testing.T) {
+	g := newRelayRig(t)
+	rec := call(g.d.r.srv.Router(), "POST", "/api/sessions/live/agent1/send", `{"text":"hi"}`, map[string]string{"Content-Type": "application/json",
+		tunnel.DeviceKeyHeader: g.bndK, tunnel.DeviceSigHeader: "x", tunnel.DeviceTsHeader: "1", tunnel.DeviceNonceHeader: "y"})
+	assert.Empty(t, relayCode(rec), rec.Body.String())
+}
