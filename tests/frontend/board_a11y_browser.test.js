@@ -81,7 +81,11 @@ const { coralReady } = require('./helpers/wait');
             await setTheme(ev, theme);
             await ev(`(() => { if (document.getElementById('agentic-state').getBoundingClientRect().width < 50) document.getElementById('panel-toggle-btn').click(); return true; })()`);
             await ev(`document.getElementById('agentic-tab-tasks').click(); true`);
-            await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 1 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the tasks', 15000);
+            // A timeout says what the page held (the Windows gate failed this wait twice on f3000051f4 and left only a console 400; #20777): the selection, the panel's width, its rows and what the board-task state held.
+            await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item').length >= 1 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the tasks', 15000).catch(async e => {
+                const held = await ev(`(() => { const st = window.__qaState || {}, s = st.currentSession || {}, p = document.getElementById('agentic-panel-tasks'), a = document.getElementById('agentic-state'); return { theme: ${JSON.stringify(theme)}, session: s.name, type: s.type, board: s.board_project, subscriber: s.board_subscriber_id, orchestrator: s.board_is_orchestrator, team: st.selectedTeam || '', panelW: p && Math.round(p.getBoundingClientRect().width), stateW: a && Math.round(a.getBoundingClientRect().width), tabOn: document.getElementById('agentic-tab-tasks')?.className, rows: p ? p.querySelectorAll('.board-task-item').length : -1, boardTasks: (st.currentBoardTasks || []).length, agentTasks: (st.currentAgentTasks || []).length, text: p ? p.innerText.slice(0, 160) : '' }; })()`).catch(x => ({ unreadable: String(x) }));
+                throw new Error(e.message + ' | page held: ' + JSON.stringify(held));
+            });
             const t = await auditRegion(ev, ['#agentic-panel-tasks']);
             assert.ok(t.checked > 0 && !t.fails.length, `${theme}: the task list (High chip) holds 4.5:1: ` + JSON.stringify(t.fails).slice(0, 400));
             if (theme === 'dark') {
