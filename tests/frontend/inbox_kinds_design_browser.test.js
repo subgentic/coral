@@ -1,4 +1,4 @@
-// The approved Inbox list (#19824, QA's notes on #19812): every kind of file for review as a real row, at 1280 in the dark theme: the video, html and md tiles (each its own colour), the four report kinds with their words
+// The approved Inbox list (#19824, QA's notes on #19812): every kind of file for review as a real row, at 1280 in the dark theme: the video, html and md tiles (one shared review colour), the four report kinds with their words
 // (Finished request, Release summary, Daily digest, Decisions made for you), the version line with its earlier-versions link, the blocker pill with "closes goal", and the hover and selected states of a row.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -41,7 +41,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const by = n => rows.find(r => r.name === n) || {};
         check(by('promo-cut-1.mp4').type === 'video' && by('landing-hero.html').type === 'html' && by('promo-script.md').type === 'md', `the tiles name their type: ${JSON.stringify(rows.map(r => [r.name, r.type]))}`);
         const bgs = ['promo-cut-1.mp4', 'landing-hero.html', 'promo-script.md'].map(n => by(n).tileBg);
-        check(new Set(bgs).size === 3, `the video, html and md tiles are three colours: ${JSON.stringify(bgs)}`);
+        check(new Set(bgs).size === 1 && bgs.every(bg => bg && bg !== 'rgba(0, 0, 0, 0)'), `the video, html and md tiles share one review colour: ${JSON.stringify(bgs)}`);
         check(by('promo-script.md').tileBg !== 'rgba(0, 0, 0, 0)' && by('promo-script.md').tileBg !== by('daily-digest.md').tileBg || by('promo-script.md').type === 'md', `the md tile is tinted blue as in the mock: ${by('promo-script.md').tileBg}`);
         check(by('done-request.md').kind === 'Finished request' && by('release-summary.md').kind === 'Release summary' && by('daily-digest.md').kind === 'Daily digest' && by('decisions.md').kind === 'Decisions made for you', `the four report kinds say their words: ${JSON.stringify(rows.map(r => r.kind))}`);
         check(by('promo-cut-1.mp4').kind === 'For review' && by('promo-script.md').kind === 'For review', 'a plain file says For review');
