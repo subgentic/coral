@@ -102,12 +102,14 @@ func TestSettingALinkCapIsLogged(t *testing.T) {
 	assert.Equal(t, l.HubOrigin, ev[0].HubOrigin)
 }
 
-// A second link is refused while the switch is off, so lifting it is its own reviewed change (Security 1).
-func TestAddingASecondLinkIsRefusedForNow(t *testing.T) {
-	r, cs, _ := linkedRemote(t, &fakeRevoker{})
+// The switch is on (#20838): a second link is no longer refused with second_link_not_yet, but a bad cap still is, before any Hub is asked.
+func TestAddingASecondLinkIsNotRefusedByTheSwitch(t *testing.T) {
+	r, cs, _, _ := linkedRemoteWithManager(t)
 	js := map[string]string{"Content-Type": "application/json"}
-	rec := call(r.srv.Router(), "POST", "/api/cloud/links", `{"hub":"https://hub-b.example.com","cap":"view"}`, js)
-	assert.Equal(t, 409, rec.Code, rec.Body.String())
+	require.NoError(t, cs.CheckCanAddLink(context.Background()))
+	rec := call(r.srv.Router(), "POST", "/api/cloud/links", `{"hub":"https://hub-b.example.com","cap":"root"}`, js)
+	assert.Equal(t, 400, rec.Code, rec.Body.String())
+	assert.NotContains(t, rec.Body.String(), "second_link_not_yet")
 	ls, _ := cs.ListLinks(context.Background())
 	assert.Len(t, ls, 1)
 }

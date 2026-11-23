@@ -15,12 +15,6 @@ func TestASecondLinkIsItsOwnAndTheEnrollmentsChangesNeverTouchIt(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, cs.Save(ctx, "https://hub-a.example.com", "srv_a", "Laptop", "tok-a"))
 
-	// The gate is shut by default: the store refuses before anything is written.
-	_, err := cs.AddLink(ctx, "https://hub-b.example.com", "srv_b", "Laptop B", "tok-b", "view")
-	require.ErrorIs(t, err, ErrSecondLinkNotYet)
-	ls, _ := cs.ListLinks(ctx)
-	require.Len(t, ls, 1)
-
 	AllowSecondLinkForTest(t)
 	b, err := cs.AddLink(ctx, "https://Hub-B.example.com/", "srv_b", "Laptop B", "tok-b", "interact")
 	require.NoError(t, err)
@@ -30,7 +24,7 @@ func TestASecondLinkIsItsOwnAndTheEnrollmentsChangesNeverTouchIt(t *testing.T) {
 	_, err = cs.AddLink(ctx, "https://hub-c.example.com", "srv_c", "C", "tok-c", "root")
 	require.Error(t, err, "a cap is a tier name")
 
-	ls, err = cs.ListLinks(ctx)
+	ls, err := cs.ListLinks(ctx)
 	require.NoError(t, err)
 	require.Len(t, ls, 2)
 	a := ls[0]

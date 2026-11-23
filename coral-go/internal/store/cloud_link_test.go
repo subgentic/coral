@@ -445,7 +445,9 @@ func TestASecondLinkIsRefusedWhileTheSwitchIsOff(t *testing.T) {
 	ctx := context.Background()
 	assert.NoError(t, cs.CheckCanAddLink(ctx), "the first link is fine")
 	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "tok"))
-	if !SecondLinkOpen {
+	if SecondLinkOpen {
+		assert.NoError(t, cs.CheckCanAddLink(ctx), "the switch is on: a second link is allowed")
+	} else {
 		assert.ErrorIs(t, cs.CheckCanAddLink(ctx), ErrSecondLinkNotYet)
 	}
 }

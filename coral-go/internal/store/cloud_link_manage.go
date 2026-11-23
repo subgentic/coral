@@ -12,9 +12,9 @@ import (
 // Link management at this computer (#20346, design v2 1.7, 3). Every call here is the Operator's own act at this computer: the routes and the CLI that reach them are never tunneled. Each one is keyed by link_id
 // only and writes its log row in the same transaction, so one link's change never touches another link's row, token, owner pin or events.
 
-// SecondLinkOpen is false while a second link is refused: Security's condition on #20201 is that every Hub-reachable write records its (link, Hub person) pair first (the pending list in the pair census is empty), and the
-// Manager is still one connector. Lifting it is its own reviewed change; a server test fails if it is true while a write is pending.
-const SecondLinkOpen = false
+// SecondLinkOpen is true: a second link takes exactly the first link's path (#20838, goal #269). Security's condition on #20201 holds: every Hub-reachable write records its (link, Hub person) pair (the pending list in the pair census is empty),
+// and the pair rule is tested with the same person label on two links. A server test fails if this is true while a write is pending or the pair-rule test is gone.
+const SecondLinkOpen = true
 
 // secondLinkOpen is what the store checks: the constant, unless a test opened it (AllowSecondLinkForTest).
 var secondLinkOpen = SecondLinkOpen

@@ -11,9 +11,8 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// #20346, Security 1, and #20444: a second link is allowed only when no tunnel write is pending in the pair census AND Security has signed off what is still open. The census is now empty (#20369), but the switch
-// stays OFF while Security's items are open: #20405 (WebSocket upgrade rows, the refused-row cap), #20413 and the second-Hub sign-in. Lifting store.SecondLinkOpen is its own reviewed change, never made here:
-// when those are closed, change this test with that review.
+// #20346, Security 1, #20444 and #20838: a second link is allowed only when no tunnel write is pending in the pair census and the tests that prove the pair rule (the same person label on two links shares nothing; the
+// pair census; the per-link ask list) still exist. The open items (#20405, #20413) are closed, and the Operator decided a second link takes the first link's path, so the switch is on.
 func TestSecondLinkSwitchStaysOffWhileAWriteIsPending(t *testing.T) {
 	raw, err := os.ReadFile("testdata/pair_census.golden")
 	require.NoError(t, err)
@@ -26,6 +25,17 @@ func TestSecondLinkSwitchStaysOffWhileAWriteIsPending(t *testing.T) {
 	if pending > 0 {
 		assert.False(t, store.SecondLinkOpen, "SecondLinkOpen is true while %d tunnel writes are still pending in pair_census.golden", pending)
 	}
-	openSecurityItems := []string{"#20405 (WebSocket upgrade rows, refused-row cap)", "#20413", "second-Hub sign-in"}
-	assert.False(t, store.SecondLinkOpen, "SecondLinkOpen must stay false while Security's items are open: %s", strings.Join(openSecurityItems, ", "))
+	if !store.SecondLinkOpen {
+		return
+	}
+	// #20838: the switch is on only with the pair rule tested for one person label on two links; each of these must still exist (a test that is removed reopens the gate).
+	for _, name := range []string{"TestTheSamePersonLabelOnTwoLinksSharesNoGrantOrStream", "TestTheSamePersonLabelOnTwoLinksLeavesTwoSeparateRows", "TestEveryTunnelWriteRouteRecordsThePairOrIsListedPending", "TestAnAddedHubAnswersOnlyTheAsksThePersonAllowed"} {
+		found := false
+		for _, f := range []string{"second_link_same_person_20838_test.go", "pair_census_test.go", "link_asks_20413_test.go"} {
+			if b, err := os.ReadFile(f); err == nil && strings.Contains(string(b), "func "+name+"(") {
+				found = true
+			}
+		}
+		assert.True(t, found, "SecondLinkOpen is true but %s is gone: the second link needs it (Security, #20838)", name)
+	}
 }

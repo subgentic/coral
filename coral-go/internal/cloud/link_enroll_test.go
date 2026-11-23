@@ -163,7 +163,7 @@ func TestAddByAddressRefusalsNeverAskTheHub(t *testing.T) {
 		assert.Contains(t, err.Error(), "already linked to that Hub")
 		assert.EqualValues(t, 1, e.hub.starts.Load(), "only the first enrollment asked")
 	})
-	t.Run("gate shut", func(t *testing.T) {
+	t.Run("gate open", func(t *testing.T) {
 		e := newEnv(t)
 		m := e.manager(e.hub.srv.URL)
 		start(t, m)
@@ -171,8 +171,8 @@ func TestAddByAddressRefusalsNeverAskTheHub(t *testing.T) {
 		waitState(t, m, StateConnected)
 		hub2 := newFakeHub(t)
 		_, err := m.AddLinkByOrigin(ctx, hub2.srv.URL, "view")
-		require.ErrorIs(t, err, store.ErrSecondLinkNotYet)
-		assert.Zero(t, hub2.starts.Load())
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, hub2.starts.Load(), "a second Hub is asked for its code, as the first was")
 	})
 	t.Run("pending counts toward the cap", func(t *testing.T) {
 		e, m, hub2 := linkEnrollEnv(t)
