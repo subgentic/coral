@@ -7,6 +7,7 @@ const { readTrustAsk } = await importOnce('./inbox_answer.js');
 import { resolveSessionIdentity } from './session_state.js';
 import { showToast } from './utils.js';
 const reads = new Map(), values = new Map();
+const flight = new Map(); // a group's answer in flight or done, by its members: the list is drawn again while the answers are checked, and the card made anew must show the same (#20865)
 const key = s => JSON.stringify([sessionServer(s), s.session_id, s.waiting_since, s.waiting_summary, s.working_directory]);
 const recorded = s => typeof s.working_directory === 'string' ? s.working_directory : '';
 const eligible = s => !isCloud() && sessionServer(s) === 'local' && s.agent_type === 'claude' && s.session_id && recorded(s) && !blockedReason('local', 'interact') && !s.review && !s.operatorAsk;
@@ -41,8 +42,16 @@ export function trustGroupCell(row) {
     const go = el('button', 'btn btn-primary inbox-answer inbox-trust-go', 'Yes, I trust this folder'); go.type = 'button';
     const names = el('span', 'inbox-trust-note inbox-trust-members', members.map(m => resolveSessionIdentity(m.session)).join(', '));
     cell.append(note, names, go);
+    const gk = JSON.stringify([folder, members.map(m => key(m.session))]);
+    cell.dataset.group = gk;
+    const before = flight.get(gk);
+    if (before?.said) cell.replaceChildren(el('span', 'inbox-trust-note inbox-trust-results', before.said));
+    else if (before) go.disabled = true;
     go.addEventListener('click', async event => {
         event.stopPropagation(); go.disabled = true;
+        if (flight.has(gk)) return;
+        flight.set(gk, {});
+        if (flight.size > 50) flight.delete(flight.keys().next().value);
         const skipped = [], sent = [], pending = [];
         for (const m of members) {
             const s = m.session, who = resolveSessionIdentity(s);
@@ -57,6 +66,8 @@ export function trustGroupCell(row) {
             } catch { skipped.push(who); }
         }
         const said = [`Answered ${sent.length} of ${members.length} agents.`, skipped.length ? `Not answered: ${skipped.join(', ')}. Open these agents to review their current question.` : '', pending.length ? `Sent, still waiting: ${pending.join(', ')}.` : ''].filter(Boolean).join(' ');
+        flight.set(gk, { said });
+        for (const c of document.querySelectorAll('.inbox-trust-group')) if (c.dataset.group === gk) c.replaceChildren(el('span', 'inbox-trust-note inbox-trust-results', said)); // this card, or the one a redraw made in its place
         cell.replaceChildren(el('span', 'inbox-trust-note inbox-trust-results', said));
         showToast(said, !!skipped.length || !!pending.length, 12000);
     });
