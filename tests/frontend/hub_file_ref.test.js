@@ -8,7 +8,13 @@ const { pathToFileURL } = require('node:url');
     const F = '/work/app';
     // 1. inside the folder: relative
     assert.deepEqual(h('/work/app/src/a.js', F), { ref: 'src/a.js' });
-    assert.deepEqual(h('/work/app/src/a.js:12', F), { ref: 'src/a.js:12' }, 'the line suffix rides along');
+    assert.deepEqual(h('/work/app/src/a.js:12', F), { ref: 'src/a.js', line: 12 }, 'the line suffix is taken off and kept as the line');
+    assert.deepEqual(h('/work/app/src/a.js:12:5', F), { ref: 'src/a.js', line: 12 }, 'line and column');
+    assert.deepEqual(h('src/a.js:12', F), { ref: 'src/a.js', line: 12 }, 'a relative reference too');
+    assert.deepEqual(h('/etc/a.js:3', F), { outside: true }, 'outside stays outside');
+    assert.deepEqual(h('/work/app/a.js:12:', F), { ref: 'a.js:12:' }, 'a dangling colon is not a suffix: sent as is');
+    assert.deepEqual(h('C:\\Work\\App\\a.js:7', 'C:\\Work\\App'), { ref: 'a.js', line: 7 }, 'a drive path with a line');
+    assert.ok(!h('/work/app/a.js:12:5', F).ref.includes(':'), 'no colon is sent');
     assert.deepEqual(h('/work/app/a.js', F + '/'), { ref: 'a.js' }, 'a trailing slash on the folder');
     assert.deepEqual(h('/work//app/./src/a.js', F), { ref: 'src/a.js' }, 'doubled and dot segments');
     assert.deepEqual(h('file:///work/app/a.js', F), { ref: 'a.js' });
