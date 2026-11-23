@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
+	"log/slog"
 	"net/http"
 )
 
@@ -17,12 +18,21 @@ func (h *BoardHandler) GetWorkingMode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mode)
 }
 func (h *BoardHandler) SetWorkingMode(w http.ResponseWriter, r *http.Request) {
-	var mode board.WorkingMode
-	if err := decodeJSON(r, &mode); err != nil {
+	var in struct {
+		board.WorkingMode
+		Images      map[string][]string `json:"images"` // the custom instructions' pictures (#20767): {"custom_instructions": [hex]}
+		ImagesDraft string              `json:"images_draft"`
+	}
+	if err := decodeJSON(r, &in); err != nil {
 		errBadRequest(w, "invalid working mode JSON")
 		return
 	}
+	mode := in.WorkingMode
 	if refuseGuestNewBoard(w, r, h.bs, urlParam(r, "project")) {
+		return
+	}
+	pictures, ok := h.fieldPictures(w, r, urlParam(r, "project"), "instruction", in.ImagesDraft, in.Images, h.recordedFieldImages(r, urlParam(r, "project"), board.FieldImagesWorkingMode, ""), "custom_instructions")
+	if !ok {
 		return
 	}
 	priorMode, _ := h.bs.GetWorkingMode(r.Context(), urlParam(r, "project")) // what the Orchestrator is told changed (#13173)
@@ -32,6 +42,17 @@ func (h *BoardHandler) SetWorkingMode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	noteSettingsChange(h.bs, r, urlParam(r, "project"), workingModeShown(priorMode), workingModeShown(result))
+	lost := false
+	if len(pictures) > 0 {
+		if err := h.saveFieldImages(r.Context(), urlParam(r, "project"), board.FieldImagesWorkingMode, "", pictures); err != nil {
+			slog.Warn("[working mode] the pictures of the custom instructions were not kept", "board", urlParam(r, "project"), "error", err)
+			lost = true
+		}
+	}
+	if shown, err := h.bs.GetWorkingMode(r.Context(), urlParam(r, "project")); err == nil {
+		result = shown // with its pictures and the lines they add to the instructions
+	}
+	result.PicturesNotSaved = lost
 	writeJSON(w, http.StatusOK, result)
 }
 

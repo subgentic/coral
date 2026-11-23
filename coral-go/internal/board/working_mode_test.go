@@ -137,3 +137,37 @@ func TestAsksAreTasksRuleInClaimedInstructions(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, kept.Workflow.Instructions, AsksAreTasksRule, "a task already claimed keeps what it was claimed with")
 }
+
+// #20767: the pictures of a team's custom instructions follow the words in the instructions a task is claimed with, and a task keeps what it was claimed with.
+func TestWorkingModePicturesFollowTheWordsAtTheClaim(t *testing.T) {
+	ctx := context.Background()
+	s, err := NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	defer s.Close()
+	hexID := strings.Repeat("a", 64)
+	_, err = s.SetWorkingMode(ctx, "team", WorkingMode{Mode: "none", CustomInstructions: "Match the mock."})
+	require.NoError(t, err)
+	require.NoError(t, s.SetFieldImages(ctx, "team", FieldImagesWorkingMode, "", "custom_instructions", []GoalImage{{Hex: hexID, Name: "mock.png", ContentType: "image/png"}}))
+
+	mode, err := s.GetWorkingMode(ctx, "team")
+	require.NoError(t, err)
+	require.Equal(t, "Match the mock.", mode.CustomInstructions, "the words the Operator edits do not carry the lines")
+	require.Contains(t, mode.Instructions, "Match the mock.\ncoral://artifacts/"+hexID)
+	require.Len(t, mode.Images["custom_instructions"], 1)
+
+	task, err := s.CreateTask(ctx, "team", "Build", "", "medium", "lead")
+	require.NoError(t, err)
+	claimed, err := s.ClaimTask(ctx, "team", "dev", task.ID)
+	require.NoError(t, err)
+	require.Contains(t, claimed.Workflow.Instructions, "Match the mock.\ncoral://artifacts/"+hexID)
+
+	require.NoError(t, s.SetFieldImages(ctx, "team", FieldImagesWorkingMode, "", "custom_instructions", nil)) // cleared: a later claim has no lines, this task keeps its own
+	later, err := s.CreateTask(ctx, "team", "Next", "", "medium", "lead")
+	require.NoError(t, err)
+	later, err = s.ClaimTask(ctx, "team", "dev2", later.ID)
+	require.NoError(t, err)
+	require.NotContains(t, later.Workflow.Instructions, "coral://artifacts/")
+	again, err := s.getTaskByID(ctx, "team", task.ID)
+	require.NoError(t, err)
+	require.Contains(t, again.Workflow.Instructions, "coral://artifacts/"+hexID)
+}

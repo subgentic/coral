@@ -12,11 +12,12 @@ import (
 
 // Kinds of record that carry field pictures.
 const (
-	FieldImagesTask     = "task"     // owner: the task's number
-	FieldImagesMessage  = "message"  // owner: the message's number
-	FieldImagesDecision = "decision" // owner: the artifact's id (a file's review decision)
-	FieldImagesJob      = "job"      // owner: a scheduled job's number; the team is "" (a person's field, #20750), field "prompt"
-	FieldImagesSession  = "session"  // owner: an agent's session id; the team is "" (a person's field, #20750), field "instructions"
+	FieldImagesTask        = "task"         // owner: the task's number
+	FieldImagesMessage     = "message"      // owner: the message's number
+	FieldImagesDecision    = "decision"     // owner: the artifact's id (a file's review decision)
+	FieldImagesWorkingMode = "working_mode" // owner: ""; the team's custom_instructions (#20767), field "custom_instructions"
+	FieldImagesJob         = "job"          // owner: a scheduled job's number; the team is "" (a person's field, #20750), field "prompt"
+	FieldImagesSession     = "session"      // owner: an agent's session id; the team is "" (a person's field, #20750), field "instructions"
 )
 
 func (s *Store) ensureFieldImagesSchema(ctx context.Context) error {

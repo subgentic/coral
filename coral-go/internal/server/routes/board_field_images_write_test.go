@@ -506,3 +506,57 @@ func TestARepeatedDecisionKeepsItsNewPicturesOrRefusesPlainly(t *testing.T) {
 	}
 	t.Logf("repeat: %d %v", code, out["code"])
 }
+
+// #20767: the custom instructions of a team's working mode carry pictures (images {"custom_instructions": [hex]}), the Operator's alone; the words stay as typed and the lines follow them in the instructions.
+func TestWorkingModeCustomInstructionsCarryPictures(t *testing.T) {
+	e := newFieldWriteEnv(t)
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.Header.Get("X-Test-Caller") != "agent" {
+				req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+				req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+			}
+			next.ServeHTTP(w, req)
+		})
+	})
+	r.Get("/api/board/{project}/working-mode", e.h.GetWorkingMode)
+	r.Put("/api/board/{project}/working-mode", e.h.SetWorkingMode)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	put := func(caller string, body map[string]any) (int, map[string]any) {
+		return sendJSONHeader(t, "PUT", srv.URL+"/api/board/alpha/working-mode", body, map[string]string{"X-Test-Caller": caller})
+	}
+	a, b := e.upload(t, "instruction", "wm", 140), e.upload(t, "instruction", "wm", 141)
+
+	code, out := put("dash", map[string]any{"mode": "none", "custom_instructions": "Match the mock.", "images_draft": "wm", "images": map[string]any{"custom_instructions": []string{a}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, []string{a}, imagesOf(out, "custom_instructions"))
+	assert.Equal(t, "Match the mock.", out["custom_instructions"])
+	assert.Contains(t, out["instructions"], "Match the mock.\ncoral://artifacts/"+a)
+
+	code, out = put("dash", map[string]any{"mode": "none", "custom_instructions": "Match the new mock."}) // omitted: left
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, []string{a}, imagesOf(out, "custom_instructions"))
+	code, out = put("dash", map[string]any{"mode": "none", "custom_instructions": "x", "images_draft": "wm", "images": map[string]any{"custom_instructions": []string{b, a}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, []string{b, a}, imagesOf(out, "custom_instructions"))
+
+	code, out = put("agent", map[string]any{"mode": "none", "images": map[string]any{"custom_instructions": []string{a}}})
+	assert.GreaterOrEqual(t, code, 400, "an agent cannot name pictures: %v", out)
+	code, out = put("dash", map[string]any{"mode": "none", "images_draft": "wm", "images": map[string]any{"mode": []string{a}}})
+	assert.Equal(t, "picture_field_unknown", out["code"], "%d", code)
+	code, out = put("dash", map[string]any{"mode": "none", "images_draft": "elsewhere", "images": map[string]any{"custom_instructions": []string{strings.Repeat("e", 64)}}})
+	assert.Equal(t, "picture_not_yours", out["code"], "%d", code)
+
+	e.h.setFieldImages = func(context.Context, string, string, string, map[string][]board.GoalImage) error {
+		return fmt.Errorf("disk full")
+	}
+	code, out = put("dash", map[string]any{"mode": "none", "images_draft": "wm", "images": map[string]any{"custom_instructions": []string{a}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, true, out["pictures_not_saved"])
+	e.h.setFieldImages = nil
+	code, out = put("dash", map[string]any{"mode": "none", "images": map[string]any{"custom_instructions": []string{}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Empty(t, imagesOf(out, "custom_instructions"))
+}
