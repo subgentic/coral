@@ -25,7 +25,7 @@ export function createComposer({ st, render, run, ownHex }) {
         const sends = /Mac/.test(navigator.platform) ? '⌘ Return' : 'Ctrl+Enter', words = () => `${ta.value.length} / ${BODY_MAX}`; // the count is only the count: the shortcut is said once, in the line under the box (#16399; it was said twice, in two spellings)
         const count = el('span', 'ac-counter', words());
         ta.addEventListener('input', () => { count.textContent = words(); cm.draft = ta.value; });
-        const tray = editOf ? null : (cm.tray || (cm.tray = imgs.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(cm.hex || st.hex, st.server, blob, versionOf, st.board) }))); // a new comment or reply can carry pictures; an edit keeps the ones it has
+        const tray = editOf ? null : (cm.tray || (cm.tray = imgs.createCommentImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(cm.hex || st.hex, st.server, blob, versionOf, st.board) }))); // a new comment or reply can carry pictures; an edit keeps the ones it has
         const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.error = ''; render(); });
         const send = btn('btn-primary ac-send', editOf ? 'Save' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
         const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;

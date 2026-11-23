@@ -1,6 +1,7 @@
 /* The pictures of a comment being written (#11651, goal #184): paste, drop or pick one or more, each shows as a thumbnail before Send and can be removed; each is stored as it is added (POST comment-images), so Send only names
  * what is already stored and the marked-up version of a picture (a second version of the same artifact) has its first version's hex to follow. A phone's picker offers the photos. Everything the person or the server wrote is set as
  * text or as an attribute, never as HTML. The tray is kept by the composing state, so a redraw of the panel gives the same node back with its pictures. */
+import { isCloud, commentImagesOn } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 const api = await importOnce('./artifact_comments_api.js'); // lazy: its failure is retried
@@ -12,7 +13,7 @@ const MAX_BYTES = 25 * 1024 * 1024; // a larger file is refused here with the re
 const typeOf = f => String((f && f.type) || '').toLowerCase();
 
 /** The tray of one comment being written. `upload(blob, versionOf)` stores (versionOf only on a marked-up copy) a picture and resolves its { hex, name, contentType, size }; `onChange()` is told whenever the pictures or their state change. */
-export function createImageTray({ upload, onChange = () => {}, hintText = HINT }) {
+export function createImageTray({ upload, onChange = () => {}, hintText = HINT, enabled = true }) {
     const node = el('div', 'ac-images'); node.hidden = true;
     const list = el('ul', 'ac-thumbs'); list.setAttribute('aria-label', 'Pictures to send with this comment');
     const note = el('p', 'ac-images-note'); note.setAttribute('role', 'status'); note.hidden = true;
@@ -44,6 +45,7 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
     }
     /** Adds the pictures among `files` (anything else is said and left out); each starts to upload at once. */
     function add(files) {
+        if (!enabled) return;
         const picked = [...files || []];
         const ok = [], bad = [];
         for (const f of picked) (api.COMMENT_IMAGE_TYPES.includes(typeOf(f)) && f.size <= MAX_BYTES ? ok : bad).push(f);
@@ -81,6 +83,7 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
     }
     /** The button and the hidden picker behind it; on a phone the picker offers the photos. */
     function picker() {
+        if (!enabled) return document.createDocumentFragment();
         const wrap = el('span', 'ac-picker');
         const input = el('input'); input.type = 'file'; input.accept = api.COMMENT_IMAGE_TYPES.join(','); input.multiple = true; input.hidden = true; input.tabIndex = -1; input.setAttribute('aria-hidden', 'true');
         const b = el('button', 'btn btn-small ac-add-image', 'Add image'); b.type = 'button'; b.setAttribute('aria-label', 'Add an image to this comment'); b.title = 'Pictures only: PNG, JPEG or WebP. To give the team any other file, use Add files on the Artifacts tab.'; // said before a file is picked (#15317), not only after a refusal
@@ -90,7 +93,7 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
         return wrap;
     }
     /** The one quiet line beside Add image (Security's INFO on #11650): what happens to a picture once it is sent. */
-    const hint = () => el('p', 'ac-images-hint', hintText);
+    const hint = () => el('p', 'ac-images-hint', enabled ? hintText : "Pictures aren't available through the Hub yet.");
     /** Pasting a picture into the text, and dropping one on the form, add it; pasted text is left to the field. */
     function attach(form, field) {
         field.addEventListener('paste', e => {
@@ -99,7 +102,7 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
             if (files.length && !cd.getData('text/plain')) { e.preventDefault(); add(files); }
         });
         const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types || []].includes('Files');
-        form.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); form.classList.add('ac-drop'); });
+        form.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); if (enabled) form.classList.add('ac-drop'); });
         form.addEventListener('dragleave', e => { if (!form.contains(e.relatedTarget)) form.classList.remove('ac-drop'); });
         form.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); form.classList.remove('ac-drop'); add(e.dataTransfer.files); });
     }
@@ -114,4 +117,9 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
         failed: () => items.some(it => it.state === 'failed'),
         listen: fn => { change = fn || (() => {}); },
     };
+}
+
+/** Comment uploads use the Hub capability; goal and direct-agent attachments use their own routes. */
+export function createCommentImageTray(options) {
+    return createImageTray({ ...options, enabled: !isCloud() || commentImagesOn() });
 }

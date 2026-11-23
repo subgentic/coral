@@ -3,14 +3,14 @@ import { spawnSync } from './helpers/child_process.js';
 import { fileURLToPath } from 'node:url';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 const cases = {
-    true: { account: { needs_native: true, goal_preview: true }, boot: false, expected: [true, true] },
-    false: { account: { needs_native: false, goal_preview: false }, boot: true, expected: [false, false] },
+    true: { account: { needs_native: true, goal_preview: true, comment_images: true }, boot: false, expected: [true, true] },
+    false: { account: { needs_native: false, goal_preview: false, comment_images: false }, boot: true, expected: [false, false] },
     absent: { account: {}, boot: true, expected: [true, true] },
     'absent-off': { account: {}, boot: false, expected: [false, false] },
     error: { boot: true, expected: [true, true] },
     refused: { boot: true, expected: [true, true] },
     array: { account: [{ needs_native: false, goal_preview: false }], boot: true, expected: [true, true] },
-    malformed: { account: { needs_native: 'true', goal_preview: 1 }, boot: true, expected: [true, true] },
+    malformed: { account: { needs_native: 'true', goal_preview: 1, comment_images: 'true' }, boot: true, expected: [true, true] },
     'needs-only': { account: { needs_native: false }, boot: true, expected: [false, true] },
     'goals-only': { account: { goal_preview: false }, boot: true, expected: [true, false] },
     hung: { boot: true, expected: [true, true] },
@@ -54,5 +54,6 @@ if (!scenario) {
     } else { await base.initCloudAccountFlags(); await base.initCloudAccountFlags(); }
     assert.equal(calls, cloud ? 1 : 0, 'one cached account read, only in cloud');
     assert.deepEqual([base.nativeNeeds(), base.goalPreviewOn()], c.expected, 'explicit booleans win; otherwise boot survives');
+    assert.equal(base.commentImagesOn(), cloud && c.account?.comment_images === true, 'comment pictures require an explicit Hub capability');
     dom.window.close();
 }

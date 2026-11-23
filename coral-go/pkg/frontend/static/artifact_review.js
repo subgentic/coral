@@ -248,7 +248,7 @@ export function attachReview(d, { reload }) {
     const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
     const submitBtn = form.querySelector('button[type=submit]');
     const approveWith = form.querySelector('.artifact-review-approve-note');
-    const tray = imgs.createImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
+    const tray = imgs.createCommentImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
     const syncSend = () => { submitBtn.disabled = approveWith.disabled = sending || inProgress || tray.busy() || tray.failed(); approveWith.disabled = approveWith.disabled || !!d.dataset.contentPending; }; // Send waits for a picture still going up, and for a failed one to be removed
     error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
     const paintApprove = () => {

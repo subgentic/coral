@@ -9,7 +9,7 @@ import { whenText } from './when_text.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('activity_dialog.css');
 const { createComment, uploadCommentImage } = await importOnce('./artifact_comments_api.js'); // lazy modules load the others through importOnce (import_hygiene)
-const { createImageTray } = await importOnce('./artifact_comment_images.js');
+const { createCommentImageTray } = await importOnce('./artifact_comment_images.js');
 const { sendForReview } = await importOnce('./artifact_send_review.js');
 const { fileKindOf } = await importOnce('./file_kind.js');
 
@@ -42,7 +42,7 @@ export function openFileDecision(row, { openFile, onDone } = {}) {
     }
     // one comment box (Comment and Send reply are one box in v3): a note for the team on this file, with pictures
     const label = el('label', 'activity-thread-label', 'Comment on this file'); const box = el('textarea', 'field activity-thread-box'); box.rows = 3; box.maxLength = 8000; box.placeholder = `Add a follow-up comment on ${markHidden(row.title || 'this file', { strict: true })}…`; label.append(box);
-    const tray = createImageTray({ upload: (blob, versionOf) => uploadCommentImage(hex, server, blob, versionOf, board) });
+    const tray = createCommentImageTray({ upload: (blob, versionOf) => uploadCommentImage(hex, server, blob, versionOf, board) });
     const err = el('p', 'activity-thread-error'); err.setAttribute('role', 'alert');
     const withIcon = (b, icon) => { const i = el('span', 'material-icons', icon); i.setAttribute('aria-hidden', 'true'); b.prepend(i); return b; }; // the mock's buttons carry an icon before the words (#19871)
     const copy = withIcon(el('button', 'btn btn-small', 'Copy link'), 'link'); copy.type = 'button';

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const src = name => readFileSync(new URL('../../coral-go/pkg/frontend/static/'+name,import.meta.url),'utf8');
+const tray=src('artifact_comment_images.js');
+assert.ok(tray.includes("Pictures aren't available through the Hub yet."));
+assert.ok(tray.includes("'Add image'"),'enabled and local pickers keep their label');
+assert.ok(tray.includes('if (!enabled) return document.createDocumentFragment();'),'disabled picker has no button or input');
+assert.ok(tray.includes('if (!enabled) return;'),'disabled trays never upload');
+for(const f of ['artifact_review.js','artifact_comment_composer.js','activity_file_dialog.js'])assert.ok(src(f).includes('createCommentImageTray'),f+' uses the comment route gate');
+assert.ok(src('operator_ask_dialog.js').includes(': m.createCommentImageTray'),'board replies use the comment route gate');
+assert.ok(src('operator_ask_dialog.js').includes("a.kind === 'agent' ? m.createImageTray"),'direct-agent pictures keep their own route');
+assert.ok(src('goal_editor.js').includes('m.createImageTray'),'goal attachments keep their own route');
+console.log('comment_images_hub_words: unavailable line, Add image, comment gate and separate goal/agent routes pinned');

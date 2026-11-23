@@ -175,10 +175,10 @@ export function openAskDialog(a, onDone, runners = {}) {
             if (!dlg.isConnected) return;
             // a single agent's picture is kept as that agent's own file (POST /api/agent-asks/<id>/images): it has no team to keep it with (#18668)
             tray = a.kind === 'agent' ? m.createImageTray({ upload: blob => agentApi.uploadAgentAskImage(a, blob), hintText: `Pictures are shared with ${who} as they are; nothing is hidden.` })
-                : m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
+                : m.createCommentImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
             tray.attach(dlg, box); tray.listen(sync);
             const picker = tray.picker(), add = picker.querySelector('button');
-            add.textContent = ''; const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'image'; add.append(icon); add.title = 'Add image';
+            if (add) { add.textContent = ''; const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'image'; add.append(icon); add.title = 'Add image'; }
             pickSlot.append(picker); addSlot.append(tray.hint()); pics.append(tray.node);
         }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
     }
