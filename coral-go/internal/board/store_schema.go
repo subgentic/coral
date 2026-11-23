@@ -81,6 +81,9 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	if err := s.ensureGoalImagesSchema(ctx); err != nil {
 		return err
 	}
+	if err := s.ensureFieldImagesSchema(ctx); err != nil {
+		return err
+	}
 	if err := s.ensureGoalRequestsSchema(ctx); err != nil {
 		return err
 	}

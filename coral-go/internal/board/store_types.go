@@ -69,9 +69,11 @@ type Task struct {
 	// GoalID is the goal of this board the task works toward (#7087), or nil.
 	GoalID *int64 `db:"goal_id" json:"goal_id,omitempty"`
 	// GoalTitle is the title of that goal, filled where a list is read for the Inbox (FillGoalTitles, #7301); absent when the task has no goal or the list did not ask.
-	GoalTitle string       `db:"-" json:"goal_title,omitempty"`
-	BlockedBy []TaskDep    `db:"-" json:"blocked_by,omitempty"`
-	Workflow  TaskWorkflow `db:"-" json:"workflow"`
+	GoalTitle string `db:"-" json:"goal_title,omitempty"`
+	// Images: the Operator's pictures in the task's prose fields (description, instructions, reason, completion_message), by field; filled where one task is read (#20731).
+	Images    map[string][]GoalImage `db:"-" json:"images,omitempty"`
+	BlockedBy []TaskDep              `db:"-" json:"blocked_by,omitempty"`
+	Workflow  TaskWorkflow           `db:"-" json:"workflow"`
 	// WorkedBy: who did the task's work, set where the workflow is read (finishWorkflow): the author a reviewed task was handed on from (a reviewed task is assigned to the orchestrator, #3725),
 	// else who completed it, else its assignee. Empty for a task nobody has. The views show it where they say who has a task or who did it.
 	WorkedBy string `db:"-" json:"worked_by,omitempty"`

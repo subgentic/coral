@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -96,9 +95,11 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		OlderVersion bool   `json:"older_version"`
 		Reason       string `json:"reason"` // deny only: the Operator's one line to the uploader
 		Note         string `json:"note"`   // approve only: the Operator's one short comment to the uploader (#11888)
-		// Text is changes only (#13976): the Operator's words, made the thread comment and the agent's notice in the same step as the decision. Images is no part of this slice: its key is refused, not ignored.
-		Text   string          `json:"text"`
-		Images json.RawMessage `json:"images"`
+		// Text is changes only (#13976): the Operator's words, made the thread comment and the agent's notice in the same step as the decision.
+		// Images are the Operator's pictures by field (#20731): note for approve, text for changes, reason for deny; they ride the notice as coral://artifacts lines.
+		Text        string              `json:"text"`
+		Images      map[string][]string `json:"images"`
+		ImagesDraft string              `json:"images_draft"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -108,8 +109,8 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "quiet applies only to automatic older-version settlement (ignore)")
 		return
 	}
-	if body.Images != nil {
-		commentRefuse(w, http.StatusBadRequest, "images_not_in_this_slice", "pictures do not go with a decision yet: comment with them, then decide")
+	if body.Images != nil && body.Decision != "approve" && body.Decision != "changes" && body.Decision != "deny" {
+		commentRefuse(w, http.StatusBadRequest, "images_only_with_a_decision", "pictures go with Approve, Request changes or Deny")
 		return
 	}
 	if strings.TrimSpace(body.Text) != "" && body.Decision != "changes" {
@@ -158,6 +159,18 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, `decision is "approve", "changes", "deny", "ignore", "unignore", "save" or "unsave"`)
 		return
 	}
+	decisionField := map[string]string{board.ReviewApproved: "note", board.ReviewChangesRequested: "text", board.ReviewDenied: "reason"}[state]
+	pictures, pok := h.fieldPictures(w, r, project, "task", body.ImagesDraft, body.Images, h.recordedFieldImages(r, project, board.FieldImagesDecision, id), decisionField)
+	if !pok {
+		return
+	}
+	pictureNote := ""
+	if imgs := pictures[decisionField]; len(imgs) > 0 {
+		pictureNote = " The pictures the operator attached, as data: " + strings.TrimPrefix(strings.ReplaceAll(pictureLines(imgs), "\n", " "), " ")
+		if state == board.ReviewChangesRequested {
+			words = strings.TrimSpace(strings.TrimSpace(words) + pictureLines(imgs))
+		}
+	}
 	item, ok := h.teamManagedArtifact(r.Context(), project, id)
 	if !ok {
 		errNotFound(w, "this team has no such artifact")
@@ -195,6 +208,11 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		errInternalServer(w, "could not record the review")
 		return
+	}
+	if change.Changed && len(pictures) > 0 {
+		if err := h.bs.SetFieldImagesOf(r.Context(), project, board.FieldImagesDecision, id, pictures); err != nil {
+			slog.Warn("[artifact review] the pictures of a decision were not kept", "board", project, "artifact", id, "error", err)
+		}
 	}
 	if change.Changed {
 		h.settleOlderVersions(r, project, id, item) // a decision on the newest version leaves no older version of the file waiting (#18166)
@@ -255,6 +273,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		if state == board.ReviewDenied {
 			notice = typedNoTeamDenied(item.Name, id, body.Reason)
 		}
+		notice += pictureNote
 		delivered, why := h.tellNoTeamUploaderOf(r.Context(), id, notice)
 		h.tellChief(context.WithoutCancel(r.Context()), decision, "file", project, item.Name, "")
 		out["delivered"] = delivered
@@ -295,6 +314,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	if state == board.ReviewDenied {
 		notice = denyNotice(title, item.Name, id, noticeData(body.Reason, reviewReasonCap, names), names)
 	}
+	notice += pictureNote
 	if state == board.ReviewApproved { // the Orchestrator is told too, so the team does not keep editing an approved file (#17674)
 		if orch, err := h.bs.TeamOrchestrator(r.Context(), project); err == nil && orch != "" && !board.SameIdentity(orch, title) {
 			notice = strings.Replace(notice, "@"+title+" [Coral]", "@"+title+" @"+cleanAgentName(orch)+" [Coral]", 1)

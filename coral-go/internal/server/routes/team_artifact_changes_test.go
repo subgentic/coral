@@ -257,17 +257,6 @@ func TestRequestChangesForABusyUploaderSaysQueued(t *testing.T) {
 	assert.Empty(t, c.messages(t))
 }
 
-func TestPicturesAreNotInThisSlice(t *testing.T) {
-	c := newChangesEnv(t)
-	for _, body := range []string{`{"decision":"changes","text":"x","images":["` + strings.Repeat("a", 64) + `"]}`, `{"decision":"changes","text":"x","images":[]}`, `{"decision":"changes","text":"x","images":null}`} {
-		code, out := c.changes(t, body)
-		assert.Equal(t, http.StatusBadRequest, code, body)
-		assert.Equal(t, "images_not_in_this_slice", out["code"], body)
-	}
-	assert.Empty(t, c.comments(t))
-	assert.Empty(t, c.messages(t))
-}
-
 func TestTextGoesWithRequestChangesOnly(t *testing.T) {
 	c := newChangesEnv(t)
 	for _, d := range []string{"approve", "deny", "ignore", "save"} {

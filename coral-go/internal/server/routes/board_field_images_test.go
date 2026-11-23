@@ -60,8 +60,8 @@ func TestAPersonUploadsAPictureForAFieldOfATeamOrOfNoTeam(t *testing.T) {
 		require.True(t, ok, scope+": kept with the team's session")
 		assert.Equal(t, "field-image:"+scope, rec.Source)
 		assert.Equal(t, "owner", rec.UploadedBy)
-		assert.True(t, recentCommentImage(fieldImageScope("alpha", scope, "d-"+scope), hex, time.Now()), scope+": remembered for its draft")
-		assert.False(t, recentCommentImage(fieldImageScope("alpha", scope, "other"), hex, time.Now()), scope+": not for another draft")
+		assert.True(t, recentFieldImage(fieldImageScope("alpha", scope, "d-"+scope), hex, time.Now()), scope+": remembered for its draft")
+		assert.False(t, recentFieldImage(fieldImageScope("alpha", scope, "other"), hex, time.Now()), scope+": not for another draft")
 		assert.False(t, recentCommentImage(goalImageScope("alpha"), hex, time.Now()), scope+": not a goal's picture")
 	}
 
