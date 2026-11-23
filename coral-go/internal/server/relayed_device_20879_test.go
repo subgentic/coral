@@ -33,13 +33,14 @@ const (
 )
 
 type relayRig struct {
-	t     *testing.T
-	d     *dkRig
-	owner *ecdsa.PrivateKey
-	ownK  string
-	bound *ecdsa.PrivateKey
-	bndK  string
-	n     int
+	t            *testing.T
+	d            *dkRig
+	owner        *ecdsa.PrivateKey
+	ownK         string
+	bound        *ecdsa.PrivateKey
+	bndK         string
+	n            int
+	sendOverride string // when set, the verb the next request is sent with (what was signed stays q.method)
 }
 
 func newRelayRig(t *testing.T) *relayRig {
@@ -134,10 +135,27 @@ func (g *relayRig) signed(q relayReq) *httptest.ResponseRecorder {
 	return g.send(q, sig)
 }
 
+// signedAs signs the request as signMethod and sends it as q.method.
+func (g *relayRig) signedAs(q relayReq, signMethod string) *httptest.ResponseRecorder {
+	g.t.Helper()
+	sent := q.method
+	q.method = signMethod
+	// build the signature for signMethod, then send it as the other verb
+	var out *httptest.ResponseRecorder
+	g.sendOverride = sent
+	out = g.signed(q)
+	g.sendOverride = ""
+	return out
+}
+
 func (g *relayRig) send(q relayReq, sig string) *httptest.ResponseRecorder {
 	h := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.ActorHeader: q.actor, "Content-Type": "application/json",
 		tunnel.DeviceKeyHeader: q.kid, tunnel.DeviceSigHeader: sig, tunnel.DeviceTsHeader: fmt.Sprint(q.ts.Unix()), tunnel.DeviceNonceHeader: q.nonce}
-	return call(g.d.r.srv.Router(), q.method, q.target, q.body, h)
+	method := q.method
+	if g.sendOverride != "" {
+		method = g.sendOverride
+	}
+	return call(g.d.r.srv.Router(), method, q.target, q.body, h)
 }
 
 // relayTarget fills a route pattern's {name} segments.
@@ -314,4 +332,28 @@ func TestALocalRequestsRelayedHeadersAreNotRead(t *testing.T) {
 	rec := call(g.d.r.srv.Router(), "POST", "/api/sessions/live/agent1/send", `{"text":"hi"}`, map[string]string{"Content-Type": "application/json",
 		tunnel.DeviceKeyHeader: g.bndK, tunnel.DeviceSigHeader: "x", tunnel.DeviceTsHeader: "1", tunnel.DeviceNonceHeader: "y"})
 	assert.Empty(t, relayCode(rec), rec.Body.String())
+}
+
+// QA's two additions on #20879: the method is part of what was signed, and a v3 signature is not a v2 message.
+func TestARelayedSignatureIsForItsMethodAndNotForAV2Route(t *testing.T) {
+	g := newRelayRig(t)
+	// trust-preview has both a PUT and a DELETE in the table: a PUT signature sent as a DELETE (the Hub changing the verb) is refused, and the PUT itself passes.
+	put := relayReq{kind: devicekey.TrustPreview, method: "PUT", target: "/api/artifacts/" + strings.Repeat("a", 64) + "/trust-preview", priv: g.bound, kid: g.bndK, actor: relayPerson}
+	rec := g.signed(put)
+	assert.Empty(t, relayCode(rec), "the PUT as signed is not refused by the check: %d %s", rec.Code, rec.Body.String())
+	swapped := put
+	swapped.method = "DELETE"
+	swapped.signTgt = put.target
+	swapped.nonce = "" // a new nonce: the refusal is the method, not a repeat
+	rb := g.signedAs(swapped, "PUT")
+	assert.Equal(t, "bad_signature", relayCode(rb), "a PUT signature sent as a DELETE: %d %s", rb.Code, rb.Body.String())
+
+	// A v3 signature on a route of the v2 form (a device removes a key: its own body carries the signature): the relayed check does not read it, and the route refuses it by its own rule; the key stays.
+	target := "/api/cloud/devices/" + g.bndK
+	v3 := relayReq{kind: devicekey.SendToAgent, method: "DELETE", target: target, priv: g.bound, kid: g.bndK, actor: relayPerson}
+	rv := g.signed(v3)
+	assert.Empty(t, relayCode(rv), "the relayed check does not claim a route outside its table: %d %s", rv.Code, rv.Body.String())
+	assert.NotEqual(t, 200, rv.Code, "a v3 signature does not remove a key: %s", rv.Body.String())
+	_, err := g.d.ss.ActiveDeviceKey(context.Background(), g.bndK, time.Now())
+	assert.NoError(t, err, "the key is still active")
 }
