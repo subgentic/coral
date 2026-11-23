@@ -9,7 +9,7 @@ import (
 
 // #20883: a Hub's owner may give and end a member's access, signed by the owner's own device. The four routes are shut (never, as before) until MemberRelayedOpen is true, which changes only in a commit
 // Security reads; open, they are the owner's, Launch tier, and nobody else's. The lists (GET) stay this computer's.
-var memberRelayedRoutes = []struct{ method, path string }{
+var memberRelayedCases = []struct{ method, path string }{
 	{http.MethodPost, "/api/member-grants"},
 	{http.MethodDelete, "/api/member-grants/abc"},
 	{http.MethodPost, "/api/board/team1/member-grants"},
@@ -18,11 +18,11 @@ var memberRelayedRoutes = []struct{ method, path string }{
 
 func TestMemberGrantRoutesAreShutUntilTheRelayedGateOpens(t *testing.T) {
 	assert.False(t, MemberRelayedOpen, "ships shut")
-	for _, r := range memberRelayedRoutes {
+	for _, r := range memberRelayedCases {
 		assert.Equal(t, TierNever, Classify(r.method, r.path, ""), "%s %s shut", r.method, r.path)
 	}
 	OpenMemberRelayedForTest(t)
-	for _, r := range memberRelayedRoutes {
+	for _, r := range memberRelayedCases {
 		assert.Equal(t, TierLaunch, Classify(r.method, r.path, ""), "%s %s open", r.method, r.path)
 		_, mode := OwnerRoute(r.method, r.path)
 		assert.Equal(t, OwnerHubOnly, mode, "%s %s is the owner's, through a Hub only", r.method, r.path)

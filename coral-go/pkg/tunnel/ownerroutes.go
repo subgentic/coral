@@ -66,7 +66,7 @@ func OwnerRoute(method, decodedPath string) (pattern string, mode OwnerMode) {
 	if !ok {
 		return "", OwnerNone
 	}
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
 			return r.pattern, r.owner
 		}
@@ -90,7 +90,7 @@ type OwnerRouteInfo struct {
 // OwnerRoutes lists every owner route of the table, for the census tests.
 func OwnerRoutes() []OwnerRouteInfo {
 	var out []OwnerRouteInfo
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if r.owner != OwnerNone {
 			out = append(out, OwnerRouteInfo{Method: r.method, Pattern: r.pattern, Tier: r.tier, Mode: r.owner})
 		}

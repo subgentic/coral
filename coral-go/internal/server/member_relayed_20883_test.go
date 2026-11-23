@@ -105,11 +105,11 @@ func TestARelayedOwnerSignedGrantGivesAndEndsAMembersAccess(t *testing.T) {
 		found = found || (a.Method == "POST" && strings.Contains(a.Path, "member-grants") && a.ViaLink == testLinkID)
 	}
 	assert.True(t, found, "an Operator-actions row for the relayed grant: %+v", actions)
-	msgs, err := g.d.r.srv.boardStore.ReadMessages(context.Background(), "team1", 0, 20)
+	msgs, err := g.d.r.srv.boardStore.ListMessages(context.Background(), "team1", 20, 0, 0)
 	require.NoError(t, err)
 	notice := false
 	for _, m := range msgs {
-		notice = notice || (m.Origin == board.OriginHubNotice && strings.Contains(m.Content, "view access"))
+		notice = notice || (m.Origin != nil && *m.Origin == board.OriginHubNotice && strings.Contains(m.Content, "view access"))
 	}
 	assert.True(t, notice, "a notice on the team's board")
 

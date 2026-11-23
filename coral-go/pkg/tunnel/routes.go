@@ -828,7 +828,7 @@ func RuleFor(method, decodedPath string) (pattern string, tier Tier, ok bool) {
 	if !valid {
 		return "", TierNever, false
 	}
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
 			return r.pattern, r.tier, true
 		}
@@ -847,7 +847,7 @@ func Classify(method, decodedPath, rawQuery string) Tier {
 	if !ok {
 		return TierNever
 	}
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
 			if r.service || r.tier == TierNever || !queryOK(r, rawQuery) {
 				return TierNever // a service route is never a user's, at any tier (hubservice.go): ClassifyService is the Hub's own service stream's
@@ -868,7 +868,7 @@ func ClassifyService(method, decodedPath, rawQuery string) Tier {
 	if !ok {
 		return TierNever
 	}
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
 			if !r.service || r.tier == TierNever || !queryOK(r, rawQuery) {
 				return TierNever
@@ -911,8 +911,8 @@ func currentMode(mode func() Mode) Mode {
 
 // RoutePatterns lists "METHOD pattern tier" for tests and docs.
 func RoutePatterns() []string {
-	out := make([]string, 0, len(routeTable))
-	for _, r := range routeTable {
+	out := make([]string, 0, len(table()))
+	for _, r := range table() {
 		out = append(out, r.method+" "+r.pattern+" "+r.tier.String())
 	}
 	return out

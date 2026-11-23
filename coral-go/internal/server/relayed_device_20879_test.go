@@ -248,7 +248,7 @@ func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
 			}
 		}
 	}
-	assert.Equal(t, 14, n, "every route of the table was visited (a route added to KindRoutes is visited too: add it here, or to the gaps)")
+	assert.Equal(t, 16, n, "every route of the table was visited (a route added to KindRoutes is visited too: add it here, or to the gaps)")
 }
 
 // The owner's key signs only as the owner this link confirmed (the pin), and only for the person the stamp names. (The two owner-only kinds are not reachable through the tunnel's route table yet, see the gaps in the

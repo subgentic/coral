@@ -49,6 +49,8 @@ var relayedRoutes = []RelayedRoute{
 	{"POST", "/api/hub-auto-accept"},
 	{"POST", "/api/member-grants"},
 	{"DELETE", "/api/member-grants/{id}"},
+	{"POST", "/api/board/{project}/member-grants"},
+	{"DELETE", "/api/board/{project}/member-grants/{id}"},
 }
 
 // RelayedRoutes lists the routes of the relayed signed kinds, for the test that keeps them equal to devicekey.KindRoutes.

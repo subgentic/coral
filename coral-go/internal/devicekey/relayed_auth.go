@@ -25,7 +25,7 @@ var KindRoutes = map[Kind][]Route{
 	BoardPost:               {{"POST", "/api/board/{project}/messages"}},
 	KeepFullAccess:          {{"POST", "/api/sessions/live/{name}/keep-full-access"}},
 	HubAutoAccept:           {{"POST", "/api/hub-auto-accept"}},
-	GrantMember:             {{"POST", "/api/member-grants"}, {"DELETE", "/api/member-grants/{id}"}},
+	GrantMember:             {{"POST", "/api/member-grants"}, {"DELETE", "/api/member-grants/{id}"}, {"POST", "/api/board/{project}/member-grants"}, {"DELETE", "/api/board/{project}/member-grants/{id}"}},
 }
 
 // RoutePath is the path of a signed request target: everything before the query.
