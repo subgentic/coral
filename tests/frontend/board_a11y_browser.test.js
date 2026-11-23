@@ -74,9 +74,14 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(h.checked > 0 && !h.fails.length, `${theme}: the team page header over the board holds 4.5:1: ` + JSON.stringify(h.fails).slice(0, 400));
         }
         // the board's tasks are the Tasks tab of an agent on the board (the board's page has no side panel, #7457)
-        await ev(`window.__m.add('a11y-agent', 'A', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);
-        await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'a11y-agent')`, 'the agent', 8000);
-        await ev(`window.selectLiveSession('a11y-agent', 'claude', 'a11y-agent-id', 'local'); true`);
+        // The mock agent lives only in the page. selectLiveSession awaits leaving the team page before it reads the agent from the list, and a full feed update from the real server (which does not list it) landing in that gap drops it: the agent is then entered with no board, subscriber or orchestrator flag and its Tasks tab says 'No tasks yet' for good (the Windows gate failed this step twice on f3000051f4, #20777/#20784). The first try has such an update land in the gap on purpose; an agent that came in without its board is added and chosen again.
+        for (let attempt = 0; ; attempt++) {
+            await ev(`window.__m.add('a11y-agent', 'A', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);
+            await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'a11y-agent')`, 'the agent', 8000);
+            await ev(`(async () => { const p = window.selectLiveSession('a11y-agent', 'claude', 'a11y-agent-id', 'local'); ${attempt === 0 ? "window._coralHandleWsMessage({ type: 'coral_update', sessions: [], servers: [] });" : ''} await p; return true; })()`);
+            if (await ev(`!!(window.__qaState.currentSession && window.__qaState.currentSession.board_project)`)) { if (attempt === 0) console.log('note: the first try lost its board, as the in-gap feed update makes it; chosen again'); break; }
+            assert.ok(attempt < 3, 'the agent came in without its board on every try');
+        }
         for (const theme of ['dark', 'light']) {
             await setTheme(ev, theme);
             await ev(`(() => { if (document.getElementById('agentic-state').getBoundingClientRect().width < 50) document.getElementById('panel-toggle-btn').click(); return true; })()`);
