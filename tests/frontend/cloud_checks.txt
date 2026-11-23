@@ -15,6 +15,7 @@ node field_census.test.mjs
 node launch_cards_census.test.mjs
 npm run lint:undef
 node no_nan_ids.test.js
+node hub_file_ref.test.js
 node lint_undef_selfcheck.test.js
 node import_hygiene.test.js
 node vendor_manifest.mjs

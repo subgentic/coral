@@ -1,11 +1,19 @@
 // File-reference options load on the first click, keeping them off startup.
 import { escapeHtml, showToast, copyText } from './utils.js';
-import { serverFetch, sessionServer, serverUrl, currentServer, isCloud, isLocalServer } from './server_base.js';
+import { serverFetch, sessionServer, serverUrl, currentServer, isCloud, isHub, isLocalServer, normServer } from './server_base.js';
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
 
 async function resolveFileRef(ref) {
     const s = state.currentSession;
     if (!s || s.type !== "live") return null;
+    if (isCloud() || isHub() || !isLocalServer(sessionServer(s))) { // through a Hub the tunnel refuses an absolute value: send the folder-relative path (#20817)
+        const agent = (state.liveSessions || []).find(a => a.name === s.name && normServer(a.server) === sessionServer(s));
+        const { hubFileRef, outsideWords } = await importOnce('./hub_file_ref.js');
+        const sent = hubFileRef(ref, (agent && (agent.current_directory || agent.working_directory)) || s.working_directory || '');
+        if (sent.outside) { showToast(outsideWords(s.display_name || s.name), true); return null; }
+        ref = sent.ref;
+    }
     try {
         const qs = new URLSearchParams({ filepath: ref, session_id: s.session_id || "" });
         const resp = await serverFetch(sessionServer(s), `/api/sessions/live/${encodeURIComponent(s.name)}/resolve-path?${qs}`);
