@@ -158,7 +158,7 @@ const AGENTS_FIELDS = host => [
     { key: 'working_dir', type: 'text', id: 'settings-working-dir', label: 'Default working directory', help: moreOnly('New agents start here.'), placeholder: host.dataset.coralRoot || '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' } },
     { key: 'agents_behaviour', type: 'heading', id: 'settings-agents-behaviour', label: 'Behaviour' },
     { key: 'auto_resume', type: 'toggle', id: 'settings-auto-resume', label: 'Resume after API errors', help: moreOnly('Resumes agents automatically.', "When an agent's CLI stops on a rate limit, an overload or another API error, Coral wakes it again after about 2, then 5, then 15 minutes, and stops trying after the third. Waking the agent yourself starts the count again.") },
-    { key: 'auto_resume_at_limit_reset', type: 'toggle', id: 'settings-auto-resume-limit', label: 'Resume at limit reset', help: 'Off by default. Resume awake agents at a known reset time; exited agents stay asleep.' },
+    { key: 'auto_resume_at_limit_reset', type: 'toggle', id: 'settings-auto-resume-limit', label: 'Resume at limit reset', help: moreOnly('Off by default. Agents a usage limit stopped carry on when it lifts; exited agents stay asleep.') },
     { key: 'auto_sleep', type: 'toggle', id: 'settings-auto-sleep', label: 'Auto-sleep' }, // no help line: the Agents tab is at its word budget; what it does is in the release notes and the line Coral posts the first time it sleeps one (#12111)
     { key: 'auto_sleep_idle_minutes', type: 'number', id: 'settings-auto-sleep-minutes', label: 'After', unit: 'min', min: 15, max: 1440, step: 5, default: 60, attrs: { inputmode: 'numeric', 'aria-label': 'Minutes idle before an agent is put to sleep' } },
     { key: 'auto_goals', type: 'toggle', id: 'settings-auto-goals', label: "Name each agent's goal", help: helpLine('Haiku names goals.', "Coral asks Claude Code's smallest model (Haiku) for a short goal line for each agent, from your requests only: once when the agent first answers, then for a new request at most every 30 minutes. Each one is a short call made with your Claude Code account (about 1,300 input tokens). When off, the goal shows your first prompt.") },
@@ -305,8 +305,6 @@ const HELP_LINES = {
     custom_models: 'Model ids are passed to the CLI as written.',
     working_dir: 'New agents start here.',
     default_thinking_claude: 'How much Claude thinks before it answers.',
-    auto_resume: 'Resumes agents automatically.',
-    agent_low_priority: 'Keeps Coral responsive.',
     board_auto_attach: 'Stores recent local images and Markdown documents so teammates can open them.',
     nudge_claude_artifacts: 'Reminds agents to publish shared files to Coral.',
     launch_in_worktree: 'Isolated checkout per team. Experimental; off by default.',
