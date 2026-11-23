@@ -1,5 +1,43 @@
 # Release Notes
 
+## v2.1.7 — A second Hub on the same Coral, pictures in task and board text boxes, and Inbox comments that stay in view
+
+Task numbers in brackets. Built on v2.1.6. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **A second self-hosted Hub can link to the same Coral** (#20838, goal #269): it is treated exactly like the first Hub, with the same access. Every request records which Hub and which Hub person sent it, and the same person label on two Hubs shares nothing: grants, open streams, asks and the actions log stay per Hub. Adding, removing or capping a link is still done only on the computer itself, and permission, custom-check and device-key asks are still never answered through a Hub. Coral Hub member grants are unchanged.
+- **Pictures in task and board text boxes** (#20731, #20748, #20749, #20750, #20758, #20767, #20768, #20787, goal #285): add pictures when you create, amend, reply to or complete a task, in a review decision's note, and in a board post. A picture that fails to upload stays in the tray with Retry and Remove; a save whose pictures were not kept says so. The privacy hint shows once a picture is added. Pictures on personal tasks are stored and shown by the list (#20800); a personal task that matches an open one says its pictures were not added (#20818). Editing a personal task's description now saves it (#20845).
+- **A file you commented on stays in For review** (#20735): quieter, with "You commented N min ago, waiting for <agent>" and your comment quoted; a new comment from the agent clears the line.
+- **The Hub icon in the top bar opens the linked Hub** while connected (#20813).
+- **The review bar no longer slides under the viewer's top edge** (#20820).
+- **A Hub page in the Inbox stays put** (#20836): a notice settling after Mark done no longer moves the page, so a click aimed at Reopen lands on it.
+- **Chat file links through a Hub** (#20817, #20827): a file click sends the folder-relative path, a file outside the folder says so, and a `:line[:col]` suffix is kept as the line.
+- **Computers page** (#20747, #20761): no Start column or New agent / New team / New terminal buttons in the rows.
+- **Phone Needs you cards** show their kind and computer in full at 390 px (#20790).
+- **An agent's question dialog holds still once it opens** (#20864): it no longer grows and moves up a moment later, so a click lands where you aimed. If an optional part fails to load, a text reply still works.
+- **"Yes, I trust this folder" for a group keeps its result** (#20865): if the Inbox redraws while the answers are sent, the new card shows the result and offers no second answer.
+- **An agent with nothing saved** no longer shows "Loading saved items" after its empty Saved list has loaded (#20876).
+- **With the picture tray in a composer**, Send stays inside its card at small widths, at 200% zoom and on a 320 px phone, and Approve with comment sits next to Send in a narrow review form (#20857, #20859).
+
+### Test and gate fixes in this release
+
+- The server waits a bounded time for its memory-release timers on close, counted per server (#20799); board_a11y picks the mock agent again when a feed update drops it (#20784, the v2.1.6 Windows red).
+- The Hub shell census lists the two picture upload routes as "explains" (#20851, found by the fail-fast on the first candidate).
+- Gate fixes on later candidates: the board picture write path is listed in the safefs join census with its reason (#20854); two browser-test oracles corrected for the tray layout (#20857); the ask dialog suite checks that the open dialog does not move, and the trust group suite redraws the Inbox during the click (#20864, #20865, both fail on the old code).
+- The routes test package needs `-timeout 40m` (about 10 minutes).
+- The start-CSS cap is unchanged; the Inbox frame fix is 7 gz bytes under the base.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- Pictures through a Hub fail until the Hub turns them on; the tray says "Picture not uploaded" and keeps Retry. Pictures on goal edits, comment edits, job prompts, agent instructions and team working mode come next (#20844).
+- The Hub sharing switches stay off.
+- Device-signed actions sent through a Hub (send to an agent, board post, member grants, device approvals) are not accepted yet: the check exists but no route uses it. It is being wired for the next release (#20879); actions signed directly on the computer are unaffected.
+- On a busy computer, a message number such as #8 in an agent's question can show as plain text instead of a link, because its helper loads after the dialog opens; the fix is in review for the next release (#20872).
+
 ## v2.1.6 — Usage limits you can see, resume at the reset, and review that reads the same for every file
 
 Task numbers in brackets. Built on v2.1.5. A prerelease until the Operator promotes it.
