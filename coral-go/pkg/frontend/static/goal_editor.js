@@ -13,6 +13,7 @@ const { assess, EXAMPLES, TASKS_MAX } = await importOnce('./goal_guide.js'); // 
 const { createFieldPictures, savedWords } = await importOnce('./field_pictures.js');
 const { renderGoalText } = await importOnce('./goal_text.js'); // the Preview and the goal's page draw the words the same way
 await loadStyles('goal_editor.css'); // not at start (page_weight): the editor's own sheet loads with this module, before anything draws
+const HEX = /^[a-f0-9]{64}$/;
 const GOAL_DESCRIPTION_MAX = 2000; // the server's cap on a goal's outcome (MaxGoalOutcome)
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -180,7 +181,7 @@ export function openGoalEditor(opts = {}) {
         if (desc.value.trim()) { const node = await renderGoalText(desc.value, { server: splitKey(project).server }); dd.append(node); } else { dd.textContent = 'Nothing written yet.'; dd.classList.add('goal-preview-blank'); }
         const dd2 = el('dd', d.value.trim() ? null : 'goal-preview-blank', d.value.trim() || 'Not set yet.'); dl.append(el('dt', null, 'Done when'), dd2);
         const kids = [state, h, meta, dl];
-        const shots = tray ? tray.items().filter(x => x.state === 'ready') : [];
+        const shots = tray ? tray.items().filter(x => x.state === 'ready' && (x.blob || HEX.test(x.hex || ''))) : [];
         if (shots.length) { const row = el('ul', 'goal-preview-pics'); for (const x of shots) { const li = el('li'), img = el('img'); const u = x.blob ? URL.createObjectURL(x.blob) : serverUrl(`/api/artifacts/${x.hex}?v=2`, splitKey(project).server); if (x.blob) previewUrls.push(u); img.src = u; img.alt = x.name || 'Picture'; li.append(img); row.append(li); } kids.push(row); }
         kids.push(el('p', 'goal-preview-tasks', 'No tasks yet. The goal\u2019s driver plans them once it exists.'));
         pane.replaceChildren(...kids);
