@@ -16,6 +16,8 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!window.T.state.liveSessions.find(s => s.name === 'with-instr')`, 'the mocked live list holds the agent (on a slow runner coralReady returns before it)', 15000); // #13510: the first attempt on Windows found no row and failed at once
         await ev(`(() => { const r = window.T.state.liveSessions.find(s => s.name === 'with-instr'); r.prompt = ${JSON.stringify(LONG)}; return !!r; })()`);
 
+        await ev(`(()=>{const real=window.fetch;window.fetch=(u,o={})=>new URL(String(u),location.href).pathname.endsWith('/info')?Promise.resolve(new Response(JSON.stringify({prompt:${JSON.stringify(LONG)},images:{instructions:[]}}),{headers:{'Content-Type':'application/json'}})):real(u,o);return true})()`);
+
         console.log('1. the empty chat shows the instructions on one line, with Edit');
         await select('with-instr');
         await waitFor(`!!document.querySelector('.chat-standing:not([hidden])')`, 'the instructions line', 8000);
