@@ -172,3 +172,38 @@ func TestInstructionPicturesNeedWordsAndEndWithTheAgent(t *testing.T) {
 	kr.Body.Close()
 	assert.Empty(t, h.instructionImages(context.Background(), sid)["instructions"], "an ended agent's pictures are removed")
 }
+
+// #20845: the read the instructions editor loads (GET /api/sessions/live/{name}/info) returns the saved pictures as images.instructions beside the prompt, in order, so a fresh browser can show and remove them; an agent
+// with none has no images key (the same shape as the PUT's answer).
+func TestTheInfoReadShowsAnAgentsInstructionPictures(t *testing.T) {
+	_, h, _, ss := setupSessionsTestServer(t)
+	_, bh := setupBoardTestServer(t)
+	h.SetBoardHandler(bh)
+	ctx := context.Background()
+	words := "be careful"
+	const sid = "sess-info-1"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "agent", WorkingDir: t.TempDir(), Prompt: &words, CreatedAt: time.Now().UTC().Format(time.RFC3339)}))
+	r := chi.NewRouter()
+	r.Get("/api/sessions/live/{name}/info", h.Info)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	info := func() map[string]any {
+		resp, err := http.Get(srv.URL + "/api/sessions/live/agent/info?agent_type=claude&session_id=" + sid)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return out
+	}
+	out := info()
+	assert.Equal(t, "be careful", out["prompt"])
+	assert.NotContains(t, out, "images", "no pictures, no key")
+
+	a, b := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	require.NoError(t, bh.bs.SetFieldImages(ctx, "", board.FieldImagesSession, sid, "instructions",
+		[]board.GoalImage{{Hex: b, Name: "two.png", ContentType: "image/png"}, {Hex: a, Name: "one.png", ContentType: "image/png"}}))
+	out = info()
+	assert.Equal(t, "be careful", out["prompt"])
+	assert.Equal(t, []string{b, a}, imagesOf(out, "instructions"), "the pictures come back in their saved order")
+}

@@ -31,7 +31,7 @@ func TestAgentTasksCRUD(t *testing.T) {
 
 	// Update
 	completed := 1
-	err = s.UpdateAgentTask(ctx, task1.ID, nil, &completed, nil)
+	err = s.UpdateAgentTask(ctx, task1.ID, nil, nil, &completed, nil)
 	require.NoError(t, err)
 
 	// Complete by title
