@@ -136,7 +136,9 @@ func TestAJobRefusesPicturesThatAreNotItsOwnOrNotTheOperators(t *testing.T) {
 func TestAJobSaysSoWhenItsPicturesCouldNotBeSaved(t *testing.T) {
 	e := newJobPicturesEnv(t)
 	a := e.upload(t, "j3", 123)
-	e.bh.setFieldImages = func(context.Context, string, string, string, map[string][]board.GoalImage) error { return fmt.Errorf("disk full") }
+	e.bh.setFieldImages = func(context.Context, string, string, string, map[string][]board.GoalImage) error {
+		return fmt.Errorf("disk full")
+	}
 	code, out := e.call(t, "dash", "POST", "/api/scheduled/jobs", newJob(e.repo, map[string]any{"images_draft": "j3", "images": map[string]any{"prompt": []string{a}}}))
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	assert.Equal(t, true, out["pictures_not_saved"])
