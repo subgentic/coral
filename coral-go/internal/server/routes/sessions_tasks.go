@@ -43,6 +43,7 @@ func (h *SessionsHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	h.withTaskImages(r.Context(), tasks)
 	writeJSON(w, http.StatusOK, tasks)
 }
 
@@ -70,7 +71,9 @@ func (h *SessionsHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Draft     bool               `json:"draft"`
 		// Notify tells the agent to claim it (a short prompt typed into its
 		// terminal; see claimPrompt).
-		Notify bool `json:"notify"`
+		Notify      bool                `json:"notify"`
+		Images      map[string][]string `json:"images"` // the body's pictures (#20800): {"body": [hex]}
+		ImagesDraft string              `json:"images_draft"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "title is required")
@@ -121,11 +124,20 @@ func (h *SessionsHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	project := taskPicturesProject(name, ptr.NonEmpty(body.SessionID))
+	pictures, ok := h.taskPictures(w, r, project, 0, body.ImagesDraft, body.Images)
+	if !ok {
+		return
+	}
 	task, err := h.ts.CreateAgentTaskWithWorkflow(r.Context(), name, body.Title, ptr.NonEmpty(body.SessionID), displayName, body.Body, body.Priority, &board.CreateTaskOpts{Workflow: body.Workflow, BlockedBy: deps, Draft: body.Draft, MaxDepth: 32})
 	if err != nil {
 		errBadRequest(w, err.Error())
 		return
 	}
+	if !h.keepTaskPictures(r.Context(), project, task.ID, pictures) {
+		task.PicturesNotSaved = true
+	}
+	task.Images = h.taskImages(r.Context(), project, task.ID)
 	resp := createdTaskResponse{AgentTask: task}
 	if body.Notify && task.Status == "pending" {
 		resp.Notified, resp.NotifyError = h.notifyTaskCreated(r.Context(), name, body.SessionID, task)
@@ -228,16 +240,24 @@ func (h *SessionsHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, ok := h.ownTask(w, r, scope, taskID); !ok {
+	owned, ok := h.ownTask(w, r, scope, taskID)
+	if !ok {
 		return
 	}
 	var body struct {
-		Title     *string `json:"title"`
-		Completed *int    `json:"completed"`
-		SortOrder *int    `json:"sort_order"`
+		Title       *string             `json:"title"`
+		Completed   *int                `json:"completed"`
+		SortOrder   *int                `json:"sort_order"`
+		Images      map[string][]string `json:"images"` // the body's pictures (#20800): {"body": [hex]}
+		ImagesDraft string              `json:"images_draft"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
+		return
+	}
+	project := taskPicturesProject(owned.AgentName, owned.SessionID)
+	pictures, ok := h.taskPictures(w, r, project, taskID, body.ImagesDraft, body.Images)
+	if !ok {
 		return
 	}
 	if err := h.ts.UpdateAgentTask(r.Context(), taskID, body.Title, body.Completed, body.SortOrder); err != nil {
@@ -245,7 +265,14 @@ func (h *SessionsHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.scheduleTaskReadiness(taskID)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	out := map[string]any{"ok": true}
+	if !h.keepTaskPictures(r.Context(), project, taskID, pictures) {
+		out["pictures_not_saved"], out["pictures_warning"] = true, picturesNotSavedWords
+	}
+	if m := h.taskImages(r.Context(), project, taskID); len(m) > 0 {
+		out["images"] = m
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h *SessionsHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
@@ -254,12 +281,16 @@ func (h *SessionsHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, ok := h.ownTask(w, r, scope, taskID); !ok {
+	owned, ok := h.ownTask(w, r, scope, taskID)
+	if !ok {
 		return
 	}
 	if err := h.ts.DeleteAgentTask(r.Context(), taskID); err != nil {
 		errBadRequest(w, err.Error())
 		return
+	}
+	if owned != nil {
+		h.forgetTaskPictures(r.Context(), taskPicturesProject(owned.AgentName, owned.SessionID), taskID)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
