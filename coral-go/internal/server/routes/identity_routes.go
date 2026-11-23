@@ -176,6 +176,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/device-keys/message":                  "send a signed device message (only a Hub-forwarded browser does)",          // #19669
 	"POST /api/device-keys/certificate":              "send a passkey certificate for a new device",                               // #19669
 	"GET /api/device-keys/list":                      "list the trusted browsers and passkeys for the Hub's owner (display only)", // #19971
+	"GET /api/device-keys/link":                      "read which Hub link this request arrived on (only a Hub-forwarded owner)",  // #20903
 	"PUT /api/cloud/allow-auto-accept":               "change whether Coral Hub may turn on auto-accept",
 	"POST /api/hub-auto-accept":                      "change whether Coral Hub may turn on auto-accept (Coral Hub's owner)",      // #5840
 	"PUT /api/cloud/hub-dropbox-share":               "change whether Coral Hub may send files you share to its Dropbox",          // #16109

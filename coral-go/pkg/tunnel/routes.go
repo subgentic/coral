@@ -417,6 +417,8 @@ var routeTable = cat(
 	rules(http.MethodPost, TierView, "/api/device-keys/message", "/api/device-keys/certificate"),
 	// The trusted-device list for display (#19971, coral-hub #252527): the owner's alone through the Hub, read only, Launch. Fields kid, label, mode, origin, kind, created_at, last_used_at; no public key. Nothing listed grants anything: the signed message is the authority.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/device-keys/list")),
+	// The arrival link for the Hub owner (#20903, coral-hub #20897): {link: lnk-<8 hex>} from the connector's own stamp, read only, Launch, owner only. Nothing is stored; a local call gets 404.
+	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/device-keys/link")),
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),

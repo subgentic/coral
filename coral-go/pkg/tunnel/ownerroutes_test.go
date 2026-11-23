@@ -231,7 +231,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 				continue
 			}
 			// The trusted-device list (#19971) is read through the hub by the owner alone: the old list never had it.
-			if m == http.MethodGet && p == "/api/device-keys/list" {
+			if m == http.MethodGet && (p == "/api/device-keys/list" || p == "/api/device-keys/link") {
 				continue
 			}
 			// The first-launch notice (#14353, #14414) is read through the hub by the owner alone: the old list never had it.

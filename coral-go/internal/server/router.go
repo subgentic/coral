@@ -666,6 +666,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/device-keys/message", s.cloudHandler.DeviceKeyMessage)
 	r.Post("/api/device-keys/certificate", s.cloudHandler.DeviceKeyCertificate)
 	r.Get("/api/device-keys/list", s.cloudHandler.TunnelDevices)           // the owner's read-only display list through the Hub (#19971); owner only, Launch tier, in the tunnel table
+	r.Get("/api/device-keys/link", s.cloudHandler.TunnelLink)              // the link this request arrived on, for the Hub owner to name in a signed text (#20903); owner only, Launch tier, in the tunnel table
 	r.Put("/api/cloud/hub-relaunch", s.cloudHandler.SetHubRelaunch)        // #5280
 	r.Put("/api/cloud/hub-cross-team", s.cloudHandler.SetHubCrossTeam)     // #5572
 	r.Get("/api/system/codex-trust-hooks", s.cloudHandler.CodexTrustHooks) // #153
