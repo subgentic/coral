@@ -25,9 +25,19 @@ const isReply = action => /^reply$/.test(action);
 // The person's own Yes, No, reply or Ignore leaves the row at once: the table redraws once, not held under the pointer that rests on the list (#17501, walk 72 M6); the same event pair the other actions use (sidebar_groups.js).
 const ownAction = () => { const b = { table: null }; document.dispatchEvent(new CustomEvent('coral:action-start', { detail: b })); return () => document.dispatchEvent(new CustomEvent('coral:action-result', { detail: b })); };
 
-export function openAskDialog(a, onDone, runners = {}) {
+export async function openAskDialog(a, onDone, runners = {}) {
     const missingCloudSource = isCloud() && !a.server;
     a = { ...a, server: a.server || LOCAL_SERVER }; // freeze the question's computer across navigation
+    const opener = document.activeElement; // capture before optional modules load
+    // Finish the title and picker before showModal centres the dialog. Late additions
+    // moved the agent link away from a person's click (#20864). Failed optional loads
+    // still allow a text reply, and a later open retries through importOnce.
+    const [agentLinks, imageModules] = await Promise.all([
+        importOnce('./agent_link.js').catch(() => null),
+        !missingCloudSource && !fromAnotherComputer(a)
+            ? Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js'), a.kind === 'agent' ? importOnce('./agent_ask_answer.js') : null]).catch(() => null)
+            : null,
+    ]);
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-flow inbox-ask-dialog'; // shared flow size on wide screens; narrow CSS keeps the form size and phone sheet
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
@@ -36,17 +46,17 @@ export function openAskDialog(a, onDone, runners = {}) {
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub';
     const who = markHidden(a.asker, { strict: true }); // the title and its link use the same visible name
     sub.textContent = whenText(a.at) + (a.kind === 'wait' ? ', waiting for your reply' : '');
-    importOnce('./agent_link.js').then(m => {
-        if (!title.isConnected || missingCloudSource) return;
+    if (agentLinks && !missingCloudSource) {
         const identity = { board: a.board ? boardTeamKey(a.server, a.board) : '', session: a.session_id || '' };
-        title.replaceChildren(m.agentLink(who, identity), ...(a.kind === 'agent' ? [] : [` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`]));
-        const live = m.liveAgentOf(a.asker, identity);
-        if (!live || normServer(live.server) !== normServer(a.server)) return;
-        const go = m.agentLink(a.asker, { ...identity, label: `Open ${who}`, cls: 'inbox-ask-open-agent' });
-        const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'open_in_new';
-        go.replaceChildren(icon);
-        title.append(' ', go); // shared chat navigation keeps the unsent-reply confirmation
-    });
+        title.replaceChildren(agentLinks.agentLink(who, identity), ...(a.kind === 'agent' ? [] : [` · ${markHidden(a.board_label || a.board || 'Team', { strict: true })}`]));
+        const live = agentLinks.liveAgentOf(a.asker, identity);
+        if (live && normServer(live.server) === normServer(a.server)) {
+            const go = agentLinks.agentLink(a.asker, { ...identity, label: `Open ${who}`, cls: 'inbox-ask-open-agent' });
+            const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'open_in_new';
+            go.replaceChildren(icon);
+            title.append(' ', go); // shared chat navigation keeps the unsent-reply confirmation
+        }
+    }
     const subjects = askSubjects(a), links = document.createElement('p'); links.className = 'inbox-ask-subjects'; links.hidden = !subjects.length; if (subjects.length) loadStyles('pictures.css'); // its links are drawn by the lazy picture rules // the goal and task it is about, each a link that opens it in the Inbox
     if (subjects.length) links.append(document.createTextNode('About ')); // the asker names them: the line says so (Security's INFO on #12164)
     subjects.forEach((x, i) => {
@@ -73,7 +83,6 @@ export function openAskDialog(a, onDone, runners = {}) {
     const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'btn btn-quiet'; dismiss.textContent = 'Dismiss, no reply'; dismiss.title = 'Take it out of Needs you; nobody is told'; dismiss.hidden = missingCloudSource || (a.kind !== 'ask' && a.kind !== 'agent') || (fromAnotherComputer(a) && decisionNeedsPerson(a.server)); // the close route is served for this computer's question and, through the Hub, for the computer's owner (coral-hub batch-125): a phone's rows have no Dismiss of their own (#14419), so the dialog must
     row.append(...(dismiss.hidden ? [close] : [dismiss, close])); // Dismiss alone at the far left (the quiet, different exit: nobody is told), Close at the right (#16371, #15816's footer; Send reply is on the row right under the reply box, #13148, the Operator: 'The send reply is too far away from text input')
     let tray = null;
-    const opener = document.activeElement; // the button that opened this: the keyboard goes back to it, as the settings menu and the member editor do (walk 17 L20)
     const finish = () => { if (tray) tray.destroy(); dlg.close(); dlg.remove(); if (onDone) onDone(); if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true }); };
     let sending = false; const choices = [];
     const picturesBlocked = () => !!tray && (tray.busy() || tray.failed());
@@ -170,17 +179,15 @@ export function openAskDialog(a, onDone, runners = {}) {
     const contextNote = document.createElement('p'); contextNote.className = 'inbox-ask-sub'; contextNote.textContent = questionContextNote(a) || (a.superseded ? `Older: ${who} has asked something newer. Answer this one too, or Dismiss it if the newer question covers it.` : ''); /* an older question is never closed on its own (#15078) */ contextNote.hidden = !contextNote.textContent;
     dlg.append(title, sub, ...(contextNote.hidden ? [] : [contextNote]), ...(links.hidden ? [] : [links]), reading, compose, foot);
     drawOffers();
-    if (!missingCloudSource && !fromAnotherComputer(a)) { // the picture is stored on the question's own team, as a goal's pictures are
-        Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js'), a.kind === 'agent' ? importOnce('./agent_ask_answer.js') : null]).then(([m, api, agentApi]) => {
-            if (!dlg.isConnected) return;
-            // a single agent's picture is kept as that agent's own file (POST /api/agent-asks/<id>/images): it has no team to keep it with (#18668)
-            tray = a.kind === 'agent' ? m.createImageTray({ upload: blob => agentApi.uploadAgentAskImage(a, blob), hintText: `Pictures are shared with ${who} as they are; nothing is hidden.` })
-                : m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
-            tray.attach(dlg, box); tray.listen(sync);
-            const picker = tray.picker(), add = picker.querySelector('button');
-            add.textContent = 'Add image'; add.title = 'Add image';
-            pickSlot.append(picker); addSlot.append(tray.hint()); pics.prepend(tray.node);
-        }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
+    if (imageModules) { // the picture is stored on the question's own team, as a goal's pictures are
+        const [m, api, agentApi] = imageModules;
+        // a single agent's picture is kept as that agent's own file (POST /api/agent-asks/<id>/images): it has no team to keep it with (#18668)
+        tray = a.kind === 'agent' ? m.createImageTray({ upload: blob => agentApi.uploadAgentAskImage(a, blob), hintText: `Pictures are shared with ${who} as they are; nothing is hidden.` })
+            : m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
+        tray.attach(dlg, box); tray.listen(sync);
+        const picker = tray.picker(), add = picker.querySelector('button');
+        add.textContent = 'Add image'; add.title = 'Add image';
+        pickSlot.append(picker); addSlot.append(tray.hint()); pics.prepend(tray.node);
     }
     close.addEventListener('click', finish);
     dismiss.addEventListener('click', async () => {

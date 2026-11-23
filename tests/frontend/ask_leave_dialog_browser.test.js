@@ -19,6 +19,8 @@ const { coralReady } = require('./helpers/wait');
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // Record the first visible rect, before any lazy picker or agent link can move it.
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const show=HTMLDialogElement.prototype.showModal; HTMLDialogElement.prototype.showModal=function(...args){const result=show.apply(this,args);if(this.classList.contains('inbox-ask-dialog')){const rect=()=>{const r=this.getBoundingClientRect();return [r.x,r.y,r.width,r.height];};window.__askInitialRect=rect();window.__askRectChanges=[];new ResizeObserver(()=>{if(!this.open)return;const now=rect();if(now.some((v,i)=>Math.abs(v-window.__askInitialRect[i])>1))window.__askRectChanges.push(now);}).observe(this);}return result;}; })()` });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -40,6 +42,8 @@ const { coralReady } = require('./helpers/wait');
             await openDialog(at);
             await ev(`(() => { const t = document.querySelector('dialog.inbox-ask-dialog[open] textarea'); t.focus(); t.value = 'half a reply'; t.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await clickAt('dialog.inbox-ask-dialog[open] .agent-link'); await settle(500);
+            const geometry = await ev(`({initial:window.__askInitialRect,changes:window.__askRectChanges})`);
+            assert.deepEqual(geometry.changes, [], at + 'the visible question dialog does not move after open: ' + JSON.stringify(geometry));
             const c = await confirm();
             assert.ok(c.shown && c.label === 'Open chat', at + 'with words typed, "Leave this dialog?" is asked: ' + JSON.stringify(c));
             if (process.env.CORAL_SCREENSHOT_DIR) { require('node:fs').mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); require('node:fs').writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/leave-confirm-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } // CORAL_SCREENSHOT_DIR: a picture of the confirm over the question dialog (for review)
