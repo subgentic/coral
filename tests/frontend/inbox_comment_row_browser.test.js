@@ -84,6 +84,12 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`!!(${row('Awake file.txt')})`, 'Waiting on an agent shows the sent-back file');
                 check(await ev(`!(${row('Commented file.txt')})`), 'a plain comment is not a row of Waiting on an agent');
                 check(!/Comment sent/.test(await ev(`document.getElementById('group-table-view').innerText`)), 'no Comment sent chip');
+                // 2b. a plain comment with no For review row (a goal thread, a file not in For review) is not lost: it stays under Waiting on an agent
+                const goalItem = { kind: 'comment_sent', id: 'cmt-goal-' + width, board: team, agent: { name: 'Writer A', session_id: 'writer-a' }, since: new Date(Date.now() - 3 * 60000).toISOString(), operator_words: 'Narrow the goal.', goal: { id: 7, title: 'Orphan goal' }, thread_id: 2 };
+                const strayItem = { ...goalItem, id: 'cmt-stray-' + width, goal: null, artifact: { hex: hexOf(99), name: 'Stray file.txt' }, thread_id: 3 };
+                await setWaiting([item, goalItem, strayItem]);
+                await waitFor(`!!(${row('Orphan goal')}) && !!(${row('Stray file.txt')})`, 'a comment with no For review row stays in Waiting on an agent');
+                check(await ev(`!(${row('Commented file.txt')})`), 'a comment shown on its For review row is still not in Waiting on an agent');
                 await ev(`document.querySelector('[data-needs-tab="you"]').click(); true`);
                 // 3. the agent replies: the server drops the item and the row is plain again
                 await setWaiting([]);
