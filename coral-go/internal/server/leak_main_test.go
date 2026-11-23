@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/subgentic/coral/internal/testleak"
 	"github.com/subgentic/coral/internal/testmem"
@@ -47,7 +48,11 @@ func TestMain(m *testing.M) {
 	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
 	bundleSource = memoBundleSource(bundleSource)
 	stopMem := testmem.Start("internal/server", testmem.LimitMB(testmem.DefaultLimitMB)) // a run over 2 GB is stopped, not left to push the machine out of memory (#12062)
+	// Each server a test builds sets a timer that returns the heap to the OS (#8749): it must neither run for seconds nor still be running when the goroutine check looks, so here it is a no-op after
+	// a millisecond and the binary waits for every timer it set (#20782). The tests of the release set their own and restore these.
+	releaseDelay, freeOSMemory = time.Millisecond, func() {}
 	code := m.Run()
+	releasing.Wait()
 	if peak := stopMem(); peak > 0 {
 		fmt.Fprintf(os.Stderr, "internal/server: peak held memory %d MiB\n", peak)
 	}
