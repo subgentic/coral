@@ -80,20 +80,22 @@ func taskActor(r *http.Request, fromBody string) string {
 func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	var body struct {
-		Title          string             `json:"title"`
-		Body           string             `json:"body"`
-		Priority       string             `json:"priority"`
-		CreatedBy      string             `json:"created_by"`
-		SubscriberID   string             `json:"subscriber_id"`
-		AssignedTo     string             `json:"assigned_to"`
-		BlockedBy      json.RawMessage    `json:"blocked_by,omitempty"`
-		Draft          bool               `json:"draft,omitempty"`
-		Workflow       board.TaskWorkflow `json:"workflow,omitempty"`
-		RemindAt       string             `json:"remind_at,omitempty"`        // RFC 3339: a one-time reminder (#4175 step 3)
-		GoalID         *int64             `json:"goal_id,omitempty"`          // a goal of this board the task works toward (#7087)
-		GoalProposalID *int64             `json:"goal_proposal_id,omitempty"` // the pending goal proposal this task is for: it waits for that goal (#11389)
-		Force          bool               `json:"force,omitempty"`            // assign past the team's limit of waiting tasks (#14862); who forced it is recorded on the board
-		Self           bool               `json:"self,omitempty"`             // a task the caller makes for ITSELF (#11247): any member may, with a goal, one per title, at most maxOpenSelfTasks open
+		Title          string              `json:"title"`
+		Body           string              `json:"body"`
+		Priority       string              `json:"priority"`
+		CreatedBy      string              `json:"created_by"`
+		SubscriberID   string              `json:"subscriber_id"`
+		AssignedTo     string              `json:"assigned_to"`
+		BlockedBy      json.RawMessage     `json:"blocked_by,omitempty"`
+		Draft          bool                `json:"draft,omitempty"`
+		Workflow       board.TaskWorkflow  `json:"workflow,omitempty"`
+		RemindAt       string              `json:"remind_at,omitempty"`        // RFC 3339: a one-time reminder (#4175 step 3)
+		GoalID         *int64              `json:"goal_id,omitempty"`          // a goal of this board the task works toward (#7087)
+		GoalProposalID *int64              `json:"goal_proposal_id,omitempty"` // the pending goal proposal this task is for: it waits for that goal (#11389)
+		Force          bool                `json:"force,omitempty"`            // assign past the team's limit of waiting tasks (#14862); who forced it is recorded on the board
+		Self           bool                `json:"self,omitempty"`             // a task the caller makes for ITSELF (#11247): any member may, with a goal, one per title, at most maxOpenSelfTasks open
+		Images         map[string][]string `json:"images,omitempty"`           // the Operator's pictures by field: description, instructions (#20731)
+		ImagesDraft    string              `json:"images_draft,omitempty"`     // the draft id the pictures were uploaded with
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -185,6 +187,10 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if body.Priority == "" {
 		body.Priority = "medium"
 	}
+	pictures, ok := h.fieldPictures(w, r, project, "task", body.ImagesDraft, body.Images, nil, "description", "instructions")
+	if !ok {
+		return
+	}
 
 	// How the creator's name is backed: the server's to say, whatever the request sent (#4175).
 	clearReviewFields(&body.Workflow)
@@ -217,6 +223,9 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if hold, ok := h.needsApproval(r, project, board.ProposalTask); !ok {
 		errInternalServer(w, "could not read the board's settings")
 		return
+	} else if ((hold && !body.Self) || body.GoalProposalID != nil) && len(pictures) > 0 {
+		writeError(w, http.StatusConflict, "pictures_not_with_proposal", "this task waits for approval as a proposal, which cannot carry pictures yet: send it without them")
+		return
 	} else if (hold && !body.Self) || body.GoalProposalID != nil { // this team's tasks need the Operator's approval (#11389), and a task for a goal still waiting waits with it; an agent's own self task is exempt
 		if body.GoalProposalID != nil {
 			if gp, err := h.bs.GetProposal(r.Context(), project, *body.GoalProposalID); err != nil || gp.Kind != board.ProposalGoal || gp.State != board.ProposalPending {
@@ -239,6 +248,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error()) // the task was made, its reminder was not
 		return
 	}
+	h.keepTaskPictures(r, project, task, pictures)
 	noteActivity(r, board.ActTaskCreate, "task", strconv.FormatInt(task.ID, 10), project, task.Title, "") // the new task's number, so the row opens it (#13621)
 	h.noteForcedAssignment(r, project, task.ID, body.AssignedTo, verifiedName(r, createdBy), forcedPast)
 	writeJSON(w, http.StatusCreated, withWarning(task, h.assigneeRestWarning(r.Context(), project, body.AssignedTo))) // a task for a member that will not read it now says so (#17657)
@@ -428,4 +438,18 @@ func writeExistingTask(w http.ResponseWriter, task *board.Task) {
 	}
 	out["existing"] = true
 	writeJSON(w, http.StatusOK, out)
+}
+
+// keepTaskPictures records the pictures a write named for a task's fields and shows them on the task it answers; a failure is logged and the task keeps what it had.
+func (h *BoardHandler) keepTaskPictures(r *http.Request, project string, task *board.Task, pictures map[string][]board.GoalImage) {
+	if len(pictures) == 0 || task == nil {
+		return
+	}
+	if err := h.bs.SetFieldImagesOf(r.Context(), project, board.FieldImagesTask, board.TaskFieldImagesOwner(task.ID), pictures); err != nil {
+		slog.Warn("[tasks] the pictures of a task were not kept", "board", project, "task", task.ID, "error", err)
+		return
+	}
+	if m, err := h.bs.FieldImages(r.Context(), project, board.FieldImagesTask, board.TaskFieldImagesOwner(task.ID)); err == nil {
+		task.Images = m
+	}
 }

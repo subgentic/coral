@@ -21,7 +21,7 @@ var deliveryReasonsOn200 = []string{"already_sent", "ambiguous_uploader", "aslee
 var deliveryReasonsThatUndo = []string{"failed", "redaction_unavailable"}
 
 // changeAnswerErrorCodes are the codes of the one-call answer's refusals, 4xx and 5xx (changeWordsError codes, the review route's own, and the 409 of a delivery in progress).
-var changeAnswerErrorCodes = []string{"agent_not_told", "already_in_progress", "comments_forbidden", "images_not_in_this_slice", "owner_identity_unavailable", "owner_only", "redaction_unavailable", "sign_in_link", "text_only_for_changes", "text_too_long", "too_many_comments", "words_unavailable"}
+var changeAnswerErrorCodes = []string{"agent_not_told", "already_in_progress", "comments_forbidden", "owner_identity_unavailable", "owner_only", "redaction_unavailable", "sign_in_link", "text_only_for_changes", "text_too_long", "too_many_comments", "words_unavailable"}
 
 func sourceWords(t *testing.T, file string, res ...*regexp.Regexp) []string {
 	t.Helper()
@@ -65,7 +65,7 @@ func TestTheDeliveryReasonsAreTheClosedListCoralHubIsTold(t *testing.T) {
 
 func TestTheOneCallAnswersRefusalCodesAreTheClosedList(t *testing.T) {
 	code := regexp.MustCompile(`&changeWordsError\{http\.Status[A-Za-z]+, "([a-z_]+)"`)
-	review := regexp.MustCompile(`commentRefuse\(w, http\.Status[A-Za-z]+, "(images_not_in_this_slice|text_only_for_changes)"`)
+	review := regexp.MustCompile(`commentRefuse\(w, http\.Status[A-Za-z]+, "(text_only_for_changes)"`)
 	got := sourceWords(t, "team_artifact_changes.go", code)
 	got = append(got, sourceWords(t, "team_artifact_review.go", review)...)
 	set := map[string]bool{}

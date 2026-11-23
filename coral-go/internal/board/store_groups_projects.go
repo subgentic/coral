@@ -232,8 +232,9 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM task_ready_notifications WHERE task_id IN " + mine, 1},
 		{"DELETE FROM board_tasks WHERE board_id = ?", 1},
 		{"DELETE FROM board_goals WHERE board_id = ?", 1},
-		{"DELETE FROM board_proposals WHERE board_id = ?", 1},   // what agents asked to add goes with the team (#11389)
-		{"DELETE FROM board_goal_images WHERE board_id = ?", 1}, // the pictures of a goal go with it (#11650)
+		{"DELETE FROM board_proposals WHERE board_id = ?", 1},    // what agents asked to add goes with the team (#11389)
+		{"DELETE FROM board_goal_images WHERE board_id = ?", 1},  // the pictures of a goal go with it (#11650)
+		{"DELETE FROM board_field_images WHERE board_id = ?", 1}, // the pictures of a task, a task reply and a file decision go with the team (#20731)
 		{"DELETE FROM board_goal_task_moves WHERE board_id = ?", 1},
 		{"DELETE FROM board_goal_events WHERE board_id = ?", 1}, // after the goals: deleting them writes goal_deleted events of their own (#7355)
 		{"DELETE FROM board_goal_meta WHERE board_id = ?", 1},

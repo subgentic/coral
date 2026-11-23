@@ -88,7 +88,7 @@ func (h *BoardHandler) UploadPersonFieldImage(w http.ResponseWriter, r *http.Req
 
 func (h *BoardHandler) storeFieldImage(w http.ResponseWriter, r *http.Request, project, scope, draft, session string) {
 	key := fieldImageScope(project, scope, draft)
-	if !commentImageLimit.allow(key, commentImageLimitPerMinute, time.Now()) {
+	if !commentImageLimit.allow(fieldImageRateKey(project, scope), commentImageLimitPerMinute, time.Now()) { // the team and the field, not the draft: a new draft id is no new allowance
 		httputil.WriteActionLimit(w, 60, "rate_limited", "too many pictures in a minute; try again shortly")
 		return
 	}
@@ -101,7 +101,7 @@ func (h *BoardHandler) storeFieldImage(w http.ResponseWriter, r *http.Request, p
 	if !ok {
 		return
 	}
-	rememberCommentImage(key, pic.hexID, time.Now())
+	rememberFieldImage(key, pic.hexID, time.Now()) // named by a write for the next 24 h (fieldImageTTL)
 	reply["source"], reply["scope"], reply["draft"] = sourceFieldImagePrefix+scope, scope, draft
 	writeJSON(w, http.StatusCreated, reply)
 }

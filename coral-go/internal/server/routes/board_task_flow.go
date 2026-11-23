@@ -90,6 +90,8 @@ func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) 
 		Artifacts         []board.TaskArtifact `json:"artifacts,omitempty"`
 		ExpectedRevision  *int                 `json:"expected_revision,omitempty"`
 		CandidateRevision string               `json:"candidate_revision,omitempty"`
+		Images            map[string][]string  `json:"images,omitempty"` // the Operator's pictures by field: completion_message (#20731)
+		ImagesDraft       string               `json:"images_draft,omitempty"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -102,6 +104,10 @@ func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) 
 	body.SubscriberID = attrWho
 	if body.SubscriberID == "" {
 		errBadRequest(w, "subscriber_id required")
+		return
+	}
+	pictures, ok := h.fieldPictures(w, r, project, "task", body.ImagesDraft, body.Images, h.recordedFieldImages(r, project, board.FieldImagesTask, board.TaskFieldImagesOwner(taskID)), "completion_message")
+	if !ok {
 		return
 	}
 	if body.Message != nil && h.refuseShortArtifactRefs(w, r, body.Message) { // #9841
@@ -118,6 +124,7 @@ func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.persistTaskArtifactAfterReply(task)
+	h.keepTaskPictures(r, project, task, pictures)
 	if len(body.Artifacts) > 0 {
 		noteArtifactsChanged() // the task's artifact count is kept for a few seconds: its result files just changed it (#12855)
 	}

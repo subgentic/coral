@@ -24,6 +24,9 @@ func (s *Store) GetTask(ctx context.Context, project string, taskID int64) (*Tas
 	if t.FollowUps, err = s.FollowUps(ctx, project, taskID); err != nil {
 		return nil, err
 	}
+	if t.Images, err = s.FieldImages(ctx, project, FieldImagesTask, TaskFieldImagesOwner(taskID)); err != nil {
+		return nil, err
+	}
 	return t, nil
 }
 

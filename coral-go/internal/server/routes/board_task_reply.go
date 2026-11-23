@@ -31,18 +31,36 @@ func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Content string `json:"content"`
-		ReplyTo int64  `json:"reply_to,omitempty"` // the message of the task the words answer (the newest one from someone else), so the board threads them under it (#12502)
+		Content     string              `json:"content"`
+		Images      map[string][]string `json:"images,omitempty"` // the Operator's pictures by field: content (#20731); they ride the message as coral://artifacts lines
+		ImagesDraft string              `json:"images_draft,omitempty"`
+		ReplyTo     int64               `json:"reply_to,omitempty"` // the message of the task the words answer (the newest one from someone else), so the board threads them under it (#12502)
 	}
 	derr := decodeJSON(r, &in)
 	if derr == nil && in.ReplyTo != 0 && (in.ReplyTo < 0 || h.bs.CheckReplyTo(r.Context(), project, in.ReplyTo) != nil) {
 		errBadRequest(w, "reply_to is not a message of this board") // before anything is posted
 		return
 	}
+	var pictures map[string][]board.GoalImage
+	if derr == nil {
+		var pok bool
+		if pictures, pok = h.fieldPictures(w, r, project, "task", in.ImagesDraft, in.Images, nil, "content"); !pok {
+			return
+		}
+	}
+	content := in.Content
+	if len(pictures["content"]) > 0 {
+		content += pictureLines(pictures["content"])
+	}
 	reply := &taskReply{taskID: taskID, creator: task.CreatedBy}
-	msg, ok := h.postMessageCore(w, r, project, derr, postMessageBody{Content: in.Content, ReplyTo: in.ReplyTo}, reply)
+	msg, ok := h.postMessageCore(w, r, project, derr, postMessageBody{Content: content, ReplyTo: in.ReplyTo}, reply)
 	if !ok {
 		return
+	}
+	if len(pictures) > 0 {
+		if err := h.bs.SetFieldImagesOf(r.Context(), project, board.FieldImagesMessage, strconv.FormatInt(msg.ID, 10), pictures); err != nil {
+			slog.Warn("[tasks] the pictures of a task reply were not kept", "board", project, "message", msg.ID, "error", err)
+		}
 	}
 	if in.ReplyTo > 0 && !board.NoAnswerFrom(r.Context()) {
 		if err := h.bs.RecordReply(r.Context(), project, msg.ID, in.ReplyTo); err != nil {

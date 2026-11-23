@@ -239,6 +239,8 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 		BaseRevision int                    `json:"base_revision"`
 		Reason       string                 `json:"reason"`
 		Changes      map[string]interface{} `json:"changes"`
+		Images       map[string][]string    `json:"images,omitempty"` // the Operator's pictures by field: description, instructions, reason (#20731)
+		ImagesDraft  string                 `json:"images_draft,omitempty"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -266,6 +268,10 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 	if !h.requireTaskPlanner(w, r, project, body.SubscriberID) {
 		return
 	}
+	pictures, ok := h.fieldPictures(w, r, project, "task", body.ImagesDraft, body.Images, h.recordedFieldImages(r, project, board.FieldImagesTask, board.TaskFieldImagesOwner(taskID)), "description", "instructions", "reason")
+	if !ok {
+		return
+	}
 	beforeTextTask, _ := h.bs.GetTask(r.Context(), project, taskID)
 	task, err := h.bs.AmendTask(r.Context(), project, taskID, body.SubscriberID, body.BaseRevision, body.Reason, body.Changes)
 	if err != nil {
@@ -279,6 +285,7 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 	if err := h.bs.RecordAmendIdentity(r.Context(), project, task.ID, task.Revision, h.claimIdentity(r, project, body.SubscriberID)); err != nil {
 		slog.Warn("record amendment identity failed", "project", project, "task", task.ID, "error", err)
 	}
+	h.keepTaskPictures(r, project, task, pictures)
 	h.goBG(func() {
 		if beforeTextTask != nil && task.Version > beforeTextTask.Version {
 			h.announceTaskTextEdit(context.Background(), project, body.SubscriberID, beforeTextTask, task)
