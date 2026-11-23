@@ -13,6 +13,12 @@ const { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } = await importO
 const { limitSeconds, limitParts } = await importOnce('./time_limit.js');
 const { stripKeys } = await importOnce('./segmented.js'); // the arrows move the choice in the Type and When strips
 
+const { mountFieldPictures, savedWords } = await importOnce('./field_pictures.js');
+let promptPictures = null;
+function mountPromptPictures(initial = []) {
+    if (promptPictures) { promptPictures.destroy(); promptPictures.node.replaceWith(...promptPictures.node.querySelectorAll(':scope > label, :scope > textarea')); }
+    promptPictures = mountFieldPictures(document.getElementById('job-modal-prompt'), { scope: 'instruction', field: 'prompt', initial, hintWhenAdded: true });
+}
 let view = null;
 let editingJobId = null;  // non-null when editing an existing job
 let openedJob = null;     // what the editor showed for the job it opened (#4423): Save sends only what the person changed since
@@ -367,6 +373,7 @@ async function submitJob() {
     // An edit sends only what the person changed since the editor opened, so a field another client changed
     // meanwhile keeps that change (#4423); a new job sends everything.
     const body = isEdit && openedJob ? changedFields(openedJob, values) : values;
+    if (values.job_type === 'prompt') Object.assign(body, promptPictures.payload());
     if (isEdit && !Object.keys(body).length) {
         showToast(NOTHING_TO_SAVE);
         hideJobModal();
@@ -395,6 +402,7 @@ async function submitJob() {
     }
     if (data.error) throw new Error(data.error);
     // no toast: the job's page says it, in words, under the title (scheduler.js, "Created. Next run today 06:00 your time."), where a toast would cover the title on a phone or the page's own actions (#9298)
+    if (data.pictures_not_saved) showToast(savedWords(data, ''), true);
     hideJobModal();
     document.dispatchEvent(new CustomEvent('job-saved', { detail: { id: data.id, saved: isEdit ? 'updated' : 'created' } })); // the Jobs page reads the list again and opens it
 }
@@ -410,7 +418,7 @@ function jobView() {
     view = mountSettingsView(host, {
         mode: 'form',
         fields: jobFields(host),
-        form: { submit: 'Create job', submitId: 'job-modal-submit', cancel: 'Cancel', barHost: footer, onSubmit: submitJob, onCancel: hideJobModal },
+        form: { submit: 'Create job', submitId: 'job-modal-submit', cancel: 'Cancel', barHost: footer, onSubmit: submitJob, onCancel: () => { promptPictures?.clear(); hideJobModal(); } },
     });
     const repoInput = document.getElementById('job-modal-repo');
     repoInput?.addEventListener('input', checkFolderSoon); repoInput?.addEventListener('change', () => { clearTimeout(folderTimer); checkFolder(); }); // typed or picked with Browse (#17150)
@@ -452,6 +460,7 @@ export function showJobModal() {
     if (state.settings?.default_working_dir) { v.set('repo_path', state.settings.default_working_dir); checkFolder(); }
     v.fold(false);
     openModal('New job', 'Create job');
+    mountPromptPictures();
     loadWorkflowOptions(); // the New job dialog opens on Run a prompt, the first choice; the workflow list is read for the other one (#10515)
     document.getElementById('cron-preview').textContent = '';
     checkSchedule();
@@ -485,6 +494,7 @@ export async function editScheduledJob(jobId) {
         await loadWorkflowOptions();
         v.set('workflow_id', job.workflow_id ? String(job.workflow_id) : '');
     }
+    mountPromptPictures(job.images?.prompt || []);
     openedJob = jobFormValues();
     checkSchedule();
 }

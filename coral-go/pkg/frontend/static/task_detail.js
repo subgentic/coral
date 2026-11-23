@@ -1,12 +1,14 @@
 /* The task dialog (#5082): now an agent's own task and a subagent's detail only. A board's task is the team page's task page (#7644): its Edit, Complete, Cancel, Publish, Nudge and Remind are team_task_actions.js. */
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('pictures.css');
 import { state } from './state.js';
 import { escapeHtml, showToast } from './utils.js';
 import { clearOpenSubagent } from './subagents.js';
 const { _taskDetailHtml } = await importOnce('./task_detail_html.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 import { _agentTaskStatus } from './task_format.js';
 import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
-import { pathId, serverFetch, currentServer, isCloud } from './server_base.js';
+import { pathId, serverFetch, currentServer, isCloud, sessionServer, serverUrl } from './server_base.js';
 import { _taskRequiredOutputs } from './task_reminders.js';
 import { loadAgentTasks } from './task_list.js';
 
@@ -34,6 +36,15 @@ export function showAgentTaskDetailModal(taskId) {
 
     titleEl.textContent = `Task #${task.id}`;
     content.innerHTML = _taskDetailHtml(task, null);
+    const server = sessionServer(state.currentSession);
+    if (task.images?.body?.length) {
+        const row = document.createElement('div'); row.className = 'ac-thumbs';
+        for (const picture of task.images.body) {
+            if (!/^[a-f0-9]{64}$/.test(picture.hex || '')) continue;
+            const a = document.createElement('a'), img = document.createElement('img'); a.href = img.src = serverUrl(`/api/artifacts/${picture.hex}?v=2`, server); img.alt = picture.name || 'Task picture'; img.width = 100; a.append(img); row.append(a);
+        }
+        content.append(row);
+    }
     modal.setAttribute('aria-labelledby', 'task-detail-modal-title task-detail-heading');
 
     const footer = document.getElementById('task-detail-modal-footer');
@@ -45,6 +56,15 @@ export function showAgentTaskDetailModal(taskId) {
             ${open ? `<button class="btn btn-primary" data-on-click="task-complete" data-task-id="${Number(task.id)}" data-personal="1">Complete</button>` : ''}`;
     }
 
+    if (!isCloud() && state.currentSession) {
+        const session = { ...state.currentSession };
+        const edit = document.createElement('button'); edit.className = 'btn'; edit.type = 'button'; edit.textContent = 'Edit';
+        edit.addEventListener('click', async () => {
+            const { openPersonalTaskEditor } = await importOnce('./personal_task_editor.js');
+            openPersonalTaskEditor({ task: t, session, server, onSaved: async () => { await loadAgentTasks(session.name, session.session_id); if (state.currentSession?.session_id === session.session_id && sessionServer(state.currentSession) === server) showAgentTaskDetailModal(taskId); } });
+        });
+        footer?.prepend(edit);
+    }
     _openTaskDetailModal(modal);
 }
 

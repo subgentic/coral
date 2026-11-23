@@ -2,7 +2,7 @@
  * Markdown-lite toolbar), done when, the pictures, the team and the driver. It creates the same goal the old dialog did: POST /api/board/<team>/goals with createBody's body. Local rules only (no model, no
  * agent call). Lazy: goals_view.js openCreate imports it when New goal is pressed. Everything drawn is built with the DOM and textContent. */
 import { loadStyles } from './lazy_styles.js';
-import { boardFetch, keyLabel, splitKey } from './server_base.js';
+import { boardFetch, keyLabel, splitKey, serverUrl } from './server_base.js';
 const { goalWrite } = await importOnce('./goal_write.js'); // a goal create is previewed first when the Hub asks for it (#13503)
 import { OPERATOR_ID, showToast } from './utils.js';
 import { toDrivers, createBody, errorOf } from './goals_adapter.js';
@@ -10,6 +10,7 @@ import { importOnce } from './import_once.js';
 import * as W from './goal_words.js';
 import { PHONE_QUERY } from './phone_layout.js';
 const { assess, EXAMPLES, TASKS_MAX } = await importOnce('./goal_guide.js'); // lazy: its failure is retried
+const { createFieldPictures, savedWords } = await importOnce('./field_pictures.js');
 const { renderGoalText } = await importOnce('./goal_text.js'); // the Preview and the goal's page draw the words the same way
 await loadStyles('goal_editor.css'); // not at start (page_weight): the editor's own sheet loads with this module, before anything draws
 const GOAL_DESCRIPTION_MAX = 2000; // the server's cap on a goal's outcome (MaxGoalOutcome)
@@ -180,7 +181,7 @@ export function openGoalEditor(opts = {}) {
         const dd2 = el('dd', d.value.trim() ? null : 'goal-preview-blank', d.value.trim() || 'Not set yet.'); dl.append(el('dt', null, 'Done when'), dd2);
         const kids = [state, h, meta, dl];
         const shots = tray ? tray.items().filter(x => x.state === 'ready') : [];
-        if (shots.length) { const row = el('ul', 'goal-preview-pics'); for (const x of shots) { const li = el('li'), img = el('img'); const u = URL.createObjectURL(x.blob); previewUrls.push(u); img.src = u; img.alt = x.name || 'Picture'; li.append(img); row.append(li); } kids.push(row); }
+        if (shots.length) { const row = el('ul', 'goal-preview-pics'); for (const x of shots) { const li = el('li'), img = el('img'); const u = x.blob ? URL.createObjectURL(x.blob) : serverUrl(`/api/artifacts/${x.hex}?v=2`, splitKey(project).server); if (x.blob) previewUrls.push(u); img.src = u; img.alt = x.name || 'Picture'; li.append(img); row.append(li); } kids.push(row); }
         kids.push(el('p', 'goal-preview-tasks', 'No tasks yet. The goal\u2019s driver plans them once it exists.'));
         pane.replaceChildren(...kids);
         return h;
@@ -212,8 +213,12 @@ export function openGoalEditor(opts = {}) {
         return { hex: j.hex, name: String(j.name || ''), contentType: String(j.content_type || blob.type), size: Number(j.size) || blob.size };
     };
     const sync = () => { go.disabled = !!tray && (tray.busy() || tray.failed()); picLab.textContent = tray && tray.items().length ? `Pictures \u00b7 ${tray.items().length}` : 'Pictures'; }; // Create waits for a picture going up, and for a failed one to be removed
-    if (edit) { picLab.hidden = pics.hidden = true; bar.querySelector('[data-tool="image"]')?.remove(); } // a goal's pictures are set when it is made
-    else importOnce('./artifact_comment_images.js').then(m => {
+    if (edit) {
+        tray = createFieldPictures({ project, field: 'description', initial: edit.images || [], uploadPicture: uploadImage, includeDraft: false, hintWhenAdded: true });
+        tray.attach(pics, desc); tray.listen(sync); pics.append(tray.node);
+        bar.querySelector('[data-tool="image"]').addEventListener('click', () => tray.node.querySelector('input[type=file]').click());
+        sync();
+    } else importOnce('./artifact_comment_images.js').then(m => {
         if (!dlg.isConnected) return;
         tray = m.createImageTray({ upload: uploadImage }); tray.attach(form, desc); tray.listen(sync);
         const picker = tray.picker(), add = picker.querySelector('button'); add.textContent = 'Add image'; add.setAttribute('aria-label', 'Add a picture to this goal');
@@ -227,9 +232,10 @@ export function openGoalEditor(opts = {}) {
         if (!t.value.trim()) { err.textContent = 'A goal needs a title.'; t.setAttribute('aria-invalid', 'true'); t.focus(); return; }
         t.removeAttribute('aria-invalid');
         if (!project) { err.textContent = 'Pick a team for this goal first. If you have none, start a team.'; (teams ? pick : t).focus(); return; } // never a silent no-op
+        if (tray && (tray.busy() || tray.failed())) { err.textContent = 'Retry or remove the picture that did not upload before saving.'; return; }
         go.disabled = true;
         if (edit) { // Edit goal: only the words that changed are sent
-            const body = { subscriber_id: OPERATOR_ID };
+            const body = { subscriber_id: OPERATOR_ID, ...tray.payload() };
             if (t.value.trim() !== edit.title) body.title = t.value.trim();
             if (desc.value.trim() !== (edit.outcome || '')) body.outcome = desc.value.trim();
             if (d.value.trim() !== (edit.doneWhen || '')) body.done_when = d.value.trim();
@@ -237,8 +243,9 @@ export function openGoalEditor(opts = {}) {
             try {
                 const r = await goalWrite(project, 'goal_update', edit.id, `/goals/${edit.id}`, 'PATCH', body);
                 if (!r.ok) throw await failure(r);
+                const kept = await r.json();
                 dlg.close();
-                showToast('Goal saved. The team reads the change on its board.');
+                showToast(savedWords(kept, 'Goal saved. The team reads the change on its board.'), !!kept.pictures_not_saved);
                 if (opts.onSaved) await opts.onSaved(project);
             } catch (ex) { err.textContent = `The goal was not saved: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; }
             return;
