@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"io/fs"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -98,3 +99,62 @@ func TestPrebuiltBundleIsNotFollowedByFreeOSMemory(t *testing.T) {
 }
 
 var errBundle = errors.New("the build failed")
+
+// #20782: the post-build release is a timer; a goroutine check (testleak, a closing server) must never find its FreeOSMemory still running. A timer that has not fired is cancelled; one that has fired is waited for.
+func TestStoppingTheReleaseTimersCancelsOrWaits(t *testing.T) {
+	staticSub, err := fs.Sub(frontend.Static, "static")
+	if err != nil {
+		t.Fatal(err)
+	}
+	realFree, realDelay := freeOSMemory, releaseDelay
+	t.Cleanup(func() { freeOSMemory, releaseDelay = realFree, realDelay })
+
+	// Not yet fired: cancelled, never runs.
+	var ran atomic.Int32
+	freeOSMemory, releaseDelay = func() { ran.Add(1) }, time.Hour
+	s := &Server{staticVersion: "build"}
+	if s.buildBundleFamily(staticSub) == nil {
+		t.Fatal("the family did not build")
+	}
+	s.stopReleaseTimers()
+	if ran.Load() != 0 {
+		t.Errorf("a cancelled release ran %d times", ran.Load())
+	}
+
+	// Fired and still running: waited for, not left for the goroutine check to find.
+	started, release := make(chan struct{}), make(chan struct{})
+	var finished atomic.Bool
+	freeOSMemory, releaseDelay = func() {
+		close(started)
+		<-release
+		finished.Store(true)
+	}, time.Millisecond
+	s2 := &Server{staticVersion: "build"}
+	if s2.buildBundleFamily(staticSub) == nil {
+		t.Fatal("the family did not build")
+	}
+	select {
+	case <-started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the release never started")
+	}
+	returned := make(chan struct{})
+	go func() {
+		s2.stopReleaseTimers()
+		close(returned)
+	}()
+	select {
+	case <-returned:
+		t.Fatal("stopReleaseTimers returned while FreeOSMemory was still running")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case <-returned:
+	case <-time.After(10 * time.Second):
+		t.Fatal("stopReleaseTimers did not return after FreeOSMemory ended")
+	}
+	if !finished.Load() {
+		t.Error("stopReleaseTimers returned before FreeOSMemory ended")
+	}
+}

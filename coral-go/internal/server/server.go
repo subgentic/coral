@@ -62,6 +62,8 @@ func UseBoardOpener(open func(path, key string) (*board.Store, error)) { openBoa
 
 // Server holds dependencies and exposes the HTTP router.
 type Server struct {
+	releaseMu       sync.Mutex         // guards releaseTimers
+	releaseTimers   []*time.Timer      // the post-build memory release timers buildBundleFamily set (#20782)
 	resourceMgr     *resources.Manager // the resource queue, when it is open (its history file closes with the server, #13671)
 	cloudHandler    *routes.CloudHandler
 	cloudMgr        atomic.Pointer[cloud.Manager] // the connector, once SetCloud runs (#3966)
@@ -263,6 +265,7 @@ const closeWait = 5 * time.Second
 // server has stopped; it is safe to call more than once.
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
+		s.stopReleaseTimers() // the post-build memory release is cancelled, or finished, before anything it could touch closes (#20782)
 		if s.resourceMgr != nil {
 			s.resourceMgr.Close() // writes what the history still holds
 		}
