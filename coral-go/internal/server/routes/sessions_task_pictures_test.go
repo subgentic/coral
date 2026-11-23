@@ -165,3 +165,58 @@ func TestAPersonalTaskCreateThatMatchesAnOpenTaskSaysItsPicturesWereNotAdded(t *
 	code, out = sendJSON(t, "POST", base, map[string]any{"title": "Same title", "session_id": sid, "images_draft": "dd1", "images": map[string]any{"title": []string{hex}}})
 	assert.Equal(t, "picture_field_unknown", out["code"], "a picture that is not allowed is still refused (%d)", code)
 }
+
+// #20845: the personal-task PATCH takes body, as the create does: present replaces (and "" clears), omitted leaves, a title edit alone leaves the body, and a finished task is refused as for any edit.
+func TestAPersonalTaskPatchTakesABodyLikeCreate(t *testing.T) {
+	_, h, terminal, ss := setupSessionsTestServer(t)
+	const name, sid = "claude-body-tasks", "sess-ptask-body"
+	terminal.addSession(name, "/tmp/test")
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: t.TempDir(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}))
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+			next.ServeHTTP(w, asCaller(callerDashCookie)(req))
+		})
+	})
+	r.Get("/api/sessions/live/{name}/tasks", h.ListTasks)
+	r.Post("/api/sessions/live/{name}/tasks", h.CreateTask)
+	r.Patch("/api/sessions/live/{name}/tasks/{taskID}", h.UpdateTask)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	base := srv.URL + "/api/sessions/live/" + name + "/tasks"
+
+	code, out := sendJSON(t, "POST", base, map[string]any{"title": "write docs", "body": "first words", "session_id": sid})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	id := int64(out["id"].(float64))
+	edit := fmt.Sprintf("%s/%d?session_id=%s", base, id, sid)
+	bodyNow := func() string {
+		resp, err := http.Get(base + "?session_id=" + sid)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var rows []map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&rows))
+		for _, x := range rows {
+			if int64(x["id"].(float64)) == id {
+				s, _ := x["body"].(string)
+				return s
+			}
+		}
+		t.Fatalf("task %d not listed", id)
+		return ""
+	}
+	assert.Equal(t, "first words", bodyNow())
+
+	code, out = sendJSON(t, "PATCH", edit, map[string]any{"body": "second words"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, "second words", bodyNow(), "the body is replaced")
+	code, out = sendJSON(t, "PATCH", edit, map[string]any{"title": "write the docs"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, "second words", bodyNow(), "a title edit alone leaves the body")
+	code, out = sendJSON(t, "PATCH", edit, map[string]any{"title": "write the docs now", "body": "third words"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, "third words", bodyNow(), "title and body together")
+	code, out = sendJSON(t, "PATCH", edit, map[string]any{"body": ""})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, "", bodyNow(), "an empty body clears it, as create accepts one")
+}
