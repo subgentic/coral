@@ -405,13 +405,3 @@ func TestNodeNotFoundKeepsTheInstallAdviceOnlyWhenThereIsNoNode(t *testing.T) {
 	assert.Contains(t, nf.Error(), "Install Node.js")
 	assert.Contains(t, nf.Error(), "PATH has node's folder")
 }
-
-// tmpDir is t.TempDir() with a mode of its own: the folder is made with the umask applied (0775 under 0002, which names the group as a writer of the node path), so the tests chmod it and pass under any umask (#20036).
-func tmpDir(t *testing.T) string {
-	t.Helper()
-	d := t.TempDir()
-	if err := os.Chmod(d, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return d
-}
