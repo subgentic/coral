@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -11,6 +12,10 @@ const board = 'preview-resize-' + Date.now().toString(36);
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [];
     try {
+        let reportResizeRequest;
+        const resizeRequest = new Promise(resolve => { reportResizeRequest = resolve; });
+        await client.Fetch.enable({ patterns: [{ urlPattern: '*preview_resize_handles.js*' }] });
+        safePaused(client, e => { reportResizeRequest(e.requestId); });
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1920, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
@@ -19,8 +24,19 @@ const board = 'preview-resize-' + Date.now().toString(36);
         await waitFor(`!!document.querySelector('#board-task-list .board-task-open')`, 'task row');
         await ev(`document.querySelector('#board-task-list .board-task-open').click(); true`);
         await waitFor(`!!document.querySelector('#preview-pane .team-task-page')`, 'task preview');
+        // Hold the first module response: an unready handle must not invite a lost first drag.
+        const requestId = await resizeRequest;
+        assert.equal(await ev(`!!document.getElementById('preview-pane-resize-handle').getClientRects().length`), false, 'handle stays hidden until attached');
+        await client.Fetch.continueRequest({ requestId });
+        await client.Fetch.disable();
         await ev(`document.getElementById('preview-dock-btn').click(); true`);
         await waitFor(`document.getElementById('preview-pane').parentElement.id==='preview-column'`, 'wide task column');
+        await waitFor(`!!document.getElementById('preview-column-resize-handle').getClientRects().length`, 'first usable resize handle');
+        const first = await ev(`(() => { const h=document.getElementById('preview-column-resize-handle').getBoundingClientRect(),c=document.getElementById('preview-column').getBoundingClientRect();return {x:h.x+h.width/2,y:h.y+h.height/2,width:c.width,hit:document.elementFromPoint(h.x+h.width/2,h.y+h.height/2)?.id}; })()`);
+        console.log('first handle',JSON.stringify(first));
+        for (const [type,x] of [['mousePressed',first.x],['mouseMoved',first.x+24],['mouseReleased',first.x+24]]) await client.Input.dispatchMouseEvent({type,x,y:first.y,button:'left',buttons:type==='mouseReleased'?0:1,clickCount:1});
+        console.log('after first drag',await ev(`({width:document.getElementById('preview-column').getBoundingClientRect().width,saved:localStorage.getItem('coral-preview-column-width')})`));
+        await waitFor(`Math.abs(Number(localStorage.getItem('coral-preview-column-width'))-${first.width-24})<=1&&Math.abs(document.getElementById('preview-column').getBoundingClientRect().width-${first.width-24})<=1`, 'first drag is saved');
         // Stretch the real CSS transition so fast and loaded browsers both observe its intermediate widths.
         await ev(`(() => { const side=document.getElementById('agentic-state'); side.style.transitionDuration='1s'; window.__dockMoves=[]; const observer=new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.id==='preview-pane')window.__dockMoves.push(r.target.id);}); for(const el of [side,document.getElementById('preview-column')])observer.observe(el,{childList:true}); return true; })()`);
         for (const [width, parent, moves] of [[1280,'preview-column',[]],[1000,'agentic-state',['agentic-state']],[1920,'preview-column',['preview-column']]]) {
