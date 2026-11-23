@@ -66,9 +66,18 @@ const HTML = '<h1>Tall page</h1>' + Array.from({ length: 80 }, (_, i) => `<p>Par
                     await ev(`document.querySelector('.preview-pane .ac-toggle').click(); true`); await ev(framesJs(3));
                     const open = await ev(`!!document.querySelector('.preview-pane .ac-panel.ac-sheet-open') && getComputedStyle(document.querySelector('.preview-pane .ac-panel')).display !== 'none'`);
                     check(open, `${at}Comments opens the panel when asked`);
-                    const topOpen = await ev(`(() => { const r = document.querySelector('.preview-pane #preview-body').getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + 40)]; })()`);
-                    const o0 = (await read()).top; for (let i = 0; i < 4; i++) await wheel(topOpen[0], topOpen[1], 120); await ev(framesJs(3)); const o1 = (await read()).top;
-                    check(o1 > o0, `${at}with the comments open, the part of the file above them still scrolls (${o0} -> ${o1})`);
+                    // The part of the file above the sheet (#20743, the v2.1.6 gate): since #20661 the sheet is at least 14rem, so in this short pane it can cover the whole file, and a wheel over the sheet is a wheel on the sheet, not on the file. Where a strip of the file shows above it, the wheel there still scrolls it (from the top, so the end of the file is not in the way: Windows' PageDown above reached 899 of 899); where it covers the file, closing the sheet gives the file back, scrolling (the sheet is not a trap).
+                    const strip = await ev(`(() => { const b = document.querySelector('.preview-pane #preview-body').getBoundingClientRect(), p = document.querySelector('.preview-pane .ac-panel').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + 12), h: Math.round(Math.min(b.bottom, p.top) - b.top) }; })()`);
+                    await ev(`(() => { const pane = document.querySelector('.preview-pane'); let sc = null; for (let e = pane.querySelector('.preview-pane-markdown, .md') || pane; e && e !== document.documentElement; e = e.parentElement) { if (/(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 4) { sc = e; break; } } if (sc) sc.scrollTop = 0; return true; })()`); await ev(framesJs(3));
+                    if (strip.h >= 30) {
+                        const o0 = (await read()).top; for (let i = 0; i < 4; i++) await wheel(strip.x, strip.y, 120); await ev(framesJs(3)); const o1 = (await read()).top;
+                        check(o1 > o0, `${at}with the comments open, the part of the file above them still scrolls (${o0} -> ${o1})`);
+                    } else {
+                        await ev(`document.querySelector('.preview-pane .ac-panel .ac-sheet-close, .preview-pane .ac-toggle').click(); true`); await ev(framesJs(3));
+                        const o0 = (await read()).top; for (let i = 0; i < 4; i++) await wheel(cx, cy, 120); await ev(framesJs(3)); const o1 = (await read()).top;
+                        check(o1 > o0, `${at}the sheet covers the file (${strip.h} px of it above), and with the sheet closed the file scrolls (${o0} -> ${o1})`);
+                        await ev(`document.querySelector('.preview-pane .ac-toggle').click(); true`); await ev(framesJs(3)); // opened again for the close below
+                    }
                     await ev(`document.querySelector('.preview-pane .ac-panel .ac-sheet-close, .preview-pane .ac-toggle').click(); true`); await ev(framesJs(3));
                 }
                 for (let i = 0; i < 60; i++) await wheel(cx, cy, 800);
