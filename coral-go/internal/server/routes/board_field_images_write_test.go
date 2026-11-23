@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -45,6 +46,7 @@ func newFieldWriteEnv(t *testing.T) *fieldWriteEnv {
 			}
 		}
 		r.Post("/api/board/{project}/field-images", wrap(h.UploadFieldImage))
+		r.Post("/api/board/{project}/messages", wrap(h.PostMessage))
 		r.Post("/api/board/{project}/tasks", wrap(h.CreateTask))
 		r.Patch("/api/board/{project}/tasks/{taskID}/amend", wrap(h.AmendTask))
 		r.Post("/api/board/{project}/tasks/{taskID}/reply", wrap(h.ReplyToTask))
@@ -280,4 +282,139 @@ func TestADecisionRefusesAPictureThatIsNotItsOwn(t *testing.T) {
 	assert.Empty(t, c.comments(t))
 	assert.Empty(t, c.messages(t))
 	assert.NotContains(t, c.state(t), "approved")
+}
+
+// Slice 2b: a board post carries its pictures in its one field, content.
+func TestABoardPostCarriesItsPicturesAsLinesAndKeepsThemOnTheMessage(t *testing.T) {
+	e := newFieldWriteEnv(t)
+	a := e.upload(t, "chat", "p1", 110)
+	other := e.upload(t, "task", "p1", 111)
+	code, out := e.json(t, "POST", "/api/board/alpha/messages", map[string]any{"subscriber_id": "Operator", "content": "see this", "images_draft": "p1", "images": map[string][]string{"content": {a}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	msgs, err := e.h.bs.ListMessages(context.Background(), "alpha", 100, 0, 0)
+	require.NoError(t, err)
+	var id int64
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "see this") {
+			id = m.ID
+			assert.Contains(t, m.Content, "coral://artifacts/"+a)
+		}
+	}
+	require.NotZero(t, id)
+	kept, err := e.h.bs.FieldImages(context.Background(), "alpha", board.FieldImagesMessage, strconv.FormatInt(id, 10))
+	require.NoError(t, err)
+	require.Len(t, kept["content"], 1)
+	assert.Equal(t, a, kept["content"][0].Hex)
+
+	// A picture for another scope, another field, and an agent are refused with nothing posted.
+	before := len(msgs)
+	for _, body := range []map[string]any{
+		{"subscriber_id": "Operator", "content": "x1", "images_draft": "p1", "images": map[string][]string{"content": {other}}},
+		{"subscriber_id": "Operator", "content": "x2", "images_draft": "p1", "images": map[string][]string{"title": {a}}},
+	} {
+		code, _ := e.json(t, "POST", "/api/board/alpha/messages", body)
+		assert.Equal(t, http.StatusBadRequest, code)
+	}
+	raw, _ := json.Marshal(map[string]any{"subscriber_id": "Operator", "content": "x3", "images_draft": "p1", "images": map[string][]string{"content": {a}}})
+	status, _ := e.send(t, e.anon, "POST", "/api/board/alpha/messages", "application/json", raw)
+	assert.GreaterOrEqual(t, status, 400)
+	msgs, _ = e.h.bs.ListMessages(context.Background(), "alpha", 100, 0, 0)
+	assert.Len(t, msgs, before, "a refused picture posted nothing")
+}
+
+// Slice 2b: a goal edit replaces the goal's pictures as a set; a comment edit does the same for the comment's.
+func TestAGoalEditReplacesItsPicturesAndAnOmittedFieldLeavesThem(t *testing.T) {
+	_, h, _ := teamArtifactServer(t)
+	old := uploaderLookup
+	uploaderLookup = func(_ context.Context, sessionID string) (string, string, string) { return "alpha", "Alice", "worker" }
+	t.Cleanup(func() { uploaderLookup = old })
+	subscribeSession(t, h, "alpha", "Alice", sessAlice)
+	registerTaskPlanner(t, h, "alpha", "Orchestrator")
+	r := chi.NewRouter()
+	asPerson := func(fn http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+			fn(w, req)
+		}
+	}
+	r.Post("/api/board/{project}/goal-images", asPerson(h.UploadGoalImage))
+	r.Post("/api/board/{project}/goals", asPerson(h.CreateGoal))
+	r.Patch("/api/board/{project}/goals/{goalID}", asPerson(h.UpdateGoal))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	call := goalCall(t, srv.URL)
+	up := func(shade uint8) string {
+		req, _ := http.NewRequest("POST", srv.URL+"/api/board/alpha/goal-images", bytes.NewReader(shadePNG(t, shade)))
+		req.Header.Set("Content-Type", "image/png")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return out["hex"].(string)
+	}
+	p1, p2 := up(120), up(121)
+	code, g := call("POST", "/api/board/alpha/goals", map[string]any{"title": "Pictures", "outcome": "o", "done_when": "d", "subscriber_id": "Operator", "images": []string{p1}})
+	require.Equal(t, http.StatusCreated, code, "%v", g)
+	path := "/api/board/alpha/goals/" + itoa(int64(g["id"].(float64)))
+
+	code, out := call("PATCH", path, map[string]any{"subscriber_id": "Operator", "outcome": "new words"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Len(t, out["images"], 1, "an edit that names no images leaves them")
+	code, out = call("PATCH", path, map[string]any{"subscriber_id": "Operator", "images": map[string][]string{"description": {p2, p1}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	imgs := out["images"].([]any)
+	require.Len(t, imgs, 2)
+	assert.Equal(t, p2, imgs[0].(map[string]any)["hex"], "the order sent, the new one added and the old one kept by naming it")
+	code, out = call("PATCH", path, map[string]any{"subscriber_id": "Operator", "images": map[string][]string{"description": {}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Empty(t, out["images"], "[] clears them")
+
+	for name, body := range map[string]map[string]any{
+		"never uploaded": {"subscriber_id": "Operator", "images": map[string][]string{"description": {strings.Repeat("ab", 32)}}},
+		"another field":  {"subscriber_id": "Operator", "images": map[string][]string{"title": {p1}}},
+		"an agent":       {"subscriber_id": "Orchestrator", "images": map[string][]string{"description": {p1}}},
+		"five":           {"subscriber_id": "Operator", "images": map[string][]string{"description": {p1, p1, p1, p1, p1}}},
+	} {
+		code, _ := call("PATCH", path, body)
+		assert.GreaterOrEqual(t, code, 400, name)
+		assert.Less(t, code, 500, name)
+	}
+}
+
+func TestACommentEditReplacesItsPicturesAndAnOmittedFieldLeavesThem(t *testing.T) {
+	rig := newImageRig(t)
+	up := func(shade uint8) string {
+		code, out := rig.upload(cmtAsOwner, "image/png", "", shadePNG(t, shade))
+		require.Equal(t, http.StatusCreated, code, "%v", out)
+		return out["hex"].(string)
+	}
+	h1, h2 := up(130), up(131)
+	code, out := rig.comment(cmtAsOwner, map[string]any{"body": "first", "images": []string{h1}, "anchor": map[string]any{"whole": true}, "board": "team-a"})
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	path := fmt.Sprintf("%s/%d", cp(rig.doc), int64(out["id"].(float64)))
+
+	code, out = rig.do("PATCH", path, cmtAsOwner, map[string]any{"body": "edited"})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Len(t, out["images"], 1, "an edit that names no images leaves them")
+	code, out = rig.do("PATCH", path, cmtAsOwner, map[string]any{"body": "edited", "images": map[string][]string{"body": {h2, h1}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	imgs := out["images"].([]any)
+	require.Len(t, imgs, 2)
+	assert.Equal(t, h2, imgs[0].(map[string]any)["hex"])
+	code, out = rig.do("PATCH", path, cmtAsOwner, map[string]any{"body": "edited", "images": map[string][]string{"body": {}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Empty(t, out["images"], "[] clears them")
+
+	for name, tc := range map[string]struct {
+		hdr  map[string]string
+		body map[string]any
+	}{
+		"never uploaded": {cmtAsOwner, map[string]any{"body": "x", "images": map[string][]string{"body": {strings.Repeat("ab", 32)}}}},
+		"another field":  {cmtAsOwner, map[string]any{"body": "x", "images": map[string][]string{"text": {h1}}}},
+	} {
+		code, _ := rig.do("PATCH", path, tc.hdr, tc.body)
+		assert.GreaterOrEqual(t, code, 400, name)
+		assert.Less(t, code, 500, name)
+	}
 }

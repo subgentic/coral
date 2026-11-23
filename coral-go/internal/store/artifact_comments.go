@@ -211,12 +211,22 @@ func (s *SessionStore) ListArtifactComments(ctx context.Context, artifactID, sta
 
 // EditArtifactComment replaces the body of a live comment and stamps edited_at; ok is false when there is no such live comment.
 func (s *SessionStore) EditArtifactComment(ctx context.Context, artifactID string, id int64, body string) (ArtifactComment, bool, error) {
+	return s.EditArtifactCommentImages(ctx, artifactID, id, body, nil)
+}
+
+// EditArtifactCommentImages is EditArtifactComment that also replaces the comment's pictures when imagesJSON is given ("" clears them; nil leaves them). A comment with pictures may have no words.
+func (s *SessionStore) EditArtifactCommentImages(ctx context.Context, artifactID string, id int64, body string, imagesJSON *string) (ArtifactComment, bool, error) {
 	body = strings.TrimSpace(body)
-	if len(body) > MaxArtifactCommentBody {
+	if len(body) > MaxArtifactCommentBody || (imagesJSON != nil && len(*imagesJSON) > MaxArtifactCommentImages) {
 		return ArtifactComment{}, false, ErrCommentTooLong
 	}
 	// A comment with pictures may have no words; one without may not.
-	res, err := s.db.ExecContext(ctx, "UPDATE artifact_comments SET body = ?, edited_at = ? WHERE id = ? AND artifact_id = ? AND deleted_at IS NULL AND (? != '' OR images_json != '')", body, nowStamp(), id, artifactID, body)
+	query, args := "UPDATE artifact_comments SET body = ?, edited_at = ? WHERE id = ? AND artifact_id = ? AND deleted_at IS NULL AND (? != '' OR images_json != '')", []any{body, nowStamp(), id, artifactID, body}
+	if imagesJSON != nil {
+		query = "UPDATE artifact_comments SET body = ?, images_json = ?, edited_at = ? WHERE id = ? AND artifact_id = ? AND deleted_at IS NULL AND (? != '' OR ? != '')"
+		args = []any{body, *imagesJSON, nowStamp(), id, artifactID, body, *imagesJSON}
+	}
+	res, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return ArtifactComment{}, false, err
 	}

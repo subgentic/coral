@@ -476,11 +476,13 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 		BlockedOn    *string `json:"blocked_on"`
 		Driver       *string `json:"driver"`
 		SubscriberID string  `json:"subscriber_id"`
+		// Images is {"description": [hex]} (#20731): the goal's pictures, replaced as a set ([] clears; omitted leaves them). A picture is one the goal has already, or one the Operator just uploaded through goal-images.
+		Images map[string][]string `json:"images"`
 	}
 	// a field that cannot be changed (id, goal_uid, board_id, closed_at) or is mistyped is refused by name, not dropped (#7239)
 	if err := decodeJSONStrict(r, &body); err != nil {
 		if name, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {
-			errBadRequest(w, fmt.Sprintf("unknown field %s: a goal's title, outcome, done_when, state, blocked_on, driver and subscriber_id can be sent", shortKey(strings.Trim(name, `"`))))
+			errBadRequest(w, fmt.Sprintf("unknown field %s: a goal's title, outcome, done_when, state, blocked_on, driver, images and subscriber_id can be sent", shortKey(strings.Trim(name, `"`))))
 			return
 		}
 		errBadRequest(w, "invalid JSON")
@@ -489,6 +491,13 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 	actor, ok := h.goalActor(w, r, project, body.SubscriberID)
 	if !ok {
 		return
+	}
+	var kept []board.GoalImage
+	if body.Images != nil {
+		var ok bool
+		if kept, ok = h.goalEditPictures(w, r, project, id, actor, body.Images); !ok {
+			return
+		}
 	}
 	var before, beforeState string
 	var wasTitle, wasOutcome, wasDoneWhen string
@@ -504,6 +513,13 @@ func (h *BoardHandler) UpdateGoal(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, err.Error())
 		}
 		return
+	}
+	if body.Images != nil {
+		if err := h.bs.SetGoalImages(r.Context(), project, id, kept); err != nil {
+			slog.Warn("[goals] the pictures of a goal were not kept", "board", project, "goal", id, "error", err)
+		} else {
+			g.Images = kept
+		}
 	}
 	if beforeState == board.GoalProposed && g.State == board.GoalActive {
 		h.announceGoalToOrchestrator(project, actor, g) // a proposed goal was not told; it is when it becomes one the team works on (#11866)
@@ -725,4 +741,51 @@ func (h *BoardHandler) retireGoalAsks(r *http.Request, project, actor string, g 
 	for _, a := range retired {
 		h.tellAsker(r, project, actor, a.Asker, a.ID, fmt.Sprintf("your question #%d is closed, not answered: goal #%d closed as %s. Ask again if it still matters.", a.ID, g.ID, g.State), "")
 	}
+}
+
+// goalEditPictures checks the pictures a goal edit names, for its one field, description: each is one the goal already has or one the Operator just uploaded through goal-images (at most 4, once each), and only the
+// Operator names any, as at creation. It answers the request itself when a picture is not allowed.
+func (h *BoardHandler) goalEditPictures(w http.ResponseWriter, r *http.Request, project string, id int64, actor string, in map[string][]string) ([]board.GoalImage, bool) {
+	for field := range in {
+		if field != "description" {
+			writeError(w, http.StatusBadRequest, "picture_field_unknown", "pictures go with description, not "+field)
+			return nil, false
+		}
+	}
+	if actor != "Operator" || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // through Coral Hub the owner's alone, as the upload route is
+		errForbidden(w, "only the Operator can attach pictures to a goal")
+		return nil, false
+	}
+	hexes := in["description"]
+	if len(hexes) > maxCommentImages {
+		writeError(w, http.StatusBadRequest, "too_many_pictures", "at most 4 pictures can be attached to a field")
+		return nil, false
+	}
+	have := map[string]board.GoalImage{}
+	if cur, err := h.bs.GetGoal(r.Context(), project, id); err == nil {
+		for _, im := range cur.Images {
+			have[im.Hex] = im
+		}
+	}
+	kept := []board.GoalImage{}
+	seen := map[string]bool{}
+	for _, raw := range hexes {
+		hexID := strings.ToLower(strings.TrimSpace(raw))
+		if !objectNameRe.MatchString(hexID) || seen[hexID] {
+			writeError(w, http.StatusBadRequest, "picture_not_yours", "a picture was not added for this: add it again")
+			return nil, false
+		}
+		seen[hexID] = true
+		if im, ok := have[hexID]; ok {
+			kept = append(kept, im)
+			continue
+		}
+		pics, why := checkedPictures(h.artifactObjectDir(), goalImageScope(project), []string{hexID})
+		if why != "" {
+			writeError(w, http.StatusBadRequest, "picture_not_yours", why)
+			return nil, false
+		}
+		kept = append(kept, board.GoalImage{Hex: pics[0].Hex, Name: pics[0].Name, ContentType: pics[0].ContentType})
+	}
+	return kept, true
 }

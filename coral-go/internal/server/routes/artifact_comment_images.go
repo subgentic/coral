@@ -326,15 +326,60 @@ func checkedPictures(objectDir, scope string, hexes []string) ([]commentImage, s
 	return out, ""
 }
 
+// commentPictureScope is what a comment's just-uploaded pictures are remembered under: the artifact, or the team's goal-images scope for a diff or a goal.
+func commentPictureScope(artifactID string) string {
+	if team, _, _, ok := parseDiffSubject(artifactID); ok {
+		return goalImageScope(team) // a diff's pictures are added through the team's picture route too (#12536)
+	} else if team, _, ok := parseGoalSubject(artifactID); ok {
+		return goalImageScope(team) // a goal's pictures are added through the team's goal-images route (#11955)
+	}
+	return artifactID
+}
+
+// editedCommentImages is the pictures an edit names for a comment's one field, body: each is one the comment already has or one the person just uploaded for it (at most 4, once each). It answers the JSON kept
+// with the comment ("" for none) or a code and why one is not allowed.
+func (h *SessionsHandler) editedCommentImages(artifactID, keptJSON string, in map[string][]string) (string, string, string) {
+	for field := range in {
+		if field != "body" {
+			return "", "picture_field_unknown", "pictures go with body, not " + field
+		}
+	}
+	hexes := in["body"]
+	if len(hexes) > maxCommentImages {
+		return "", "too_many_pictures", "at most 4 pictures can be attached to a field"
+	}
+	have := map[string]commentImage{}
+	for _, im := range parseCommentImages(keptJSON) {
+		have[im.Hex] = im
+	}
+	var out []commentImage
+	seen := map[string]bool{}
+	for _, raw := range hexes {
+		hexID := strings.ToLower(strings.TrimSpace(raw))
+		if !objectNameRe.MatchString(hexID) || seen[hexID] {
+			return "", "picture_not_yours", "a picture was not added for this: add it again"
+		}
+		seen[hexID] = true
+		if im, ok := have[hexID]; ok {
+			out = append(out, im)
+			continue
+		}
+		pics, why := checkedPictures(h.artifactDir(), commentPictureScope(artifactID), []string{hexID})
+		if why != "" {
+			return "", "picture_not_yours", why
+		}
+		out = append(out, pics[0])
+	}
+	if len(out) == 0 {
+		return "", "", ""
+	}
+	b, _ := json.Marshal(out)
+	return string(b), "", ""
+}
+
 // commentImagesOf is checkedPictures for a comment on artifactID, as the JSON kept with the comment.
 func (h *SessionsHandler) commentImagesOf(artifactID string, hexes []string) (string, string) {
-	scope := artifactID
-	if team, _, _, ok := parseDiffSubject(artifactID); ok {
-		scope = goalImageScope(team) // a diff's pictures are added through the team's picture route too (#12536)
-	} else if team, _, ok := parseGoalSubject(artifactID); ok {
-		scope = goalImageScope(team) // a goal's pictures are added through the team's goal-images route (#11955)
-	}
-	imgs, why := checkedPictures(h.artifactDir(), scope, hexes)
+	imgs, why := checkedPictures(h.artifactDir(), commentPictureScope(artifactID), hexes)
 	if why != "" || len(imgs) == 0 {
 		return "", why
 	}

@@ -806,7 +806,8 @@ func (h *SessionsHandler) editArtifactComment(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var in struct {
-		Body string `json:"body"`
+		Body   string              `json:"body"`
+		Images map[string][]string `json:"images"` // {"body": [hex]} (#20731): replaces the comment's pictures ([] clears, omitted leaves them)
 	}
 	if !readJSONBody(w, r, 3*store.MaxArtifactCommentBody, &in) {
 		return
@@ -825,6 +826,19 @@ func (h *SessionsHandler) editArtifactComment(w http.ResponseWriter, r *http.Req
 		errPayloadTooLarge(w, "a comment is at most "+strconv.Itoa(store.MaxArtifactCommentBody)+" bytes")
 		return
 	}
+	var imagesJSON *string
+	if in.Images != nil {
+		if _, isGuide := guideOf(r); isGuide || caller.Kind != commentCallerOwner {
+			commentRefuse(w, http.StatusForbidden, "owner_only", "only the person at this computer can add a picture to a comment")
+			return
+		}
+		kept, code, msg := h.editedCommentImages(id, t.ImagesJSON, in.Images)
+		if msg != "" {
+			writeError(w, http.StatusBadRequest, code, msg)
+			return
+		}
+		imagesJSON = &kept
+	}
 	body, ok := redactComment(in.Body)
 	if !ok {
 		commentRefuse(w, http.StatusServiceUnavailable, "redaction_unavailable", "the comment could not be checked for secrets, so it was not kept")
@@ -833,7 +847,7 @@ func (h *SessionsHandler) editArtifactComment(w http.ResponseWriter, r *http.Req
 	if !h.commentRate(w, caller) {
 		return
 	}
-	c, found, err := h.ss.EditArtifactComment(r.Context(), id, t.ID, body)
+	c, found, err := h.ss.EditArtifactCommentImages(r.Context(), id, t.ID, body, imagesJSON)
 	switch {
 	case errors.Is(err, store.ErrCommentEmpty):
 		errBadRequest(w, "a comment needs some text")
