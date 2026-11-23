@@ -102,8 +102,18 @@ func (h *SessionsHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	// One row per open task: the operator's task and the agent's own
 	// TaskCreate for it (synced by title) converge instead of duplicating.
+	project := taskPicturesProject(name, ptr.NonEmpty(body.SessionID))
+	pictures, ok := h.taskPictures(w, r, project, 0, body.ImagesDraft, body.Images)
+	if !ok {
+		return
+	}
 	if existing, err := h.ts.FindOpenAgentTask(r.Context(), name, body.Title, ptr.NonEmpty(body.SessionID)); err == nil && existing != nil {
-		writeJSON(w, http.StatusOK, existing)
+		existing.Images = h.taskImages(r.Context(), project, existing.ID)
+		resp := createdTaskResponse{AgentTask: existing}
+		if len(pictures) > 0 { // the task already exists and is not changed: its pictures are its own, so these are not added and the answer says so, not the screen
+			resp.PicturesNotAdded, resp.PicturesWarning = true, picturesNotAddedWords
+		}
+		writeJSON(w, http.StatusOK, resp)
 		return
 	}
 
@@ -123,11 +133,6 @@ func (h *SessionsHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 			errBadRequest(w, err.Error())
 			return
 		}
-	}
-	project := taskPicturesProject(name, ptr.NonEmpty(body.SessionID))
-	pictures, ok := h.taskPictures(w, r, project, 0, body.ImagesDraft, body.Images)
-	if !ok {
-		return
 	}
 	task, err := h.ts.CreateAgentTaskWithWorkflow(r.Context(), name, body.Title, ptr.NonEmpty(body.SessionID), displayName, body.Body, body.Priority, &board.CreateTaskOpts{Workflow: body.Workflow, BlockedBy: deps, Draft: body.Draft, MaxDepth: 32})
 	if err != nil {

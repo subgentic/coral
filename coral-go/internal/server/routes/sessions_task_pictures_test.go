@@ -118,3 +118,50 @@ func TestAPersonalTaskCarriesPicturesLikeABoardTask(t *testing.T) {
 	left, _ := bh.bs.FieldImages(context.Background(), store.AgentTaskProject(name, &[]string{sid}[0]), board.FieldImagesTask, board.TaskFieldImagesOwner(id))
 	assert.Empty(t, left, "a deleted task's pictures are removed")
 }
+
+// #20818: a create whose title matches an open task is answered with that task; the pictures sent with it are not added and the answer says so, so a screen does not show them as attached.
+func TestAPersonalTaskCreateThatMatchesAnOpenTaskSaysItsPicturesWereNotAdded(t *testing.T) {
+	_, h, terminal, ss := setupSessionsTestServer(t)
+	_, bh := setupBoardTestServer(t)
+	bh.SetTaskArtifactWriter(t.TempDir(), nil)
+	h.SetBoardHandler(bh)
+	const name, sid = "claude-pic-dupe", "sess-ptask-2"
+	terminal.addSession(name, "/tmp/test")
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: t.TempDir(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}))
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+			next.ServeHTTP(w, asCaller(callerDashCookie)(req))
+		})
+	})
+	r.Post("/api/field-images", bh.UploadPersonFieldImage)
+	r.Post("/api/sessions/live/{name}/tasks", h.CreateTask)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	base := srv.URL + "/api/sessions/live/" + name + "/tasks"
+	req, err := http.NewRequest("POST", srv.URL+"/api/field-images?scope=instruction&draft=dd1", bytes.NewReader(shadePNG(t, 170)))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "image/png")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	var up map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&up))
+	resp.Body.Close()
+	hex := up["hex"].(string)
+
+	code, first := sendJSON(t, "POST", base, map[string]any{"title": "Same title", "session_id": sid})
+	require.Equal(t, http.StatusOK, code, "%v", first)
+	assert.Nil(t, first["pictures_not_added"], "a new task has nothing refused")
+	code, out := sendJSON(t, "POST", base, map[string]any{"title": "Same title", "session_id": sid, "images_draft": "dd1", "images": map[string]any{"body": []string{hex}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, first["id"], out["id"], "the open task is answered")
+	assert.Equal(t, true, out["pictures_not_added"])
+	assert.NotEmpty(t, out["pictures_warning"])
+	assert.Empty(t, imagesOf(out, "body"), "the task does not show pictures it was not given")
+	code, out = sendJSON(t, "POST", base, map[string]any{"title": "Same title", "session_id": sid})
+	require.Equal(t, http.StatusOK, code)
+	assert.Nil(t, out["pictures_not_added"], "no pictures sent, nothing to say")
+	code, out = sendJSON(t, "POST", base, map[string]any{"title": "Same title", "session_id": sid, "images_draft": "dd1", "images": map[string]any{"title": []string{hex}}})
+	assert.Equal(t, "picture_field_unknown", out["code"], "a picture that is not allowed is still refused (%d)", code)
+}
