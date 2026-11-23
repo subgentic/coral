@@ -1,5 +1,7 @@
 /* Edit instructions (#10133, Beta Tester #10130): the text an agent is given each time it starts, its Behavior prompt, edited from its row's menu. It is saved for the next restart and the running agent is not touched; the dialog says so
  * above the box and in the toast. A native <dialog> like the reminder's: Escape closes it, Tab stays inside, the focus goes back to what opened it. A refusal is said in the dialog and it stays open. An empty box clears the instructions. */
+import { importOnce } from './import_once.js';
+const { mountFieldPictures } = await importOnce('./field_pictures.js');
 const MAX_BYTES = 20000;
 import { el as mk } from './dom_el.js';
 let dialog = null;
@@ -23,20 +25,23 @@ export function openInstructionsDialog(label, opts) {
     const box = mk('textarea'); box.id = 'instructions-text'; box.rows = 10; box.value = opts.current || ''; box.setAttribute('aria-label', 'Instructions'); box.setAttribute('aria-describedby', 'instructions-lead');
     const err = mk('div', 'field-error'); err.hidden = true; err.setAttribute('role', 'alert');
     form.append(lead, box, err);
+    const pictures = mountFieldPictures(box, { server: opts.server, scope: 'instruction', field: 'instructions', initial: opts.images || [], hintWhenAdded: true });
     const acts = mk('div', 'modal-actions modal-footer');
     const cancel = mk('button', 'btn', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', close);
     const save = mk('button', 'btn btn-primary', 'Save'); save.type = 'submit'; save.setAttribute('form', 'instructions-form');
+    pictures.listen(() => { if (!dialog.dataset.busy) save.disabled = pictures.busy() || pictures.failed(); });
     acts.append(cancel, save);
     dialog.append(head, form, acts);
-    dialog.addEventListener('close', () => { if (opts.opener && opts.opener.isConnected) opts.opener.focus({ preventScroll: true }); }, { once: true });
+    dialog.addEventListener('close', () => { pictures.destroy(); if (opts.opener && opts.opener.isConnected) opts.opener.focus({ preventScroll: true }); }, { once: true });
     form.addEventListener('submit', async e => {
         e.preventDefault();
         err.hidden = true;
         if (bytes(box.value) > MAX_BYTES) { err.textContent = `That is too long: at most ${MAX_BYTES.toLocaleString('en-US')} bytes (a plain letter is one byte; an accented letter or an emoji is more).`; err.hidden = false; box.setAttribute('aria-invalid', 'true'); box.focus(); return; }
         box.removeAttribute('aria-invalid');
+        try { pictures.assertReady(); if (!box.value.trim() && pictures.items().length) throw new Error('Write instructions for these pictures, or remove the pictures to clear the instructions.'); } catch (x) { err.textContent = x.message; err.hidden = false; return; }
         save.disabled = true; cancel.disabled = true; dialog.dataset.busy = '1';
         let res;
-        try { res = await opts.onSave(box.value.trim()); } catch (x) { res = { ok: false, error: (x && x.message) || 'Could not save the instructions.' }; }
+        try { res = await opts.onSave(box.value.trim(), pictures.payload()); } catch (x) { res = { ok: false, error: (x && x.message) || 'Could not save the instructions.' }; }
         save.disabled = false; cancel.disabled = false; delete dialog.dataset.busy;
         if (res && res.ok) { close(); return; }
         err.textContent = (res && res.error) || 'Could not save the instructions.'; err.hidden = false;

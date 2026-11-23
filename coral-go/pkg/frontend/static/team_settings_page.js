@@ -20,6 +20,7 @@ const { createTeamReminders } = await importOnce('./team_reminders.js'); // the 
 const { createGuideRoster, GR_KEYS } = await importOnce('./team_guide_roster.js');
 const { healthFields, healthToValues, saveHealth, HEALTH_KEYS } = await importOnce('./team_health_fields.js');
 const { approvalField, presetOf, wireApproval } = await importOnce('./team_approval_presets.js'); // how much the Operator approves: three names for the flags below (#11657)
+const { mountFieldPictures, savedWords } = await importOnce('./field_pictures.js');
 const { HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
 const { jsonError, presetNameText, presetInstructionsText, presetLabel, renderInspection } = await importOnce('./team_working_mode.js');
 
@@ -39,6 +40,7 @@ const PRESET_EDITOR = `<details class="disclosure team-settings-section workflow
 
 /** Draws the team's Settings tab into options.page. */
 export async function showTeamSettingsPage(team, options = {}) {
+    options.page?.querySelector('#team-settings-workspace')?.view?.destroy();
     const st = openSettingsState(team, options);
     const opts = settingsViewOptions(st);
     st.view = mountSettingsView(st.page, opts);
@@ -115,6 +117,7 @@ function settingsViewOptions(st) {
             const h = st.host.querySelector('.settings-pane:not([hidden]) .settings-pane-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } // the button that had the focus is gone: it goes to the open group's heading
         } },
         readOnly: key => ((key === 'require_goal' || key === 'planning_approval') && !answeredLocally(st.team) ? true : false), // only this computer changes it (the route refuses it through Coral Hub); the planning approval sets it, so it is read only there too
+        parts: () => st.picturePart ? [st.picturePart] : [],
         groups: settingsGroups(st),
         load: loadSettings(st),
         save: saveSettings(st),
@@ -263,7 +266,27 @@ function wirePage(st) {
     st.xt.bind(st.view);
     st.og.bind(st.view);
     st.view.say('Loading\u2026');
-    st.view.ready.then(() => { st.syncModeDescription(); st.xt.drawn(); }).catch(() => {}); // the line under the list follows the mode the load set
+    st.view.ready.then(() => {
+        if (!st.page.isConnected) return;
+        st.syncModeDescription(); st.xt.drawn();
+        const pictures = mountFieldPictures(st.q('textarea[name="custom_instructions"]'), { project: st.team, scope: 'instruction', field: 'custom_instructions', initial: st.workingMode.images?.custom_instructions || [], hintWhenAdded: true });
+        pictures.listen(() => st.view.refresh());
+        st.picturePart = { dirty: () => pictures.changed() || pictures.busy() || pictures.failed(), save: async () => {
+            const payload = pictures.payload();
+            if (!payload.images) return;
+            const current = await fetch(st.workingModeURL);
+            if (!current.ok) throw new Error(await jsonError(current, 'Could not read the working mode.'));
+            const fresh = await current.json();
+            const body = Object.fromEntries(MODE_KEYS.map(k => [k, fresh[k]]));
+            const response = await fetch(st.workingModeURL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, ...payload }) });
+            if (!response.ok) throw new Error(await jsonError(response, 'Could not save the pictures.'));
+            st.workingMode = await response.json();
+            if (st.workingMode.pictures_not_saved) throw new Error(savedWords(st.workingMode, ''));
+            pictures.acceptSaved();
+        } };
+        const destroy = st.view.destroy; st.view.destroy = () => { pictures.destroy(); destroy(); };
+        st.view.refresh();
+    }).catch(() => {}); // the line under the list follows the mode the load set
     st.view.ready.catch(error => { st.view.say(error.message, true); const c = st.q('.prompt-inspection-content'); if (c) c.textContent = 'Prompt inspection could not be loaded.'; st.xt.load({}).then(() => st.xt.drawn()).catch(() => {}); });
 }
 

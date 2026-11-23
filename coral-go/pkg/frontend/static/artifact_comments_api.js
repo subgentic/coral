@@ -10,6 +10,7 @@ const base = (hex, server) => serverUrl(`/api/artifacts/${hex}/comments`, server
 function normalizeComment(c) {
     const can = c.can || {}, who = c.author || {};
     return {
+        picturesNotSaved: !!c.pictures_not_saved,
         atS: typeof c.at_s === 'number' && Number.isFinite(c.at_s) ? c.at_s : null, endS: typeof c.end_s === 'number' && Number.isFinite(c.end_s) ? c.end_s : null,
         id: c.id, parentId: c.parent_id == null ? null : c.parent_id, anchor: c.anchor || { whole: true }, body: String(c.body == null ? '' : c.body),
         authorId: who.subject || '', authorName: who.name || '', authorKind: who.kind || '',
@@ -65,7 +66,7 @@ export async function uploadCommentImage(hex, server, blob, versionOf, board) {
 
 /** Where a picture of a comment is drawn from. */
 export const commentImageUrl = (imageHex, server) => serverUrl(`/api/artifacts/${imageHex}?v=2`, server);
-export const editComment = (hex, server, id, body) => requestJson('PATCH', `${base(hex, server)}/${id}`, { body }).then(normalizeComment);
+export const editComment = (hex, server, id, body, pictures = {}) => requestJson('PATCH', `${base(hex, server)}/${id}`, { body, ...pictures }).then(normalizeComment);
 export const deleteComment = (hex, server, id) => requestJson('DELETE', `${base(hex, server)}/${id}`);
 export const resolveComment = (hex, server, id) => requestJson('POST', `${base(hex, server)}/${id}/resolve`, {}).then(normalizeComment);
 export const reopenComment = (hex, server, id) => requestJson('POST', `${base(hex, server)}/${id}/reopen`, {}).then(normalizeComment);

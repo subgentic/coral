@@ -26,7 +26,7 @@ export async function openTeamSettings(team, options = {}) {
     </div>`;
     modal.querySelector('h3').textContent = `Team settings: ${keyLabel(key)}`;
     document.body.appendChild(modal);
-    const close = registerDialog(modal, { beforeClose: async () => !hasUnsavedTeamSettings() || await confirmTeamWorkspaceChange(), onClose: () => { document.removeEventListener('keydown', keepIn, true); document.removeEventListener('keyup', keepIn, true); if (open && open.modal === modal) open = null; } });
+    const close = registerDialog(modal, { beforeClose: async () => !hasUnsavedTeamSettings() || await confirmTeamWorkspaceChange(), onClose: () => { open?.view?.destroy(); document.removeEventListener('keydown', keepIn, true); document.removeEventListener('keyup', keepIn, true); if (open && open.modal === modal) open = null; } });
     // Tab stays inside: the page-wide trap (modal_chrome.js) wraps at the first and last stop it computes, but the browser can still walk past the dialog (a disclosure's summary at the end, a roving-tabindex tab the pointer
     // chose). After a Tab key, if focus is outside the dialog (and no other dialog, the unsaved question, is the one asked), it goes back to the dialog's first stop, or its last with Shift.
     const stopsOf = () => [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], summary, [tabindex]')].filter(el => el.tabIndex >= 0 && el.getClientRects().length > 0);
