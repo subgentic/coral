@@ -411,7 +411,7 @@ export function mountSettingsView(host, spec) {
             const r = fields.get(key); if (!r) return;
             r.field = { ...r.field };
             if (label !== undefined) { r.field.label = label; if (r.label) r.label.textContent = label; }
-            if (sentence !== undefined) { const el = r.descId && document.getElementById(r.descId); if (el) el.textContent = sentence; } // the sentence under the label
+            if (sentence !== undefined) { r.baseHelp = sentence; if (r.helpEl) r.helpEl.querySelector('.sv-help-text').textContent = sentence; } // the sentence under the label
             if (required !== undefined) {
                 r.field.required = !!required; if (requiredMessage !== undefined) r.field.requiredMessage = requiredMessage;
                 let badge = r.row.querySelector('.sv-required');
