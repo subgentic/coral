@@ -45,6 +45,7 @@ type relayRig struct {
 
 func newRelayRig(t *testing.T) *relayRig {
 	t.Helper()
+	routes.ResetDeviceMessageLimits() // the failed-check counts are process-wide: not what other tests spent this minute
 	r := newE2ERemote(t, "relay-20879", nil)
 	ss := store.NewSessionStore(r.db)
 	require.NoError(t, ss.SetSetting(context.Background(), routes.MaxModeSetting, tunnel.TierLaunch.String())) // this computer lets a Hub type into agents, so the guard is what answers
