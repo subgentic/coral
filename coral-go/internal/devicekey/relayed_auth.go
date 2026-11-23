@@ -39,6 +39,20 @@ func RoutePath(target string) string {
 // MatchRoute reports whether the kind may be signed for this method and request target, and returns the values of the pattern's {name} segments exactly as signed. A handler of a body-less kind acts only on these (and on the
 // query it was signed with), never on a field of its own request that the signature does not cover.
 func MatchRoute(k Kind, method, target string) (map[string]string, bool) {
+	params, ok := matchPattern(k, method, target)
+	if !ok {
+		return nil, false
+	}
+	if k == HubAutoAccept { // the value it sets is in the signed query: any other query (or none) signs nothing the computer will accept (#20649)
+		if _, qok := AutoAcceptQuery(target); !qok {
+			return nil, false
+		}
+	}
+	return params, true
+}
+
+// matchPattern is MatchRoute without the query rule of hub-auto-accept: whether the method and the path are one of the kind's routes.
+func matchPattern(k Kind, method, target string) (map[string]string, bool) {
 	path := strings.Split(RoutePath(target), "/")
 	for _, r := range KindRoutes[k] {
 		if r.Method != method {
@@ -62,15 +76,21 @@ func MatchRoute(k Kind, method, target string) (map[string]string, bool) {
 			}
 		}
 		if ok {
-			if k == HubAutoAccept { // the value it sets is in the signed query: any other query (or none) signs nothing the computer will accept (#20649)
-				if _, qok := AutoAcceptQuery(target); !qok {
-					return nil, false
-				}
-			}
 			return params, true
 		}
 	}
 	return nil, false
+}
+
+// KindOfRoute is the relayed kind whose route (method and path) this request is, whatever its query: a route no kind lists is not a relayed one, and nothing about it is signed. A request on a kind's route with a query that kind
+// does not accept is still that kind's: the check then refuses it (wrong_request), it is never treated as unsigned.
+func KindOfRoute(method, target string) (Kind, bool) {
+	for _, k := range RelayedKinds {
+		if _, ok := matchPattern(k, method, target); ok {
+			return k, true
+		}
+	}
+	return "", false
 }
 
 // OwnerPinFunc says which Hub label the owner of a link was confirmed as (the owner pin, #20407) and whether one was.
