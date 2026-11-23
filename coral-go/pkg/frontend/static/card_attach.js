@@ -1,8 +1,9 @@
 /* Images in the question card's answer box (#11386): a person can paste an image into "Or type your own answer" (or press Add image) to direct the agent. It goes up the way the message box's images do (postImage, one uploader:
  * POST /api/upload, the same limits and type checks, the same failures in words), shows as a chip with a remove button inside the card, and is sent WITH the typed text as the answer: the image's artifact link and the one
  * hint to fetch it first (attachmentsLead, exactly what the message box types), then the text. The card's images are its own: they never join the message box's strip, and they go when the answer is sent. */
+import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { escapeAttr, showToast } from './utils.js';
+import { showToast } from './utils.js';
 import { serverFetch, sessionServer } from './server_base.js';
 import { promptOptionsBySession, pendingToolBySession, setPrompt, syncNeedsInputCard, announcePrompt } from './needs_input_card.js';
 import { blockedReason } from './hub_access.js';
@@ -11,6 +12,7 @@ import { postImage } from './image_composer.js';
 import { attachmentsLead } from './shared_images.js';
 import { registerUnsavedWork } from './update_banner.js';
 
+const { drawPictureTray } = await importOnce('./picture_tray.js');
 const bySession = new Map(); // session_id -> { list: [{ path, filename, artifact, previewUrl }], uploading: n }
 const slot = sid => { let s = bySession.get(sid); if (!s) { s = { list: [], uploading: 0 }; bySession.set(sid, s); } return s; };
 
@@ -18,8 +20,8 @@ const slot = sid => { let s = bySession.get(sid); if (!s) { s = { list: [], uplo
 registerUnsavedWork(() => [...bySession.values()].some(s => s.list.length > 0 || s.uploading > 0));
 
 /** The parts an answer starts with for this agent's card images (their links, then the one hint), [] with none. */
-export const answerLead = sid => attachmentsLead(slot(sid).list);
-export const cardImagesUploading = sid => slot(sid).uploading > 0;
+export const answerLead = sid => attachmentsLead(slot(sid).list.filter(it => it.state !== 'failed' && it.state !== 'uploading'));
+export const cardImagesUploading = sid => slot(sid).uploading > 0 || slot(sid).list.some(it => it.state === 'failed');
 
 /** The images are sent (or the card is gone): drop them and their thumbnails. */
 export function clearCardImages(sid) {
@@ -52,17 +54,17 @@ export function drawCardImages(card, sid) {
         const row = form.querySelector('.cni-attach'); if (!row) continue;
         const busy = s.uploading > 0;
         row.hidden = s.list.length === 0 && !busy;
-        const chips = s.list.map((a, i) => `<div class="image-attachment" title="${escapeAttr(a.filename)}"><img src="${escapeAttr(a.previewUrl)}" alt="Image ${Number(i) + 1}" />`
-            + `<button type="button" class="image-attachment-remove cni-attach-remove" data-index="${Number(i)}" aria-label="Remove image ${Number(i) + 1}" title="Remove ${escapeAttr(a.filename)}">&times;</button></div>`).join('');
-        row.innerHTML = chips + (busy ? `<div class="image-uploading" role="status">Uploading ${Number(s.uploading) === 1 ? 'image' : `${Number(s.uploading)} images`}…</div>` : '');
+        drawPictureTray(row, s.list, { removeClass: 'cni-attach-remove',
+            remove: i => { const gone = s.list.splice(i, 1)[0]; if (gone) URL.revokeObjectURL(gone.previewUrl); drawCardImages(card, sid); },
+            retry: i => { const it = s.list[i]; if (it?.state !== 'failed') return; s.list.splice(i, 1); URL.revokeObjectURL(it.previewUrl); attach([it.file], form, it.session); },
+        });
     }
 }
 
 const cardOf = el => el.closest('.chat-needs-input') || el;
 
 /** Put images into the answer box of `form`: each is checked and made smaller like the message box's, then uploaded one at a time. */
-async function attach(files, form) {
-    const session = state.currentSession;
+async function attach(files, form, session = state.currentSession) {
     if (!session || session.type !== 'live') return;
     const why = blockedReason(sessionServer(session), 'launch'); // an upload writes a file on the agent's computer: the same tier as the message box's
     if (why) { showToast(why, true); return; }
@@ -70,10 +72,12 @@ async function attach(files, form) {
     for (const file of files) {
         const prepared = await prepareImage(file);
         if (prepared.error) { showToast(prepared.error, true); continue; }
+        const draft = { file: prepared.file, session, name: file.name || 'Picture', previewUrl: URL.createObjectURL(prepared.file), state: 'uploading' }; s.list.push(draft);
         s.uploading++; drawCardImages(cardOf(form), sid);
         let result = null;
-        try { result = await postImage(prepared.file, session, () => attach([file], form)); } finally { s.uploading--; }
-        if (result) s.list.push({ path: result.path, filename: result.filename, artifact: result.artifact || null, previewUrl: URL.createObjectURL(prepared.file) });
+        try { result = await postImage(prepared.file, session, () => {}); } catch { /* shown in the tray */ } finally { s.uploading--; }
+        if (!s.list.includes(draft) || bySession.get(sid) !== s) continue;
+        Object.assign(draft, result ? { path: result.path, filename: result.filename, artifact: result.artifact || null, state: 'ready' } : { state: 'failed' });
         drawCardImages(cardOf(form), sid);
     }
 }
@@ -88,15 +92,13 @@ document.addEventListener('paste', e => {
     attach(files, form);
 });
 
+document.addEventListener('dragover', e => { const form = formOf(e); if (form && [...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
+document.addEventListener('drop', e => { const form = formOf(e); if (!form) return; const files = [...(e.dataTransfer?.files || [])].filter(f => f.type.startsWith('image/')); if (!files.length) return; e.preventDefault(); e.stopPropagation(); attach(files, form); });
+
 document.addEventListener('click', e => {
     const add = e.target instanceof Element ? e.target.closest('#live-history-messages .cni-attach-btn') : null;
     if (add) { const input = add.closest('.cni-text-form')?.querySelector('.cni-attach-input'); if (input) input.click(); return; }
-    const rm = e.target instanceof Element ? e.target.closest('#live-history-messages .cni-attach-remove') : null;
-    if (!rm || !state.currentSession) return;
-    const sid = state.currentSession.session_id, s = slot(sid), i = Number(rm.dataset.index), gone = s.list.splice(i, 1)[0];
-    if (gone && gone.previewUrl) URL.revokeObjectURL(gone.previewUrl);
-    drawCardImages(cardOf(rm), sid);
-    rm.closest('.cni-text-form')?.querySelector('.cni-text-input')?.focus();
+
 });
 
 document.addEventListener('change', e => {

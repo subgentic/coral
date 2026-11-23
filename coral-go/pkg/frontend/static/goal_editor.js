@@ -216,7 +216,7 @@ export function openGoalEditor(opts = {}) {
     else importOnce('./artifact_comment_images.js').then(m => {
         if (!dlg.isConnected) return;
         tray = m.createImageTray({ upload: uploadImage }); tray.attach(form, desc); tray.listen(sync);
-        const picker = tray.picker(), add = picker.querySelector('button'); add.textContent = 'Drop, paste or choose'; add.classList.add('goal-drop'); add.setAttribute('aria-label', 'Add a picture to this goal');
+        const picker = tray.picker(), add = picker.querySelector('button'); add.textContent = 'Add image'; add.setAttribute('aria-label', 'Add a picture to this goal');
         picRow.append(tray.node, picker); pics.append(picRow, tray.hint());
         bar.querySelector('[data-tool="image"]').addEventListener('click', () => picker.querySelector('input').click());
     }).catch(() => { /* a goal needs no picture: the form works without the button */ });

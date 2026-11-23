@@ -12,6 +12,7 @@ import { importOnce } from './import_once.js';
 import { prepareImage } from './image_attach.js';
 import { postImage } from './image_composer.js';
 import { attachmentsLead } from './shared_images.js';
+const { drawPictureTray } = await importOnce('./picture_tray.js');
 await loadStyles('activity_dialog.css');
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -52,7 +53,7 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     const strip = el('div', 'activity-thread-pics'); strip.hidden = true;
     // 'image/' + '*' is written in two parts: a slash-star in a string reads as the start of a comment to the page's lint
     const picker = el('input'); picker.type = 'file'; picker.accept = 'image/' + '*'; picker.multiple = true; picker.hidden = true;
-    const attach = el('button', 'btn btn-small', 'Attach image'); attach.type = 'button';
+    const attach = el('button', 'btn btn-small', 'Add image'); attach.type = 'button';
     const hint = el('span', 'activity-thread-hint', 'Paste or drop an image here too');
     const attachRow = el('div', 'activity-thread-attach'); attachRow.append(attach, hint, picker);
     const err = el('p', 'activity-thread-error'); err.setAttribute('role', 'alert');
@@ -63,18 +64,22 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     // Reopen question (#15792): the question goes back to Needs you, unanswered; the thread stays on the board
     const reopen = el('button', 'btn btn-small activity-thread-reopen', 'Reopen question'); reopen.type = 'button';
     const actions = el('div', 'activity-thread-actions'); actions.append(task, board, close, reopen, send);
-    const canSend = () => (box.value.trim() || pics.length) && !uploading;
-    const drawPics = () => { strip.hidden = !pics.length && !uploading; strip.replaceChildren(...pics.map((a, i) => { const w = el('div', 'image-attachment'); const im = el('img'); im.src = a.previewUrl; im.alt = `Image ${i + 1}`; const x = el('button', 'image-attachment-remove', '\u00d7'); x.type = 'button'; x.setAttribute('aria-label', `Remove image ${i + 1}`); x.addEventListener('click', () => { URL.revokeObjectURL(a.previewUrl); pics.splice(i, 1); drawPics(); }); w.append(im, x); return w; }), ...(uploading ? [Object.assign(el('div', 'image-uploading', `Uploading ${uploading === 1 ? 'image' : uploading + ' images'}\u2026`), {})] : [])); send.disabled = !canSend(); };
+    const canSend = () => (box.value.trim() || pics.length) && !uploading && !pics.some(it => it.state === 'failed');
+    const drawPics = () => { strip.hidden = !pics.length; drawPictureTray(strip, pics, {
+        remove: i => { const it = pics.splice(i, 1)[0]; URL.revokeObjectURL(it.previewUrl); drawPics(); },
+        retry: i => { const it = pics[i]; if (it?.state !== 'failed') return; pics.splice(i, 1); URL.revokeObjectURL(it.previewUrl); addImages([it.file], it.session); },
+    }); send.disabled = !canSend(); };
     // An image goes up to the asking agent's own computer the way the message box's does (one uploader, postImage): it needs that agent to be running.
     const agentSession = () => (state.liveSessions || []).find(x => [x.display_name, x.name].includes(asker) && sessionTeamKey(x) === team) || null; // the agent of THIS team on THIS computer: another team's agent of the same name is not the one asked
-    const addImages = async files => {
-        const session = agentSession();
+    const addImages = async (files, session = agentSession()) => {
         if (!session) { showToast(`${asker} is not running, so an image cannot be sent to it now.`, true); return; }
         for (const file of files) {
             const prepared = await prepareImage(file); if (prepared.error) { showToast(prepared.error, true); continue; }
+            const draft = { file: prepared.file, session, name: file.name || 'Picture', previewUrl: URL.createObjectURL(prepared.file), state: 'uploading' }; pics.push(draft);
             uploading++; drawPics();
-            let result = null; try { result = await postImage(prepared.file, session, () => addImages([file])); } finally { uploading--; }
-            if (result) pics.push({ path: result.path, filename: result.filename, artifact: result.artifact || null, previewUrl: URL.createObjectURL(prepared.file) });
+            let result = null; try { result = await postImage(prepared.file, session, () => {}); } catch { /* shown in the tray */ } finally { uploading--; }
+            if (!pics.includes(draft)) continue;
+            Object.assign(draft, result ? { path: result.path, filename: result.filename, artifact: result.artifact || null, state: 'ready' } : { state: 'failed' });
             drawPics();
         }
     };
@@ -85,7 +90,7 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     dlg.addEventListener('drop', e => { const f = [...(e.dataTransfer?.files || [])].filter(x => x.type.startsWith('image/')); if (!f.length) return; e.preventDefault(); addImages(f); });
     dlg.append(head, status, list, label, strip, attachRow, err, actions); document.body.append(dlg);
     const opener = document.activeElement;
-    const finish = () => { dlg.close(); dlg.remove(); if (onDone) onDone(); if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true }); };
+    const finish = () => { for (const it of pics.splice(0)) URL.revokeObjectURL(it.previewUrl); dlg.close(); dlg.remove(); if (onDone) onDone(); if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true }); };
     close.addEventListener('click', finish); dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     board.addEventListener('click', () => { finish(); openBoard(row); });
     reopen.addEventListener('click', async () => {
@@ -101,6 +106,7 @@ export async function openThread(row, { onDone, openBoard, openTask } = {}) {
     const paint = () => { list.replaceChildren(...thread.map(block)); status.hidden = true; send.disabled = !canSend(); };
     box.addEventListener('input', () => { send.disabled = !canSend(); err.textContent = ''; });
     send.addEventListener('click', async () => {
+        if (!canSend()) return;
         const text = [...attachmentsLead(pics), box.value.trim()].filter(Boolean).join('\n\n'); if (!text) return;
         const parent = thread.length && !kept ? thread[thread.length - 1] : { id: askId, subscriber_id: asker };
         send.disabled = true; err.textContent = '';

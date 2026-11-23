@@ -29,8 +29,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`document.documentElement.style.fontSize = '${fs}px'; import((window.__coralStatic || '/static/') + 'goal_editor.js').then(m => { m.openGoalEditor({ project: 'team-a' }); return true; })`);
-            await waitFor(`!!document.querySelector('.goal-editor .goal-drop') && !document.querySelector('#goal-new-driver').disabled`, `${tag}: the screen with its picture tile`, 8000);
-            check(`${tag}: the tile says what it takes`, /Drop, paste or choose/.test(await ev(`document.querySelector('.goal-drop').textContent`)) && (await label()) === 'Pictures');
+            await waitFor(`!!document.querySelector('.goal-editor .ac-add-image') && !document.querySelector('#goal-new-driver').disabled`, `${tag}: the screen with its picture tile`, 8000);
+            check(`${tag}: the tile says what it takes`, /Add image/.test(await ev(`document.querySelector('.goal-editor .ac-add-image').textContent`)) && (await label()) === 'Pictures');
 
             // paste into the text
             await ev(`(() => { const dt = new DataTransfer(); dt.items.add(${file('pasted.png')}); const t = document.getElementById('goal-new-description'); t.focus(); t.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
@@ -50,7 +50,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             check(`${tag}: three were stored on the team`, (await ev(`window.__uploads.length`)) === 3);
             // mark up and remove are reachable: by focus on a desktop, always on a phone
             await ev(`document.querySelector('.goal-editor .ac-thumb .ac-thumb-remove').focus(); true`); await new Promise(r => setTimeout(r, 150)); // sleep-ok: the focus style has no event
-            const ops = await ev(`(() => { const b = document.querySelector('.goal-editor .ac-thumb .ac-thumb-remove'); const r = b.getBoundingClientRect(), o = Number(getComputedStyle(b).opacity), m = document.querySelector('.goal-editor .ac-thumb .ac-thumb-markup').getBoundingClientRect(); return { remove: [Math.round(r.width), Math.round(r.height)], opacity: o, overlap: !(r.right <= m.left || m.right <= r.left) }; })()`);
+            const ops = await ev(`(() => { const b = document.querySelector('.goal-editor .ac-thumb .ac-thumb-remove'); const r = b.getBoundingClientRect(), o = Number(getComputedStyle(b).opacity), m = document.querySelector('.goal-editor .ac-thumb .ac-thumb-markup').getBoundingClientRect(); return { remove: [Math.round(r.width), Math.round(r.height)], opacity: o, overlap: !(r.right <= m.left || m.right <= r.left || r.bottom <= m.top || m.bottom <= r.top) }; })()`);
             check(`${tag}: Remove shows on focus and does not sit on Mark up`, ops.opacity === 1 && !ops.overlap, JSON.stringify(ops));
             if (mobile && fs === 16) check(`${tag}: on a phone the buttons are drawn without a hover and are at least 32 px`, ops.remove[1] >= 32, JSON.stringify(ops));
             check(`${tag}: nothing scrolls sideways`, (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) <= 0 && (await ev(`(() => { const d = document.querySelector('dialog.goal-editor'); return d.scrollWidth - d.clientWidth; })()`)) <= 1);

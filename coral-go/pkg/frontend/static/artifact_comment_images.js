@@ -3,6 +3,7 @@
  * text or as an attribute, never as HTML. The tray is kept by the composing state, so a redraw of the panel gives the same node back with its pictures. */
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
+const { drawPictureTray } = await importOnce('./picture_tray.js');
 const api = await importOnce('./artifact_comments_api.js'); // lazy: its failure is retried
 await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -14,7 +15,7 @@ const typeOf = f => String((f && f.type) || '').toLowerCase();
 /** The tray of one comment being written. `upload(blob, versionOf)` stores (versionOf only on a marked-up copy) a picture and resolves its { hex, name, contentType, size }; `onChange()` is told whenever the pictures or their state change. */
 export function createImageTray({ upload, onChange = () => {}, hintText = HINT }) {
     const node = el('div', 'ac-images'); node.hidden = true;
-    const list = el('ul', 'ac-thumbs'); list.setAttribute('aria-label', 'Pictures to send with this comment');
+    const list = el('ul', 'ac-thumbs'); list.setAttribute('aria-label', 'Pictures to send');
     const note = el('p', 'ac-images-note'); note.setAttribute('role', 'status'); note.hidden = true;
     node.append(list, note);
     const items = [];
@@ -22,18 +23,7 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
 
     const say = (text) => { note.textContent = text || ''; note.hidden = !text; };
     const draw = () => {
-        list.replaceChildren(...items.map(it => {
-            const li = el('li', `ac-thumb ac-thumb-${it.state}`);
-            const img = el('img', 'ac-thumb-img'); img.src = it.previewUrl; img.alt = it.name || 'Picture'; img.decoding = 'async';
-            const stateText = it.state === 'uploading' ? 'Uploading…' : it.state === 'failed' ? (it.error || 'Not stored') : '';
-            const state = el('span', 'ac-thumb-state', stateText); state.hidden = !stateText; if (it.state === 'failed') state.setAttribute('role', 'alert');
-            const rm = el('button', 'btn btn-small ac-thumb-remove', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', `Remove ${it.name || 'picture'}`);
-            rm.addEventListener('click', () => remove(it.id));
-            const mk = el('button', 'btn btn-small ac-thumb-markup', 'Mark up'); mk.type = 'button'; mk.setAttribute('aria-label', `Mark up ${it.name || 'picture'}`); mk.hidden = it.state !== 'ready';
-            mk.addEventListener('click', () => markUp(it.id));
-            li.append(img, state, mk, rm);
-            return li;
-        }));
+        drawPictureTray(list, items, { remove: i => remove(items[i].id), retry: i => store(items[i]), markUp: i => markUp(items[i].id) });
         node.hidden = items.length === 0 && note.hidden;
         change();
     };
@@ -50,13 +40,19 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
         const room = api.COMMENT_IMAGE_MAX - items.length, take = ok.slice(0, Math.max(room, 0)), over = ok.length - take.length;
         const notes = [];
         if (bad.length) notes.push(bad.some(f => f.size > MAX_BYTES) && bad.every(f => api.COMMENT_IMAGE_TYPES.includes(typeOf(f))) ? 'That picture is larger than 25 MB.' : 'Only PNG, JPEG and WebP pictures can be added.');
-        if (over > 0) notes.push(`A comment carries at most ${api.COMMENT_IMAGE_MAX} pictures.`);
+        if (over > 0) notes.push(`You can add at most ${api.COMMENT_IMAGE_MAX} pictures here.`);
         say(notes.join(' '));
         for (const f of take) {
             const it = { id: ++seq, name: f.name || 'pasted-image', blob: f, previewUrl: URL.createObjectURL(f), hex: '', state: 'uploading', error: '' };
             items.push(it);
-            Promise.resolve().then(() => upload(f, undefined)).then(r => { it.hex = r.hex; it.state = 'ready'; }, e => { it.state = 'failed'; it.error = e && e.message ? e.message : 'Not stored'; }).finally(() => { if (!destroyed) draw(); });
+            store(it);
         }
+        draw();
+    }
+    function store(it) {
+        if (destroyed || !items.includes(it) || it.pending) return;
+        it.state = 'uploading'; it.error = ''; it.pending = true;
+        Promise.resolve().then(() => upload(it.blob, undefined)).then(r => { it.hex = r.hex; it.state = 'ready'; }, e => { it.state = 'failed'; it.error = e && e.message ? e.message : 'Picture not uploaded.'; }).finally(() => { it.pending = false; if (!destroyed && items.includes(it)) draw(); });
         draw();
     }
     /** Mark up (#11654): the editor loads on the first use, its picture goes up as the next version of the one it marks (`versionOf` is the first version's hex, kept through repeated marking), and replaces it here. Cancel, or Done with no marks, changes nothing. */
@@ -83,7 +79,7 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
     function picker() {
         const wrap = el('span', 'ac-picker');
         const input = el('input'); input.type = 'file'; input.accept = api.COMMENT_IMAGE_TYPES.join(','); input.multiple = true; input.hidden = true; input.tabIndex = -1; input.setAttribute('aria-hidden', 'true');
-        const b = el('button', 'btn btn-small ac-add-image', 'Add image'); b.type = 'button'; b.setAttribute('aria-label', 'Add an image to this comment'); b.title = 'Pictures only: PNG, JPEG or WebP. To give the team any other file, use Add files on the Artifacts tab.'; // said before a file is picked (#15317), not only after a refusal
+        const b = el('button', 'btn btn-small ac-add-image', 'Add image'); b.type = 'button'; b.setAttribute('aria-label', 'Add image'); b.title = 'Pictures only: PNG, JPEG or WebP. To give the team any other file, use Add files on the Artifacts tab.'; // said before a file is picked (#15317), not only after a refusal
         b.addEventListener('click', () => input.click());
         input.addEventListener('change', () => { add(input.files); input.value = ''; });
         wrap.append(b, input);

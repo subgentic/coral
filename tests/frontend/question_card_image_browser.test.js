@@ -49,14 +49,14 @@ const STUB = `
             await ev(`import((window.__coralStatic || '/static/') + 'card_attach.js').then(() => true)`);
             // pasting a picture into the answer box: one upload, a chip in the card, nothing in the message box's strip
             await ev(`(() => { const dt = new DataTransfer(); dt.items.add(new File([Uint8Array.from(atob(${JSON.stringify(PNG)}), c => c.charCodeAt(0))], 'shot.png', { type: 'image/png' })); const i = ${F}.querySelector('.cni-text-input'); i.focus(); i.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
-            await waitFor(`${F}.querySelectorAll('.cni-attach .image-attachment').length === 1`, `${at}: the pasted image's chip in the card`, 8000);
+            await waitFor(`${F}.querySelectorAll('.cni-attach .ac-thumb-ready').length === 1`, `${at}: the pasted image's chip in the card`, 8000);
             const chip = await ev(`(() => { const f = ${F}, c = f.querySelector('.cni-attach'); const r = c.getBoundingClientRect(), i = f.querySelector('.cni-text-input').getBoundingClientRect(); return { shown: !c.hidden && r.height > 0, above: r.bottom <= i.top + 1, remove: !!c.querySelector('.cni-attach-remove'), removeName: c.querySelector('.cni-attach-remove').getAttribute('aria-label'), strip: document.getElementById('image-attachments') ? document.getElementById('image-attachments').children.length : 0, uploads: window.__uploads }; })()`);
             check(chip.shown && chip.above && chip.remove, `${at}: the chip shows above the box with a remove button: ${JSON.stringify(chip)}`);
             check(chip.strip === 0 && chip.uploads === 1, `${at}: the message box's strip is untouched and the image went up once: ${JSON.stringify(chip)}`);
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); await ev(`${F}.scrollIntoView({ block: 'center' }); true`); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/question-card-image-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             // the chip survives the card being drawn again (the terminal's screen changed)
             await ev(`window.__promptScreen = { ...window.__promptScreen, title: 'Redrawn' }; true`);
-            await waitFor(`!!${F} && ${F}.querySelectorAll('.cni-attach .image-attachment').length === 1`, `${at}: the chip stays when the card is drawn again`, 8000);
+            await waitFor(`!!${F} && ${F}.querySelectorAll('.cni-attach .ac-thumb-ready').length === 1`, `${at}: the chip stays when the card is drawn again`, 8000);
             // too big, and not a picture: refused in words, nothing uploaded
             await ev(`(() => { const i = ${F}.querySelector('.cni-text-input'); const paste = file => { const dt = new DataTransfer(); dt.items.add(file); i.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); };
                 paste(new File([new Uint8Array(23 * 1024 * 1024)], 'huge.png', { type: 'image/png' })); paste(new File([new Uint8Array(10)], 'photo.heic', { type: 'image/heic' })); return true; })()`);
@@ -75,7 +75,7 @@ const STUB = `
             await waitFor(`!!${F}`, `${at}: the card again`, 8000);
             check(await ev(`!!${F}.querySelector('.cni-attach-btn') && ${F}.querySelector('.cni-attach-btn').getAttribute('aria-label') === 'Add image' && ${F}.querySelector('.cni-attach-btn').getBoundingClientRect().height >= ${mobile ? 44 : 24} && ${F}.querySelector('.cni-attach-btn').getBoundingClientRect().width >= ${mobile ? 44 : 28}`), `${at}: an Add image button is there${mobile ? ' and a 44 px target' : ''}`);
             await ev(`(() => { const dt = new DataTransfer(); dt.items.add(new File([Uint8Array.from(atob(${JSON.stringify(PNG)}), c => c.charCodeAt(0))], 'pick.png', { type: 'image/png' })); const inp = ${F}.querySelector('.cni-attach-input'); inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`${F}.querySelectorAll('.cni-attach .image-attachment').length === 1`, `${at}: a picked image's chip`, 8000);
+            await waitFor(`${F}.querySelectorAll('.cni-attach .ac-thumb-ready').length === 1`, `${at}: a picked image's chip`, 8000);
             await ev(`${F}.querySelector('.cni-attach-remove').click(); true`);
             await waitFor(`${F}.querySelectorAll('.cni-attach .image-attachment').length === 0`, `${at}: remove takes the chip out`, 4000);
             await ev(`(() => { ${F}.querySelector('.cni-text-input').value = 'just words'; ${F}.requestSubmit(); return true; })()`);

@@ -43,8 +43,8 @@ async function httpJson(method, p, body, headers = {}) {
                 return real(u, o); };
             const ce = console.error; console.error = (...a) => { window.__rec.errors.push(a.map(x => String(x && x.message || x)).join(' ')); ce.apply(console, a); };
             new MutationObserver(() => { for (const t of document.querySelectorAll('.toast, #toast-container *')) { const x = (t.textContent || '').replace(/\\s+/g, ' ').trim(); if (x && !window.__rec.toasts.includes(x)) window.__rec.toasts.push(x); } }).observe(document.body, { childList: true, subtree: true, characterData: true });
-            const strip = document.getElementById('image-attachments'); const proto = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
-            if (strip) Object.defineProperty(strip, 'innerHTML', { configurable: true, get() { return proto.get.call(this); }, set(v) { if (window.__breakStrip) throw new Error('strip cannot be drawn'); proto.set.call(this, v); } });
+            const strip = document.getElementById('image-attachments'), replace = strip.replaceChildren;
+            strip.replaceChildren = function (...nodes) { if (window.__breakStrip) throw new Error('strip cannot be drawn'); return replace.apply(this, nodes); };
             return true; })()`);
         await ev(`window.selectLiveSession(${JSON.stringify(name)}, 'claude', ${JSON.stringify(sid)}, 'local'); true`);
         await waitFor(`!!window.T && T.state.currentSession && T.state.currentSession.session_id === ${JSON.stringify(sid)}`, 'the agent is open', 15000);
@@ -54,7 +54,7 @@ async function httpJson(method, p, body, headers = {}) {
             const before = await ev(`window.__uploadsHandled`);
             await ev(`(() => { const i = document.getElementById('attach-image-input'); i.addEventListener('click', e => e.preventDefault(), { once: true }); document.querySelector('.attach-image-btn').click(); return true; })()`);
             await ev(`(async () => { const c = document.createElement('canvas'); c.width = 300; c.height = 200; const x = c.getContext('2d'); x.fillStyle = '#39c'; x.fillRect(0, 0, 300, 200); const b = await new Promise(r => c.toBlob(r, 'image/png')); const f = new File([b], 'image.png', { type: 'image/png' }); const dt = new DataTransfer(); dt.items.add(f); const input = document.getElementById('attach-image-input'); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            await waitFor(`window.__uploadsHandled > ${before}`, 'the page to finish with the upload', 15000);
+            await waitFor(`window.__uploadsHandled > ${before} && import((window.__coralStatic || '/static/') + 'image_composer.js').then(m => !m.activeUploadPromisesBySession.has(window.__sid))`, 'the page to finish with the upload', 15000);
             await settle(1500);
             return ev(`({ toasts: window.__rec.toasts.filter(t => !/Agents loading|Sign-in|tmux/.test(t)), errors: window.__rec.errors, chips: document.querySelectorAll('#image-attachments .image-attachment').length, pending: T.state.currentSession && (document.querySelectorAll('#image-attachments .image-attachment').length), input: document.getElementById('command-input').value })`);
         };
@@ -67,8 +67,9 @@ async function httpJson(method, p, body, headers = {}) {
 
         await reset('throw');
         r = await attach();
-        check('a request that fails says "Upload didn\'t finish" with Retry, and logs the error', r.chips === 0 && r.toasts.some(t => /Upload didn.t finish/.test(t)) && r.errors.some(e => /Upload request failed/.test(e) && /network down/.test(e)), JSON.stringify(r));
+        check('a request that fails says "Upload didn\'t finish" with Retry, and logs the error', r.chips === 1 && r.toasts.some(t => /Upload didn.t finish/.test(t)) && r.errors.some(e => /Upload request failed/.test(e) && /network down/.test(e)), JSON.stringify(r));
 
+        await clearChips();
         await reset('ok');
         await ev(`(() => { window.__origCreate = URL.createObjectURL; URL.createObjectURL = () => { throw new Error('no object url'); }; return true; })()`);
         r = await attach();

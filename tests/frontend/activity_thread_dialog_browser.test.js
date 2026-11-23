@@ -50,7 +50,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await ev(`[...document.querySelectorAll('.activity-thread-body')].map(e => e.textContent.trim())`), ['Should we ship it?', '@Ada yes, ship it', 'Shipped. Anything else?']);
         assert.equal(await ev(`document.querySelector('.activity-thread-send').disabled`), true, 'Send reply waits for words');
         // mockup v3 (#15774): one Reply box with Attach image and its hint, the buttons at the right with Send reply last, the thread as a chat (the Operator's words on the right)
-        const v3 = await ev(`(() => { const d = document.querySelector('dialog.activity-thread-dialog'); const b = [...d.querySelectorAll('.activity-thread-actions .btn')].filter(x => !x.hidden).map(x => x.textContent.trim()); const mine = d.querySelector('.activity-thread-mine'), other = d.querySelector('.activity-thread-msg:not(.activity-thread-mine)'); return { attach: [...d.querySelectorAll('button')].some(x => x.textContent.trim() === 'Attach image'), hint: /Paste or drop an image here too/.test(d.textContent), buttons: b, reply: !!d.querySelector('textarea') && d.querySelectorAll('textarea').length === 1, mineRight: !!mine && !!other && mine.getBoundingClientRect().left > other.getBoundingClientRect().left }; })()`);
+        const v3 = await ev(`(() => { const d = document.querySelector('dialog.activity-thread-dialog'); const b = [...d.querySelectorAll('.activity-thread-actions .btn')].filter(x => !x.hidden).map(x => x.textContent.trim()); const mine = d.querySelector('.activity-thread-mine'), other = d.querySelector('.activity-thread-msg:not(.activity-thread-mine)'); return { attach: [...d.querySelectorAll('button')].some(x => x.textContent.trim() === 'Add image'), hint: /Paste or drop an image here too/.test(d.textContent), buttons: b, reply: !!d.querySelector('textarea') && d.querySelectorAll('textarea').length === 1, mineRight: !!mine && !!other && mine.getBoundingClientRect().left > other.getBoundingClientRect().left }; })()`);
         assert.ok(v3.attach && v3.hint && v3.reply && v3.mineRight, JSON.stringify(v3));
         assert.equal(v3.buttons[v3.buttons.length - 1], 'Send reply', 'Send reply is the last, right-most button: ' + JSON.stringify(v3.buttons));
         await shot('activity-thread-1280');
@@ -70,7 +70,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.querySelectorAll('dialog.activity-thread-dialog .image-attachment').length`), 0);
         await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.liveSessions = [...(m.state.liveSessions || []), { name: 'Ada', display_name: 'Ada', session_id: 'sid-ada', agent_type: 'claude', type: 'live', board_project: 'tm' }]; return true; })`);
         await pickImage();
-        await waitFor(`document.querySelectorAll('dialog.activity-thread-dialog .image-attachment').length === 1`, 'the agent is running: the picture is attached', 8000);
+        await waitFor(`document.querySelectorAll('dialog.activity-thread-dialog .ac-thumb-ready').length === 1`, 'the agent is running: the picture is attached', 8000);
         assert.equal(await ev(`window.__uploads`), 1, 'it was uploaded once');
         assert.deepEqual(await ev(`window.__uploadFor`), ['sid-ada'], "and for this team's agent");
         await ev(`document.querySelector('.activity-thread-send').click(); true`);

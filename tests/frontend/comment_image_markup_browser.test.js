@@ -67,7 +67,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await ev(`(async () => { const c = document.createElement('canvas'); c.width = 400; c.height = 250; const x = c.getContext('2d'); x.fillStyle = '#0000ff'; x.fillRect(0, 0, 400, 250); const b = await new Promise(r => c.toBlob(r, 'image/png')); window.__big = new File([b], 'shot.png', { type: 'image/png' }); const i = document.querySelector('.ac-composer .ac-picker input'); i.files = window.__dt([window.__big]).files; i.dispatchEvent(new Event('change')); return true; })()`);
             await waitFor(`document.querySelectorAll('.ac-composer .ac-thumb-img').length === 1`, at + 'the thumbnail', 5000); await settled();
             const markBtn = `document.querySelector('.ac-composer .ac-thumb-markup')`;
-            assert.equal(await ev(`${markBtn}.textContent + '|' + ${markBtn}.getAttribute('aria-label')`), 'Mark up|Mark up shot.png', at + 'a ready picture has Mark up, named');
+            assert.equal(await ev(`${markBtn}.querySelector('.material-icons[aria-hidden=\"true\"]').textContent + '|' + ${markBtn}.getAttribute('aria-label')`), 'edit|Mark up shot.png', at + 'a ready picture has Mark up, named');
             if (mobile) assert.ok((await ev(`${markBtn}.getBoundingClientRect().height`)) >= 43.5, at + 'a 44 px target');
             const dlg = `document.querySelector('dialog.markup-dialog')`;
             const drag = async (a, b) => {
