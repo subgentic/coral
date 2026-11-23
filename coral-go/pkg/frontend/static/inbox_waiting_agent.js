@@ -25,6 +25,11 @@ export function commentedNode(r, plain, ago) {
     const line = el('span', 'inbox-commented', `You commented ${ago(it.since)}, waiting for ${markHidden(it.agent?.name || r.produced_by || 'the agent', { strict: true })}`);
     line.title = 'You commented. The agent has not replied or sent a new version yet. The file stays in For review.'; return line;
 }
+/** The Operator's own words under the title of a commented row, as the mock's quoted line (#20735): null when the row has no You commented line. */
+export function commentedQuote(r, plain) {
+    const it = plain && !(r.new_comments > 0) && commentedOn(r.id); if (!it || !it.operator_words) return null;
+    return el('span', 'inbox-commented-quote', `\u201c${String(it.operator_words).replace(/\s+/g, ' ').trim()}\u201d`);
+}
 export const dismissArtifact = hex => { for (const it of items) if (it.kind === 'comment_sent' && String(it.artifact?.hex || '').toLowerCase() === String(hex || '').toLowerCase()) dismiss(it); };
 let items = [], failed = false, readAt = 0, inflight = null, redraw = () => {};
 

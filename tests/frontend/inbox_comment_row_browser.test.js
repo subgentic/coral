@@ -79,6 +79,14 @@ const { coralReady } = require('./helpers/wait');
                 check(JSON.stringify(await said('Quiet file.txt')) === '[]', 'another file has no line');
                 check(await ev(`!![...(${row('Commented file.txt')}).querySelectorAll('button')].find(b => /^Approve$/.test(b.textContent.trim()))`), 'Approve is still on the row');
                 check(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), 'no horizontal overflow');
+                check(JSON.stringify(await ev(`[...(${row('Commented file.txt')}).querySelectorAll('.inbox-commented-quote')].map(e => e.textContent.trim())`)) === JSON.stringify(['\u201cTighten the intro.\u201d']), 'the row quotes your comment');
+                check(await ev(`!![...(${row('Commented file.txt')}).querySelectorAll('button')].find(b => /^Approve$/.test(b.textContent.trim()) && b.classList.contains('btn-quiet'))`), 'Approve is quiet on a commented row');
+                check(await ev(`!![...(${row('Quiet file.txt')}).querySelectorAll('button')].find(b => /^Approve$/.test(b.textContent.trim()) && !b.classList.contains('btn-quiet'))`), 'Approve stays normal on another row');
+                // 1b. the agent replies with a new comment: the line goes at once, even while the server still lists your comment
+                await ev(`(async()=>{window.__reviewItems.find(a=>a.name==='Commented file.txt').new_comments=1;await (await import((window.__coralStatic||'/static/')+'inbox_reviews.js')).refreshReviews(true);return true;})()`);
+                await waitFor(`!!(${row('Commented file.txt')}) && !(${row('Commented file.txt')}).querySelector('.inbox-commented, .inbox-commented-quote')`, 'a new comment from the agent takes the You commented line away');
+                await ev(`(async()=>{window.__reviewItems.find(a=>a.name==='Commented file.txt').new_comments=0;await (await import((window.__coralStatic||'/static/')+'inbox_reviews.js')).refreshReviews(true);return true;})()`);
+                await waitFor(`!!(${row('Commented file.txt')}).querySelector('.inbox-commented')`, 'the line is back once the new comment is read');
                 // 2. it is not under Waiting on an agent
                 await ev(`document.querySelector('[data-needs-tab="agent"]').click(); true`);
                 await waitFor(`!!(${row('Awake file.txt')})`, 'Waiting on an agent shows the sent-back file');
