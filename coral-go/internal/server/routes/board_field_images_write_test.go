@@ -418,3 +418,89 @@ func TestACommentEditReplacesItsPicturesAndAnOmittedFieldLeavesThem(t *testing.T
 		assert.Less(t, code, 500, name)
 	}
 }
+
+// #20750: an upload stays nameable for 24 h across a restart (the memory is also in the store), and a write whose pictures could not be saved says so plainly (#20758).
+func TestAnUploadIsStillNameableAfterARestart(t *testing.T) {
+	e := newFieldWriteEnv(t)
+	a := e.upload(t, "task", "rs", 60)
+	recentFieldImages.Lock() // a restart: this process's memory is empty
+	recentFieldImages.m = map[string]time.Time{}
+	recentFieldImages.Unlock()
+
+	code, out := e.json(t, "POST", "/api/board/alpha/tasks", map[string]any{"title": "after restart", "body": "x", "created_by": "Operator", "subscriber_id": "Operator", "images_draft": "rs", "images": map[string]any{"description": []string{a}}})
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.Equal(t, []string{a}, imagesOf(out, "description"))
+
+	// Another draft's upload is still not nameable, and a row older than 24 h is not either.
+	code, out = e.json(t, "POST", "/api/board/alpha/tasks", map[string]any{"title": "other draft", "body": "x", "created_by": "Operator", "subscriber_id": "Operator", "images_draft": "elsewhere", "images": map[string]any{"description": []string{a}}})
+	assert.Equal(t, http.StatusBadRequest, code, "%v", out)
+	assert.Equal(t, "picture_not_yours", out["code"])
+	require.NoError(t, e.h.bs.RememberFieldUpload(context.Background(), "alpha", "old-scope", a, time.Now().Add(-25*time.Hour)))
+	assert.False(t, e.h.recentFieldUpload(context.Background(), "old-scope", a, time.Now()), "a 25 h row is not nameable")
+}
+
+func TestAnUploadRowOlderThanSevenDaysIsSwept(t *testing.T) {
+	e := newFieldWriteEnv(t)
+	ctx := context.Background()
+	require.NoError(t, e.h.bs.RememberFieldUpload(ctx, "alpha", "s-old", strings.Repeat("a", 64), time.Now().Add(-8*24*time.Hour)))
+	_, ok := e.h.bs.FieldUploadedAt(ctx, "s-old", strings.Repeat("a", 64))
+	require.True(t, ok)
+	require.NoError(t, e.h.bs.RememberFieldUpload(ctx, "alpha", "s-new", strings.Repeat("b", 64), time.Now())) // the next upload sweeps
+	_, ok = e.h.bs.FieldUploadedAt(ctx, "s-old", strings.Repeat("a", 64))
+	assert.False(t, ok, "an 8-day-old row is gone")
+	_, ok = e.h.bs.FieldUploadedAt(ctx, "s-new", strings.Repeat("b", 64))
+	assert.True(t, ok)
+}
+
+func TestAWriteWhosePicturesCouldNotBeSavedSaysSo(t *testing.T) {
+	e := newFieldWriteEnv(t)
+	a := e.upload(t, "task", "f1", 70)
+	e.h.setFieldImages = func(context.Context, string, string, string, map[string][]board.GoalImage) error { return fmt.Errorf("disk full") }
+
+	code, out := e.json(t, "POST", "/api/board/alpha/tasks", map[string]any{"title": "lossy", "body": "x", "created_by": "Operator", "subscriber_id": "Operator", "images_draft": "f1", "images": map[string]any{"description": []string{a}}})
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.Equal(t, true, out["pictures_not_saved"], "the task is made and the answer says its pictures were not saved")
+	assert.Empty(t, imagesOf(out, "description"))
+
+	chat := e.upload(t, "chat", "f1", 71)
+	code, out = e.json(t, "POST", "/api/board/alpha/messages", map[string]any{"content": "words", "images_draft": "f1", "subscriber_id": "Operator", "images": map[string]any{"content": []string{chat}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, true, out["pictures_not_saved"], "a post says it too")
+
+	e.h.setFieldImages = nil
+	code, out = e.json(t, "POST", "/api/board/alpha/tasks", map[string]any{"title": "fine", "body": "x", "created_by": "Operator", "subscriber_id": "Operator", "images_draft": "f1", "images": map[string]any{"description": []string{a}}})
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	assert.Nil(t, out["pictures_not_saved"], "a saved write carries no such flag")
+}
+
+func TestARepeatedDecisionKeepsItsNewPicturesOrRefusesPlainly(t *testing.T) {
+	old := uploaderLookup
+	t.Cleanup(func() { uploaderLookup = old })
+	c := newChangesEnv(t)
+	uploaderLookup = func(_ context.Context, sessionID string) (string, string, string) { return "alpha", "Alice", "worker" }
+	up := chi.NewRouter()
+	up.Post("/api/board/{project}/field-images", func(w http.ResponseWriter, req *http.Request) {
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		c.h.UploadFieldImage(w, req)
+	})
+	us := httptest.NewServer(up)
+	t.Cleanup(us.Close)
+	fe := &fieldWriteEnv{h: c.h, srv: us}
+	first, second := fe.upload(t, "task", "rep", 110), fe.upload(t, "task", "rep", 111)
+
+	code, out := c.changes(t, `{"decision":"approve","note":"good","images_draft":"rep","images":{"note":["`+first+`"]}}`)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	code, out = c.changes(t, `{"decision":"approve","note":"good","images_draft":"rep","images":{"note":["`+second+`"]}}`)
+	kept, err := c.h.bs.FieldImages(context.Background(), "alpha", board.FieldImagesDecision, c.id)
+	require.NoError(t, err)
+	if code == http.StatusOK {
+		require.Len(t, kept["note"], 1, "a repeat that is answered 200 has kept its pictures")
+		assert.Equal(t, second, kept["note"][0].Hex)
+	} else {
+		assert.Equal(t, http.StatusConflict, code, "%v", out)
+		assert.NotEmpty(t, out["code"], "a refusal says why")
+		require.Len(t, kept["note"], 1)
+		assert.Equal(t, first, kept["note"][0].Hex, "a refused repeat leaves the first pictures")
+	}
+	t.Logf("repeat: %d %v", code, out["code"])
+}

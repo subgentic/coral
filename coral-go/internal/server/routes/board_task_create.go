@@ -445,8 +445,9 @@ func (h *BoardHandler) keepTaskPictures(r *http.Request, project string, task *b
 	if len(pictures) == 0 || task == nil {
 		return
 	}
-	if err := h.bs.SetFieldImagesOf(r.Context(), project, board.FieldImagesTask, board.TaskFieldImagesOwner(task.ID), pictures); err != nil {
+	if err := h.saveFieldImages(r.Context(), project, board.FieldImagesTask, board.TaskFieldImagesOwner(task.ID), pictures); err != nil {
 		slog.Warn("[tasks] the pictures of a task were not kept", "board", project, "task", task.ID, "error", err)
+		task.PicturesNotSaved = true // the task is written; the Operator is told plainly that its pictures are not (#20758)
 		return
 	}
 	if m, err := h.bs.FieldImages(r.Context(), project, board.FieldImagesTask, board.TaskFieldImagesOwner(task.ID)); err == nil {

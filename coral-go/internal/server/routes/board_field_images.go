@@ -101,7 +101,7 @@ func (h *BoardHandler) storeFieldImage(w http.ResponseWriter, r *http.Request, p
 	if !ok {
 		return
 	}
-	rememberFieldImage(key, pic.hexID, time.Now()) // named by a write for the next 24 h (fieldImageTTL)
+	h.rememberFieldUpload(r.Context(), project, key, pic.hexID, time.Now()) // named by a write for the next 24 h (fieldImageTTL), kept across a restart
 	reply["source"], reply["scope"], reply["draft"] = sourceFieldImagePrefix+scope, scope, draft
 	writeJSON(w, http.StatusCreated, reply)
 }

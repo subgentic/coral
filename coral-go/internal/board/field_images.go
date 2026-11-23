@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // Pictures on the prose fields of a record (#20731, goal #285): the Operator's words in a field of a task, a message or a file's review decision can carry up to MaxGoalImages pictures per field,
@@ -83,3 +84,36 @@ func (s *Store) FieldImages(ctx context.Context, boardID, kind, owner string) (m
 
 // TaskFieldImagesOwner names a task as the owner of its pictures.
 func TaskFieldImagesOwner(taskID int64) string { return fmt.Sprintf("%d", taskID) }
+
+// FieldUploadKeep is how long a picture uploaded for a field is remembered at all: past it the row is swept (the 7 days of the contract); a write can name it for the first 24 hours (the routes' fieldImageTTL).
+const FieldUploadKeep = 7 * 24 * time.Hour
+
+func (s *Store) ensureFieldUploadsSchema(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS board_field_uploads (
+		board_id TEXT NOT NULL,
+		scope    TEXT NOT NULL,
+		hex      TEXT NOT NULL,
+		at       INTEGER NOT NULL,
+		PRIMARY KEY (scope, hex)
+	)`)
+	return err
+}
+
+// RememberFieldUpload records that a picture was uploaded for a field scope (the team, the field and the draft, as the route names it) so a write can name it after a restart; it also sweeps the rows older than FieldUploadKeep.
+// boardID is the team ("" for a person's field) and only says whose row it is.
+func (s *Store) RememberFieldUpload(ctx context.Context, boardID, scope, hex string, at time.Time) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM board_field_uploads WHERE at < ?`, at.Add(-FieldUploadKeep).Unix()); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO board_field_uploads (board_id, scope, hex, at) VALUES (?, ?, ?, ?) ON CONFLICT(scope, hex) DO UPDATE SET at = excluded.at, board_id = excluded.board_id`, boardID, scope, hex, at.Unix())
+	return err
+}
+
+// FieldUploadedAt says when a picture was uploaded for a field scope; false when it never was or its row is swept.
+func (s *Store) FieldUploadedAt(ctx context.Context, scope, hex string) (time.Time, bool) {
+	var at int64
+	if err := s.reader().GetContext(ctx, &at, `SELECT at FROM board_field_uploads WHERE scope = ? AND hex = ?`, scope, hex); err != nil {
+		return time.Time{}, false
+	}
+	return time.Unix(at, 0), true
+}

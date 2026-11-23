@@ -209,9 +209,11 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "could not record the review")
 		return
 	}
-	if change.Changed && len(pictures) > 0 {
-		if err := h.bs.SetFieldImagesOf(r.Context(), project, board.FieldImagesDecision, id, pictures); err != nil {
+	picturesLost := false
+	if len(pictures) > 0 { // saved whether or not this call changed the state: a repeat of a decision with new pictures still keeps them (QA on #20748)
+		if err := h.saveFieldImages(r.Context(), project, board.FieldImagesDecision, id, pictures); err != nil {
 			slog.Warn("[artifact review] the pictures of a decision were not kept", "board", project, "artifact", id, "error", err)
+			picturesLost = true
 		}
 	}
 	if change.Changed {
@@ -240,6 +242,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	inboxActioned(r, tracking.InboxReview, "", body.Decision, inboxTime(item.CreatedAt)) // the Inbox's numbers (#7512): a person's own decision, by kind and action only
 	reviews, _ := h.bs.ArtifactReviews(r.Context(), project)
 	out := map[string]any{"id": id, "state": state, "changed": change.Changed, "tags": tags, "review": reviews[id], "delivered": false}
+	if picturesLost {
+		out["pictures_not_saved"], out["pictures_warning"] = true, picturesNotSavedWords // #20758
+	}
 	if words != "" && h.changeWords != nil { // text_kept is how a client knows this computer took the words: one that predates them ignores the field and says nothing
 		out["text_kept"], out["comment_id"], out["delivered"] = true, wordsDone.CommentID, wordsDone.Delivery.To != ""
 		if wordsDone.Delivery.To != "" {

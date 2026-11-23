@@ -60,5 +60,9 @@ func (h *BoardHandler) ReplyToTask(w http.ResponseWriter, r *http.Request) {
 	if reply.prefix == "" {
 		out["warnings"] = []string{"creator_not_reachable"}
 	}
+	if msg.PicturesNotSaved {
+		out["pictures_not_saved"] = true
+		out["pictures_warning"] = picturesNotSavedWords
+	}
 	writeJSON(w, http.StatusOK, out)
 }

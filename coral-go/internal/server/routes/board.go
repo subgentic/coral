@@ -31,10 +31,11 @@ func taskClaimNudge(taskID int64) string {
 
 // BoardHandler handles message board HTTP endpoints.
 type BoardHandler struct {
-	nameRule    func(w http.ResponseWriter, ctx context.Context, project, name, exceptSessionName string) bool // names are unique in a team, archived agents included (#19673)
-	countCache  allCountCache                                                                                  // the cross-team list's answers to a count-only read (#18623)
-	itemsCache  teamItemsCache                                                                                 // the built list of a team's artifacts, kept for a walk of its pages (#13522)
-	goalDoneNow func() time.Time                                                                               // the clock of the "Goal looks done" quiet period (#12161); nil is time.Now
+	setFieldImages func(ctx context.Context, project, kind, owner string, pictures map[string][]board.GoalImage) error // nil: the store; a test's seam (#20758)
+	nameRule       func(w http.ResponseWriter, ctx context.Context, project, name, exceptSessionName string) bool      // names are unique in a team, archived agents included (#19673)
+	countCache     allCountCache                                                                                       // the cross-team list's answers to a count-only read (#18623)
+	itemsCache     teamItemsCache                                                                                      // the built list of a team's artifacts, kept for a walk of its pages (#13522)
+	goalDoneNow    func() time.Time                                                                                    // the clock of the "Goal looks done" quiet period (#12161); nil is time.Now
 	// goalDoneQuiet reads the quiet period (goal_done_quiet_minutes, #12161); nil: 15 minutes.
 	goalDoneQuietFn func(ctx context.Context) time.Duration
 	proposalNow     func() time.Time // a test's clock for the proposal sweeps (expiry and stuck claims); nil is time.Now
