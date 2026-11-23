@@ -63,6 +63,9 @@ func TestTheFeedListsWhatAHubGaveAndRevokeEndsItHere(t *testing.T) {
 	assert.Equal(t, "Ada from Acme", r.Person)
 	assert.NotContains(t, raw, g.ownK, "never the whole key id")
 
+	// The state filter is an enum.
+	assert.Equal(t, 400, call(g.d.r.srv.Router(), "GET", "/api/relayed-grant-notices?state=bogus", "", nil).Code)
+
 	// Revoke here ends it at once, twice is the same answer, an unknown id is 404.
 	h := g.d.r.srv.Router()
 	rec := call(h, "POST", "/api/relayed-grant-notices/"+r.GrantID+"/revoke", "", nil)

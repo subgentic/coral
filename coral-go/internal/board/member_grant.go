@@ -100,9 +100,11 @@ type MemberGrant struct {
 	CreatedAt     string  `db:"created_at" json:"created_at"`
 	ExpiresAt     string  `db:"expires_at" json:"expires_at"`
 	RevokedAt     *string `db:"revoked_at" json:"revoked_at,omitempty"`
+	ViaHub        bool    `db:"via_hub" json:"via_hub"`       // made by the owner's device through a Hub (#20914), not at this computer
+	RevokedBy     string  `db:"revoked_by" json:"revoked_by"` // what ended it: this computer, signed device, link removed; empty while live or expired
 }
 
-const memberGrantCols = `grant_id, link_id, hub_user, level, scope_kind, scope_id, board_id, flag_artifacts, flag_files, pinned_folder, label, signed_by, created_at, expires_at, revoked_at`
+const memberGrantCols = `grant_id, link_id, hub_user, level, scope_kind, scope_id, board_id, flag_artifacts, flag_files, pinned_folder, label, signed_by, created_at, expires_at, revoked_at, via_hub, revoked_by`
 
 // NewMemberGrant is what the owner's device signed. SignedBy, Nonce and Ts are the proof: a grant without them is never written, and a nonce is spent once.
 type NewMemberGrant struct {
@@ -120,6 +122,7 @@ type NewMemberGrant struct {
 	SignedBy      string
 	Nonce         string
 	Ts            int64
+	ViaHub        bool // the request came through a Hub (#20914)
 }
 
 // MemberGrantDigest is the text the owner's device signs: every field of the grant in one fixed order, behind a label no other protocol uses, so a signature made for a message of another kind (or for another
@@ -181,6 +184,8 @@ func (s *Store) ensureMemberGrantSchema(ctx context.Context) error {
 			created_at     TEXT NOT NULL,
 			expires_at     TEXT NOT NULL,
 			revoked_at     TEXT,
+			via_hub        INTEGER NOT NULL DEFAULT 0,
+			revoked_by     TEXT NOT NULL DEFAULT '',
 			CHECK (
 				(level = 'view' AND scope_kind IN ('board', 'agent') AND scope_id <> '' AND board_id <> '' AND (scope_kind <> 'board' OR scope_id = board_id))
 				OR (level = 'full' AND scope_kind = 'computer' AND scope_id = '' AND board_id = '' AND flag_artifacts = 0 AND flag_files = 0)
@@ -206,6 +211,21 @@ func (s *Store) ensureMemberGrantSchema(ctx context.Context) error {
 	} {
 		if _, err := s.db.ExecContext(ctx, ddl); err != nil {
 			return err
+		}
+	}
+	// A table made before the notice feed (#20914) gets its two columns.
+	for _, col := range []struct{ name, ddl string }{
+		{"via_hub", `ALTER TABLE member_grant ADD COLUMN via_hub INTEGER NOT NULL DEFAULT 0`},
+		{"revoked_by", `ALTER TABLE member_grant ADD COLUMN revoked_by TEXT NOT NULL DEFAULT ''`},
+	} {
+		var has int
+		if err := s.db.GetContext(ctx, &has, `SELECT COUNT(*) FROM pragma_table_info('member_grant') WHERE name = ?`, col.name); err != nil {
+			return err
+		}
+		if has == 0 {
+			if _, err := s.db.ExecContext(ctx, col.ddl); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -293,7 +313,7 @@ func (s *Store) CreateMemberGrant(ctx context.Context, in NewMemberGrant) (*Memb
 	sum := sha256.Sum256(MemberGrantDigest(in))
 	g := MemberGrant{GrantID: "mg-" + hex.EncodeToString(idb), LinkID: in.LinkID, HubUser: in.HubUser, Level: in.Level, ScopeKind: in.ScopeKind, ScopeID: in.ScopeID, BoardID: in.BoardID,
 		FlagArtifacts: in.FlagArtifacts, FlagFiles: in.FlagFiles, PinnedFolder: in.PinnedFolder, Label: label, SignedBy: in.SignedBy,
-		CreatedAt: now.Format(time.RFC3339), ExpiresAt: now.Add(time.Duration(days) * 24 * time.Hour).Format(time.RFC3339)}
+		CreatedAt: now.Format(time.RFC3339), ExpiresAt: now.Add(time.Duration(days) * 24 * time.Hour).Format(time.RFC3339), ViaHub: in.ViaHub}
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -328,9 +348,9 @@ func (s *Store) CreateMemberGrant(ctx context.Context, in NewMemberGrant) (*Memb
 	if n >= MemberGrantsPerPerson {
 		return nil, memberErr("this person already has as much access as Coral allows")
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO member_grant (grant_id, link_id, hub_user, level, scope_kind, scope_id, board_id, flag_artifacts, flag_files, pinned_folder, label, signed_by, signed_nonce, signed_digest, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		g.GrantID, g.LinkID, g.HubUser, g.Level, g.ScopeKind, g.ScopeID, g.BoardID, b2n(g.FlagArtifacts), b2n(g.FlagFiles), g.PinnedFolder, g.Label, g.SignedBy, in.Nonce, hex.EncodeToString(sum[:]), g.CreatedAt, g.ExpiresAt); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO member_grant (grant_id, link_id, hub_user, level, scope_kind, scope_id, board_id, flag_artifacts, flag_files, pinned_folder, label, signed_by, signed_nonce, signed_digest, created_at, expires_at, via_hub)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		g.GrantID, g.LinkID, g.HubUser, g.Level, g.ScopeKind, g.ScopeID, g.BoardID, b2n(g.FlagArtifacts), b2n(g.FlagFiles), g.PinnedFolder, g.Label, g.SignedBy, in.Nonce, hex.EncodeToString(sum[:]), g.CreatedAt, g.ExpiresAt, b2n(g.ViaHub)); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return nil, memberErr("that signature was already used")
 		}
@@ -407,6 +427,18 @@ func (s *Store) ListMemberGrants(ctx context.Context, board string, now time.Tim
 
 // RevokeMemberGrant ends a grant now. It is immediate: the next MemberGrantLive finds none. A grant that is not live is ErrNoMemberGrant.
 func (s *Store) RevokeMemberGrant(ctx context.Context, grantID string, now time.Time) (*MemberGrant, error) {
+	return s.RevokeMemberGrantBy(ctx, grantID, now, "")
+}
+
+// Who ended a grant (MemberGrant.RevokedBy), as a closed list the notice feed shows.
+const (
+	MemberRevokedHere   = "this computer"
+	MemberRevokedSigned = "signed device"
+	MemberRevokedLink   = "link removed"
+)
+
+// RevokeMemberGrantBy is RevokeMemberGrant that records what ended the grant.
+func (s *Store) RevokeMemberGrantBy(ctx context.Context, grantID string, now time.Time, by string) (*MemberGrant, error) {
 	if !memberIDRe.MatchString(grantID) {
 		return nil, ErrNoMemberGrant
 	}
@@ -424,7 +456,7 @@ func (s *Store) RevokeMemberGrant(ctx context.Context, grantID string, now time.
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE member_grant SET revoked_at = ? WHERE grant_id = ? AND revoked_at IS NULL`, ts, grantID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE member_grant SET revoked_at = ?, revoked_by = ? WHERE grant_id = ? AND revoked_at IS NULL`, ts, by, grantID); err != nil {
 		return nil, err
 	}
 	if err := memberAudit(ctx, tx, "revoked", g); err != nil {
@@ -443,13 +475,43 @@ func (s *Store) RevokeMemberGrantsOfLink(ctx context.Context, linkID string, now
 	}
 	n := 0
 	for _, g := range gs {
-		if _, err := s.RevokeMemberGrant(ctx, g.GrantID, now); err == nil {
+		if _, err := s.RevokeMemberGrantBy(ctx, g.GrantID, now, MemberRevokedLink); err == nil {
 			n++
 		} else if !errors.Is(err, ErrNoMemberGrant) {
 			return n, err
 		}
 	}
 	return n, nil
+}
+
+// MemberGrantNotices is every grant made since the given time, live, revoked or expired, newest first, for the notice feed (#20914); live only when liveOnly. At most limit rows.
+func (s *Store) MemberGrantNotices(ctx context.Context, since, now time.Time, liveOnly bool, limit int) ([]MemberGrant, error) {
+	out := []MemberGrant{}
+	q := `SELECT ` + memberGrantCols + ` FROM member_grant WHERE created_at >= ?`
+	args := []any{since.UTC().Format(time.RFC3339)}
+	if liveOnly {
+		q += ` AND revoked_at IS NULL AND expires_at > ?`
+		args = append(args, now.UTC().Format(time.RFC3339))
+	}
+	args = append(args, limit)
+	err := s.db.SelectContext(ctx, &out, q+` ORDER BY created_at DESC, rowid DESC LIMIT ?`, args...)
+	return out, err
+}
+
+// MemberGrantByID is one grant by id whatever its state; ErrNoMemberGrant when there is none.
+func (s *Store) MemberGrantByID(ctx context.Context, grantID string) (*MemberGrant, error) {
+	if !memberIDRe.MatchString(grantID) {
+		return nil, ErrNoMemberGrant
+	}
+	var g MemberGrant
+	err := s.db.GetContext(ctx, &g, `SELECT `+memberGrantCols+` FROM member_grant WHERE grant_id = ?`, grantID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNoMemberGrant
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &g, nil
 }
 
 // MemberGrantAuditCount is how many audit rows a grant has (for tests).
