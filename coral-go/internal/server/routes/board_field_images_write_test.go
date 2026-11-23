@@ -560,3 +560,37 @@ func TestWorkingModeCustomInstructionsCarryPictures(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	assert.Empty(t, imagesOf(out, "custom_instructions"))
 }
+
+// #20768: a client that reads the working mode and writes it back whole (coral-board working-mode --mode X did) sends its pictures as the GET showed them, objects not hexes: that names nothing and leaves them; a value that is neither shape is refused by name.
+func TestWorkingModeWrittenBackWholeKeepsItsPictures(t *testing.T) {
+	e := newFieldWriteEnv(t)
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+			next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie)))
+		})
+	})
+	r.Get("/api/board/{project}/working-mode", e.h.GetWorkingMode)
+	r.Put("/api/board/{project}/working-mode", e.h.SetWorkingMode)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	a := e.upload(t, "instruction", "rt", 150)
+	code, out := sendJSON(t, "PUT", srv.URL+"/api/board/alpha/working-mode", map[string]any{"mode": "none", "custom_instructions": "Match the mock.", "images_draft": "rt", "images": map[string]any{"custom_instructions": []string{a}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+
+	code, shown := sendJSON(t, "GET", srv.URL+"/api/board/alpha/working-mode", nil)
+	require.Equal(t, http.StatusOK, code, "%v", shown)
+	require.Equal(t, []string{a}, imagesOf(shown, "custom_instructions"))
+	delete(shown, "instructions") // as the CLI does; the images stay as the GET showed them
+	shown["mode"] = "none"
+	code, out = sendJSON(t, "PUT", srv.URL+"/api/board/alpha/working-mode", shown)
+	require.Equal(t, http.StatusOK, code, "a mode written back with its pictures as read: %v", out)
+	assert.Equal(t, []string{a}, imagesOf(out, "custom_instructions"), "the pictures were left")
+
+	code, out = sendJSON(t, "PUT", srv.URL+"/api/board/alpha/working-mode", map[string]any{"mode": "none", "images": "nope"})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, "images_invalid", out["code"], "%v", out)
+	code, out = sendJSON(t, "GET", srv.URL+"/api/board/alpha/working-mode", nil)
+	assert.Equal(t, []string{a}, imagesOf(out, "custom_instructions"), "a refused write left the pictures")
+}
