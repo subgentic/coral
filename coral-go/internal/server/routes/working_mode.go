@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
@@ -20,18 +21,23 @@ func (h *BoardHandler) GetWorkingMode(w http.ResponseWriter, r *http.Request) {
 func (h *BoardHandler) SetWorkingMode(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		board.WorkingMode
-		Images      map[string][]string `json:"images"` // the custom instructions' pictures (#20767): {"custom_instructions": [hex]}
-		ImagesDraft string              `json:"images_draft"`
+		Images      json.RawMessage `json:"images"` // the custom instructions' pictures (#20767): {"custom_instructions": [hex]}
+		ImagesDraft string          `json:"images_draft"`
 	}
 	if err := decodeJSON(r, &in); err != nil {
 		errBadRequest(w, "invalid working mode JSON")
+		return
+	}
+	images, err := namedPictures(in.Images)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "images_invalid", "images must be {field: [hex, ...]}")
 		return
 	}
 	mode := in.WorkingMode
 	if refuseGuestNewBoard(w, r, h.bs, urlParam(r, "project")) {
 		return
 	}
-	pictures, ok := h.fieldPictures(w, r, urlParam(r, "project"), "instruction", in.ImagesDraft, in.Images, h.recordedFieldImages(r, urlParam(r, "project"), board.FieldImagesWorkingMode, ""), "custom_instructions")
+	pictures, ok := h.fieldPictures(w, r, urlParam(r, "project"), "instruction", in.ImagesDraft, images, h.recordedFieldImages(r, urlParam(r, "project"), board.FieldImagesWorkingMode, ""), "custom_instructions")
 	if !ok {
 		return
 	}
@@ -139,4 +145,21 @@ func (h *BoardHandler) presetBefore(ctx context.Context, project, id string) map
 		}
 	}
 	return nil
+}
+
+// namedPictures reads the images of a write: {field: [hex]}. What a GET shows ({field: [{hex, name, ...}]}) comes back unchanged
+// when a client reads the record and writes it whole; it names nothing, so it leaves the pictures as they are (#20768). Anything else is refused.
+func namedPictures(raw json.RawMessage) (map[string][]string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	var named map[string][]string
+	if err := json.Unmarshal(raw, &named); err == nil {
+		return named, nil
+	}
+	var shown map[string][]board.GoalImage
+	if err := json.Unmarshal(raw, &shown); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }

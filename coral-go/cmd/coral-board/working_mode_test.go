@@ -89,3 +89,21 @@ func TestWorkingModeAsksAreTasksFlag(t *testing.T) {
 	require.NoError(t, runWorkingMode([]string{"--board", "team", "--asks-are-tasks=false"}))
 	require.Equal(t, false, bodies[1]["asks_are_tasks"])
 }
+
+// #20768: the mode's GET shows its pictures as objects; the CLI writes the mode back whole, so it must not send them (the server reads images as {field: [hex]}).
+func TestWorkingModeCLIDoesNotSendBackThePicturesItRead(t *testing.T) {
+	var sent map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "PUT" {
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&sent))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"mode":"none","custom_instructions":"Match the mock.","instructions":"Match the mock.\ncoral://artifacts/aa","images":{"custom_instructions":[{"hex":"aa","name":"m.png","content_type":"image/png"}]},"pictures_not_saved":true}`))
+	}))
+	defer server.Close()
+	oldURL := serverURL
+	defer func() { serverURL = oldURL }()
+	serverURL = server.URL
+	require.NoError(t, runWorkingMode([]string{"--board", "team", "--mode", "worktrees"}))
+	require.Equal(t, map[string]any{"mode": "worktrees", "custom_instructions": "Match the mock."}, sent)
+}

@@ -187,5 +187,7 @@ func updatedWorkingMode(f workingModeFlags, get func() ([]byte, error)) (map[str
 		current["asks_are_tasks"] = f.asksAreTasks
 	}
 	delete(current, "instructions")
+	delete(current, "images") // its pictures stay as they are: a GET shows them as objects, and a write names hexes (#20768)
+	delete(current, "pictures_not_saved")
 	return current, nil
 }
