@@ -119,3 +119,56 @@ func TestAWakeStartsAnAgentWithItsInstructionPictures(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, plan.params.Prompt, "mind the table\ncoral://artifacts/"+hexID)
 }
+
+// #20768: pictures with empty instructions are refused (an agent reads them after its words, so they would never be delivered), and an agent that is ended takes its instruction pictures with it.
+func TestInstructionPicturesNeedWordsAndEndWithTheAgent(t *testing.T) {
+	_, h, _, ss := setupSessionsTestServer(t)
+	_, bh := setupBoardTestServer(t)
+	bh.SetTaskArtifactWriter(t.TempDir(), nil)
+	h.SetBoardHandler(bh)
+	const sid = "sess-instr-2"
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "agent", WorkingDir: t.TempDir(), CreatedAt: time.Now().UTC().Format(time.RFC3339)}))
+
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+			next.ServeHTTP(w, asCaller(callerDashCookie)(req))
+		})
+	})
+	r.Post("/api/field-images", bh.UploadPersonFieldImage)
+	r.Put("/api/sessions/live/{name}/instructions", h.SetInstructions)
+	r.Post("/api/sessions/live/{name}/kill", h.Kill)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest("POST", srv.URL+"/api/field-images?scope=instruction&draft=k1", bytes.NewReader(shadePNG(t, 140)))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "image/png")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	var up map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&up))
+	resp.Body.Close()
+	hex := up["hex"].(string)
+	put := func(body map[string]any) (int, map[string]any) {
+		body["session_id"] = sid
+		return sendJSON(t, "PUT", srv.URL+"/api/sessions/live/agent/instructions", body)
+	}
+
+	code, out := put(map[string]any{"instructions": "  ", "images_draft": "k1", "images": map[string]any{"instructions": []string{hex}}})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, "pictures_need_instructions", out["code"], "%v", out)
+	assert.Empty(t, h.instructionImages(context.Background(), sid)["instructions"], "a refused write saved nothing")
+	code, out = put(map[string]any{"instructions": "", "images": map[string]any{"instructions": []string{}}}) // clearing with empty words stays fine
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+
+	code, out = put(map[string]any{"instructions": "go", "images_draft": "k1", "images": map[string]any{"instructions": []string{hex}}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	require.Len(t, h.instructionImages(context.Background(), sid)["instructions"], 1)
+
+	kr, err := http.Post(srv.URL+"/api/sessions/live/agent/kill", "application/json", strings.NewReader(`{"agent_type":"claude","session_id":"`+sid+`"}`))
+	require.NoError(t, err)
+	kr.Body.Close()
+	assert.Empty(t, h.instructionImages(context.Background(), sid)["instructions"], "an ended agent's pictures are removed")
+}
