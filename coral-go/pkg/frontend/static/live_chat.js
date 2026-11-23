@@ -146,7 +146,7 @@ document.addEventListener("submit", (e) => {
     const input = form.querySelector("input.cni-text-input");
     const sid = state.currentSession && state.currentSession.session_id;
     importOnce('./card_attach.js').then(A => { // loaded already when the card drew its image strip (#11403)
-        if (sid && A.cardImagesUploading(sid)) { showToast("An image is still uploading. Send when it is done.", true); return; }
+        if (sid && A.cardImagesUploading(sid)) { showToast("A picture is uploading or needs Retry. Finish or remove it before sending.", true); return; }
         const text = [...(sid ? A.answerLead(sid) : []), input.value.trim()].filter(Boolean).join(" "); // the images' links and their one hint, then the typed words: what the message box sends
         if (!text) {
             input.focus();

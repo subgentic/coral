@@ -65,6 +65,13 @@ try {
     assert.deepEqual(calls[1],{sid:'image-b',filename:'paste.png'});
     const done=settled();pending.shift()();await done;
     assert.equal(controls.getPendingAttachments(b).length,1);
+    // The shared view loads on first use; wait for its DOM, separately from upload completion.
+    if (!document.querySelector('#image-attachments .image-attachment')) await new Promise((resolve, reject) => {
+        const host = document.getElementById('image-attachments');
+        const observer = new MutationObserver(() => { if (host.querySelector('.image-attachment')) { clearTimeout(timer); observer.disconnect(); resolve(); } });
+        const timer = setTimeout(() => { observer.disconnect(); reject(new Error('picture view did not load')); }, 2000);
+        observer.observe(host, { childList: true, subtree: true });
+    });
     assert.equal(document.querySelectorAll('#image-attachments .image-attachment').length,1);
     controls.removeAttachment(0,b);
     assert.deepEqual(revoked,['blob:fixture-2'],'removing a chip releases its own preview');

@@ -67,7 +67,7 @@ async function httpJson(method, p, body, headers = {}) {
             await ev(`(() => { const i = document.getElementById('attach-image-input'); const stop = e => e.preventDefault(); i.addEventListener('click', stop, { once: true }); document.querySelector('.attach-image-btn').click(); return true; })()`);
             const pick = files => ev(`(async () => { const fs = await Promise.all([${files.join(',')}]); const dt = new DataTransfer(); fs.forEach(f => dt.items.add(f)); const input = document.getElementById('attach-image-input'); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); return fs.length; })()`);
             await pick([mk(`'one.png'`, 40, 30, 'image/png'), mk(`'two.jpg'`, 41, 31, 'image/jpeg')]);
-            await waitFor(`window.__rec.ups.length === 2 && document.querySelectorAll('#image-attachments .image-attachment').length === 2`, `${tag}: both pictures are attached`, { timeout: 15000 });
+            await waitFor(`window.__rec.ups.length === 2 && document.querySelectorAll('#image-attachments .ac-thumb-ready').length === 2`, `${tag}: both pictures are attached`, { timeout: 15000 });
             const ups = await ev(`window.__rec.ups`);
             check(`${tag}: two picked pictures go up one after the other, each with the agent's session`, ups[0].name === 'one.png' && ups[1].name === 'two.jpg' && ups[1].start >= ups[0].end && ups.every(u => u.session === sid), JSON.stringify(ups));
             check(`${tag}: the picker is cleared, so the same picture can be chosen again`, await ev(`document.getElementById('attach-image-input').value === ''`));
@@ -111,7 +111,7 @@ async function httpJson(method, p, body, headers = {}) {
 
             // 8. an upload Coral Hub cut short answers an EMPTY 200: that is a failed upload, with Retry; 413 and 408 say what happened in plain words; a throw says it did not finish
             const toastOf = re => `(() => { const t = [...document.querySelectorAll('.toast')].reverse().find(x => ${re}.test(x.textContent)); return t ? { text: t.querySelector('.toast-message').textContent, retry: !!t.querySelector('.toast-action'), retryLabel: (t.querySelector('.toast-action') || {}).textContent } : null; })()`;
-            const attached = () => ev(`document.querySelectorAll('#image-attachments .image-attachment').length`);
+            const attached = () => ev(`document.querySelectorAll('#image-attachments .ac-thumb-ready').length`);
             const a0 = await attached();
             await ev(`window.__upMode = 'empty'; true`);
             await pick([mk(`'cut.png'`, 40, 30, 'image/png')]);
@@ -119,7 +119,7 @@ async function httpJson(method, p, body, headers = {}) {
             let tt = await ev(toastOf(`/didn't finish/`));
             check(`${tag}: an empty 200 is a failed upload: "Upload didn't finish. Try again." with Retry, and nothing is attached`, tt.text === "Upload didn't finish. Try again." && tt.retry && tt.retryLabel === 'Retry' && (await attached()) === a0, JSON.stringify(tt));
             await ev(`window.__upMode = 'real'; const n = window.__rec.ups.length; document.querySelector('.toast-action').click(); window.__nBefore = n; true`);
-            await waitFor(`window.__rec.ups.length === window.__nBefore + 1 && document.querySelectorAll('#image-attachments .image-attachment').length === ${a0 + 1}`, `${tag}: Retry uploads the same picture again`, { timeout: 10000 });
+            await waitFor(`window.__rec.ups.length === window.__nBefore + 1 && document.querySelectorAll('#image-attachments .ac-thumb-ready').length === ${a0 + 1}`, `${tag}: Retry uploads the same picture again`, { timeout: 10000 });
             check(`${tag}: Retry sends the same picture again and it is attached`, (await ev(`window.__rec.ups[window.__rec.ups.length - 1].name`)) === 'cut.png' && (await attached()) === a0 + 1);
             await ev(`import(${S} + 'controls.js').then(m => { for (let i = m.getPendingAttachments().length - 1; i >= 0; i--) m.removeAttachment(i); })`);
             for (const [mode, re, want, retry] of [[413, '/too big/', 'That image is too big to send. Pick a smaller one.', false], [408, '/took too long/', 'The upload took too long. Try again, on a faster connection if you can.', true], [503, '/timed out/', 'Upload timed out. Try a smaller image.', true], ['toolarge', '/through Coral Hub/', 'That image is too large to send through Coral Hub.', false], ['stalled', '/stalled/', 'The upload stalled. Try again.', true], ['tooslow', '/timed out/', 'Upload timed out. Try a smaller image.', true], [502, "/didn't finish/", "Upload didn't finish. Try again.", true], ['throw', "/didn't finish/", "Upload didn't finish. Try again.", true]]) {
@@ -129,7 +129,7 @@ async function httpJson(method, p, body, headers = {}) {
                 tt = await ev(toastOf(re));
                 check(`${tag}: ${mode} says "${want}"${retry ? ' with Retry' : ' (no Retry: the same file would fail again)'}`, tt.text === want && tt.retry === retry, JSON.stringify(tt));
             }
-            await ev(`window.__upMode = 'real'; document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
+            await ev(`window.__upMode = 'real'; document.querySelectorAll('.toast').forEach(t => t.remove()); import(${S} + 'image_composer.js').then(m => m.clearAttachments()); true`);
 
             // 7. the button opens the picker (a click on a hidden input is the browser's own: here it is counted)
             await ev(`window.__clicks = 0; document.getElementById('attach-image-input').addEventListener('click', e => { window.__clicks++; e.preventDefault(); }); true`);

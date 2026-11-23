@@ -475,3 +475,4 @@ node computer_update_error.test.js
 node fail_fast_suites.test.mjs
 
 node usage_limit.test.mjs
+node picture_tray.test.mjs

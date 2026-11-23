@@ -46,3 +46,18 @@
 .artifact-review-form { display: flex; flex-flow: row wrap; align-items: center; justify-content: flex-end; gap: 6px; padding: 8px 16px; }
 .artifact-review-form > :not(button) { flex: 1 1 100%; }
 .artifact-review-form textarea { min-height: 4.5em; resize: vertical; }
+
+/* Shared tray: the picture and its name stay together, with remove/retry beside it. */
+.picture-tray { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.picture-tray .ac-thumb { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; width: auto; max-width: 100%; min-width: 0; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); }
+.picture-tray .ac-thumb-img { width: 64px; height: 60px; object-fit: contain; grid-row: auto; }
+.picture-tray .picture-name { min-width: 0; max-width: 18ch; overflow-wrap: anywhere; font-size: var(--fs-sm, .8125rem); }
+.picture-tray .picture-actions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.picture-tray .picture-actions button { position: static; align-self: center; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-tertiary); white-space: normal; margin: 0; min-width: 32px; min-height: 32px; padding: 4px 8px; }
+.picture-tray .ac-thumb-state { grid-column: 2 / -1; }
+@media (pointer: coarse), (max-width: 600px) { .picture-tray .picture-actions button { min-width: 44px; min-height: 44px; } .picture-tray .picture-actions { max-width: 100px; } }
+
+.ac-composer-row .ac-counter { flex-basis: 100%; }
+
+.picture-tray .picture-actions button:hover { background: var(--bg-hover); }
+.ac-add-image::before { content: "＋ "; }
