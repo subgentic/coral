@@ -1,6 +1,6 @@
 /* Preview placement, resizing, maximising, and phone focus restoration. */
 import { isPhoneLayout } from './phone_layout.js';
-import { makeDraggable } from './draggable.js';
+import { importOnce } from './import_once.js';
 import { fitTerminal } from './xterm_renderer.js';
 import { trapTab } from './dialog_focus.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
@@ -71,67 +71,33 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         _placePane();
     }
 
+    let _resizeHandles = false;
+    let _resizeVersion = 0;
+    // A resize changes the side panel's width through a CSS transition. Its intermediate
+    // widths can briefly lack room for a task column even when the final width fits.
+    function _resizePane() {
+        const version = ++_resizeVersion;
+        if (!getTabs().length) return;
+        if (!isTaskPreview() || _isMobile()) { _placePane(); return; }
+        const transitions = (document.getElementById('agentic-state')?.getAnimations?.() || [])
+            .filter(a => a.transitionProperty === 'width' || a.transitionProperty === 'min-width');
+        if (transitions.length) {
+            Promise.allSettled(transitions.map(a => a.finished)).then(() => {
+                if (version === _resizeVersion) _resizePane();
+            });
+        } else _placePane();
+    }
+
     function initPreviewPane() {
         const handle = document.getElementById('preview-pane-resize-handle');
         if (!handle) return;
 
         _paneHeight = _savedNumber('coral-preview-pane-height');
 
-        makeDraggable(handle, {
-            cursor: 'row-resize',
-            onMove: (e) => {
-                const container = document.getElementById('agentic-state');
-                if (!container) return null;
-                const rect = container.getBoundingClientRect();
-                const newHeight = rect.bottom - e.clientY;
-                const min = 100;
-                const max = rect.height * 0.7;
-                return Math.min(Math.max(newHeight, min), max);
-            },
-            onFlush: (v) => {
-                const pane = document.getElementById('preview-pane');
-                if (pane) pane.style.height = v + 'px';
-            },
-            onEnd: (v) => {
-                if (v != null) {
-                    _paneHeight = Math.round(v);
-                    browserLocal.set('coral-preview-pane-height', _paneHeight);
-                }
-            },
-        });
-
         _paneWidth = _savedNumber('coral-preview-column-width');
         if (browserLocal.get('coral-preview-pane-dock') === 'column') _dock = 'column';
-
-        const colHandle = document.getElementById('preview-column-resize-handle');
-        const column = document.getElementById('preview-column');
         const liveBody = document.querySelector('.live-body');
-        if (colHandle && column && liveBody) {
-            makeDraggable(colHandle, {
-                cursor: 'col-resize',
-                onMove: (e) => {
-                    // The room is .live-body's: the side panel is outside it (it was taken off again here, so the limit fell to the minimum and the pane could only be dragged narrower, #4931).
-                    return Math.min(Math.max(column.getBoundingClientRect().right - e.clientX, COLUMN_MIN), _maxColumnWidth());
-                },
-                onFlush: (v) => { column.style.width = v + 'px'; _syncColumnHandle(v); },
-                onEnd: (v) => {
-                    if (v != null) browserLocal.set('coral-preview-column-width', _paneWidth = Math.round(v));
-                },
-            });
-            // The handle by keyboard (a separator with a value): Left widens, Right narrows, Home and End go to the ends; kept where the window has room.
-            colHandle.addEventListener('keydown', (e) => {
-                const step = e.shiftKey ? 96 : 24;
-                const now = column.getBoundingClientRect().width;
-                const next = e.key === 'ArrowLeft' ? now + step : e.key === 'ArrowRight' ? now - step : e.key === 'Home' ? COLUMN_MIN : e.key === 'End' ? _maxColumnWidth() : null;
-                if (next === null) return;
-                e.preventDefault();
-                browserLocal.set('coral-preview-column-width', _paneWidth = _clampColumnWidth(next));
-                _applyColumnWidth();
-                fitTerminal();
-            });
-            // The room changes with the window, the side panel opening or shutting, and the sidebar's width: the width shown is held to it again each time.
-            if (typeof ResizeObserver === 'function') new ResizeObserver(() => { if (getTabs().length && !_maximised) _placePane(); }).observe(liveBody);
-        }
+        if (liveBody && typeof ResizeObserver === 'function') new ResizeObserver(() => { if (!_maximised) _resizePane(); }).observe(liveBody);
 
         // A task's expand button, in the sidebar, does what a file's dock button does (#9076, the Operator): the preview goes to the full-height column beside the chat, with the column's handle and its width kept; one more press maximises it as for a file.
         document.getElementById('preview-max-btn')?.addEventListener('click', () => { if (_isMobile()) _setPhoneFull(!_phoneFull); else if (isTaskPreview() && _dock === 'bottom') _toggleDock(true); else _setMaximised(!_maximised); });
@@ -147,7 +113,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         });
 
         document.getElementById('preview-dock-btn')?.addEventListener('click', () => _toggleDock(!isTaskPreview())); // an artifact goes to the column whatever the room (#19788); a task keeps Chat's 420 px (#8905)
-        window.addEventListener('resize', () => { if (getTabs().length) _placePane(); });
+        window.addEventListener('resize', _resizePane);
         _placePane();
         _setMaximised(false); // paints the toggle's icon and label
 
@@ -256,7 +222,18 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         const maxBtn = document.getElementById('preview-max-btn');
         if (maxBtn) { maxBtn.hidden = _isMobile() ? !visible : !(visible && (dock === 'column' || isTaskPreview())); _paintMaxButton(); }
 
-        if (visible) revealActiveTab();
+        if (visible) {
+            revealActiveTab();
+            if (!_resizeHandles) {
+                _resizeHandles = true;
+                importOnce('./preview_resize_handles.js', 'preview resizing').then(m => m.initResizeHandles({
+                    saveHeight: v => browserLocal.set('coral-preview-pane-height', _paneHeight = v),
+                    saveWidth: v => browserLocal.set('coral-preview-column-width', _paneWidth = v),
+                    minWidth: COLUMN_MIN, maxWidth: _maxColumnWidth, clampWidth: _clampColumnWidth,
+                    syncHandle: _syncColumnHandle, applyWidth: _applyColumnWidth,
+                })).catch(() => { _resizeHandles = false; });
+            }
+        }
 
         const btn = document.getElementById('preview-dock-btn');
         if (btn) {
