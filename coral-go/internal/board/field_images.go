@@ -85,6 +85,26 @@ func (s *Store) FieldImages(ctx context.Context, boardID, kind, owner string) (m
 	return out, nil
 }
 
+// FieldImagesOfBoard is the pictures of every record of one kind on a board, by owner and field (a personal task list shows its tasks' pictures with one read, #20800).
+func (s *Store) FieldImagesOfBoard(ctx context.Context, boardID, kind string) (map[string]map[string][]GoalImage, error) {
+	var rows []struct {
+		Owner string `db:"owner"`
+		Field string `db:"field"`
+		GoalImage
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT owner, field, hex, name, content_type FROM board_field_images WHERE board_id = ? AND kind = ? ORDER BY owner, field, pos`, boardID, kind); err != nil {
+		return nil, err
+	}
+	out := map[string]map[string][]GoalImage{}
+	for _, r := range rows {
+		if out[r.Owner] == nil {
+			out[r.Owner] = map[string][]GoalImage{}
+		}
+		out[r.Owner][r.Field] = append(out[r.Owner][r.Field], r.GoalImage)
+	}
+	return out, nil
+}
+
 // TaskFieldImagesOwner names a task as the owner of its pictures.
 func TaskFieldImagesOwner(taskID int64) string { return fmt.Sprintf("%d", taskID) }
 
