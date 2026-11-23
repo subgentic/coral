@@ -39,11 +39,12 @@ const board = 'preview-resize-' + Date.now().toString(36);
         await waitFor(`Math.abs(Number(localStorage.getItem('coral-preview-column-width'))-${first.width-24})<=1&&Math.abs(document.getElementById('preview-column').getBoundingClientRect().width-${first.width-24})<=1`, 'first drag is saved');
         // Stretch the real CSS transition so fast and loaded browsers both observe its intermediate widths.
         await ev(`(() => { const side=document.getElementById('agentic-state'); side.style.transitionDuration='1s'; window.__dockMoves=[]; const observer=new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.id==='preview-pane')window.__dockMoves.push(r.target.id);}); for(const el of [side,document.getElementById('preview-column')])observer.observe(el,{childList:true}); return true; })()`);
+        // Settled means the product has re-fitted the column too, not only that the side panel stopped: the mini's 2-shard batch measured at 1280 with the column still at its earlier 457 px and chat 344 px (#20888).
         for (const [width, parent, moves] of [[1280,'preview-column',[]],[1000,'agentic-state',['agentic-state']],[1920,'preview-column',['preview-column']]]) {
             await ev(`window.__dockMoves=[]; true`);
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: false });
             const sideWidth = width === 1920 ? 576 : 420;
-            await waitFor(`(() => { const s=document.getElementById('agentic-state');return Math.abs(s.getBoundingClientRect().width-${sideWidth})<1&&!s.getAnimations().some(a=>a.playState==='running')&&document.getElementById('preview-pane').parentElement.id==='${parent}'; })()`, 'resize settles at ' + width, 8000);
+            await waitFor(`(() => { const s=document.getElementById('agentic-state');return Math.abs(s.getBoundingClientRect().width-${sideWidth})<1&&!s.getAnimations().some(a=>a.playState==='running')&&document.getElementById('preview-pane').parentElement.id==='${parent}'&&document.querySelector('.live-left-column').getBoundingClientRect().width>=419; })()`, 'resize settles at ' + width, 8000);
             const seen = await ev(`({moves:window.__dockMoves,chat:document.querySelector('.live-left-column').getBoundingClientRect().width})`);
             console.log(width, JSON.stringify(seen));
             if (JSON.stringify(seen.moves)!==JSON.stringify(moves)) failures.push(width+': no intermediate dock moves: '+JSON.stringify(seen));
