@@ -8,6 +8,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 const board = 'preview-room-' + Date.now().toString(36);
+const holdStill = `(async () => { const w = () => document.querySelector('.live-body').getBoundingClientRect().width; let last = -1, still = 0; for (let i = 0; i < 90 && still < 8; i++) { await new Promise(r => setTimeout(r, 16)); const n = w(); still = n === last ? still + 1 : 0; last = n; } return still >= 8; })()`;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [];
@@ -35,7 +36,7 @@ const board = 'preview-room-' + Date.now().toString(36);
             await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
             await ev(framesJs(2));
             // The side panel's width animates (about 130 ms) after the window changes, so the room the preview is placed in changes again after the resize: judge the layout once the room has held still.
-            await waitFor(`(async () => { const w = () => document.querySelector('.live-body').getBoundingClientRect().width; let last = -1, still = 0; for (let i = 0; i < 90 && still < 8; i++) { await new Promise(r => setTimeout(r, 16)); const n = w(); still = n === last ? still + 1 : 0; last = n; } return still >= 8; })()`, width + ': the room holds still');
+            await waitFor(holdStill, width + ': the room holds still');
             if (width === 390) {
                 await ev(`window.toggleAgenticPanel(true); window.switchAgenticTab('tasks', 'top'); true`);
                 await waitFor(`document.querySelector('#board-task-list .board-task-open')?.getClientRects().length > 0`, 'phone Tasks panel');
@@ -48,8 +49,18 @@ const board = 'preview-room-' + Date.now().toString(36);
             if (!seen.scrolls) failures.push(width + ': tab strip must support horizontal scrolling');
             if (width === 390 && (!seen.closeVisible || seen.closeWidth < 44 || seen.closeHeight < 44)) failures.push('phone close target must remain fully visible and 44px: ' + JSON.stringify(seen));
             if (width === 1920 && (seen.parent !== 'preview-column' || seen.chat < 420)) failures.push('wide screen retains column preference: ' + JSON.stringify(seen));
-            // Settled at 1280 the room beside the side panel holds a column and the 420 px chat (#8905); in the 130 ms while the panel animates it holds less, so a pane sent to the bottom then comes back.
-            if (width === 1280 && (seen.parent !== 'preview-column' || seen.chat < 420)) failures.push('1280 settled: the column fits beside a chat of at least 420: ' + JSON.stringify(seen));
+            // Whether the agent list's sidebar is a rail at 1280 is the window's doing (it goes to its rail while the side panel is still wide from 1920: a race with the animation), so the suite chooses it (#20905: CI left it open, 538 px of room, and the pane stayed at the bottom). Open: the pane stays at the bottom with the chat at least 420. On its rail: 802 px hold a column and the 420 px chat (#8905).
+            if (width === 1280) {
+                for (const railed of [false, true]) {
+                    await ev(`(() => { const on = document.querySelector('.layout').classList.contains('sidebar-collapsed'); if (on !== ${railed}) window.toggleSidebarRail(); return true; })()`);
+                    await waitFor(`document.querySelector('.layout').classList.contains('sidebar-collapsed') === ${railed}`, '1280: the sidebar is ' + (railed ? 'a rail' : 'open'));
+                    await ev(framesJs(2));
+                    await waitFor(holdStill, '1280: the room holds still, sidebar ' + (railed ? 'railed' : 'open'));
+                    const room = await ev(`({ parent: document.getElementById('preview-pane').parentElement.id, chat: document.querySelector('.live-left-column').getBoundingClientRect().width })`);
+                    const want = railed ? 'preview-column' : 'agentic-state';
+                    if (room.parent !== want || room.chat < 420) failures.push('1280 settled, sidebar ' + (railed ? 'on its rail' : 'open') + ': the pane belongs in ' + want + ' beside a chat of at least 420: ' + JSON.stringify(room));
+                }
+            }
             if (width === 1000 && seen.parent !== 'agentic-state') failures.push('shrinking returns task to bottom: ' + JSON.stringify(seen));
             const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out'));
             if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['dark', 'light']) { await setTheme(ev, theme); fs.writeFileSync(path.join(dir, `task-preview-room-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
