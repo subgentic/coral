@@ -203,7 +203,7 @@ func (h *CloudHandler) recordAutoAcceptChange(ctx context.Context, by, user stri
 
 // HubOwnerSetAutoAccept: POST /api/hub-auto-accept {"allow": bool} (#5840), Coral Hub's owner turning "Coral Hub can turn on auto-accept" on or off. The route table marks it owner-only for the
 // hub (tunnel.OwnerHubOnly, Launch tier): refuseNonOwner refuses anyone but the account this computer is linked to, and a request that did not come through Coral Hub, with 403 owner_only
-// before anything is read. The body is closed (exactly {"allow": true|false}, 64 bytes at most, no query). It sets the same setting as the Settings switch (PUT /api/cloud/allow-auto-accept);
+// before anything is read. The body is closed (exactly {"allow": true|false}, 64 bytes at most; the query is none, or exactly allow=true or allow=false saying the same as the body, #20882). It sets the same setting as the Settings switch (PUT /api/cloud/allow-auto-accept);
 // turning it off ends every auto-accept the hub had enabled, as that route does. The change is recorded on this computer (who, when: shown beside the switch), in the Operator-actions
 // log and in the log.
 func (h *CloudHandler) HubOwnerSetAutoAccept(w http.ResponseWriter, r *http.Request) {
@@ -212,7 +212,8 @@ func (h *CloudHandler) HubOwnerSetAutoAccept(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	id := hubOwnerRequest(r)
-	if r.URL.RawQuery != "" {
+	query := r.URL.RawQuery // compared as the raw text: the signature covers the received URI
+	if query != "" && query != "allow=true" && query != "allow=false" {
 		errBadRequest(w, textHubAutoAcceptBody)
 		return
 	}
@@ -231,6 +232,10 @@ func (h *CloudHandler) HubOwnerSetAutoAccept(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	allow := *body.Allow
+	if query != "" && query != "allow="+strconv.FormatBool(allow) {
+		errBadRequest(w, textHubAutoAcceptBody) // a query that says another value than the body is refused, never merged
+		return
+	}
 	v := "false"
 	if allow {
 		v = "true"
@@ -255,7 +260,7 @@ func (h *CloudHandler) HubOwnerSetAutoAccept(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "allow_hub_auto_accept": allow, "auto_accepts_ended": ended, "changed_by": change})
 }
 
-const textHubAutoAcceptBody = `the body is {"allow": true} or {"allow": false} and nothing else (and no query)`
+const textHubAutoAcceptBody = `the body is {"allow": true} or {"allow": false} and nothing else (and, when a request carries a signature, the same value as ?allow=true or ?allow=false)`
 
 // refuseSystemSetting is refuseCloud's dashboard-only gate for Coral's own system settings
 // (hub mode, restart, #3460): the same checks, with answers that point at this computer's

@@ -42,6 +42,8 @@ EXTRA = {
     # muted (#13172): muted=1|0, the files the Operator's inbox settings mute or the ones they do not (parseTeamArtifactQuery; a plain flag, only the Operator's own read marks a row muted). Added on both artifact list rows, with the Hub told.
     # waiting (#13172): waiting=1|0, the files that wait for the Operator by the server's own needs-you rule (parseTeamArtifactQuery; a plain flag). Added on both artifact list rows, with the Hub told.
     # read (#13162): Needs you's unread filter, read=0|1, applied by the computer before the page is cut (parseTeamArtifactQuery, a plain flag: no file reference). Added on both artifact list rows, with the Hub told.
+    # The signed query of a relayed hub-auto-accept (#20882): ?allow=true or ?allow=false, the value the owner's device signed; HubOwnerSetAutoAccept requires it to equal its body (it compares the raw RawQuery, which the scan above does not follow).
+    'POST /api/hub-auto-accept': {'allow'},
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
     'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'versions', 'read', 'facets', 'muted', 'waiting'},
@@ -103,6 +105,8 @@ DROP = {
 # (internal/background and coral-hub internal/feed): a dashboard-less client that must not consume the machine's pending UI
 # notifications. Only that exact value is accepted through the tunnel; anything else (feed=, feed=Hub, feed=hub2, two values) is refused.
 ENUM = {
+    # The signed query of a relayed hub-auto-accept (#20882): exactly these two values, once; the setter compares the raw query byte for byte and requires it to match the body.
+    'POST /api/hub-auto-accept': {'allow': ['true', 'false']},
     # The Skills page list through the Hub (#19627): only the three statuses the handler knows pass (a removed skill is never listed).
     'GET /api/skills': {'status': ['approved', 'pending', 'rejected']},
     # Needs you filtered to one kind (#13834): only a kind the answer counts passes.

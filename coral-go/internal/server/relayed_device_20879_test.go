@@ -20,6 +20,7 @@ import (
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/server/routes"
+	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -152,6 +153,10 @@ func (g *relayRig) signedAs(q relayReq, signMethod string) *httptest.ResponseRec
 func (g *relayRig) send(q relayReq, sig string) *httptest.ResponseRecorder {
 	h := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.ActorHeader: q.actor, "Content-Type": "application/json",
 		tunnel.DeviceKeyHeader: q.kid, tunnel.DeviceSigHeader: sig, tunnel.DeviceTsHeader: fmt.Sprint(q.ts.Unix()), tunnel.DeviceNonceHeader: q.nonce}
+	if q.actor == relayOwner { // what Coral Hub adds for the account this computer is linked to
+		h[tunnel.HubRoleHeader] = "owner"
+		h[tunnel.HubUserHeader] = relayOwner
+	}
 	method := q.method
 	if g.sendOverride != "" {
 		method = g.sendOverride
@@ -203,8 +208,13 @@ func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
 			base := relayReq{kind: k, method: rt.Method, target: target, body: bodyFor(k, rt.Method, kid), priv: priv, kid: kid, actor: actor}
 			signedBody := base.body
 			base.signed = &signedBody
-			if k == devicekey.GrantMember || k == devicekey.HubAutoAccept {
-				// KNOWN GAPS (reported on #20879): the tunnel's route table does not list the grant routes, and lists hub-auto-accept with no query while its signed text carries ?allow=. A Hub cannot reach either
+			if k == devicekey.HubAutoAccept {
+				// Owner-only: a person-bound key is refused as outside_pair, so this loop (bound keys) cannot show its valid case. TestARelayedOwnerSignedAutoAcceptChangesTheSwitch does.
+				assert.Equal(t, tunnel.TierLaunch, tunnel.Classify(rt.Method, devicekey.RoutePath(target), "allow=true"), "the route takes its signed query")
+				continue
+			}
+			if k == devicekey.GrantMember {
+				// KNOWN GAPS (reported on #20879): the tunnel's route table does not list the grant routes, and (hub-auto-accept was the second gap, opened in #20882). A Hub cannot reach this one
 				// at any mode, so the guard is never asked. Opening them is a change to pkg/tunnel/routes.go that Security reads first; this fails the day they open, so a signed-path test is written then.
 				u := target
 				query := ""
@@ -357,4 +367,73 @@ func TestARelayedSignatureIsForItsMethodAndNotForAV2Route(t *testing.T) {
 	assert.NotEqual(t, 200, rv.Code, "a v3 signature does not remove a key: %s", rv.Body.String())
 	_, err := g.d.ss.ActiveDeviceKey(context.Background(), g.bndK, time.Now())
 	assert.NoError(t, err, "the key is still active")
+}
+
+// #20882: the owner's own key signs hub-auto-accept with ?allow=true|false; the Hub's carrying it reaches the setter, which records the change. A key bound to a person, a query the table refuses, a signed
+// query that is not the one sent, and a body that disagrees with the query never change the switch.
+func TestARelayedOwnerSignedAutoAcceptChangesTheSwitch(t *testing.T) {
+	g := newRelayRig(t)
+	ctx := context.Background()
+	allowed := func() bool {
+		s, err := g.d.ss.GetSettings(ctx)
+		require.NoError(t, err)
+		return routes.HubAutoAcceptAllowed(s)
+	}
+	send := func(priv *ecdsa.PrivateKey, kid, actor, target, body string, mut func(*relayReq)) *httptest.ResponseRecorder {
+		q := relayReq{kind: devicekey.HubAutoAccept, method: "POST", target: target, body: body, priv: priv, kid: kid, actor: actor}
+		if mut != nil {
+			mut(&q)
+		}
+		return g.signed(q)
+	}
+	require.True(t, allowed(), "on by default")
+
+	rec := send(g.owner, g.ownK, relayOwner, "/api/hub-auto-accept?allow=false", `{"allow":false}`, nil)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	assert.False(t, allowed())
+	assert.Equal(t, 1, relayedActions(t, g), "the change is recorded in the Operator-actions log")
+	s, err := g.d.ss.GetSettings(ctx)
+	require.NoError(t, err)
+	assert.Contains(t, s[setreg.HubAutoAcceptChanged], relayOwner, "and the who-and-when record beside the switch names the owner")
+
+	rec = send(g.owner, g.ownK, relayOwner, "/api/hub-auto-accept?allow=true", `{"allow":true}`, nil)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	assert.True(t, allowed(), "turned on by the same rule, the same key")
+	assert.Equal(t, 2, relayedActions(t, g))
+
+	for _, c := range []struct {
+		name   string
+		priv   *ecdsa.PrivateKey
+		kid    string
+		actor  string
+		target string
+		body   string
+		mut    func(*relayReq)
+		status int
+		code   string
+	}{
+		{"a key bound to a person", g.bound, g.bndK, relayPerson, "/api/hub-auto-accept?allow=false", `{"allow":false}`, nil, 0, "outside_pair"},
+		{"the owner key for another person", g.owner, g.ownK, relayPerson, "/api/hub-auto-accept?allow=false", `{"allow":false}`, nil, 0, "outside_pair"},
+		{"a query the table refuses", g.owner, g.ownK, relayOwner, "/api/hub-auto-accept?allow=False", `{"allow":false}`, nil, 403, ""},
+		{"an extra key", g.owner, g.ownK, relayOwner, "/api/hub-auto-accept?allow=false&x=1", `{"allow":false}`, nil, 403, ""},
+		{"a repeated key", g.owner, g.ownK, relayOwner, "/api/hub-auto-accept?allow=false&allow=false", `{"allow":false}`, nil, 403, ""},
+		{"the signed query is not the one sent", g.owner, g.ownK, relayOwner, "/api/hub-auto-accept?allow=false", `{"allow":false}`, func(q *relayReq) { q.signTgt = "/api/hub-auto-accept?allow=true" }, 0, "bad_signature"},
+		{"a body that disagrees with the signed query", g.owner, g.ownK, relayOwner, "/api/hub-auto-accept?allow=false", `{"allow":true}`, nil, 0, "wrong_request"},
+	} {
+		rec := send(c.priv, c.kid, c.actor, c.target, c.body, c.mut)
+		if c.code != "" {
+			assert.Equal(t, c.code, relayCode(rec), "%s: %d %s", c.name, rec.Code, rec.Body.String())
+		} else {
+			assert.Equal(t, c.status, rec.Code, "%s: %s", c.name, rec.Body.String())
+		}
+		assert.True(t, allowed(), "%s: the switch did not change", c.name)
+		assert.Equal(t, 2, relayedActions(t, g), "%s: nothing was recorded", c.name)
+	}
+}
+
+func relayedActions(t *testing.T, g *relayRig) int {
+	t.Helper()
+	rows, err := g.d.r.srv.boardStore.RecentHubOperatorActions(context.Background(), 50)
+	require.NoError(t, err)
+	return len(rows)
 }
