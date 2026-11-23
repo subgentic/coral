@@ -271,7 +271,7 @@ async function probe(it) {
     return { state: live ? 'live' : 'ended', index: d.index };
 }
 
-let _drawn = false; // the list has been drawn once: a later read keeps what is on screen until the answer comes
+let _drawn = false; // the first answer has arrived: a later read keeps what is on screen until its answer comes
 let _readError = ''; // why the last read failed, for the Inbox's Saved table (the dock says it in #saved-status)
 async function refresh() {
     changedSince = false; // this read starts after every change so far
@@ -279,7 +279,8 @@ async function refresh() {
         syncBar(0);
         drawDock();
     }
-    try { await load(); _readError = ''; render(); await _dockDrawn; _drawn = true; } catch (e) { _readError = `Could not read the saved messages (${e.message}).`; drawDock(); $('saved-status').textContent = _readError; for (const fn of renderListeners) fn(); } // the loading line goes: the screen must not say it is loading and that it failed
+    // The first completed answer must render as loaded, including an empty scope (#20876).
+    try { await load(); _readError = ''; _drawn = true; render(); await _dockDrawn; } catch (e) { _readError = `Could not read the saved messages (${e.message}).`; drawDock(); $('saved-status').textContent = _readError; for (const fn of renderListeners) fn(); } // the loading line goes: the screen must not say it is loading and that it failed
 }
 
 /** On a phone the side panel is an overlay over the chat: it gives way so the jump is seen (the tab is where it was when it is opened again). */

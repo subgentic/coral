@@ -10,6 +10,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 const { coralReady } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 
 const hex = i => i.toString(16).padStart(20, '0');
 
@@ -127,18 +128,27 @@ const hex = i => i.toString(16).padStart(20, '0');
             await rowsAre('All saved', ['fe-a chat', 'qa-a chat', 'qa-b chat', 'team-a board, by the Orchestrator', 'team-a board, by the QA Engineer', 'team-b board, by the QA Engineer'], ['(6)', '(1)'], `${dev}: home again shows everything`);
         }
 
-        // an agent with nothing saved
+        // An agent with nothing saved can finish its first scoped read before the startup all-scope read.
+        // Hold the latter so the scope's first completed empty draw is tested, independent of CPU timing.
+        safePaused(client, async e => {
+            const u = new URL(e.request.url);
+            if (e.request.method === 'GET' && u.pathname === '/api/saved' && u.searchParams.get('agent') !== 'lonely-id') return;
+            await client.Fetch.continueRequest({ requestId: e.requestId });
+        });
+        await client.Fetch.enable({ patterns: [{ urlPattern: '*/api/saved*' }] });
         await open(1280, false);
         await ev(`window.__m.add('Lonely', 'L', 2, { sleeping: false, board_project: null, session_id: 'lonely-id' }); true`);
         await select({ name: 'Lonely', sid: 'lonely-id' });
-        await openSaved();
-        await settle(`!!document.querySelector('#saved-table .empty-state-line')`, 'the empty line');
+        // The opener can share the older read; observe the newer scoped read before releasing that older request.
+        await ev(`(async () => { const m=await import((window.__coralStatic || '/static/')+'saved.js'); window.__emptySavedOpen=m.openSaved(); return true; })()`);
+        await settle(`(async () => { const m=await import((window.__coralStatic || '/static/')+'saved.js'); const line=document.querySelector('#saved-table .empty-state-line');return document.getElementById('saved-ui')?.getAttribute('aria-label')==='Saved: Lonely'&&!m.savedView().loading&&!!line&&line.textContent!=='Loading saved items'; })()`, 'the completed scoped empty draw').catch(async e => { throw new Error(e.message+' | '+JSON.stringify(await snap())); });
         const s = await snap();
         check('an agent with nothing saved says whom it is empty for', s.heading === 'Saved: Lonely' && /Nothing saved from Lonely yet/.test(s.empty || ''), JSON.stringify([s.heading, s.empty]));
     } catch (e) {
         console.error(e && e.stack || e);
         results.push(false);
     } finally {
+        await client.Fetch.disable().catch(() => {});
         await require('./helpers/saved_cleanup').clearSaved(api).catch(() => {}); // the bookmarks this suite saved are taken off again (#4916)
         await removeBoards(ev, ['team-a', 'team-b']);
         try { await client.close(); } catch (_) {}
