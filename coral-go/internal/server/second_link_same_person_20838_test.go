@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -89,4 +90,60 @@ func TestTheSamePersonLabelOnTwoLinksLeavesTwoSeparateRows(t *testing.T) {
 		}
 	}
 	assert.Equal(t, map[string]string{a.LinkID: same, b.LinkID: same}, got, "one row for each (link, person) pair")
+}
+
+// Security's SHOULD on #20838: an ask is answered once, whichever link the same person label comes through. The first answer closes it; the same label's answer through the other link is delivered as a message and
+// reopens nothing;  and a link that may not answer (no message_reply row) answers nothing even when the other link's identical label could.
+func TestAnAskAnsweredByTheSameLabelOnTwoLinksIsAnsweredOnce(t *testing.T) {
+	r, enrolled, hubOf, local := askWorld(t) // both links carry askPerson, the same label
+	h := r.srv.Router()
+	ctx := context.Background()
+	bs := r.srv.boardStore
+	for _, who := range []string{"Lead", "Operator"} {
+		_, err := bs.Subscribe(ctx, "team", who, who, "", nil, "all")
+		require.NoError(t, err)
+	}
+	ask := func() int64 {
+		q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator which design?", nil)
+		require.NoError(t, err)
+		to, err := bs.AskTargets(ctx, "team", "Lead", q.Content)
+		require.NoError(t, err)
+		require.NoError(t, bs.RecordAsk(ctx, "team", q, to))
+		return q.ID
+	}
+	open := func(id int64) bool {
+		m, err := bs.GetMessageByID(ctx, "team", id)
+		require.NoError(t, err)
+		require.NotNil(t, m.Ask)
+		return len(m.Ask.Open) > 0 && !m.Ask.Closed
+	}
+	reply := func(link string, id int64, text string) (int, string) {
+		b, _ := json.Marshal(map[string]any{"subscriber_id": "Operator", "content": text, "reply_to": id})
+		rec := call(h, "POST", "/api/board/team/messages", string(b), hubOf(link))
+		return rec.Code, rec.Body.String()
+	}
+
+	// Another added link C carries the same label. Only B has a message_reply row: C's answer is delivered and answers nothing, though B (same label) may answer.
+	const linkC = "lnk-0000000c"
+	_, err := r.db.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, owner_account, owner_user, created_at, source)
+		VALUES (?, 'https://hub-c.example.com', 'srv_c', 'Laptop C', 'v1:c-sealed', 'active', 'launch', 'all', 'acct-c', ?, '2026-01-01T00:00:00Z', 'added')`, linkC, askPerson)
+	require.NoError(t, err)
+	code, body := local("PUT", "/api/cloud/links/"+askAdded+"/asks", `{"kind":"message_reply","allow":true}`)
+	require.Equal(t, 200, code, body)
+	q1 := ask()
+	c, b := reply(linkC, q1, "from C")
+	require.Equal(t, 200, c, b)
+	assert.True(t, open(q1), "C has no row: B's identical label does not lend it one")
+	c, b = reply(askAdded, q1, "from B")
+	require.Equal(t, 200, c, b)
+	assert.False(t, open(q1), "B answers")
+
+	// Both A and B may answer: the first answer closes the ask, and the same label's answer through the other link reopens nothing.
+	q2 := ask()
+	c, b = reply(askAdded, q2, "B first")
+	require.Equal(t, 200, c, b)
+	assert.False(t, open(q2))
+	c, b = reply(enrolled, q2, "A second")
+	require.Equal(t, 200, c, b)
+	assert.False(t, open(q2), "the ask stays closed")
 }
