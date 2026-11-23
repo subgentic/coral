@@ -202,11 +202,11 @@ func (s *TaskStore) FindOpenAgentTask(ctx context.Context, agentName, title stri
 	return &t, nil
 }
 
-// UpdateAgentTask updates task fields (title, completed, sort_order).
+// UpdateAgentTask updates task fields (title, body, completed, sort_order).
 // When completed transitions to 2 (in_progress), started_at is set.
 // When completed transitions to 1 (done), completed_at is set and cost is computed
 // from token_usage records between started_at and completed_at.
-func (s *TaskStore) UpdateAgentTask(ctx context.Context, taskID int64, title *string, completed *int, sortOrder *int) error {
+func (s *TaskStore) UpdateAgentTask(ctx context.Context, taskID int64, title, body *string, completed *int, sortOrder *int) error {
 	task, err := s.GetAgentTask(ctx, taskID)
 	if err != nil {
 		return err
@@ -214,8 +214,8 @@ func (s *TaskStore) UpdateAgentTask(ctx context.Context, taskID int64, title *st
 	if task == nil {
 		return fmt.Errorf("task not found")
 	}
-	if title != nil {
-		if _, err := s.UpdateAgentTaskWorkflow(ctx, taskID, board.TaskUpdate{Title: title}); err != nil {
+	if title != nil || body != nil {
+		if _, err := s.UpdateAgentTaskWorkflow(ctx, taskID, board.TaskUpdate{Title: title, Body: body}); err != nil {
 			return err
 		}
 	}
