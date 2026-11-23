@@ -251,6 +251,7 @@ func (h *SessionsHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Title       *string             `json:"title"`
+		Body        *string             `json:"body"` // as create takes it (#20845): present replaces, "" clears, omitted leaves
 		Completed   *int                `json:"completed"`
 		SortOrder   *int                `json:"sort_order"`
 		Images      map[string][]string `json:"images"` // the body's pictures (#20800): {"body": [hex]}
@@ -265,7 +266,7 @@ func (h *SessionsHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := h.ts.UpdateAgentTask(r.Context(), taskID, body.Title, body.Completed, body.SortOrder); err != nil {
+	if err := h.ts.UpdateAgentTask(r.Context(), taskID, body.Title, body.Body, body.Completed, body.SortOrder); err != nil {
 		errBadRequest(w, err.Error())
 		return
 	}

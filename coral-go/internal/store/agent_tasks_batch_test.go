@@ -29,7 +29,7 @@ func TestListAgentTasksForSessionsMatchesListAgentTasks(t *testing.T) {
 	}
 	all, err := s.ListAgentTasks(ctx, "dev", &one)
 	require.NoError(t, err)
-	require.NoError(t, s.UpdateAgentTask(ctx, all[0].ID, nil, ptrInt(1), nil)) // one completed
+	require.NoError(t, s.UpdateAgentTask(ctx, all[0].ID, nil, nil, ptrInt(1), nil)) // one completed
 
 	got, err := s.ListAgentTasksForSessions(ctx, []string{one, two, none, one})
 	require.NoError(t, err)
