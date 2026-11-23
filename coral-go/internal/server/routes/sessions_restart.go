@@ -115,6 +115,9 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plan.restartSettings()
+	if req.Prompt == "" && plan.stored != nil { // the saved instructions are what it starts with: their pictures follow them (#20750)
+		plan.prompt = h.withInstructionPictures(ctx, plan.stored.SessionID, plan.prompt)
+	}
 	if req.Prompt != "" && plan.stored != nil {
 		plan.prompt = withRestartSkillNote(plan.prompt, h.skillNoteForRestart(ctx, plan.stored.SessionID)) // new Instructions replaced the prompt the launch note was in (#15484)
 	}

@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ type ScheduleHandler struct {
 	scheduler *background.JobScheduler // Run now; nil until the server hands it over
 	// knowledgeTeam says a team of this computer exists: a "knowledge" job (#13928) is made only for one.
 	knowledgeTeam func(ctx context.Context, name string) bool
+	pictures      *BoardHandler // checks and keeps the pictures of a job's prompt (#20750); nil: none
 }
 
 // SetKnowledgeTeamCheck gives the handler the check that a team exists.
@@ -110,7 +112,7 @@ func (h *ScheduleHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "job not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, job)
+	writeJSON(w, http.StatusOK, h.jobAnswer(r.Context(), job, jobID, false))
 }
 
 // CreateJob creates a new scheduled job.
@@ -119,25 +121,27 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	// Use pointer types for int fields so we can distinguish "not provided" (nil)
 	// from "explicitly set to 0". Python defaults enabled=1 and cleanup_worktree=1.
 	var body struct {
-		Name            string `json:"name"`
-		Description     string `json:"description"`
-		CronExpr        string `json:"cron_expr"`
-		Timezone        string `json:"timezone"`
-		AgentType       string `json:"agent_type"`
-		RepoPath        string `json:"repo_path"`
-		BaseBranch      string `json:"base_branch"`
-		Prompt          string `json:"prompt"`
-		Enabled         *int   `json:"enabled"`
-		MaxDurationS    *int   `json:"max_duration_s"`
-		CleanupWorktree *int   `json:"cleanup_worktree"`
-		NoWorktree      *int   `json:"no_worktree"`    // 1: the runs work in the folder itself, which need not be a git repository (#10276)
-		TrustWorktree   *int   `json:"trust_worktree"` // 1: each run trusts its own worktree for the agent CLI; only the person's own dashboard may set it (#16421)
-		Flags           string `json:"flags"`
-		JobType         string `json:"job_type"`
-		WorkflowID      *int64 `json:"workflow_id"`
-		TeamName        string `json:"team_name"` // a "knowledge" job's team (#13928)
-		Model           string `json:"model"`     // refused for a knowledge job, which takes the team and nothing else
-		Command         string `json:"command"`
+		Name            string              `json:"name"`
+		Description     string              `json:"description"`
+		CronExpr        string              `json:"cron_expr"`
+		Timezone        string              `json:"timezone"`
+		AgentType       string              `json:"agent_type"`
+		RepoPath        string              `json:"repo_path"`
+		BaseBranch      string              `json:"base_branch"`
+		Prompt          string              `json:"prompt"`
+		Enabled         *int                `json:"enabled"`
+		MaxDurationS    *int                `json:"max_duration_s"`
+		CleanupWorktree *int                `json:"cleanup_worktree"`
+		NoWorktree      *int                `json:"no_worktree"`    // 1: the runs work in the folder itself, which need not be a git repository (#10276)
+		TrustWorktree   *int                `json:"trust_worktree"` // 1: each run trusts its own worktree for the agent CLI; only the person's own dashboard may set it (#16421)
+		Flags           string              `json:"flags"`
+		JobType         string              `json:"job_type"`
+		WorkflowID      *int64              `json:"workflow_id"`
+		TeamName        string              `json:"team_name"` // a "knowledge" job's team (#13928)
+		Model           string              `json:"model"`     // refused for a knowledge job, which takes the team and nothing else
+		Command         string              `json:"command"`
+		Images          map[string][]string `json:"images"` // the prompt's pictures (#20750)
+		ImagesDraft     string              `json:"images_draft"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -263,12 +267,21 @@ func (h *ScheduleHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		job.TrustWorktree = 1
 	}
 
+	if body.Images != nil && job.JobType != "prompt" {
+		writeError(w, http.StatusBadRequest, "picture_field_unknown", "pictures go with the prompt of a prompt job")
+		return
+	}
+	pictures, ok := h.jobPictures(w, r, body.ImagesDraft, body.Images, 0)
+	if !ok {
+		return
+	}
 	created, err := h.sched.CreateScheduledJob(r.Context(), &job)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, created)
+	kept := h.keepJobPictures(r.Context(), created.ID, pictures)
+	writeJSON(w, http.StatusOK, h.jobAnswer(r.Context(), created, created.ID, !kept))
 }
 
 // UpdateJob updates an existing scheduled job.
@@ -286,6 +299,11 @@ func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 
 	if fields["job_type"] == "check" {
 		errBadRequest(w, "use Chief checks to create a check")
+		return
+	}
+	images, imagesDraft, imagesOK := takeImages(fields)
+	if !imagesOK {
+		errBadRequest(w, "images must be {\"prompt\": [hex, ...]}")
 		return
 	}
 	if _, ok := fields["team_name"]; ok {
@@ -405,10 +423,24 @@ func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	existingJob, _ := h.sched.GetScheduledJob(r.Context(), jobID)
+	if images != nil && (existingJob == nil || existingJob.JobType != "prompt") {
+		writeError(w, http.StatusBadRequest, "picture_field_unknown", "pictures go with the prompt of a prompt job")
+		return
+	}
+	pictures, ok := h.jobPictures(w, r, imagesDraft, images, jobID)
+	if !ok {
+		return
+	}
 	if !applyTrustTick(w, r, fields, existingJob) {
 		return
 	}
-	updated, err := h.sched.UpdateScheduledJob(r.Context(), jobID, fields)
+	var updated *store.ScheduledJob
+	var err error
+	if len(fields) == 0 && len(pictures) > 0 { // only the pictures change
+		updated, err = h.sched.GetScheduledJob(r.Context(), jobID)
+	} else {
+		updated, err = h.sched.UpdateScheduledJob(r.Context(), jobID, fields)
+	}
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -417,7 +449,8 @@ func (h *ScheduleHandler) UpdateJob(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "job not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, updated)
+	kept := h.keepJobPictures(r.Context(), jobID, pictures)
+	writeJSON(w, http.StatusOK, h.jobAnswer(r.Context(), updated, jobID, !kept))
 }
 
 // DeleteJob deletes a scheduled job and its run history.
@@ -430,6 +463,11 @@ func (h *ScheduleHandler) DeleteJob(w http.ResponseWriter, r *http.Request) {
 	if err := h.sched.DeleteScheduledJob(r.Context(), jobID); err != nil {
 		errInternalServer(w, err.Error())
 		return
+	}
+	if h.pictures != nil && h.pictures.bs != nil { // the pictures go with the job (the artifacts stay: other records may hold the same bytes)
+		if err := h.pictures.bs.DeleteFieldImages(r.Context(), "", board.FieldImagesJob, jobPictureOwner(jobID)); err != nil {
+			slog.Warn("[schedule] the pictures of a deleted job were not removed", "job", jobID, "error", err)
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

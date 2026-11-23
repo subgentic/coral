@@ -15,6 +15,8 @@ const (
 	FieldImagesTask     = "task"     // owner: the task's number
 	FieldImagesMessage  = "message"  // owner: the message's number
 	FieldImagesDecision = "decision" // owner: the artifact's id (a file's review decision)
+	FieldImagesJob      = "job"      // owner: a scheduled job's number; the team is "" (a person's field, #20750), field "prompt"
+	FieldImagesSession  = "session"  // owner: an agent's session id; the team is "" (a person's field, #20750), field "instructions"
 )
 
 func (s *Store) ensureFieldImagesSchema(ctx context.Context) error {
@@ -116,4 +118,10 @@ func (s *Store) FieldUploadedAt(ctx context.Context, scope, hex string) (time.Ti
 		return time.Time{}, false
 	}
 	return time.Unix(at, 0), true
+}
+
+// DeleteFieldImages removes the pictures of one record (a scheduled job that is deleted, an agent whose instructions are cleared); the artifacts themselves stay (other records may share the bytes).
+func (s *Store) DeleteFieldImages(ctx context.Context, boardID, kind, owner string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM board_field_images WHERE board_id = ? AND kind = ? AND owner = ?`, boardID, kind, owner)
+	return err
 }

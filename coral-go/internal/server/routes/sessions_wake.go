@@ -99,7 +99,7 @@ type wakePlan struct {
 
 func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession, noStartPrompt bool) (*wakePlan, error) {
 	flags := wakeFlags(ls)
-	prompt := ptr.Value(ls.Prompt)
+	prompt := h.withInstructionPictures(ctx, ls.SessionID, ptr.Value(ls.Prompt))
 	boardName := ptr.Value(ls.BoardName)
 
 	// Inject distilled knowledge on wake
