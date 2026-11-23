@@ -317,9 +317,12 @@ type postMessageBody struct {
 	// Buttons declares up to three buttons on a question to @Operator (#11643): each "Label=action[:arg]" from a closed list, checked by the server, shown to the Operator, run by nobody until they click.
 	Buttons []string `json:"buttons,omitempty"`
 	// DryRun checks the post (size, mentions) and answers {"ok": true, "dry_run": true} without storing anything: "post --assign" asks before it creates the task, so a refused post leaves nothing behind (#9047).
-	DryRun  bool            `json:"dry_run,omitempty"`
-	ReplyTo int64           `json:"reply_to,omitempty"`
-	TaskID  json.RawMessage `json:"task_id,omitempty"` // raw, so a task_id that is not a whole number is answered as that (invalid task_id), not as a body that failed to decode ("content required")
+	DryRun  bool  `json:"dry_run,omitempty"`
+	ReplyTo int64 `json:"reply_to,omitempty"`
+	// Images are the Operator's pictures by field, one field, content (#20731): they ride the message as coral://artifacts lines and are kept with it. ImagesDraft names the draft they were uploaded with.
+	Images      map[string][]string `json:"images,omitempty"`
+	ImagesDraft string              `json:"images_draft,omitempty"`
+	TaskID      json.RawMessage     `json:"task_id,omitempty"` // raw, so a task_id that is not a whole number is answered as that (invalid task_id), not as a body that failed to decode ("content required")
 }
 
 // taskReply makes a post a reply to a task (#5463): the task's id and creator in, and what the server did with the creator's mention out.
@@ -384,6 +387,18 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		}
 		reply.prefix, reply.notified = m.Prefix, m.Notified
 		body.Content = m.Prefix + body.Content
+	}
+	var pictures map[string][]board.GoalImage
+	if body.Images != nil {
+		scope := "chat" // a task's reply is uploaded for the task scope, a board post for the chat one
+		if reply != nil {
+			scope = "task"
+		}
+		var pok bool
+		if pictures, pok = h.fieldPictures(w, r, project, scope, body.ImagesDraft, body.Images, nil, "content"); !pok {
+			return nil, false
+		}
+		body.Content += pictureLines(pictures["content"])
 	}
 	body.Content = unescapeLineBreaks(body.Content)
 	// Terminal control goes before anything reads the text (#3580): mentions, links and the
@@ -522,6 +537,11 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return nil, false
+	}
+	if len(pictures) > 0 {
+		if err := h.bs.SetFieldImagesOf(r.Context(), project, board.FieldImagesMessage, strconv.FormatInt(msg.ID, 10), pictures); err != nil {
+			slog.Warn("[board] the pictures of a message were not kept", "board", project, "message", msg.ID, "error", err)
+		}
 	}
 	if cloud.Tunneled(r) {
 		// Every board write through the tunnel is recorded, not only the Operator's (#3428).
