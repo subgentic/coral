@@ -71,9 +71,11 @@ type Task struct {
 	// GoalTitle is the title of that goal, filled where a list is read for the Inbox (FillGoalTitles, #7301); absent when the task has no goal or the list did not ask.
 	GoalTitle string `db:"-" json:"goal_title,omitempty"`
 	// Images: the Operator's pictures in the task's prose fields (description, instructions, reason, completion_message), by field; filled where one task is read (#20731).
-	Images    map[string][]GoalImage `db:"-" json:"images,omitempty"`
-	BlockedBy []TaskDep              `db:"-" json:"blocked_by,omitempty"`
-	Workflow  TaskWorkflow           `db:"-" json:"workflow"`
+	Images map[string][]GoalImage `db:"-" json:"images,omitempty"`
+	// PicturesNotSaved is set by the server only, on the answer to a write whose words were saved but whose pictures were not (#20758): the screen says so instead of showing success.
+	PicturesNotSaved bool         `db:"-" json:"pictures_not_saved,omitempty"`
+	BlockedBy        []TaskDep    `db:"-" json:"blocked_by,omitempty"`
+	Workflow         TaskWorkflow `db:"-" json:"workflow"`
 	// WorkedBy: who did the task's work, set where the workflow is read (finishWorkflow): the author a reviewed task was handed on from (a reviewed task is assigned to the orchestrator, #3725),
 	// else who completed it, else its assignee. Empty for a task nobody has. The views show it where they say who has a task or who did it.
 	WorkedBy string `db:"-" json:"worked_by,omitempty"`
@@ -138,6 +140,8 @@ type Message struct {
 	// Ask: this message is a question (post --ask, asks.go) and who has not answered it; ReplyTo: the message this one answers (post --reply-to). Filled where messages are read, never stored on the row.
 	Ask     *AskInfo `db:"-" json:"ask,omitempty"`
 	ReplyTo *int64   `db:"-" json:"reply_to,omitempty"`
+	// PicturesNotSaved: the post was made but its pictures were not saved (#20758); set by the server only, on the answer to that post.
+	PicturesNotSaved bool `db:"-" json:"pictures_not_saved,omitempty"`
 	// ReplyWith: for a message from another board, the line that says how to answer it (CrossReplyLine, #9054). Built where messages are read, never stored.
 	ReplyWith string `db:"-" json:"reply_with,omitempty"`
 	// Legacy column — kept for DB compat, mirrors SubscriberID for new rows.

@@ -539,8 +539,9 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		return nil, false
 	}
 	if len(pictures) > 0 {
-		if err := h.bs.SetFieldImagesOf(r.Context(), project, board.FieldImagesMessage, strconv.FormatInt(msg.ID, 10), pictures); err != nil {
+		if err := h.saveFieldImages(r.Context(), project, board.FieldImagesMessage, strconv.FormatInt(msg.ID, 10), pictures); err != nil {
 			slog.Warn("[board] the pictures of a message were not kept", "board", project, "message", msg.ID, "error", err)
+			msg.PicturesNotSaved = true // #20758
 		}
 	}
 	if cloud.Tunneled(r) {

@@ -349,6 +349,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_board_field_uploads_1",
+      "sql": null,
+      "tbl_name": "board_field_uploads",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_board_goal_images_1",
       "sql": null,
       "tbl_name": "board_goal_images",
@@ -640,6 +646,12 @@
       "name": "board_field_images",
       "sql": "CREATE TABLE board_field_images (\n\t\tboard_id     TEXT NOT NULL,\n\t\tkind         TEXT NOT NULL,\n\t\towner        TEXT NOT NULL,\n\t\tfield        TEXT NOT NULL,\n\t\tpos          INTEGER NOT NULL,\n\t\thex          TEXT NOT NULL,\n\t\tname         TEXT NOT NULL,\n\t\tcontent_type TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, kind, owner, field, pos)\n\t)",
       "tbl_name": "board_field_images",
+      "type": "table"
+    },
+    {
+      "name": "board_field_uploads",
+      "sql": "CREATE TABLE board_field_uploads (\n\t\tboard_id TEXT NOT NULL,\n\t\tscope    TEXT NOT NULL,\n\t\thex      TEXT NOT NULL,\n\t\tat       INTEGER NOT NULL,\n\t\tPRIMARY KEY (scope, hex)\n\t)",
+      "tbl_name": "board_field_uploads",
       "type": "table"
     },
     {
@@ -2641,6 +2653,81 @@
             }
           ],
           "name": "sqlite_autoindex_board_field_images_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "board_field_uploads": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "scope",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hex",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "scope",
+              "seqno": 0
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "hex",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_board_field_uploads_1",
           "origin": "pk",
           "partial": 0,
           "seq": 0,

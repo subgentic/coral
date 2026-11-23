@@ -18,7 +18,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_subscribers", "project"}, {"board_messages", "project"}, {"board_reminders", "project"}, {"board_join_notices", "project"}, {"board_groups", "project"},
 	{"board_tasks", "board_id"}, {"board_settings", "project"}, {"board_waits", "project"}, {"board_working_modes", "board_id"},
 	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"health_checks", "project"}, {"boards", "id"},
-	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_field_images", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
+	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_field_images", "board_id"}, {"board_field_uploads", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
 	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_opening_ask", "project"}, {"board_ask_reopened", "project"}, {"board_ask_links", "project"}, {"board_ask_buttons", "project"}, {"board_ask_subjects", "project"}, {"board_orch_grant", "project"}, {"member_grant", "board_id"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
 	{"artifact_tags", "board_id"},        // #8583: a team's tags of its artifacts
@@ -132,6 +132,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	_, err = s.AddArtifactTags(ctx, project, strings.Repeat("a", 64), []string{"saved"}) // and when it was saved for later (#20519)
 	require.NoError(t, err)
 	require.NoError(t, s.SetGoalImages(ctx, project, goal.ID, []GoalImage{{Hex: strings.Repeat("b", 64), Name: "shot.png", ContentType: "image/png"}}))                              // and the pictures of its goal (#11650)
+	require.NoError(t, s.RememberFieldUpload(ctx, project, "k-"+project, strings.Repeat("d", 64), time.Now()))                                                                       // and the memory of what was uploaded for a field (#20750)
 	require.NoError(t, s.SetFieldImages(ctx, project, FieldImagesTask, "1", "description", []GoalImage{{Hex: strings.Repeat("c", 64), Name: "shot.png", ContentType: "image/png"}})) // and the pictures of a task field (#20731)
 	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now())                                                                       // and what its upload asked (#11555)
 	require.NoError(t, err)

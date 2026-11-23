@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -22,6 +24,9 @@ import (
 const fieldImageTTL = 24 * time.Hour
 
 const fieldImageMemoryCap = 4096
+
+// picturesNotSavedWords is what the Operator is told when a write was made and its pictures were not (#20758).
+const picturesNotSavedWords = "pictures not saved: the words were saved, the pictures were not; attach them again"
 
 // recentFieldImages remembers what the Operator uploaded in this run for a field scope, so a write can name only pictures that were uploaded for it.
 var recentFieldImages = struct {
@@ -54,6 +59,37 @@ func recentFieldImage(scope, hexID string, now time.Time) bool {
 	recentFieldImages.Lock()
 	defer recentFieldImages.Unlock()
 	at, ok := recentFieldImages.m[commentImageKey(scope, hexID)]
+	return ok && now.Sub(at) <= fieldImageTTL
+}
+
+// saveFieldImages writes the pictures of a record's fields; a test swaps it (setFieldImages) to see what a failed save tells the Operator (#20758).
+func (h *BoardHandler) saveFieldImages(ctx context.Context, project, kind, owner string, pictures map[string][]board.GoalImage) error {
+	if h.setFieldImages != nil {
+		return h.setFieldImages(ctx, project, kind, owner, pictures)
+	}
+	return h.bs.SetFieldImagesOf(ctx, project, kind, owner, pictures)
+}
+
+// rememberFieldUpload keeps what was uploaded for a field scope in this process's memory and in the board's store, so it is still nameable after a restart (#20750; the Orchestrator's note on QA's #20748).
+func (h *BoardHandler) rememberFieldUpload(ctx context.Context, project, scope, hexID string, now time.Time) {
+	rememberFieldImage(scope, hexID, now)
+	if h.bs == nil {
+		return
+	}
+	if err := h.bs.RememberFieldUpload(ctx, project, scope, hexID, now); err != nil {
+		slog.Warn("[field images] an upload was not remembered across a restart", "board", project, "error", err)
+	}
+}
+
+// recentFieldUpload says whether a picture was uploaded for a field scope in the last fieldImageTTL: in this process's memory, else in the store (a restart empties the memory, not the store).
+func (h *BoardHandler) recentFieldUpload(ctx context.Context, scope, hexID string, now time.Time) bool {
+	if recentFieldImage(scope, hexID, now) {
+		return true
+	}
+	if h.bs == nil {
+		return false
+	}
+	at, ok := h.bs.FieldUploadedAt(ctx, scope, hexID)
 	return ok && now.Sub(at) <= fieldImageTTL
 }
 
@@ -106,7 +142,7 @@ func (h *BoardHandler) fieldPictures(w http.ResponseWriter, r *http.Request, pro
 				kept = append(kept, im)
 				continue
 			}
-			if !recentFieldImage(fieldImageScope(project, scope, draft), hexID, time.Now()) {
+			if !h.recentFieldUpload(r.Context(), fieldImageScope(project, scope, draft), hexID, time.Now()) {
 				writeError(w, http.StatusBadRequest, "picture_not_yours", "a picture was not added for this: add it again")
 				return nil, false
 			}
