@@ -298,7 +298,10 @@ func (s *Server) Close() {
 		case <-time.After(closeWait):
 			log.Printf("[server] background work still running after %s; closing the board database anyway", closeWait)
 		}
+		s.cloudHandler.ReleaseDropboxBackup()
+		s.sessHandler.ReleaseArtifactStore() // the process-wide tables would keep the closed server in memory (#20892)
 		if s.boardStore != nil {
+			routes.UnbindArtifactRevisions(s.cfg.CoralDir(), s.boardStore) // the process-wide table would keep the closed server in memory (#20892)
 			if err := s.boardStore.Close(); err != nil {
 				log.Printf("[server] closing the board database: %v", err)
 			}

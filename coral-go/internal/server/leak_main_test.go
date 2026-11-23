@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"weak"
 
 	"github.com/subgentic/coral/internal/testleak"
 	"github.com/subgentic/coral/internal/testmem"
@@ -51,17 +52,20 @@ func TestMain(m *testing.M) {
 	// Each server a test builds sets a timer that returns the heap to the OS (#8749): it must neither run for seconds nor still be running when the goroutine check looks, so here it is a no-op after
 	// a millisecond and the binary waits for every timer it set (#20782). The tests of the release set their own and restore these.
 	releaseDelay, freeOSMemory = time.Millisecond, func() {}
-	var tracked []*sync.WaitGroup
+	// Weak: a strong pointer here is a pointer into the Server (the count is its field) and kept every server a test built, with its stores, routers and parsed templates, to the end of the run (#20892).
+	var tracked []weak.Pointer[sync.WaitGroup]
 	var trackedMu sync.Mutex
 	releaseTracker = func(wg *sync.WaitGroup) {
 		trackedMu.Lock()
-		tracked = append(tracked, wg)
+		tracked = append(tracked, weak.Make(wg))
 		trackedMu.Unlock()
 	}
 	code := m.Run()
 	trackedMu.Lock()
-	for _, wg := range tracked {
-		wg.Wait()
+	for _, w := range tracked {
+		if wg := w.Value(); wg != nil {
+			wg.Wait()
+		}
 	}
 	trackedMu.Unlock()
 	if peak := stopMem(); peak > 0 {

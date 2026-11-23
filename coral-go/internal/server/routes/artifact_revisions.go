@@ -17,6 +17,14 @@ func bindArtifactRevisions(dir string, bs *board.Store) {
 	}
 }
 
+// UnbindArtifactRevisions drops dir's entry when it is still bs, as the server that bound it closes (#20892): the table lives as long as the process, and a store left in it is kept with everything its callbacks reach (the
+// handlers, routers and templates of a server that has closed). A later server on the same folder has replaced the entry and keeps it.
+func UnbindArtifactRevisions(dir string, bs *board.Store) {
+	if dir != "" && bs != nil {
+		artifactRevisionStores.CompareAndDelete(dir, bs)
+	}
+}
+
 func noteArtifactRecordChanged(dir, team string) {
 	if v, ok := artifactRevisionStores.Load(dir); ok {
 		v.(*board.Store).NoteArtifactsChanged(team)

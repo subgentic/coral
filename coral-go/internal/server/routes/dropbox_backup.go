@@ -162,6 +162,20 @@ func (h *CloudHandler) NewDropboxBackup(ob *store.DropboxOutbox) *DropboxBackup 
 	return b
 }
 
+// ReleaseDropboxBackup drops the handler's worker from the table of workers by data folder when its server closes (#20892): the table lives as long as the process, and the worker reaches the handler's
+// stores and, through them, the closed server. A later server on the same folder has put its own worker there and keeps it.
+func (h *CloudHandler) ReleaseDropboxBackup() {
+	if h == nil || h.dbx == nil || h.dbx.backup == nil {
+		return
+	}
+	k := filepath.Clean(h.dbx.backup.coralDir)
+	dropboxBackupsMu.Lock()
+	defer dropboxBackupsMu.Unlock()
+	if dropboxBackups[k] == h.dbx.backup {
+		delete(dropboxBackups, k)
+	}
+}
+
 // SetPrivate gives the worker the board's private marks (board.Store.PrivateArtifacts).
 // SetChat gives the worker the board's messages, for Share via Dropbox's chat page (#14944).
 func (b *DropboxBackup) SetChat(f func(ctx context.Context, project string, id int64) (*board.Message, error)) {

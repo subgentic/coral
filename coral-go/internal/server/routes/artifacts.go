@@ -86,6 +86,7 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	st.mu.Lock()
 	st.maxBytes = h.artifactStoreMaxBytes
 	st.receivedMaxBytes = h.receivedArtifactsMaxBytes
+	st.owner = h
 	st.mu.Unlock()
 	docIDMigrationStart(h.cfg.CoralDir()) // in the background: startup never waits for it (#14551)
 	r.Post("/api/agent/artifacts", h.uploadAgentArtifact)
