@@ -16,7 +16,7 @@
     "amended twice": "17dfe00da0231e7f7b3085a520b8e95fc1d46aaac4c35eb748d71e6e1ccb3ed2",
     "markup in every text": "d5e29633ea16f6e5fa524457e09575b50827fc7c2b0d4a4edd0fe89ef99a28d2",
     "running, with a live cost": "ee61e5f0b869d856437929456354699555ed7e1c15e4dd0c215a18a834da6137",
-    "an agent task": "7139f18120470f0ed4e6ba62e9706fc7ae870ede9418cb6e39f07f3999663159"
+    "an agent task": "01194c1c70a938336a71447ed72534689a9d9e8206fdea8446856e9e2b0fd143"
   },
   "lines": {
     "a new task": "#1 Plain | ← Tasks#1 PlainQueuedsmart_toyAssigned toNobody yetGoalNo goalPriorityMediumCreated byOrchestratorCreatedOct 1MoreEditCancel taskComplete | footer More | Complete",
@@ -34,6 +34,6 @@
     "amended twice": "#23 Changed | ← Tasks#23 ChangedQueuedsmart_toyAssigned toNobody yetGoalNo goalPriorityMediumCreated byOrchestratorCreatedOct 1DescriptionNow this. Instruction revision Current revision 3 · 2 amendments Changed since task creationRevision 2 · Planner · Oct 2 9:00 AMclarifyInstructions: old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old old o… → new textRevision 3 · Planner · Oct 3 9:00 AMDescription: (empty) → x Instructions for the agent Required outputs: None Completion gates: None MoreEditCancel taskComplete | footer More | Complete",
     "markup in every text": "#24 <img src=x onerror=alert(1)> \"quoted\" & more | ← Tasks#24 <img src=x onerror=alert(1)> \"quoted\" & moreIn progresssmart_toyAssigned to<i>me</i>Jump to agentNot runningGoalNo goalPriorityHighCreated bya\"bCreatedOct 1StartedOct 1Description<script>1</script>MoreEditNudgeRemindStop remindersCancel taskComplete | footer More | Complete",
     "running, with a live cost": "#25 Costing now | ← Tasks#25 Costing nowIn progresssmart_toyAssigned toDevJump to agentNot runningGoalNo goalPriorityMediumCreated byOrchestratorCreatedOct 1StartedOct 1 Running Cost ~$1.50 Input 11 Output 22 Cache Read 33 Cache Write 44 Requests 7 MoreEditNudgeRemindStop remindersCancel taskComplete | footer More | Complete",
-    "an agent task": "Task #40 | #40 · My own task LifecycleOpen Priority— Assigned To solo Created By — Created Oct 1, 09:00 AM Claimed Oct 1, 10:00 AM Cost $2.25 Input 10 Output 20 Cache Read 30 Cache Write 40 | footer Close Complete"
+    "an agent task": "Task #40 | #40 · My own task LifecycleOpen Priority— Assigned To solo Created By — Created Oct 1, 09:00 AM Claimed Oct 1, 10:00 AM Cost $2.25 Input 10 Output 20 Cache Read 30 Cache Write 40 | footer Edit Close Complete"
   }
 }
