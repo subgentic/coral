@@ -18,21 +18,33 @@ var (
 	bundleSource = frontend.PrebuiltOrBuild // the embedded prebuilt family when it is of this tree, else a build (#8760)
 )
 
-// releasing counts the release timers that are set and not yet finished; stopReleaseTimers and a test binary's end wait for it (#20782).
-var releasing sync.WaitGroup
+// releaseTracker, when set (a test binary's TestMain), is told of each server's count of release timers not yet finished, so the binary can wait for them all before its goroutine check (#20782).
+var releaseTracker func(*sync.WaitGroup)
 
-// stopReleaseTimers cancels this server's release timers that have not fired and waits for those that have (a FreeOSMemory is not cut short): a closed server leaves none behind.
-func (s *Server) stopReleaseTimers() {
+// stopReleaseTimers cancels this server's release timers that have not fired and waits, up to max, for those that have (a FreeOSMemory is not cut short, and a Close does not wait out a long one):
+// it reports whether none is left running.
+func (s *Server) stopReleaseTimers(max time.Duration) bool {
 	s.releaseMu.Lock()
 	timers := s.releaseTimers
 	s.releaseTimers = nil
 	s.releaseMu.Unlock()
 	for _, t := range timers {
 		if t.Stop() {
-			releasing.Done() // it never ran, so its own Done never will
+			s.releasing.Done() // it never ran, so its own Done never will
 		}
 	}
-	releasing.Wait()
+	done := make(chan struct{})
+	go func() {
+		defer safego.Recover("release-build-memory-wait")
+		s.releasing.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return true
+	case <-time.After(max):
+		return false
+	}
 }
 
 // buildBundleFamily builds the bundled family (#4228: app.js's module graph, the lazy modules and the shell's stylesheets as a few files, next to the unchanged files) from the
@@ -67,11 +79,14 @@ func (s *Server) buildBundleFamily(staticSub fs.FS) fs.FS {
 		// the delay and the call are read now, not when the goroutine runs: a test that swaps them for its own must not have an earlier server's goroutine call its hook late (#8785)
 		// A timer, not a goroutine asleep: a test binary builds a server per test, and a sleeping goroutine each is what testleak reports at the end (#4167).
 		delay, free := releaseDelay, freeOSMemory
-		// Counted from before it is set to after it ends: a timer that was stopped, or one that has run, is not in the count, so waiting for the count (Close, a test binary's end) leaves
+		// Counted (per server) from before it is set to after it ends: a timer that was stopped, or one that has run, is not in the count, so waiting for the count (Close, a test binary's end) leaves
 		// no FreeOSMemory still running for a goroutine check to find on a slow runner (#20782).
-		releasing.Add(1)
+		s.releasing.Add(1)
+		if releaseTracker != nil {
+			releaseTracker(&s.releasing)
+		}
 		timer := time.AfterFunc(delay, func() {
-			defer releasing.Done()
+			defer s.releasing.Done()
 			defer safego.Recover("release-build-memory")
 			free()
 		})

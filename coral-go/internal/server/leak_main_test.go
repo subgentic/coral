@@ -51,8 +51,19 @@ func TestMain(m *testing.M) {
 	// Each server a test builds sets a timer that returns the heap to the OS (#8749): it must neither run for seconds nor still be running when the goroutine check looks, so here it is a no-op after
 	// a millisecond and the binary waits for every timer it set (#20782). The tests of the release set their own and restore these.
 	releaseDelay, freeOSMemory = time.Millisecond, func() {}
+	var tracked []*sync.WaitGroup
+	var trackedMu sync.Mutex
+	releaseTracker = func(wg *sync.WaitGroup) {
+		trackedMu.Lock()
+		tracked = append(tracked, wg)
+		trackedMu.Unlock()
+	}
 	code := m.Run()
-	releasing.Wait()
+	trackedMu.Lock()
+	for _, wg := range tracked {
+		wg.Wait()
+	}
+	trackedMu.Unlock()
 	if peak := stopMem(); peak > 0 {
 		fmt.Fprintf(os.Stderr, "internal/server: peak held memory %d MiB\n", peak)
 	}

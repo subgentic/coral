@@ -116,7 +116,7 @@ func TestStoppingTheReleaseTimersCancelsOrWaits(t *testing.T) {
 	if s.buildBundleFamily(staticSub) == nil {
 		t.Fatal("the family did not build")
 	}
-	s.stopReleaseTimers()
+	s.stopReleaseTimers(time.Minute)
 	if ran.Load() != 0 {
 		t.Errorf("a cancelled release ran %d times", ran.Load())
 	}
@@ -140,7 +140,7 @@ func TestStoppingTheReleaseTimersCancelsOrWaits(t *testing.T) {
 	}
 	returned := make(chan struct{})
 	go func() {
-		s2.stopReleaseTimers()
+		s2.stopReleaseTimers(time.Minute)
 		close(returned)
 	}()
 	select {
@@ -156,5 +156,40 @@ func TestStoppingTheReleaseTimersCancelsOrWaits(t *testing.T) {
 	}
 	if !finished.Load() {
 		t.Error("stopReleaseTimers returned before FreeOSMemory ended")
+	}
+}
+
+// #20799: a Close does not wait out a long FreeOSMemory: the wait is bounded and says so; the count is the server's own, so another server's release is not waited for.
+func TestStoppingTheReleaseTimersIsBoundedAndPerServer(t *testing.T) {
+	staticSub, err := fs.Sub(frontend.Static, "static")
+	if err != nil {
+		t.Fatal(err)
+	}
+	realFree, realDelay := freeOSMemory, releaseDelay
+	t.Cleanup(func() { freeOSMemory, releaseDelay = realFree, realDelay })
+	started, release := make(chan struct{}), make(chan struct{})
+	freeOSMemory, releaseDelay = func() {
+		close(started)
+		<-release
+	}, time.Millisecond
+	slow := &Server{staticVersion: "build"}
+	if slow.buildBundleFamily(staticSub) == nil {
+		t.Fatal("the family did not build")
+	}
+	select {
+	case <-started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the release never started")
+	}
+	other := &Server{} // built nothing: nothing of its own to wait for
+	if t0 := time.Now(); !other.stopReleaseTimers(time.Minute) || time.Since(t0) > 5*time.Second {
+		t.Error("a server with no release of its own waited for another's")
+	}
+	if t0 := time.Now(); slow.stopReleaseTimers(100*time.Millisecond) || time.Since(t0) > 5*time.Second {
+		t.Error("the wait on a running release was not bounded")
+	}
+	close(release)
+	if !slow.stopReleaseTimers(10 * time.Second) {
+		t.Error("the release ended but the server still counts it")
 	}
 }
