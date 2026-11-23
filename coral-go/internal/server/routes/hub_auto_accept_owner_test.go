@@ -172,7 +172,62 @@ func TestHubAutoAcceptRouteTakesOnlyAClosedBody(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code, "%s: %s", name, rec.Body.String())
 		assert.True(t, e.allowed(), "%s: nothing changed", name)
 	}
-	assert.Equal(t, http.StatusBadRequest, e.postTo("/api/hub-auto-accept?allow=false", `{"allow":false}`, owner).Code, "no query")
+	assert.Equal(t, http.StatusBadRequest, e.postTo("/api/hub-auto-accept?x=1", `{"allow":false}`, owner).Code, "no other query")
 	assert.True(t, e.allowed())
 	assert.Equal(t, 200, e.post(`{"allow":false}`, owner).Code, "the closed body itself")
+}
+
+// #20882: a relayed request signs ?allow=true|false. The handler takes exactly that query (compared as the raw text), with the body still required and saying the same; anything else is 400 and changes nothing.
+func TestHubAutoAcceptQueryMustBeExactlyTheBodysValue(t *testing.T) {
+	owner := ownerHeaders(ownerLabel)
+	for _, c := range []struct {
+		name, query, body string
+		code              int
+		allowed           bool // the setting afterwards, starting from on
+	}{
+		{"off, the query says the same", "allow=false", `{"allow":false}`, 200, false},
+		{"on, the query says the same", "allow=true", `{"allow":true}`, 200, true},
+		{"no query, as before", "", `{"allow":false}`, 200, false},
+		{"the query disagrees with the body (off)", "allow=true", `{"allow":false}`, 400, true},
+		{"the query disagrees with the body (on)", "allow=false", `{"allow":true}`, 400, true},
+		{"no body", "allow=false", ``, 400, true},
+		{"a look-alike value", "allow=False", `{"allow":false}`, 400, true},
+		{"a trailing space", "allow=false%20", `{"allow":false}`, 400, true},
+		{"an encoded value", "allow=%66alse", `{"allow":false}`, 400, true},
+		{"an extra key", "allow=false&x=1", `{"allow":false}`, 400, true},
+		{"a repeated key", "allow=false&allow=false", `{"allow":false}`, 400, true},
+		{"another key", "x=1", `{"allow":false}`, 400, true},
+		{"an empty value", "allow=", `{"allow":false}`, 400, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := newHubAutoAcceptEnv(t)
+			require.True(t, e.allowed())
+			target := "/api/hub-auto-accept"
+			if c.query != "" {
+				target += "?" + c.query
+			}
+			rec := e.postTo(target, c.body, owner)
+			require.Equal(t, c.code, rec.Code, rec.Body.String())
+			assert.Equal(t, c.allowed, e.allowed())
+			rows, err := e.h.bs.RecentHubOperatorActions(context.Background(), 10)
+			require.NoError(t, err)
+			if c.code == 200 {
+				require.Len(t, rows, 1, "a change is recorded (who, when, the Operator-actions log)")
+				assert.Contains(t, rows[0].Path, "allow="+map[bool]string{true: "true", false: "false"}[c.allowed])
+			} else {
+				assert.Empty(t, rows, "a refused request records nothing")
+			}
+		})
+	}
+}
+
+// The owner check comes before the query is read: a person who is not the owner gets 403 owner_only with a valid query, and nothing changes.
+func TestHubAutoAcceptQueryDoesNotMakeANonOwnerAnOwner(t *testing.T) {
+	e := newHubAutoAcceptEnv(t)
+	rec := e.postTo("/api/hub-auto-accept?allow=false", `{"allow":false}`, granteeHeaders())
+	assert.Equal(t, 403, rec.Code, rec.Body.String())
+	assert.True(t, e.allowed())
+	rec = e.postTo("/api/hub-auto-accept?allow=false", `{"allow":false}`, nil)
+	assert.Equal(t, 403, rec.Code, "not through Coral Hub")
+	assert.True(t, e.allowed())
 }

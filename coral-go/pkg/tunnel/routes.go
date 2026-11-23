@@ -785,6 +785,10 @@ func homeRef(v string) bool {
 	return found && safeRef(rest, false)
 }
 
+// exactTextQueries are the routes whose query a signature covers as received (a relayed device-key request signs its RequestURI, #20882): an enum value there must be written as the word itself, because the
+// handler compares the raw text. Other enum routes decode as the handler does.
+var exactTextQueries = map[string]bool{"POST /api/hub-auto-accept": true}
+
 // queryOK enforces the per-route query table: only the parameters the handler reads are
 // accepted, file references are normalised and checked, and everything else is refused.
 func queryOK(r route, rawQuery string) bool {
@@ -806,6 +810,9 @@ func queryOK(r route, rawQuery string) bool {
 		}
 		if ps.kind == paramEnum && (len(vals) != 1 || !slices.Contains(ps.values, vals[0])) {
 			return false // exact value, once: no look-alikes, no repeats
+		}
+		if ps.kind == paramEnum && exactTextQueries[shapeOf(r.method, r.pattern)] && !slices.Contains(strings.Split(rawQuery, "&"), name+"="+vals[0]) {
+			return false // written as that word, not a percent-encoded form of it (allow=%74rue)
 		}
 		for _, v := range vals {
 			if ps.kind == paramFile && !safeRef(v, r.tier == TierLaunch) && !(name == "path" && homeBrowseRoutes[shapeOf(r.method, r.pattern)] && homeRef(v)) {

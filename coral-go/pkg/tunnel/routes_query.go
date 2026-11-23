@@ -124,6 +124,7 @@ var routeQueries = map[string]string{
 	"POST /api/board/{}/tasks/{}/nudge":           "subscriber_id",
 	"POST /api/board/{}/tasks/{}/publish":         "subscriber_id",
 	"POST /api/board/{}/tasks/{}/reminder":        "subscriber_id",
+	"POST /api/hub-auto-accept":                   "allow=true|false",
 	"POST /api/sessions/live/{}/files/refresh":    "live,manual,worktree",
 	"POST /api/sessions/live/{}/notes":            "session_id",
 	"POST /api/sessions/live/{}/share-file":       "filepath*,session_id",
