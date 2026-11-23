@@ -358,7 +358,7 @@ function askBlockers() { // loaded once, when a row carries the field; the table
 let answered = '', answeredTimer; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
 const answeredRows = new Map(); // `${server}:${session_id}` -> { began, at }: a row answered here, waiting for the agent to stop waiting (#14408)
 document.addEventListener('coral:inbox-answered', e => { clearTimeout(answeredTimer); answered = e.detail.said; answeredTimer = setTimeout(() => { answered = ''; renderInboxNav(true); }, 3e5); if (e.detail.began && e.detail.session_id) answeredRows.set(`${e.detail.server || ''}:${e.detail.session_id}`, { began: e.detail.began, at: Date.now() }); });
-const waitRows = () => { WA.load({ onChange: () => renderInboxNav(true) }); return WA.rows(); }; // a sent-back file is one row, not also a 'Comment sent' (#20017)
+const waitRows = () => { WA.load({ onChange: () => renderInboxNav(true) }); const shown = new Set(reviewItems().filter(a => waitingOnAgent(a) || WA.commentedNode(a, !waitingOnAgent(a) && !hasNewVersion(a), saved.ago)).map(a => String(a.id || '').toLowerCase())); return WA.rows(hex => shown.has(hex)); }; // a sent-back file is one row, not also a 'Comment sent' (#20017); a comment shown on its For review row is not listed twice (#20735)
 const everyNeed = () => [...waitingSessions(), ...reviewRows(), ...waitRows(), ...runRows(), ...proposalRows(), ...goalDoneRows(), ...skillRows(), ...askRows(), ...recordRows(), ...closedByAgentRows()]; // no Getting started items: uncounted (#19274)
 let activeNeedsTeam = '';
 let teamNeedsMount = null;
