@@ -30,7 +30,7 @@ const { safePaused } = require('./helpers/paused');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 1`, `${tag}: a row of Needs you`, 10000);
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
-            await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]') && !!document.querySelector('dialog.inbox-ask-dialog .ac-add-image')`, `${tag}: the dialog with Add image`, 15000);
+            await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]') && !!document.querySelector('dialog.inbox-ask-dialog .ac-add-image')`, `${tag}: the dialog with Add image`, 8000);
             const refs = await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-text .msg-ref')].map(b => { const r = b.getBoundingClientRect(); return { id: b.dataset.message, text: b.textContent, label: b.getAttribute('aria-label'), h: Math.round(r.height), w: Math.round(r.width) }; })`);
             check(`${tag}: #8, #6 and #7 are message buttons; task #12, Goal #5 and the #9 in code are not`, JSON.stringify(refs.map(r => r.id)) === JSON.stringify(['8', '6', '7']) && refs.every(r => r.label === 'Open message ' + r.id && r.text === '#' + r.id), JSON.stringify(refs));
             if (mobile) check(`${tag}: each is a 44 px target`, refs.every(r => r.h >= 43.5), JSON.stringify(refs));
