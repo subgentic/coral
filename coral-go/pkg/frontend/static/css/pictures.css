@@ -91,3 +91,9 @@ body.keyboard-open .ac-composer-row .ac-counter { display: none; }
 .artifact-review-form .review-pictures, .artifact-review-form .field-pictures { display: contents; }
 .artifact-review-form .ac-images-hint { flex: 1 0 100%; }
 .artifact-review-form :is(.ac-picker, button) { order: 1; }
+
+/* On a phone, reserve the decision row for Send and Approve; Cancel follows it. */
+@media (max-width: 768px) {
+    .artifact-review-form .ac-picker { flex: 1 0 100%; }
+    .artifact-review-form > .artifact-review-cancel { order: 3; }
+}
