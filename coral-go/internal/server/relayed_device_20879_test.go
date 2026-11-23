@@ -19,6 +19,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/devicekey"
+	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -45,6 +46,7 @@ func newRelayRig(t *testing.T) *relayRig {
 	t.Helper()
 	r := newE2ERemote(t, "relay-20879", nil)
 	ss := store.NewSessionStore(r.db)
+	require.NoError(t, ss.SetSetting(context.Background(), routes.MaxModeSetting, tunnel.TierLaunch.String())) // this computer lets a Hub type into agents, so the guard is what answers
 	key, err := devicekey.LoadOrCreateComputerKey(t.TempDir())
 	require.NoError(t, err)
 	m := cloud.New(cloud.Options{HubURL: "https://app.coralhub.dev", Store: store.NewCloudStore(r.db, store.NewRemoteServerStore(r.db, r.dir)), MaxMode: func() tunnel.Mode { return tunnel.TierLaunch },
@@ -77,8 +79,8 @@ type relayReq struct {
 	kind    devicekey.Kind
 	method  string
 	target  string
-	body    string // what arrives
-	signed  string // what was signed (the body hash); "" means the same as body
+	body    string  // what arrives
+	signed  *string // the body that was hashed when signing; nil means the one that arrives
 	priv    *ecdsa.PrivateKey
 	kid     string
 	actor   string // the Hub person the stamp names
@@ -114,14 +116,14 @@ func (g *relayRig) signed(q relayReq) *httptest.ResponseRecorder {
 		n[0], n[1], n[2] = byte(g.n), byte(g.n>>8), 9
 		q.nonce = rb64.EncodeToString(n)
 	}
-	if q.signed == "" {
-		q.signed = q.body
+	if q.signed == nil {
+		q.signed = &q.body
 	}
 	signTarget := q.target
 	if q.signTgt != "" {
 		signTarget = q.signTgt
 	}
-	m := devicekey.Relayed{Kind: q.kind, KID: q.kid, Computer: q.comp, Ts: q.ts.Unix(), Nonce: q.nonce, Link: q.link, HubUser: q.signAs, Method: q.method, Path: signTarget, BodySHA256: devicekey.BodySHA256([]byte(q.signed))}
+	m := devicekey.Relayed{Kind: q.kind, KID: q.kid, Computer: q.comp, Ts: q.ts.Unix(), Nonce: q.nonce, Link: q.link, HubUser: q.signAs, Method: q.method, Path: signTarget, BodySHA256: devicekey.BodySHA256([]byte(*q.signed))}
 	canon, err := m.Canonical()
 	require.NoError(g.t, err)
 	input := devicekey.RelayedSigningInput(q.kind, canon)
@@ -165,6 +167,8 @@ func bodyFor(k devicekey.Kind, method, kid string) string {
 func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
 	g := newRelayRig(t)
 	n := 0
+	var priv *ecdsa.PrivateKey
+	var kid string
 	for _, k := range devicekey.RelayedKinds {
 		for _, rt := range devicekey.KindRoutes[k] {
 			n++
@@ -172,11 +176,25 @@ func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
 			if k == devicekey.HubAutoAccept {
 				target += "?allow=true"
 			}
-			priv, kid, actor := g.bound, g.bndK, relayPerson
-			if devicekey.OwnerOnly(k) {
-				priv, kid, actor = g.owner, g.ownK, relayOwner
+			// A new signer every third route: this computer's budget of failed checks is per signer (30 a minute), and each route here fails nine times on purpose (a computer lists at most ten keys).
+			if n%3 == 1 {
+				priv, kid = g.addKey(testLinkID, relayPerson)
 			}
+			actor := relayPerson
 			base := relayReq{kind: k, method: rt.Method, target: target, body: bodyFor(k, rt.Method, kid), priv: priv, kid: kid, actor: actor}
+			signedBody := base.body
+			base.signed = &signedBody
+			if k == devicekey.GrantMember || k == devicekey.HubAutoAccept {
+				// KNOWN GAPS (reported on #20879): the tunnel's route table does not list the grant routes, and lists hub-auto-accept with no query while its signed text carries ?allow=. A Hub cannot reach either
+				// at any mode, so the guard is never asked. Opening them is a change to pkg/tunnel/routes.go that Security reads first; this fails the day they open, so a signed-path test is written then.
+				u := target
+				query := ""
+				if i := strings.IndexByte(u, '?'); i >= 0 {
+					u, query = u[:i], u[i+1:]
+				}
+				assert.Equal(t, tunnel.TierNever, tunnel.Classify(rt.Method, u, query), "%s %s", rt.Method, rt.Pattern)
+				continue
+			}
 			name := fmt.Sprintf("%s %s %s", k, rt.Method, rt.Pattern)
 
 			ok := base
@@ -189,7 +207,7 @@ func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
 				what, code string
 				mut        func(q *relayReq)
 			}{
-				{"one changed body byte", "body_hash", func(q *relayReq) { q.body += "x" }},
+				{"one changed body byte", "bad_signature", func(q *relayReq) { q.body += "x" }},
 				{"another link in the signed text", "bad_signature", func(q *relayReq) { q.link = "lnk-0000ffff" }},
 				{"another computer", "bad_signature", func(q *relayReq) { q.comp = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }},
 				{"another hub_user in the signed text", "bad_signature", func(q *relayReq) { q.signAs = "hub-user-cccc3333" }},
@@ -203,32 +221,37 @@ func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
 				c.mut(&q)
 				rec := g.signed(q)
 				assert.Equal(t, c.code, relayCode(rec), "%s: %s: %d %s", name, c.what, rec.Code, rec.Body.String())
-				assert.Equal(t, http.StatusForbidden, rec.Code, "%s: %s", name, c.what)
+				want := http.StatusForbidden
+				if c.code == "ts_window" {
+					want = http.StatusBadRequest
+				}
+				assert.Equal(t, want, rec.Code, "%s: %s", name, c.what)
 			}
 		}
 	}
-	assert.GreaterOrEqual(t, n, 15, "every route of the table was exercised")
+	assert.Equal(t, 14, n, "every route of the table was visited (a route added to KindRoutes is visited too: add it here, or to the gaps)")
 }
 
-// A key bound to a Hub person never signs an owner-only kind; the owner's key signs it only as the owner this link confirmed; and a person the stamp names must be the one the signature names.
-func TestARelayedOwnerKindNeedsTheOwnersKeyAndThePinnedLabel(t *testing.T) {
+// The owner's key signs only as the owner this link confirmed (the pin), and only for the person the stamp names. (The two owner-only kinds are not reachable through the tunnel's route table yet, see the gaps in the
+// test above; the owner rule itself holds for every kind, so it is tested on one a Hub reaches.)
+func TestARelayedOwnerKeySignsOnlyAsThePinnedOwner(t *testing.T) {
 	g := newRelayRig(t)
-	toggle := relayReq{kind: devicekey.HubAutoAccept, method: "POST", target: "/api/hub-auto-accept?allow=true"}
-	q := toggle
-	q.priv, q.kid, q.actor = g.bound, g.bndK, relayPerson
-	assert.Equal(t, "outside_pair", relayCode(g.signed(q)), "a Hub person's key never signs the owner's toggle")
+	roster := relayReq{kind: devicekey.GuideRoster, method: "PUT", target: "/api/board/team1/guide-roster", body: "{}"}
+	q := roster
+	q.priv, q.kid, q.actor = g.owner, g.ownK, relayOwner
+	assert.Empty(t, relayCode(g.signed(q)), "the owner's key, as the pinned owner, is let through")
 
-	q = toggle
+	q = roster
 	q.priv, q.kid, q.actor = g.owner, g.ownK, relayPerson // the owner's key, a person who is not the pinned owner
 	assert.Equal(t, "outside_pair", relayCode(g.signed(q)), "the owner's key signs only as the pinned label")
 
-	q = toggle
+	q = roster
 	q.priv, q.kid, q.actor, q.signAs = g.owner, g.ownK, relayOwner, relayPerson // the stamp names the owner, the text another person
 	assert.Equal(t, "bad_signature", relayCode(g.signed(q)), "the signed person is the one the stamp names")
 
 	_, err := g.d.r.db.ExecContext(context.Background(), `UPDATE cloud_link SET owner_user = '' WHERE link_id = ?`, testLinkID)
 	require.NoError(t, err)
-	q = toggle
+	q = roster
 	q.priv, q.kid, q.actor = g.owner, g.ownK, relayOwner
 	assert.Equal(t, "outside_pair", relayCode(g.signed(q)), "a link with no pinned owner has no owner")
 }

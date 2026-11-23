@@ -21,6 +21,7 @@ import (
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/logexit"
 	"github.com/subgentic/coral/internal/opencode"
@@ -71,6 +72,16 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	// every writer, and Allow (which allows everything in this build) is the one check point.
 	linkStamps := store.NewCloudStore(s.db, nil)
 	r.Use(cloud.LinkStamp(linkStamps.LinkExists, cloud.AskAllow(linkStamps))) // a request that answers an ask passes only for a link that may answer that kind (#20413)
+	// A request a Hub carries on a relayed kind's route with the four Coral-Device-* headers is checked here, before any handler: the signed text is rebuilt from this computer's own state (#20879).
+	relayedVerifier := func() *devicekey.Verifier {
+		m := s.cloudMgr.Load()
+		if m == nil {
+			return nil
+		}
+		return m.NewDeviceVerifier(store.NewSessionStore(s.db))
+	}
+	relayedOwner, _ := routes.LinkOwnerSources(linkStamps)
+	r.Use(routes.RelayedGuard(relayedVerifier, relayedOwner))
 	// A tunneled write on a route in pairRecordedRoutes leaves one Operator-actions row with the link and the Hub person, after its handler (#20369); the census (pair_census_test.go) proves each one.
 	r.Use(routes.RecordPairWrites(s.boardStore, pairRecordedRoutes, pairUpgradeRoutes, r))
 	// What the owner's signed grants give a Hub person (#20473, S2): the better of their live grants, lowered by the link's cap read now, must reach the route's tier; the table is read on every request.
