@@ -44,8 +44,8 @@ const SERVERS = [
 
             // 1. a table: Server, Status, Agents; the name opens the page; no Test, Edit or Remove in the rows
             const t = await ev(`(() => { const tb = document.querySelector('table.dt-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => (h.querySelector('.dt-sort span') || h.querySelector('.dt-head-text')).textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
-                links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => (b.querySelector('.dt-name-text') || b).textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open' && !b.dataset.computerStart).length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
-            assert.deepEqual(t.heads, ['Computer', 'Tags', 'Status', 'Agents', 'Waiting', 'Last seen', 'Version', 'Start'], at + 'the columns, UI/UX\'s order (Goal #79, #9679): Tags stays by the name, its warning on the row');
+                links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => (b.querySelector('.dt-name-text') || b).textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
+            assert.deepEqual(t.heads, ['Computer', 'Tags', 'Status', 'Agents', 'Waiting', 'Last seen', 'Version'], at + 'the columns, UI/UX\'s order (Goal #79, #9679): Tags stays by the name, its warning on the row');
             if (!mobile) { // the table's default sizes (#9856): the server's name is at least 24 characters, nothing scrolls sideways, at 1280 and at 1024
                 for (const bw of [1280, 1024]) {
                     await Emulation.setDeviceMetricsOverride({ width: bw, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
@@ -55,7 +55,7 @@ const SERVERS = [
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: back to the suite's width
             }
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), true, at + 'the table keeps the Servers title');
-            assert.deepEqual(t.scopes, ['col', 'col', 'col', 'col', 'col', 'col', 'col', 'col']);
+            assert.deepEqual(t.scopes, ['col', 'col', 'col', 'col', 'col', 'col', 'col']);
             const cols = await ev(`(() => { const cell = (id, k) => { const td = document.querySelector('#server-row-' + id + ' td[data-key="' + k + '"]'); return td ? td.textContent.trim() : null; }; return { needs: ['local', 'epoch', 'lan'].map(id => cell(id, 'needs')), seen: ['local', 'epoch', 'lan'].map(id => cell(id, 'seen')), sortable: [...document.querySelectorAll('table.dt-table thead th')].map(th => !!th.querySelector('.dt-sort')) }; })()`);
             assert.deepEqual(cols.needs, ['', '', '1'], at + 'Waiting (agents waiting for you on that computer, not the Inbox\'s count of files, questions and goals): nothing at zero, the count where an agent waits: ' + JSON.stringify(cols));
             assert.deepEqual(cols.seen.slice(0, 2), ['now', 'now'], at + 'Last seen is "now" while a server is online: ' + JSON.stringify(cols));
@@ -92,15 +92,15 @@ const SERVERS = [
             const first = await seenOrder(), second = await seenOrder();
             assert.equal(first.at(-1), 'lan', at + 'Last seen sorts: the most recent first, so the server heard from 14 days ago is last: ' + JSON.stringify(first));
             assert.equal(second[0], 'lan', at + 'and a second press reverses it: ' + JSON.stringify(second));
-            assert.deepEqual(cols.sortable, [true, false, true, true, true, true, true, false], at + 'every header sorts but Tags and Start: ' + JSON.stringify(cols));
+            assert.deepEqual(cols.sortable, [true, false, true, true, true, true, true], at + 'every header sorts but Tags: ' + JSON.stringify(cols));
             { // a computer that cannot start things says why in one sentence under its buttons (mock #20111), so that row has two lines; every other row is one
                 const rows = await rowLines(ev, 'table.dt-table tbody tr[data-key]');
                 const sayingWhy = await ev(`[...document.querySelectorAll('table.dt-table tbody tr[data-key]')].filter(tr => tr.querySelector('.computer-start-note')).map(tr => (tr.querySelector('.dt-primary, .dt-name-text') || tr).textContent.trim().slice(0, 40))`);
                 assert.ok(rows.length >= 2, `${at}the servers: ${rows.length} rows measured`);
-                assert.deepEqual(rows.filter(r => r.lines > 1 && !sayingWhy.includes(r.name)), [], `${at}the servers: every row is one line, bar the ones that say why they cannot start (${JSON.stringify(rows)})`);
-                assert.ok(rows.filter(r => sayingWhy.includes(r.name)).every(r => r.lines <= 3), `${at}the sentence adds one line at most`);
+                assert.deepEqual(sayingWhy, [], `${at}the servers: no row carries a Start sentence (#20747: the starts are on the computer's page)`);
+                assert.deepEqual(rows.filter(r => r.lines > 1), [], `${at}the servers: every row is one line (${JSON.stringify(rows)})`);
             } // Goal #79: a server is one line at both widths; a narrow list drops Tags, Version
-            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('table.dt-table tbody tr[data-key]')].filter(r => r.getClientRects().length && !r.querySelector('.computer-start-note')).map(r => Math.round(r.getBoundingClientRect().height))`), [36, 36], at + 'a server row is 36 px at a mouse (the shared table density, #9734: it was 44 to 45 from a 44 px row button); the row that says why it cannot start is taller by its sentence (mock #20111)');
+            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('table.dt-table tbody tr[data-key]')].filter(r => r.getClientRects().length).map(r => Math.round(r.getBoundingClientRect().height))`), [36, 36, 36], at + 'every server row is 36 px at a mouse (the shared table density, #9734); none is taller for a Start sentence, the list has no Start column (#20747)');
             for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await sceneShot(`servers-list-${theme}-${w}`); } await setTheme(ev, 'dark'); // the scenes UI/UX looks at (written when the gate asks for shots)
             assert.equal(t.rows, 3, at + 'this hub and two servers');
             assert.deepEqual(t.links, ['epoch', 'LAN box'], at + 'each remote server\'s name opens its page; this hub has none');

@@ -203,7 +203,7 @@ const contrast = (a, b) => {
         console.log('   ok');
 
         console.log('3. A row opens the machine\'s page: its details, Rename and Revoke are there, Back returns to the row');
-        assert.equal(await ev(`[...document.querySelectorAll('#servers-view tr.cs-row button')].filter(b => !b.classList.contains('cs-toggle') && !b.closest('.computer-start')).length`), 0, 'no Rename, More or Revoke in any row: the row\'s one button opens the page (the Start buttons are the mock\'s, #20111)');
+        assert.equal(await ev(`[...document.querySelectorAll('#servers-view tr.cs-row button')].filter(b => !b.classList.contains('cs-toggle')).length`), 0, 'no Rename, More, Revoke or Start button in any row: the row\'s one button opens the page (#20747: the Start buttons are on the computer\'s page, not in the list)');
         await openPage('m1');
         assert.equal(await ev(`document.querySelectorAll('#servers-view tr.cs-row').length`), 0, 'the list is not on screen while a machine\'s page is open');
         assert.equal(await ev(`document.activeElement.id`), 'server-row-m1', 'the keyboard is on the page');

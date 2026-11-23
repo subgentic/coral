@@ -35,7 +35,7 @@ import { healthDot, healthCard, healthStatusText } from './machine_health.js';
 // This module is loaded lazily, so its search box is loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { syncRelaunchReads, resetRelaunchReads, relaunchBadge } = await importOnce('./relaunch_badge.js'); // the "Updating" badge of a hub relaunch (#5355, behind the update flag)
 const { syncServersBar, serverVisible, serversFiltered } = await importOnce('./server_search.js');
-const { computerStart } = await importOnce('./computer_start.js'); // New agent, New team, New terminal on every row (#20388)
+const { computerStart } = await importOnce('./computer_start.js'); // New agent, New team, New terminal on a computer's page (#20388; not in the list rows, #20747)
 const DT = await importOnce('./data_table.js'); // the one table (#7903)
 const { agentCopyBeside } = await importOnce('./agent_copy_button.js'); // the robot beside the Computers page's title (#15152)
 
@@ -329,7 +329,7 @@ function machinePage(s) {
             ...fact('Hub access', accessPicker(s, isBusy, helpId))),
         detailCell(s, live, online, isBusy, helpId),
         launchDisclosureLine(s),
-        h('div', { className: 'servers-page-start' }, startFor(s)), // the same three starts as the list row, by Rename and More (mock #20111)
+        h('div', { className: 'servers-page-start' }, startFor(s)), // the three starts, by Rename and More (the list rows have none, #20747) (mock #20111)
         h('div', { className: 'item-bar servers-page-bar cs-actions' }, rowActions(s, isBusy)));
     page.addEventListener('keydown', e => { if (e.key === 'Escape' && confirming === s.id) { e.preventDefault(); e.stopPropagation(); cancelRevoke(s); } });
     return page;
@@ -348,7 +348,6 @@ function serversTable(shown) {
         needs: s => { const n = needsCount(s); if (!n) return ''; const e = h('span', { className: 'cs-needs', text: String(n) }); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; },
         seen: s => seenWords(s),
         access: s => accessPicker(s, busy.has(s.id), `${rowId(s.id)}-access-help`),
-        start: s => startFor(s),
     };
     return buildServersTable(DT, {
         label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed computer',
@@ -360,7 +359,6 @@ function serversTable(shown) {
             { key: 'seen', foldLabel: true, label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: s => (onPhone() ? '' : cellOf.seen(s)) },
             { key: 'version', foldLabel: true, label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
             { key: 'access', foldLabel: true, label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: s => (onPhone() ? '' : cellOf.access(s)) },
-            { key: 'start', label: 'Start', line: 3, width: '19rem', fixed: true, align: 'end', cell: cellOf.start },
         ],
         // The names the deep links, the focus keep and the suites read: the table keeps its own classes, these are hooks only (no rule in any stylesheet); they are put back whenever a sort draws the rows again.
         decorateHead: (th, c) => { th.classList.add('cs-th', `cs-col-${c.key}`); th.querySelector('.dt-sort')?.classList.add('cs-sort'); },
