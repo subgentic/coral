@@ -35,7 +35,7 @@ const board = 'preview-room-' + Date.now().toString(36);
             await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
             await ev(framesJs(2));
             // The side panel's width animates (about 130 ms) after the window changes, so the room the preview is placed in changes again after the resize: judge the layout once the room has held still.
-            await waitFor(`(async () => { const w = () => document.querySelector('.live-body').getBoundingClientRect().width; let last = -1, still = 0; for (let i = 0; i < 90 && still < 8; i++) { await new Promise(r => requestAnimationFrame(r)); const n = w(); still = n === last ? still + 1 : 0; last = n; } return still >= 8; })()`, width + ': the room holds still');
+            await waitFor(`(async () => { const w = () => document.querySelector('.live-body').getBoundingClientRect().width; let last = -1, still = 0; for (let i = 0; i < 90 && still < 8; i++) { await new Promise(r => setTimeout(r, 16)); const n = w(); still = n === last ? still + 1 : 0; last = n; } return still >= 8; })()`, width + ': the room holds still');
             if (width === 390) {
                 await ev(`window.toggleAgenticPanel(true); window.switchAgenticTab('tasks', 'top'); true`);
                 await waitFor(`document.querySelector('#board-task-list .board-task-open')?.getClientRects().length > 0`, 'phone Tasks panel');
