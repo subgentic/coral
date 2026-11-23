@@ -17,6 +17,10 @@ type WorkingMode struct {
 	// AsksAreTasks adds the work-on-tasks rule to the instructions every task of the team is claimed with (goal #21): asks for work go through tasks, plain posts are for talk. Off when absent (a team keeps today's instructions until it turns it on).
 	AsksAreTasks bool   `json:"asks_are_tasks"`
 	Instructions string `json:"instructions"`
+	// Images are the pictures of the custom instructions (#20767): set when the mode is read, never stored in its data. Their coral://artifacts lines follow the words in Instructions, which is what a task is claimed with.
+	Images map[string][]GoalImage `json:"images,omitempty"`
+	// PicturesNotSaved is set by the server only, on the answer to a write whose words were saved and whose pictures were not (#20758).
+	PicturesNotSaved bool `json:"pictures_not_saved,omitempty"`
 }
 
 // AsksAreTasksRule is the sentence the setting adds.
@@ -73,8 +77,27 @@ func loadWorkingMode(ctx context.Context, db sqlx.QueryerContext, project string
 		return m, err
 	}
 	m.Instructions = preset.Instructions
-	err = m.normalize()
-	return m, err
+	if err = m.normalize(); err != nil {
+		return m, err
+	}
+	var rows []struct {
+		Hex         string `db:"hex"`
+		Name        string `db:"name"`
+		ContentType string `db:"content_type"`
+	}
+	if err = sqlx.SelectContext(ctx, db, &rows, `SELECT hex, name, content_type FROM board_field_images WHERE board_id = ? AND kind = ? AND owner = '' AND field = 'custom_instructions' ORDER BY pos`, project, FieldImagesWorkingMode); err != nil {
+		return m, err
+	}
+	if len(rows) > 0 {
+		lines := ""
+		m.Images = map[string][]GoalImage{"custom_instructions": {}}
+		for _, r := range rows {
+			m.Images["custom_instructions"] = append(m.Images["custom_instructions"], GoalImage{Hex: r.Hex, Name: r.Name, ContentType: r.ContentType})
+			lines += "\ncoral://artifacts/" + r.Hex
+		}
+		m.Instructions = joinModeInstruction(m.Instructions, strings.TrimPrefix(lines, "\n")) // after the words, one line per picture
+	}
+	return m, nil
 }
 func (s *Store) GetWorkingMode(ctx context.Context, project string) (WorkingMode, error) {
 	return loadWorkingMode(ctx, s.reader(), project)
