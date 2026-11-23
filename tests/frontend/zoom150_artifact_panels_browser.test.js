@@ -46,6 +46,7 @@ const { coralReady } = require('./helpers/wait');
         await shot('zoom-request');
         const q = await ev(`(() => { const r = e => { if (!e) return null; const b = e.getBoundingClientRect(); return [Math.round(b.top), Math.round(b.bottom)]; }, d = document.querySelector('#artifact-viewer'); return { vh: innerHeight, body: r(d.querySelector('.artifact-viewer-body')), review: r(d.querySelector('.artifact-review')), form: r(d.querySelector('.artifact-review form')), kids: [...d.querySelector('.artifact-review form').children].map(e => e.tagName + '.' + e.className + ':' + r(e)), buttons: [...d.querySelectorAll('.artifact-review button')].map(b => b.textContent.trim() + ':' + r(b)) }; })()`);
         assert.ok(q.body[0] <= 330 && q.review[1] <= 330 && q.buttons.every(b => { const bottom = +b.split(',')[1]; return bottom > 0 && bottom <= q.vh; }), 'the change request is compact and the document starts in the upper part of the window: ' + JSON.stringify(q));
+        assert.equal(await ev(`(()=>{const p=document.querySelector('.artifact-review-form .ac-picker').getBoundingClientRect(),t=document.querySelector('#artifact-review-text').getBoundingClientRect();return Math.abs(p.left-t.left)<=1})()`),true,'Add image keeps the field’s left edge beside the decision buttons');
         console.log('PASS zoom150_artifact_panels_browser');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

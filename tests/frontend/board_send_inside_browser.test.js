@@ -20,7 +20,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.querySelector('.mb-post-send-btn') && document.querySelector('.mb-post-send-btn').getClientRects().length > 0`, 'the composer', 15000);
         const g = await ev(`(() => { const card = document.querySelector('.mb-post-card'), b = document.querySelector('.mb-post-send-btn'), c = card.getBoundingClientRect(), r = b.getBoundingClientRect(); const R = parseFloat(getComputedStyle(card).borderTopRightRadius), br = parseFloat(getComputedStyle(b).borderTopRightRadius);
             // the card's outline near its right end: a corner point of Send is inside when it is inside the quarter circle of radius R at the card's top right and bottom right
-            const inside = (x, y) => { const cx = c.right - R, cy = y < c.top + c.height / 2 ? c.top + R : c.bottom - R; return x <= cx || Math.hypot(x - cx, y - cy) <= R - 1; };
+            const inside = (x, y) => { const cx = c.right - R, cy = y < c.top + c.height / 2 ? c.top + R : c.bottom - R; return x >= c.left + 1 && x <= c.right - 1 && y >= c.top + 1 && y <= c.bottom - 1 && (x <= cx || (y >= c.top + R && y <= c.bottom - R) || Math.hypot(x - cx, y - cy) <= R - 1); };
             // Send's rounded corner, not its square one: the nearest point of its own outline to the card's corner
             const pts = [[r.right - br + br * Math.SQRT1_2, r.top + br - br * Math.SQRT1_2], [r.right - br + br * Math.SQRT1_2, r.bottom - br + br * Math.SQRT1_2]];
             return { R, br, card: [c.top, c.bottom, c.right], btn: [r.top, r.bottom, r.right], ok: pts.every(p => inside(p[0], p[1])) }; })()`);

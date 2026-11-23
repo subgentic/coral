@@ -465,6 +465,10 @@ async function run() {
   const keptInput = await ev(`document.getElementById('command-input').value`);
   check('upload failure aborts send without dispatching lone caption', !failPost && keptInput === 'Do not send without image', JSON.stringify({ failPost, keptInput }));
 
+  // The approved shared tray retains a failed picture: remove that draft before testing a new send.
+  await waitFor(`!!document.querySelector('#image-attachments .ac-thumb-failed .image-attachment-remove')`, 'the failed picture is retained');
+  await ev(`document.querySelector('#image-attachments .ac-thumb-failed .image-attachment-remove').click();true`);
+
   // Repeat-send debouncing while upload is in-flight
   await ev(`window.__posts = []; window.__failUpload = false; window.__uploadDelay = 500;
     const file2 = new File(['fake data'], 'shot2.png', { type: 'image/png' });
