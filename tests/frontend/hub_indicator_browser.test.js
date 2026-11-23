@@ -120,12 +120,18 @@ const STATES = {
         console.log('4. A click: the hub in a new tab when connected, the Connect to Coral Hub screen when not');
         await ev(`window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; true`);
         await show('connected');
-        await ev(`document.getElementById('hub-indicator').click(); true`);
-        const tab = await ev(`window.__opened`);
-        check('connected: the hub opens in a new tab, with noopener', JSON.stringify(tab) === JSON.stringify([['https://app.coralhub.dev', '_blank', 'noopener,noreferrer']]), JSON.stringify(tab));
+        // #20813: connected, the indicator is a real link to the hub (the app window sends a link, not a script's window.open, to the system browser).
+        const link = await ev(`(() => { const a = document.getElementById('hub-indicator'); let prevented = null; a.addEventListener('click', e => { prevented = e.defaultPrevented; e.preventDefault(); }, { once: true }); a.click(); return { tag: a.tagName, href: a.getAttribute('href'), target: a.target, rel: a.rel, name: a.getAttribute('aria-label'), role: a.getAttribute('role'), prevented, opened: window.__opened.length }; })()`);
+        check('connected: the indicator is a link to the hub that opens in a new tab, with noopener', link.tag === 'A' && link.href === 'https://app.coralhub.dev' && link.target === '_blank' && /noopener/.test(link.rel), JSON.stringify(link));
+        check('connected: its accessible name is Open Coral Hub (with the address)', /^Open Coral Hub \(.*app\.coralhub\.dev/.test(link.name), link.name);
+        check('connected: a click is left to the link (no script opens a window)', link.opened === 0, JSON.stringify(link.opened));
+        const tab = [];
         check('and Settings did not open', await ev(`!document.getElementById('settings-modal') || getComputedStyle(document.getElementById('settings-modal')).display === 'none'`));
         const modalShown = () => ev(`(() => { const m = document.getElementById('editions-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`);
         check('and the Connect screen did not open', !(await modalShown()));
+        await show('revoked');
+        const btn = await ev(`(() => { const a = document.getElementById('hub-indicator'); return { href: a.getAttribute('href'), focusable: a.tabIndex >= 0 }; })()`);
+        check('not connected: the link goes nowhere (#), is reached by the keyboard, and opens no tab', btn.href === '#' && btn.focusable, JSON.stringify(btn));
         for (const name of ['revoked', 'connecting']) {
             await show(name);
             await ev(`window.__opened.length = 0; document.getElementById('hub-indicator').click(); true`);
