@@ -74,11 +74,26 @@ func newDKRig(t *testing.T) *dkRig {
 }
 
 func (d *dkRig) addDevice(mode, kind string) (*ecdsa.PrivateKey, string) {
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(d.t, err)
-	e, _ := priv.ECDH()
-	raw := e.PublicKey().Bytes()
-	kid := rb64.EncodeToString(sha(raw))
+	return d.addDeviceKid(mode, kind, 0)
+}
+
+// addDeviceKid lists a new device; a non-zero first makes its kid start with that character (keys are drawn until one does, only that one is listed).
+func (d *dkRig) addDeviceKid(mode, kind string, first byte) (*ecdsa.PrivateKey, string) {
+	var priv *ecdsa.PrivateKey
+	var raw []byte
+	var kid string
+	for {
+		var err error
+		priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(d.t, err)
+		e, _ := priv.ECDH()
+		raw = e.PublicKey().Bytes()
+		kid = rb64.EncodeToString(sha(raw))
+		if first == 0 || kid[0] == first {
+			break
+		}
+	}
+	var err error
 	_, err = d.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: kid, PK: raw, Label: "Phone", Mode: mode, Origin: store.DeviceOriginPairing, Kind: kind, Link: store.PairOwner, HubUser: store.PairOwner}, time.Now().Add(-time.Hour))
 	require.NoError(d.t, err)
 	return priv, kid
@@ -273,11 +288,30 @@ func TestAnUnlistedRemovedOrWrongComputerSenderGetsBadSignature(t *testing.T) {
 
 // Review #19738 SHOULD 1: only FAILED checks use the budget, per claimed signer, so a flood of bad messages cannot delay a signed removal from another signer, and good ones never use it.
 func TestAFloodOfBadMessagesDoesNotDelayAnotherSignersRemoval(t *testing.T) {
+	floodDoesNotDelayRemoval(t, newDKRig(t))
+}
+
+// The flood's invented kid used to be the signer's own with its first character set to "A": for the 1 in 64 signers whose kid starts with "A" that was the signer's own kid, so the flood spent the signer's own budget and the final removal got 503 (v2.1.6 gate, #20774). Pinned with a signer that does.
+func TestAFloodDoesNotDelayARemovalWhoseKidStartsWithA(t *testing.T) {
 	d := newDKRig(t)
+	d.signer, d.kid = d.addDeviceKid("launch", store.DeviceKindDevice, 'A')
+	floodDoesNotDelayRemoval(t, d)
+}
+
+// inventedKid is a kid nobody listed: the signer's own with its first character changed, never to the same one.
+func inventedKid(kid string) string {
+	if kid[0] == 'B' {
+		return "C" + kid[1:]
+	}
+	return "B" + kid[1:]
+}
+
+func floodDoesNotDelayRemoval(t *testing.T, d *dkRig) {
 	_, target := d.addDevice("view", store.DeviceKindDevice)
 	body, sig := d.removal(target)
 	// The flood claims a kid nobody listed: more failed checks than the budget.
-	flood := msgJSON("remove-device", strings.Replace(body, d.kid, "A"+d.kid[1:], 1), sig)
+	require.NotEqual(t, d.kid, inventedKid(d.kid))
+	flood := msgJSON("remove-device", strings.Replace(body, d.kid, inventedKid(d.kid), 1), sig)
 	for i := 0; i < 80; i++ {
 		d.post("/api/device-keys/message", flood, nil)
 	}
