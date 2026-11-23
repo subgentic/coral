@@ -125,7 +125,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     const syncToggle = () => { toggle.hidden = !st.shownNow; };
     // The drawn text changes after the comments were placed (a code block coloured once highlight.js has loaded): their ranges follow it, a moment after it settles (#5311).
     let relocateTimer = 0;
-    new MutationObserver(() => { if (!shown()) return; clearTimeout(relocateTimer); relocateTimer = setTimeout(() => { if (st.data && st.text) paint(true); }, 150); }).observe(body, { childList: true, subtree: true, characterData: true });
+    new MutationObserver(() => { if (!shown()) return; clearTimeout(relocateTimer); const again = () => { if (!st.data || !st.text) return; if (panelSelection()) { relocateTimer = setTimeout(again, 400); return; } paint(true); }; relocateTimer = setTimeout(again, 150); }).observe(body, { childList: true, subtree: true, characterData: true });
 
     // ── the data
     const allThreads = () => {
@@ -148,6 +148,8 @@ export function attachComments(dialog, body, host, opts = {}) {
     const ownHex = (c) => c.artifactId || st.hex; // a carried comment's replies, resolving and edits go to the version it was written on
     // the box takes focus and is shown whole, Save/Cancel (or Comment/Reply) with it: it was cut at the bottom of the panel (#15239, walk 10 M12)
     const focusComposer = () => { const ta = panel.querySelector('.ac-input'); if (!ta) return; ta.focus({ preventScroll: true }); (ta.closest('.ac-composer') || ta).scrollIntoView({ block: 'nearest' }); };
+    // Text in the panel the person has selected (to copy it): a redraw replaces its nodes and drops the selection, so nothing redraws the panel under it (the Operator, native app: 'After I highlight it it immediately is unselected')
+    const panelSelection = () => { const s = window.getSelection?.(); return !!s && !s.isCollapsed && s.rangeCount > 0 && panel.contains(s.anchorNode) && panel.contains(s.focusNode) && !panel.querySelector('textarea:focus, input:focus'); };
     const openCount = () => threads().filter(t => !t.c.deleted && !t.c.resolved && groupOf(t.c) !== 'earlier').length;
     async function refresh() {
         if (!st.hex || (!st.text && !st.whole)) return;
@@ -180,7 +182,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const gen = ctxGen, hex = st.hex, server = st.server, board = st.board, series = st.series; liveBusyGen = gen;
         try {
             const data = sourcePolicy(await api.listComments(hex, server, board, series));
-            if (gen !== ctxGen || hex !== st.hex || server !== st.server || board !== st.board || series !== st.series || !st.data || sigOf(data) === sigOf(st.data)) return;
+            if (gen !== ctxGen || hex !== st.hex || server !== st.server || board !== st.board || series !== st.series || !st.data || sigOf(data) === sigOf(st.data) || panelSelection()) return; // selected text waits: the next tick draws what changed once it is let go
             const added = data.comments.filter(c => !c.deleted).length - st.data.comments.filter(c => !c.deleted).length, top = panel.scrollTop;
             const ta = document.activeElement && document.activeElement.matches?.('.ac-input') && panel.contains(document.activeElement) ? document.activeElement : null, sel = ta ? [ta.selectionStart, ta.selectionEnd, ta.selectionDirection] : null; // the caret of a comment being written
             st.data = data; render(); paint(); panel.scrollTop = top;
@@ -371,7 +373,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             li.append(rb);
         }
         if (st.composing && st.composing.parentId === c.id) li.append(composer());
-        li.addEventListener('click', (e) => { if (e.target.closest('button, textarea, .ac-ask')) return; activate(c.id, true); }); // the picker's own clicks (a checkbox) are not a click on the card: drawing it again would drop the box that was ticked
+        li.addEventListener('click', (e) => { if (e.target.closest('button, textarea, .ac-ask') || panelSelection()) return; activate(c.id, true); }); // the picker's own clicks (a checkbox) are not a click on the card: drawing it again would drop the box that was ticked
         // The card and its highlight light each other while the pointer is on either (a click makes them current).
         li.addEventListener('pointerenter', () => hover(c.id)); li.addEventListener('pointerleave', () => hover(null));
         return li;
