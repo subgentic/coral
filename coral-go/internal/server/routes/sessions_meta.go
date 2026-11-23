@@ -65,6 +65,14 @@ func (h *SessionsHandler) SetInstructions(w http.ResponseWriter, r *http.Request
 	if trimmed := strings.TrimSpace(body.Instructions); trimmed != "" {
 		prompt = &trimmed
 	}
+	if prompt == nil { // pictures need words to follow: an agent reads them after its instructions (#20768)
+		for _, hexes := range body.Images {
+			if len(hexes) > 0 {
+				writeError(w, http.StatusBadRequest, "pictures_need_instructions", "pictures go with instructions: write the instructions, or send no pictures")
+				return
+			}
+		}
+	}
 	pictures, ok := h.instructionPictures(w, r, body.SessionID, body.ImagesDraft, body.Images)
 	if !ok {
 		return

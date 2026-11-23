@@ -62,6 +62,7 @@ func (h *SessionsHandler) KillTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		h.chatMeta.forget(ls.SessionID)
 		h.ss.UnregisterLiveSession(bgCtx, ls.SessionID)
+		h.forgetInstructionPictures(bgCtx, ls.SessionID)
 		h.terminal.KillSession(ctx, ls.AgentName, ls.AgentType, ls.SessionID)
 		removeBoardStateFile(ls.AgentName, h.cfg)
 		agent.CleanupTempFiles(ls.SessionID)

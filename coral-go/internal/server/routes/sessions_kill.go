@@ -81,6 +81,7 @@ func (h *SessionsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 		if err := h.ss.UnregisterLiveSession(bgCtx, body.SessionID); err != nil {
 			log.Printf("[kill] failed to unregister session %s: %v", body.SessionID, err)
 		}
+		h.forgetInstructionPictures(bgCtx, body.SessionID) // its instructions' pictures go with it (#20768)
 	}
 
 	h.kickWS() // the list drops the row now, not when the terminal and the worktree are done (#15370)

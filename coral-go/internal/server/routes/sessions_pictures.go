@@ -52,3 +52,13 @@ func (h *SessionsHandler) withInstructionPictures(ctx context.Context, sessionID
 	}
 	return prompt + pictureLines(h.instructionImages(ctx, sessionID)["instructions"])
 }
+
+// forgetInstructionPictures removes the pictures of an agent that is gone (#20768); the artifacts stay, other records may share them.
+func (h *SessionsHandler) forgetInstructionPictures(ctx context.Context, sessionID string) {
+	if sessionID == "" || h.boardHandler == nil || h.boardHandler.bs == nil {
+		return
+	}
+	if err := h.boardHandler.bs.DeleteFieldImages(ctx, "", board.FieldImagesSession, sessionID); err != nil {
+		slog.Warn("[sessions] an ended agent's instruction pictures were not removed", "session", sessionID, "error", err)
+	}
+}
