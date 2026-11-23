@@ -5,8 +5,16 @@ const WIN_DRIVE = /^[A-Za-z]:[\\/]/;
 
 const segs = p => String(p || '').replace(/\\/g, '/').split('/').filter(s => s && s !== '.');
 
-/** @returns {{ref: string}|{outside: true}} ref to send through the Hub, or outside when the file lies beyond the folder. */
+const LINE_SUFFIX = /:(\d+)(?::(\d+))?$/;
+
+/** @returns {{ref: string, line?: number}|{outside: true}} ref to send through the Hub, or outside when the file lies beyond the folder. A trailing :line[:col] is taken off (the tunnel refuses ':', #20827) and returned as line. */
 export function hubFileRef(ref, folder) {
+    const m = LINE_SUFFIX.exec(String(ref || ''));
+    const out = hubFilePath(m ? String(ref).slice(0, m.index) : ref, folder);
+    return m && out.ref !== undefined && out.ref !== '' ? { ...out, line: Number(m[1]) } : out;
+}
+
+function hubFilePath(ref, folder) {
     const raw = String(ref || '').replace(/^file:\/\//i, '');
     const absolute = raw.startsWith('/') || raw.startsWith('\\') || raw.startsWith('~') || WIN_DRIVE.test(raw);
     if (!absolute) return { ref: String(ref) };
@@ -18,7 +26,6 @@ export function hubFileRef(ref, folder) {
     if (path.length <= base.length || !base.every((s, i) => norm(s) === norm(path[i]))) return { outside: true };
     const rest = path.slice(base.length);
     if (rest.includes('..')) return { outside: true };
-    // the line suffix (file.js:12) stays on the last segment: the route reads it
     return { ref: rest.join('/') };
 }
 

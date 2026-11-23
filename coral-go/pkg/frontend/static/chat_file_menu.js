@@ -7,12 +7,13 @@ import { importOnce } from './import_once.js';
 async function resolveFileRef(ref) {
     const s = state.currentSession;
     if (!s || s.type !== "live") return null;
+    let hubLine = 0;
     if (isCloud() || isHub() || !isLocalServer(sessionServer(s))) { // through a Hub the tunnel refuses an absolute value: send the folder-relative path (#20817)
         const agent = (state.liveSessions || []).find(a => a.name === s.name && normServer(a.server) === sessionServer(s));
         const { hubFileRef, outsideWords } = await importOnce('./hub_file_ref.js');
         const sent = hubFileRef(ref, (agent && (agent.current_directory || agent.working_directory)) || s.working_directory || '');
         if (sent.outside) { showToast(outsideWords(s.display_name || s.name), true); return null; }
-        ref = sent.ref;
+        ref = sent.ref; hubLine = sent.line || 0;
     }
     try {
         const qs = new URLSearchParams({ filepath: ref, session_id: s.session_id || "" });
@@ -25,7 +26,7 @@ async function resolveFileRef(ref) {
             return null;
         }
         const data = await resp.json();
-        return { filepath: data.filepath, line: data.line || 0 };
+        return { filepath: data.filepath, line: data.line || hubLine };
     } catch {
         showToast(`Could not open ${ref}`, true);
         return null;
