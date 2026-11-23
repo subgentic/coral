@@ -38,7 +38,7 @@ async function httpJson(method, p, body) {
         const state = () => ev(`(() => { const status = document.getElementById('image-attach-status'); const sends = [...document.querySelectorAll('.mobile-send-btn')].filter(b => b.getClientRects().length);
             const hit = sends.map(b => { const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && (e === b || b.contains(e)); });
             const ta = document.getElementById('command-input').getBoundingClientRect(), tr = document.getElementById('command-input'); const e = document.elementFromPoint(ta.left + ta.width / 2, ta.top + ta.height / 2);
-            return { uploading: (document.querySelector('#image-attachments .image-uploading') || {}).textContent || '', toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim()), chips: document.querySelectorAll('#image-attachments .image-attachment').length, status: status ? status.textContent : null, role: status && status.getAttribute('role'),
+            return { uploading: [...document.querySelectorAll('#image-attachments .image-uploading')].map(e => e.textContent).join('|'), toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim()), chips: document.querySelectorAll('#image-attachments .image-attachment').length, status: status ? status.textContent : null, role: status && status.getAttribute('role'),
                 sends: sends.length, sendHit: hit.length > 0 && hit.every(Boolean), boxHit: e === tr || tr.contains(e) }; })()`);
 
         check('the first image: the ok reply, a chip, the status line says which file, no toast', await attach(0) === true, 'uploaded');
@@ -58,9 +58,9 @@ async function httpJson(method, p, body) {
         const hold = i => ev(`(() => { window.__ups = (window.__ups || []).concat([(async () => { const c = document.createElement('canvas'); c.width = 41 + ${i}; c.height = 29; const x = c.getContext('2d'); x.fillStyle = '#6c3'; x.fillRect(0, 0, 41, 29); x.fillStyle = '#c36'; x.fillRect(${i}, 0, 6, 29);
             const b = await new Promise(r => c.toBlob(r, 'image/png')); const f = new File([b], 'held-${i}.png', { type: 'image/png' }); const m = await import(${S} + 'controls.js'); return m.uploadAndInsertImage(f); })()]); return true; })()`);
         await hold(1); await hold(2);
-        await waitFor(`(document.querySelector('#image-attachments .image-uploading') || {}).textContent === 'Uploading 2 images…'`, 'the Uploading line while two uploads are held', 8000);
+        await waitFor(`document.querySelectorAll('#image-attachments .ac-thumb-uploading .image-uploading').length === 2`, 'the Uploading line while two uploads are held', 8000);
         s = await state();
-        check('two uploads in flight: the chip row says "Uploading 2 images…" and the five chips are still there', s.uploading === 'Uploading 2 images…' && s.chips === 5, JSON.stringify(s));
+        check('two held uploads each say Uploading, alongside the five ready pictures', s.uploading === 'Uploading…|Uploading…' && s.chips === 7, JSON.stringify(s));
         await ev(`window.__release(); Promise.all(window.__ups).then(() => true)`);
         s = await state();
         check('once they are in: no Uploading line, seven chips and "7 images attached"', s.uploading === '' && s.chips === 7 && s.status === '7 images attached', JSON.stringify(s));

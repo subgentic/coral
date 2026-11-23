@@ -7,8 +7,9 @@
     .inbox-ask-sendrow .inbox-ask-send { flex: 1 1 auto; } /* a phone: Send reply fills the row beside Add image, right under the box (#13148) */
 }
 .inbox-ask-sendrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; } /* the row under the reply box: Add image left, Send reply right */
-.inbox-ask-pick { display: inline-flex; flex: none; }
-.inbox-ask-sendrow .inbox-ask-send { margin-left: auto; min-height: 44px; } /* alone on the row until the picture button has loaded */
+.inbox-ask-pick { display: inline-flex; flex: none; align-self: stretch; }
+.inbox-ask-pick .ac-picker { display: flex; } /* keep Add image level with Send when its label wraps at 200% text */
+.inbox-ask-sendrow .inbox-ask-send { margin-left: auto; min-height: 44px; min-width: 0; white-space: normal; } /* alone on the row until the picture button has loaded */
 
 /* #20383: content height leaves no empty band on short questions; the cap
    still bounds the two scrolling columns on long ones.
@@ -38,7 +39,7 @@
 .inbox-ask-attach { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; min-width: 0; }
 .inbox-ask-attach .ac-picker { flex-shrink: 0; }
 .inbox-ask-attach .ac-images-hint { min-width: 0; }
-.inbox-ask-pics .ac-add-image { width: 44px; min-height: 44px; padding: 0; }
+.inbox-ask-pics .ac-add-image { min-height: 44px; padding: 4px 10px; white-space: normal; }
 
 /* #13583: quick choices follow the question; the reply keeps the freed lines and grows with input. */
 .inbox-ask-dialog .inbox-ask-box { height: min(9em, 40dvh); min-height: min(9em, 40dvh); max-height: 40dvh; resize: none; overflow-y: auto; } /* a fixed box that scrolls inside (#14153): a box that grew as you typed pushed Send reply down from under the pointer */
@@ -75,3 +76,6 @@
 }
 
 .inbox-ask-dialog h2 .inbox-ask-open-agent { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; vertical-align: middle; }
+
+/* Keep the decisions beside Send when the named image picker needs its own row. */
+@media (max-width: 360px) { .inbox-ask-sendrow:has(.inbox-ask-yes-no) .inbox-ask-pick { flex-basis: 100%; } }

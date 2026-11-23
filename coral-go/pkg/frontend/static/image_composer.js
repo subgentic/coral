@@ -2,10 +2,10 @@
 
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
-import { escapeHtml, escapeAttr, showToast } from './utils.js';
+import { showToast } from './utils.js';
 import { sessionServer, sessionTeamKey } from './server_base.js';
 import { blockedReason } from './hub_access.js';
-import { prepareImage, artifactErrorText, PICKER_ACCEPT } from './image_attach.js';
+import { prepareImage, PICKER_ACCEPT } from './image_attach.js';
 import { sleepingBlocked } from './control_runtime.js';
 import { registerUnsavedWork } from './update_banner.js';
 import { registerActions } from './actions.js';
@@ -13,10 +13,13 @@ import { registerActions } from './actions.js';
 // Active upload promises scoped by session_id
 export const activeUploadPromisesBySession = new Map(); // session_id -> Promise[]
 // Attached image paths scoped by session_id (cleared on send)
-const pendingAttachmentsBySession = new Map(); // session_id -> [{ path, filename, previewUrl }]
+const pendingAttachmentsBySession = new Map();
+export const uploadDrafts = new Map();
+let pictureView;
+export const hasFailedAttachments = sid => (uploadDrafts.get(sid) || []).some(it => it.state === 'failed');
 
 // An image attached or on its way is unsent work: a reload after a server update waits for it, as for typed text (update_banner.js; an empty composer with a picture in it is not an idle tab, #8735).
-registerUnsavedWork(() => activeUploadPromisesBySession.size > 0 || [...pendingAttachmentsBySession.values()].some(list => list.length > 0));
+registerUnsavedWork(() => activeUploadPromisesBySession.size > 0 || uploadDrafts.size > 0 || [...pendingAttachmentsBySession.values()].some(list => list.length > 0));
 
 export function getPendingAttachments(session = state.currentSession) {
     const sid = session?.session_id;
@@ -83,8 +86,9 @@ export function initImageDrop() {
         }
         if (files.length === 0) return;
 
+        const session = state.currentSession;
         for (const file of files) {
-            await uploadAndInsertImage(file);
+            await uploadAndInsertImage(file, session);
         }
     });
 
@@ -107,8 +111,9 @@ export function initImageDrop() {
         if (files.length === 0) return;
 
         e.preventDefault();
+        const session = state.currentSession;
         for (const file of files) {
-            await uploadAndInsertImage(file);
+            await uploadAndInsertImage(file, session);
         }
     };
     document.addEventListener("paste", pasteHandler);
@@ -168,100 +173,37 @@ export async function postImage(file, targetSession, retry) {
 }
 
 export async function uploadAndInsertImage(file, session = state.currentSession) {
-    const targetSession = session || state.currentSession;
-    const sid = targetSession?.session_id;
-    if (!sid) return false;
-
-    const uploadPromise = (async () => {
-        const result = await postImage(file, targetSession, () => uploadAndInsertImage(file, targetSession));
-        if (!result) return false;
-
-        // The file is on the agent's server: it is attached first, so a page that then fails to draw it still sends it.
-        let list;
-        try {
-            // Create a local object URL for the thumbnail preview
-            const previewUrl = URL.createObjectURL(file);
-            list = getPendingAttachments(targetSession);
-            list.push({
-                path: result.path,
-                filename: result.filename,
-                previewUrl,
-                artifact: result.artifact || null, // the image as an artifact (#5284); null with artifact_error saying why
-            });
-        } catch (e) {
-            console.error("Image uploaded but could not be attached:", e);
-            showToast("Image uploaded but not attached. Try again.", true, 10000, { action: { label: "Retry", onClick: () => uploadAndInsertImage(file, targetSession) } });
-            return false;
-        }
-        try {
-            if (state.currentSession?.session_id === sid) {
-                renderAttachments(targetSession);
-                document.getElementById("command-input")?.focus();
-            }
-            // The chip says what was attached (a toast per file covered Send on a phone, #6160): a screen reader is told in a hidden status line; only a copy that could not be shared is a toast, as it is news the chip does not carry.
-            const status = document.getElementById("image-attach-status");
-            if (status) status.textContent = list.length === 1 ? `Attached ${result.filename}` : `${list.length} images attached`;
-            if (result.artifact_error) showToast(`Attached ${result.filename}, not shared: ${artifactErrorText(result)}`, true);
-        } catch (e) {
-            console.error("Image attached but could not be shown:", e);
-            showToast("Image attached; the preview is not shown, it will still be sent.", true);
-        }
-        return true;
-    })();
-
-    const activeList = activeUploadPromisesBySession.get(sid) || [];
-    activeList.push(uploadPromise);
-    activeUploadPromisesBySession.set(sid, activeList);
-    if (state.currentSession?.session_id === sid) renderAttachments(targetSession); // "Uploading" shows in the chip row, not as a toast per file (#6160)
-
-    try {
-        return await uploadPromise;
-    } finally {
-        const currentList = activeUploadPromisesBySession.get(sid) || [];
-        const nextList = currentList.filter(p => p !== uploadPromise);
-        if (nextList.length > 0) {
-            activeUploadPromisesBySession.set(sid, nextList);
-        } else {
-            activeUploadPromisesBySession.delete(sid);
-        }
-        if (state.currentSession?.session_id === sid) renderAttachments(targetSession);
+    const sid = session?.session_id; if (!sid) return false;
+    const p = importOnce('./chat_picture_upload.js').then(m => m.uploadAndInsertImage(file, session));
+    const list = activeUploadPromisesBySession.get(sid) || []; list.push(p); activeUploadPromisesBySession.set(sid, list);
+    try { return await p; } catch { showToast('Picture could not be added. Try again.', true); return false; } finally {
+        const rest = (activeUploadPromisesBySession.get(sid) || []).filter(it => it !== p);
+        if (rest.length) activeUploadPromisesBySession.set(sid, rest); else activeUploadPromisesBySession.delete(sid);
+        if (state.currentSession?.session_id === sid) renderAttachments(session);
     }
 }
 
 const NOT_IMAGES = "Only images can be attached here.";
 let lastDropNotice = 0;
 
-// An attachment is named by its place in the strip ("Image 2"), not by its file's name: the name is a generated id that says nothing; it stays in the tooltip.
-const imageName = (i, n) => (n > 1 ? `Image ${i + 1}` : 'Image');
-
 export function renderAttachments(session = state.currentSession) {
     for (const otherFiles of document.querySelectorAll('.composer-other-files')) otherFiles.hidden = !sessionTeamKey(session);
     const container = document.getElementById("image-attachments");
     if (!container) return;
 
-    const list = getPendingAttachments(session);
-    const uploading = (activeUploadPromisesBySession.get(session?.session_id) || []).length;
-    if (list.length === 0 && uploading === 0) {
-        container.innerHTML = "";
-        container.style.display = "none";
-        return;
+    const list = getPendingAttachments(session), drafts = uploadDrafts.get(session?.session_id) || [];
+    if (!list.length && !drafts.length) { container.replaceChildren(); container.style.display = 'none'; return; }
+    container.style.display = 'flex';
+    if (!pictureView) { importOnce('./picture_tray.js').then(m => { pictureView = m; renderAttachments(); }, () => showToast('Picture preview could not load. Your draft is kept.', true)); return; }
+    const items = [...list.map(a => ({ ...a, state: 'ready' })), ...drafts];
+    try { pictureView.drawPictureTray(container, items, {
+        open: i => window.open(items[i].previewUrl, '_blank', 'noopener'),
+        remove: i => { if (i < list.length) removeAttachment(i, session); else { const d = drafts.splice(i - list.length, 1)[0]; URL.revokeObjectURL(d.previewUrl); if (!drafts.length) uploadDrafts.delete(session.session_id); renderAttachments(session); } },
+        retry: i => importOnce('./chat_picture_upload.js').then(m => m.retryDraft(items[i], session)),
+    }); } catch (e) {
+        console.error('Image attached but could not be shown:', e);
+        showToast('Image attached; the preview is not shown, it will still be sent.', true);
     }
-
-    container.style.display = "flex";
-    const uploadingText = `Uploading ${uploading === 1 ? "image" : `${uploading} images`}…`;
-    const pending = uploading ? `<div class="image-uploading">${escapeHtml(uploadingText)}</div>` : "";
-    container.innerHTML = list.map((att, i) => `
-        <div class="image-attachment" title="${escapeAttr(att.filename)}">
-            <button type="button" class="image-attachment-open" data-on-click="attachment-open" data-index="${Number(i)}" aria-label="Enlarge ${escapeAttr(imageName(i, list.length).toLowerCase())}" title="Open ${escapeAttr(att.filename)} full size"><img src="${escapeAttr(att.previewUrl)}" alt="" /></button>
-            <button type="button" class="image-attachment-remove" data-on-click="attachment-remove" data-index="${Number(i)}" aria-label="Remove ${escapeAttr(imageName(i, list.length).toLowerCase())}" title="Remove ${escapeAttr(att.filename)}">&times;</button>
-        </div>
-    `).join("") + pending;
-}
-
-/** The attachment's picture full size, in its own tab (#10147): the thumbnail is small. */
-export function openAttachment(index, session = state.currentSession) {
-    const att = getPendingAttachments(session || state.currentSession)[index];
-    if (att?.previewUrl) window.open(att.previewUrl, "_blank", "noopener");
 }
 
 export function removeAttachment(index, session = state.currentSession) {
@@ -276,6 +218,7 @@ export function clearAttachments(session = state.currentSession) {
     const targetSession = session || state.currentSession;
     const sid = targetSession?.session_id;
     if (!sid) return;
+    const drafts = uploadDrafts.get(sid) || []; for (const d of drafts) URL.revokeObjectURL(d.previewUrl); drafts.length = 0; uploadDrafts.delete(sid);
     const list = pendingAttachmentsBySession.get(sid) || [];
     for (const att of list) {
         if (att.previewUrl) URL.revokeObjectURL(att.previewUrl);

@@ -117,6 +117,12 @@ async function httpJson(method, path, body, headers = {}) {
             }
             await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog .ac-add-image')`, 'attachment button ready for stable tab order', 6000);
             await ev(`document.querySelector('dialog.inbox-ask-dialog textarea').focus(); true`);
+            if (image) {
+                await key('Tab');
+                assert.equal(await ev(`document.activeElement.getAttribute('aria-label')`), 'Mark up draft.png', 'Tab reaches picture markup above the action row');
+                await key('Tab');
+                assert.equal(await ev(`document.activeElement.getAttribute('aria-label')`), 'Remove draft.png', 'Tab reaches named picture removal');
+            }
             await key('Tab');
             assert.equal(await ev(`document.activeElement.title`), 'Add image', 'real Tab reaches the attachment button below the draft');
             await key('Tab');

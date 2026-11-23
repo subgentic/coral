@@ -34,7 +34,7 @@ import { showWorktreeNotice } from './worktree_notice.js';
 import { killLiveSession, dropKilledRows } from './kill_live.js';
 import { MODES, modeFromFooterText, pressesFor } from './mode_cycle.js';
 import { _getXtermModule, sleepingBlocked } from './control_runtime.js';
-import { activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker, removeAttachment, openAttachment } from './image_composer.js';
+import { hasFailedAttachments, activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker } from './image_composer.js';
 import { SVGO } from './svg_open.js';
 
 export { getPendingAttachments, initImageDrop, uploadAndInsertImage, renderAttachments, removeAttachment } from './image_composer.js';
@@ -89,6 +89,8 @@ export async function sendCommand({ nudge = false } = {}) {
                 return;
             }
         }
+
+        if (hasFailedAttachments(targetSessionId)) { showToast('Picture not uploaded. Retry or remove it before sending.', true); return; }
 
         // Verify session did not change while waiting for uploads
         if (!state.currentSession || state.currentSession.session_id !== targetSessionId) {
@@ -831,6 +833,4 @@ registerActions({
     'send-menu-keys': () => { window.closeSendMenu(); setTimeout(() => document.getElementById('keys-chip')?.click(), 0); }, // and the terminal's Keys
     'send-menu-resend': () => { resendInputPrompt(); window.closeSendMenu(); },
     'send-menu-protocol': () => { sendBoardProtocol(); window.closeSendMenu(); },
-    'attachment-open': el => { const i = indexOf(el.dataset.index); if (i !== null) openAttachment(i); },
-    'attachment-remove': el => { const i = indexOf(el.dataset.index); if (i !== null) removeAttachment(i); },
 });

@@ -103,7 +103,6 @@ const NOT_POPOUT_RELEVANT = new Map(Object.entries({
     'group-move': 'sidebar order only',
     'msg-edit-resubmit': 'copies a past message into the command input; sending is cmd-send (gated)',
     // Names with a destructive word, reviewed one by one
-    'attachment-remove': 'drops a pending attachment from the unsent message',
     'board-chat-select-cancel': 'leaves the board chat\'s selection mode (UI state)',
     'custom-view-delete': 'deletes a custom view definition, after showConfirmModal',
     'dep-tag-remove': 'removes a dependency chip from the task dialog\'s unsaved draft',

@@ -476,3 +476,4 @@ node fail_fast_suites.test.mjs
 
 node usage_limit.test.mjs
 node review_tile_color.test.mjs
+node picture_tray.test.mjs

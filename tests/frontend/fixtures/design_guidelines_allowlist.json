@@ -85,11 +85,10 @@
    "radius: 2px": 1
   },
   "coral-go/pkg/frontend/static/css/goal_editor.css": {
-   "height: .goal-editor .ac-thumb .btn-small { height: 24px }": 1,
    "height: .goal-editor .goals-form-body > input#goal-new-done { min-height: 40px }": 1,
    "height: .goal-scope select { min-height: 28px }": 1,
    "radius: 15px": 1,
-   "radius: 16px": 2
+   "radius: 16px": 1
   },
   "coral-go/pkg/frontend/static/css/goals.css": {
    "radius: 22px": 1

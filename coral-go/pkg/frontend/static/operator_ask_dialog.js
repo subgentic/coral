@@ -178,8 +178,8 @@ export function openAskDialog(a, onDone, runners = {}) {
                 : m.createImageTray({ upload: (blob, versionOf) => api.uploadCommentImage(null, a.server, blob, versionOf, a.board) });
             tray.attach(dlg, box); tray.listen(sync);
             const picker = tray.picker(), add = picker.querySelector('button');
-            add.textContent = ''; const icon = document.createElement('span'); icon.className = 'material-icons'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = 'image'; add.append(icon); add.title = 'Add image';
-            pickSlot.append(picker); addSlot.append(tray.hint()); pics.append(tray.node);
+            add.textContent = 'Add image'; add.title = 'Add image';
+            pickSlot.append(picker); addSlot.append(tray.hint()); pics.prepend(tray.node);
         }).catch(() => { /* a reply needs no picture: the dialog works without the button */ });
     }
     close.addEventListener('click', finish);
