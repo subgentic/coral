@@ -74,7 +74,7 @@ func (h *CloudHandler) TunnelLink(w http.ResponseWriter, r *http.Request) {
 	}
 	v, ok := cloud.ViaFrom(r.Context())
 	if !cloud.Tunneled(r) || !ok || !tunnel.ValidLinkID(v.LinkID) {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no link: this request did not come through a Hub"})
+		errNotFound(w, "no link: this request did not come through a Hub")
 		return
 	}
 	writeJSON(w, http.StatusOK, struct {
