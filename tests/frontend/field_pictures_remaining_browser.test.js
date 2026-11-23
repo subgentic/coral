@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady, nextFrame } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 const BASE = require('./test_base').BASE;
 (async () => {
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
  const written=async suffix=>{await waitFor(`window.__writes.some(w=>w.url.split('?')[0].endsWith(${JSON.stringify(suffix)}))`,'write '+suffix);return ev(`window.__writes.find(w=>w.url.split('?')[0].endsWith(${JSON.stringify(suffix)})).body`);};
  try {
   await client.Fetch.enable({patterns:[{urlPattern:'*/api/artifacts/'+'a'.repeat(64)+'*'}]});
-  client.Fetch.requestPaused(async e=>{await client.Fetch.fulfillRequest({requestId:e.requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:'image/png'}],body:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='});});
+  safePaused(client, async e=>{await client.Fetch.fulfillRequest({requestId:e.requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:'image/png'}],body:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='});});
   await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
   for(const [width,theme,font] of [[1280,'dark',16],[1280,'light',16],[390,'dark',16],[390,'light',16],[390,'dark',32],[390,'light',32]]) {
    const at=`${width}-${theme}-${font}`;
