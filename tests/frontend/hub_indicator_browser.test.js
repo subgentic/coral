@@ -122,7 +122,7 @@ const STATES = {
         await show('connected');
         // #20813: connected, the indicator is a real link to the hub (the app window sends a link, not a script's window.open, to the system browser).
         const link = await ev(`(() => { const a = document.getElementById('hub-indicator'); let prevented = null; a.addEventListener('click', e => { prevented = e.defaultPrevented; e.preventDefault(); }, { once: true }); a.click(); return { tag: a.tagName, href: a.getAttribute('href'), target: a.target, rel: a.rel, name: a.getAttribute('aria-label'), role: a.getAttribute('role'), prevented, opened: window.__opened.length }; })()`);
-        check('connected: the indicator is a link to the hub that opens in a new tab, with noopener', link.tag === 'A' && link.href === 'https://app.coralhub.dev' && link.target === '_blank' && /noopener/.test(link.rel), JSON.stringify(link));
+        check('connected: the indicator is a link to the hub that opens in a new tab, with noopener and noreferrer', link.tag === 'A' && link.href === 'https://app.coralhub.dev' && link.target === '_blank' && /\bnoopener\b/.test(link.rel) && /\bnoreferrer\b/.test(link.rel), JSON.stringify(link));
         check('connected: its accessible name is Open Coral Hub (with the address)', /^Open Coral Hub \(.*app\.coralhub\.dev/.test(link.name), link.name);
         check('connected: a click is left to the link (no script opens a window)', link.opened === 0, JSON.stringify(link.opened));
         const tab = [];

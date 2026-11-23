@@ -89,7 +89,7 @@ function button() {
     if (!bar) return null;
     const b = document.createElement('a'); // a link while connected (#20813)
     b.id = 'hub-indicator';
-    b.target = '_blank'; b.rel = 'noopener';
+    b.target = '_blank'; b.rel = 'noopener noreferrer';
     b.className = 'btn btn-quiet btn-icon btn-small top-bar-btn hub-indicator';
     b.hidden = true;
     // A hub: one node joined to three.
