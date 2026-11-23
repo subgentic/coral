@@ -73,6 +73,7 @@ type artifactStore struct {
 	receivedMaxBytes func() int64
 	windows          map[string]*uploadUsage
 	now              func() time.Time
+	owner            *SessionsHandler // the handler whose settings the two readers above are (RegisterAgentArtifacts); the table keeps the entry as long as the process lives, so its server's close lets it go (#20892)
 }
 
 type uploadUsage struct {
@@ -85,6 +86,26 @@ var (
 	artifactStoresMu sync.Mutex
 	artifactStores   = map[string]*artifactStore{}
 )
+
+// ReleaseArtifactStore drops this handler's hold on its folder's artifact bookkeeping, when the server that owns it closes (#20892). The table of stores is a package variable that lives as long as the
+// process, and the entry's two readers are this handler's methods: left in place they keep the closed server (its stores, routers and templates) in memory. A later server on the same folder has
+// bound its own readers (and keeps them); the next use of the folder measures it again.
+func (h *SessionsHandler) ReleaseArtifactStore() {
+	if h == nil || h.cfg == nil {
+		return
+	}
+	dir := h.cfg.CoralDir()
+	artifactStoresMu.Lock()
+	defer artifactStoresMu.Unlock()
+	if s := artifactStores[dir]; s != nil {
+		s.mu.Lock()
+		mine := s.owner == h
+		s.mu.Unlock()
+		if mine {
+			delete(artifactStores, dir)
+		}
+	}
+}
 
 // storeFor returns the bookkeeping for coralDir's artifact store, measuring it the first time.
 func storeFor(coralDir string) *artifactStore {
