@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 const { coralReady } = require('./helpers/wait');
+const { safePaused } = require('./helpers/paused');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect(); const { Input } = client;
@@ -13,6 +14,9 @@ const { coralReady } = require('./helpers/wait');
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // #20872: a slow load of the link helper (a busy machine) must not show the question with #8 still plain text: hold message_refs.js back 1.5 s on every open
+        await client.Fetch.enable({ patterns: [{ urlPattern: '*/message_refs.js*' }] });
+        safePaused(client, p => new Promise(r => setTimeout(r, 1500)).then(() => client.Fetch.continueRequest({ requestId: p.requestId })).catch(() => {})); // sleep-ok: the held module load
         for (const [w, h, mobile, fs16] of [[1280, 800, false, 16], [390, 844, true, 16], [390, 844, true, 32]]) {
             const tag = `${w} px${fs16 === 32 ? ' 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -26,7 +30,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 1`, `${tag}: a row of Needs you`, 10000);
             await ev(`document.querySelector('button[aria-label="Answer the question of Orchestrator"]').click(); true`);
-            await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]') && !!document.querySelector('dialog.inbox-ask-dialog .ac-add-image')`, `${tag}: the dialog with Add image`, 8000);
+            await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]') && !!document.querySelector('dialog.inbox-ask-dialog .ac-add-image')`, `${tag}: the dialog with Add image`, 15000);
             const refs = await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog .inbox-ask-text .msg-ref')].map(b => { const r = b.getBoundingClientRect(); return { id: b.dataset.message, text: b.textContent, label: b.getAttribute('aria-label'), h: Math.round(r.height), w: Math.round(r.width) }; })`);
             check(`${tag}: #8, #6 and #7 are message buttons; task #12, Goal #5 and the #9 in code are not`, JSON.stringify(refs.map(r => r.id)) === JSON.stringify(['8', '6', '7']) && refs.every(r => r.label === 'Open message ' + r.id && r.text === '#' + r.id), JSON.stringify(refs));
             if (mobile) check(`${tag}: each is a 44 px target`, refs.every(r => r.h >= 43.5), JSON.stringify(refs));
