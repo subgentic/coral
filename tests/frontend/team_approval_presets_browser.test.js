@@ -47,6 +47,8 @@ const { coralReady } = require('./helpers/wait');
         r = await row();
         assert.deepEqual([r.goals, r.tasks, r.requireGoal], [true, false, true], 'Operator approves goals: goals on, tasks off, Require a goal on');
         assert.match(r.help, /every task needs a goal/, 'the sentence follows the choice');
+        await ev(`document.querySelector('#team-settings-workspace').view.refresh(); true`);
+        assert.match((await row()).help, /every task needs a goal/, 'refreshing picture/settings state preserves the current planning help');
         await save({ goals: true, tasks: false, requireGoal: true });
         assert.equal((await row()).value, 'goals', 'the row still says it after the save');
 
