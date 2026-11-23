@@ -61,3 +61,17 @@
 
 .picture-tray .picture-actions button:hover { background: var(--bg-hover); }
 .ac-add-image::before { content: "＋ "; }
+/* A field's tray and picker share its left edge and keep their full height in a scrolling dialog. */
+.field-pictures { min-width: 0; width: 100%; max-width: 100%; flex-shrink: 0; }
+.field-pictures > .ac-picker { display: inline-flex; }
+.field-pictures .ac-add-image { margin: 0; }
+
+/* The board's text and pictures share the space left beside Send. */
+.mb-post-card > .field-pictures { flex: 1; width: auto; }
+.mb-post-card .mb-post-input { display: block; width: 100%; box-sizing: border-box; }
+
+/* An enlarged composer with attachments scrolls within its allotted height. Its hint and Send stay together. */
+.mb-post-form:has(.field-pictures) { min-height: 0; overflow-y: auto; }
+.mb-post-card:has(.ac-thumb) { align-items: flex-end; }
+/* The mention list opens above the card; it must escape the composer's scroll boundary. */
+.mb-post-form:has(.mention-list:not([hidden])) { overflow: visible; }

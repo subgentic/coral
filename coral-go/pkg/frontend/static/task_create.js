@@ -1,4 +1,5 @@
 /* Creating a task: the dialog and its submit (moved out of tasks.js, #5082; no behaviour change). */
+import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { readTaskChoices } from './tasks_view.js';
 import { closeOnBackdropAndEscape, releaseEscape } from './dialog_close.js';
@@ -16,6 +17,7 @@ let _project = '', _dependencies, _created = null; // explicit page context, ind
 let _requireGoal = false; // the board asks for a goal on every task: the Goal select has no empty choice to stay on
 let _solo = false;        // an agent without a board: the task goes to this agent, and the board's fields are not shown
 let _goalShown = false;   // the board has open goals (or asks for one): the Goal select is shown
+let pictureFields = [], picturesModule;
 let view = null;          // the dialog's form (settings_view in form mode), drawn when the dialog is first opened
 
 const PRIORITIES = [{ value: 'critical', label: 'Critical' }, { value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }];
@@ -128,6 +130,13 @@ export async function showCreateTaskModal(preset = {}) {
         v.fold(deps.length > 0 || condition !== 'success' || Object.values(values).some(Boolean));
     }
     v.refresh();
+    for (const p of pictureFields) { p.destroy(); p.node.replaceWith(...p.node.querySelectorAll(':scope > label, :scope > textarea')); }
+    pictureFields = [];
+    if (boardProject) {
+        picturesModule = await importOnce('./field_pictures.js');
+        const draft = 'pictures-' + crypto.randomUUID();
+        pictureFields = [['create-task-body', 'description'], ['create-task-instructions', 'instructions']].map(([id, field]) => picturesModule.mountFieldPictures(document.getElementById(id), { project: boardProject, field, draft }));
+    }
 
     modal.style.display = '';
     document.getElementById('create-task-title').focus();
@@ -139,6 +148,7 @@ export function hideCreateTaskModal() {
     const modal = document.getElementById('create-task-modal');
     if (!modal) return;
     modal.style.display = 'none';
+    for (const p of pictureFields) p.clear();
     releaseEscape(modal);
 }
 
@@ -155,6 +165,7 @@ async function submitValues(values) {
         const payload = { title, body, priority: values.priority, assigned_to: values.assigned_to, created_by: 'Operator' };
         if (blockedBy.length > 0) payload.blocked_by = blockedBy.map(task_id => ({ task_id, condition: values.condition || 'success', required_artifacts: names(values.inputs) }));
         payload.workflow = { name: String(values.workflow || '').trim(), stage: String(values.stage || '').trim(), required_outputs: names(values.outputs), instructions: String(values.instructions || '').trim() };
+        Object.assign(payload, picturesModule?.picturePayload(...pictureFields));
         if (values.draft) payload.draft = true;
         if (goalId) payload.goal_id = Number(goalId);
         const resp = await boardFetch(boardProject, `/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -167,7 +178,7 @@ async function submitValues(values) {
         if (_created) await _created();
         else await loadBoardTasks(boardProject);
         document.dispatchEvent(new CustomEvent('coral:task-created', { detail: { project: boardProject } })); // the team's Tasks page reads its own list again (it is not the dock's)
-        showToast(created.goal_reopened ? 'Task created; goal reopened' : 'Task created');
+        showToast(picturesModule.savedWords(created, created.goal_reopened ? 'Task created; goal reopened' : 'Task created'), !!created.pictures_not_saved);
     } catch (e) {
         view.fold(true); // server validation can name a workflow or prerequisite field; keep all of them visible
         throw e;

@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('2. Create Task: the Goal select lists the open goals; the task is made under the chosen one');
         await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal').closest('.sv-row').hidden`, 'the dialog with its Goal select', 8000);
+        await waitFor(`!!document.getElementById('create-task-modal') && getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal').closest('.sv-row').hidden`, 'the dialog with its Goal select', 8000);
         assert.deepEqual(await ev(`[...document.getElementById('create-task-goal').options].map(o => o.textContent)`), ['No goal', 'Fix the flaky suites', 'Ship the new installer']); // newest activity first, as the Goals view lists them
         await ev(`document.getElementById('create-task-title').value = 'Stabilise CI'; document.getElementById('create-task-goal').value = '${g2}'; document.getElementById('create-task-submit').click(); true`);
         await waitFor(`!document.getElementById('create-task-modal') || getComputedStyle(document.getElementById('create-task-modal')).display === 'none'`, 'the dialog to close', 8000);
@@ -69,7 +69,7 @@ const { coralReady } = require('./helpers/wait');
         console.log('5. a board that requires a goal: the empty choice says "Choose a goal" and Create refuses without one');
         assert.equal((await api('PUT', `/api/board/${B}/settings`, { subscriber_id: 'Operator', require_goal: true })).status, 200);
         await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
-        await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal').closest('.sv-row').hidden && document.getElementById('create-task-goal').options[0].textContent === 'Choose a goal'`, 'the required Goal select', 8000);
+        await waitFor(`!!document.getElementById('create-task-modal') && getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal').closest('.sv-row').hidden && document.getElementById('create-task-goal').options[0].textContent === 'Choose a goal'`, 'the required Goal select', 8000);
         await ev(`document.getElementById('create-task-title').value = 'No goal here'; document.getElementById('create-task-submit').click(); true`);
         await waitFor(`/Choose a goal/.test(document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error').textContent) && !document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error').hidden`, 'the refusal beside the select', 6000);
         assert.deepEqual(await ev(`(() => { const sel = document.getElementById('create-task-goal'), line = document.getElementById('create-task-goal').closest('.sv-row').querySelector('.sv-error'); return { required: sel.required, ariaRequired: sel.getAttribute('aria-required'), invalid: sel.getAttribute('aria-invalid'), by: (sel.getAttribute('aria-describedby') || '').split(' ').includes(line.id) ? 'create-task-goal-error' : sel.getAttribute('aria-describedby'), role: line.getAttribute('role'), beside: sel.closest('.sv-row').contains(line), focus: document.activeElement.id }; })()`),

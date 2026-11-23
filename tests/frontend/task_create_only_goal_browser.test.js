@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.querySelector('#board-task-bar .btn-create-task') && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'the Tasks bar', 15000);
         const open = async () => {
             await ev(`document.querySelector('#board-task-bar .btn-create-task').click(); true`);
-            await waitFor(`getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal').closest('.sv-row').hidden`, 'the dialog with its Goal select', 8000);
+            await waitFor(`!!document.getElementById('create-task-modal') && getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !document.getElementById('create-task-goal').closest('.sv-row').hidden`, 'the dialog with its Goal select', 8000);
             await waitFor(`document.getElementById('create-task-goal').options.length >= 2`, 'the goals listed', 8000);
             return ev(`({ value: document.getElementById('create-task-goal').value, options: [...document.getElementById('create-task-goal').options].map(o => o.textContent) })`);
         };

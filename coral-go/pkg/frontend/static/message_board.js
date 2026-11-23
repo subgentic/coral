@@ -27,7 +27,7 @@ const { confirmDeleteBoardMessage, copyMessageLink, loadPausedState, loadSleepSt
 const { clearNewPill, jumpToLatest } = await importOnce('./board_new_pill.js');
 const { focusMessageById, formatTime, isAtBottom, jumpToFirst, loadBoardMessages, loadEarlierMessages, openMessageActions, renderMessages } = await importOnce('./board_window.js');
 const { _pollNewMessages, startBoardPoll, stopBoardPoll } = await importOnce('./board_poll.js');
-const { replyToMessage, postBoardMessage, postEvent } = await importOnce('./board_composer.js');
+const { replyToMessage, postBoardMessage, postEvent, mountBoardPictures } = await importOnce('./board_composer.js');
 importOnce('./board_quick_reply.js');
 export { fetchAllBoardMessages, fetchAllHistory, fetchAllLiveChat } from './board_fetch.js';
 // the moved exports, still importable from here
@@ -110,6 +110,7 @@ export function showBoardInPage(project, host, messageId = null) {
     loadSleepState(project);
     syncBoardDeleteButton(project);
     applyBoardTable(project);
+    mountBoardPictures(project);
     if (!again) { clearNewPill(); bs.pendingMessageId = messageId != null ? String(messageId) : null; loadBoardMessages(project); }
     else if (messageId != null) focusMessageById(messageId); // a link to a message of the board already on screen
     loadBoardSubscribers(project);

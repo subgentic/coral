@@ -22,11 +22,14 @@ const REPLY_MAX = 65536; // characters the box takes; the server's own cap is 25
 
 // ── drafts: in memory only ─────────────────────────────────────────────────────────────────────────────
 const _drafts = new Map();
+const _pictureDrafts = new Map();
 const _answering = new Map(); // task -> the id of the newest message of its conversation that is not the person's: the one a reply answers (#12502)
 const _boxes = new Set(); // the reply boxes on screen, so a purge empties what is typed in them too
 /** Drop every unsent reply (sign-out, a change of account): the kept drafts and what is typed in an open box. */
 export function clearInboxDrafts() {
     _drafts.clear();
+    for (const p of _pictureDrafts.values()) p.destroy();
+    _pictureDrafts.clear();
     for (const box of _boxes) { if (!box.isConnected) { _boxes.delete(box); continue; } box.value = ''; box.dispatchEvent(new Event('input')); }
 }
 const draftKey = (project, id) => `${project}#${id}`;
@@ -275,31 +278,36 @@ export function mountInbox(host, adapter, options) {
         if (describedBy) ta.setAttribute('aria-describedby', describedBy); // a task to review: the line above the box says it cannot be answered here
         const grow = () => { ta.style.height = 'auto'; if (ta.scrollHeight > 0) ta.style.height = `${Math.min(ta.scrollHeight + 2, 240)}px`; };
         queueMicrotask(grow); // after the form is in the page (a box with a saved draft opens tall enough for it)
-        let busy = false;
-        const sync = () => { send.disabled = busy || !ta.value.trim(); };
+        let busy = false, pictures = _pictureDrafts.get(key);
+        const sync = () => { send.disabled = busy || pictures?.busy() || pictures?.failed() || (!ta.value.trim() && !pictures?.hexes().length); };
         ta.addEventListener('input', () => { if (ta.value) _drafts.set(key, ta.value); else _drafts.delete(key); sync(); grow(); });
         ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit(); } });
         sync();
         form.hidden = true; // Permission must be known before offering the reply box.
-        Promise.resolve().then(() => adapter.canReply(task)).then(can => {
+        Promise.resolve().then(() => adapter.canReply(task)).then(async can => {
             form.hidden = false;
             if (!can || can.ok !== true) {
                 form.replaceChildren(el('p', 'ibx-note', can?.reason || 'You can read this task here but not reply to it.'));
+            } else if (adapter.createPictureTray) {
+                pictures ||= await adapter.createPictureTray(task);
+                _pictureDrafts.set(key, pictures); pictures.detach(); pictures.listen(sync);
+                ta.after(pictures.node); pictures.attach(form, ta); sync();
             }
         }).catch(() => { form.hidden = false; form.replaceChildren(el('p', 'ibx-note', 'Reply permission could not be checked.')); });
         form.addEventListener('submit', async e => {
             e.preventDefault();
             const content = ta.value.trim();
-            if (!content || busy) return;
+            if ((!content && !pictures?.hexes().length) || busy) return;
+            try { pictures?.assertReady(); } catch (e) { status.textContent = e.message; return; }
             busy = true; sync(); status.textContent = 'Sending…';
             try {
-                const res = await adapter.replyToTask({ project: task.project, taskId: task.id, content, replyTo: _answering.get(`${task.project}#${task.id}`) });
+                const res = await adapter.replyToTask({ project: task.project, taskId: task.id, content, ...pictures?.payload(), replyTo: _answering.get(`${task.project}#${task.id}`) });
                 const warnings = Array.isArray(res && res.warnings) ? res.warnings : [];
                 const who = creator || 'its creator';
-                const text = warnings.includes('creator_not_reachable')
+                const text = res?.pictures_not_saved ? (res.pictures_warning || 'Pictures not saved: your words were saved, but the pictures were not. Attach them again.') : warnings.includes('creator_not_reachable')
                     ? `Reply saved on the board, but ${who} could not be notified.`
                     : (res && Array.isArray(res.notified) && res.notified.length ? `Reply sent. ${res.notified.join(', ')} notified.` : 'Reply sent.');
-                _drafts.delete(key);
+                _drafts.delete(key); pictures?.clear();
                 ta.value = ''; grow();
                 status.textContent = text;
                 say(text);

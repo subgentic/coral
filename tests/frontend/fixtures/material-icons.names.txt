@@ -97,6 +97,7 @@ menu_book
 message
 messenger_outline
 mode
+note
 notes
 notifications
 now_widgets

@@ -13,15 +13,16 @@ const MAX_BYTES = 25 * 1024 * 1024; // a larger file is refused here with the re
 const typeOf = f => String((f && f.type) || '').toLowerCase();
 
 /** The tray of one comment being written. `upload(blob, versionOf)` stores (versionOf only on a marked-up copy) a picture and resolves its { hex, name, contentType, size }; `onChange()` is told whenever the pictures or their state change. */
-export function createImageTray({ upload, onChange = () => {}, hintText = HINT }) {
+export function createImageTray({ upload, onChange = () => {}, hintText = HINT, initial = [], read }) {
     const node = el('div', 'ac-images'); node.hidden = true;
     const list = el('ul', 'ac-thumbs'); list.setAttribute('aria-label', 'Pictures to send');
-    const note = el('p', 'ac-images-note'); note.setAttribute('role', 'status'); note.hidden = true;
+    const note = el('p', 'ac-images-note'); note.hidden = true;
     node.append(list, note);
-    const items = [];
-    let seq = 0, destroyed = false, change = onChange;
+    const detach = [];
+    const items = initial.map((it, i) => ({ ...it, id: i + 1, state: 'ready' }));
+    let seq = items.length, destroyed = false, change = onChange;
 
-    const say = (text) => { note.textContent = text || ''; note.hidden = !text; };
+    const say = (text) => { note.textContent = text || ''; note.hidden = !text; if (text) note.setAttribute('role', 'status'); else note.removeAttribute('role'); };
     const draw = () => {
         drawPictureTray(list, items, { remove: i => remove(items[i].id), retry: i => store(items[i]), markUp: i => markUp(items[i].id) });
         node.hidden = items.length === 0 && note.hidden;
@@ -34,6 +35,7 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
     }
     /** Adds the pictures among `files` (anything else is said and left out); each starts to upload at once. */
     function add(files) {
+        if (destroyed) return;
         const picked = [...files || []];
         const ok = [], bad = [];
         for (const f of picked) (api.COMMENT_IMAGE_TYPES.includes(typeOf(f)) && f.size <= MAX_BYTES ? ok : bad).push(f);
@@ -61,7 +63,7 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
         it.marking = true;
         try {
             const { openMarkup } = await importOnce('./image_markup.js'); // lazy: only Mark up loads it
-            const out = await openMarkup(it.blob);
+            const out = await openMarkup(it.blob || await read(it));
             if (!out || destroyed || !items.includes(it)) return;
             const first = it.first || it.hex; it.state = 'uploading'; say(''); draw();
             try { const r = await upload(out, first); if (!items.includes(it)) return; it.first = first; replaceBlob(id, out, r.hex); }
@@ -89,21 +91,24 @@ export function createImageTray({ upload, onChange = () => {}, hintText = HINT }
     const hint = () => el('p', 'ac-images-hint', hintText);
     /** Pasting a picture into the text, and dropping one on the form, add it; pasted text is left to the field. */
     function attach(form, field) {
-        field.addEventListener('paste', e => {
+        const on = (host, type, fn) => { host.addEventListener(type, fn); detach.push(() => host.removeEventListener(type, fn)); };
+        on(field, 'paste', e => {
             const cd = e.clipboardData; if (!cd) return;
             const files = [...cd.files || []].filter(f => typeOf(f).startsWith('image/'));
             if (files.length && !cd.getData('text/plain')) { e.preventDefault(); add(files); }
         });
         const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types || []].includes('Files');
-        form.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); form.classList.add('ac-drop'); });
-        form.addEventListener('dragleave', e => { if (!form.contains(e.relatedTarget)) form.classList.remove('ac-drop'); });
-        form.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); form.classList.remove('ac-drop'); add(e.dataTransfer.files); });
+        on(form, 'dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); form.classList.add('ac-drop'); });
+        on(form, 'dragleave', e => { if (!form.contains(e.relatedTarget)) form.classList.remove('ac-drop'); });
+        on(form, 'drop', e => { if (!hasFiles(e)) return; e.preventDefault(); form.classList.remove('ac-drop'); add(e.dataTransfer.files); });
     }
     /** Takes every picture out (a goal's form whose team changed: the pictures were stored on the other one). */
     function clear(words) { for (const it of items) URL.revokeObjectURL(it.previewUrl); items.length = 0; say(words || ''); draw(); }
-    function destroy() { destroyed = true; for (const it of items) URL.revokeObjectURL(it.previewUrl); items.length = 0; list.replaceChildren(); }
+    function destroy() { destroyed = true; for (const off of detach.splice(0)) off(); for (const it of items) URL.revokeObjectURL(it.previewUrl); items.length = 0; list.replaceChildren(); }
+    if (items.length) draw();
     return {
         node, add, remove, replaceBlob, picker, hint, attach, clear, destroy,
+        detach: () => { for (const off of detach.splice(0)) off(); },
         items: () => items.map(it => ({ id: it.id, name: it.name, blob: it.blob, hex: it.hex, state: it.state })),
         hexes: () => items.filter(it => it.state === 'ready').map(it => it.hex),
         busy: () => items.some(it => it.state === 'uploading'),

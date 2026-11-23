@@ -27,8 +27,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const page = u.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(u.href, location.href, {'${team}':[item]}) : null;
                 if (page && m === 'GET') return json(page);
                 if (m === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? [item] : [], has_more: false });
-                if (u.pathname.startsWith('/api/board/${team}/artifacts/') && u.pathname.endsWith('/review') && m === 'POST') { window.__decisions.push(JSON.parse(opts.body).decision); return json({ id: hex, state: 'changes requested', changed: true, tags: ['for review', 'changes requested'], review: null }); }
-                if (u.pathname === '/api/artifacts/' + hex + '/comment-images' && m === 'POST') { window.__uploads.push(String(opts.body && opts.body.type)); return json({ hex: '${PIC}', name: 'screenshot.png', content_type: 'image/png', size: 70 }); }
+                if (u.pathname.startsWith('/api/board/${team}/artifacts/') && u.pathname.endsWith('/review') && m === 'POST') { const body=JSON.parse(opts.body); window.__decisions.push(body); return json({text_kept:true,delivered:true,to:'Writer A', id: hex, state: 'changes requested', changed: true, tags: ['for review', 'changes requested'], review: null }); }
+                if (u.pathname === '/api/board/${team}/field-images' && m === 'POST') { window.__uploads.push(String(opts.body && opts.body.type)); return json({ hex: '${PIC}', name: 'screenshot.png', content_type: 'image/png', size: 70 }); }
                 if (u.pathname === '/api/artifacts/' + hex + '/comments' && m === 'POST') { const b = JSON.parse(opts.body); window.__comments.push(b); return json({ id: 7, body: b.body, anchor: b.anchor, author_kind: 'owner', author_name: 'You', state: 'open', created_at: new Date().toISOString(), replies: [], images: [] }, 201); }
                 if (u.pathname === '/api/artifacts/' + hex + '/comments/7/send') return json({ ok: true, results: [{ agent: JSON.parse(opts.body).agents[0], state: 'sent', ask_id: 1 }] });
                 if (u.pathname.startsWith('/api/artifacts/') && /^[0-9a-f]{64}$/.test(u.pathname.split('/')[3]) && (u.pathname.split('/').length === 4 || u.pathname.split('/')[4] === 'content')) return Promise.resolve(new Response('Review preview text', { headers: { 'Content-Type': 'text/plain' } }));
@@ -53,9 +53,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await waitFor(`/Say what should change/.test(document.querySelector('.artifact-review-error').textContent)`, 'the words are asked for', 4000);
         check((await ev(`window.__comments.length`)) === 0, 'a picture alone sends no request');
         await ev(`(() => { const t = document.getElementById('artifact-review-text'); t.value = 'The totals row is missing; see the picture'; document.querySelector('.artifact-review-form').requestSubmit(); return true; })()`);
-        await waitFor(`window.__decisions.includes('changes')`, 'the request was recorded', 8000);
-        const c = await ev(`window.__comments[0]`);
-        check(!!c && c.anchor.whole === true && /The totals row is missing/.test(c.body) && JSON.stringify(c.images) === JSON.stringify([PIC]), 'the comment carries the words and the picture: ' + JSON.stringify(c));
+        await waitFor(`window.__decisions.some(x=>x.decision==='changes')`, 'the request was recorded', 8000);
+        const c = await ev(`window.__decisions.find(x=>x.decision==='changes')`);
+        check(!!c && /The totals row is missing/.test(c.text) && JSON.stringify(c.images.text) === JSON.stringify([PIC]), 'one decision carries the words and the picture: ' + JSON.stringify(c));
         check(await ev(`document.querySelectorAll('.artifact-review-form .ac-thumb').length`) === 0, 'the tray is empty after the request is sent');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }

@@ -5,8 +5,9 @@ import { boardFetch, identityKey, decisionNeedsPerson, isCloud, commentWritesOn,
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
-const { createComment, sendComment, uploadCommentImage } = await importOnce('./artifact_comments_api.js'); // lazy, as the viewer's other modules: a failure is retried
+const { createComment, sendComment } = await importOnce('./artifact_comments_api.js'); // lazy, as the viewer's other modules: a failure is retried
 const { resultWords } = await importOnce('./artifact_comment_send.js');
+const { createFieldPictures, mountFieldPictures, savedWords } = await importOnce('./field_pictures.js');
 const imgs = await importOnce('./artifact_comment_images.js'); // the pictures of a comment: the same tray as the comment box (thumbnails, Mark up, Remove), so a change request can show what to change (#11837)
 
 const HEX = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i;
@@ -34,8 +35,8 @@ const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' 
 
 const NOTE_MAX = 500; // characters of the comment that goes with Approve (#11888)
 const CHANGE_WORDS_MAX = 500; // runes of the words sent with Request changes
-async function decide(team, row, decision, reason, note, quiet = false, words = '', olderVersion = false) {
-    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}), ...(olderVersion ? { older_version: true } : {}) }) });
+async function decide(team, row, decision, reason, note, quiet = false, words = '', olderVersion = false, pictures = {}) {
+    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...pictures, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}), ...(olderVersion ? { older_version: true } : {}) }) });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) { const error = new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`); error.status = r.status; error.code = body.code; throw error; }
     return body;
@@ -82,8 +83,8 @@ async function settleEarlierVersions(m, row) {
 }
 
 /** Approve a review row of Needs you (or the viewer): it is decided, the Inbox list follows. Resolves the server's answer ({delivered, to, reason}). */
-export async function approveRow(team, row, note = '') { // note (#11888): one short comment that goes to the agent in the approval's one notice; the approval is final
-    const out = await decide(team, row, 'approve', undefined, String(note || '').replace(/\s+/g, ' ').trim());
+export async function approveRow(team, row, note = '', pictures = {}) { // note (#11888): one short comment that goes to the agent in the approval's one notice; the approval is final
+    const out = await decide(team, row, 'approve', undefined, String(note || '').replace(/\s+/g, ' ').trim(), false, '', false, pictures);
     document.dispatchEvent(new CustomEvent('coral:review-approved', { detail: { team, id: row.id, at: out.review?.at || new Date().toISOString() } })); // an open viewer of this file says Approved at once, whoever approved it (the Inbox row, the viewer, a note)
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
     if (m) { out.earlier = await settleEarlierVersions(m, row).catch(e => ({ settled: 0, failed: 1, ...(e?.message ? { reason: e.message } : {}) })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
@@ -113,8 +114,8 @@ async function onEarlier(row, run) {
     return { done, failed };
 }
 
-export async function denyRow(team, row, reason) { const h = begin();
-    const out = await decide(team, row, 'deny', reason);
+export async function denyRow(team, row, reason, pictures = {}) { const h = begin();
+    const out = await decide(team, row, 'deny', reason, undefined, false, '', false, pictures);
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
     if (m) out.earlier = await settleEarlierVersions(m, row).catch(e => ({ settled: 0, failed: 1, ...(e?.message ? { reason: e.message } : {}) })); // the older versions leave Needs you with it, quietly: the agent is told once, about the newest
     settled(row, h); return out;
@@ -138,7 +139,7 @@ export function sayIgnored(team, row, out) {
     showToast(words, false, undefined, { action: { label: 'Undo', onClick: () => unignoreRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
     announceNotice(`${words} Undo is in the notice.`);
 }
-export function sayDenied(name, out) { showToast(`Denied ${shown(name)}. ${fromWords(out)}${earlierFailure(out)}`.trim()); }
+export function sayDenied(name, out) { showToast(savedWords(out, `Denied ${shown(name)}. ${fromWords(out)}${earlierFailure(out)}`.trim()), !!out.pictures_not_saved); }
 
 /** The Deny dialog: "Deny this?" with an optional reason (500 characters); the agent is told it was declined. Red text, never a red fill. onDone runs after the deny went through. */
 export function openDenyDialog(team, row, onDone, { refuse = false } = {}) { // refuse: the viewer's Refuse button (#15284): the same final no, worded as a plan's refusal, and the toast says Sent to <agent>
@@ -153,12 +154,13 @@ export function openDenyDialog(team, row, onDone, { refuse = false } = {}) { // 
     const go = document.createElement('button'); go.type = 'button'; go.className = 'btn inbox-deny-confirm'; go.textContent = refuse ? 'Refuse' : 'Deny';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = 'Cancel';
     row2.append(go, cancel); dlg.append(title, sub, label, err, row2);
-    const finish = () => { dlg.close(); dlg.remove(); };
+    const pictures = mountFieldPictures(box, { project: team, field: 'reason' });
+    const finish = () => { pictures.destroy(); dlg.close(); dlg.remove(); };
     cancel.addEventListener('click', finish);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     go.addEventListener('click', async () => {
         err.textContent = ''; go.disabled = true;
-        try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim()); finish(); if (refuse) { showToast(`Refused ${shown(row.name)}. ${out.delivered ? `Sent to ${out.to}.${out.asleep ? ' It is asleep: it will see this when it wakes.' : ''}` : fromWords(out)}`.trim()); announceNotice(`Refused ${shown(row.name)}.`); } else { sayDenied(row.name, out); announceNotice(`Denied ${shown(row.name)}.`); } onDone?.(); }
+        try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim(), pictures.payload()); finish(); if (refuse && !out.pictures_not_saved) { showToast(`Refused ${shown(row.name)}. ${out.delivered ? `Sent to ${out.to}.${out.asleep ? ' It is asleep: it will see this when it wakes.' : ''}` : fromWords(out)}`.trim()); announceNotice(`Refused ${shown(row.name)}.`); } else { sayDenied(row.name, out); announceNotice(`Denied ${shown(row.name)}.`); } onDone?.(); }
         catch (e) { err.textContent = e.message || 'Not saved.'; go.disabled = false; box.focus(); }
     });
     document.body.append(dlg); dlg.showModal(); box.focus();
@@ -179,12 +181,13 @@ export function openApproveNoteDialog(team, row, onDone) {
     const go = document.createElement('button'); go.type = 'button'; go.className = 'btn btn-primary inbox-approve-note-confirm'; go.textContent = 'Approve';
     const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = 'Cancel';
     buttons.append(go, cancel); dlg.append(title, sub, label, err, buttons);
-    const finish = () => { dlg.close(); dlg.remove(); };
+    const pictures = mountFieldPictures(box, { project: team, field: 'note' });
+    const finish = () => { pictures.destroy(); dlg.close(); dlg.remove(); };
     cancel.addEventListener('click', finish);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     go.addEventListener('click', async () => {
         err.textContent = ''; go.disabled = true;
-        try { const out = await approveRow(team, row, box.value); finish(); sayApproved(row.name, out); announceNotice(`Approved ${shown(row.name)}.`); onDone?.(out); }
+        try { const out = await approveRow(team, row, box.value, pictures.payload()); finish(); sayApproved(row.name, out); announceNotice(`Approved ${shown(row.name)}.`); onDone?.(out); }
         catch (e) { err.textContent = e.message || 'Not saved.'; go.disabled = false; box.focus(); }
     });
     document.body.append(dlg); dlg.showModal(); box.focus();
@@ -193,6 +196,7 @@ export function openApproveNoteDialog(team, row, onDone) {
 
 /** Say what an approval did, in a toast. */
 export function sayApproved(rawName, out) {
+    if (out.pictures_not_saved) { showToast(savedWords(out, ''), true); return; }
     const name = shown(rawName);
     if (out.earlier && out.earlier.failed && out.earlier.reason) showToast(`Approved ${name}, but ${out.earlier.reason} Earlier versions may remain in Needs you.`, true);
     else if (out.earlier && out.earlier.failed) showToast(`Approved ${name}, but ${out.earlier.failed} earlier version${out.earlier.failed === 1 ? '' : 's'} could not be cleared: ${out.earlier.failed === 1 ? 'it' : 'they'} stay${out.earlier.failed === 1 ? 's' : ''} in Needs you.`, true);
@@ -248,9 +252,11 @@ export function attachReview(d, { reload }) {
     const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
     const submitBtn = form.querySelector('button[type=submit]');
     const approveWith = form.querySelector('.artifact-review-approve-note');
-    const tray = imgs.createImageTray({ upload: (blob, versionOf) => uploadCommentImage(cur.hex, cur.server, blob, versionOf, cur.name) });
+    let tray = imgs.createImageTray({ upload: () => Promise.reject(new Error('Open a file before adding pictures.')) });
+    const pictureHost = document.createElement('div'); pictureHost.className = 'review-pictures';
     const syncSend = () => { submitBtn.disabled = approveWith.disabled = sending || inProgress || tray.busy() || tray.failed(); approveWith.disabled = approveWith.disabled || !!d.dataset.contentPending; }; // Send waits for a picture still going up, and for a failed one to be removed
-    error.before(tray.picker(), tray.node, tray.hint()); tray.attach(form, text); tray.listen(syncSend);
+    error.before(pictureHost);
+    const decisionPictures = field => { const p = tray.payload?.() || {}; return p.images ? { ...p, images: { [field]: p.images.text } } : p; };
     const paintApprove = () => {
         const n = d.dataset.shownVersion, newer = d.dataset.newerVersion, covers = d.dataset.coversFiles, unopened = d.dataset.unopenedFiles;
         if (armed && covers && Number(unopened) > 0) { approve.textContent = `${unopened} of ${covers} files not opened: approve all?`; approve.title = 'Press again to approve every file in this review, or open the others first.'; return; }
@@ -333,10 +339,10 @@ export function attachReview(d, { reload }) {
         if (!cur || sending || inProgress) return;
         const note = text.value.replace(/\s+/g, ' ').trim(), was = cur;
         if ([...note].length > NOTE_MAX) { error.textContent = `Keep the comment to ${NOTE_MAX} characters: it is ${[...note].length}. Your words are still here.`; return; }
-        if (tray.hexes().length) { error.textContent = 'Pictures go with Request changes. Remove them to approve with a comment.'; return; }
+        try { tray.assertReady?.(); } catch (e) { error.textContent = e.message; return; }
         sending = true; syncSend(); error.textContent = '';
         try {
-            const out = await approveRow(was.team, was.row, note);
+            const out = await approveRow(was.team, was.row, note, decisionPictures('note'));
             sayApproved(was.row.name || 'the artifact', out); announceNotice(`Approved ${shown(was.row.name || 'the artifact')}.`);
             text.value = ''; tray.clear(); openForm(false); show({ ...was, state: 'approved', at: out.review?.at || new Date().toISOString() });
         } catch (e) { error.textContent = e.message || 'Not saved.'; } finally { sending = false; syncSend(); }
@@ -344,6 +350,7 @@ export function attachReview(d, { reload }) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (sending || inProgress) return;
+        try { tray.assertReady?.(); } catch (e) { error.textContent = e.message; return; }
         const body = text.value.trim();
         if (!body || !cur) { error.textContent = 'Say what should change.'; return; }
         if ([...body].length > CHANGE_WORDS_MAX) { error.textContent = `Keep it to ${CHANGE_WORDS_MAX} characters: it is ${[...body].length}. Your words are still here.`; return; } // the Hub takes 1 to 500 characters of text for Request changes (coral-hub, #14797); the computer's own cap is 8 KB. Never cut a person's words: say so
@@ -354,7 +361,12 @@ export function attachReview(d, { reload }) {
             const who = was.row.produced_by, images = tray.hexes();
             let out = null, decided = false;
             if (legacyDecision === fileKey(was)) { out = {}; decided = true; recorded = true; }
-            else if (!images.length) {
+            else if (images.length) {
+                out = await decide(was.team, was.row, 'changes', undefined, undefined, false, body, false, decisionPictures('text')); decided = true; recorded = true;
+                if (!current()) return;
+                if (out.pictures_not_saved) { showToast(savedWords(out, ''), true); text.value = ''; tray.clear(); done = true; openForm(false); show({ ...was, state: 'changes' }); reload(); return; }
+                if (out.text_kept !== true) throw new Error('The computer did not confirm that your words and pictures were kept. Your draft is still here.');
+            } else if (!images.length) {
                 try { out = await decide(was.team, was.row, 'changes', undefined, undefined, false, body); decided = true; recorded = true; }
                 catch (err) { if (err.status !== 400 || err.code !== 'images_not_in_this_slice') throw err; }
                 if (!current()) return;
@@ -415,7 +427,7 @@ export function attachReview(d, { reload }) {
     return {
         async open(hex, opts = {}) {
             legacyDecision = null; legacyComment = null;
-            const g = ++gen; clearProgress(); sending = false; text.readOnly = false; syncSend(); show(null); sendCtx = null; syncSendItem(); if (!opts.switched) done = false;
+            const g = ++gen; tray.clear(); clearProgress(); sending = false; text.readOnly = false; syncSend(); show(null); sendCtx = null; syncSendItem(); if (!opts.switched) done = false;
             if (!opts.board || opts.sourceNamed === false) return;
             const team = identityKey(opts.server, opts.board);
             let s = null;
@@ -423,6 +435,9 @@ export function attachReview(d, { reload }) {
             if (g !== gen) return;
             sendCtx = { team, hex, server: opts.server, filename: opts.filename || '', inReview: !!s && (s.state === 'pending' || s.state === 'changes') }; syncSendItem();
             if (!s) return;
+            tray.destroy();
+            tray = createFieldPictures({ project: team, field: 'text', onChange: syncSend });
+            pictureHost.replaceChildren(tray.node); tray.attach(pictureHost.parentElement, text);
             show({ ...s, team, hex, server: opts.server, name: opts.board });
             if (opts.requestChanges && !opts.switched && !done && (s.state === 'pending' || s.state === 'changes')) openForm(true); // not on the reload after a send: the form stays closed
         },
