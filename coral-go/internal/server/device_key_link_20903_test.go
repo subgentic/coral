@@ -31,7 +31,10 @@ func TestTheOwnerReadsTheArrivalLinkThroughTheHub(t *testing.T) {
 		assert.Equal(t, tunnel.TierNever, tunnel.Classify(m, "/api/device-keys/link", ""), m+" is not in the table")
 	}
 
-	const link = "lnk-0a1b2c3d"
+	lk, err := cs.LinkByOrigin(ctx, "https://hub.example.invalid")
+	require.NoError(t, err)
+	link := lk.LinkID
+	require.True(t, tunnel.ValidLinkID(link))
 	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd", tunnel.LinkHeader: link}
 	rec := call(h, "GET", "/api/device-keys/link", "", owner)
 	require.Equal(t, 200, rec.Code, rec.Body.String())

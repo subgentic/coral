@@ -8,7 +8,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // The device list at this computer (#19669 slice 5, coral-hub condition e): the person here sees the browsers and passkeys Coral Hub's owner trusts, lowers or removes any one, and lowers the mode new browsers start at. Every route here is local only: the dashboard on this computer and the signed command line, never the tunnel (never at any mode), never a paired browser, never a Hub sign-in.
@@ -63,6 +65,21 @@ func (h *CloudHandler) TunnelDevices(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, struct {
 		Devices []deviceRow `json:"devices"`
 	}{out.Devices})
+}
+
+// TunnelLink: GET /api/device-keys/link: the link this request arrived on (lnk-<8 hex>), for Coral Hub's owner (#20903, coral-hub #20897), so the Hub can name it in the v3 text a browser signs. It is the connector's own stamp read from the request context, never from a body or query; nothing is stored. Owner only, Launch tier, read only. A local call has no link and gets 404.
+func (h *CloudHandler) TunnelLink(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) {
+		return
+	}
+	v, ok := cloud.ViaFrom(r.Context())
+	if !cloud.Tunneled(r) || !ok || !tunnel.ValidLinkID(v.LinkID) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no link: this request did not come through a Hub"})
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Link string `json:"link"`
+	}{v.LinkID})
 }
 
 // sprintfClock is the notice for a clock behind the last accepted device message: it says what the clock was compared with and how to fix it.
