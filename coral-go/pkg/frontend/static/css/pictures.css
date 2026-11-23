@@ -26,7 +26,7 @@
 
 /* The same tray in the viewer's Request changes form (#11837): its buttons sit on the form's left edge, a picture's buttons beside it. */
 .artifact-review-form .btn-small { margin: 0; }
-.artifact-review-form .ac-picker { align-self: flex-start; }
+.artifact-review-form .ac-picker { align-self: flex-start; margin-inline-end: auto; }
 .artifact-review-form .ac-thumbs { display: flex; flex-wrap: wrap; gap: 12px; }
 .artifact-review-form .ac-thumb { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .inbox-ask-pics { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 0 0 6px; } /* the pictures of a reply to a question (#12173): small tiles */
@@ -75,3 +75,19 @@
 .mb-post-card:has(.ac-thumb) { align-items: flex-end; }
 /* The mention list opens above the card; it must escape the composer's scroll boundary. */
 .mb-post-form:has(.mention-list:not([hidden])) { overflow: visible; }
+
+/* A taller picture composer must not let the message scroller grow under it. */
+.mb-board:has(.field-pictures) .mb-messages-scroll { min-height: 0; padding-bottom: 0; }
+.mb-board:has(.field-pictures) .mb-messages-scroll::after { content: ""; display: block; height: var(--mb-actions-space, 3.5rem); }
+/* On a short window, the empty field, Add image and Send share their row. */
+@media (max-height: 500px) and (pointer: fine) {
+    .mb-post-card > .field-pictures { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .mb-post-card .mb-post-input { flex: 1; width: 0; padding-block: 0; }
+    .mb-post-card .field-pictures > :is(.ac-images, .ac-images-hint) { flex: 1 0 100%; }
+}
+/* The keyboard leaves one button row; its count remains available when it closes. */
+body.keyboard-open .ac-composer-row .ac-counter { display: none; }
+/* Keep Add image with the request buttons instead of allocating a separate footer row. */
+.artifact-review-form .review-pictures, .artifact-review-form .field-pictures { display: contents; }
+.artifact-review-form .ac-images-hint { flex: 1 0 100%; }
+.artifact-review-form :is(.ac-picker, button) { order: 1; }
