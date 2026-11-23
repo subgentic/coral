@@ -32,11 +32,14 @@ export async function openAskDialog(a, onDone, runners = {}) {
     // Finish the title and picker before showModal centres the dialog. Late additions
     // moved the agent link away from a person's click (#20864). Failed optional loads
     // still allow a text reply, and a later open retries through importOnce.
+    // The helpers that link "#8" and a file name in the question load here too: the words are plain text until they run, and a slow load showed the question with #8 not yet a button (#20872).
     const [agentLinks, imageModules] = await Promise.all([
         importOnce('./agent_link.js').catch(() => null),
         !missingCloudSource && !fromAnotherComputer(a)
             ? Promise.all([importOnce('./artifact_comment_images.js'), importOnce('./artifact_comments_api.js'), a.kind === 'agent' ? importOnce('./agent_ask_answer.js') : null]).catch(() => null)
             : null,
+        !fromAnotherComputer(a) ? importOnce('./message_refs.js').catch(() => null) : null,
+        importOnce('./artifact_refs.js').catch(() => null),
     ]);
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-flow inbox-ask-dialog'; // shared flow size on wide screens; narrow CSS keeps the form size and phone sheet
