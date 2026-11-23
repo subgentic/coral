@@ -455,7 +455,9 @@ func TestAnUploadRowOlderThanSevenDaysIsSwept(t *testing.T) {
 func TestAWriteWhosePicturesCouldNotBeSavedSaysSo(t *testing.T) {
 	e := newFieldWriteEnv(t)
 	a := e.upload(t, "task", "f1", 70)
-	e.h.setFieldImages = func(context.Context, string, string, string, map[string][]board.GoalImage) error { return fmt.Errorf("disk full") }
+	e.h.setFieldImages = func(context.Context, string, string, string, map[string][]board.GoalImage) error {
+		return fmt.Errorf("disk full")
+	}
 
 	code, out := e.json(t, "POST", "/api/board/alpha/tasks", map[string]any{"title": "lossy", "body": "x", "created_by": "Operator", "subscriber_id": "Operator", "images_draft": "f1", "images": map[string]any{"description": []string{a}}})
 	require.Equal(t, http.StatusCreated, code, "%v", out)
