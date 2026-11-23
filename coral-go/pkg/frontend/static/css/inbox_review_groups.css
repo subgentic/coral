@@ -105,5 +105,6 @@
 /* A file you commented on and the agent has not answered (#20735, the approved mock option A): still in For review, quieter, with one plain line. The text stays readable (secondary on the card, 4.5:1), only the decision buttons step back */
 .inbox-commented { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); border: 1px solid var(--border-color, currentColor); border-radius: var(--radius-sm, 6px); padding: 0 var(--space-2, 8px); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-review-item[data-commented] .inbox-review-name { font-weight: var(--fw-medium, 500); }
-:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr:has(.inbox-review-item[data-commented]) .inbox-review-actions > .inbox-main-action.inbox-approve-action { background: transparent; color: var(--text-secondary); border-color: var(--border-color, currentColor); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-commented::before { content: none; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-commented-quote { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 28ch; }
+:root :is(#group-table-view, .team-needs-list) :is(.inbox-needs-results, .inbox-saved-card) .inbox-review-actions > .inbox-main-action.inbox-approve-action.btn-quiet { background: transparent; color: var(--text-secondary); border-color: var(--border-color, currentColor); }
