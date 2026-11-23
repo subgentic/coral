@@ -71,7 +71,7 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         _placePane();
     }
 
-    let _resizeHandles = false;
+    let _resizeHandles = 0; // 0: not loaded, 1: loading, 2: handlers attached
     let _resizeVersion = 0;
     // A resize changes the side panel's width through a CSS transition. Its intermediate
     // widths can briefly lack room for a task column even when the final width fits.
@@ -212,8 +212,8 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
             if (h) pane.style.height = h + 'px';
         }
         column.style.display = dock === 'column' && visible ? '' : 'none';
-        colHandle.style.display = dock === 'column' && visible ? '' : 'none';
-        bottomHandle.style.display = dock === 'bottom' && visible ? '' : 'none';
+        colHandle.style.display = dock === 'column' && visible && _resizeHandles === 2 ? '' : 'none';
+        bottomHandle.style.display = dock === 'bottom' && visible && _resizeHandles === 2 ? '' : 'none';
         pane.style.display = visible ? '' : 'none';
         if (dock === 'column' && visible) _applyColumnWidth();
         // Maximise is the column's: nothing to cover at the bottom, on a phone (the pane is full screen there) or with no tabs.
@@ -225,13 +225,13 @@ export function createPreviewLayout({ getTabs, isTaskPreview, getLastOpenedPath,
         if (visible) {
             revealActiveTab();
             if (!_resizeHandles) {
-                _resizeHandles = true;
+                _resizeHandles = 1;
                 importOnce('./preview_resize_handles.js', 'preview resizing').then(m => m.initResizeHandles({
                     saveHeight: v => browserLocal.set('coral-preview-pane-height', _paneHeight = v),
                     saveWidth: v => browserLocal.set('coral-preview-column-width', _paneWidth = v),
                     minWidth: COLUMN_MIN, maxWidth: _maxColumnWidth, clampWidth: _clampColumnWidth,
                     syncHandle: _syncColumnHandle, applyWidth: _applyColumnWidth,
-                })).catch(() => { _resizeHandles = false; });
+                })).then(() => { _resizeHandles = 2; _placePane(); }).catch(() => { _resizeHandles = 0; });
             }
         }
 
