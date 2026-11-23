@@ -1,5 +1,6 @@
 /* Comments in the artifact viewer (#5182): the side panel (a bottom sheet on a phone), the cards, the composer, the highlights. */
 .artifact-viewer-content { display: flex; flex-direction: column; box-sizing: border-box; padding: 0; }
+.artifact-viewer-content > .artifact-viewer-foot.modal-footer { margin: 0; } /* the shared footer's -24px side and bottom margins are for a dialog with 24px of padding; this one has none, so they made the overflow-hidden content 24px scrollable and a focus or scrollIntoView slid the header's buttons up under the top edge (#20820) */
 .artifact-viewer-main { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .artifact-viewer-main > .artifact-viewer-body { flex: 1 1 auto; min-width: 0; }
 .artifact-viewer.ac-on .artifact-viewer-content { width: min(1240px, 96vw); }
