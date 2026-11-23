@@ -1,5 +1,5 @@
 const { liveServer: liveOf, buildServersTable } = await importOnce('./server_table.js');
-const { startCell } = await importOnce('./computer_start.js'); // New agent, New team, New terminal on every row (#20388)
+const { startCell } = await importOnce('./computer_start.js'); // New agent, New team, New terminal on a computer's page (#20388; not in the list rows, #20747)
 /* Servers settings view (multi-server hub).
  *
  * A self-contained dialog, built on demand, to list / add / edit / test /
@@ -167,7 +167,6 @@ function serversTable(local, remotes) {
             { key: 'needs', label: 'Waiting', width: '6rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: s => { const n = needsCount(s); if (!n) return ''; const e = DT.el('span', 'servers-needs', String(n)); e.title = `${n} agent${n === 1 ? '' : 's'} waiting for you`; return e; } },
             { key: 'seen', label: 'Last seen', width: '6rem', dropAt: 62, tone: 'tertiary', sort: 'date', firstDir: 'desc', sortValue: s => seenValue(s, live(s)), cell: s => seenWords(s, live(s)) },
             { key: 'version', label: 'Version', width: '7.5rem', dropAt: 62, tone: 'tertiary', sort: true, sortValue: s => versionWords(s, live(s)), cell: s => versionWords(s, live(s)) || '\u2014' },
-            { key: 'start', label: 'Start', line: 3, width: '17rem', fixed: true, dropAt: 36, align: 'end', cell: s => startCell(isLocal(s) ? 'local' : s.id, s.label || s.id, DT.el) },
         ],
         open: s => { if (!isLocal(s)) { _open = s.id; _confirmDelete = null; _focusNext = 'back'; render(); } },
     }, { rowId: s => `server-row-${isLocal(s) ? 'local' : s.id}` });
