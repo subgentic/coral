@@ -1,5 +1,42 @@
 # Release Notes
 
+## v2.1.6 — Usage limits you can see, resume at the reset, and review that reads the same for every file
+
+Task numbers in brackets. Built on v2.1.5. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **A usage limit is a calm waiting state** (#20700, #20692, goal #279): an agent stopped by its plan's usage limit shows that it is waiting and when the limit lifts, on the Agents list and in its chat, instead of looking broken. Claude's reset time is read from its error; Codex's and Antigravity's from the screen.
+- **Resume at limit reset** (#20691, #20697): a new Settings switch, off by default. When it is on, an awake agent that a usage limit stopped carries on at the reset time; an agent that exited stays asleep. Its explanation is under More in Settings › Agents, next to the "Resume after API errors" and low-priority notes, which moved there too to keep the pane short (#20722).
+- **An HTML file in review has the same single top bar as Markdown** (#20715): the Sandboxed label moved from the bar into the ⋯ menu (it still shows or hides the notice), so the header stays one row.
+- **Text in a comment thread can be selected and copied** (#20718): the comment panel no longer redraws while you hold a selection, and a click that ends a selection doesn't open the card. Checked in Chrome; please confirm in the native app.
+- **Comment on the whole document is in view** when the comments sheet opens in a short docked preview (#20661).
+- **Hub links in Settings** (#20704): with this computer's own Hub connection down and a Hub still linked, the Coral Hub card says where the links are and offers Add a Hub; each link names its Hub by address, as text.
+- **Branches tab on older git** (#20681): worktrees are listed on git before 2.36.
+- **One colour for review tiles in Needs you** (#20714): every file type's tile uses the same colour, so an HTML file no longer shows amber as if something were wrong.
+- **One Approve bar on a phone** (#20736): the bottom review bar hides while the note form is open, so a phone shows one set of Approve and Request changes buttons.
+
+#### Hub access and device keys
+
+- **Device keys** (#20649): granting a Hub member and the Hub auto-accept switch are owner-only; the grant's key id is the relayed signer's, the switch's value is inside the signed query, and the grant signature needs an owner device and is bound to this computer.
+- A Hub address with `?open=<file>` opens that file's viewer on a cold load (#20657, a test from coral-hub's probe).
+
+### Test and gate fixes in this release
+
+- The start-order census lists `limit_resume`; the Settings oracle, the Settings trace (94 controls) and the agent-row golden are regenerated for the new row; the Agents pane stays at its 112-word budget without raising it (#20722).
+- Limit fixtures use Europe/Berlin and a ten-day shift (#20697); the safefs census reason matches the non-strict branch (#20644); secfile and agent tests pass under any umask, and the nft skip covers a non-root exit 1 (#20681).
+- Gate fixes on the first candidate (#20743, #20744): the live-list golden's blank line; the Windows Settings trace fixture from the values CI printed; the preview side-scroll test follows #20661's comments sheet; the task cost column is measured after widths settle; the hermes test's temp folder helper moved to a file every platform builds.
+- Gate fixes on the second candidate: the bad-message flood test no longer picks the signer's own key id by chance (#20774); the server stops or waits for its memory-release timers on close, so the leak check never sees one running (#20782); the needs-menu scroll suite is measured without the alerts offer strip, which appeared mid-test on slow runners (#20778); board_a11y logs the agent's board state when its tasks do not show (#20777, a diagnostic).
+- The start-CSS cap is unchanged.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- A second Hub link is refused until Security's items are closed; the Hub sharing switches stay off.
+- Pictures in comments and goals through the Hub fail until the Hub turns them on; pictures in every text box are being built (goal #285).
+
 ## v2.1.5 — Start an agent on another computer, tighter Hub access, and a Saved list that follows the Inbox
 
 Task numbers in brackets. Built on v2.1.4. A prerelease until the Operator promotes it.
