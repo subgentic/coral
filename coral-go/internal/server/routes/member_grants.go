@@ -266,9 +266,7 @@ func (h *BoardHandler) noteRelayedGrant(r *http.Request, verb string, g *board.M
 		return
 	}
 	who := board.CleanMemberLabel(g.Label)
-	if len(who) > 40 {
-		who = who[:40]
-	}
+	who = capRunes(who, 40)
 	text := fmt.Sprintf("Through Coral Hub, your device %s %s %s (%s) %s access to this team until %s. End it from this computer's access list.", shortKID(g.SignedBy), verb, who, g.HubUser, g.Level, g.ExpiresAt)
 	if verb == "ended" {
 		text = fmt.Sprintf("Through Coral Hub, your device %s ended %s's (%s) %s access to this team.", shortKID(g.SignedBy), who, g.HubUser, g.Level)
@@ -276,6 +274,14 @@ func (h *BoardHandler) noteRelayedGrant(r *http.Request, verb string, g *board.M
 	if _, err := h.bs.PostHubNotice(r.Context(), g.BoardID, text); err != nil {
 		slog.Warn("[member] could not post the notice of a relayed grant", "error", err)
 	}
+}
+
+// capRunes cuts s to at most n characters (not bytes), so a multi-byte name is never split.
+func capRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }
 
 func shortKID(k string) string {

@@ -13,9 +13,9 @@ func TestACappedLabelIsNeverSplitInTheMiddleOfACharacter(t *testing.T) {
 	for i := 0; i < 60; i++ {
 		long += "é" // two bytes each
 	}
-	got := capLabel(long, 40)
+	got := capRunes(long, 40)
 	assert.True(t, utf8.ValidString(got))
 	assert.Equal(t, 40, utf8.RuneCountInString(got))
-	assert.Equal(t, "short", capLabel("short", 40))
-	assert.Equal(t, "", capLabel("", 40))
+	assert.Equal(t, "short", capRunes("short", 40))
+	assert.Equal(t, "", capRunes("", 40))
 }
