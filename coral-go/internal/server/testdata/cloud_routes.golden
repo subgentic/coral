@@ -388,6 +388,7 @@ POST /api/board/{project}/cross-team/files/disable launch
 POST /api/board/{project}/cross-team/files/enable launch
 POST /api/board/{project}/external-artifacts interact
 POST /api/board/{project}/external-messages interact
+POST /api/board/{project}/field-images never
 POST /api/board/{project}/goal-images interact
 POST /api/board/{project}/goal-requests never
 POST /api/board/{project}/goal-requests/{requestID}/accept never
@@ -477,6 +478,7 @@ POST /api/dropbox/switch never
 POST /api/dropbox/takeover never
 POST /api/dropbox/undo/{digest} never
 POST /api/dropbox/upload-anyway/{digest} never
+POST /api/field-images never
 POST /api/folder-tags/{folderName} never
 POST /api/google/connect never
 POST /api/google/disconnect never

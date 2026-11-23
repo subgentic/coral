@@ -537,6 +537,8 @@ b POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle
 b POST /api/board/{project}/operator-artifacts
 b POST /api/board/{project}/operator-artifacts/message
 b POST /api/board/{project}/goal-images
+b POST /api/board/{project}/field-images
+b POST /api/field-images
 b PUT /api/board/{project}/artifacts/{id}/review
 b PUT /api/board/{project}/artifacts/{id}/tags
 b POST /api/board/{project}/member-grants
