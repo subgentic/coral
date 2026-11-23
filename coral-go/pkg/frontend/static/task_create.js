@@ -15,6 +15,7 @@ import { mountSettingsView } from './settings_view.js'; // the dialog's fields (
 
 let _project = '', _dependencies, _created = null; // explicit page context, independent of the selected agent/team
 let _requireGoal = false; // the board asks for a goal on every task: the Goal select has no empty choice to stay on
+let soloSession = null;
 let _solo = false;        // an agent without a board: the task goes to this agent, and the board's fields are not shown
 let _goalShown = false;   // the board has open goals (or asks for one): the Goal select is shown
 let pictureFields = [], picturesModule;
@@ -73,6 +74,7 @@ export async function showCreateTaskModal(preset = {}) {
 
     // Solo agent: no board fields; offer to send the task to the agent
     _solo = !_project && _isSoloAgent();
+    soloSession = _solo ? { ...state.currentSession } : null;
     _goalShown = false; _requireGoal = false;
     v.reset(); // a fresh task: every field at its default, the optional workflow part folded, no mark, an empty status line
     v.fold(false);
@@ -132,10 +134,11 @@ export async function showCreateTaskModal(preset = {}) {
     v.refresh();
     for (const p of pictureFields) { p.destroy(); p.node.replaceWith(...p.node.querySelectorAll(':scope > label, :scope > textarea')); }
     pictureFields = [];
-    if (boardProject) {
+    if (boardProject || _solo) {
         picturesModule = await importOnce('./field_pictures.js');
         const draft = 'pictures-' + crypto.randomUUID();
-        pictureFields = [['create-task-body', 'description'], ['create-task-instructions', 'instructions']].map(([id, field]) => picturesModule.mountFieldPictures(document.getElementById(id), { project: boardProject, field, draft }));
+        const fields = _solo ? [['create-task-body', 'body']] : [['create-task-body', 'description'], ['create-task-instructions', 'instructions']];
+        pictureFields = fields.map(([id, field]) => picturesModule.mountFieldPictures(document.getElementById(id), { project: boardProject, server: sessionServer(soloSession || state.currentSession), scope: _solo ? 'instruction' : 'task', field, draft, hintWhenAdded: _solo }));
     }
 
     modal.style.display = '';
@@ -190,14 +193,14 @@ async function submitValues(values) {
 // claim it with `coral-agent task claim`, which marks it in progress and
 // shows the details; `coral-agent task complete <id>` marks it done.
 async function _createSoloAgentTask(title, body, values) {
-    const session = state.currentSession;
+    const session = soloSession;
     const notify = values.send !== false;
     // With notify, the server types the claim prompt into the agent's
     // terminal and returns it (see claimPrompt in routes/agent_tasks.go).
     const resp = await serverFetch(sessionServer(session), `/api/sessions/live/${encodeURIComponent(session.name)}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, body, priority: values.priority || 'medium', session_id: session.session_id, notify }),
+        body: JSON.stringify({ title, body, priority: values.priority || 'medium', session_id: session.session_id, notify, ...picturesModule.picturePayload(...pictureFields) }),
     });
     const task = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(task.error || `HTTP ${resp.status}`);
@@ -205,5 +208,5 @@ async function _createSoloAgentTask(title, body, values) {
     if (task.notified) addPendingMessage(session.session_id, task.notified);
     hideCreateTaskModal();
     await loadAgentTasks(session.name, session.session_id);
-    showToast(notify ? 'Task added; the agent was told to claim it' : 'Task added');
+    showToast(task.pictures_not_added ? task.pictures_warning : picturesModule.savedWords(task, notify ? 'Task added; the agent was told to claim it' : 'Task added'), !!(task.pictures_not_added || task.pictures_not_saved));
 }

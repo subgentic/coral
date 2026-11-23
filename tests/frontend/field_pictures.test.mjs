@@ -8,6 +8,13 @@ try {
  globalThis.fetch=async(url,options)=>{requests.push({url:String(url),options});if(fail)return new Response(JSON.stringify({error:'offline'}),{status:503});if(finish)return new Promise(resolve=>finish.resolve=resolve);return new Response(JSON.stringify({hex:'b'.repeat(64)}),{status:201})};
  const until=(p,pred)=>new Promise(resolve=>{if(pred())return resolve();p.listen(()=>{if(pred())resolve()})});
  const quiet=createFieldPictures({project:'alpha',field:'content'});assert.equal(quiet.node.querySelectorAll('[role=status]').length,0,'an empty tray adds no unused live region to the reply form');quiet.add([new File(['text'],'Not a picture.txt',{type:'text/plain'})]);assert.match(quiet.node.querySelector('[role=status]').textContent,/Only PNG/);quiet.clear();assert.equal(quiet.node.querySelectorAll('[role=status]').length,0,'clearing the notice removes its status role');quiet.destroy();
+ const conditional=createFieldPictures({project:'alpha',field:'description',hintWhenAdded:true,includeDraft:false,uploadPicture:async()=>({hex:'d'.repeat(64)})});
+ assert.equal(conditional.node.querySelector('.ac-images-hint').hidden,true,'part 2 hides the empty privacy hint');
+ conditional.add([new File(['png'],'New.png',{type:'image/png'})]);await until(conditional,()=>!conditional.busy());
+ assert.equal(conditional.node.querySelector('.ac-images-hint').hidden,false,'the full privacy hint is shown before saving a picture');
+ assert.deepEqual(conditional.payload(),{images:{description:['d'.repeat(64)]}},'legacy editors use their upload route without a draft field');
+ conditional.acceptSaved();assert.deepEqual(conditional.payload(),{},'settings rebase only after pictures save');
+ conditional.remove(conditional.items()[0].id);assert.equal(conditional.node.querySelector('.ac-images-hint').hidden,true);assert.deepEqual(conditional.payload(),{images:{description:[]}});conditional.destroy();
  const initial=createFieldPictures({project:'alpha',field:'description',initial:[{hex:'a'.repeat(64),name:'Existing.png'}]});
  assert.equal(initial.node.querySelector('.ac-images-hint').hidden,false,'ordinary fields retain the unconditional hint');
  assert.deepEqual(initial.payload(),{},'untouched pictures are omitted');initial.remove(initial.items()[0].id);assert.deepEqual(initial.payload().images,{description:[]},'removing the last existing picture explicitly clears');
