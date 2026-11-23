@@ -17,11 +17,20 @@ const keyOf = it => `${it.kind}:${it.id}`;
 export const dismiss = it => { dismissed.add(keyOf(it)); browserLocal.set(DISMISS_KEY, JSON.stringify([...dismissed].slice(-500))); };
 // A sent-back file and its request-changes comment are one waiting item. Capture only
 // comments already read, so a later comment on the same file can still appear.
+/** The Operator's comment on this file that its agent has not answered (the server drops it when the agent replies, the file gets a new version, or the comment is resolved or deleted), or null. */
+export const commentedOn = hex => items.find(it => it.kind === 'comment_sent' && !dismissed.has(keyOf(it)) && String(it.artifact?.hex || '').toLowerCase() === String(hex || '').toLowerCase()) || null;
+/** The line of a For review row the Operator has commented on and the agent has not answered (#20735, the approved mock option A): null when the row is plain. `plain` is false for a sent-back file or one with a new version. */
+export function commentedNode(r, plain, ago) {
+    const it = plain && !(r.new_comments > 0) && commentedOn(r.id); if (!it) return null;
+    const line = el('span', 'inbox-commented', `You commented ${ago(it.since)}, waiting for ${markHidden(it.agent?.name || r.produced_by || 'the agent', { strict: true })}`);
+    line.title = 'You commented. The agent has not replied or sent a new version yet. The file stays in For review.'; return line;
+}
 export const dismissArtifact = hex => { for (const it of items) if (it.kind === 'comment_sent' && String(it.artifact?.hex || '').toLowerCase() === String(hex || '').toLowerCase()) dismiss(it); };
 let items = [], failed = false, readAt = 0, inflight = null, redraw = () => {};
 
 /** The rows as the list holds them: a row that is not a file, an agent or an ask, with the fields the table reads. */
-export const rows = (sentBack = new Set()) => items.filter(it => !dismissed.has(keyOf(it)) && !(it.kind === 'comment_sent' && sentBack.has(String(it.artifact?.hex || '').toLowerCase()))).map(it => ({
+// A plain comment is not a wait: Waiting on an agent is for things like Request changes (the Operator, #20735). The file stays in For review; its row says "You commented ... waiting for <agent>" (commentedOn).
+export const rows = () => items.filter(it => !dismissed.has(keyOf(it)) && it.kind !== 'comment_sent').map(it => ({
     waitItem: it, session_id: `waiting-agent:${it.kind}:${it.id}`, display_name: it.agent?.name || 'Unknown agent', board_project: it.board || '', server: LOCAL_SERVER,
     waiting_kind: it.kind, waiting_summary: wordsOf(it), waiting_since: it.since, agentRef: refOf(it),
     goal: it.goal?.id ? { id: it.goal.id, title: String(it.goal.title || `Goal #${it.goal.id}`), board: it.board } : null, task: it.task?.id ? { id: it.task.id, title: String(it.task.title || '') } : null,
