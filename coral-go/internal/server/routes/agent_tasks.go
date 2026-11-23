@@ -440,7 +440,12 @@ type createdTaskResponse struct {
 	*store.AgentTask
 	Notified    string `json:"notified,omitempty"`
 	NotifyError string `json:"notify_error,omitempty"`
+	// PicturesNotAdded: the title matched a task that is open, which is answered as it is: the pictures sent with this create were not added to it (#20818).
+	PicturesNotAdded bool   `json:"pictures_not_added,omitempty"`
+	PicturesWarning  string `json:"pictures_warning,omitempty"`
 }
+
+const picturesNotAddedWords = "A task with this title is already open, so this one was not created and its pictures were not added. Edit that task to change its pictures."
 
 // claimPrompt is what an agent is told when the operator gives it a task:
 // short, naming the task and the commands to claim and finish it. The

@@ -14,28 +14,30 @@ import (
 
 // AgentTask represents a checklist item for an agent.
 type AgentTask struct {
-	Status            string             `db:"-" json:"status"`
-	Workflow          board.TaskWorkflow `db:"-" json:"workflow"`
-	BlockedBy         []board.TaskDep    `db:"-" json:"blocked_by,omitempty"`
-	ID                int64              `db:"id" json:"id"`
-	AgentName         string             `db:"agent_name" json:"agent_name"`
-	SessionID         *string            `db:"session_id" json:"session_id,omitempty"`
-	Title             string             `db:"title" json:"title"`
-	Body              *string            `db:"body" json:"body,omitempty"`
-	Priority          *string            `db:"priority" json:"priority,omitempty"`
-	CompletionMessage *string            `db:"completion_message" json:"completion_message,omitempty"`
-	Completed         int                `db:"completed" json:"completed"`
-	SortOrder         int                `db:"sort_order" json:"sort_order"`
-	CreatedAt         string             `db:"created_at" json:"created_at"`
-	UpdatedAt         string             `db:"updated_at" json:"updated_at"`
-	StartedAt         *string            `db:"started_at" json:"started_at,omitempty"`
-	CompletedAt       *string            `db:"completed_at" json:"completed_at,omitempty"`
-	CostUSD           float64            `db:"cost_usd" json:"cost_usd"`
-	InputTokens       int                `db:"input_tokens" json:"input_tokens"`
-	OutputTokens      int                `db:"output_tokens" json:"output_tokens"`
-	CacheReadTokens   int                `db:"cache_read_tokens" json:"cache_read_tokens"`
-	CacheWriteTokens  int                `db:"cache_write_tokens" json:"cache_write_tokens"`
-	DisplayName       *string            `db:"display_name" json:"display_name,omitempty"`
+	Status            string                       `db:"-" json:"status"`
+	Workflow          board.TaskWorkflow           `db:"-" json:"workflow"`
+	BlockedBy         []board.TaskDep              `db:"-" json:"blocked_by,omitempty"`
+	ID                int64                        `db:"id" json:"id"`
+	AgentName         string                       `db:"agent_name" json:"agent_name"`
+	SessionID         *string                      `db:"session_id" json:"session_id,omitempty"`
+	Title             string                       `db:"title" json:"title"`
+	Body              *string                      `db:"body" json:"body,omitempty"`
+	Priority          *string                      `db:"priority" json:"priority,omitempty"`
+	CompletionMessage *string                      `db:"completion_message" json:"completion_message,omitempty"`
+	Completed         int                          `db:"completed" json:"completed"`
+	SortOrder         int                          `db:"sort_order" json:"sort_order"`
+	CreatedAt         string                       `db:"created_at" json:"created_at"`
+	UpdatedAt         string                       `db:"updated_at" json:"updated_at"`
+	StartedAt         *string                      `db:"started_at" json:"started_at,omitempty"`
+	CompletedAt       *string                      `db:"completed_at" json:"completed_at,omitempty"`
+	CostUSD           float64                      `db:"cost_usd" json:"cost_usd"`
+	InputTokens       int                          `db:"input_tokens" json:"input_tokens"`
+	OutputTokens      int                          `db:"output_tokens" json:"output_tokens"`
+	CacheReadTokens   int                          `db:"cache_read_tokens" json:"cache_read_tokens"`
+	CacheWriteTokens  int                          `db:"cache_write_tokens" json:"cache_write_tokens"`
+	DisplayName       *string                      `db:"display_name" json:"display_name,omitempty"`
+	Images            map[string][]board.GoalImage `db:"-" json:"images,omitempty"`             // the pictures of its body (#20800)
+	PicturesNotSaved  bool                         `db:"-" json:"pictures_not_saved,omitempty"` // its write was saved but its pictures were not (#20758)
 }
 
 // ListAgentTasks returns tasks for an agent, optionally scoped by session.
