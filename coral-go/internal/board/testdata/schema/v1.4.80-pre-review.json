@@ -902,7 +902,7 @@
     },
     {
       "name": "member_grant",
-      "sql": "CREATE TABLE member_grant (\n\t\t\tgrant_id       TEXT PRIMARY KEY,\n\t\t\tlink_id        TEXT NOT NULL,\n\t\t\thub_user       TEXT NOT NULL,\n\t\t\tlevel          TEXT NOT NULL CHECK (level IN ('view', 'full')),\n\t\t\tscope_kind     TEXT NOT NULL CHECK (scope_kind IN ('board', 'agent', 'computer')),\n\t\t\tscope_id       TEXT NOT NULL,\n\t\t\tboard_id       TEXT NOT NULL,\n\t\t\tflag_artifacts INTEGER NOT NULL DEFAULT 0 CHECK (flag_artifacts IN (0, 1)),\n\t\t\tflag_files     INTEGER NOT NULL DEFAULT 0 CHECK (flag_files IN (0, 1)),\n\t\t\tpinned_folder  TEXT NOT NULL DEFAULT '',\n\t\t\tlabel          TEXT NOT NULL,\n\t\t\tsigned_by      TEXT NOT NULL CHECK (length(signed_by) = 43),\n\t\t\tsigned_nonce   TEXT NOT NULL UNIQUE CHECK (length(signed_nonce) = 22),\n\t\t\tsigned_digest  TEXT NOT NULL CHECK (length(signed_digest) = 64),\n\t\t\tcreated_at     TEXT NOT NULL,\n\t\t\texpires_at     TEXT NOT NULL,\n\t\t\trevoked_at     TEXT,\n\t\t\tCHECK (\n\t\t\t\t(level = 'view' AND scope_kind IN ('board', 'agent') AND scope_id \u003c\u003e '' AND board_id \u003c\u003e '' AND (scope_kind \u003c\u003e 'board' OR scope_id = board_id))\n\t\t\t\tOR (level = 'full' AND scope_kind = 'computer' AND scope_id = '' AND board_id = '' AND flag_artifacts = 0 AND flag_files = 0)\n\t\t\t),\n\t\t\tCHECK (flag_files = 0 OR pinned_folder \u003c\u003e ''),\n\t\t\tCHECK (pinned_folder = '' OR flag_files = 1)\n\t\t)",
+      "sql": "CREATE TABLE member_grant (\n\t\t\tgrant_id       TEXT PRIMARY KEY,\n\t\t\tlink_id        TEXT NOT NULL,\n\t\t\thub_user       TEXT NOT NULL,\n\t\t\tlevel          TEXT NOT NULL CHECK (level IN ('view', 'full')),\n\t\t\tscope_kind     TEXT NOT NULL CHECK (scope_kind IN ('board', 'agent', 'computer')),\n\t\t\tscope_id       TEXT NOT NULL,\n\t\t\tboard_id       TEXT NOT NULL,\n\t\t\tflag_artifacts INTEGER NOT NULL DEFAULT 0 CHECK (flag_artifacts IN (0, 1)),\n\t\t\tflag_files     INTEGER NOT NULL DEFAULT 0 CHECK (flag_files IN (0, 1)),\n\t\t\tpinned_folder  TEXT NOT NULL DEFAULT '',\n\t\t\tlabel          TEXT NOT NULL,\n\t\t\tsigned_by      TEXT NOT NULL CHECK (length(signed_by) = 43),\n\t\t\tsigned_nonce   TEXT NOT NULL UNIQUE CHECK (length(signed_nonce) = 22),\n\t\t\tsigned_digest  TEXT NOT NULL CHECK (length(signed_digest) = 64),\n\t\t\tcreated_at     TEXT NOT NULL,\n\t\t\texpires_at     TEXT NOT NULL,\n\t\t\trevoked_at     TEXT,\n\t\t\tvia_hub        INTEGER NOT NULL DEFAULT 0,\n\t\t\trevoked_by     TEXT NOT NULL DEFAULT '',\n\t\t\tCHECK (\n\t\t\t\t(level = 'view' AND scope_kind IN ('board', 'agent') AND scope_id \u003c\u003e '' AND board_id \u003c\u003e '' AND (scope_kind \u003c\u003e 'board' OR scope_id = board_id))\n\t\t\t\tOR (level = 'full' AND scope_kind = 'computer' AND scope_id = '' AND board_id = '' AND flag_artifacts = 0 AND flag_files = 0)\n\t\t\t),\n\t\t\tCHECK (flag_files = 0 OR pinned_folder \u003c\u003e ''),\n\t\t\tCHECK (pinned_folder = '' OR flag_files = 1)\n\t\t)",
       "tbl_name": "member_grant",
       "type": "table"
     },
@@ -8122,6 +8122,24 @@
           "hidden": 0,
           "name": "revoked_at",
           "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 17,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "via_hub",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 18,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "revoked_by",
+          "notnull": 1,
           "pk": 0,
           "type": "TEXT"
         }

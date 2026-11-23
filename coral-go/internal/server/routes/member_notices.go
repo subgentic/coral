@@ -5,7 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
@@ -60,7 +62,12 @@ func hubHost(origin string) string {
 	if err == nil && u.Host != "" {
 		host = u.Host
 	}
-	host = board.CleanMemberLabel(host)
+	host = strings.Map(func(r rune) rune { // text only: no control or unprintable characters, and no length cut here (the cut below marks itself)
+		if unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, host)
 	if r := []rune(host); len(r) > noticeHostCap {
 		return string(r[:noticeHostCap]) + "…"
 	}
