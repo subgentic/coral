@@ -258,6 +258,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/board/{project}/goals/{goalID}/move":                        "give a goal to another team",
 	"POST /api/board/{project}/goals/{goalID}/done-state":                  "hide, show, read or unread a goal-looks-done row in Needs you",
 	"POST /api/board/{project}/goal-images":                                "add a picture to a new goal as the Operator",
+	"POST /api/board/{project}/field-images":                               "add a picture to a task, chat or instruction field as the Operator",
+	"POST /api/field-images":                                               "add a picture to a task, chat or instruction field as the Operator",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings":  "set an agent's Reviews only switch and review areas",
 	"PUT /api/artifacts/{id}/keep":                                         "keep an artifact",
 	"POST /api/artifacts/{id}/gdoc/share":                                  "share an artifact to a Google Doc with the owner's own Google sign-in (#19996)",

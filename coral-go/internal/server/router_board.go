@@ -301,8 +301,10 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/analytics/inbox-vs-chat", routes.NewInboxVsChatHandler(s.boardStore, store.NewSessionStore(s.db)).Read) // the Operator's Inbox-versus-chat counts (#12158): counts only, theirs alone, this computer only
 	// Goals (#7087): board text, written by the Operator or an orchestrator, readable like tasks.
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals", boardHandler.CreateGoal)
-	r.Post("/api/board/{project}/goal-images", boardHandler.UploadGoalImage) // the Operator's picture for a new goal's description (#11650)
-	r.Get("/api/goals", boardHandler.ListAllGoals)                           // every board's goals (#7260), the Operator's; /api/goals/metrics is the Jobs metrics
+	r.Post("/api/board/{project}/goal-images", boardHandler.UploadGoalImage)   // the Operator's picture for a new goal's description (#11650)
+	r.Post("/api/board/{project}/field-images", boardHandler.UploadFieldImage) // the Operator's picture for a task, chat or instruction field (#20731)
+	r.Post("/api/field-images", boardHandler.UploadPersonFieldImage)           // the same for a field with no team (#20731)
+	r.Get("/api/goals", boardHandler.ListAllGoals)                             // every board's goals (#7260), the Operator's; /api/goals/metrics is the Jobs metrics
 	r.Get("/api/board/{project}/goals", boardHandler.ListGoals)
 	r.Get("/api/board/{project}/goals/{goalID}", boardHandler.GetGoal)
 	r.With(routes.RefuseSignInLink).Patch("/api/board/{project}/goals/{goalID}", boardHandler.UpdateGoal)
