@@ -79,7 +79,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__m.add('a11y-agent', 'A', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);
             await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'a11y-agent')`, 'the agent', 8000);
             await ev(`(async () => { const p = window.selectLiveSession('a11y-agent', 'claude', 'a11y-agent-id', 'local'); ${attempt === 0 ? "window._coralHandleWsMessage({ type: 'coral_update', sessions: [], servers: [] });" : ''} await p; return true; })()`);
-            if (await ev(`!!(window.__qaState.currentSession && window.__qaState.currentSession.board_project)`)) { if (attempt === 0) console.log('note: the first try lost its board, as the in-gap feed update makes it; chosen again'); break; }
+            if (await ev(`!!(window.__qaState.currentSession && window.__qaState.currentSession.board_project)`)) { if (attempt > 0) console.log('note: the first try lost its board, as the in-gap feed update makes it; chosen again'); break; }
             assert.ok(attempt < 3, 'the agent came in without its board on every try');
         }
         for (const theme of ['dark', 'light']) {
