@@ -11,6 +11,11 @@ const WANT = [
     ['Coding Team', 'Builds and reviews software: an orchestrator, developers, QA and security.', 'You describe the goal and approve the reviews.'],
     ['Consumer Research', 'Runs a study with a panel of simulated customers and reports what they said.', 'You set the question and read the findings.'],
     ['Dungeon Master', 'Runs a tabletop story: a narrator and the characters around it.', 'You play and steer the scene.'],
+    ['Overnight run', 'A planner, a builder and a checker work your goal through the night.', 'You leave a goal at night; a morning summary waits in Needs you.'],
+    ['Builder and reviewer', 'One agent writes the change and an agent from another vendor reviews it.', 'You give the goal and approve every change before it lands.'],
+    ['Bug sweep', 'One agent works through your issue list, one reproduces each bug and one fixes it.', 'You point it at the issue list and read the daily summary of fixed and stuck items.'],
+    ['Docs and tests catch-up', 'A tests writer and a docs writer cover the code that changed this week.', 'You get a weekly catch-up and review what it adds before it lands.'],
+    ['Research and write-up', 'A researcher gathers sources and a writer turns them into one report.', 'You give the question and review the report before it is final.'],
 ];
 
 (async () => {
@@ -31,7 +36,7 @@ const WANT = [
                 return { tiles: tiles.map(b => { const r = b.getBoundingClientRect(), d = b.querySelector('.d'); return { name: b.querySelector('.nm')?.textContent, does: d && d.firstChild?.textContent, you: d?.querySelector('i')?.textContent, roles: b.querySelector('.m')?.textContent, pressed: b.getAttribute('aria-pressed'), l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, clipped: d ? d.scrollHeight > d.clientHeight + 1 : null, shown: b.offsetParent !== null && r.width > 100 && r.height > 40 }; }),
                     sel: sel.value, members: document.querySelectorAll('#team-agents-list .team-agent-row').length, vw: innerWidth }; })()`);
             const a = await read();
-            if (a.tiles.length !== 3) { problems.push(`${label}: ${a.tiles.length} tiles, want the 3 built-in templates`); continue; }
+            if (a.tiles.length !== WANT.length) { problems.push(`${label}: ${a.tiles.length} tiles, want the ${WANT.length} built-in templates: ${WANT.map(w => w[0]).join(', ')}`); continue; }
             WANT.forEach(([name, does, you], i) => {
                 const x = a.tiles[i];
                 if (x.name !== name) problems.push(`${label}: tile ${i} is "${x.name}", want "${name}"`);
@@ -41,8 +46,8 @@ const WANT = [
                 if (x.clipped) problems.push(`${label}: ${name} description is cut`);
                 if (x.r > a.vw + 1 || x.l < -1) problems.push(`${label}: ${name} runs off the screen`);
             });
-            const same = (k) => a.tiles.every(x => Math.abs(x[k] - a.tiles[0][k]) < 2);
-            if (mobile ? !(a.tiles[1].t >= a.tiles[0].b - 1 && a.tiles[2].t >= a.tiles[1].b - 1) : !same('t')) problems.push(`${label}: tiles are not ${mobile ? 'one under the other' : 'three across'}`);
+            const same = (k) => a.tiles.slice(0, 3).every(x => Math.abs(x[k] - a.tiles[0][k]) < 2); // eight tiles wrap: the first row is the three
+            if (mobile ? !a.tiles.every((x, i) => i === 0 || x.t >= a.tiles[i - 1].b - 1) : !same('t')) problems.push(`${label}: tiles are not ${mobile ? 'one under the other' : 'three across'}`);
             if (a.tiles.some(x => x.pressed !== 'false')) problems.push(`${label}: a tile is pressed before any choice`);
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/template-tiles-${label}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             // a tile press is the select's choice

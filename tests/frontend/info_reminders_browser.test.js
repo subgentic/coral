@@ -44,7 +44,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`!!document.querySelector('#info-reminders h3') && document.querySelector('#info-reminders h3').textContent`), 'Reminders');
 
             await ev(`document.querySelector('#info-reminders .agent-rem-new').click(); true`); await waitFor(`!!document.querySelector('dialog.chief-check-editor')`, 'the editor');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('dialog.chief-check-editor label')].map(l => l.firstChild.textContent)`), ['Instruction', 'Schedule', 'Repeat every', 'Date and time'], 'Chief\'s editor, the interval is "Repeat every"');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('dialog.chief-check-editor label')].map(l => l.firstChild.textContent)`), ['Instruction', 'Schedule', 'Repeat every', 'Day', 'Date and time'], 'Chief\'s editor, the interval is "Repeat every"');
             await ev(`(() => { const f = document.querySelector('dialog.chief-check-editor form'), set = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
                 set(f.querySelector('textarea'), 'Look at the soak'); set(f.querySelector('input[type=datetime-local]'), '2030-01-02T09:30'); f.querySelector('button[type=submit]').click(); return true; })()`);
             await waitFor(`window.__rem.posts.length === 1`, 'the post');
