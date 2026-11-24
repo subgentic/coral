@@ -189,6 +189,8 @@ GET /api/history-import never
 GET /api/launch-disclosure view
 GET /api/launch/check launch
 GET /api/launch/where launch
+GET /api/live/links never
+GET /api/live/links/{id}/preview never
 GET /api/member-grants never
 GET /api/needs-you view
 GET /api/operator-asks view
@@ -502,6 +504,12 @@ POST /api/hub-auto-accept launch
 POST /api/indexer/refresh never
 POST /api/launch-disclosure/ack never
 POST /api/launch/permission-args never
+POST /api/live/links never
+POST /api/live/links/{id}/go-live never
+POST /api/live/links/{id}/pause never
+POST /api/live/links/{id}/reconfirm never
+POST /api/live/links/{id}/resume never
+POST /api/live/links/{id}/stop never
 POST /api/member-grants never
 POST /api/notifications never
 POST /api/pinned-folders launch
@@ -648,6 +656,7 @@ PUT /api/dropbox/autosync never
 PUT /api/dropbox/filters never
 PUT /api/dropbox/offload never
 PUT /api/dropbox/retention never
+PUT /api/live/links/{id}/views never
 PUT /api/resources/{name} never
 PUT /api/scheduled/jobs/{jobID} never
 PUT /api/sessions/history/{sessionID}/notes never

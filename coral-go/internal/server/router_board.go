@@ -370,6 +370,17 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/tasks/{taskID}/review-size", boardHandler.TaskReviewSize) // the banner's verdict on a task's changes.diff: a warning only
 	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/health/settings", boardHandler.GetHealthSettings)
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/settings", boardHandler.PutHealthSettings)
+	// Coral Live (#21047): the person's own controls at this computer, never through the Hub; every one answers 404 live_closed while the gate is shut.
+	liveHandler := routes.NewLiveHandler(boardHandler)
+	r.With(routes.RefuseSignInLink).Get("/api/live/links", liveHandler.ListLinks)
+	r.With(routes.RefuseSignInLink).Post("/api/live/links", liveHandler.CreateLink)
+	r.With(routes.RefuseSignInLink).Put("/api/live/links/{id}/views", liveHandler.SetViews)
+	r.With(routes.RefuseSignInLink).Get("/api/live/links/{id}/preview", liveHandler.Preview)
+	r.With(routes.RefuseSignInLink).Post("/api/live/links/{id}/go-live", liveHandler.GoLive)
+	r.With(routes.RefuseSignInLink).Post("/api/live/links/{id}/reconfirm", liveHandler.Reconfirm)
+	r.With(routes.RefuseSignInLink).Post("/api/live/links/{id}/pause", liveHandler.Pause)
+	r.With(routes.RefuseSignInLink).Post("/api/live/links/{id}/resume", liveHandler.Resume)
+	r.With(routes.RefuseSignInLink).Post("/api/live/links/{id}/stop", liveHandler.Stop)
 	r.Get("/api/board/{project}/health/checks", boardHandler.ListHealthChecksRoute)                                             // a team's custom health checks (#20176)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/checks", boardHandler.AddHealthCheckRoute)                // pending until the Operator approves its record
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/checks/{name}", boardHandler.ChangeHealthCheckRoute)       // any change is pending again, live tokens end

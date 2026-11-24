@@ -30,6 +30,15 @@ func isAgentTool(r *http.Request) bool {
 // every mode since #3929 (only with strict local auth before); the Operator can (the dashboard,
 // an API key, the signed command line). Each agent call is recorded in the identity report.
 var operatorOnlyRoutes = map[string]string{
+	"GET /api/live/links":                           "read the Coral Live links",
+	"POST /api/live/links":                          "create a Coral Live link",
+	"PUT /api/live/links/{id}/views":                "change a Coral Live link's views",
+	"GET /api/live/links/{id}/preview":              "read a Coral Live preview",
+	"POST /api/live/links/{id}/go-live":             "take a Coral Live link live",
+	"POST /api/live/links/{id}/reconfirm":           "re-confirm a Coral Live link",
+	"POST /api/live/links/{id}/pause":               "pause a Coral Live link",
+	"POST /api/live/links/{id}/resume":              "resume a Coral Live link",
+	"POST /api/live/links/{id}/stop":                "stop a Coral Live link",
 	"GET /api/filesystem/trust-probe":               "check project configuration names before choosing folder trust",
 	"GET /api/artifacts/{id}/thumbnail":             "read an artifact thumbnail",
 	"GET /api/chief/checks":                         "read scheduled checks",

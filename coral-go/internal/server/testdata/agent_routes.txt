@@ -707,3 +707,12 @@ b POST /api/member-grants
 b GET /api/relayed-grant-notices
 b POST /api/relayed-grant-notices/{id}/revoke
 b GET /api/cloud/devices/{kid}/signed-grants
+b GET /api/live/links
+b POST /api/live/links
+b PUT /api/live/links/{id}/views
+b GET /api/live/links/{id}/preview
+b POST /api/live/links/{id}/go-live
+b POST /api/live/links/{id}/reconfirm
+b POST /api/live/links/{id}/pause
+b POST /api/live/links/{id}/resume
+b POST /api/live/links/{id}/stop
