@@ -190,7 +190,7 @@ func (h *BoardHandler) createMemberGrant(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	ng := board.NewMemberGrant{LinkID: in.LinkID, HubUser: in.HubUser, Level: in.Level, ScopeKind: in.ScopeKind, ScopeID: in.ScopeID, FlagArtifacts: in.Artifacts, FlagFiles: in.Files,
-		PinnedFolder: in.PinnedFolder, Label: in.Label, Days: in.Days, SignedBy: in.Signature.KID, Nonce: in.Signature.Nonce, Ts: in.Signature.Ts}
+		PinnedFolder: in.PinnedFolder, Label: in.Label, Days: in.Days, SignedBy: in.Signature.KID, Nonce: in.Signature.Nonce, Ts: in.Signature.Ts, ViaHub: isRelayed}
 	switch {
 	case project != "":
 		if in.Level == board.MemberLevelFull || in.ScopeKind == board.MemberScopeComputer {
@@ -284,6 +284,10 @@ func capRunes(s string, n int) string {
 	return s
 }
 
+func slogWarnNotice(err error) {
+	slog.Warn("[member] could not post the notice of a revoked grant", "error", err)
+}
+
 func shortKID(k string) string {
 	if len(k) > 8 {
 		return k[:8]
@@ -325,7 +329,11 @@ func (h *BoardHandler) RevokeMemberGrant(w http.ResponseWriter, r *http.Request)
 		errNotFound(w, "no one has that access here")
 		return
 	}
-	g, err := h.bs.RevokeMemberGrant(r.Context(), id, time.Now())
+	by := board.MemberRevokedHere
+	if isRelayed {
+		by = board.MemberRevokedSigned
+	}
+	g, err := h.bs.RevokeMemberGrantBy(r.Context(), id, time.Now(), by)
 	if err != nil {
 		if errors.Is(err, board.ErrNoMemberGrant) {
 			errNotFound(w, "no one has that access here")

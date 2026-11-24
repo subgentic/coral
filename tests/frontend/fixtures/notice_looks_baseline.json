@@ -1,1 +1,5 @@
-{}
+{
+  "css/relayed_grant_notices.css": {
+    ".grant-notice": 2
+  }
+}

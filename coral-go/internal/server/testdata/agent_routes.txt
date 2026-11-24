@@ -700,3 +700,6 @@ b POST /api/launch/permission-args
 b DELETE /api/member-grants/{id}
 b GET /api/member-grants
 b POST /api/member-grants
+b GET /api/relayed-grant-notices
+b POST /api/relayed-grant-notices/{id}/revoke
+b GET /api/cloud/devices/{kid}/signed-grants

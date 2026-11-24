@@ -178,6 +178,15 @@ func (h *CloudHandler) RemoveDevice(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "Could not remove the device")
 		return
 	}
+	// The person may also end the access this device signed (#20899): the list asks (DeviceSignedGrants) and says so with ?revoke_grants=1.
+	if r.URL.Query().Get("revoke_grants") == "1" && h.bs != nil {
+		n, gerr := h.bs.RevokeMemberGrantsSignedBy(ctx, kid, time.Now())
+		if gerr != nil {
+			slog.Warn("cloud: could not end the grants a removed device signed", "kid", kid, "error", gerr)
+		} else if n > 0 {
+			slog.Info("cloud: grants ended with their device", "kid", kid, "count", n)
+		}
+	}
 	slog.Info("cloud: device removed", "action", "removed-here", "kid", kid, "mode", k.Mode)
 	out, lerr := h.deviceList(r)
 	if lerr != nil {
@@ -185,6 +194,22 @@ func (h *CloudHandler) RemoveDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// DeviceSignedGrants: GET /api/cloud/devices/{kid}/signed-grants: how many live grants of access this owner device signed, so removing it can offer to end them too (#20899). Local only, like the rest of the device list.
+func (h *CloudHandler) DeviceSignedGrants(w http.ResponseWriter, r *http.Request) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) {
+		return
+	}
+	n := 0
+	if h.bs != nil {
+		var err error
+		if n, err = h.bs.CountLiveGrantsSignedBy(r.Context(), chi.URLParam(r, "kid"), time.Now()); err != nil {
+			errInternalServer(w, "Could not read the access this device gave")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"live": n})
 }
 
 // ClearDevicesClock: POST /api/cloud/devices/clear-clock: the owner's reset after a clock jump (the mark becomes now).

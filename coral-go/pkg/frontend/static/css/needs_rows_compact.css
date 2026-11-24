@@ -293,3 +293,35 @@
 /* Review symbols inherit the review palette too; the shared file artwork elsewhere keeps its type colours (#20714). */
 :root .inbox-kind-icon[data-kind="review"] .artifact-thumbnail svg [stroke]:not([stroke="none"]) { stroke: currentColor; }
 :root .inbox-kind-icon[data-kind="review"] .artifact-thumbnail svg [fill]:not([fill="none"]) { fill: currentColor; }
+
+/* #20938, approved one-focus mock: titles lead; a resting list has no competing green actions.
+   Hover or keyboard/touch focus wins over the current row. Bulk checkbox selections do not each gain an accent. */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row {
+    --inbox-action-ink: var(--text-secondary); --inbox-action-bg: color-mix(in srgb, var(--text-primary) 4%, transparent); --inbox-action-edge: var(--text-muted);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row:is(:hover, :focus-within, [aria-current="true"]) {
+    --inbox-action-ink: var(--success-text, var(--success)); --inbox-action-bg: color-mix(in srgb, var(--success) 14%, transparent); --inbox-action-edge: color-mix(in srgb, var(--success) 38%, transparent);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results:has(tr.inbox-kind-row:focus-within) tr.inbox-kind-row:not(:focus-within),
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results:not(:has(tr.inbox-kind-row:focus-within)):has(tr.inbox-kind-row:hover) tr.inbox-kind-row:not(:hover) {
+    --inbox-action-ink: var(--text-secondary); --inbox-action-bg: color-mix(in srgb, var(--text-primary) 4%, transparent); --inbox-action-edge: var(--text-muted);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row .inbox-review-actions > .btn { color: var(--text-secondary); }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row .inbox-review-actions > .inbox-main-action.inbox-main-action {
+    color: var(--inbox-action-ink); background: var(--inbox-action-bg); border-color: var(--inbox-action-edge);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .material-icons.inbox-kind-icon:not(:has(.artifact-thumbnail-image)) {
+    background: var(--bg-tertiary); color: var(--text-secondary); border-color: var(--border);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row :is(.inbox-review-name, .inbox-v4-heading-text) {
+    color: var(--text-primary); font-weight: var(--fw-strong);
+}
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row:focus-within { background: var(--bg-hover); }
+/* Operator amendment: colour, not weight alone, separates the headline from the card's supporting words. */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-v4-row.inbox-kind-row.inbox-message-row :is(.inbox-meta, .inbox-heading-kind, .inbox-computer-chip, .inbox-header-meta) { color: var(--text-muted); }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-message { color: var(--text-secondary); }
+
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row .inbox-meta :is(a, button, span) { color: inherit; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row .inbox-v4-heading-text { white-space: normal; overflow-wrap: anywhere; height: auto; }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-v4-row.inbox-kind-row .inbox-review-from:not(.inbox-review-name) { color: var(--text-muted); font-weight: var(--fw-regular); }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-v4-row.inbox-kind-row .inbox-review-name:not(.inbox-ask-name):not(.inbox-message) { white-space: normal; overflow-wrap: anywhere; overflow: visible; height: auto; max-height: none; -webkit-line-clamp: unset; }

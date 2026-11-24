@@ -32,16 +32,16 @@ document.addEventListener('coral:welcome-changed', updateInboxTab); // a welcome
 
 /** How many agents are waiting for input right now, from the feed's list. */
 export function waitingCount() {
-    return (state.liveSessions || []).filter(needsYou).length + (unrecordedItem(state.liveSessions) ? 1 : 0); // the agents held until recorded are one item (#11415)
+    return (state.liveSessions || []).filter(needsYou).length + !!unrecordedItem(state.liveSessions); // the agents held until recorded are one item (#11415)
 }
 
 /** The ONE number of things that need the person: the tab's badge, the sidebar's Needs you count and the page header all read it, so they cannot disagree (#15380 D). Only what is live is counted: rows kept from a computer that is offline are shown, not counted (#15380 C). */
 export function needsCount(reviews = reviewAttentionCount().value) {
-    return (_hooks.extra?.() || 0) + waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount();
+    return (_hooks.extra?.() || 0) + (state.grantN || 0) + waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount();
 }
 
 /** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */
-function oldestWaiting() { return Math.min(...[...(state.liveSessions || []).filter(needsYou).map(s => Date.parse(s.waiting_since)), ...operatorAsks().map(a => Date.parse(a.at)), ...unreadReviewItems().map(a => Date.parse(a.created_at))].filter(Number.isFinite)); } // Infinity when nothing waits
+function oldestWaiting() { return Math.min(...[...(state.liveSessions || []).filter(needsYou).map(s => s.waiting_since), ...operatorAsks().map(a => a.at), ...unreadReviewItems().map(a => a.created_at)].map(Date.parse).filter(Number.isFinite)); } // Infinity when nothing waits
 function offerAlertsAgainIfWaited(n) {
     if (n <= 0 || document.hidden) return;
     const oldest = oldestWaiting();
@@ -83,14 +83,15 @@ export function updateInboxTab() {
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
     const reviewCount = reviewAttentionCount();
     const n = needsCount(reviewCount.value); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
-    const text = n > 99 ? '99+' : n > 0 ? `${n}${reviewCount.complete ? '' : '+'}` : ''; // "5", or "5+" when more are not read yet: the same number as the title, the strip and the sidebar (#17450)
+    const text = n > 99 ? '99+' : n ? `${n}${reviewCount.complete ? '' : '+'}` : ''; // "5", or "5+" when more are not read yet: the same number as the title, the strip and the sidebar (#17450)
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).
-    if (badge.textContent !== text) badge.textContent = text;
-    if (badge.hidden !== (n === 0)) badge.hidden = n === 0;
-    const phone = document.getElementById('phone-nav-inbox-badge'); // the phone's floating nav carries the same count (#11116)
-    if (phone) { if (phone.textContent !== text) phone.textContent = text; if (phone.hidden !== (n === 0)) phone.hidden = n === 0; }
-    const label = n > 0 ? `Inbox, ${n}${reviewCount.complete ? '' : '+'} ${reviewCount.value || failedUnread().length || operatorAsks().length ? 'need your attention' : 'waiting for input'}` : reviewCount.complete ? null : 'Inbox, attention count incomplete';
+    for (const counter of [badge, document.getElementById('phone-nav-inbox-badge')]) {
+        if (!counter) continue;
+        if (counter.textContent !== text) counter.textContent = text;
+        if (counter.hidden !== (n === 0)) counter.hidden = n === 0;
+    }
+    const label = n ? `Inbox, ${n}${reviewCount.complete ? '' : '+'} ${state.grantN || reviewCount.value || failedUnread().length || operatorAsks().length ? 'need your attention' : 'waiting for input'}` : reviewCount.complete ? null : 'Inbox, attention count incomplete';
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
     tellAttention(n);

@@ -197,6 +197,8 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Get("/api/member-grants", boardHandler.ComputerMemberGrants) // #20511: every grant of this computer, and a full one (shut until Security reads its commit)
 		r.With(routes.RefuseSignInLink).Post("/api/member-grants", boardHandler.ComputerMemberGrants)
 		r.With(routes.RefuseSignInLink).Delete("/api/member-grants/{id}", boardHandler.RevokeMemberGrant)
+		r.With(routes.RefuseSignInLink).Get("/api/relayed-grant-notices", boardHandler.RelayedGrantNotices) // #20914: what a Hub gave, for the Operator here; local only, never in the tunnel table
+		r.With(routes.RefuseSignInLink).Post("/api/relayed-grant-notices/{id}/revoke", boardHandler.RevokeRelayedGrantNotice)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/wake", sessHandler.OrchestratorWake)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/sleep", sessHandler.OrchestratorSleep)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/restart", sessHandler.OrchestratorRestart)

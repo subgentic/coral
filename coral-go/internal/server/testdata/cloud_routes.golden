@@ -153,6 +153,7 @@ GET /api/chief/checks never
 GET /api/chief/checks/{checkID} never
 GET /api/chief/triggers never
 GET /api/cloud/devices never
+GET /api/cloud/devices/{kid}/signed-grants never
 GET /api/cloud/link-keys never
 GET /api/cloud/link-requests never
 GET /api/cloud/link-requests/{id} never
@@ -190,6 +191,7 @@ GET /api/needs-you view
 GET /api/operator-asks view
 GET /api/pinned-folders view
 GET /api/proposals view
+GET /api/relayed-grant-notices never
 GET /api/reminders never
 GET /api/reminders/agents never
 GET /api/reminders/{reminderID} never
@@ -500,6 +502,7 @@ POST /api/launch/permission-args never
 POST /api/member-grants never
 POST /api/notifications never
 POST /api/pinned-folders launch
+POST /api/relayed-grant-notices/{id}/revoke never
 POST /api/reminders never
 POST /api/reminders/agents/{sessionID}/switch never
 POST /api/reminders/{reminderID}/done never

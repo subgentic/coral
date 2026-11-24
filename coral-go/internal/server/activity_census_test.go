@@ -346,6 +346,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/cloud/link-requests/{id}/finish":                            "Coral Hub connection and Hub-to-computer calls",
 	"POST /api/cloud/link-keys":                                            "Coral Hub connection and Hub-to-computer calls",
 	"DELETE /api/cloud/link-keys/{id}":                                     "Coral Hub connection and Hub-to-computer calls",
+	"POST /api/relayed-grant-notices/{id}/revoke":                          "Coral Hub connection and Hub-to-computer calls",
 	"POST /api/cloud/links":                                                "Coral Hub connection and Hub-to-computer calls",
 	"POST /api/cloud/links/cancel":                                         "Coral Hub connection and Hub-to-computer calls",
 	"POST /api/cloud/links/confirm-owner":                                  "Coral Hub connection and Hub-to-computer calls",

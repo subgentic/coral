@@ -1,0 +1,62 @@
+/* Local grant notices, loaded only with the Inbox. Typography follows the shared theme tokens. */
+.grant-notice{box-sizing:border-box;
+    min-width:0;
+    border:1px solid var(--border);
+    border-radius:var(--radius-xl);
+    background:var(--bg-primary);
+    padding:22px;
+    margin-bottom:16px;
+    overflow-wrap:anywhere;
+    font-size:var(--fs-title);
+    color:var(--text-primary)}
+
+.grant-head{display:flex;
+    align-items:flex-start;
+    gap:12px}
+.grant-head>div{min-width:0}
+.grant-head h2{font-size:var(--fs-2xl);
+    line-height:var(--lh-ui);
+    margin:0 0 4px}
+.grant-head small,.grant-explain,.grant-foot{color:var(--text-secondary)}
+.grant-symbol{display:grid;
+    place-items:center;
+    flex:none;
+    width:34px;
+    height:34px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    color:var(--accent);
+    font-size:var(--fs-2xl)}
+.grant-lead{line-height:var(--lh-body);
+    margin:24px 0}
+.grant-facts{display:grid;
+    gap:20px;
+    margin:0 0 24px}
+.grant-facts dt{color:var(--text-secondary);
+    font-size:.9em;
+    margin-bottom:6px}
+.grant-facts dd{margin:0;
+    font-weight:var(--fw-strong);
+    line-height:var(--lh-body)}
+.grant-facts .grant-explain{font-weight:var(--fw-regular);
+    font-size:.9em;
+    margin-top:3px}
+.grant-actions{display:flex;
+    gap:8px;
+    flex-wrap:wrap}
+.grant-actions .btn{min-width:44px;
+    min-height:44px;
+    padding:10px 16px}
+.grant-danger{background:color-mix(in srgb,var(--danger) 80%,rgb(var(--black-rgb)));
+    color:var(--text-on-accent)}
+.grant-info,.grant-error{padding:12px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    line-height:var(--lh-body)}
+.grant-error{color:var(--error-text)}
+.grant-foot{font-size:.9em;
+    line-height:var(--lh-body);
+    margin:14px 0 0}
+@media(max-width:600px){.grant-notice{padding:20px 16px}
+.grant-actions .btn{flex:1}
+}

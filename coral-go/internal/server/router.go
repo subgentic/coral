@@ -691,6 +691,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/cloud/devices/clear-clock", s.cloudHandler.ClearDevicesClock)
 	r.Put("/api/cloud/devices/{kid}/mode", s.cloudHandler.SetDeviceMode)
 	r.Delete("/api/cloud/devices/{kid}", s.cloudHandler.RemoveDevice)
+	r.Get("/api/cloud/devices/{kid}/signed-grants", s.cloudHandler.DeviceSignedGrants) // how many live grants this device signed, for the Remove offer (#20899); local only
 	// Device keys, slice 7 (#19669): what a trusted browser signed, forwarded by the Hub unstamped. The signature is the only authority; these routes read no Hub user, owner or account header.
 	r.Post("/api/device-keys/message", s.cloudHandler.DeviceKeyMessage)
 	r.Post("/api/device-keys/certificate", s.cloudHandler.DeviceKeyCertificate)
@@ -731,6 +732,29 @@ func (s *Server) registerCloud(r *chi.Mux) {
 			}
 		}
 		return tunnel.TierNever, false
+	})
+	routes.SetNoticeLookups(func(ctx context.Context, id string) string { // the feed of access given through a Hub (#20914): the link's Hub and the signing device's label
+		ls, err := ownerCloud.ListLinks(ctx)
+		if err != nil {
+			return ""
+		}
+		for _, l := range ls {
+			if l.LinkID == id {
+				return l.HubOrigin
+			}
+		}
+		return ""
+	}, func(ctx context.Context, kid string) string {
+		ks, err := store.NewSessionStore(s.db).ListDeviceKeys(ctx)
+		if err != nil {
+			return ""
+		}
+		for _, k := range ks {
+			if k.KID == kid && k.RemovedAt == 0 {
+				return k.Label
+			}
+		}
+		return ""
 	})
 	s.cloudHandler.SetOwnerLabelStore(ownerCloud) // and where the person at this computer records it when it is missing (#6108)
 	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), func() { s.endForUpdate(endThisServer) })
