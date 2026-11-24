@@ -2,13 +2,18 @@ package background
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/jsonl"
 )
 
 // limitPosts are the board posts that announce a usage limit.
@@ -85,4 +90,44 @@ func TestALimitHitWithNoOrchestratorGoesToNeedsYou(t *testing.T) {
 	require.Len(t, asks, 1, "one open question for the Operator")
 	assert.Equal(t, "Operator", asks[0].Member)
 	assert.Contains(t, asks[0].Content, "reset time not shown")
+}
+
+// A Claude agent's limit is not on its screen: it is the latest record of its transcript. The notice reads it as the live list and the resumer do, and posts
+// once for the hit (a real limit record, the scrubbed one of internal/jsonl/testdata, its times moved to now).
+func TestAClaudeLimitInItsTranscriptIsOnePostToo(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 40*time.Minute)
+	projects := t.TempDir()
+	t.Setenv("CLAUDE_PROJECTS_DIR", projects)
+	raw, err := os.ReadFile(filepath.Join("..", "jsonl", "testdata", "claude_limit_5h.jsonl"))
+	require.NoError(t, err)
+	var rec map[string]any
+	require.NoError(t, json.Unmarshal(raw, &rec))
+	rec["timestamp"] = h.now.Format(time.RFC3339Nano)
+	rec["apiErrorParams"].(map[string]any)["rate_limit_info"].(map[string]any)["resetsAt"] = h.now.Add(time.Hour).Unix()
+	line, err := json.Marshal(rec)
+	require.NoError(t, err)
+	dir := filepath.Join(projects, "-tmp-project")
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, h.sid(2)+".jsonl"), append(line, '\n'), 0o600))
+	h.agents[1].WorkingDirectory = "/tmp/project"
+	h.m.claudeLimit = claudeTranscriptLimit(jsonl.NewSessionReader())
+
+	for i := 0; i < 4; i++ {
+		h.now = h.now.Add(5 * time.Minute)
+		h.m.scan(ctx)
+	}
+	posts := h.limitPosts()
+	require.Len(t, posts, 1, "one post for the hit: %q", posts)
+	assert.Contains(t, posts[0], "@Orchestrator")
+	assert.Contains(t, posts[0], "Dev")
+	assert.Contains(t, posts[0], "claude")
+	assert.Regexp(t, `resets in 5\d min`, posts[0], "the reset the record names (an hour), less the first scan's five minutes")
+
+	// The reset has come: nothing more, and no new hit.
+	h.now = h.now.Add(2 * time.Hour)
+	h.m.scan(ctx)
+	assert.Len(t, h.limitPosts(), 1)
 }
