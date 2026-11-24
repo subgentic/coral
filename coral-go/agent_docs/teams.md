@@ -368,16 +368,21 @@ Besides **Coding Team** (7 roles), **Consumer Research** (12 roles) and **Dungeo
 
 ### Review size guard
 
-In Team settings, the **Review size guard** tab warns reviewers when a task in review has a large diff. It is **off by default** and never blocks or rejects a review:
+In Team settings, the **Review size guard** tab warns reviewers when a task in review has a large diff. It is **off by default** and never blocks or rejects a review automatically:
 
 - **Warn when a change is too big to review**: turns the warning on or off. When it is on, set at least one limit (**Lines changed over** or **Files changed over**).
 - **Lines changed over** (`0` to `1,000,000`) and **Files changed over** (`0` to `100,000`): whole numbers. Either limit triggers the warning; leave one empty (or `0` in the API) to check only the other.
 - **Skip these paths (not counted)**: comma-separated path patterns (up to 50 patterns, 200 characters each, using `*`, `?` and `**`, such as `*.lock, **/generated/**`). Matching files and their changed lines are excluded from the count.
+- **Over the limit**: what the banner offers on a change over the limit (**Warn: show a banner**, **Send back: ask the author to split**, or **Split: the Orchestrator files follow-ups**; JSON `over_limit`: `"warn"`, `"send_back"`, or `"split"`). **Warn** is the default. **Send back** and **Split** add a button to the banner; nothing happens until someone presses it.
 - **Applies to**: **Whole team** or **Only these roles** (with **Roles** selecting up to 50 team roles).
 
-When a task is in `review_pending` and exceeds a limit for its author's role, the task page shows a warning banner above the task details: **Large change.** *`<N> lines in <M> files; your team's limit is <limit>. [<K> lines in <P> skipped paths are not counted.] This is a warning only. You can still review and approve it.`*
+When a task is in `review_pending` and exceeds a limit for its author's role, the task page shows a **Large change.** warning banner above the task details (*`<N> lines in <M> files; your team's limit is <limit>. [<K> lines in <P> skipped paths are not counted.]`*):
 
-The API endpoints (`GET` and `PUT /api/board/{project}/review-size` for the team's Orchestrator or the Operator; `GET /api/board/{project}/tasks/{taskID}/review-size` for the task verdict) are local to this computer and are not served through Coral Hub.
+- With **Over the limit** set to **Warn: show a banner** (`"warn"`), the banner ends with: *This is a warning only. You can still review and approve it.*
+- With **Over the limit** set to **Send back: ask the author to split** (`"send_back"`), the banner says *Your team sends a change this size back to its author.*, shows a **Send back to author** button, and notes *You can still approve it.* Pressing **Send back to author** opens **Send back to `<author>`?** (*The author gets this note and the task goes back to them. Edit it if you like.*) with an editable **Note to the author** pre-filled with the change's size and limit, plus **Cancel** and **Send back**. Confirming posts `POST /api/board/{project}/tasks/{taskID}/review-size/send-back`, ends any open review round as rejected with the note, skips open review tasks (offered again when the author resubmits), returns the task to its author in `pending`, and notifies the author on the board.
+- With **Over the limit** set to **Split: the Orchestrator files follow-ups** (`"split"`), the banner says *Your team splits a change this size into follow-up tasks.*, shows a **Split into follow-ups** button, and notes *You can still approve it.* Pressing **Split into follow-ups** opens **Split `#<id>` into follow-ups?** (*The Orchestrator reads the change and files follow-up tasks, each under the limit. Nothing is approved or rejected until you decide.*) with **Ask the Orchestrator to split**. Confirming posts `POST /api/board/{project}/tasks/{taskID}/review-size/split`, which posts a waking notice on the board asking the team's Orchestrator to file follow-up tasks under the limit while the review stays open.
+
+The API endpoints (`GET` and `PUT /api/board/{project}/review-size` for the team's Orchestrator or the Operator; `GET /api/board/{project}/tasks/{taskID}/review-size` for the task verdict; `POST /api/board/{project}/tasks/{taskID}/review-size/send-back` and `POST /api/board/{project}/tasks/{taskID}/review-size/split` for the Operator or the team's Orchestrator, returning HTTP 409 when the change is not over the limit) are local to this computer and are not served through Coral Hub.
 
 For a small documentation correction, `none` with no dependency guidance may be
 sufficient. For two developers in one checkout, choose `shared_checkout` and

@@ -79,14 +79,19 @@ You can also add or cancel reminders on any agent from the **Agents** tab of a t
 
 ## Warn when a review is too big
 
-In a team's **Settings** tab, open **Review size guard** (this computer only, not through Coral Hub). It is **off by default** and warns without blocking:
+In a team's **Settings** tab, open **Review size guard** (this computer only, not through Coral Hub). It is **off by default** and never blocks a review automatically:
 
 - **Warn when a change is too big to review**: turns the warning on. Set at least one limit below.
 - **Lines changed over** and **Files changed over**: whole numbers (`0` to `1,000,000` lines; `0` to `100,000` files). Either limit warns; leave one empty to use only the other.
 - **Skip these paths (not counted)**: comma-separated path patterns (for example `*.lock, **/generated/**`; `*`, `?` and `**` work).
+- **Over the limit**: **Warn: show a banner** (the default), **Send back: ask the author to split**, or **Split: the Orchestrator files follow-ups** (*Warn is the default. Send back and Split add a button to the banner; nothing happens until someone presses it.*).
 - **Applies to**: **Whole team** or **Only these roles** (then pick one or more **Roles**).
 
-When a task in review is over a limit for its author's role, the task page shows a **Large change.** banner above the task facts with the line and file counts, the team's limit, any skipped lines and files, and the note: *This is a warning only. You can still review and approve it.*
+When a task in review is over a limit for its author's role, the task page shows a **Large change.** banner above the task facts with the line and file counts, the team's limit, and any skipped lines and files:
+
+- In **Warn** mode, the banner ends with: *This is a warning only. You can still review and approve it.*
+- In **Send back** mode (*Your team sends a change this size back to its author.* / *You can still approve it.*), the banner includes **Send back to author**. Pressing it opens **Send back to `<author>`?** with an editable **Note to the author** pre-filled with the change's size and limit; **Send back** returns the task to its author in `pending` and tells them on the board.
+- In **Split** mode (*Your team splits a change this size into follow-up tasks.* / *You can still approve it.*), the banner includes **Split into follow-ups**. Pressing it opens **Split `#<id>` into follow-ups?**; **Ask the Orchestrator to split** asks the team's Orchestrator on the board to file follow-up tasks under the limit while the review stays open.
 
 ## Turn on the team health monitor
 
