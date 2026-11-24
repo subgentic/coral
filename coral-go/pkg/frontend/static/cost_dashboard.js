@@ -395,6 +395,7 @@ async function _readCostDashboard({ force = false } = {}) {
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
     syncEfficiency(period); // Tokens per commit and Task time: the comparison on Coral Hub's page too (coral-hub #261001)
     importOnce('./analytics_limit_waits.js').then(m => m.showLimitWaits(document.getElementById('cost-limit-waits'), period)).catch(e => console.error('[cost-dashboard] limit waits:', e)); // the Limit waits card (#21020)
+    importOnce('./analytics_waste.js').then(m => m.showWaste(document.getElementById('cost-waste'), period)).catch(e => console.error('[cost-dashboard] waste:', e)); // the Waste card (#21127)
     importOnce('./analytics_servers.js').then(m => m.showByComputer(document.getElementById('cost-by-computer'), sinceParam + (_team() ? `${sinceParam ? '&' : '?'}team=${encodeURIComponent(_team())}` : ''), period)).catch(e => console.error('[cost-dashboard] by computer:', e)); // this computer and each linked one (#16017): its own read, its own errors
     if (!isCloud()) showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time'), force); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors; Coral Hub's page has the comparison only (the spend route is not the Hub's)
 

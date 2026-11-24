@@ -26,6 +26,12 @@
    "covered_by": "analytics"
   },
   {
+   "file": "analytics_waste.js",
+   "calls": 1,
+   "surface": "Analytics Overview: Waste",
+   "covered_by": "analytics"
+  },
+  {
    "file": "analytics_spend.js",
    "calls": 2,
    "surface": "Analytics: Who spends, Task time by agent",
