@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/teamhealth"
 )
 
@@ -22,7 +24,7 @@ const limitNoticeSender = "Coral Health Monitor"
 // the next hit, after the agent was seen unblocked for limitHitClearAfter, is a new one. A team with no Orchestrator (or an Orchestrator that is itself
 // blocked) gets it as a question to the Operator, so it reaches Needs you.
 func (m *BoardHealthMonitor) noticeLimitHits(ctx context.Context, project string, bySession map[string]AgentInfo, tick time.Time) {
-	if m.limit == nil {
+	if m.limit == nil && m.claudeLimit == nil {
 		return
 	}
 	subs, err := m.store.ListSubscribers(ctx, project)
@@ -37,7 +39,7 @@ func (m *BoardHealthMonitor) noticeLimitHits(ctx context.Context, project string
 		a, live := bySession[sub.SessionName]
 		resets, blocked := time.Duration(0), false
 		if live {
-			resets, blocked = m.blockedByLimit(ctx, a)
+			resets, blocked = m.limitOf(ctx, a, tick)
 		}
 		m.mu.Lock()
 		if m.limitHits == nil {
@@ -94,5 +96,34 @@ func (m *BoardHealthMonitor) postLimitHit(ctx context.Context, project, agent st
 		if err := m.store.RecordAsk(ctx, project, msg, []string{"Operator"}); err != nil {
 			m.logger.Warn("limit notice could not be asked", "project", project, "error", err)
 		}
+	}
+}
+
+// limitOf says whether a is stopped by a usage limit for the notice, and when it resets (0 when not shown). A Claude agent's limit is its transcript's own
+// record (the one the live list's "blocked" and the resumer read, #20691, #20692); the other CLIs' limits are the screens the health check reads.
+func (m *BoardHealthMonitor) limitOf(ctx context.Context, a AgentInfo, now time.Time) (time.Duration, bool) {
+	if (a.AgentType == at.Claude || a.AgentType == "") && m.claudeLimit != nil {
+		if resets, blocked := m.claudeLimit(ctx, a, now); blocked {
+			return resets, true
+		}
+	}
+	return m.blockedByLimit(ctx, a)
+}
+
+// claudeTranscriptLimit reads a Claude agent's limit off the latest record of its transcript: a usage-limit error whose reset (when it names one) has not come.
+func claudeTranscriptLimit(reader *jsonl.SessionReader) func(context.Context, AgentInfo, time.Time) (time.Duration, bool) {
+	return func(_ context.Context, a AgentInfo, now time.Time) (time.Duration, bool) {
+		e, ok := reader.ReadClaudeAPIError(a.SessionID, a.WorkingDirectory)
+		if !ok || !e.UsageLimit() {
+			return 0, false
+		}
+		resetAt, _ := e.ResetsAt()
+		if resetAt.IsZero() {
+			return 0, true
+		}
+		if !resetAt.After(now) {
+			return 0, false // the reset has come: the agent may work again
+		}
+		return resetAt.Sub(now), true
 	}
 }
