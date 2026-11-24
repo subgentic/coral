@@ -37,7 +37,7 @@ const N = {
     persona: /persona/i, name: /^Name/i, prompt: /^Instructions for this agent$/i,
     provider: /^Provider$/i, model: /^Model$/i, thinking: /^Thinking/i, mode: /mode$/i, flags: /^Flags/i,
     cancel: /^Cancel$/i, back: /^Back$/i, next: /^(Next|Choose model)$/i, launch: /^Launch$/i, restart: /^Restart$/i,
-    tabs: ['Agent', 'Permissions', 'Advanced'], restartTabs: ['Agent', 'Persona', 'Permissions', 'Advanced'],
+    tabs: ['Agent', 'Permissions', 'Advanced', 'Reminders'], restartTabs: ['Agent', 'Persona', 'Permissions', 'Advanced'],
 };
 
 // Open New agent as a person does: the Launch dialog, then the Agent choice if the dialog asks first. Resolves once the dialog is there (or after the wait, so a failing build reports what is missing).

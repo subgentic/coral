@@ -248,6 +248,9 @@ function _selectAgentPreset(name) {
         });
         if (nameInput) nameInput.value = '';
     }
+    // A persona's own reminders (#21184) fill the New agent Reminders tab, named for the persona (#21169); the tab is loaded lazily, so the pick is kept for it too
+    launch.personaReminders = { name: persona ? persona.name : '', list: persona && Array.isArray(persona.reminders) ? persona.reminders : [] };
+    document.getElementById('launch-agent-acf')?.dispatchEvent(new CustomEvent('persona-reminders', { detail: launch.personaReminders }));
 }
 
 

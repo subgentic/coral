@@ -1,0 +1,15 @@
+/* New agent's Reminders tab (#21169, mock approved by the Operator): the cards and the form are Chief's (chief-checks.css); this lays the tab out and styles the source chip. Loaded with launch_reminders.js. */
+.launch-rem-lead, .launch-rem-from, .launch-rem-text { margin: 0; }
+.launch-rem-lead { color: var(--text-secondary); margin-bottom: 12px; }
+.launch-rem-cards { display: grid; gap: 10px; }
+.launch-rem-none { display: grid; gap: 8px; justify-items: start; padding: 18px; border: 1px dashed var(--control-border); border-radius: var(--radius-lg); }
+.launch-rem-none p { margin: 0; color: var(--text-secondary); }
+.launch-rem-top { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; justify-content: space-between; width: 100%; }
+.launch-rem-text { overflow-wrap: anywhere; }
+.launch-rem-from { color: var(--text-muted); font-size: var(--fs-sm, 0.8125rem); }
+.launch-rem-chip { border: 1px solid var(--border); color: var(--text-secondary); }
+.launch-rem-chip-src { border-color: var(--accent); color: var(--link-text, var(--accent)); }
+.launch-rem-form { margin-top: 12px; padding: 14px; border: 1px solid var(--accent); border-radius: var(--card-radius, 10px); background: var(--card-fill, var(--bg-tertiary)); }
+.launch-rem-form h4 { margin: 0; }
+.launch-rem-remove { color: var(--error-text); }
+.launch-rem-count { margin-left: 6px; background: var(--bg-tertiary); color: var(--text-secondary); }

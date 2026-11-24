@@ -8,8 +8,8 @@ import { loadStyles } from './lazy_styles.js';
 const { scheduleWords, INTERVALS } = await importOnce('./chief_checks_model.js');
 await Promise.all([loadStyles('agent_reminders.css'), loadStyles('chief-checks.css')]); // not at start (page_weight)
 
-const KINDS = [['once', 'Once'], ['every', 'Repeat'], ['daily', 'Daily'], ['weekdays', 'Weekdays'], ['weekly', 'Weekly']];
-const DAYS = [['Mon', 'Monday'], ['Tue', 'Tuesday'], ['Wed', 'Wednesday'], ['Thu', 'Thursday'], ['Fri', 'Friday'], ['Sat', 'Saturday'], ['Sun', 'Sunday']];
+export const KINDS = [['once', 'Once'], ['every', 'Repeat'], ['daily', 'Daily'], ['weekdays', 'Weekdays'], ['weekly', 'Weekly']];
+export const DAYS = [['Mon', 'Monday'], ['Tue', 'Tuesday'], ['Wed', 'Wednesday'], ['Thu', 'Thursday'], ['Fri', 'Friday'], ['Sat', 'Saturday'], ['Sun', 'Sunday']];
 
 /** A reminder in Chief's words: "Every 15 minutes", "Daily at 09:00 · UTC", "Weekdays at 09:00 · UTC", "Once, 2026-11-18 09:00 · UTC". */
 export function whenWords(r) {
