@@ -23,8 +23,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(() => { const original = window.fetch, json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 const hex = n => n.toString(16).padStart(64, '0');
                 const item = (i, tags) => ({ id: hex(i), name: 'plan-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags, produced_by: 'Plan Writer', review_question: 'Ship plan ' + i + '?' });
-                const items = [item(1, ['for review']), item(2, ['for review', 'read']), item(3, ['for review'])]; window.__needsItems = items;
+                const items = [item(1, ['for review']), item(2, ['for review', 'read']), item(3, ['for review'])]; window.__needsItems = items; window.__bulkWrites = []; window.__bulkActionClicks = [];
+                document.addEventListener('click', e => { const action = e.target.closest('.dt-bar-action'); if (action) window.__bulkActionClicks.push(action.textContent.trim()); }, true);
                 window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
+                    if ((opts.method || 'GET') !== 'GET' && u.pathname.endsWith('/review')) window.__bulkWrites.push(u.pathname);
                     if ((opts.method || 'GET') === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     return original(url, opts); };
                 return true; })()`);
@@ -40,16 +42,24 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const after = await tops();
             check(after.bar && /1 selected/.test(after.text), at + 'the bar says 1 selected: ' + JSON.stringify(after));
             check(after.tops.length === before.tops.length && after.tops.every((t, i) => Math.abs(t - before.tops[i]) <= 1), at + 'ticking a row does not move the list (walk 23 H3): ' + JSON.stringify({ before: before.tops, after: after.tops }) + ' PROBE ' + JSON.stringify({b: before.tb, a: after.tb}));
+            // Check the reverse transition against the same four rows, before changing the fixture.
+            await ev(`document.querySelector('${T} tbody tr .dt-check input:checked').click(); true`); await ev(framesJs(4));
+            const unticked = await tops();
+            check(JSON.stringify(unticked.tops) === JSON.stringify(before.tops) && !unticked.bar, at + 'unticking restores the unchanged list: ' + JSON.stringify({ before: before.tops, back: unticked.tops, bar: unticked.bar }));
+            await ev(`document.querySelector('${T} tbody tr .dt-check input').click(); true`);
             // a ticked row that is gone is not still counted: tick two, answer one elsewhere (it leaves the feed), the count says 1
             await ev(`document.querySelectorAll('${T} tbody tr .dt-check input')[1].click(); true`); await ev(framesJs(3));
             check(/2 selected/.test((await tops()).text), at + 'two ticked say 2 selected: ' + JSON.stringify(await tops()));
             await ev(`{ const names = [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].filter(r => r.querySelector('.dt-check input')?.checked).map(r => r.textContent); const i = window.__needsItems.findIndex(a => names.some(n => n.includes(a.name))); if (i < 0) throw new Error('no ticked plan row: ' + names.join('|').slice(0, 200)); window.__needsItems.splice(i, 1); } import(${S} + 'inbox_reviews.js').then(async m => { m.reviewsChangedOnServer(); await m.refreshReviews(true); return import(${S} + 'inbox_tab.js'); }).then(m => m.selectInboxTab('needs')).then(() => true)`); await ev(framesJs(6));
             await waitFor(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length === 3`, at + 'the list without the answered row (rows: ' + await ev(`document.querySelectorAll('${T} tbody tr:not(.dt-group)').length`) + ')', 10000);
             const gone = await tops();
-            check(!gone.bar || /^1 selected/.test(gone.text), at + 'the count follows the rows that are left (1 selected, not 2): ' + JSON.stringify(gone));
-            await ev(`document.querySelector('${T} .dt-bar-clear, ${T} .dt-bar button')?.click(); true`);
-            await ev(`document.querySelector('${T} tbody tr .dt-check input').click(); true`); await ev(framesJs(4));
+            check(gone.bar && /^1 selected/.test(gone.text), at + 'the count follows the rows that are left (1 selected, not 2): ' + JSON.stringify(gone));
+            // A comma selector is not a fallback: '.dt-bar button' used to choose Approve
+            // before Done, racing its async failure/clear against the following checkbox click.
+            // Untick the sole remaining selection instead; this geometry test must not decide reviews.
+            await ev(`{ const checked = document.querySelectorAll('${T} tbody tr .dt-check input:checked'); if (checked.length !== 1) throw new Error('expected one remaining selection, got ' + checked.length); checked[0].click(); } true`); await ev(framesJs(4));
             const back = await tops();
+            check((await ev('window.__bulkActionClicks.length')) === 0 && (await ev('window.__bulkWrites.length')) === 0, at + 'selection geometry sends no review action or decision: ' + JSON.stringify(await ev('({ clicks: window.__bulkActionClicks, writes: window.__bulkWrites })')));
             check(JSON.stringify(back.tops) === JSON.stringify(before.tops.slice(0, back.tops.length)) && !back.bar, at + 'unticking it puts everything back: ' + JSON.stringify({ before: before.tops, back: back.tops, bar: back.bar }));
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
