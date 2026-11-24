@@ -10,7 +10,7 @@ coral-board remind add "Look at CI" --every 15m
 coral-board remind list | show <id> | done <id> | cancel <id>
 ```
 
-Times: `--in 2h`, `--at 2026-11-18 09:00` (one time, at most 364 days ahead), `--every 5m|15m|30m|60m`, `--daily HH:mm`, `--weekdays HH:mm`, `--weekly "Mon 09:00"` (one day a week, Mon to Sun, then the time; a week the clocks change still fires at 09:00 on the wall).
+Times: `--in 2h`, `--at 2026-11-18 09:00` (one time, at most 364 days ahead), `--every 5m|15m|30m|60m`, `--daily HH:mm`, `--weekdays HH:mm`, `--weekly "Mon 09:00"` (one day a week, `Mon` to `Sun`, then `HH:mm`; uses `--tz` or this computer's time zone, and a week the clocks change still fires at that local time on the wall. If Coral was off when a weekly slot came due, it fires once when Coral starts again).
 
 ## Who may do what
 
@@ -29,4 +29,4 @@ A one-time reminder fires once. If the computer was off at its time, it fires on
 
 ## From the Operator
 
-An agent's page (Team, Agents) has a Reminders section: its reminders with Cancel, and a form that adds a one-time reminder or a repeating one (every day, Monday to Friday, every 5, 15, 30 or 60 minutes). It is not available through Coral Hub.
+An agent's page (Team, Agents) has a Reminders section: its reminders with Cancel, and a form (**Instruction**, **Schedule**, **Repeat every**, **Day**, **Date and time** / **Time**, **Save reminder**) that adds a one-time reminder (**Once**) or a repeating one (**Repeat** every `5 minutes`, `15 minutes`, `30 minutes` or `Hour`; **Daily**; **Weekdays**; or **Weekly** on **Day** `Monday` to `Sunday` at **Time** in this computer's time zone). It is not available through Coral Hub.

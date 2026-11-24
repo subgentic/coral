@@ -51,6 +51,43 @@ The **By Thinking Level** table has a row per provider, model and level.
 
 The numbers come from `by_agent_type`, `by_model` and `by_thinking` in [Token Usage](token-usage.md).
 
+## Export cost as CSV and read Limit waits
+
+On the **Analytics** Overview page, the top bar has the time range select, the **Team** select (**All teams** or one team), **Refresh** and **Export CSV**.
+
+**Export CSV.** Press **Export CSV** to open the **Export cost as CSV** dialog:
+
+- Pick **By task** (`Task`, `Task ID`, `Team`, `Status`, `Agent`, `Started`, `Finished`, `Cost (USD)`, `New input tokens`, `Output tokens`, `Cache read tokens`, `Cache write tokens`) or **By goal** (`Goal`, `Goal ID`, `Tasks`, `Cost (USD)`, `New input tokens`, `Output tokens`, `Cache read tokens`, `Cache write tokens`).
+- Press **Download CSV** (or **Cancel**). The browser builds the file from the rows of the **By task** or **By goal** table for the chosen time range and team, with a `Total` row matching the page's **Total cost**, and downloads `coral-cost-by-<task|goal>-<period>[-<team>]-<YYYY-MM-DD>.csv`. When a team is selected in **Team**, only that team's tasks are included.
+
+**Limit waits.** On this computer's dashboard (not through Coral Hub), the **Limit waits** card on the **Analytics** Overview counts how often an agent was stopped by its vendor's usage limit and how it resumed, per agent and day:
+
+- Three summary counts: **limit waits**, **resumed at reset** and **resumed early** (*"Early" means Coral or you resumed the agent before the reset time the vendor gave.*).
+- A table (**Limit waits per agent and day**) with columns **Agent**, **Day**, **Waits**, **At reset** and **Early**. A wait is counted on the local day it started. Every agent of the team seen on a day that had a wait is listed, with `0` when that agent had no waits. Use the **Team** select in the top bar to filter the card to one team.
+
+## Start a team from a solo template
+
+In the **New team** dialog (**Members** step, under **Start from a template**), each built-in template is a tile showing its name, what the team does, what you do, and its role count. Alongside **Coding Team**, **Consumer Research** and **Dungeon Master**, five three-role templates are built for one person:
+
+- **Overnight run** (`Orchestrator`, `Builder`, `Checker`): *A planner, a builder and a checker work your goal through the night. You leave a goal at night; a morning summary waits in Needs you.* Launches with a daily `07:30` morning-summary reminder on the `Orchestrator`.
+- **Builder and reviewer** (`Orchestrator`, `Builder`, `Reviewer`): *One agent writes the change and an agent from another vendor reviews it. You give the goal and approve every change before it lands.*
+- **Bug sweep** (`Orchestrator`, `Reproducer`, `Fixer`): *One agent works through your issue list, one reproduces each bug and one fixes it. You point it at the issue list and read the daily summary of fixed and stuck items.* Launches with a daily `17:00` summary reminder on the `Orchestrator`.
+- **Docs and tests catch-up** (`Orchestrator`, `Test Writer`, `Docs Writer`): *A tests writer and a docs writer cover the code that changed this week. You get a weekly catch-up and review what it adds before it lands.* Launches with a weekly Monday `09:00` reminder on the `Orchestrator`.
+- **Research and write-up** (`Orchestrator`, `Researcher`, `Writer`): *A researcher gathers sources and a writer turns them into one report. You give the question and review the report before it is final.*
+
+You can also add or cancel reminders on any agent from the **Agents** tab of a team's page: open the agent's reminders editor, fill in **Instruction**, choose **Schedule** (**Once**, **Repeat**, **Daily**, **Weekdays** or **Weekly**), pick **Repeat every** or **Day** (`Monday` to `Sunday`) and **Date and time** / **Time** (in this computer's time zone), and press **Save reminder**.
+
+## Warn when a review is too big
+
+In a team's **Settings** tab, open **Review size guard** (this computer only, not through Coral Hub). It is **off by default** and warns without blocking:
+
+- **Warn when a change is too big to review**: turns the warning on. Set at least one limit below.
+- **Lines changed over** and **Files changed over**: whole numbers (`0` to `1,000,000` lines; `0` to `100,000` files). Either limit warns; leave one empty to use only the other.
+- **Skip these paths (not counted)**: comma-separated path patterns (for example `*.lock, **/generated/**`; `*`, `?` and `**` work).
+- **Applies to**: **Whole team** or **Only these roles** (then pick one or more **Roles**).
+
+When a task in review is over a limit for its author's role, the task page shows a **Large change.** banner above the task facts with the line and file counts, the team's limit, any skipped lines and files, and the note: *This is a warning only. You can still review and approve it.*
+
 ## Turn on the team health monitor
 
 A team's health check is **on by default** (a team that turned it off keeps it off). While it is on, Coral checks in on the team every few minutes (10 by default, 5 to 1440 in settings) to spot stuck or idle agents, and types one summary into one person's terminal: the orchestrator unless you pick another team member. It says who is idle, stuck or waiting, and what changed. **It uses tokens each time**, because the recipient's agent reads and answers it.

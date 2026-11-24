@@ -17,6 +17,29 @@ Open **Team view** from the team's controls to see members, observed activity, a
 
 Team settings include working-mode guidance such as shared checkout or worktrees. The guidance is attached when a task is first claimed; already-claimed tasks retain their instructions. Choosing worktree guidance does not itself create worktrees.
 
+### Solo team templates and weekly reminders
+
+Under **Start from a template** on the **Members** step of **New team**, each built-in template is a tile with its name, what the team does, what you do, and its role count. Alongside **Coding Team**, **Consumer Research** and **Dungeon Master**, five three-role templates are built for one person:
+
+- **Overnight run** (`Orchestrator`, `Builder`, `Checker`): *A planner, a builder and a checker work your goal through the night. You leave a goal at night; a morning summary waits in Needs you.* Starts with a daily `07:30` morning-summary reminder on the `Orchestrator`.
+- **Builder and reviewer** (`Orchestrator`, `Builder`, `Reviewer`): *One agent writes the change and an agent from another vendor reviews it. You give the goal and approve every change before it lands.*
+- **Bug sweep** (`Orchestrator`, `Reproducer`, `Fixer`): *One agent works through your issue list, one reproduces each bug and one fixes it. You point it at the issue list and read the daily summary of fixed and stuck items.* Starts with a daily `17:00` summary reminder on the `Orchestrator`.
+- **Docs and tests catch-up** (`Orchestrator`, `Test Writer`, `Docs Writer`): *A tests writer and a docs writer cover the code that changed this week. You get a weekly catch-up and review what it adds before it lands.* Starts with a weekly Monday `09:00` (`Mon 09:00`) reminder on the `Orchestrator`.
+- **Research and write-up** (`Orchestrator`, `Researcher`, `Writer`): *A researcher gathers sources and a writer turns them into one report. You give the question and review the report before it is final.*
+
+To add a weekly reminder from the dashboard (on an agent's Reminders section in **Team > Agents**), choose **Schedule > Weekly**, pick **Day** (`Monday` to `Sunday`) and **Time** (in this computer's time zone), and choose **Save reminder**. From the command line, run `coral-board remind add "<text>" --weekly "Mon 09:00"` (with optional `--tz <zone>`).
+
+### Review size guard
+
+In a team's **Settings** tab, open **Review size guard** (on this computer only, not through Coral Hub) to warn reviewers when a task in review has a large diff. It is **off by default** and warns without blocking:
+
+- **Warn when a change is too big to review**: turns the warning on or off.
+- **Lines changed over** (`0` to `1,000,000`) and **Files changed over** (`0` to `100,000`): whole numbers. Either limit warns; leave one empty to check only the other.
+- **Skip these paths (not counted)**: comma-separated path patterns (such as `*.lock, **/generated/**`; `*`, `?` and `**` work).
+- **Applies to**: **Whole team** or **Only these roles** (then select one or more **Roles**).
+
+When a task in review exceeds a limit for its author's role, the task page shows a **Large change.** warning banner above the task details with the changed lines and files, your team's limit, any skipped lines and paths, and the note: *This is a warning only. You can still review and approve it.*
+
 ## Create and inspect tasks
 
 From the team's task list, create a task with a clear title and description. Choose a priority and, optionally, an assignee. You can also save a draft and use **Publish** when it is ready for the queue.

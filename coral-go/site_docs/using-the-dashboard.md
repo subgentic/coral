@@ -53,6 +53,20 @@ The **By Thinking Level** table has a row per provider, model and level.
 
 The numbers come from `by_agent_type`, `by_model` and `by_thinking` in [Token usage](https://github.com/subgentic/coral/blob/main/coral-go/agent_docs/token-usage.md).
 
+## Export cost as CSV and read Limit waits
+
+On the **Analytics** Overview page, the top bar has the time range select, the **Team** select (**All teams** or one team), **Refresh** and **Export CSV**.
+
+**Export CSV.** Press **Export CSV** to open the **Export cost as CSV** dialog:
+
+- Pick **By task** (`Task`, `Task ID`, `Team`, `Status`, `Agent`, `Started`, `Finished`, `Cost (USD)`, `New input tokens`, `Output tokens`, `Cache read tokens`, `Cache write tokens`) or **By goal** (`Goal`, `Goal ID`, `Tasks`, `Cost (USD)`, `New input tokens`, `Output tokens`, `Cache read tokens`, `Cache write tokens`).
+- Press **Download CSV** (or **Cancel**). The browser builds the file from the rows of the **By task** or **By goal** table for the chosen time range and team, with a `Total` row matching the page's **Total cost**, and downloads `coral-cost-by-<task|goal>-<period>[-<team>]-<YYYY-MM-DD>.csv`. When a team is selected in **Team**, only that team's tasks are included.
+
+**Limit waits.** On this computer's dashboard (not through Coral Hub), the **Limit waits** card on the **Analytics** Overview counts how often an agent was stopped by its vendor's usage limit and how it resumed, per agent and day:
+
+- Three summary counts: **limit waits**, **resumed at reset** and **resumed early** (*"Early" means Coral or you resumed the agent before the reset time the vendor gave.*).
+- A table (**Limit waits per agent and day**) with columns **Agent**, **Day**, **Waits**, **At reset** and **Early**. A wait is counted on the local day it started. Every agent of the team seen on a day that had a wait is listed, with `0` when that agent had no waits. Use the **Team** select in the top bar to filter the card to one team.
+
 ## Turn on the team health monitor
 
 A team's health check is **off by default**. When it is on, Coral checks in on the team every few minutes (10 by default, 5 to 1440 in settings) to spot stuck or idle agents, and types one summary into one person's terminal: the orchestrator unless you pick another team member. It says who is idle, stuck or waiting, and what changed. **It uses tokens each time**, because the recipient's agent reads and answers it.

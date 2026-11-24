@@ -50,6 +50,7 @@ Each entry in the `agents` array defines one agent.
 | `max_turns` | integer | No | Override default max_turns. |
 | `working_dir` | string | No | Override working directory for this agent. |
 | `cli_path` | string | No | Custom path to agent binary. |
+| `reminders` | array | No | Optional reminders created for this member when a person launches the team (`kind`: `"every"`, `"daily"`, `"weekdays"`, or `"weekly"`; `at`: `"HH:mm"` or `"Mon 09:00"` for `"weekly"`; `every_minutes`: `15`, `30`, or `60`; optional `timezone`, defaulting to this computer's time zone; `text`: instruction). Capped at 5 per role and 20 per agent. Launching as an agent creates none. |
 
 ## Override Rules
 

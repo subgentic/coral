@@ -12,6 +12,7 @@ Read token and cost records captured by Coral's agent usage hooks.
 | `GET` | `/api/token-usage/timeseries` | Bucketed cost and tokens; `interval` accepts `5m`, `1h`, or `1d` and defaults to `1h` for a range of up to 7 days and to `1d` for a longer one (no `since` is all history, so `1d`); optional `since`. |
 | `GET` | `/api/token-usage/by-team` | Usage grouped by board/team; optional `since`. |
 | `GET` | `/api/token-usage/by-branch` | Usage grouped by repository branch; optional `since` and exact `branch`. |
+| `GET` | `/api/analytics/limit-waits` | Limit waits per agent and day for the Cost page's **Limit waits** card: `days` (1 to 90, default 7) and optional `team` (board name). Operator only on this computer (403 for an agent token; not served through Coral Hub). Returns `{days_asked, team, generated_at, tracking, totals: {waits, at_reset, early}, rows: [{agent, day, waits, at_reset, early}], waiting, teams}` using this computer's local day. |
 
 **An agent's session token** gets 403 `forbidden_for_agent` on `GET /api/token-usage` (the list: every session's records) and `GET /api/token-usage/by-branch`; both are the Operator's. `GET /api/token-usage/session/{sessionID}/turns` answers it for its own session and the sessions on its own board, and 403 `forbidden_other_session` for another. The Operator, the dashboard and the command line are not limited.
 

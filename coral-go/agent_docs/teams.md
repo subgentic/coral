@@ -352,6 +352,33 @@ permissions remain enforced regardless of these settings.
 
 The built-in **Coding Team** template of the Agent Team dialog is an Orchestrator with a Lead Developer, a QA Engineer, a DevOps Engineer, a Frontend Dev, a Backend Dev and a Security Reviewer, and it starts the team in the Task queue mode. The Working mode on the dialog's Start step shows it and can be changed before the launch; the other built-in templates start at None.
 
+### Built-in team templates and solo templates
+
+In the New team dialog (**Members** step, under **Start from a template**), each built-in template appears as a tile with its name, a two-line description (what the team does and what you do), and its role count. **Blank team**, **Default team (3 members)**, and your saved templates remain in the template select.
+
+Besides **Coding Team** (7 roles), **Consumer Research** (12 roles) and **Dungeon Master** (7 roles), Coral includes five three-role templates for one person working with a small team. When you launch a template from the dashboard, any reminder on a role is created as your reminder for that agent in this computer's time zone (an agent launch creates none):
+
+| Template | Roles | What it does / What you do | Built-in reminder on Orchestrator |
+|---|---|---|---|
+| **Overnight run** | `Orchestrator`, `Builder`, `Checker` | *A planner, a builder and a checker work your goal through the night.* / *You leave a goal at night; a morning summary waits in Needs you.* | Daily at `07:30`: posts a one-screen morning summary to Needs you. |
+| **Builder and reviewer** | `Orchestrator`, `Builder` (`claude`), `Reviewer` (`codex`) | *One agent writes the change and an agent from another vendor reviews it.* / *You give the goal and approve every change before it lands.* | None. Every change waits for the Reviewer and your approval before it lands. |
+| **Bug sweep** | `Orchestrator`, `Reproducer`, `Fixer` | *One agent works through your issue list, one reproduces each bug and one fixes it.* / *You point it at the issue list and read the daily summary of fixed and stuck items.* | Daily at `17:00`: posts a one-screen daily summary of fixed, stuck, and next issues to Needs you. |
+| **Docs and tests catch-up** | `Orchestrator`, `Test Writer`, `Docs Writer` | *A tests writer and a docs writer cover the code that changed this week.* / *You get a weekly catch-up and review what it adds before it lands.* | Weekly on Monday at `09:00` (`Mon 09:00`): lists code changed in the last 7 days and assigns missing tests and docs. |
+| **Research and write-up** | `Orchestrator`, `Researcher`, `Writer` | *A researcher gathers sources and a writer turns them into one report.* / *You give the question and review the report before it is final.* | None. The Writer submits one cited report for your review. |
+
+### Review size guard
+
+In Team settings, the **Review size guard** tab warns reviewers when a task in review has a large diff. It is **off by default** and never blocks or rejects a review:
+
+- **Warn when a change is too big to review**: turns the warning on or off. When it is on, set at least one limit (**Lines changed over** or **Files changed over**).
+- **Lines changed over** (`0` to `1,000,000`) and **Files changed over** (`0` to `100,000`): whole numbers. Either limit triggers the warning; leave one empty (or `0` in the API) to check only the other.
+- **Skip these paths (not counted)**: comma-separated path patterns (up to 50 patterns, 200 characters each, using `*`, `?` and `**`, such as `*.lock, **/generated/**`). Matching files and their changed lines are excluded from the count.
+- **Applies to**: **Whole team** or **Only these roles** (with **Roles** selecting up to 50 team roles).
+
+When a task is in `review_pending` and exceeds a limit for its author's role, the task page shows a warning banner above the task details: **Large change.** *`<N> lines in <M> files; your team's limit is <limit>. [<K> lines in <P> skipped paths are not counted.] This is a warning only. You can still review and approve it.`*
+
+The API endpoints (`GET` and `PUT /api/board/{project}/review-size` for the team's Orchestrator or the Operator; `GET /api/board/{project}/tasks/{taskID}/review-size` for the task verdict) are local to this computer and are not served through Coral Hub.
+
 For a small documentation correction, `none` with no dependency guidance may be
 sufficient. For two developers in one checkout, choose `shared_checkout` and
 agree which files each owns. For parallel branches, choose `worktrees` and
