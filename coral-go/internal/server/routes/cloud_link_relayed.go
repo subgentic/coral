@@ -220,3 +220,14 @@ func (j jsonRaw) MarshalJSON() ([]byte, error) {
 	}
 	return j, nil
 }
+
+// relayedReadOK is the check of the owner's two plain reads through a Hub (#20966): the gate is open, the request came through a link, and its Hub person is the owner the link confirmed (the table's owner rule,
+// asked again). The reads need no device signature; they hold no secret. false has the reason written.
+func (h *CloudHandler) relayedReadOK(w http.ResponseWriter, r *http.Request) bool {
+	via, tun := cloud.ViaFrom(r.Context())
+	if !tunnel.LinkRelayedIsOpen() || !tun || !tunnel.ValidLinkID(via.LinkID) {
+		errForbidden(w, "that is done at this computer")
+		return false
+	}
+	return !refuseNonOwner(w, r)
+}

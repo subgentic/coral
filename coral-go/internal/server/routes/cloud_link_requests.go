@@ -119,7 +119,11 @@ type linkRequestView struct {
 
 // LinkRequestFeed: GET /api/cloud/link-requests. The waiting requests, for the card: the Hub's address (Hub B's one supplied word) and the access it asked. No secret, no code.
 func (h *CloudHandler) LinkRequestFeed(w http.ResponseWriter, r *http.Request) {
-	if h.linkRequestHuman(w, r) {
+	if cloud.Tunneled(r) { // the owner's read through a Hub, behind a gate that ships shut (#20966); the same words, no more
+		if !h.relayedReadOK(w, r) {
+			return
+		}
+	} else if h.linkRequestHuman(w, r) {
 		return
 	}
 	ps, err := h.links.PendingLinkRequests(r.Context(), time.Now())

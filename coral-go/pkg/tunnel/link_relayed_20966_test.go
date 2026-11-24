@@ -30,7 +30,7 @@ func TestLinkRoutesAreShutUntilTheRelayedGateOpens(t *testing.T) {
 		assert.True(t, ForwardsDeviceHeaders(r.method, r.path), "%s %s", r.method, r.path)
 	}
 	// Nothing else of the join is a Hub's, open or shut.
-	for _, r := range [][2]string{{http.MethodPost, "/api/cloud/link-requests/lr-1/deny"}, {http.MethodGet, "/api/cloud/link-requests"}, {http.MethodGet, "/api/cloud/link-keys"},
+	for _, r := range [][2]string{{http.MethodPost, "/api/cloud/link-requests/lr-1/deny"},
 		{http.MethodPost, "/api/cloud/link-requests"}, {http.MethodPost, "/api/cloud/link-requests/lr-1/finish"}, {http.MethodGet, "/api/cloud/link-requests/lr-1"}} {
 		assert.Equal(t, TierNever, Classify(r[0], r[1], ""), "%s %s stays this computer's", r[0], r[1])
 	}
@@ -49,4 +49,20 @@ func TestTheTwoGatesAreIndependent(t *testing.T) {
 	assert.Equal(t, TierNever, Classify(http.MethodPost, "/api/member-grants", ""), "opening the join's gate opens no member route")
 	assert.False(t, MemberRelayedIsOpen())
 	assert.False(t, strings.Contains(strings.Join(RoutePatterns(), "\n"), "POST /api/member-grants "), "and the table does not list it")
+}
+
+// The two reads the owner's Inbox needs to Allow through a Hub (the Orchestrator's call on #20966): the waiting requests and the keys this link made. Plain reads, no device signature, no query; owner only, Interact.
+func TestTheOwnersTwoJoinReadsAreShutUntilTheGateOpensAndTakeNoQuery(t *testing.T) {
+	reads := []string{"/api/cloud/link-requests", "/api/cloud/link-keys"}
+	for _, p := range reads {
+		assert.Equal(t, TierNever, Classify(http.MethodGet, p, ""), "GET %s shut", p)
+	}
+	OpenLinkRelayedForTest(t)
+	for _, p := range reads {
+		assert.Equal(t, TierInteract, Classify(http.MethodGet, p, ""), "GET %s open", p)
+		_, mode := OwnerRoute(http.MethodGet, p)
+		assert.Equal(t, OwnerHubOnly, mode, "GET %s is the owner's", p)
+		assert.False(t, IsRelayedRoute(http.MethodGet, p), "a read carries no device signature")
+		assert.Equal(t, TierNever, Classify(http.MethodGet, p, "x=1"), "GET %s takes no query", p)
+	}
 }

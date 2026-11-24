@@ -81,10 +81,17 @@ func (h *CloudHandler) LinkKeyCreate(w http.ResponseWriter, r *http.Request) {
 
 // LinkKeyList: GET /api/cloud/link-keys.
 func (h *CloudHandler) LinkKeyList(w http.ResponseWriter, r *http.Request) {
-	if h.linkRequestHuman(w, r) {
+	list := h.links.ListLinkKeys
+	if cloud.Tunneled(r) { // the owner's read through a Hub, behind a gate that ships shut (#20966): only the keys this link made
+		if !h.relayedReadOK(w, r) {
+			return
+		}
+		via, _ := cloud.ViaFrom(r.Context())
+		list = func(ctx context.Context) ([]store.LinkKey, error) { return h.links.ListLinkKeysVia(ctx, via.LinkID) }
+	} else if h.linkRequestHuman(w, r) {
 		return
 	}
-	ks, err := h.links.ListLinkKeys(r.Context())
+	ks, err := list(r.Context())
 	if err != nil {
 		errInternalServer(w, "Could not read the keys")
 		return

@@ -322,3 +322,67 @@ func (g *linkRig) ownerKeyOfMode(mode string) (*ecdsa.PrivateKey, string) {
 	require.NoError(g.t, err)
 	return priv, kid
 }
+
+// get is a Hub's plain read as the connector hands it over: no device signature, the owner's stamp (or another person's).
+func (g *linkRig) get(target, actor string) *httptest.ResponseRecorder {
+	h := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.ActorHeader: actor}
+	if actor == relayOwner {
+		h[tunnel.HubRoleHeader] = "owner"
+		h[tunnel.HubUserHeader] = relayOwner
+	}
+	return call(g.d.r.srv.Router(), "GET", target, "", h)
+}
+
+func TestTheOwnerReadsTheWaitingRequestsAndItsLinksKeysThroughTheHubAndNothingSecret(t *testing.T) {
+	g := newLinkRig(t, true)
+	id := g.pending(t, "interact")
+	_, polled, err := g.cs.CreateLinkRequest(context.Background(), "https://hub-d.example.com", "view", "", time.Now())
+	require.NoError(t, err)
+	b := newBrowser(t)
+	rec, nonce := g.makeKey(t, "Hub C", b, nil)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	var made struct {
+		ID  string
+		Box json.RawMessage
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &made))
+	key, err := b.open(t, made.Box, "make-link-key", nonce, made.ID)
+	require.NoError(t, err)
+	_, _, err = g.cs.CreateLinkKey(context.Background(), "At the computer", time.Now()) // another place made it: not this link's
+	require.NoError(t, err)
+
+	feed := g.get("/api/cloud/link-requests", relayOwner)
+	require.Equal(t, 200, feed.Code, feed.Body.String())
+	var fv struct {
+		Requests []map[string]any `json:"requests"`
+	}
+	require.NoError(t, json.Unmarshal(feed.Body.Bytes(), &fv))
+	require.Len(t, fv.Requests, 2)
+	assert.Equal(t, id, fv.Requests[0]["id"])
+	assert.Equal(t, "https://hub-c.example.com", fv.Requests[0]["hub"])
+	for _, k := range []string{"id", "hub", "cap_asked", "created_at", "expires_at", "links", "max"} {
+		assert.Contains(t, fv.Requests[0], k)
+	}
+	assert.NotContains(t, feed.Body.String(), polled, "never the poll secret")
+	assert.NotRegexp(t, `"(code|poll_secret|secret)"`, feed.Body.String())
+
+	list := g.get("/api/cloud/link-keys", relayOwner)
+	require.Equal(t, 200, list.Code, list.Body.String())
+	assert.Contains(t, list.Body.String(), "Hub C")
+	assert.NotContains(t, list.Body.String(), "At the computer", "only the keys this link made")
+	assert.NotContains(t, list.Body.String(), key)
+	assert.NotContains(t, list.Body.String(), strings.TrimPrefix(key, "lrk_"))
+	assert.NotRegexp(t, `"(key|box)"`, list.Body.String())
+
+	assert.NotEqual(t, 200, g.get("/api/cloud/link-requests", relayPerson).Code, "a Hub person who is not the owner")
+	assert.NotEqual(t, 200, g.get("/api/cloud/link-keys", relayPerson).Code)
+}
+
+func TestTheTwoReadsAreRefusedThroughAHubWhileTheGateIsShut(t *testing.T) {
+	g := newLinkRig(t, false)
+	for _, p := range []string{"/api/cloud/link-requests", "/api/cloud/link-keys"} {
+		rec := g.get(p, relayOwner)
+		assert.Equal(t, 403, rec.Code, p)
+		assert.Contains(t, rec.Body.String(), "hub_route_refused")
+	}
+}

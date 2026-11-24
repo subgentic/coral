@@ -172,6 +172,19 @@ func (s *CloudStore) ListLinkKeys(ctx context.Context) ([]LinkKey, error) {
 	return out, nil
 }
 
+// ListLinkKeysVia are the live keys one Hub link made (#20966), oldest first: what that link's owner may see of the keys. Never a key or a hash.
+func (s *CloudStore) ListLinkKeysVia(ctx context.Context, link string) ([]LinkKey, error) {
+	var rows []linkKeyRow
+	if err := s.db.SelectContext(ctx, &rows, `SELECT key_id, name, key_salt, key_hash, created_at, last_used_at FROM cloud_link_key WHERE revoked_at = '' AND via_link = ? AND via_link <> '' ORDER BY rowid`, link); err != nil {
+		return nil, err
+	}
+	out := make([]LinkKey, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.view())
+	}
+	return out, nil
+}
+
 // RevokeLinkKeyVia ends a key for a Hub's owner (#20966): only one that same link made. Another link's key, a key made at this computer and a key that is not there are the same ErrLinkKeyNone, so a Hub learns nothing
 // about its neighbours.
 func (s *CloudStore) RevokeLinkKeyVia(ctx context.Context, id, link string, now time.Time) error {

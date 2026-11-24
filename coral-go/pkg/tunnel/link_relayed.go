@@ -36,6 +36,8 @@ func OpenLinkRelayedForTest(t interface{ Cleanup(func()) }) {
 var linkRelayedRoutes = owner(OwnerHubOnly,
 	rules(http.MethodPost, TierInteract, "/api/cloud/link-requests/{id}/allow", "/api/cloud/link-keys"),
 	rules(http.MethodDelete, TierInteract, "/api/cloud/link-keys/{id}"),
+	// The two reads the owner's Inbox needs to Allow through a Hub (#20966): the waiting requests, and the keys this link made. Plain reads: no device signature, no query.
+	rules(http.MethodGet, TierInteract, "/api/cloud/link-requests", "/api/cloud/link-keys"),
 )
 
 var (
