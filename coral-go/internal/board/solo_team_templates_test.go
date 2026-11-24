@@ -68,3 +68,33 @@ func requireTwoLineDescription(t *testing.T, block string) {
 	require.NotNil(t, m, "two lines, as the tiles read them: does (what the team does) and you (what you do)")
 	require.Regexp(t, `^You `, m[2], "the second line is what you do")
 }
+
+// Brief task 8 (#21058): the next three solo templates. Each has an Orchestrator (the Members step needs one) and two roles named by what they do, two lines for its card, and no
+// working mode; Bug sweep and Docs and tests catch-up carry their reminder on the Orchestrator, Research and write-up has none.
+func TestTheNextThreeSoloTemplates(t *testing.T) {
+	src := frontendSource(t, "team_templates_ui.js")
+	for _, c := range []struct {
+		name     string
+		members  []string
+		reminder string // a pattern for the one reminder, "" for none
+	}{
+		{"Bug sweep", []string{"Orchestrator", "Reproducer", "Fixer"}, `text: "Daily summary: [^"]*Needs you[^"]*", kind: "daily", at: "[0-2][0-9]:[0-5][0-9]"`},
+		{"Docs and tests catch-up", []string{"Orchestrator", "Test Writer", "Docs Writer"}, `text: "Weekly catch-up, Mondays only: [^"]*", kind: "weekdays", at: "[0-2][0-9]:[0-5][0-9]"`},
+		{"Research and write-up", []string{"Orchestrator", "Researcher", "Writer"}, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			block := templateBlock(t, src, c.name)
+			require.Equal(t, c.members, memberNames(block))
+			requireTwoLineDescription(t, block)
+			require.NotRegexp(t, `\bmode: "`, block)
+			if c.reminder == "" {
+				require.NotContains(t, block, "reminders:")
+				require.Contains(t, block, "review", "the report goes to the person for review")
+				return
+			}
+			require.Equal(t, 1, strings.Count(block, "reminders:"))
+			require.Regexp(t, `reminders: \[\{ `+c.reminder+` \}\]`, block)
+			require.Less(t, strings.Index(block, "reminders:"), strings.Index(block, `name: "`+c.members[1]+`"`), "the Orchestrator's")
+		})
+	}
+}
