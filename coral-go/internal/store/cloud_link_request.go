@@ -39,7 +39,7 @@ var (
 	ErrLinkRequestCap   = errors.New("a Hub cannot be given more than it asked for")
 	ErrLinkRequestBusy  = errors.New("too many requests waiting")
 	ErrLinkRequestRate  = errors.New("too many requests in the last hour")
-	ErrLinkRequestMuted = errors.New("that Hub's requests were denied twice: it may ask again in an hour")
+	ErrLinkRequestMuted = errors.New("that Hub's requests were denied twice, or ended by wrong codes (a run of wrong codes counts as guessing): it may ask again in an hour")
 )
 
 // LinkRequest is a request as the Needs-you feed and the Hub's status see it. Never the poll secret or the code.
@@ -121,11 +121,19 @@ func (s *CloudStore) CreateLinkRequest(ctx context.Context, hub, linkCap, cred s
 	if err := s.CheckCanAddLink(ctx); err != nil {
 		return "", "", err
 	}
-	s.expireLinkRequests(ctx, now)
+	// One write-first transaction from the first count to the insert, so two creates at once cannot both pass a limit (QA's SHOULD 2 on #20936). The connection is single, so nothing else runs in between.
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return "", "", err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	if _, err := tx.ExecContext(ctx, `UPDATE cloud_link_request SET state = 'expired', ended_at = ? WHERE state IN ('pending','allowed') AND expires_at <= ?`, lrTime(now), lrTime(now)); err != nil {
+		return "", "", err
+	}
 	hourAgo := lrTime(now.Add(-time.Hour))
 	count := func(q string, args ...any) (int, error) {
 		var n int
-		err := s.db.GetContext(ctx, &n, q, args...)
+		err := tx.GetContext(ctx, &n, q, args...)
 		return n, err
 	}
 	denied, err := count(`SELECT COUNT(*) FROM cloud_link_request WHERE hub_origin = ? AND state = 'denied' AND ended_at >= ?`, origin, lrTime(now.Add(-linkRequestMuteFor)))
@@ -169,9 +177,11 @@ func (s *CloudStore) CreateLinkRequest(ctx context.Context, hub, linkCap, cred s
 		return "", "", err
 	}
 	id = "req-" + idHex
-	_, err = s.db.ExecContext(ctx, `INSERT INTO cloud_link_request (request_id, hub_origin, cap_asked, state, cred_id, poll_salt, poll_hash, created_at, expires_at)
-		VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`, id, origin, linkCap, cred, salt, lrHash(salt, pollSecret), lrTime(now), lrTime(now.Add(LinkRequestPendingTTL)))
-	if err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO cloud_link_request (request_id, hub_origin, cap_asked, state, cred_id, poll_salt, poll_hash, created_at, expires_at)
+		VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`, id, origin, linkCap, cred, salt, lrHash(salt, pollSecret), lrTime(now), lrTime(now.Add(LinkRequestPendingTTL))); err != nil {
+		return "", "", err
+	}
+	if err := tx.Commit(); err != nil {
 		return "", "", err
 	}
 	return id, pollSecret, nil

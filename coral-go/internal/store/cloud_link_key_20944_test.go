@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -106,4 +109,32 @@ func TestRequestLimitsCountPerKey(t *testing.T) {
 	assert.ErrorIs(t, err, ErrLinkRequestBusy, "key A is at its limit")
 	_, _, err = cs.CreateLinkRequest(ctx, "https://hub-y.example.com", "view", b, now)
 	assert.NoError(t, err, "key B has its own")
+}
+
+// QA's SHOULD 2 on #20936: the count and the insert are one write-first transaction, so two creates at once for one Hub cannot both pass the one-waiting limit.
+func TestTwoCreatesAtOnceForOneHubMakeOneRequest(t *testing.T) {
+	cs, ctx, now := keyRig(t)
+	var wg sync.WaitGroup
+	var made, busy atomic.Int32
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _, err := cs.CreateLinkRequest(ctx, "https://hub-race.example.com", "view", "", now)
+			switch {
+			case err == nil:
+				made.Add(1)
+			case errors.Is(err, ErrLinkRequestBusy):
+				busy.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	assert.EqualValues(t, 1, made.Load())
+	assert.EqualValues(t, 7, busy.Load())
+}
+
+// A run of wrong codes is guessing, so it counts toward the mute, and the refusal says so.
+func TestTheMuteSaysWrongCodesCountToo(t *testing.T) {
+	assert.Contains(t, ErrLinkRequestMuted.Error(), "wrong codes")
 }
