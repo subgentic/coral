@@ -81,6 +81,7 @@ GET /api/board/{project}/proposals | board-claims | operator-only
 GET /api/board/{project}/queue | board-claims
 GET /api/board/{project}/relay-targets | board-claims
 GET /api/board/{project}/reminder | board-claims | operator-only
+GET /api/board/{project}/review-size | board-claims +token-session
 GET /api/board/{project}/search | board-claims
 GET /api/board/{project}/settings | board-claims
 GET /api/board/{project}/settings/log | board-claims +token-session | operator-only
@@ -93,6 +94,7 @@ GET /api/board/{project}/tasks/{taskID}/artifact-content | board-claims
 GET /api/board/{project}/tasks/{taskID}/changes.diff | board-claims
 GET /api/board/{project}/tasks/{taskID}/cost | board-claims
 GET /api/board/{project}/tasks/{taskID}/history | board-claims
+GET /api/board/{project}/tasks/{taskID}/review-size | board-claims
 GET /api/board/{project}/waits | board-claims
 GET /api/board/{project}/waits/poll | board-claims
 GET /api/board/{project}/working-mode | board-claims
@@ -323,6 +325,7 @@ PUT /api/board/{project}/guide-roster | board-claims | operator-only
 PUT /api/board/{project}/health/checks/{name} | board-claims +token-session
 PUT /api/board/{project}/health/settings | board-claims +token-session
 PUT /api/board/{project}/orchestrator-grant | board-claims | operator-only
+PUT /api/board/{project}/review-size | board-claims +token-session
 PUT /api/board/{project}/settings | board-claims +token-session | operator-only
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | board-claims | operator-only
 PUT /api/board/{project}/tasks/{taskID}/goal | board-claims

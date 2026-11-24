@@ -247,10 +247,25 @@ func (h *BoardHandler) TaskChangesDiff(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid task ID")
 		return
 	}
+	_, data, ok := h.taskDiff(w, r, project, taskID)
+	if !ok {
+		return
+	}
+	if cloud.Tunneled(r) {
+		data = safeDiff(data) // through Coral Hub: filtered and capped, old diffs too (#3555)
+	}
+	w.Header().Set("Content-Type", "text/x-diff; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="changes.diff"`)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+// taskDiff finds a task and reads the patch kept for it (what TaskChangesDiff serves and the review size verdict counts). It answers the error itself and reports false when there is nothing to serve.
+func (h *BoardHandler) taskDiff(w http.ResponseWriter, r *http.Request, project string, taskID int64) (*board.Task, []byte, bool) {
 	tasks, err := h.bs.ListTasks(r.Context(), project)
 	if err != nil {
 		errInternalServer(w, err.Error())
-		return
+		return nil, nil, false
 	}
 	var found *board.Task
 	for i := range tasks {
@@ -261,11 +276,11 @@ func (h *BoardHandler) TaskChangesDiff(w http.ResponseWriter, r *http.Request) {
 	}
 	if found == nil {
 		errNotFound(w, "task not found")
-		return
+		return nil, nil, false
 	}
 	if h.coralDir == "" {
 		errNotFound(w, "task changes artifact not found")
-		return
+		return nil, nil, false
 	}
 	// The diff is kept by board and id. It must have been written after the task was made: a file older than the task is an older task's under a repeated id (#6948). A diff kept by id alone, before the
 	// board key, is not read: such a task shows no changes.diff.
@@ -279,7 +294,7 @@ func (h *BoardHandler) TaskChangesDiff(w http.ResponseWriter, r *http.Request) {
 			b, rerr := os.ReadFile(path)
 			if rerr != nil && !os.IsNotExist(rerr) {
 				errInternalServer(w, rerr.Error())
-				return
+				return nil, nil, false
 			}
 			if rerr == nil {
 				data, served = b, true
@@ -288,15 +303,9 @@ func (h *BoardHandler) TaskChangesDiff(w http.ResponseWriter, r *http.Request) {
 	}
 	if !served {
 		errNotFound(w, "task changes artifact not found")
-		return
+		return nil, nil, false
 	}
-	if cloud.Tunneled(r) {
-		data = safeDiff(data) // through Coral Hub: filtered and capped, old diffs too (#3555)
-	}
-	w.Header().Set("Content-Type", "text/x-diff; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="changes.diff"`)
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(data)
+	return found, data, true
 }
 
 // TaskLiveCost returns real-time cost for a task by querying proxy_requests

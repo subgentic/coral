@@ -154,6 +154,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/board/{project}/groups/{groupID}/members":                   "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/health/ack":                                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"PUT /api/board/{project}/health/settings":                             "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
+	"PUT /api/board/{project}/review-size":                                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"DELETE /api/board/{project}/health/checks/{name}":                     "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/health/checks":                              "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/health/checks/{name}/pause":                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
