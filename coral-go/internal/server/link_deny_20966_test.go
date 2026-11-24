@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,6 +100,20 @@ func TestEveryRelayedJoinKindAsksTheOwnerCheckInsideRelayedLink(t *testing.T) {
 		assert.NotEqual(t, 200, rec.Code, "%s: %s", name, rec.Body.String())
 	}
 	assert.Empty(t, g.keys())
+	st, _ := g.cs.LinkRequestByID(context.Background(), id, time.Now())
+	assert.Equal(t, "pending", st.State)
+}
+
+// #20979: a one-time key of the right form that cannot seal (all zero bytes, a point of small order) is refused before anything is made or allowed: a value nobody can read is never created.
+func TestAKeyThatCannotSealMakesNothingAndAllowsNothing(t *testing.T) {
+	g := newLinkRig(t, true)
+	zero := browser{pk: strings.Repeat("A", 43)}
+	rec, _ := g.makeKey(t, "Hub C", zero, nil)
+	assert.Equal(t, 400, rec.Code, rec.Body.String())
+	assert.Empty(t, g.keys())
+	id := g.pending(t, "interact")
+	rec = g.do(devicekey.AllowLink, "POST", "/api/cloud/link-requests/"+id+"/allow?box_pk="+zero.pk, `{"cap":"view"}`, "", nil)
+	assert.Equal(t, 400, rec.Code, rec.Body.String())
 	st, _ := g.cs.LinkRequestByID(context.Background(), id, time.Now())
 	assert.Equal(t, "pending", st.State)
 }

@@ -77,7 +77,7 @@ func relayedLink(w http.ResponseWriter, r *http.Request, kind devicekey.Kind) (c
 		return c, false
 	}
 	pm, pok := tunnel.ParseMode(mode)
-	if !found || !pok || pm < tunnel.TierInteract {
+	if !pok || pm < tunnel.TierInteract {
 		errForbidden(w, "that device's access setting is lower than this needs: sign with a device that has interact access")
 		return c, false
 	}

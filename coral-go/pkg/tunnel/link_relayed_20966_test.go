@@ -66,3 +66,15 @@ func TestTheOwnersTwoJoinReadsAreShutUntilTheGateOpensAndTakeNoQuery(t *testing.
 		assert.Equal(t, TierNever, Classify(http.MethodGet, p, "x=1"), "GET %s takes no query", p)
 	}
 }
+
+// #20979: the box key's form is checked here as well as in devicekey.MatchRoute: a short, long or non-base64url key is never a route through the table.
+func TestTheTableRefusesABoxKeyThatIsNotExactlyFortyThreeBase64urlCharacters(t *testing.T) {
+	OpenLinkRelayedForTest(t)
+	good := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	for _, p := range []string{"/api/cloud/link-requests/lr-1/allow", "/api/cloud/link-keys"} {
+		assert.Equal(t, TierInteract, Classify(http.MethodPost, p, "box_pk="+good), p)
+		for name, q := range map[string]string{"short": "box_pk=" + good[:42], "long": "box_pk=" + good + "A", "not base64url": "box_pk=" + good[:42] + "+", "empty": "box_pk="} {
+			assert.Equal(t, TierNever, Classify(http.MethodPost, p, q), "%s %s", p, name)
+		}
+	}
+}
