@@ -58,7 +58,7 @@ func Gather(ctx context.Context, src LiveSource, c ViewChoice) (Input, error) {
 	}
 	var in Input
 	for _, r := range rows {
-		in.Agents = append(in.Agents, AgentFacts{RealName: r.Name, Role: r.Role, Status: StatusFrom(r), TaskTitle: r.TaskTitle, Shown: r.Key != "" && c.Shown[r.Key]})
+		in.Agents = append(in.Agents, AgentFacts{RealName: r.Name, Role: r.Role, Status: StatusFrom(r), TaskTitle: r.TaskTitle, Shown: r.Key != "" && !r.Archived && c.Shown[r.Key]})
 	}
 	sort.SliceStable(posts, func(i, j int) bool { return posts[i].At.Before(posts[j].At) })
 	for _, p := range posts {

@@ -32,7 +32,9 @@ type LiveHandler struct {
 	clock live.Clock
 	// machineID is this computer's own id (tests set it). open is the gate, read once from live.Open.
 	machineID func() (string, error)
-	open      bool
+	// hubLinks: this computer's own Hub links that are active now (the router gives the store's). Unset: none.
+	hubLinks func(ctx context.Context) []string
+	open     bool
 }
 
 // NewLiveHandler makes the handler over the board's store and data folder.
@@ -42,6 +44,28 @@ func NewLiveHandler(h *BoardHandler) *LiveHandler {
 
 // SetAgentState gives the handler the agents' working, waiting and sleeping state (the sessions the server keeps). Unset, every agent reads as idle.
 func (lh *LiveHandler) SetAgentState(f func(subscriberID string) live.AgentState) { lh.state = f }
+
+// SetHubLinks gives the handler the ids of this computer's active Hub links.
+func (lh *LiveHandler) SetHubLinks(f func(ctx context.Context) []string) { lh.hubLinks = f }
+
+func (lh *LiveHandler) activeLinks(ctx context.Context) []string {
+	if lh.hubLinks == nil {
+		return nil
+	}
+	return lh.hubLinks(ctx)
+}
+
+func (lh *LiveHandler) linkActive(id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, a := range lh.activeLinks(context.Background()) {
+		if a == id {
+			return true
+		}
+	}
+	return false
+}
 
 func (lh *LiveHandler) manager() (*live.Manager, error) {
 	lh.mu.Lock()
@@ -62,7 +86,7 @@ func (lh *LiveHandler) manager() (*live.Manager, error) {
 	computer := hex.EncodeToString(sum[:])
 	state := lh.state
 	m, err := live.NewManager(live.Config{
-		Clock: lh.clock, Store: st, Computer: computer,
+		Clock: lh.clock, Store: st, Computer: computer, LinkActive: lh.linkActive,
 		Source: func(team string) live.LiveSource { return live.NewBoardSource(lh.h.bs, team, state) },
 		// Chat is the chat slice's: until it lands no agent has it.
 		ChatAvailable: lh.chat,
@@ -115,6 +139,8 @@ func liveFail(w http.ResponseWriter, err error) {
 		liveErr(w, http.StatusBadRequest, "bad_period")
 	case errors.Is(err, live.ErrBadHubLink):
 		liveErr(w, http.StatusBadRequest, "bad_hub_link")
+	case errors.Is(err, live.ErrBadVia):
+		liveErr(w, http.StatusBadRequest, "bad_via")
 	case errors.Is(err, live.ErrNotRead):
 		liveErr(w, http.StatusBadRequest, "not_read")
 	case errors.Is(err, live.ErrBadViews):
@@ -223,6 +249,7 @@ func (lh *LiveHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		HubLink string `json:"hub_link"`
 		Team    string `json:"team"`
+		Via     string `json:"via"` // which of this computer's own Hub links to push through; omitted when there is exactly one active
 	}
 	if err := decodeJSONStrict(r, &body); err != nil {
 		liveErr(w, http.StatusBadRequest, "bad_views")
@@ -232,7 +259,13 @@ func (lh *LiveHandler) CreateLink(w http.ResponseWriter, r *http.Request) {
 		liveErr(w, http.StatusBadRequest, "bad_views")
 		return
 	}
-	l, err := m.Create(body.HubLink, body.Team, "Operator")
+	via := body.Via
+	if via == "" {
+		if ids := lh.activeLinks(r.Context()); len(ids) == 1 {
+			via = ids[0]
+		}
+	}
+	l, err := m.Create(body.HubLink, body.Team, "Operator", via)
 	if err != nil {
 		liveFail(w, err)
 		return

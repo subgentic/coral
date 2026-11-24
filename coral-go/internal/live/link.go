@@ -57,6 +57,8 @@ var (
 	ErrNotRead         = errors.New("not_read")
 	ErrBadViews        = errors.New("bad_views")
 	ErrNotAllowed      = errors.New("not_allowed")
+	ErrBadVia          = errors.New("bad_via")  // the Hub link to push through is not one of this computer's active links
+	ErrViaDown         = errors.New("via_down") // that Hub link is paused, being removed or gone
 )
 
 // Views is the draft the owner edits. It changes nothing that is pushed (MUST A) until a new go-live names the hash of what was previewed.
@@ -98,6 +100,7 @@ type Link struct {
 	ChatOffWhy   string    `json:"chat_off_why,omitempty"`
 	LastViewedS  *int64    `json:"last_viewed_age_s,omitempty"` // as the Hub reports; never used for a decision
 	HubStops     int       `json:"hub_stops"`
+	Via          string    `json:"via"`      // which of this computer's own Hub links the link pushes through (condition 6)
 	Computer     string    `json:"computer"` // this computer's identity when the link was made or went live (design 14.6, answer 3)
 }
 
@@ -160,6 +163,8 @@ type Config struct {
 	NewID         func() string
 	// Computer is this computer's identity (the device key's fingerprint). A live link stored under another one comes back paused (reason restart).
 	Computer string
+	// LinkActive says whether id is one of this computer's own Hub links, active now (not paused, removing, revoked or gone). Nil: none is.
+	LinkActive func(id string) bool
 }
 
 // Manager holds the links.
@@ -252,13 +257,17 @@ func (m *Manager) Get(id string) (Link, error) {
 }
 
 // Create makes a draft for one Hub link and one team. Every agent is shown, chat is off, no expiry, a 30 s delay and the longest re-confirm period. A Hub link that has a link here already (not stopped) is refused.
-func (m *Manager) Create(hubLink, team, by string) (Link, error) {
+func (m *Manager) Create(hubLink, team, by, via string) (Link, error) {
 	hubLink = strings.ToLower(strings.TrimSpace(hubLink))
 	if !hubLinkRE.MatchString(hubLink) {
 		return Link{}, ErrBadHubLink
 	}
 	if strings.TrimSpace(team) == "" {
 		return Link{}, ErrBadViews
+	}
+	// Condition 6: the link pushes through one of this computer's own Hub links, and it must be an active one now.
+	if m.cfg.LinkActive == nil || !m.cfg.LinkActive(via) {
+		return Link{}, ErrBadVia
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -268,7 +277,7 @@ func (m *Manager) Create(hubLink, team, by string) (Link, error) {
 		}
 	}
 	now := m.cfg.Clock.Now()
-	l := &Link{ID: m.cfg.NewID(), HubLink: hubLink, Team: team, CreatedBy: by, State: StateDraft, CreatedAt: now, Computer: m.cfg.Computer,
+	l := &Link{ID: m.cfg.NewID(), HubLink: hubLink, Team: team, CreatedBy: by, State: StateDraft, CreatedAt: now, Computer: m.cfg.Computer, Via: via,
 		Views: Views{PeriodDays: MaxPeriod, ExpiresIn: "none", DelayS: 30}}
 	m.links[l.ID] = l
 	m.order = append(m.order, l.ID)
@@ -353,7 +362,7 @@ func hashOf(keys []string, v Views, gen string) string {
 func agentKeys(rows []AgentRow) []string {
 	var keys []string
 	for _, r := range rows {
-		if r.Key != "" {
+		if r.Key != "" && !r.Archived { // an archived agent, or one that has left, is never shown (SHOULD 8)
 			keys = append(keys, r.Key)
 		}
 	}
@@ -614,6 +623,7 @@ func (m *Manager) Tick(ctx context.Context) error {
 			l.Approved.ChatKey, l.Approved.ChatGen = "", ""
 			l.Views.ChatKey, l.ChatGen, l.ChatSince = "", "", time.Time{}
 			l.ChatOffWhy = "the agent restarted"
+			m.out = append(m.out, m.confirmMsg(l)) // the Hub is told chat is off (it would otherwise keep the old copy)
 		}
 		if l.State == StateLive {
 			_, pauseAt := Deadlines(*l)
@@ -653,6 +663,9 @@ func (m *Manager) CanPush(id, hubLink string) error {
 	}
 	if !hubLinkRE.MatchString(hubLink) || hubLink != l.HubLink {
 		return ErrBadHubLink
+	}
+	if m.cfg.LinkActive == nil || !m.cfg.LinkActive(l.Via) {
+		return ErrViaDown
 	}
 	now := m.cfg.Clock.Now()
 	_, pauseAt := Deadlines(*l)

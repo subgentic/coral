@@ -26,9 +26,17 @@ func (s *mutSource) Posts(context.Context, int) ([]PostRow, error) {
 	return []PostRow{{Author: "Backend Dev", Text: "hello there", At: time.Unix(1700000001, 0)}}, nil
 }
 
+// testVia is the id of this computer's own Hub link the tests push through; hubLinkUp is whether it is active.
+const testVia = "lnk-aaaaaaaa"
+
+var hubLinkUp = true
+
+func linkActive(id string) bool { return hubLinkUp && id == testVia }
+
 func newMgr(t *testing.T, st Store, src *mutSource, clk *fakeClock) *Manager {
 	t.Helper()
-	m, err := NewManager(Config{Clock: clk, Store: st, Source: func(string) LiveSource { return src }, Redactor: hubScan(),
+	hubLinkUp = true
+	m, err := NewManager(Config{Clock: clk, Store: st, LinkActive: linkActive, Source: func(string) LiveSource { return src }, Redactor: hubScan(),
 		ChatAvailable: func(a AgentRow) bool { return true }, NewID: func() string { return "L1" }})
 	require.NoError(t, err)
 	return m
@@ -47,7 +55,7 @@ func fixture(t *testing.T) (*Manager, *mutSource, *fakeClock, *MemStore) {
 func goLive(t *testing.T, m *Manager) Link {
 	t.Helper()
 	ctx := context.Background()
-	_, err := m.Create(hubA, "team", "Operator")
+	_, err := m.Create(hubA, "team", "Operator", testVia)
 	require.NoError(t, err)
 	p, err := m.Preview(ctx, "L1")
 	require.NoError(t, err)
@@ -59,14 +67,14 @@ func goLive(t *testing.T, m *Manager) Link {
 func TestCreateRefusesABadOrRepeatedHubLinkAndKeepsNoURL(t *testing.T) {
 	m, _, _, _ := fixture(t)
 	for _, bad := range []string{"", "not-a-uuid", "https://hub.example/live#abc", hubA + "x"} {
-		_, err := m.Create(bad, "team", "Operator")
+		_, err := m.Create(bad, "team", "Operator", testVia)
 		require.ErrorIs(t, err, ErrBadHubLink, bad)
 	}
-	l, err := m.Create(strings.ToUpper(hubA), "team", "Operator")
+	l, err := m.Create(strings.ToUpper(hubA), "team", "Operator", testVia)
 	require.NoError(t, err)
 	require.Equal(t, hubA, l.HubLink)
 	require.Equal(t, StateDraft, l.State)
-	_, err = m.Create(hubA, "team", "Operator")
+	_, err = m.Create(hubA, "team", "Operator", testVia)
 	require.ErrorIs(t, err, ErrBadHubLink, "one Hub link, one link here")
 	raw, _ := json.Marshal(l)
 	require.NotContains(t, string(raw), "http", "no URL is ever held")
@@ -75,7 +83,7 @@ func TestCreateRefusesABadOrRepeatedHubLinkAndKeepsNoURL(t *testing.T) {
 func TestGoLiveNeedsTheReadFlagAndTheCurrentHash(t *testing.T) {
 	m, _, _, _ := fixture(t)
 	ctx := context.Background()
-	_, _ = m.Create(hubA, "team", "Operator")
+	_, _ = m.Create(hubA, "team", "Operator", testVia)
 	p, _ := m.Preview(ctx, "L1")
 	_, err := m.GoLive(ctx, "L1", p.Hash, false)
 	require.ErrorIs(t, err, ErrNotRead)
@@ -210,7 +218,7 @@ func TestThePusherChecksTheHubLinkEveryFrame(t *testing.T) { // MUST D
 func TestExpiryStopsTheLink(t *testing.T) {
 	m, _, clk, _ := fixture(t)
 	ctx := context.Background()
-	_, _ = m.Create(hubA, "team", "Operator")
+	_, _ = m.Create(hubA, "team", "Operator", testVia)
 	_, err := m.SetViews(ctx, "L1", Views{PeriodDays: 90, ExpiresIn: "24h", DelayS: 30})
 	require.NoError(t, err)
 	p, _ := m.Preview(ctx, "L1")
@@ -279,7 +287,7 @@ func TestOwnerPauseSendsTheOwnerReason(t *testing.T) {
 func TestChatNeedsAnAvailableAgentAndIsBoundToItsGeneration(t *testing.T) { // MUST B
 	m, src, clk, _ := fixture(t)
 	ctx := context.Background()
-	_, _ = m.Create(hubA, "team", "Operator")
+	_, _ = m.Create(hubA, "team", "Operator", testVia)
 	for _, bad := range []string{"nobody", "ghost"} {
 		_, err := m.SetViews(ctx, "L1", Views{ChatKey: bad})
 		require.ErrorIs(t, err, ErrChatUnavailable)
@@ -317,7 +325,7 @@ func TestChatNeedsAnAvailableAgentAndIsBoundToItsGeneration(t *testing.T) { // M
 func TestChatDoesNotFollowARoleOrAReusedName(t *testing.T) { // MUST B: key plus generation, never the role
 	m, src, _, _ := fixture(t)
 	ctx := context.Background()
-	_, _ = m.Create(hubA, "team", "Operator")
+	_, _ = m.Create(hubA, "team", "Operator", testVia)
 	_, _ = m.SetViews(ctx, "L1", Views{ChatKey: "backend"})
 	p, _ := m.Preview(ctx, "L1")
 	_, err := m.GoLive(ctx, "L1", p.Hash, true)
@@ -335,7 +343,7 @@ func TestChatDoesNotFollowARoleOrAReusedName(t *testing.T) { // MUST B: key plus
 func TestARestartBringsALinkWithChatBackPausedAndTellsTheHub(t *testing.T) {
 	m, src, clk, st := fixture(t)
 	ctx := context.Background()
-	_, _ = m.Create(hubA, "team", "Operator")
+	_, _ = m.Create(hubA, "team", "Operator", testVia)
 	_, _ = m.SetViews(ctx, "L1", Views{ChatKey: "backend"})
 	p, _ := m.Preview(ctx, "L1")
 	_, err := m.GoLive(ctx, "L1", p.Hash, true)
@@ -365,7 +373,7 @@ func TestALinkFromAnotherComputerComesBackPausedEvenWithoutChat(t *testing.T) {
 	clk := &fakeClock{t: time.Unix(1700000000, 0)}
 	st := &MemStore{}
 	mk := func(computer string) *Manager {
-		m, err := NewManager(Config{Clock: clk, Store: st, Computer: computer, Source: func(string) LiveSource { return src }, Redactor: hubScan(),
+		m, err := NewManager(Config{Clock: clk, Store: st, LinkActive: linkActive, Computer: computer, Source: func(string) LiveSource { return src }, Redactor: hubScan(),
 			NewID: func() string { return "L1" }})
 		require.NoError(t, err)
 		return m
@@ -389,7 +397,7 @@ func TestALinkStoredWithNoComputerComesBackPausedOnAComputerThatHasOne(t *testin
 	clk := &fakeClock{t: time.Unix(1700000000, 0)}
 	st := &MemStore{}
 	mk := func(computer string) *Manager {
-		m, err := NewManager(Config{Clock: clk, Store: st, Computer: computer, Source: func(string) LiveSource { return src }, Redactor: hubScan(),
+		m, err := NewManager(Config{Clock: clk, Store: st, LinkActive: linkActive, Computer: computer, Source: func(string) LiveSource { return src }, Redactor: hubScan(),
 			NewID: func() string { return "L1" }})
 		require.NoError(t, err)
 		return m
@@ -398,4 +406,61 @@ func TestALinkStoredWithNoComputerComesBackPausedOnAComputerThatHasOne(t *testin
 	l, _ := mk("compA").Get("L1")
 	require.Equal(t, StatePaused, l.State)
 	require.Equal(t, ReasonRestart, l.PausedReason)
+}
+
+// Condition 6: a link pushes through one of this computer's own active Hub links, checked at create and before every frame.
+func TestACreateNeedsAnActiveHubLinkOfThisComputer(t *testing.T) {
+	m, _, _, _ := fixture(t)
+	for _, via := range []string{"", "lnk-bbbbbbbb"} {
+		_, err := m.Create(hubA, "team", "Operator", via)
+		require.ErrorIs(t, err, ErrBadVia, "via %q", via)
+	}
+	hubLinkUp = false
+	_, err := m.Create(hubA, "team", "Operator", testVia)
+	require.ErrorIs(t, err, ErrBadVia, "a link that is not active now")
+}
+
+func TestNoFrameWhileTheHubLinkIsPausedRemovingOrGone(t *testing.T) {
+	m, _, _, _ := fixture(t)
+	goLive(t, m)
+	require.NoError(t, m.CanPush("L1", hubA))
+	hubLinkUp = false
+	require.ErrorIs(t, m.CanPush("L1", hubA), ErrViaDown)
+	hubLinkUp = true
+	require.NoError(t, m.CanPush("L1", hubA), "it goes on when the Hub link is active again")
+}
+
+// SHOULD 8: an agent that is archived or has left is never in the approved set, and one archived later drops out of the frame.
+func TestAnArchivedAgentIsNotShownAndOneArchivedLaterDropsOut(t *testing.T) {
+	m, src, _, _ := fixture(t)
+	src.rows = append(src.rows, AgentRow{Key: "gone", Generation: "s3@t1", Name: "Gone Gus", Role: "ux", Archived: true})
+	l := goLive(t, m)
+	require.NotContains(t, l.Approved.AgentKeys, "gone")
+	f, err := m.Frame(context.Background(), "L1", 1)
+	require.NoError(t, err)
+	require.Len(t, f.Agents, 2)
+	src.rows[1].Archived = true // qa leaves after go-live
+	f, err = m.Frame(context.Background(), "L1", 2)
+	require.NoError(t, err)
+	require.Len(t, f.Agents, 1)
+}
+
+// INFO: when Tick drops chat (the agent restarted) the Hub is told with a confirm that has chat off.
+func TestTickDroppingChatTellsTheHubWithAChatOffConfirm(t *testing.T) {
+	m, src, _, _ := fixture(t)
+	ctx := context.Background()
+	_, _ = m.Create(hubA, "team", "Operator", testVia)
+	_, _ = m.SetViews(ctx, "L1", Views{ChatKey: "backend"})
+	p, _ := m.Preview(ctx, "L1")
+	_, err := m.GoLive(ctx, "L1", p.Hash, true)
+	require.NoError(t, err)
+	m.Drain()
+	src.rows[0].Generation = "s1@t2" // restarted
+	require.NoError(t, m.Tick(ctx))
+	out := m.Drain()
+	require.Len(t, out, 1)
+	require.Equal(t, "confirm", out[0].Kind)
+	require.False(t, out[0].Chat)
+	require.Zero(t, out[0].ChatSince)
+	require.NotZero(t, out[0].ReconfirmDue)
 }

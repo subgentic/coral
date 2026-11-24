@@ -41,7 +41,7 @@ type inboundKind struct {
 }
 
 // inboundKinds are every kind this package knows, in the order the hub checks them.
-var inboundKinds = []*inboundKind{relayKind, signinKind, controlKind}
+var inboundKinds = []*inboundKind{relayKind, signinKind, controlKind, liveKind}
 
 // inboundReadDeadline bounds how long the hub waits for a request's header and body
 // (Security: enforced before any lookup).
@@ -60,6 +60,12 @@ func (c SessionConfig) inboundHook(k *inboundKind) inboundHook {
 		}
 	case KindControl:
 		return c.localModeHook()
+	case KindLive:
+		if c.OnLive != nil {
+			return func(ctx context.Context, s *Session, path string, body []byte) RelayResponse {
+				return c.OnLive(ctx, s, LiveRequest{Path: path, Body: body})
+			}
+		}
 	case KindSignin:
 		if c.OnSignin != nil {
 			return func(ctx context.Context, s *Session, path string, body []byte) RelayResponse {

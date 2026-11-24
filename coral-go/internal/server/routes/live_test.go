@@ -27,6 +27,7 @@ func openLiveHandler(h *BoardHandler) *LiveHandler {
 	lh := NewLiveHandler(h)
 	lh.open = true
 	lh.machineID = func() (string, error) { return "machine-1", nil }
+	lh.hubLinks = func(context.Context) []string { return []string{"lnk-11111111"} }
 	return lh
 }
 
@@ -242,7 +243,7 @@ func TestALiveLinkStoredOnAnotherComputerComesBackPaused(t *testing.T) {
 	lh := openLiveHandler(h)
 	m, err := lh.manager()
 	require.NoError(t, err)
-	l, err := m.Create(liveHub, "team", "Operator")
+	l, err := m.Create(liveHub, "team", "Operator", "lnk-11111111")
 	require.NoError(t, err)
 	p, err := m.Preview(ctx, l.ID)
 	require.NoError(t, err)
@@ -267,4 +268,36 @@ func TestALiveLinkStoredOnAnotherComputerComesBackPaused(t *testing.T) {
 	got, _ = m3.Get(l.ID)
 	require.Equal(t, live.StatePaused, got.State)
 	require.Equal(t, live.ReasonRestart, got.PausedReason)
+}
+
+// Condition 6: a link is made through one of this computer's own active Hub links: the one named, the only one there is, or it is refused.
+func TestCreateNeedsOneOfThisComputersActiveHubLinks(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	_, err := h.bs.Subscribe(ctx, "team", "Backend Dev", "backend", "sess-be", nil, "all")
+	require.NoError(t, err)
+	lh := openLiveHandler(h)
+	var create liveCall
+	for _, c := range liveRoutes() {
+		if c.method == "POST" && c.path == "/api/live/links" {
+			create = c
+		}
+	}
+	body := func(via string) string {
+		if via == "" {
+			return `{"hub_link":"` + liveHub + `","team":"team"}`
+		}
+		return `{"hub_link":"` + liveHub + `","team":"team","via":"` + via + `"}`
+	}
+	lh.hubLinks = func(context.Context) []string { return nil }
+	code, out := create.do(lh, body(""), livePerson)
+	require.Equal(t, http.StatusBadRequest, code)
+	require.Equal(t, "bad_via", out["error"], "no active Hub link")
+	lh.hubLinks = func(context.Context) []string { return []string{"lnk-aaaaaaaa", "lnk-bbbbbbbb"} }
+	code, out = create.do(lh, body(""), livePerson)
+	require.Equal(t, "bad_via", out["error"], "two to pick from: the person names one")
+	code, out = create.do(lh, body("lnk-cccccccc"), livePerson)
+	require.Equal(t, "bad_via", out["error"], "not one of this computer's links")
+	code, out = create.do(lh, body("lnk-bbbbbbbb"), livePerson)
+	require.Equal(t, http.StatusOK, code, "%v", out)
 }

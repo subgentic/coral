@@ -60,6 +60,8 @@ type SessionConfig struct {
 	// OnSignin handles a Hub sign-in request the connector opens (#3966, signin.go). Nil: the
 	// capability is never advertised.
 	OnSignin SigninFunc
+	// OnLive handles a Coral Live push the connector opens (#21064, live.go). Nil: the live_push/1 capability is never advertised and a live stream is closed.
+	OnLive LiveFunc
 	// OnLocalMode handles the connector's local mode message (#5918, control.go). Nil: "local_mode/1" is never advertised.
 	OnLocalMode LocalModeFunc
 	// MinLocalModeGap is the least time between two local mode messages from one tunnel (default LocalModeMinGap, a second): a faster one is answered 429.
