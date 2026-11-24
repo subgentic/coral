@@ -18,7 +18,7 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
     host.replaceChildren(root);
     const life = new AbortController();
     let link = links.find(item => item.team === teamLabel && item.state !== 'stopped') || null;
-    let preview = null, read = false, busy = false, revision = 0, dirty = false, stopping = false, createExpiry = 'none', createDelay = 30;
+    let preview = null, read = false, busy = false, revision = 0, dirty = false, stopping = false, createPeriod = 90, createDelay = 30;
     // The Hub gives the person this id; this computer never receives the URL/token.
     const via = field('hub');
     via.setAttribute('aria-label', 'Share through');
@@ -66,11 +66,11 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
         finally { stopping = false; busy = false; if (alive()) renderControls(); }
     };
     const edit = () => link?.draft || link || {};
-    const writeViews = (chatKey, expiresIn = edit().expires_in, delay = edit().delay_s) => {
+    const writeViews = (chatKey, periodDays = edit().period_days, delay = edit().delay_s) => {
         invalidate();
         return run(async () => {
             const mine = revision;
-            const next = await request(path('views'), 'PUT', { chat_key: chatKey, period_days: chatKey ? Math.min(edit().period_days || 7, 7) : 90, expires_in: expiresIn || 'none', delay_s: Number(delay || 30) });
+            const next = await request(path('views'), 'PUT', { chat_key: chatKey, period_days: chatKey ? 7 : Number(periodDays || 90), expires_in: 'none', delay_s: Number(delay || 30) });
             if (alive() && mine === revision) { link = next; dirty = true; }
         });
     };
@@ -93,9 +93,9 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
         via.replaceChildren(new Option(canCreate ? 'Choose a Hub link' : 'Hub selected when created', ''));
         for (const item of hubLinks) via.append(new Option(item.label || item.hub_origin || item.link_id, item.link_id));
         via.value = chosenVia; via.disabled = !canCreate || busy;
-        field('expiry').disabled = busy;
+        field('expiry').disabled = busy || (!canCreate && !!selectedKey());
         field('delay').disabled = busy;
-        field('expiry').value = canCreate ? createExpiry : edit().expires_in || 'none';
+        field('expiry').value = String(canCreate ? createPeriod : selectedKey() ? 7 : edit().period_days || 90);
         field('delay').value = String(canCreate ? createDelay : edit().delay_s || 30);
         chatRows.replaceChildren();
         for (const agent of link?.agents || []) {
@@ -132,7 +132,7 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
             const next = await request('', 'POST', { hub_link: hub.value.trim(), team: teamLabel, via: chosenVia });
             if (alive()) {
                 link = next;
-                if (createExpiry !== 'none' || createDelay !== 30) link = await request(path('views'), 'PUT', { chat_key: '', period_days: 90, expires_in: createExpiry, delay_s: createDelay });
+                if (createPeriod !== 90 || createDelay !== 30) link = await request(path('views'), 'PUT', { chat_key: '', period_days: createPeriod, expires_in: 'none', delay_s: createDelay });
                 invalidate(); field('changed').hidden = true;
             }
         }), true, busy || !hub.value.trim() || !hubLinks.some(item => item.link_id === chosenVia));
@@ -159,8 +159,8 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
     hub.oninput = renderControls;
     via.onchange = () => { chosenVia = via.value; renderControls(); };
     field('confirm').onchange = e => { read = e.target.checked && !!preview; renderControls(); };
-    field('expiry').onchange = e => { if (!link || link.state === 'stopped') { createExpiry = e.target.value; renderControls(); } else writeViews(selectedKey(), e.target.value, edit().delay_s); };
-    field('delay').onchange = e => { if (!link || link.state === 'stopped') { createDelay = Number(e.target.value); renderControls(); } else writeViews(selectedKey(), edit().expires_in, e.target.value); };
+    field('expiry').onchange = e => { if (!link || link.state === 'stopped') { createPeriod = Number(e.target.value); renderControls(); } else writeViews(selectedKey(), Number(e.target.value), edit().delay_s); };
+    field('delay').onchange = e => { if (!link || link.state === 'stopped') { createDelay = Number(e.target.value); renderControls(); } else writeViews(selectedKey(), edit().period_days, e.target.value); };
     field('load-preview').onclick = () => run(async () => {
         const mine = revision;
         const next = await request(path('preview'));
