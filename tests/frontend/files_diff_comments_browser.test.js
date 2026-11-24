@@ -45,7 +45,7 @@ const TEAM = 'team-x', SID = 'wp-sess1';
                     window.fetch = (u, o = {}) => { const url = new URL(String(u), location.href), p = decodeURIComponent(url.pathname);
                         if (/\\/api\\/sessions\\/live\\/(wp|nt)\\/files(\\/refresh)?$/.test(p)) return json({ files: Object.entries(window.__files).map(([filepath, f]) => ({ filepath, status: f.status, additions: f.additions, deletions: f.deletions })), is_git: true, compare: { label: 'HEAD' } }, 200);
                         const m = /^\\/api\\/artifacts\\/(diff:[^/]+)\\/comments$/.exec(p);
-                        if (m && (!o.method || o.method === 'GET')) return json({ comments: window.__comments, locked: false, you: { kind: 'owner', name: 'You', can_comment: true, can_lock: true }, limits: {} }, 200);
+                        if (m && (!o.method || o.method === 'GET')) return (window.__hold || Promise.resolve()).then(() => json({ comments: window.__comments, locked: false, you: { kind: 'owner', name: 'You', can_comment: true, can_lock: true }, limits: {} }, 200));
                         if (m && o.method === 'POST') { const b = JSON.parse(o.body); window.__posts.push({ key: m[1], ...b }); const c = { id: window.__comments.length + 1, parent_id: null, anchor: b.anchor, body: b.body, author: { subject: 'install-owner-id', name: 'You', kind: 'owner' }, created_at: new Date().toISOString(), mine: true, can: { reply: true, edit: true, delete: true, resolve: true }, sent_to: 'Dev' }; window.__comments.push(c); return json(c); }
                         const f = window.__files[String(url.searchParams.get('filepath') || '').replace(/^[/]+/, '')];
                         if (f && /\\/file-original$/.test(p)) return json({ content: f.original }, 200);
@@ -59,8 +59,17 @@ const TEAM = 'team-x', SID = 'wp-sess1';
             await waitFor(`document.getElementById('changed-files-title').getClientRects().length > 0`, `${tag}: the Files header on screen`, 8000);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'changed_files.js'); await m.loadChangedFiles('wp', '${SID}'); return true; })()`);
             await waitFor(`document.querySelectorAll('#changed-files-list .file-item').length === 1`, `${tag}: the changed file`, 8000);
+            // #20965: the comments are still being read when Comment is pressed: the press is held, not lost, and the composer opens when they arrive
+            await ev(`window.__hold = new Promise(r => { window.__release = r; }); true`);
             await ev(`document.querySelector('#changed-files-list .file-expand-btn[data-path="e.go"]').click(); true`);
             await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .cm-line') && !!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-panel')`, `${tag}: the diff with its comments panel`, 12000);
+            await ev(`document.querySelector('#changed-files-list .file-item[data-filepath="e.go"] .file-comment-btn').click(); true`);
+            await ev(framesJs(10));
+            check(`${tag}: while the comments are still being read, no composer is open yet`, !(await ev(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-input')`)));
+            await ev(`window.__release(); window.__hold = null; true`);
+            await waitFor(`!!document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-input')`, `${tag}: the press made while the comments loaded opens the composer when they arrive`, 6000);
+            await ev(`document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments .ac-cancel').click(); true`);
+            await waitFor(`document.querySelector('#changed-files-list .file-diff[data-filepath="e.go"] .diff-comments').getClientRects().length === 0`, `${tag}: the held scene closes again`, 4000);
             check(`${tag}: no comment button before anything is selected`, await ev(`(document.querySelector('.diff-comment-btn') || { hidden: true }).hidden`));
 
             // #13528 (the Operator: the Comments panel under every file is too much): the thread is not drawn until it is asked for; one small comment icon sits in the file's row, with a name, a tip and a 24 px box

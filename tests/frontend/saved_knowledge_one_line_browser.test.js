@@ -35,9 +35,10 @@ const board = 'saved-line-' + Date.now().toString(36);
                     await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
                     await Page.navigate({ url: BASE + where }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
                     if (folder) { await ev(`window.switchNavTab('hub-inbox'); true`); await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(folder)})).then(() => true)`); }
-                    await waitFor(`document.querySelectorAll('.dt-table tbody tr:not(.dt-group)').length >= ${name === 'Saved' ? 3 : 1}`, at + 'the rows', 15000);
-                    const rows = await measure();
-                    assert.ok(rows.length >= 1, at + 'rows');
+                    // The rows are the ones measure() finds on screen, and the first measurement with enough of them is the one checked: a redraw between a wait on the DOM and a later measure left it none on Windows (#20972).
+                    let rows = [];
+                    for (const end = Date.now() + 15000; ; await new Promise(r => setTimeout(r, 50))) { rows = await measure(); if (rows.length >= (name === 'Saved' ? 3 : 1)) break; if (Date.now() > end) break; }
+                    assert.ok(rows.length >= (name === 'Saved' ? 3 : 1), at + 'rows');
                     for (const r of rows) {
                         assert.ok(r.title, at + 'the title is on the row');
                         if (name === 'Saved') continue; // Saved is the Inbox's row since #20508 (the words and the buttons under the title, not one line): one_list_browser pins its shape
