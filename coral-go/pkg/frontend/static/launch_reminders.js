@@ -10,6 +10,7 @@ const { KINDS, DAYS } = await importOnce('./agent_reminders.js');
 await loadStyles('launch_reminders.css').catch(() => {});
 
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+const zoneName = () => { try { return new Intl.DateTimeFormat('en', { timeZoneName: 'longGeneric' }).formatToParts(new Date()).find(p => p.type === 'timeZoneName').value; } catch { return zone(); } }; // 'Pacific Time'
 const button = (text, fn, cls = 'btn') => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', fn); return b; };
 let seq = 0;
 export const MAX_REMINDERS = 5; // a persona or template role carries 5 at most (#21019, #21184), so does the tab
@@ -17,10 +18,12 @@ const FULL = `An agent starts with ${MAX_REMINDERS} reminders at most. Remove on
 
 /** A draft in the words of POST /api/reminders: { text, kind: once|every|daily|weekdays|weekly, at, every_minutes }, plus where it came from (source) and whether the person changed it. */
 export function draftWords(d) {
-    if (d.kind === 'once') return `Once, ${String(d.at || '').replace('T', ' ')} · ${zone()}`;
-    return scheduleWords({ schedule_kind: d.kind === 'every' ? 'interval' : d.kind, at: d.at, every_minutes: d.every_minutes, timezone: zone() });
+    const dayName = c => (DAYS.find(([v]) => v === c) || [c, c])[1];
+    if (d.kind === 'once') return `Once, ${String(d.at || '').replace('T', ' ')}`;
+    if (d.kind === 'every') { const n = Number(d.every_minutes) || 15; return n === 60 ? 'Every hour' : n % 60 === 0 ? `Every ${n / 60} hours` : `Every ${n} minutes`; }
+    if (d.kind === 'weekly') { const [day, time] = String(d.at || '').split(' '); return `Weekly, ${dayName(day)} at ${time || ''}`; }
+    return `${d.kind === 'weekdays' ? 'Weekdays' : 'Daily'} at ${d.at || ''}`; // the time zone is said once, in the tab's line (the approved mock)
 }
-
 /** The body POST /api/reminders takes for a draft made for the session sessionId. */
 export function reminderBody(d, sessionId) {
     const body = { text: d.text, session_id: sessionId, kind: d.kind, timezone: d.kind === 'every' ? 'UTC' : d.timezone || zone() };
@@ -44,11 +47,13 @@ export function mountLaunchReminders(host, { who = () => 'this agent', onChange 
     if (isCloud()) { host.hidden = true; return { drafts: () => [], setSource() {}, reset() {} }; } // reminders are the person's own, on the computer: the Hub does not serve them (#19630)
     let items = [], editing = null; // editing: an item, or {} for a new one
     const id = `launch-rem-${++seq}`;
-    const lead = el('p', 'launch-rem-lead', 'A reminder wakes this agent at a time you choose and stays open until it marks it done. You can add or change them later on the agent\'s page.');
+    const BLANK = 'A reminder wakes this agent at a time you choose and stays open until it marks it done. You can add or change them later on the agent\'s page.';
+    const lead = el('p', 'launch-rem-lead', BLANK);
     const cards = el('div', 'launch-rem-cards'), formHost = el('div'), say = el('p', 'chief-check-hint'); say.setAttribute('role', 'status');
     host.replaceChildren(lead, cards, formHost, say);
     const changed = () => { draw(); onChange(items.length); };
     function draw() {
+        lead.textContent = items.some(x => x.source) ? `These come with the template. Keep them, change them or remove them; ${who()} is woken at each time below (times in ${zoneName()}, this computer's).` : BLANK;
         cards.replaceChildren();
         if (!items.length && !editing) {
             const empty = el('div', 'empty-state launch-rem-none'); empty.append(el('p', '', 'No reminders. This agent will only act when you or the team ask it to.'), button('Add a reminder', () => open({}), 'btn'));
@@ -58,7 +63,7 @@ export function mountLaunchReminders(host, { who = () => 'this agent', onChange 
     }
     function card(it) {
         const c = el('section', 'chief-check-card launch-rem-card'); c.setAttribute('aria-label', `Reminder: ${it.text}`);
-        const top = el('div', 'launch-rem-top'); top.append(el('strong', '', draftWords(it)), el('span', it.source ? 'chip chip-tag launch-rem-chip launch-rem-chip-src' : 'chip chip-tag launch-rem-chip', it.source ? 'From the template' : 'Added by you'));
+        const top = el('div', 'launch-rem-top'); top.append(el('strong', '', draftWords(it)), it.source ? el('span', 'chip chip-tag launch-rem-chip launch-rem-chip-src', 'From the template') : el('span', 'launch-rem-by', 'Added by you'));
         const acts = el('div', 'chief-check-actions');
         const remove = button('Remove', () => {
             if (remove.dataset.confirm !== 'yes') { remove.dataset.confirm = 'yes'; remove.textContent = 'Confirm remove'; return; }
@@ -89,7 +94,7 @@ export function mountLaunchReminders(host, { who = () => 'this agent', onChange 
             wasOnce = isOnce;
         };
         kind.addEventListener('change', sync); sync();
-        form.append(el('p', 'chief-check-hint', `Times are in ${zone()}, this computer's. The reminder wakes ${who()} and stays open until it marks it done.`));
+        form.append(el('p', 'chief-check-hint', `${target.kind === 'once' ? 'Date and time are' : 'Time is'} in ${zoneName()}, this computer's. The reminder wakes ${who()} and stays open until it marks it done.`));
         const error = el('p', 'chief-check-error'); error.setAttribute('role', 'alert'); error.hidden = true;
         const acts = el('div', 'chief-check-actions'), save = el('button', 'btn btn-primary', 'Save reminder'); save.type = 'submit';
         acts.append(save, button('Cancel', () => close())); form.append(error, acts);
