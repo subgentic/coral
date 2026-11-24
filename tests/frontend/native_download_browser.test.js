@@ -62,7 +62,7 @@ assert.ok(/coral:native-download/.test(SCRIPT), "the app's script was read from 
             const body = document.createElement('div'); body.id = 'oversized-report';
             body.style.cssText = 'position:fixed;left:200px;top:20px;width:400px;z-index:99999;background:#fff;color:#000';
             document.body.append(body);
-            try { await renderArtifact(body, 'coral://artifacts/${digest}', { filename: 'Before and after', mediaType: 'text/html' }, { signal: new AbortController().signal, isStale: () => false }); }
+            try { await renderArtifact(body, 'coral://artifacts/${digest}', { filename: 'Before and after', mediaType: 'text/html', sourceNamed: false }, { signal: new AbortController().signal, isStale: () => false }); }
             finally { window.fetch = fetchOriginal; }
             return true;
         })()`);
@@ -74,7 +74,8 @@ assert.ok(/coral:native-download/.test(SCRIPT), "the app's script was read from 
         await waitFor(`window.__saved.length === 2`, 'the oversized HTML fallback reached native save', 8000);
         assert.deepEqual(await ev(`window.__opened`), [], 'no system browser opened');
         assert.deepEqual(await ev(`window.__saved[1]`), ['before-and-after.html', '<html>session-protected report</html>']);
-        assert.equal(downloadRequests.length, 1, 'one download request');
+        // The preview of a named artifact also writes a read mark (POST .../opened) once the inbox's review list has loaded, which matched this filter 5 times in 8 on the Mac (#21060): this fake digest is rendered as an unnamed source, so no mark is written, and only the download's own GET may reach it.
+        assert.deepEqual(downloadRequests.map(r => r.method), ['GET'], 'one download request, and nothing else under the artifact');
         const cookie = Object.entries(downloadRequests[0].headers).find(([name]) => name.toLowerCase() === 'cookie')?.[1] || '';
         assert.match(cookie, /native_download_session_proof=window-only/, 'the app window session accompanies the download');
         assert.equal(await ev(`location.pathname`), before, 'the fallback did not navigate the page');
