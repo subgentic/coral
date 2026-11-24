@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -153,4 +154,59 @@ func TestAKeyReachesNothingElseAndABadOneReachesNothing(t *testing.T) {
 	}
 	require.Equal(t, 200, call(h, "DELETE", "/api/cloud/link-keys/"+id, "", map[string]string{"Content-Type": "application/json"}).Code)
 	assert.Equal(t, 401, call(h, "POST", "/api/cloud/link-requests", body, kj).Code, "a revoked key")
+}
+
+// #20959: the key that made a request is the only key that finishes it; another key with the right secret and code gets the same 404 as an unknown request, and the real key still finishes.
+func TestAnotherKeyCannotFinishARequestEvenWithItsSecretAndCode(t *testing.T) {
+	r, _, _, _ := linkedRemoteWithManager(t)
+	store.AllowSecondLinkForTest(t)
+	_, err := r.db.ExecContext(context.Background(), `INSERT OR REPLACE INTO user_settings (key, value) VALUES ('cloud_max_mode', 'launch')`)
+	require.NoError(t, err)
+	hub := newStubHub(t)
+	h := r.srv.Router()
+	js := map[string]string{"Content-Type": "application/json"}
+	_, key1 := makeKeyForTest(t, h, "Hub C")
+	_, key2 := makeKeyForTest(t, h, "Hub D")
+	k1 := map[string]string{"Content-Type": "application/json", linkKeyHeader: key1}
+	k2 := map[string]string{"Content-Type": "application/json", linkKeyHeader: key2}
+	rec := call(h, "POST", "/api/cloud/link-requests", `{"hub":"`+hub.srv.URL+`","cap":"view"}`, k1)
+	require.Equal(t, 200, rec.Code, rec.Body.String())
+	var made map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &made))
+	id, _ := made["request_id"].(string)
+	secret, _ := made["poll_secret"].(string)
+	al := call(h, "POST", "/api/cloud/link-requests/"+id+"/allow", `{"cap":"view"}`, js)
+	require.Equal(t, 200, al.Code, al.Body.String())
+	code := regexp.MustCompile(`"code":"(\d{8})"`).FindStringSubmatch(al.Body.String())
+	require.Len(t, code, 2)
+	body := `{"poll_secret":"` + secret + `","code":"` + code[1] + `"}`
+	assert.Equal(t, 404, call(h, "POST", "/api/cloud/link-requests/"+id+"/finish", body, k2).Code, "the other key")
+	assert.EqualValues(t, 0, hub.starts.Load(), "nothing was enrolled")
+	assert.Equal(t, 200, call(h, "POST", "/api/cloud/link-requests/"+id+"/finish", body, k1).Code, "the key that asked still finishes")
+}
+
+// #20959 (Security INFO 8): making and revoking a request key is in the Operator-actions log with the key's name and who did it, never the key.
+func TestMakingAndRevokingAKeyIsInTheOperatorActionsLog(t *testing.T) {
+	r, _, _, _ := linkedRemoteWithManager(t)
+	h := r.srv.Router()
+	js := map[string]string{"Content-Type": "application/json"}
+	id, key := makeKeyForTest(t, h, "Hub C")
+	require.Equal(t, 200, call(h, "DELETE", "/api/cloud/link-keys/"+id, "", js).Code)
+	ctx := context.Background()
+	made, err := r.srv.boardStore.ListActivity(ctx, board.ActivityFilter{Action: board.ActLinkKeyMake, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, made, 1)
+	assert.Equal(t, id, made[0].ItemID)
+	assert.Equal(t, "Hub C", made[0].Title, "the key's name")
+	assert.Equal(t, "local", made[0].Actor)
+	assert.NotEmpty(t, made[0].Note, "who made it: the caller")
+	gone, err := r.srv.boardStore.ListActivity(ctx, board.ActivityFilter{Action: board.ActLinkKeyRevoke, Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, gone, 1)
+	assert.Equal(t, id, gone[0].ItemID)
+	assert.Equal(t, "Hub C", gone[0].Title, "the name survives the revoke")
+	all, _ := r.srv.boardStore.ListActivity(ctx, board.ActivityFilter{Limit: 50})
+	for _, a := range all {
+		assert.NotContains(t, a.Note+a.Title+a.ItemID, strings.TrimPrefix(key, "lrk_"), "never the key")
+	}
 }

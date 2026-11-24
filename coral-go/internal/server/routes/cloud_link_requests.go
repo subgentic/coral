@@ -192,7 +192,8 @@ func (h *CloudHandler) LinkRequestDeny(w http.ResponseWriter, r *http.Request) {
 // LinkRequestFinish: POST /api/cloud/link-requests/{id}/finish {poll_secret, code}. It takes no address. One transaction checks the secret, the clock, the tries and the code and marks the request used; then the existing
 // enroll (the one `coral cloud links add` runs) goes to the origin that was allowed, with the cap given.
 func (h *CloudHandler) LinkRequestFinish(w http.ResponseWriter, r *http.Request) {
-	if _, refused := h.linkRequestCaller(w, r); refused || !requireJSON(w, r) {
+	key, refused := h.linkRequestCaller(w, r)
+	if refused || !requireJSON(w, r) {
 		return
 	}
 	var body struct {
@@ -213,7 +214,7 @@ func (h *CloudHandler) LinkRequestFinish(w http.ResponseWriter, r *http.Request)
 		httputil.WriteActionLimit(w, int(finishFailureWindow.Seconds()), "rate_limited", "Too many wrong codes just now. Try again in a few minutes.")
 		return
 	}
-	hub, linkCap, err := h.links.FinishLinkRequest(r.Context(), id, body.PollSecret, body.Code, time.Now())
+	hub, linkCap, err := h.links.FinishLinkRequestBy(r.Context(), id, body.PollSecret, body.Code, key, time.Now())
 	if err != nil {
 		if errors.Is(err, store.ErrLinkRequestCode) {
 			noteFinishFailure(time.Now())

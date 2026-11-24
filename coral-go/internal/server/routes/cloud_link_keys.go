@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -60,6 +61,7 @@ func (h *CloudHandler) LinkKeyCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("cloud: link key made", "key", id) // never the key
+	h.recordLinkKey(r, board.ActLinkKeyMake, id, body.Name)
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]string{"id": id, "name": cleanSavedField(body.Name), "key": key})
 }
@@ -97,11 +99,20 @@ func (h *CloudHandler) LinkKeyRevoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := chi.URLParam(r, "id")
+	name := ""
+	if ks, err := h.links.ListLinkKeys(r.Context()); err == nil {
+		for _, k := range ks {
+			if k.ID == id {
+				name = k.Name
+			}
+		}
+	}
 	if err := h.links.RevokeLinkKey(r.Context(), id, time.Now()); err != nil {
 		h.linkKeyErr(w, err)
 		return
 	}
 	slog.Info("cloud: link key revoked", "key", id)
+	h.recordLinkKey(r, board.ActLinkKeyRevoke, id, name)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -133,4 +144,17 @@ func noteFinishFailure(now time.Time) {
 	finishFailures.Lock()
 	finishFailures.at = append(finishFailures.at, now)
 	finishFailures.Unlock()
+}
+
+// recordLinkKey leaves a row in the Operator-actions log for a key made or revoked (#20959): the key's id and name, and who did it (the dashboard or the signed command line, as the identity layer saw it). Never the key.
+// Best effort, as every row of that log: a row that cannot be written is logged and never blocks the action.
+func (h *CloudHandler) recordLinkKey(r *http.Request, action, id, name string) {
+	if h.bs == nil {
+		return
+	}
+	via := "the dashboard"
+	if kind, _ := r.Context().Value(callerKindKey{}).(string); kind == callerCLISigned {
+		via = "the command line"
+	}
+	_ = h.bs.RecordActivity(context.WithoutCancel(r.Context()), activityMetaFor(r, cleanSavedField(name), "from "+via), action, "link_key", id, "", "")
 }

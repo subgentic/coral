@@ -253,3 +253,17 @@ func TestCancellingAnAllowedRequestEndsTheCodeAtOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.ErrorIs(t, cs.DenyLinkRequest(ctx, id2, now), ErrLinkRequestState)
 }
+
+// #20959 (Security SHOULD 7): a request made with one key is finished only by that key, as defence in depth beside the poll secret.
+func TestAKeyFinishesOnlyTheRequestItMade(t *testing.T) {
+	cs, ctx, now := reqRig(t)
+	id, secret, _ := cs.CreateLinkRequest(ctx, "https://hub-c.example.com", "view", "lk-aaaa1111", now)
+	code, _, _ := cs.AllowLinkRequest(ctx, id, "view", now)
+	_, _, err := cs.FinishLinkRequestBy(ctx, id, secret, code, "lk-bbbb2222", now)
+	assert.ErrorIs(t, err, ErrLinkRequestNone, "another key with the right secret and code is refused, as for an unknown request")
+	_, _, err = cs.FinishLinkRequestBy(ctx, id, secret, code, "", now)
+	assert.ErrorIs(t, err, ErrLinkRequestNone, "a request a key made is not finished with no key either")
+	hub, _, err := cs.FinishLinkRequestBy(ctx, id, secret, code, "lk-aaaa1111", now)
+	require.NoError(t, err, "the key that made it is not locked out by the refusals")
+	assert.Equal(t, "https://hub-c.example.com", hub)
+}

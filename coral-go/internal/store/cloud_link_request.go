@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 )
 
@@ -326,6 +327,12 @@ func (s *CloudStore) CancelLinkRequest(ctx context.Context, id string) error {
 // FinishLinkRequest is the Hub's finish: in one transaction it checks the secret (first, so the code is never hinted at), the state, the clock, the tries and the code, and marks the request consumed before anything
 // is enrolled, so two finishes at once make one link. It returns only the origin that was Allowed and the cap given; finish takes no address. Five wrong codes end the request.
 func (s *CloudStore) FinishLinkRequest(ctx context.Context, id, pollSecret, code string, now time.Time) (hub, linkCap string, err error) {
+	return s.FinishLinkRequestBy(ctx, id, pollSecret, code, "", now)
+}
+
+// FinishLinkRequestBy is FinishLinkRequest for a caller that is a request key (#20959, defence in depth beside the poll secret): a request made with one key is finished only by that key, and any other key, or
+// none, gets the same none as an unknown request. A person at this computer passes key "" and is not held to it.
+func (s *CloudStore) FinishLinkRequestBy(ctx context.Context, id, pollSecret, code, key string, now time.Time) (hub, linkCap string, err error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return "", "", err
@@ -337,6 +344,12 @@ func (s *CloudStore) FinishLinkRequest(ctx context.Context, id, pollSecret, code
 	}
 	r, err := lrLoad(ctx, tx, id)
 	if err != nil || !lrSame(r.PollSalt, pollSecret, r.PollHash) {
+		return "", "", ErrLinkRequestNone
+	}
+	if strings.HasPrefix(r.CredID, "lk-") && key != r.CredID { // made with a key: only that key finishes it
+		return "", "", ErrLinkRequestNone
+	}
+	if key != "" && key != r.CredID {
 		return "", "", ErrLinkRequestNone
 	}
 	switch r.State {
