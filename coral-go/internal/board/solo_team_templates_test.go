@@ -64,7 +64,7 @@ func memberNames(block string) []string {
 // requireTwoLineDescription: the card's text is two lines, what the team does then what the person does (#21023).
 func requireTwoLineDescription(t *testing.T, block string) {
 	t.Helper()
-	m := regexp.MustCompile(`description: \["([^"]+)", "([^"]+)"\]`).FindStringSubmatch(block)
-	require.NotNil(t, m, "a two-line description: [what the team does, what you do]")
+	m := regexp.MustCompile(`does: "([^"]+)", you: "([^"]+)"`).FindStringSubmatch(block)
+	require.NotNil(t, m, "two lines, as the tiles read them: does (what the team does) and you (what you do)")
 	require.Regexp(t, `^You `, m[2], "the second line is what you do")
 }
