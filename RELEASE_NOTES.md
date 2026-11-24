@@ -1,5 +1,37 @@
 # Release Notes
 
+## v2.1.10 — Limit notices and limit waits, a review size guard, team templates with reminders, cost export, and Coral Live controls (built, switched off)
+
+Task numbers in brackets. Built on v2.1.9. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **A limit hit is one board post** (#21018): when an agent reaches its usage limit, Coral posts once to the team's Orchestrator, with the agent, its open task, the vendor and the reset time, so the Orchestrator can move the task. For a Claude agent the limit comes from its transcript.
+- **Limit waits on the Cost page** (#21020): a card counts limit waits per agent and day, resumed at reset or early, with a table under it. It is this computer's own record and is not shown through a Hub.
+- **Export CSV on the Cost page** (#21021): download cost by task or by goal for the period you are looking at. The file ends with a Total row that equals the page total.
+- **Review size guard** (#21022, #21027): a Team settings section warns when a change is too big to review (lines and files changed, skip paths, whole team or only some roles). A task in review over the limit shows a Large change banner.
+- **Start a team from a template** (#21023, #21056, #21058): the New team dialog shows each built-in template as a tile with two lines on what it does. Five new solo templates: Overnight run, Builder and reviewer, Bug sweep, Docs and tests catch-up and Research and write-up.
+- **Reminders in templates, and weekly reminders** (#21019, #21085): a template role can bring its reminders with it. A reminder can now repeat weekly, on one day at a time in this computer's time zone. Docs and tests catch-up uses a Monday 09:00 one.
+- **Pending Hub joins show as Inbox attention** (#21006), and the join text a Hub serves names only the computer (#21088).
+
+#### Built and switched off
+
+- **Coral Live** (#21014, #21047, #21064, #21073, #21074, #21030, #21108): a read-only live link to one team, pushed by this computer to a Hub. This release has the frame builder and its scans, the local routes, the pusher and the controls with re-confirm periods of up to 90 days (7 with chat) and a chat delay of 30 s or 1 minute. The gate is shut; nothing is sent until a later release opens it.
+
+### Test and gate fixes in this release
+
+- native_download_browser counts only the download's own request (#21060), the Mac flake from v2.1.9.
+- ptymanager tests forget a reused session's state (#21078).
+- Census, pin and lint fixes found by this release's gate (#21089, #21115, #21128, #21132, #21138), including reduced motion in the Live controls.
+- Gate: the CI gate passed 2210 of 2210 browser suites with no retry, and the Go, race, gofmt, cross-build and encryption jobs are green. No Windows run: no change in this release is Windows-only. One part of the browser gate was run again once: needs_bulk_steady_browser passed there only on a retry. Its test clicked Approve where it meant Clear. The test-only fix (#21144) goes in the next release.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+
 ## v2.1.9 — A calmer Inbox with brighter titles, a second Hub joining by key, and Hub member grants (built, switched off)
 
 Task numbers in brackets. Built on v2.1.8. A prerelease until the Operator promotes it.
