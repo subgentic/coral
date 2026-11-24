@@ -482,3 +482,4 @@ node review_tile_color.test.mjs
 node picture_tray.test.mjs
 
 node field_pictures.test.mjs
+node artifacts_first_update_unit.test.mjs

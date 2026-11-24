@@ -16,7 +16,7 @@ const LOG = `(() => { window.__coralNoFetchShare = false; if (window.__logged) r
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(`localStorage.clear(); true`); await new Promise(r => setTimeout(r, 2500)); // sleep-ok: a server just started finishes its own first indexing (revision bumps) before the cold load is measured
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(`localStorage.clear(); true`);
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady(ev);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await new Promise(r => setTimeout(r, 2500)); // sleep-ok: the cold reads and any second read they would cause all happen in this window
