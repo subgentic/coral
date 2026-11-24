@@ -1,5 +1,35 @@
 # Release Notes
 
+## v2.1.11 — The Cost page follows its Team select, a faster Inbox load, and Coral Live chat (built, switched off)
+
+Task numbers in brackets. Built on v2.1.10. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **The Cost page follows its Team select** (#21037, #21111, #21131): totals, models, agents, branches, the series, By task and By goal, and the call metrics, tasks, efficiency, operator, inbox-vs-chat and comm views all narrow to the chosen team. It works through a Hub too (#21147, #21152).
+- **The Cost header on a phone** (#21148): the time range stays beside Refresh, and the Team select sits in the bar under it.
+- **A faster Inbox load** (#21114, #21126, #21139): opening Saved no longer reads the review lists twice, panels that ask at the same moment whether a team's files changed share one read, and a cold load on a freshly started server reads each list once.
+- **Docs for the 2.1.10 features** (#21120) in the agent docs and the site docs.
+
+#### Built and switched off
+
+- **Coral Live chat** (#21094, slice 6): for the chosen agent, only what a person typed and what the agent replied, the newest 12 messages, scanned like posts. Compaction summaries, injected context, notifications, skills and subagent turns are left out, for claude, codex, agy and pi. No frame is pushed more than 120 s after it was built. The gate stays shut.
+- **Waste line per agent, backend** (#21057): `GET /api/analytics/waste`. The Cost card for it comes in a later release.
+
+### Test and gate fixes in this release
+
+- The bulk layout test unticks the row without clicking Approve (#21144), the v2.1.10 retry.
+- The select-session trace leaves out the page's own timer reads, so a slow runner cannot move the pin (#21149).
+- The tunnel route queries are generated again for the Cost team param (#21152). This changes `tools/gen_route_queries.py`, with the Operator's yes.
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption and the browser gate are green on the gated commit. No Windows run: no change in this release is Windows-only. One part of the browser gate (part 9 of 9) was run again once: needs_phone_rows_browser passed there only on a retry. It passed on the Mac and in the rerun (239 of 239 suites, no retry). A fix for that test is filed.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+
 ## v2.1.10 — Limit notices and limit waits, a review size guard, team templates with reminders, cost export, and Coral Live controls (built, switched off)
 
 Task numbers in brackets. Built on v2.1.9. A prerelease until the Operator promotes it.
