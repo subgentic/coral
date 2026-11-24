@@ -55,6 +55,7 @@ type BoardHealthMonitor struct {
 	lastPrint  map[string]map[string]bool // per board: the facts the last look found, so the same findings are not said again until the heartbeat
 	landing    *LandingWatch              // the landing alert's view of the repositories (git_poller.go feeds it); nil: the alert has nothing to read
 	devPending map[string][]deviationSaid // per board: the deviation findings the check composed last, said once it is delivered (board_health_deviation.go)
+	limitHits  map[string]time.Time       // project|session: the last scan that saw this agent blocked by a usage limit, so a hit is posted once (health_limit_notice.go)
 	offShown   map[string][]offBooksShown // per board: the off-the-books occurrences the check composed last, said once it is delivered (board_health_offbooks.go)
 }
 
@@ -116,6 +117,7 @@ func (m *BoardHealthMonitor) scan(ctx context.Context) {
 	}
 	_, _ = m.store.CloseAsksOfFinishedTasks(ctx) // questions about a finished task leave Needs you (#18714)
 	for _, p := range projects {
+		m.noticeLimitHits(ctx, p.Project, bySession, tick)
 		m.checkProject(ctx, p.Project, bySession, tick)
 		m.sweepProject(ctx, p.Project, bySession, tick) // the stale-task sweep, on its own period (#14863)
 	}
