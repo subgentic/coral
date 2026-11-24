@@ -8,7 +8,8 @@ import { loadStyles } from './lazy_styles.js';
 const { scheduleWords, INTERVALS } = await importOnce('./chief_checks_model.js');
 await Promise.all([loadStyles('agent_reminders.css'), loadStyles('chief-checks.css')]); // not at start (page_weight)
 
-const KINDS = [['once', 'Once'], ['every', 'Repeat'], ['daily', 'Daily'], ['weekdays', 'Weekdays']];
+const KINDS = [['once', 'Once'], ['every', 'Repeat'], ['daily', 'Daily'], ['weekdays', 'Weekdays'], ['weekly', 'Weekly']];
+const DAYS = [['Mon', 'Monday'], ['Tue', 'Tuesday'], ['Wed', 'Wednesday'], ['Thu', 'Thursday'], ['Fri', 'Friday'], ['Sat', 'Saturday'], ['Sun', 'Sunday']];
 
 /** A reminder in Chief's words: "Every 15 minutes", "Daily at 09:00 · UTC", "Weekdays at 09:00 · UTC", "Once, 2026-11-18 09:00 · UTC". */
 export function whenWords(r) {
@@ -68,6 +69,7 @@ export async function mountAgentReminders(host, team, agent) {
         const text = el('textarea'); text.rows = 4; text.maxLength = 1000; text.required = true; field('Instruction', text);
         const kind = el('select'); for (const [v, t] of KINDS) kind.append(Object.assign(el('option', '', t), { value: v })); field('Schedule', kind);
         const every = el('select'); for (const [v, t] of INTERVALS) every.append(Object.assign(el('option', '', t), { value: String(v) })); field('Repeat every', every);
+        const day = el('select'); for (const [v, t] of DAYS) day.append(Object.assign(el('option', '', t), { value: v })); field('Day', day);
         const when = el('input'); field('Time', when);
         form.append(el('p', 'chief-check-hint', `The reminder wakes ${who} and stays open until it marks it done.`));
         const error = el('p', 'chief-check-error'); error.setAttribute('role', 'alert'); error.hidden = true;
@@ -76,7 +78,7 @@ export async function mountAgentReminders(host, team, agent) {
         const discard = el('button', 'btn', 'Discard changes'); discard.type = 'button'; discard.hidden = true;
         const save = el('button', 'btn btn-primary', 'Save reminder'); save.type = 'submit';
         footer.append(error, cancel, discard, save); form.append(footer); dialog.append(heading, form);
-        const sync = () => { const k = kind.value; every.parentElement.hidden = k !== 'every'; when.parentElement.hidden = k === 'every'; when.type = k === 'once' ? 'datetime-local' : 'time'; when.parentElement.firstChild.textContent = k === 'once' ? 'Date and time' : 'Time'; when.value = ''; };
+        const sync = () => { const k = kind.value; every.parentElement.hidden = k !== 'every'; day.parentElement.hidden = k !== 'weekly'; when.parentElement.hidden = k === 'every'; when.type = k === 'once' ? 'datetime-local' : 'time'; when.parentElement.firstChild.textContent = k === 'once' ? 'Date and time' : 'Time'; when.value = ''; };
         kind.addEventListener('change', sync); sync();
         const closing = () => {
             if (busy) return;
@@ -93,7 +95,7 @@ export async function mountAgentReminders(host, team, agent) {
             const body = { text: text.value.trim(), ...(board ? { board, to: agent.subscriber_id || agent.name } : { session_id: agent.session_id }), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' };
             if (!body.text) { error.hidden = false; error.textContent = 'Say what to remind it of.'; return; }
             if (kind.value === 'every') { body.kind = 'every'; body.every_minutes = Number(every.value); body.timezone = 'UTC'; }
-            else { if (!when.value) { error.hidden = false; error.textContent = 'Choose when.'; return; } body.kind = kind.value; body.at = when.value.slice(0, 16); }
+            else { if (!when.value) { error.hidden = false; error.textContent = 'Choose when.'; return; } body.kind = kind.value; body.at = (kind.value === 'weekly' ? `${day.value} ` : '') + when.value.slice(0, 16); }
             busy = true; save.disabled = cancel.disabled = discard.disabled = true; error.hidden = true; form.setAttribute('aria-busy', 'true');
             try {
                 const r = await fetch(list, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
