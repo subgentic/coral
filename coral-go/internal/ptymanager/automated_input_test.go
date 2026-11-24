@@ -92,6 +92,16 @@ func quickLaunchWaits(t *testing.T) {
 	})
 }
 
+// freshSession forgets what Coral remembers of a session name now and again when the test ends: the gate's memos and skips are package state keyed by name, and a name a test reuses
+// (go test -count=N, or -shuffle placing another test's use of it first) would otherwise find the last run's typed text (#21078).
+func freshSession(t *testing.T, names ...string) {
+	t.Helper()
+	for _, n := range names {
+		ForgetSession(n)
+		t.Cleanup(func() { ForgetSession(n) })
+	}
+}
+
 func deliver(t *testing.T, a *fakeAgent, name, text string) Delivery {
 	t.Helper()
 	d, err := DeliverAutomated(context.Background(), a.input(name, text, false))
@@ -122,6 +132,7 @@ func TestAMidTurnAgentGetsTheText(t *testing.T) {
 // A readable screen Coral does not recognise gets the text: "ambiguous" is not a reason to skip.
 func TestAScreenCoralDoesNotRecogniseGetsTheText(t *testing.T) {
 	a := &fakeAgent{screen: "Some new CLI v9 :: type here\nstatus: working"}
+	freshSession(t, "claude-t-unknown")
 	assert.Equal(t, Sent, deliver(t, a, "claude-t-unknown", "hello"))
 	assert.Equal(t, []string{"hello"}, a.sent())
 }
@@ -278,6 +289,7 @@ func TestAFirstPromptWaitsForTheInputBox(t *testing.T) {
 	quickLaunchWaits(t)
 	a := &fakeAgent{screen: ""}
 	n := "claude-t-launch"
+	freshSession(t, n, "claude-t-launch2")
 	done := make(chan Delivery, 1)
 	go func() {
 		d, _ := DeliverAutomated(context.Background(), a.input(n, "Build the feature", true))
