@@ -51,7 +51,7 @@ const SHAPES = {
         const lum = c => c.slice(0,3).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
         const contrast = (Math.max(lum(bg),lum(fg))+.05)/(Math.min(lum(bg),lum(fg))+.05);
         return { height: dr.height, opaque: bg.length===3||bg[3]===1, contrast, background, color, dialog: { l: Math.round(dr.left), r: Math.round(dr.right), t: Math.round(dr.top), b: Math.round(dr.bottom), vw, vh }, inViewport: dr.left >= -1 && dr.right <= vw + 1 && dr.top >= -1 && dr.bottom <= vh + 1, overlaps, past, wide, n: parts.length,
-            footBelowBody: fr.top >= R(d.querySelector('.inbox-card-body')).bottom - 1, footInside: fr.bottom <= dr.bottom + 1, display: getComputedStyle(d).display, cmdWraps: !cmd || cmd.scrollWidth <= cmd.clientWidth + 1 }; })()`);
+            bottomSpace: fr.bottom - Math.max(...[...foot.querySelectorAll('button')].map(button => R(button).bottom)), footBelowBody: fr.top >= R(d.querySelector('.inbox-card-body')).bottom - 1, footInside: fr.bottom <= dr.bottom + 1, display: getComputedStyle(d).display, cmdWraps: !cmd || cmd.scrollWidth <= cmd.clientWidth + 1 }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile, zoom] of [[1280, 900, false, '100%'], [390, 844, true, '100%'], [390, 844, true, '200%']]) {
@@ -84,6 +84,7 @@ const SHAPES = {
                         check(m.overlaps.length === 0, at + 'no two parts overlap: ' + m.overlaps.join('; '));
                         check(m.past.length === 0, at + 'nothing is past the dialog edge: ' + m.past.join('; '));
                         check(m.wide.length === 0, at + 'no label or line is wider than its box: ' + m.wide.join('; '));
+                        check(m.bottomSpace >= 11.5, at + 'at least 12px below Open agent / Close: ' + m.bottomSpace);
                         check(m.footBelowBody && m.footInside, at + 'Open agent and Close are a row under the body, inside the dialog');
                         check(m.display === 'flex', at + 'the card is a column, not the question dialog\'s grid: ' + m.display);
                     }

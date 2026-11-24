@@ -12,7 +12,7 @@ dialog.inbox-ask-dialog.inbox-card-dialog[open] { display: flex; flex-direction:
 .inbox-card-dialog .inbox-ask-offers-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .inbox-card-dialog .inbox-ask-offers-list .btn { flex: 0 1 auto; box-sizing: border-box; max-width: 100%; height: auto; min-height: 44px; padding-block: 8px; white-space: normal; overflow-wrap: anywhere; text-align: left; line-height: var(--lh-ui); }
 .inbox-card-dialog > .inbox-ask-error { margin: 8px 0 0; }
-.inbox-card-dialog > .inbox-ask-buttons { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.inbox-card-dialog > .inbox-ask-buttons { margin-top: 12px; padding-block: 12px; border-top: 1px solid var(--border); }
 .inbox-card-dialog > .inbox-ask-buttons .btn { height: auto; }
 @media (max-width: 500px) {
     .inbox-card-dialog .inbox-ask-offers-list .btn { flex: 1 1 100%; }
