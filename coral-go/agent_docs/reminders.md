@@ -27,6 +27,10 @@ A one-time reminder fires once. If the computer was off at its time, it fires on
 
 `coral-board task add ... --remind-at <time>` keeps working. When the time comes, an open, unparked task's assignee (or the team's Orchestrator when nobody is assigned) is reminded once, within the board's limits, and the reminder goes out as a one-time reminder of origin `task` on the same machinery as the ones above: it shows in `coral-board remind list`, is told after a restart if its minute passed while Coral was off, and is held while the Operator has switched that agent's reminders off (it is told once when they are switched back on). Only the Operator or the team's Orchestrator can cancel it; an agent marks it done with `coral-board remind done <id>`.
 
+## Reminders on a persona (#21184)
+
+A persona (a built-in one, or one saved in the New agent panel; saved ones are the `saved_personas` setting) may carry an optional `reminders` list, which the New agent panel's Reminders step fills in, labelled with the persona's name. It has the shape of a team template role's reminders (#21019): `reminders: [{"text": "...", "kind": "daily", "at": "09:00"}]`, where `kind` is `every` (with `every_minutes`, at least 15), `daily`, `weekdays` or `weekly` (`"at": "Mon 09:00"`), with an optional `timezone` (this computer's when left out) and `no_wake`. At most 5 a persona. Saving a persona checks none of this; each reminder is checked when the agent is created, by the same rules as any reminder (no secret, no sign-in link, 20 active at most per agent).
+
 ## From the Operator
 
 An agent's page (Team, Agents) has a Reminders section: its reminders with Cancel, and a form (**Instruction**, **Schedule**, **Repeat every**, **Day**, **Date and time** / **Time**, **Save reminder**) that adds a one-time reminder (**Once**) or a repeating one (**Repeat** every `5 minutes`, `15 minutes`, `30 minutes` or `Hour`; **Daily**; **Weekdays**; or **Weekly** on **Day** `Monday` to `Sunday` at **Time** in this computer's time zone). It is not available through Coral Hub.
