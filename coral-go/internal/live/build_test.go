@@ -57,9 +57,8 @@ func TestNothingButTheNamedFieldsComesOut(t *testing.T) {
 	require.NoError(t, err)
 	s := string(raw)
 	require.NotContains(t, s, "REALNAME-9f3", "the real name is never in a frame")
-	for _, want := range []string{`"label":`, `"v":1`, `"seq":7`} {
-		_ = want
-	}
+	require.Contains(t, s, `"v":1`)
+	require.Contains(t, s, `"seq":7`)
 	require.Contains(t, s, "Pub")
 	require.Contains(t, s, "TITLE-1")
 	require.Equal(t, "Pub", f.Posts[0].Author, "a post is signed with the public label")
@@ -110,7 +109,7 @@ func TestCorpusIsWithheldAndNeighboursToo(t *testing.T) {
 			shown++
 		}
 	}
-	require.Equal(t, 3, shown, "the hit and 5 before and 5 after are withheld; 14 posts leave 2 before and 1 after... see counts")
+	require.Equal(t, 3, shown, "14 posts, a hit at 7: 5 before and 5 after are withheld, so 0, 1 and 13 stay")
 	require.Equal(t, "plain note 0", f.Posts[0].Text)
 	require.Equal(t, "plain note 1", f.Posts[1].Text)
 	require.True(t, f.Posts[2].Withheld, "5 before the hit are withheld")
