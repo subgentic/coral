@@ -23,9 +23,9 @@ func hubScan() redact.Redactor { return secrets.HubRedactor(func() bool { return
 
 func twoAgents() []AgentFacts {
 	return []AgentFacts{
-		{RealName: "Backend Dev", Label: "Builder", Role: "backend", CLI: "claude", Status: StatusWorking, TaskTitle: "Fix the login page", Shown: true},
-		{RealName: "Ada Lovelace", Label: "", Role: "", CLI: "codex", Status: StatusIdle, Shown: true},
-		{RealName: "QA Engineer", Label: "Tester", Role: "qa", CLI: "claude", Status: StatusAsleep, Shown: false},
+		{RealName: "Backend Dev", Role: "backend", Status: StatusWorking, TaskTitle: "Fix the login page", Shown: true},
+		{RealName: "Ada Lovelace", Role: "", Status: StatusIdle, Shown: true},
+		{RealName: "QA Engineer", Role: "qa", Status: StatusAsleep, Shown: false},
 	}
 }
 
@@ -45,13 +45,14 @@ func TestFrameFieldCensus(t *testing.T) {
 		return out
 	}
 	require.Equal(t, []string{"Agents:[]live.Agent", "Posts:[]live.Post", "Seq:uint64", "V:int"}, names(Frame{}))
-	require.Equal(t, []string{"CLI:string", "Label:string", "Role:string", "Status:string", "Task:string"}, names(Agent{}))
-	require.Equal(t, []string{"At:int64", "Author:string", "Text:string", "Withheld:bool"}, names(Post{}))
+	require.Equal(t, []string{"Chat:[]live.Chat", "Role:string", "Status:string", "Task:string"}, names(Agent{}))
+	require.Equal(t, []string{"At:int64", "From:string", "Text:string", "W:bool"}, names(Post{}))
+	require.Equal(t, []string{"At:int64", "From:string", "Text:string", "W:bool"}, names(Chat{}))
 }
 
 // Every field of the input is filled with a unique marker: only the public ones may come out, and a real name never does.
 func TestNothingButTheNamedFieldsComesOut(t *testing.T) {
-	agents := []AgentFacts{{RealName: "REALNAME-9f3", Label: "Pub", Role: "ROLE-1", CLI: "CLI-1", Status: StatusWorking, TaskTitle: "TITLE-1", Shown: true}}
+	agents := []AgentFacts{{RealName: "REALNAME-9f3", Role: "pub-role", Status: StatusWorking, TaskTitle: "TITLE-1", Shown: true}}
 	f := Build(Input{Agents: agents, Posts: []PostFacts{post("REALNAME-9f3", "hello there", 1)}}, Options{Seq: 7}, hubScan())
 	raw, err := json.Marshal(f)
 	require.NoError(t, err)
@@ -59,19 +60,20 @@ func TestNothingButTheNamedFieldsComesOut(t *testing.T) {
 	require.NotContains(t, s, "REALNAME-9f3", "the real name is never in a frame")
 	require.Contains(t, s, `"v":1`)
 	require.Contains(t, s, `"seq":7`)
-	require.Contains(t, s, "Pub")
+	require.Contains(t, s, "pub-role")
 	require.Contains(t, s, "TITLE-1")
-	require.Equal(t, "Pub", f.Posts[0].Author, "a post is signed with the public label")
+	require.NotContains(t, s, "CLI-1", "the CLI is not on the wire")
+	require.Equal(t, "pub-role", f.Posts[0].From, "a post is signed with the role")
 }
 
 func TestLabelFallsBackToRoleThenAgentN(t *testing.T) {
 	f := Build(Input{Agents: twoAgents()}, Options{}, hubScan())
 	require.Len(t, f.Agents, 2, "a hidden agent is not in the frame")
-	require.Equal(t, "Builder", f.Agents[0].Label)
-	require.Equal(t, "Agent 2", f.Agents[1].Label, "no label and no role: Agent N by its place among the shown")
+	require.Equal(t, "backend", f.Agents[0].Role)
+	require.Equal(t, "Agent 2", f.Agents[1].Role, "no role: Agent N by its place among the shown")
 	for _, a := range f.Agents {
-		require.NotEqual(t, "QA Engineer", a.Label)
-		require.NotEqual(t, "Tester", a.Label)
+		require.NotEqual(t, "QA Engineer", a.Role)
+		require.NotEqual(t, "qa", a.Role, "a hidden agent's role is not shown")
 	}
 	require.Equal(t, "asleep", string(StatusAsleep))
 }
@@ -91,7 +93,7 @@ func TestHiddenAgentsPostsAndRealNamesAreNotShown(t *testing.T) {
 		require.NotContains(t, string(raw), bad)
 	}
 	require.Contains(t, string(raw), "thanks Agent 2, merging now", "a shown agent's @mention becomes its public label")
-	require.Contains(t, string(raw), "Builder finished the page", "a real name becomes the public label")
+	require.Contains(t, string(raw), "backend finished the page", "a real name becomes the public label")
 }
 
 func TestCorpusIsWithheldAndNeighboursToo(t *testing.T) {
@@ -105,14 +107,14 @@ func TestCorpusIsWithheldAndNeighboursToo(t *testing.T) {
 	require.NotContains(t, string(raw), "sk_live_")
 	shown := 0
 	for _, p := range f.Posts {
-		if !p.Withheld {
+		if !p.W {
 			shown++
 		}
 	}
 	require.Equal(t, 3, shown, "14 posts, a hit at 7: 5 before and 5 after are withheld, so 0, 1 and 13 stay")
 	require.Equal(t, "plain note 0", f.Posts[0].Text)
 	require.Equal(t, "plain note 1", f.Posts[1].Text)
-	require.True(t, f.Posts[2].Withheld, "5 before the hit are withheld")
+	require.True(t, f.Posts[2].W, "5 before the hit are withheld")
 	require.Equal(t, "plain note 13", f.Posts[len(f.Posts)-1].Text)
 }
 
@@ -125,11 +127,9 @@ func TestWithheldRunIsOneMarkerWithNoCount(t *testing.T) {
 	f := Build(Input{Agents: twoAgents(), Posts: posts}, Options{}, hubScan())
 	markers := 0
 	for _, p := range f.Posts {
-		if p.Withheld {
+		if p.W {
 			markers++
-			require.Equal(t, MarkerMessage, p.Text)
-			require.Empty(t, p.Author)
-			require.Zero(t, p.At)
+			require.Equal(t, Post{W: true}, p, "a withheld post is {w:true} and nothing else")
 		}
 	}
 	require.Equal(t, 1, markers, "a run of withheld posts is one marker, so a count does not leak")
@@ -142,10 +142,10 @@ func (errRedactor) Text([]byte) ([]byte, error) { return nil, errors.New("rules 
 func TestScanErrorWithholdsEverythingFailClosed(t *testing.T) {
 	f := Build(Input{Agents: twoAgents(), Posts: []PostFacts{post("Backend Dev", "hello", 1)}}, Options{}, errRedactor{hubScan()})
 	require.Len(t, f.Posts, 1)
-	require.True(t, f.Posts[0].Withheld)
+	require.True(t, f.Posts[0].W)
 	require.Empty(t, f.Agents[0].Task, "a task title that cannot be judged is dropped")
 	f = Build(Input{Agents: twoAgents(), Posts: []PostFacts{post("Backend Dev", "hello", 1)}}, Options{}, redact.Refuse)
-	require.True(t, f.Posts[0].Withheld, "the refusing redactor withholds too")
+	require.True(t, f.Posts[0].W, "the refusing redactor withholds too")
 }
 
 func TestPathsIdsAndControlCharactersAreNotShown(t *testing.T) {
