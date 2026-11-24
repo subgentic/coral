@@ -16,6 +16,7 @@ const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
 const { createMessaging, XT_KEYS } = await importOnce('./team_cross_team_fields.js');
 const { createOrchestratorGrant, OG_KEYS } = await importOnce('./team_orchestrator_grant.js');
+const { createReviewSize, RS_KEYS } = await importOnce('./team_review_size.js'); // the review size guard group (#21027)
 const { createTeamReminders } = await importOnce('./team_reminders.js'); // the agents' reminders group (#19288)
 const { createGuideRoster, GR_KEYS } = await importOnce('./team_guide_roster.js');
 const { healthFields, healthToValues, saveHealth, HEALTH_KEYS } = await importOnce('./team_health_fields.js');
@@ -94,6 +95,7 @@ function openSettingsState(team, options) {
     st.membersReady = boardFetch(team, '/subscribers').then(async r => (r.ok ? (await r.json()).filter(m => m.is_active !== 0) : [])).catch(() => []);
     st.xt = createMessaging(team); // the Messaging group: its fields, its lines and its save
     st.og = createOrchestratorGrant(team, () => st.membersReady); // the Orchestrator access group (#11432)
+    st.rs = createReviewSize(team, () => st.membersReady); // the review size guard group (#21027)
     st.rem = createTeamReminders(team);
     st.gr = createGuideRoster(team); // the Guides group: the names agents see on a guide's messages (#11457)
     st.modeOptions = () => (st.presets.length ? st.presets.map(p => ({ value: p.id, label: presetNameText(p) })) : DEFAULT_MODES);
@@ -158,6 +160,7 @@ function settingsGroups(st) {
         { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => st.membersReady, hasHeld: () => Boolean(st.healthBase && st.healthBase.held_notice), hasRecommend: () => Boolean(st.healthBase && st.healthBase.auto_recommend), monitorOff: () => !st.healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
         { id: 'messaging', domId: 'team-settings-messaging', label: 'Messaging', icon: 'chat', hint: 'How the team\'s messages reach its agents.', fields: st.xt.fields() },
         { id: 'orchestrator', domId: 'team-settings-orchestrator', label: 'Orchestrator access', icon: 'security', hint: 'What the Orchestrator may do to this team\'s agents.', fields: st.og.fields() },
+        { id: 'review-size', domId: 'team-settings-review-size', label: 'Review size guard', icon: 'difference', hint: 'A warning on a review that is too big to read well.', fields: st.rs.fields() },
         { id: 'reminders', domId: 'team-settings-reminders', label: 'Agent reminders', icon: 'notifications', hint: 'Which agents have reminders, and a switch for each.', fields: st.rem.fields() },
         { id: 'guides', domId: 'team-settings-guides', label: 'Guides', icon: 'group', hint: 'The names agents see on a guide\'s messages.', fields: st.gr.fields() },
         { id: 'prompts', label: 'Prompts', icon: 'description', hint: 'Read-only preview of the prompts agents get.', render: p => { p.innerHTML = '<div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection\u2026</div>'; } },
@@ -194,10 +197,12 @@ function loadSettings(st) {
         const orch = await st.og.load().catch(() => ({ values: null })); // the Operator's switch for the Orchestrator: not given to a page that may not read it (the group is then not drawn)
         if (!orch.values) st.view.removeGroup('orchestrator');
         if (!(await st.rem.load().catch(() => false))) st.view.removeGroup('reminders'); // the person's own: not served through Coral Hub (the group is then not drawn)
+        const size = await st.rs.load().catch(() => ({ values: null })); // the owner's setting: not given to a page that may not read it, or through Coral Hub (the group is then not drawn)
+        if (!size.values) st.view.removeGroup('review-size');
         const guides = await st.gr.load().catch(() => ({ values: null })); // the owner's roster: not given to a page that may not read it (the group is then not drawn)
         if (!guides.values) st.view.removeGroup('guides');
         st.q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), st.workingMode, { id: splitKey(st.team).name, name: boardLabel(st.team) }) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(st.team)))}</p>`;
-        return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), max_open_goals: Number(boardSettings?.max_open_goals) || 0, goals_need_approval: Boolean(boardSettings?.goals_need_approval), tasks_need_approval: Boolean(boardSettings?.tasks_need_approval), planning_approval: presetOf({ goals_need_approval: boardSettings?.goals_need_approval, tasks_need_approval: boardSettings?.tasks_need_approval, require_goal: boardSettings?.require_goal }), ...(st.healthBase ? healthToValues(st.healthBase) : {}), ...(orch.values || {}), ...(guides.values || {}) };
+        return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), max_open_goals: Number(boardSettings?.max_open_goals) || 0, goals_need_approval: Boolean(boardSettings?.goals_need_approval), tasks_need_approval: Boolean(boardSettings?.tasks_need_approval), planning_approval: presetOf({ goals_need_approval: boardSettings?.goals_need_approval, tasks_need_approval: boardSettings?.tasks_need_approval, require_goal: boardSettings?.require_goal }), ...(st.healthBase ? healthToValues(st.healthBase) : {}), ...(orch.values || {}), ...(size.values || {}), ...(guides.values || {}) };
     };
 }
 
@@ -249,6 +254,9 @@ function saveSettings(st) {
         if (OG_KEYS.some(k => k in changes)) {
             try { await st.og.save(values); saved.push(...OG_KEYS); } catch (error) { failures.push(error.message); }
         }
+        if (RS_KEYS.some(k => k in changes)) {
+            try { await st.rs.save(values); saved.push(...RS_KEYS); } catch (error) { failures.push(error.message); }
+        }
         if (GR_KEYS.some(k => k in changes)) {
             try { const kept = await st.gr.save(); st.view.set('gr_roster', kept); saved.push(...GR_KEYS); } catch (error) { failures.push(error.message); }
         }
@@ -256,7 +264,7 @@ function saveSettings(st) {
         if (failures.length) throw Object.assign(new Error(failures[0]), { saved, fields: fieldErrors });
         // the note names what was saved: the working mode takes effect on first claim, the instructions at each agent's next task (an agent mid-task, or answering a chat request, keeps the ones it was given; #17675)
         const saidNow = [['mode', 'dependency_guidance', 'asks_are_tasks'].some(k => k in changes) && 'Working mode applies to tasks agents claim from now on; tasks already claimed keep how they were set.', 'custom_instructions' in changes && "Additional instructions reach each agent with the next task it claims."].filter(Boolean);
-        return { note: saidNow.length ? 'Saved. ' + saidNow.join(' ') : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k) || OG_KEYS.includes(k) || GR_KEYS.includes(k)) };
+        return { note: saidNow.length ? 'Saved. ' + saidNow.join(' ') : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k) || OG_KEYS.includes(k) || RS_KEYS.includes(k) || GR_KEYS.includes(k)) };
     };
 }
 
@@ -265,6 +273,7 @@ function wirePage(st) {
     st.page.hasUnsaved = () => st.view.isDirty(); // read live by the leave-the-page question (team_working_mode.js)
     st.xt.bind(st.view);
     st.og.bind(st.view);
+    st.rs.bind(st.view);
     st.view.say('Loading\u2026');
     st.view.ready.then(() => {
         if (!st.page.isConnected) return;

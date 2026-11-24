@@ -1,0 +1,2 @@
+/* The review size guard's warning on a task in review (#21027): the banner is the shared .notice .notice-warn; only its second line is set here. */
+.review-size-note { margin-top: 2px; font-size: var(--fs-base); color: var(--text-secondary); }
