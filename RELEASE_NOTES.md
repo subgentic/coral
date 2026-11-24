@@ -1,5 +1,39 @@
 # Release Notes
 
+## v2.1.8 — Device-signed actions through a Hub, pictures in the rest of the text boxes, and a steadier task preview
+
+Task numbers in brackets. Built on v2.1.7. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Device-signed actions through a Hub work** (#20879): a send to an agent, a board post, keep Full Access, the Hub auto-accept switch, team guide and knowledge settings, file preview trust and the owner's member grants, signed by a trusted device key, are now accepted when they come through a Hub. A wrong method, or a newer signature on an older route, is refused. Actions signed directly on the computer are unchanged. Grants made by Hub members other than the owner (#20883) come later.
+- **The Hub auto-accept switch through a Hub** (#20882) takes exactly the value inside its signed request.
+- **The Hub can read where a device key arrived from** (#20903): the owner reads the arrival link through the Hub, for coral-hub's device screen.
+- **Pictures in the rest of the text boxes** (#20844, #20891, goal #285): goal edits, comment edits, job prompts, agent instructions and team working mode now take pictures too. Saved instruction pictures load before the editor opens, and goal picture previews are checked.
+- **A message number in an agent's question is a link as soon as the dialog shows** (#20872): its helpers load before the dialog opens, even on a busy computer.
+- **The task preview holds still while panels resize** (#20861, #20863, #20888): the side preview no longer jumps during a panel width change, and its resize handles appear only once they work.
+- **Add files on a goal page shows the new file** (#20945): a refresh asked for while the goal's file list was still loading is now run when the load ends, instead of being dropped. Slow computers showed this most.
+- **Settings help stays put through picture refreshes** (#20904).
+- **Comment on a diff line pressed while comments load is not lost** (#20965): the comment box opens once they arrive.
+
+### Test and gate fixes in this release
+
+- The internal/server test package releases closed servers as it goes, so it peaks well under its 2048 MiB memory guard (#20892).
+- Gate fixes on the first candidate (#20904, #20905): the Settings pin, team approval presets and UI consistency suites follow the new Edit button and help fix; the task preview room suite picks the sidebar rail at 1280 instead of racing its animation.
+- The task cost column check measures a fifth of the line, since the Status column's width follows the font (#20924, second candidate).
+- Windows on the third candidate: one runner fault (Chrome DevToolsActivePort), and team_add_files failed twice, traced to the real product bug fixed in #20945, with a failing-first scene in goal_artifacts_list. needs_phone_rows failed once on Windows and did not reproduce in 8 stressed runs; it is watched. On the fourth candidate model_picker passed on Windows only on a retry; it now waits for the exact option list instead of fixed 300 ms pauses (#20955).
+- Fifth candidate: mobile_agent_open and the census file-busy error on Windows fixed (#20965). Sixth candidate: saved_knowledge_one_line measures the rows it waits for, and a held-press scene pins the diff-comment fix (#20975); inbox_task_threads keeps its fake agents' waiting and task fields through a list refresh (#20980). needs_phone_rows retried once on Windows and is watched.
+- The start-CSS cap is unchanged.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches stay off.
+- Grants by Hub members other than the owner (#20883) are not in this release; they come switched off in the next one and open once the Hub signs those routes.
+- A second Hub joining with Allow and a code (#20901) is being built; nothing of it is in this release.
+
 ## v2.1.7 — A second Hub on the same Coral, pictures in task and board text boxes, and Inbox comments that stay in view
 
 Task numbers in brackets. Built on v2.1.6. A prerelease until the Operator promotes it.
