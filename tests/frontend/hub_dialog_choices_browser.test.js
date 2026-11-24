@@ -6,6 +6,8 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
 const { coralReady } = require('./helpers/wait');
 // #19864 (the Operator: "the hooks isn't in my inbox on CoralHub"): an agent stuck at a terminal dialog Coral read from its screen (Codex's "Hooks need review", on the row as at_dialog, no hook, waiting_for_input false)
 // is a Needs you row through the Hub with its menu's own options as buttons, no default and none chosen for the person, and a press answers through the computer's answer-prompt route. A dialog still inside its minutes is no row.
+// #21209: the server's note for Codex's hook review (the plugin the hook likely comes from), drawn on the card
+const HOOK_NOTE = "These are not Coral's hooks: Coral already trusts its own. Most likely the Codex plugin posthog (a plugin update changes its hook). Trust all lets them run outside the sandbox; Continue without trusting skips them.";
 const OPTIONS = [{ n: 1, label: 'Review hooks', action: 'select' }, { n: 2, label: 'Trust all and continue', action: 'select' }, { n: 3, label: 'Continue without trusting', action: 'select' }];
 const SHOWN = OPTIONS.map(o => o.label);
 (async () => {
@@ -22,7 +24,7 @@ const SHOWN = OPTIONS.map(o => o.label);
                 const real = window.fetch, json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const url = new URL(String(u), location.href), p = url.pathname, m = (o.method || 'GET').toUpperCase();
                     if (m === 'POST' && /\\/api\\/sessions\\/live\\/[^/]+\\/answer-prompt$/.test(p)) { window.__answers.push({ path: p, body: JSON.parse(o.body) }); return json({ ok: true }); }
-                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat$/.test(p)) return json({ messages: [], total: 0, prompt_options: { title: 'Hooks need review', question: 'Hooks need review 2 hooks are new or changed. Hooks can run outside the sandbox after you trust them.', ask_id: 'ask-1', multi: false, options: ${JSON.stringify(OPTIONS)} } });
+                    if (m === 'GET' && /\\/api\\/sessions\\/live\\/[^/]+\\/chat$/.test(p)) return json({ messages: [], total: 0, prompt_options: { title: 'Hooks need review', question: 'Hooks need review 2 hooks are new or changed. Hooks can run outside the sandbox after you trust them.', ask_id: 'ask-1', multi: false, hook_note: ${JSON.stringify(HOOK_NOTE)}, options: ${JSON.stringify(OPTIONS)} } });
                     return real(u, o); };
             })()` });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady(ev, 'startup', 'liveList', 'settings');
@@ -34,6 +36,7 @@ const SHOWN = OPTIONS.map(o => o.label);
             const names = await ev(`[...document.querySelectorAll('#group-table-view .inbox-answer')].map(b => b.textContent.trim())`);
             assert.deepEqual(names, SHOWN, at + 'the menu\'s own words, in its order');
             assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => r.textContent.includes('it is at a dialog')).length`), 1, at + 'one dialog row: the dialog still inside its minutes is none');
+            assert.ok((await ev(`[...document.querySelectorAll('#group-table-view .inbox-hook-note')].map(n => n.textContent)`)).every(t => t === HOOK_NOTE) && await ev(`document.querySelectorAll('#group-table-view .inbox-hook-note').length`) >= 1, at + 'the card says the hooks are not Coral\'s and names the plugin (#21209)');
             assert.equal(await ev(`document.querySelectorAll('#group-table-view .inbox-answer.primary, #group-table-view .inbox-answer[data-default]').length`), 0, at + 'no option is made the default');
             assert.deepEqual(await ev(`window.__answers.length`), 0, at + 'nothing was answered for the person');
             await ev(`new Promise(r => setTimeout(r, 900))`); // sleep-ok: an answer ignores a press for its first 400 ms (the arm hold, #14302)
