@@ -29,6 +29,7 @@ var KindRoutes = map[Kind][]Route{
 	AllowLink:               {{"POST", "/api/cloud/link-requests/{id}/allow"}},
 	MakeLinkKey:             {{"POST", "/api/cloud/link-keys"}},
 	RevokeLinkKey:           {{"DELETE", "/api/cloud/link-keys/{id}"}},
+	DenyLink:                {{"POST", "/api/cloud/link-requests/{id}/deny"}},
 }
 
 // RoutePath is the path of a signed request target: everything before the query.
@@ -56,7 +57,7 @@ func MatchRoute(k Kind, method, target string) (map[string]string, bool) {
 		if _, qok := BoxQuery(target); !qok {
 			return nil, false
 		}
-	case RevokeLinkKey:
+	case RevokeLinkKey, DenyLink: // no query to sign
 		if strings.IndexByte(target, '?') >= 0 {
 			return nil, false
 		}

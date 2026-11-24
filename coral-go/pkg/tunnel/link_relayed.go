@@ -34,7 +34,7 @@ func OpenLinkRelayedForTest(t interface{ Cleanup(func()) }) {
 // linkRelayedRoutes are the owner's three, Interact tier (Allow gives at most Interact, and a key only lets a Hub ask): Allow a waiting request, make a request key, revoke one. Only the Hub's owner is stamped for them
 // (OwnerHubOnly) and every one needs the relayed owner signature, checked by the guard and again by the handler. Deny, the feed, the key list and the Hub's own three calls are this computer's alone and are not here.
 var linkRelayedRoutes = owner(OwnerHubOnly,
-	rules(http.MethodPost, TierInteract, "/api/cloud/link-requests/{id}/allow", "/api/cloud/link-keys"),
+	rules(http.MethodPost, TierInteract, "/api/cloud/link-requests/{id}/allow", "/api/cloud/link-requests/{id}/deny", "/api/cloud/link-keys"),
 	rules(http.MethodDelete, TierInteract, "/api/cloud/link-keys/{id}"),
 	// The two reads the owner's Inbox needs to Allow through a Hub (#20966): the waiting requests, and the keys this link made. Plain reads: no device signature, no query.
 	rules(http.MethodGet, TierInteract, "/api/cloud/link-requests", "/api/cloud/link-keys"),

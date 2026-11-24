@@ -25,6 +25,10 @@ func TestTheLinkKindsSignTheirOwnRoutesAndTheBoxKeyQuery(t *testing.T) {
 		{AllowLink, "POST", "/api/cloud/link-requests/lr-1/allow?box_pk=" + pk[:42], false, "a short key"},
 		{AllowLink, "POST", "/api/cloud/link-requests/lr-1/allow?box_pk=" + pk + "&box_pk=" + pk, false, "a repeated key"},
 		{AllowLink, "POST", "/api/cloud/link-requests/lr-1/deny?box_pk=" + pk, false, "another route"},
+		{DenyLink, "POST", "/api/cloud/link-requests/lr-1/deny", true, "deny"},
+		{DenyLink, "POST", "/api/cloud/link-requests/lr-1/deny?box_pk=" + pk, false, "deny takes no query"},
+		{DenyLink, "POST", "/api/cloud/link-requests/lr-1/allow?box_pk=" + pk, false, "another route"},
+		{DenyLink, "DELETE", "/api/cloud/link-requests/lr-1/deny", false, "wrong method"},
 		{MakeLinkKey, "POST", "/api/cloud/link-keys?box_pk=" + pk, true, "make with the key"},
 		{MakeLinkKey, "POST", "/api/cloud/link-keys", false, "make without a key"},
 		{MakeLinkKey, "GET", "/api/cloud/link-keys?box_pk=" + pk, false, "the list is never relayed"},
@@ -36,7 +40,7 @@ func TestTheLinkKindsSignTheirOwnRoutesAndTheBoxKeyQuery(t *testing.T) {
 		_, ok := MatchRoute(c.k, c.method, c.target)
 		assert.Equal(t, c.ok, ok, c.why)
 	}
-	for _, k := range []Kind{AllowLink, MakeLinkKey, RevokeLinkKey} {
+	for _, k := range []Kind{AllowLink, MakeLinkKey, RevokeLinkKey, DenyLink} {
 		assert.True(t, relayedKnown(k), string(k))
 	}
 	k, ok := KindOfRoute("POST", "/api/cloud/link-keys?x=1")

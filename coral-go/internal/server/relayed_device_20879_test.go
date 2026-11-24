@@ -213,7 +213,7 @@ func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
 				assert.Equal(t, tunnel.TierLaunch, tunnel.Classify(rt.Method, devicekey.RoutePath(target), "allow=true"), "the route takes its signed query")
 				continue
 			}
-			if k == devicekey.AllowLink || k == devicekey.MakeLinkKey || k == devicekey.RevokeLinkKey {
+			if k == devicekey.AllowLink || k == devicekey.MakeLinkKey || k == devicekey.RevokeLinkKey || k == devicekey.DenyLink {
 				// The join's three are the owner's alone, behind LinkRequestRelayedOpen (#20966): shut here, so a Hub cannot reach them; the gate-open cases are in link_relayed_20966_test.go.
 				assert.Equal(t, tunnel.TierNever, tunnel.Classify(rt.Method, devicekey.RoutePath(target), ""), "%s %s", rt.Method, rt.Pattern)
 				continue
@@ -263,7 +263,7 @@ func TestARelayedSignedRequestIsCheckedOnEveryRouteOfEveryKind(t *testing.T) {
 			}
 		}
 	}
-	assert.Equal(t, 19, n, "every route of the table was visited (a route added to KindRoutes is visited too: add it here, or to the gaps)")
+	assert.Equal(t, 20, n, "every route of the table was visited (a route added to KindRoutes is visited too: add it here, or to the gaps)")
 }
 
 // The owner's key signs only as the owner this link confirmed (the pin), and only for the person the stamp names. (The two owner-only kinds are not reachable through the tunnel's route table yet, see the gaps in the

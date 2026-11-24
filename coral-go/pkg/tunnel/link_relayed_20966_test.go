@@ -14,6 +14,7 @@ var linkRelayedCases = []struct{ method, path, query string }{
 	{http.MethodPost, "/api/cloud/link-requests/lr-1/allow", "box_pk=" + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
 	{http.MethodPost, "/api/cloud/link-keys", "box_pk=" + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
 	{http.MethodDelete, "/api/cloud/link-keys/lk-aaaa1111", ""},
+	{http.MethodPost, "/api/cloud/link-requests/lr-1/deny", ""},
 }
 
 func TestLinkRoutesAreShutUntilTheRelayedGateOpens(t *testing.T) {
@@ -30,8 +31,7 @@ func TestLinkRoutesAreShutUntilTheRelayedGateOpens(t *testing.T) {
 		assert.True(t, ForwardsDeviceHeaders(r.method, r.path), "%s %s", r.method, r.path)
 	}
 	// Nothing else of the join is a Hub's, open or shut.
-	for _, r := range [][2]string{{http.MethodPost, "/api/cloud/link-requests/lr-1/deny"},
-		{http.MethodPost, "/api/cloud/link-requests"}, {http.MethodPost, "/api/cloud/link-requests/lr-1/finish"}, {http.MethodGet, "/api/cloud/link-requests/lr-1"}} {
+	for _, r := range [][2]string{{http.MethodPost, "/api/cloud/link-requests"}, {http.MethodPost, "/api/cloud/link-requests/lr-1/finish"}, {http.MethodGet, "/api/cloud/link-requests/lr-1"}} {
 		assert.Equal(t, TierNever, Classify(r[0], r[1], ""), "%s %s stays this computer's", r[0], r[1])
 	}
 	assert.Equal(t, TierNever, Classify(http.MethodPost, "/api/cloud/link-keys", "box_pk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&x=1"), "no other parameter")

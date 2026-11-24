@@ -21,7 +21,7 @@ import (
 
 // relayedRequired are the kinds whose request must carry the signature: without it the guard refuses (bad_form), where for the others a request with none of the headers goes on untouched. Giving or ending a member's
 // access (#20883) is one: a Hub request for it with no signature is never a local request and never a grant. The handler asks again (RelayedFrom), so removing either check still leaves the route refused.
-var relayedRequired = map[devicekey.Kind]bool{devicekey.GrantMember: true, devicekey.AllowLink: true, devicekey.MakeLinkKey: true, devicekey.RevokeLinkKey: true}
+var relayedRequired = map[devicekey.Kind]bool{devicekey.GrantMember: true, devicekey.AllowLink: true, devicekey.MakeLinkKey: true, devicekey.RevokeLinkKey: true, devicekey.DenyLink: true}
 
 // RelayedGuard is the guard, after the link stamp and before the grant check. verifier is the computer's one device verifier (nil when there is none); ownerLabel is the owner label confirmed for the link the
 // request came through, "" when none.

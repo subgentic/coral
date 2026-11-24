@@ -188,6 +188,10 @@ func (h *CloudHandler) LinkRequestAllow(w http.ResponseWriter, r *http.Request) 
 
 // LinkRequestDeny: POST /api/cloud/link-requests/{id}/deny.
 func (h *CloudHandler) LinkRequestDeny(w http.ResponseWriter, r *http.Request) {
+	if _, signed := devicekey.RelayedFrom(r.Context()); signed && cloud.Tunneled(r) {
+		h.relayedDeny(w, r)
+		return
+	}
 	if h.linkRequestHuman(w, r) || !requireJSON(w, r) {
 		return
 	}

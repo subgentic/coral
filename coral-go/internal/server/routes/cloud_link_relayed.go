@@ -60,13 +60,16 @@ func relayedLink(w http.ResponseWriter, r *http.Request, kind devicekey.Kind) (c
 	}
 	r.Body = io.NopCloser(bytes.NewReader(raw))
 	c = relayedLinkCall{m: m, body: raw}
-	if kind != devicekey.RevokeLinkKey {
+	if kind == devicekey.AllowLink || kind == devicekey.MakeLinkKey {
 		pk, qok := devicekey.BoxQuery(m.Path)
 		if !qok {
 			errBadRequest(w, "send the browser's one-time key (box_pk) in the signed request")
 			return c, false
 		}
 		c.pk = pk
+	}
+	if refuseNonOwner(w, r) { // the table's owner rule, asked by every relayed join kind and not only the reads (Security's SHOULD on #20966)
+		return c, false
 	}
 	mode, owner, found := relayedSignerMode(r.Context(), m.KID)
 	if !found || !owner { // a Hub person's own bound device never makes or ends a key or allows a join: only the owner's
@@ -208,6 +211,22 @@ func (h *CloudHandler) relayedKeyRevoke(w http.ResponseWriter, r *http.Request) 
 	slog.Info("cloud: link key revoked through a Hub", "key", id, "link", c.m.Link)
 	h.recordLinkKey(r, "link_key_revoke", id, name)
 	h.noteRelayedLink(r, " key="+id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// relayedDeny is LinkRequestDeny for a verified relayed request: a waiting request is denied (it counts toward the two-denials mute), an allowed one that is not finished is cancelled (expired, no mute), and its code stops working.
+func (h *CloudHandler) relayedDeny(w http.ResponseWriter, r *http.Request) {
+	c, ok := relayedLink(w, r, devicekey.DenyLink)
+	if !ok {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if err := h.links.DenyLinkRequest(r.Context(), id, time.Now()); err != nil {
+		h.linkRequestErr(w, err)
+		return
+	}
+	slog.Info("cloud: link request denied through a Hub", "request", id, "link", c.m.Link)
+	h.noteRelayedLink(r, "")
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 

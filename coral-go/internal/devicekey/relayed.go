@@ -40,10 +40,11 @@ const (
 	AllowLink               Kind = "allow-link"      // #20966: Allow a second Hub's request to join; the 8-digit code goes back sealed
 	MakeLinkKey             Kind = "make-link-key"   // #20966: make a request key for a self-hosted Hub; the key goes back sealed
 	RevokeLinkKey           Kind = "revoke-link-key" // #20966
+	DenyLink                Kind = "deny-link"       // #20966: Deny a waiting join request, or cancel an allowed one that is not finished
 )
 
 // RelayedKinds is every relayed kind.
-var RelayedKinds = []Kind{GuideRoster, GrantMember, InputGrant, KeepFullAccess, HubAutoAccept, OrchestratorGrant, TrustPreview, DailyKnowledgeTeam, DailyKnowledgeAutoApply, DailyKnowledgeAccept, DailyKnowledgeRevert, SendToAgent, BoardPost, AllowLink, MakeLinkKey, RevokeLinkKey}
+var RelayedKinds = []Kind{GuideRoster, GrantMember, InputGrant, KeepFullAccess, HubAutoAccept, OrchestratorGrant, TrustPreview, DailyKnowledgeTeam, DailyKnowledgeAutoApply, DailyKnowledgeAccept, DailyKnowledgeRevert, SendToAgent, BoardPost, AllowLink, MakeLinkKey, RevokeLinkKey, DenyLink}
 
 // relayedLabel starts every v3 signing input, so a v3 signature is never a v2 one and the reverse.
 const relayedLabel = "coral-hub/device-keys/3/"

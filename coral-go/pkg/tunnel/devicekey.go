@@ -54,6 +54,7 @@ var relayedRoutes = []RelayedRoute{
 	{"POST", "/api/cloud/link-requests/{id}/allow"},
 	{"POST", "/api/cloud/link-keys"},
 	{"DELETE", "/api/cloud/link-keys/{id}"},
+	{"POST", "/api/cloud/link-requests/{id}/deny"},
 }
 
 // RelayedRoutes lists the routes of the relayed signed kinds, for the test that keeps them equal to devicekey.KindRoutes.
