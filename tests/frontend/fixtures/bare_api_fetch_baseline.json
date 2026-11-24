@@ -76,6 +76,14 @@
     "worktrees_panel.js": {
       "count": 2,
       "reason": "the worktrees panel lists this computer's folders; removing is not offered through the Hub (canRemove is !isCloud)"
+    },
+    "live_links.js": {
+      "count": 1,
+      "reason": "Local human-only Live list; answeredLocally refuses cloud and remote teams before fetch. Never tunneled."
+    },
+    "live_needs.js": {
+      "count": 1,
+      "reason": "Local human-only Stop from Needs you; answeredLocally refuses cloud before fetch. Never tunneled."
     }
   }
 }

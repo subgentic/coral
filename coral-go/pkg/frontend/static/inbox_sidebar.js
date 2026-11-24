@@ -426,6 +426,14 @@ const filteredNeeds = () => { const kept = NF.keepOrder(orderedNeeds(), needsKey
 const needsOverflow = () => reviewGroups(filteredNeeds().filter(s => s.review && !s.review.starred).map(s => s.review)).filter(g => g.more.length);
 /** Grouped on Waiting on an agent, every row of one agent (or one goal) sits together, in the order of the group's first row: a divider is drawn where the group changes, so a thread row and a file row of one agent apart would each get a heading (#20190, walk item 9: two Writer headings). */
 const clusterAgentRows = rows => { if (needsTab !== 'agent' || !(agentGroup || agentGoal)) return rows; const keyOf = (r, i) => isAgentRow(r) && !r.review?.starred ? (agentGroup ? `agent:${AW.agentWaitState(refOf(r)).who}` : `goal:${r.goal?.id || 'none'}`) : `row:${i}`, by = new Map(); rows.forEach((r, i) => { const k = keyOf(r, i); if (!by.has(k)) by.set(k, []); by.get(k).push(r); }); return [...by.values()].flat(); };
+let liveAttention = null;
+if (!isCloud()) importOnce('./live_needs.js').then(m => {
+    liveAttention = m;
+    m.watchLiveAttention(() => { updateInboxTab(); renderInboxNav(true); });
+    onInboxHooks({ liveCount: m.liveAttentionCount });
+    m.refreshLiveAttention();
+}).catch(() => {});
+
 const needsRows = () => {
     const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review && !s.review.starred).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
     return [...trustRows(clusterAgentRows(arrangeReviewRows(all.filter(s => !s.review || s.review.starred || visible.has(s.review.reviewKey)), groupReviews)), () => renderInboxNav(true)), ...(activeNeedsTeam || needsTab !== 'you' ? [] : welcomeRows())]; // Getting started: on Waiting on you only, last, untouched by search and filters (#19274); the tab counts them (walk #20009 item 5), the badges do not
@@ -1223,6 +1231,7 @@ function renderInboxNav(force = false) {
     setHidden(document.querySelector('.sidebar-header[data-header="hub-inbox"] [data-group-toggle]'), true); // folders do not fold: the collapse-all button has nothing to fold
     syncLeadStrip(sections, here);
     refreshGroupTable('hub-inbox'); addEmptyAgentsButton();
+    liveAttention?.mountLiveAttention(group === 'needs' && needsTab === 'you' ? $('group-table-view') : null, activeNeedsTeam ? splitKey(activeNeedsTeam).name : '');
     // An answered row leaves as soon as the agent stops waiting (#14408, with the server's state of #14345): that is the Answer's own result, so the table it was answered in redraws once, not held under a resting pointer
     for (const [k, a] of answeredRows) {
         if (Date.now() - a.at > 3e5) answeredRows.delete(k);
@@ -1929,7 +1938,7 @@ function mountInbox() {
     new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; persistNeedsFilters(); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
     $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
     if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
-    onInboxHooks({ extra: HJ.joinCount, goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
+    onInboxHooks({ extra: HJ.joinCount, goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; liveAttention?.refreshLiveAttention(); renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
     saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
     saved.mountInboxSavedBar($('inbox-saved-bar'));
 }

@@ -43,6 +43,8 @@ const PRESET_EDITOR = `<details class="disclosure team-settings-section workflow
 export async function showTeamSettingsPage(team, options = {}) {
     options.page?.querySelector('#team-settings-workspace')?.view?.destroy();
     const st = openSettingsState(team, options);
+    // Gate refusal means no entry, including on every remote/cloud team.
+    st.liveLinks = answeredLocally(team) ? await importOnce('./live_links.js').then(m => m.localLiveLinks(team)).catch(() => null) : null;
     const opts = settingsViewOptions(st);
     st.view = mountSettingsView(st.page, opts);
     groupRows(st.page, opts.groups); // the large headings and the rails (#15058)
@@ -163,6 +165,13 @@ function settingsGroups(st) {
         { id: 'review-size', domId: 'team-settings-review-size', label: 'Review size guard', icon: 'difference', hint: 'A warning on a review that is too big to read well.', fields: st.rs.fields() },
         { id: 'reminders', domId: 'team-settings-reminders', label: 'Agent reminders', icon: 'notifications', hint: 'Which agents have reminders, and a switch for each.', fields: st.rem.fields() },
         { id: 'guides', domId: 'team-settings-guides', label: 'Guides', icon: 'group', hint: 'The names agents see on a guide\'s messages.', fields: st.gr.fields() },
+        ...(st.liveLinks ? [{ id: 'live', label: 'Coral Live', icon: 'public', hint: 'A public, read-only live view of this team.', render: slot => {
+            importOnce('./live_controller.js').then(m => {
+                if (!slot.isConnected) return;
+                st.liveControls = m.mountLiveControls(slot, { team: st.team, teamLabel: splitKey(st.team).name, links: st.liveLinks });
+                const destroy = st.view.destroy; st.view.destroy = () => { st.liveControls?.destroy(); destroy(); };
+            }).catch(() => { slot.textContent = 'Coral Live could not be shown.'; });
+        } }] : []),
         { id: 'prompts', label: 'Prompts', icon: 'description', hint: 'Read-only preview of the prompts agents get.', render: p => { p.innerHTML = '<div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection\u2026</div>'; } },
     ];
 }

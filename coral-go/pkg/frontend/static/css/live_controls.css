@@ -1,0 +1,84 @@
+/* Approved mock title sizes, scoped to this lazy component. */
+
+/* Lazy, scoped computer-side Coral Live controls (#21030). */
+.coral-live *{box-sizing:border-box}
+.coral-live{
+ --live-title-size: 1.5rem;
+ --live-phone-title-size: 1.375rem;
+ /* The checkbox box; its containing label supplies the 44px target. */
+ --live-check-size: 1.25rem;
+ margin:0;background:var(--bg-primary);color:var(--text-primary);font:var(--fs-lg)/1.5 system-ui,-apple-system,sans-serif}
+.coral-live button,.coral-live input,.coral-live select{font:inherit;color:inherit}
+.coral-live button,.coral-live select,.coral-live input[type=text]{background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:9px 12px;min-height:44px}
+.coral-live button{cursor:pointer}
+.coral-live button:disabled{opacity:.45;cursor:default}
+.coral-live button:focus-visible,.coral-live input:focus-visible,.coral-live select:focus-visible,.coral-live a:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.coral-live button.coral-live-primary{background:color-mix(in srgb,var(--success) 12%,var(--bg-secondary));border-color:var(--success);color:var(--success);font-weight:var(--fw-strong)}
+.coral-live button.coral-live-danger{border-color:var(--warning-text);color:var(--warning-text)}
+.coral-live input[type=checkbox]{width:var(--live-check-size);height:var(--live-check-size);flex:none;accent-color:var(--success)}
+.coral-live header{border-bottom:1px solid var(--border-color);padding:14px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.coral-live header strong{font-size:var(--fs-xl)}
+.coral-live .coral-live-muted,.coral-live small{color:var(--text-secondary)}
+.coral-live small{font-size:var(--fs-base)}
+.coral-live main{max-width:1280px;margin:auto;padding:24px}
+.coral-live .coral-live-reviewbar,.coral-live .coral-live-actions,.coral-live .coral-live-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.coral-live .coral-live-reviewbar{margin-bottom:24px}
+.coral-live .coral-live-reviewbar strong{margin-right:auto}
+.coral-live .coral-live-reviewbar select{width:auto;max-width:100%}
+.coral-live h1{font-size:var(--live-title-size);line-height:var(--lh-label);margin:4px 0 10px}
+.coral-live h2{font-size:var(--fs-xl);margin:0 0 12px}
+.coral-live h3{font-size:var(--fs-lg);margin:0}
+.coral-live p{margin:8px 0 14px}
+.coral-live .coral-live-eyebrow{text-transform:uppercase;letter-spacing:normal;font-size:var(--fs-sm);color:var(--text-secondary)}
+.coral-live .coral-live-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+.coral-live .coral-live-card{padding:var(--card-pad);background:var(--card-fill);border:var(--card-border);border-radius:var(--card-radius);margin-top:16px;min-width:0}
+.coral-live .coral-live-notice{display:block;margin:16px 0}
+.coral-live .coral-live-notice p:last-child{margin-bottom:0}
+.coral-live .coral-live-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.coral-live label.coral-live-field{display:flex;flex-direction:column;gap:6px;font-size:var(--fs-base);color:var(--text-secondary)}
+.coral-live select,.coral-live input[type=text]{width:100%;color:var(--text-primary)}
+.coral-live .coral-live-check{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 0;cursor:pointer}
+.coral-live .coral-live-check span{min-width:0}
+.coral-live .coral-live-check small{display:block}
+.coral-live .coral-live-check:has(:disabled){cursor:default}
+.coral-live .coral-live-section-separator{border-top:1px solid var(--border-color);padding-top:16px;margin-top:16px}
+.coral-live .coral-live-actions{margin-top:18px}
+.coral-live .coral-live-status{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border-color);border-radius:var(--radius-xl);padding:3px 10px;font-size:var(--fs-base)}
+.coral-live .coral-live-status.coral-live-live{color:var(--success)}
+.coral-live .coral-live-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.coral-live .coral-live-facts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+.coral-live .coral-live-fact small{display:block}
+.coral-live .coral-live-needs{border-left:3px solid var(--success)}
+.coral-live .coral-live-needs .coral-live-row{justify-content:space-between}
+.coral-live .coral-live-needs p{font-size:var(--fs-md)}
+.coral-live .coral-live-badge{border:1px solid var(--border-color);border-radius:var(--radius-sm);font-size:var(--fs-sm);padding:2px 5px;color:var(--text-secondary)}
+.coral-live .coral-live-previewhead{border-bottom:1px solid var(--border-color);padding-bottom:14px;margin-bottom:16px}
+.coral-live .coral-live-public{background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:20px;margin-top:16px}
+.coral-live .coral-live-agent{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:13px 0;border-bottom:1px solid var(--border-color)}
+.coral-live .coral-live-agent .coral-live-task{grid-column:1/-1;color:var(--text-secondary);font-size:var(--fs-md)}
+.coral-live .coral-live-post,.coral-live .coral-live-message{padding:12px 0;border-bottom:1px solid var(--border-color)}
+.coral-live .coral-live-post:last-child,.coral-live .coral-live-message:last-child{border-bottom:0}
+.coral-live .coral-live-post p,.coral-live .coral-live-message p{margin:4px 0;font-size:var(--fs-md)}
+.coral-live .coral-live-withheld{color:var(--text-secondary);font-style:italic}
+.coral-live .coral-live-annotation{margin-top:24px;font-size:var(--fs-base);color:var(--text-secondary)}
+.coral-live [data-live="status-line"]{min-height:24px;margin-top:12px;color:var(--success)}
+.coral-live [hidden]{display:none!important}
+.coral-live .coral-live-tight{margin-bottom:0}
+@media(max-width:750px){.coral-live header{padding:12px 16px}
+.coral-live main{padding:20px 12px}
+.coral-live .coral-live-columns{grid-template-columns:minmax(0,1fr);gap:20px}
+.coral-live .coral-live-public{padding:16px}
+.coral-live .coral-live-fields{grid-template-columns:1fr}
+.coral-live .coral-live-reviewbar{align-items:stretch}
+.coral-live .coral-live-reviewbar strong{width:100%}
+.coral-live .coral-live-reviewbar select{flex:1;min-width:0}
+.coral-live h1{font-size:var(--live-phone-title-size)}
+.coral-live .coral-live-actions button{flex:1 1 auto}
+.coral-live .coral-live-facts{gap:14px}
+.coral-live .coral-live-reviewbar button{padding:8px}
+.coral-live .coral-live-preview-column{border-top:1px solid var(--border-color);padding-top:20px}
+}
+
+
+
+.coral-live .coral-live-between{justify-content:space-between}
