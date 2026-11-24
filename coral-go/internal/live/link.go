@@ -98,6 +98,7 @@ type Link struct {
 	ChatOffWhy   string    `json:"chat_off_why,omitempty"`
 	LastViewedS  *int64    `json:"last_viewed_age_s,omitempty"` // as the Hub reports; never used for a decision
 	HubStops     int       `json:"hub_stops"`
+	Computer     string    `json:"computer"` // this computer's identity when the link was made or went live (design 14.6, answer 3)
 }
 
 // Clock is this computer's wall clock; tests set it.
@@ -157,6 +158,8 @@ type Config struct {
 	ChatAvailable func(a AgentRow) bool
 	Redactor      redact.Redactor
 	NewID         func() string
+	// Computer is this computer's identity (the device key's fingerprint). A live link stored under another one comes back paused (reason restart).
+	Computer string
 }
 
 // Manager holds the links.
@@ -188,7 +191,7 @@ func NewManager(cfg Config) (*Manager, error) {
 			l := ls[i]
 			m.links[l.ID] = &l
 			m.order = append(m.order, l.ID)
-			if l.State == StateLive && l.Approved != nil && l.Approved.ChatKey != "" {
+			if l.State == StateLive && ((l.Approved != nil && l.Approved.ChatKey != "") || l.Computer != cfg.Computer) {
 				m.pause(&l, ReasonRestart)
 				m.links[l.ID] = &l
 			}
@@ -265,7 +268,7 @@ func (m *Manager) Create(hubLink, team, by string) (Link, error) {
 		}
 	}
 	now := m.cfg.Clock.Now()
-	l := &Link{ID: m.cfg.NewID(), HubLink: hubLink, Team: team, CreatedBy: by, State: StateDraft, CreatedAt: now,
+	l := &Link{ID: m.cfg.NewID(), HubLink: hubLink, Team: team, CreatedBy: by, State: StateDraft, CreatedAt: now, Computer: m.cfg.Computer,
 		Views: Views{PeriodDays: MaxPeriod, ExpiresIn: "none", DelayS: 30}}
 	m.links[l.ID] = l
 	m.order = append(m.order, l.ID)
@@ -468,6 +471,7 @@ func (m *Manager) approve(l *Link, keys []string, hash string) {
 	now := m.cfg.Clock.Now()
 	l.Approved = &Approved{Hash: hash, AgentKeys: keys, ChatKey: l.Views.ChatKey, ChatGen: l.ChatGen, ExpiresIn: l.Views.ExpiresIn, DelayS: l.Views.DelayS, PeriodDays: l.Views.PeriodDays, At: now}
 	l.State, l.PausedReason, l.ChatOffWhy = StateLive, "", ""
+	l.Computer = m.cfg.Computer
 	l.ConfirmedAt, l.LiveSince = now, now
 	l.ChatSince = time.Time{}
 	if l.Views.ChatKey != "" {

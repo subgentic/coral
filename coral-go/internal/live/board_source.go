@@ -58,7 +58,7 @@ func (b *BoardSource) Agents(ctx context.Context) ([]AgentRow, error) {
 	return out, nil
 }
 
-// Posts reads the newest public posts of this team: a message to a group, one Coral wrote itself, and a copy of another team's message are not the team's public posts and are left out.
+// Posts reads the newest public posts of this team: a message to a group, one Coral wrote itself, a copy of another team's message, a question to the Operator (or an answer to one) and a post a Hub user made are not the team's public posts and are left out.
 // It reads a few more than n so that leaving those out still gives n when there are that many.
 func (b *BoardSource) Posts(ctx context.Context, n int) ([]PostRow, error) {
 	msgs, err := b.r.ListMessages(ctx, b.project, n*4+20, 0, 0)
@@ -67,7 +67,7 @@ func (b *BoardSource) Posts(ctx context.Context, n int) ([]PostRow, error) {
 	}
 	var out []PostRow
 	for _, m := range msgs {
-		if m.Project != b.project || m.TargetGroupID != nil || m.IsSystem || len(m.External) > 0 {
+		if m.Project != b.project || m.TargetGroupID != nil || m.IsSystem || len(m.External) > 0 || m.Ask != nil || m.ReplyTo != nil || m.Origin != nil || m.HubUser != nil {
 			continue
 		}
 		at, err := parseBoardTime(m.CreatedAt)

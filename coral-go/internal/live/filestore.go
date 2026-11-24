@@ -8,7 +8,7 @@ import (
 )
 
 // Open is the gate (design: every slice ships shut). While it is false no route answers and nothing is read or written. Only a reviewed change sets it, and only the Operator's release decision opens it.
-var Open = false
+const Open = false
 
 // FileStore keeps the links in one file in this computer's data folder: private to this user (0600), written whole to a new file and renamed over the old one. A file that is there but cannot be read is an error, never "no links": a guard must not forget a live link.
 type FileStore struct{ Path string }

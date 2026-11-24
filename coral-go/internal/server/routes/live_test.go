@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,10 +22,12 @@ import (
 
 const liveHub = "11111111-2222-3333-4444-555555555555"
 
-func openLive(t *testing.T) {
-	t.Helper()
-	live.Open = true
-	t.Cleanup(func() { live.Open = false })
+// openLiveHandler is a handler with its gate open (the real one is a const, shut) and a fixed machine id.
+func openLiveHandler(h *BoardHandler) *LiveHandler {
+	lh := NewLiveHandler(h)
+	lh.open = true
+	lh.machineID = func() (string, error) { return "machine-1", nil }
+	return lh
 }
 
 type liveCall struct {
@@ -84,9 +88,8 @@ func TestLiveRoutesAreClosedWhileTheGateIsShut(t *testing.T) {
 
 // MUST C: all three refusals for every route that widens or acts (an agent token, a Hub-stamped request, a caller that is not a livePerson).
 func TestEveryLiveRouteRefusesAnAgentTheHubAndAScript(t *testing.T) {
-	openLive(t)
 	_, h := setupBoardTestServer(t)
-	lh := NewLiveHandler(h)
+	lh := openLiveHandler(h)
 	agent := func(r *http.Request) {
 		livePerson(r)
 		r.Header.Set(store.SessionTokenHeader, "some-agent-token")
@@ -112,14 +115,13 @@ func TestLiveRoutesNeverGoThroughTheHub(t *testing.T) {
 }
 
 func TestTheLiveFlowThroughTheRoutes(t *testing.T) {
-	openLive(t)
 	_, h := setupBoardTestServer(t)
 	ctx := context.Background()
 	_, err := h.bs.Subscribe(ctx, "team", "Backend Dev", "backend", "sess-be", nil, "all")
 	require.NoError(t, err)
 	_, err = h.bs.Subscribe(ctx, "team", "QA Engineer", "qa", "sess-qa", nil, "all")
 	require.NoError(t, err)
-	lh := NewLiveHandler(h)
+	lh := openLiveHandler(h)
 	by := map[string]liveCall{}
 	for _, c := range liveRoutes() {
 		by[c.method+" "+c.path] = c
@@ -228,4 +230,41 @@ func TestTheLiveFlowThroughTheRoutes(t *testing.T) {
 
 	raw, _ := json.Marshal(out)
 	assert.NotContains(t, string(raw), "http", "no route answers a URL")
+}
+
+// Security's MUST on #21047: a link is stored with a hash of this computer's machine id (never the id), and a different one, or none, brings a live link back paused.
+func TestALiveLinkStoredOnAnotherComputerComesBackPaused(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	h.coralDir = t.TempDir()
+	ctx := context.Background()
+	_, err := h.bs.Subscribe(ctx, "team", "Backend Dev", "backend", "sess-be", nil, "all")
+	require.NoError(t, err)
+	lh := openLiveHandler(h)
+	m, err := lh.manager()
+	require.NoError(t, err)
+	l, err := m.Create(liveHub, "team", "Operator")
+	require.NoError(t, err)
+	p, err := m.Preview(ctx, l.ID)
+	require.NoError(t, err)
+	_, err = m.GoLive(ctx, l.ID, p.Hash, true)
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(filepath.Join(h.coralDir, "live_links.json"))
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), "machine-1", "the machine id itself is never stored")
+	require.Contains(t, string(raw), `"computer":"`)
+
+	same := openLiveHandler(h)
+	m2, err := same.manager()
+	require.NoError(t, err)
+	got, _ := m2.Get(l.ID)
+	require.Equal(t, live.StateLive, got.State)
+
+	other := openLiveHandler(h)
+	other.machineID = func() (string, error) { return "machine-2", nil }
+	m3, err := other.manager()
+	require.NoError(t, err)
+	got, _ = m3.Get(l.ID)
+	require.Equal(t, live.StatePaused, got.State)
+	require.Equal(t, live.ReasonRestart, got.PausedReason)
 }

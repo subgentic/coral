@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/board/boardtest"
 )
 
@@ -87,4 +88,28 @@ func TestBoardSourceReadsThisTeamsPublicBoardOnly(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, one, 1)
 	require.Equal(t, "second team post", one[0].Text, "n keeps the newest")
+}
+
+func TestAnAskAndAHubUsersPostAreNotPublicPosts(t *testing.T) {
+	ctx := context.Background()
+	st, err := boardtest.Open(t.TempDir() + "/b.db")
+	require.NoError(t, err)
+	t.Cleanup(func() { st.Close() })
+	_, err = st.Subscribe(ctx, "team", "Backend Dev", "backend", "sess-b", nil, "all")
+	require.NoError(t, err)
+	_, err = st.PostMessage(ctx, "team", "Backend Dev", "plain post", nil)
+	require.NoError(t, err)
+	ask, err := st.PostMessage(ctx, "team", "Backend Dev", "@Operator may I ship?", nil)
+	require.NoError(t, err)
+	require.NoError(t, st.RecordAsk(ctx, "team", ask, []string{"Operator"}))
+	_, err = st.PostMessageWithOrigin(ctx, "team", "Backend Dev", "typed by a Hub user", nil, board.OriginHubUser)
+	require.NoError(t, err)
+
+	posts, err := NewBoardSource(st, "team", func(string) AgentState { return AgentState{} }).Posts(ctx, 50)
+	require.NoError(t, err)
+	var texts []string
+	for _, p := range posts {
+		texts = append(texts, p.Text)
+	}
+	require.Equal(t, []string{"plain post"}, texts)
 }

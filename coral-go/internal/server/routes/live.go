@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
@@ -12,12 +14,13 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/dropbox"
 	"github.com/subgentic/coral/internal/live"
 	"github.com/subgentic/coral/internal/secrets"
 )
 
 // Coral Live's local routes (#21047, design v4 14.4). Every one is the person's alone: never through Coral Hub (the table has no row, the golden says never, and a tunneled request is refused here too),
-// never an agent's or a script's (refuseUnlessPerson), and every one answers 404 live_closed while the gate (live.Open) is shut, before it reads or writes anything. No route returns a URL: the link lives on the Hub page.
+// never an agent's or a script's (refuseUnlessPerson), and every one answers 404 live_closed while the gate (live.Open, read once) is shut, before it reads or writes anything. No route returns a URL: the link lives on the Hub page.
 
 // LiveHandler serves the routes. The manager is made on the first request after the gate opens, so a shut gate never touches the data folder.
 type LiveHandler struct {
@@ -27,10 +30,15 @@ type LiveHandler struct {
 	state func(subscriberID string) live.AgentState
 	chat  func(a live.AgentRow) bool
 	clock live.Clock
+	// machineID is this computer's own id (tests set it). open is the gate, read once from live.Open.
+	machineID func() (string, error)
+	open      bool
 }
 
 // NewLiveHandler makes the handler over the board's store and data folder.
-func NewLiveHandler(h *BoardHandler) *LiveHandler { return &LiveHandler{h: h} }
+func NewLiveHandler(h *BoardHandler) *LiveHandler {
+	return &LiveHandler{h: h, machineID: dropbox.MachineID, open: live.Open}
+}
 
 // SetAgentState gives the handler the agents' working, waiting and sleeping state (the sessions the server keeps). Unset, every agent reads as idle.
 func (lh *LiveHandler) SetAgentState(f func(subscriberID string) live.AgentState) { lh.state = f }
@@ -45,9 +53,16 @@ func (lh *LiveHandler) manager() (*live.Manager, error) {
 	if lh.h.coralDir != "" {
 		st = live.FileStore{Path: filepath.Join(lh.h.coralDir, "live_links.json")}
 	}
+	// The link is bound to this computer: a hash of its machine id (never shown or logged). A copied data folder or another computer brings it back paused.
+	id, err := lh.machineID()
+	if err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256([]byte("coral-live-computer:" + id))
+	computer := hex.EncodeToString(sum[:])
 	state := lh.state
 	m, err := live.NewManager(live.Config{
-		Clock: lh.clock, Store: st,
+		Clock: lh.clock, Store: st, Computer: computer,
 		Source: func(team string) live.LiveSource { return live.NewBoardSource(lh.h.bs, team, state) },
 		// Chat is the chat slice's: until it lands no agent has it.
 		ChatAvailable: lh.chat,
@@ -66,7 +81,7 @@ func liveErr(w http.ResponseWriter, status int, code string) {
 
 // guard is the common front of every route: gate, then not through the Hub, then a person. It reports true when the request may go on.
 func (lh *LiveHandler) guard(w http.ResponseWriter, r *http.Request) (*live.Manager, bool) {
-	if !live.Open {
+	if !lh.open {
 		liveErr(w, http.StatusNotFound, "live_closed")
 		return nil, false
 	}

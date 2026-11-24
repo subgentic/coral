@@ -359,3 +359,43 @@ func TestARestartKeepsALinkWithoutChatAsItWas(t *testing.T) {
 	require.Empty(t, m2.Drain())
 	require.NoError(t, m2.CanPush("L1", hubA))
 }
+
+func TestALinkFromAnotherComputerComesBackPausedEvenWithoutChat(t *testing.T) {
+	src := &mutSource{rows: []AgentRow{{Key: "backend", Generation: "s1@t1", Name: "Backend Dev", Role: "backend"}}}
+	clk := &fakeClock{t: time.Unix(1700000000, 0)}
+	st := &MemStore{}
+	mk := func(computer string) *Manager {
+		m, err := NewManager(Config{Clock: clk, Store: st, Computer: computer, Source: func(string) LiveSource { return src }, Redactor: hubScan(),
+			NewID: func() string { return "L1" }})
+		require.NoError(t, err)
+		return m
+	}
+	m := mk("compA")
+	goLive(t, m)
+	same := mk("compA")
+	l, _ := same.Get("L1")
+	require.Equal(t, StateLive, l.State)
+
+	other := mk("compB") // a different computer, or a copied data folder
+	l, _ = other.Get("L1")
+	require.Equal(t, StatePaused, l.State)
+	require.Equal(t, ReasonRestart, l.PausedReason)
+	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Reason: ReasonRestart}}, other.Drain())
+	require.ErrorIs(t, other.CanPush("L1", hubA), ErrState)
+}
+
+func TestALinkStoredWithNoComputerComesBackPausedOnAComputerThatHasOne(t *testing.T) {
+	src := &mutSource{rows: []AgentRow{{Key: "backend", Generation: "s1@t1", Name: "Backend Dev", Role: "backend"}}}
+	clk := &fakeClock{t: time.Unix(1700000000, 0)}
+	st := &MemStore{}
+	mk := func(computer string) *Manager {
+		m, err := NewManager(Config{Clock: clk, Store: st, Computer: computer, Source: func(string) LiveSource { return src }, Redactor: hubScan(),
+			NewID: func() string { return "L1" }})
+		require.NoError(t, err)
+		return m
+	}
+	goLive(t, mk("")) // a link made before links carried an identity
+	l, _ := mk("compA").Get("L1")
+	require.Equal(t, StatePaused, l.State)
+	require.Equal(t, ReasonRestart, l.PausedReason)
+}
