@@ -313,9 +313,9 @@
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .material-icons.inbox-kind-icon:not(:has(.artifact-thumbnail-image)) {
     background: var(--bg-tertiary); color: var(--text-secondary); border-color: var(--border);
 }
-:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row :is(.inbox-review-name, .inbox-v4-heading-text) {
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results :where(tr.inbox-kind-row) :is(.inbox-review-name, .inbox-v4-heading-text) {
     color: var(--text-primary); font-weight: var(--fw-strong);
-}
+} /* #21000: :where keeps the component's read-state colour/weight rules stronger than this default. */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row:focus-within { background: var(--bg-hover); }
 /* Operator amendment: colour, not weight alone, separates the headline from the card's supporting words. */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-v4-row.inbox-kind-row.inbox-message-row :is(.inbox-meta, .inbox-heading-kind, .inbox-computer-chip, .inbox-header-meta) { color: var(--text-muted); }
@@ -325,3 +325,8 @@
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row .inbox-v4-heading-text { white-space: normal; overflow-wrap: anywhere; height: auto; }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-v4-row.inbox-kind-row .inbox-review-from:not(.inbox-review-name) { color: var(--text-muted); font-weight: var(--fw-regular); }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-v4-row.inbox-kind-row .inbox-review-name:not(.inbox-ask-name):not(.inbox-message) { white-space: normal; overflow-wrap: anywhere; overflow: visible; height: auto; max-height: none; -webkit-line-clamp: unset; }
+
+/* Access is a notice about a grant, not a question awaiting an answer (#20909). */
+:root .inbox-kind-icon[data-kind="access"]::before { content: 'key'; }
+/* The one-focus design supersedes the old coloured resting Wake/Start surfaces. */
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row .inbox-review-actions > .inbox-wake { background: color-mix(in srgb, var(--text-primary) 4%, transparent); border-color: var(--text-muted); }

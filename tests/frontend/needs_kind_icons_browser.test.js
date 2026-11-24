@@ -28,7 +28,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 for (const k of NF.KINDS.filter(k => k !== 'answered_ask' && k !== 'comment_sent')) { const cell = NF.withKindIcon({ waiting_kind: k }, 'x'); host.append(cell); const i = cell.querySelector('.inbox-kind-icon'), cs = getComputedStyle(i), g = getComputedStyle(i, '::before').content;
                     out.push({ k, label: i.getAttribute('aria-label'), want: NF.KIND_LABEL[k], role: i.getAttribute('role'), text: i.textContent, glyph: g, font: cs.fontFamily, size: Math.round(parseFloat(cs.fontSize)), first: cell.firstChild === i, rest: cell.textContent }); cell.remove(); }
                 return out; })()`);
-            check(kinds.length === 9, at + 'nine kinds: ' + kinds.length);
+            // #20909 adds the access-granted notice to the nine waiting kinds.
+            check(kinds.map(x => x.k).join(',') === 'permission,question,other,review,run,proposal,goal_done,skill_review,welcome,access', at + 'all ten kinds: ' + kinds.map(x => x.k));
+            check(kinds.find(x => x.k === 'access')?.glyph === '"key"', at + 'access uses its own grant glyph');
             check(kinds.every(x => x.label && x.label === x.want && x.role === 'img' && x.text === '' && x.first && x.rest === 'x'), at + 'each icon is labelled with its kind, has no text, comes first and leaves the cell text alone: ' + JSON.stringify(kinds.filter(x => !(x.label === x.want && x.text === '' && x.first && x.rest === 'x'))));
             check(new Set(kinds.map(x => x.glyph)).size === kinds.length, at + 'every kind has its own glyph: ' + kinds.map(x => x.k + '=' + x.glyph).join(' '));
             check(kinds.every(x => /Material Icons/.test(x.font) && x.size >= 14 && x.size <= 22), at + 'drawn in the icon font at the tile size: ' + JSON.stringify(kinds.map(x => [x.k, x.font, x.size])));
