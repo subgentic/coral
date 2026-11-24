@@ -19,6 +19,7 @@ var columnMigrations = []struct {
 	{"device_keys", "via_passkey", "TEXT NOT NULL DEFAULT ''"},     // #20515 M5: the passkey whose certificate made the device; it acts only on itself
 	{"device_keys", "raised_by", "TEXT NOT NULL DEFAULT ''"},       // #20515 M4: the kid of the signer that last raised the key (PairOwner for a raise at this computer), for the owner's notice
 	{"device_keys", "changed_at", "INTEGER NOT NULL DEFAULT 0"},    // #20515 M4: when the row was made or its mode last changed, for the owner's notice
+	{"cloud_link_key", "via_link", "TEXT NOT NULL DEFAULT ''"},     // #20966: the link a key was made through (a relayed make), '' for one made at this computer; a Hub ends only its own link's
 	{"cloud_link", "source", "TEXT NOT NULL DEFAULT 'enrollment'"}, // #20368: 'enrollment' is the link the one enrollment mirrors (its cap is the setting), 'added' a link added at this computer (its own cap); the enrollment's save, delete and mirror touch only the first kind
 	{"gdoc_comment_map", "seen", "INTEGER NOT NULL DEFAULT 1"},     // the last pull saw this Google comment (#20012): an upgrade from a build that made the table without it
 	{"chief_checks", "origin", "TEXT NOT NULL DEFAULT 'chief'"},    // who set the check (#19162): 'chief' for Chief's own checks, else 'operator', 'agent' or 'orchestrator' for a reminder

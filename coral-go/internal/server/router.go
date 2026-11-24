@@ -82,6 +82,18 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	}
 	relayedOwner, _ := routes.LinkOwnerSources(linkStamps)
 	r.Use(routes.RelayedGuard(relayedVerifier, relayedOwner))
+	routes.SetRelayedSignerMode(func(ctx context.Context, kid string) (string, bool, bool) { // #20966: the mode of the device that signed a relayed join request, and whether it is the owner's, from this computer's own list
+		v := relayedVerifier()
+		if v == nil {
+			return "", false, false
+		}
+		k, err := v.Store.ActiveDeviceKey(ctx, kid, time.Now())
+		if err != nil {
+			return "", false, false
+		}
+		owner, _ := k.PairState()
+		return k.Mode, owner, true
+	})
 	routes.SetRelayedMemberVerify(func(ctx context.Context, digest []byte, kid, sig string) (string, error) { // #20883: the owner's device signing a grant that a Hub carried
 		v := relayedVerifier()
 		if v == nil {

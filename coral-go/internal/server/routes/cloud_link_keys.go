@@ -11,6 +11,9 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/devicekey"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -38,6 +41,10 @@ func (h *CloudHandler) linkKeyErr(w http.ResponseWriter, err error) {
 		errBadRequest(w, store.ErrLinkKeyName.Error())
 	case errors.Is(err, store.ErrLinkKeyLimit):
 		writeError(w, http.StatusConflict, "too_many_keys", store.ErrLinkKeyLimit.Error())
+	case errors.Is(err, store.ErrLinkKeyLinkLimit):
+		writeError(w, http.StatusConflict, "too_many_keys_link", store.ErrLinkKeyLinkLimit.Error())
+	case errors.Is(err, store.ErrLinkKeyRate):
+		httputil.WriteActionLimit(w, 3600, "link_key_rate", store.ErrLinkKeyRate.Error())
 	default:
 		errInternalServer(w, "Could not do that with the key")
 	}
@@ -45,6 +52,12 @@ func (h *CloudHandler) linkKeyErr(w http.ResponseWriter, err error) {
 
 // LinkKeyCreate: POST /api/cloud/link-keys.
 func (h *CloudHandler) LinkKeyCreate(w http.ResponseWriter, r *http.Request) {
+	if cloud.Tunneled(r) { // #20966, as LinkRequestAllow
+		if _, signed := devicekey.RelayedFrom(r.Context()); signed {
+			h.relayedKeyCreate(w, r)
+			return
+		}
+	}
 	if h.linkRequestHuman(w, r) || !requireJSON(w, r) {
 		return
 	}
@@ -95,6 +108,12 @@ func (h *CloudHandler) LinkKeyList(w http.ResponseWriter, r *http.Request) {
 
 // LinkKeyRevoke: DELETE /api/cloud/link-keys/{id}.
 func (h *CloudHandler) LinkKeyRevoke(w http.ResponseWriter, r *http.Request) {
+	if cloud.Tunneled(r) { // #20966, as LinkRequestAllow
+		if _, signed := devicekey.RelayedFrom(r.Context()); signed {
+			h.relayedKeyRevoke(w, r)
+			return
+		}
+	}
 	if h.linkRequestHuman(w, r) {
 		return
 	}

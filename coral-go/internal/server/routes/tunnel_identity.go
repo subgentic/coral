@@ -287,5 +287,5 @@ func tunnelBoardProject(r *http.Request) (string, bool) {
 // admits only that signed request, and records its Operator-actions row and its notice itself. A request with no verified signature is never exempt.
 func isVerifiedRelayedGrant(r *http.Request) bool {
 	m, ok := devicekey.RelayedFrom(r.Context())
-	return ok && m.Kind == devicekey.GrantMember
+	return ok && (m.Kind == devicekey.GrantMember || m.Kind == devicekey.AllowLink || m.Kind == devicekey.MakeLinkKey || m.Kind == devicekey.RevokeLinkKey) // the join's three (#20966) are the owner's signed device too
 }

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -137,4 +138,40 @@ func TestTwoCreatesAtOnceForOneHubMakeOneRequest(t *testing.T) {
 // A run of wrong codes is guessing, so it counts toward the mute, and the refusal says so.
 func TestTheMuteSaysWrongCodesCountToo(t *testing.T) {
 	assert.Contains(t, ErrLinkRequestMuted.Error(), "wrong codes")
+}
+
+// #20966: a key made through a Hub (a relayed make) carries the link it came through: at most 3 live ones and 10 made an hour per link, and a Hub can end only its own link's.
+func TestKeysMadeThroughALinkAreCappedPerLinkAndEndedOnlyByIt(t *testing.T) {
+	cs, ctx, now := reqRig(t)
+	var ids []string
+	for i := 0; i < 3; i++ {
+		id, key, err := cs.CreateLinkKeyVia(ctx, fmt.Sprintf("Hub %d", i), "lnk-aaaa1111", now)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(key, "lrk_"))
+		ids = append(ids, id)
+	}
+	_, _, err := cs.CreateLinkKeyVia(ctx, "Hub 3", "lnk-aaaa1111", now)
+	assert.ErrorIs(t, err, ErrLinkKeyLinkLimit, "a fourth live key through one link")
+	_, _, err = cs.CreateLinkKeyVia(ctx, "Hub 3", "lnk-bbbb2222", now)
+	assert.NoError(t, err, "another link has its own three")
+
+	assert.ErrorIs(t, cs.RevokeLinkKeyVia(ctx, ids[0], "lnk-bbbb2222", now), ErrLinkKeyNone, "another link cannot end it, and learns nothing")
+	assert.ErrorIs(t, cs.RevokeLinkKeyVia(ctx, "lk-00000000", "lnk-aaaa1111", now), ErrLinkKeyNone)
+	require.NoError(t, cs.RevokeLinkKeyVia(ctx, ids[0], "lnk-aaaa1111", now))
+	local, _, err := cs.CreateLinkKey(ctx, "At the computer", now)
+	require.NoError(t, err)
+	assert.ErrorIs(t, cs.RevokeLinkKeyVia(ctx, local, "lnk-aaaa1111", now), ErrLinkKeyNone, "a key made at the computer is ended at the computer")
+}
+
+func TestTenCreationsAnHourPerLinkCountRevokedOnesToo(t *testing.T) {
+	cs, ctx, now := reqRig(t)
+	for i := 0; i < 10; i++ {
+		id, _, err := cs.CreateLinkKeyVia(ctx, fmt.Sprintf("Hub %d", i), "lnk-aaaa1111", now.Add(time.Duration(i)*time.Minute))
+		require.NoError(t, err, i)
+		require.NoError(t, cs.RevokeLinkKeyVia(ctx, id, "lnk-aaaa1111", now.Add(time.Duration(i)*time.Minute)))
+	}
+	_, _, err := cs.CreateLinkKeyVia(ctx, "Hub x", "lnk-aaaa1111", now.Add(11*time.Minute))
+	assert.ErrorIs(t, err, ErrLinkKeyRate, "an eleventh in the hour, though none is live")
+	_, _, err = cs.CreateLinkKeyVia(ctx, "Hub x", "lnk-aaaa1111", now.Add(75*time.Minute))
+	assert.NoError(t, err, "an hour later")
 }

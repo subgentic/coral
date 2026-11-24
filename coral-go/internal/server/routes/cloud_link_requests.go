@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -149,6 +150,12 @@ func (h *CloudHandler) LinkRequestStatus(w http.ResponseWriter, r *http.Request)
 
 // LinkRequestAllow: POST /api/cloud/link-requests/{id}/allow {cap?}. The person here allows, optionally a lower cap; the 8-digit code is in this response and nowhere else.
 func (h *CloudHandler) LinkRequestAllow(w http.ResponseWriter, r *http.Request) {
+	if cloud.Tunneled(r) { // only the owner's own signed device, behind a gate that ships shut (#20966); anything else through a Hub is refused below as before
+		if _, signed := devicekey.RelayedFrom(r.Context()); signed {
+			h.relayedAllow(w, r)
+			return
+		}
+	}
 	if h.linkRequestHuman(w, r) || !requireJSON(w, r) {
 		return
 	}

@@ -653,7 +653,8 @@ CREATE TABLE IF NOT EXISTS cloud_link_key (
     key_hash     TEXT NOT NULL,
     created_at   TEXT NOT NULL,
     last_used_at TEXT NOT NULL DEFAULT '',
-    revoked_at   TEXT NOT NULL DEFAULT ''
+    revoked_at   TEXT NOT NULL DEFAULT '',
+    via_link     TEXT NOT NULL DEFAULT ''
 );
 
 -- A person's own limit on one link (design v2 2.2): created now and empty; a missing row means the link's own value. Rows only ever lower access.
