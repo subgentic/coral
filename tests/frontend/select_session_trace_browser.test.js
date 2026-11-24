@@ -12,6 +12,9 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'select_session_trace.json');
 const sha = t => require('node:crypto').createHash('sha256').update(t).digest('hex');
 const { coralReady } = require('./helpers/wait');
 
+// Page-level readers that run on their own timers, not because a session was selected: the Hub indicator's poll, the Inbox's local Live links read (#21030) and the auto-wake check (6 s after the page opens). On a slow runner their
+// timers land inside a traced step (v2.1.11 gate: GET /api/live/links), on a fast one they land between steps, so the trace leaves them out. Every other request, new ones included, still changes the pinned trace.
+const BACKGROUND = ['GET /api/cloud/status', 'GET /api/live/links', 'GET /api/system/auto-wake'];
 const RECORD = `(() => {
     window.__seen = { fetches: [], sockets: [] };
     const realFetch = window.fetch;
@@ -45,7 +48,7 @@ const RECORD = `(() => {
                 path: location.pathname,
                 commands: JSON.stringify(T.state.currentCommands || null),
                 tasks: [(T.state.currentAgentTasks || []).length, (T.state.currentBoardTasks || []).length, (T.state.currentAgentEvents || []).length],
-                fetches: [...new Set(window.__seen.fetches)].sort(), sockets: window.__seen.sockets.slice(),
+                fetches: [...new Set(window.__seen.fetches)].filter(f => !${JSON.stringify(BACKGROUND)}.includes(f)).sort(), sockets: window.__seen.sockets.slice(),
             };
         })()`;
         const run = async (name, setup, calls) => {
