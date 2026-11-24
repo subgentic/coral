@@ -54,6 +54,29 @@ const BUILTIN_TEAM_TEMPLATES = [
         ],
         flags: "",
     },
+    // Templates for a person working alone (brief task 7, #21056). description is the card's two lines: what the team does, then what you do (#21023). A role's reminders are created when the team launches (#21019).
+    {
+        name: "Overnight run",
+        builtin: true,
+        description: ["A planner, a builder and a checker work your goal through the night.", "You leave a goal at night; a morning summary waits in Needs you."],
+        agents: [
+            { name: "Orchestrator", prompt: "You are the orchestrator of an overnight run. The operator leaves one goal before going away and does not answer until morning, so do not wait for them: break the goal into small tasks, give each to the Builder, send each finished one to the Checker, and keep a numbered entry for every task on the board with its state. If you are blocked on a decision only the operator can make, post it as a question to the operator, then carry on with the tasks that do not need it. Do not write code yourself.", reminders: [{ text: "Morning summary: post to Needs you what finished overnight, what is stuck and why, and what you need from the operator. Keep it to one screen.", kind: "daily", at: "07:30" }] },
+            { name: "Builder", prompt: "You are the builder. Take the tasks the Orchestrator gives you one at a time, do the work in your own worktree, run the tests, and hand each finished task to the Checker for review. Wait for instructions from the Orchestrator before starting." },
+            { name: "Checker", prompt: "You are the checker. Review each task the Builder hands over against what the Orchestrator asked for: read the change, run the tests, and approve it or send it back with what is wrong. Wait for instructions from the Orchestrator before starting." },
+        ],
+        flags: "",
+    },
+    {
+        name: "Builder and reviewer",
+        builtin: true,
+        description: ["One agent writes the change and an agent from another vendor reviews it.", "You give the goal and approve every change before it lands."],
+        agents: [
+            { name: "Orchestrator", prompt: "You are the orchestrator. Take the goal from the operator, break it into tasks, and give each to the Builder. When the Builder finishes a task, send it to the Reviewer. A change is only finished when the Reviewer has approved it and the operator has approved it too: never land or merge a change before the operator's approve. Do not write code yourself." },
+            { name: "Builder", agent_type: "claude", prompt: "You are the builder. Write the change for each task the Orchestrator gives you, in your own worktree, with its tests, and submit it for review. Wait for instructions from the Orchestrator before starting." },
+            { name: "Reviewer", agent_type: "codex", prompt: "You are the reviewer, and you are not the builder's vendor, so you come to the change with fresh eyes. Read each change the Builder submits, check it against the task, run its tests, and approve it or reject it with what is wrong. Do not rewrite the change yourself. Wait for instructions from the Orchestrator before starting." },
+        ],
+        flags: "",
+    },
 ];
 
 // The template picker (#7407): a select of "Blank team" and each template with its member count. (It was a searchable list, #6397; the design's select scales to the templates people save by being a native list.)

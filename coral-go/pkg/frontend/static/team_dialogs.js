@@ -590,7 +590,7 @@ function _loadTeamTemplate(name) {
     for (const agent of tmpl.agents) {
         const agentName = agent.name || agent.role || '';
         const agentPrompt = agent.prompt || agent.description || '';
-        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags, { thinking: agent.thinking });
+        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags, { thinking: agent.thinking, reminders: agent.reminders });
         if (!tmpl.builtin) row.dataset.permissionExplicit = '1'; // existing saved templates retain their confirm-mode meaning
         const modeSel = agent.permission_mode && document.getElementById(row.dataset.acfId)?.querySelector('.acf-permission-mode');
         if (modeSel && [...modeSel.options].some(o => o.value === agent.permission_mode)) { modeSel.value = agent.permission_mode; modeSel.dataset.pickedByPerson = '1'; }
@@ -606,7 +606,7 @@ function _loadTeamTemplate(name) {
 
 // reveal: scroll the new row into view. Only for a member the person added; the default members and a template's are added while the dialog opens or fills, and scrolling to the last of them
 // left the Members step opened past its heading and the template picker (#4950). top: put the row first (Add Orchestrator).
-function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false, thinking = '' } = {}) {
+function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false, thinking = '', reminders = null } = {}) {
     launch.teamAgentCounter++;
     const idx = launch.teamAgentCounter;
     const acfId = `team-agent-acf-${idx}`;
@@ -621,6 +621,7 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
     if (!defaultAgentType) row.dataset.followsTeamType = '1';
     if (defaultModel) row.dataset.modelHand = '1';
     if (thinking) row.dataset.thinkingHand = '1';
+    if (Array.isArray(reminders) && reminders.length) row.dataset.reminders = JSON.stringify(reminders); // a template's reminders for this role (#21019): the launch sends them and the server creates them
 
     // A member is one quiet row, read-only: its role and one summary line. The row opens the Edit member dialog, and so does the one Edit button at its end (Remove is in that dialog; Alt+Up/Down on the row's button reorders, as dragging does, #10836). The form that holds the member's values is kept (hidden) in the row.
     row.innerHTML = `
@@ -943,6 +944,7 @@ async function launchTeam() {
         if (config.agentType) agent.agent_type = config.agentType;
         if (config.model) agent.model = config.model;
         if (config.thinking) agent.thinking = config.thinking; // #4969
+        try { const rs = row.dataset.reminders ? JSON.parse(row.dataset.reminders) : null; if (Array.isArray(rs) && rs.length) agent.reminders = rs; } catch { /* a role's reminders that cannot be read are left out */ }
         if (config.flags) agent.flags = config.flags.split(/\s+/).filter(Boolean);
         // A member whose mode is Default says so (#10362): its form sends no flag for Default, the same request as "nothing chosen", which starts in the saved default or Auto.
         const modeWasPicked = row.dataset.permissionExplicit === '1' || document.getElementById(acfId)?.querySelector('.acf-permission-mode')?.dataset.pickedByPerson === '1';
