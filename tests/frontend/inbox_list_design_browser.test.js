@@ -45,7 +45,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 teamRight: rows.map(r => r.querySelector('td[data-key="team"]')).filter(Boolean).map(t => Math.round(rect(t).right)), waitRight: rows.map(r => r.querySelector('td[data-key="waiting"]')).filter(Boolean).map(t => Math.round(rect(t).right)),
                 pill: cs(document.querySelector('${T} .inbox-pill'), 'borderRadius') }; })()`);
         check(d.n >= 4, `rows seen (${d.n})`);
-        check(d.rail.every(b => /0px 0px 0px 3px|3px 0px 0px 0px inset|inset 3px 0px 0px 0px/.test(b) || /3px/.test(b)), `1: an unread row has the 3 px accent rail (${JSON.stringify(d.rail)})`);
+        check(d.rail.every(b => /4px 0px 0px 0px inset|inset 4px 0px 0px 0px/.test(b)), `1: an unread row has the 4 px accent rail (#21161) (${JSON.stringify(d.rail)})`);
         check(d.pad === '14px', `8: a row has 14 px above its words (${d.pad})`);
         check(d.icon.every(([w, h]) => w === 32 && h === 32) && d.radius === '8px', `4: every kind icon is a 32 px tile with 8 px corners (${JSON.stringify(d.icon)} ${d.radius})`);
         check(d.fileName === "15px" && d.askFrom === "15px", `5: the file name and the asker are one 15 px headline (${d.fileName} ${d.askFrom})`);
