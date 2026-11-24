@@ -364,6 +364,14 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 	for _, r := range clean {
 		if prev, ok := have[r]; ok {
 			round.Reviewers = append(round.Reviewers, prev) // kept, with any verdict given
+			if prev.State == "pending" || prev.State == "stale" {
+				// #21173: a reviewer with no verdict yet whose review task was closed by hand (or skipped) on an earlier notice cannot give one: the task is opened again, and the answer lists it like a new one so they are told
+				if rt, rerr := s.reopenClosedReviewTask(ctx, project, id, prev.ReviewTaskID, r, round.Round, task.Title, w.OriginalAuthor); rerr != nil {
+					return nil, nil, rerr
+				} else if rt != nil {
+					created = append(created, rt)
+				}
+			}
 			continue
 		}
 		title, body := fmt.Sprintf("Review #%d: %s", id, task.Title), reviewTaskBody(id, task.Title, w.OriginalAuthor, round.Round)
@@ -387,6 +395,19 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 	}
 	task, err = s.GetTask(ctx, project, id)
 	return task, created, err
+}
+
+// reopenClosedReviewTask opens reviewer's review task again when it is closed (completed by hand, skipped, cancelled) and the reviewer has given no verdict. It returns the task, or nil when it was open already.
+func (s *Store) reopenClosedReviewTask(ctx context.Context, project string, id, reviewTaskID int64, reviewer string, round int, title, author string) (*Task, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE board_tasks SET status='pending', assigned_to=?, claimed_at=NULL, completed_by=NULL, completion_message=NULL, completed_at=NULL, body=?, edited_at=?
+		WHERE id=? AND board_id=? AND status NOT IN ('pending','in_progress')`, reviewer, reviewTaskBody(id, title, author, round), nowUTC(), reviewTaskID, project)
+	if err != nil {
+		return nil, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, nil
+	}
+	return s.GetTask(ctx, project, reviewTaskID)
 }
 
 // ReviewVerdict is what ApproveReview or RejectReview did.
