@@ -10,9 +10,9 @@ import { defineFilters } from './filter_model.js';
 import { browserLocal } from './safe_storage.js';
 
 /** What an agent waits on, as the pills say it: its permission, its question, or anything else (an input request, a plan, a prompt only the screen showed). */
-export const KINDS = ['permission', 'question', 'other', 'review', 'run', 'proposal', 'goal_done', 'skill_review', 'welcome'];
+export const KINDS = ['permission', 'question', 'other', 'review', 'run', 'proposal', 'goal_done', 'skill_review', 'welcome', 'access'];
 export const KIND_ART = {}; // a kind drawn as another's icon (the second tab's two, #19904)
-export const KIND_LABEL = { permission: 'Permission', question: 'Question', other: 'Needs input', review: 'For review', run: 'Failed run', proposal: 'To approve', goal_done: 'Goal looks done', skill_review: 'Skill to approve', welcome: 'Welcome', ask: 'Question' };
+export const KIND_LABEL = { access: 'Access granted', permission: 'Permission', question: 'Question', other: 'Needs input', review: 'For review', run: 'Failed run', proposal: 'To approve', goal_done: 'Goal looks done', skill_review: 'Skill to approve', welcome: 'Welcome', ask: 'Question' };
 /** How long it has waited, at least (minutes), as the Filters panel offers it. */
 export const LONGER = ['5', '15', '60', '240'];
 export const LONGER_LABEL = { 5: '5 minutes', 15: '15 minutes', 60: '1 hour', 240: '4 hours' };

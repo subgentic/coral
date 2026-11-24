@@ -4,6 +4,7 @@
     "cloud-facts": "the enroll page of Coral Hub, a standalone page that does not load layout.css",
     "chat-row-facts": "a line of a chat row in the sidebar (slice 4's list rows), not a definition list",
     "ibx-task-facts": "a note under an Inbox task, a paragraph",
-    "update-fact": "a settings field's slot (slice 2's fields)"
+    "update-fact": "a settings field's slot (slice 2's fields)",
+    "grant-facts": "Operator-approved #20909 mock v2: stacked grant identity/scope facts, with bold values and separate muted identity stubs; kept to match the approved card (e15bd5a98c87)."
   }
 }
