@@ -84,8 +84,9 @@ func scan(red redact.Redactor, text string) bool {
 func Build(in Input, opt Options, red redact.Redactor) Frame {
 	f := Frame{V: 1, Seq: opt.Seq, Agents: []Agent{}, Posts: []Post{}}
 	label := map[string]string{} // real name (lower case) -> public label, "" when hidden
+	roles := make([]string, len(in.Agents))
 	n := 0
-	for _, a := range in.Agents {
+	for i, a := range in.Agents {
 		key := strings.ToLower(strings.TrimSpace(a.RealName))
 		if !a.Shown {
 			if key != "" {
@@ -95,17 +96,26 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 		}
 		n++
 		l := clean(a.Role, maxLabel)
+		if l != "" && (!scan(red, l) || !safeText(l)) {
+			l = "" // a role no rule can judge is not shown: Agent N instead
+		}
 		if l == "" {
 			l = "Agent " + itoa(n)
 		}
+		roles[i] = l
 		if key != "" {
 			label[key] = l
 		}
-		task := clean(a.TaskTitle, maxTask)
-		if !scan(red, task) || !safeText(task) {
-			task = ""
+	}
+	for i, a := range in.Agents {
+		if !a.Shown {
+			continue
 		}
-		f.Agents = append(f.Agents, Agent{Role: l, Status: string(a.Status), Task: task})
+		task := ""
+		if t, ok := publicText(clean(a.TaskTitle, maxTask), label); ok && scan(red, t) && scan(red, a.TaskTitle) {
+			task = t
+		}
+		f.Agents = append(f.Agents, Agent{Role: roles[i], Status: statusWord(a.Status), Task: task})
 	}
 	posts := in.Posts
 	if len(posts) > maxPosts {
@@ -146,6 +156,15 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 	return f
 }
 
+// statusWord maps to the four words the public sees; anything else is idle.
+func statusWord(s Status) string {
+	switch s {
+	case StatusWorking, StatusIdle, StatusWaiting, StatusAsleep:
+		return string(s)
+	}
+	return string(StatusIdle)
+}
+
 func safeText(s string) bool { return !pathRE.MatchString(s) && !idRE.MatchString(s) }
 
 // publicAuthor is the label of a shown agent. A hidden agent's post is withheld (MUST 5). Someone who is no agent is the Operator, never a real name.
@@ -166,59 +185,46 @@ func publicText(text string, label map[string]string) (string, bool) {
 		return "", false
 	}
 	for _, m := range mentionRE.FindAllString(t, -1) {
-		name := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(m, "@")))
-		if l := longestKnown(name, label); l == nil {
+		if !startsWithKnown(strings.TrimPrefix(m, "@"), label) {
 			return "", false // an @mention of nobody we know
-		}
-	}
-	for real, l := range label {
-		if real == "" || !containsFold(t, real) {
-			continue
-		}
-		if l == "" {
-			return "", false
 		}
 	}
 	for real, l := range label {
 		if real == "" {
 			continue
 		}
-		t = replaceFold(t, "@"+real, l)
-		t = replaceFold(t, real, l)
+		re := nameRE(real)
+		if !re.MatchString(t) {
+			continue
+		}
+		if l == "" {
+			return "", false
+		}
+		t = re.ReplaceAllLiteralString(t, l) // indexes are the original string's: a character whose lower case has another length cannot shift a cut
 	}
-	return clean(t, maxText), true
-}
-
-// longestKnown finds a known real name at the start of s (a mention may be followed by more words).
-func longestKnown(s string, label map[string]string) *string {
-	for real, l := range label {
-		if real != "" && strings.HasPrefix(s, real) {
-			l := l
-			return &l
+	t = clean(t, maxText)
+	// nothing a real name is left: a name the replacement missed withholds the post (the owner's label rule would be void otherwise)
+	for real := range label {
+		if real != "" && nameRE(real).MatchString(t) {
+			return "", false
 		}
 	}
-	return nil
+	return t, true
 }
 
-func containsFold(s, sub string) bool { return strings.Contains(strings.ToLower(s), sub) }
-
-func replaceFold(s, old, repl string) string {
-	if old == "" {
-		return s
-	}
-	low, lo := strings.ToLower(s), strings.ToLower(old)
-	var b strings.Builder
-	i := 0
-	for {
-		j := strings.Index(low[i:], lo)
-		if j < 0 {
-			b.WriteString(s[i:])
-			return b.String()
+// startsWithKnown reports whether s begins with a known real name (a mention may be followed by more words), ignoring case.
+func startsWithKnown(s string, label map[string]string) bool {
+	for real := range label {
+		if real != "" && regexp.MustCompile(`(?i)^`+regexp.QuoteMeta(real)).MatchString(s) {
+			return true
 		}
-		b.WriteString(s[i : i+j])
-		b.WriteString(repl)
-		i += j + len(lo)
 	}
+	return false
+}
+
+// nameRE matches a real name, with an optional @ before it, ignoring case. The text is never sliced by an index found in a lower-cased copy.
+func nameRE(real string) *regexp.Regexp {
+	return regexp.MustCompile(`(?i)@?` + regexp.QuoteMeta(real))
 }
 
 func itoa(n int) string {
