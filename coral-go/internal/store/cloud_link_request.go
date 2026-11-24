@@ -294,12 +294,19 @@ func (s *CloudStore) AllowLinkRequest(ctx context.Context, id, capGiven string, 
 	return code, given, nil
 }
 
-// DenyLinkRequest is the Operator's Deny of a waiting request.
+// DenyLinkRequest is the Operator's Deny of a waiting request, and also the Cancel connection after Allow: an allowed request that has not finished ends at once (a later finish gets the same none). A waiting
+// one ends 'denied' (two of those mute the Hub); an allowed one the Operator takes back ends 'expired', so a change of mind does not mute.
 func (s *CloudStore) DenyLinkRequest(ctx context.Context, id string, now time.Time) error {
 	s.expireLinkRequests(ctx, now)
 	res, err := s.db.ExecContext(ctx, `UPDATE cloud_link_request SET state = 'denied', ended_at = ? WHERE request_id = ? AND state = 'pending'`, lrTime(now), id)
 	if err != nil {
 		return err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		res, err = s.db.ExecContext(ctx, `UPDATE cloud_link_request SET state = 'expired', ended_at = ? WHERE request_id = ? AND state = 'allowed'`, lrTime(now), id)
+		if err != nil {
+			return err
+		}
 	}
 	if n, _ := res.RowsAffected(); n != 1 {
 		if _, lerr := lrLoad(ctx, s.db, id); lerr != nil {

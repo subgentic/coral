@@ -236,3 +236,20 @@ func TestThePendingFeedHoldsOnlyWaitingRequestsAndNoSecrets(t *testing.T) {
 	p, _ = cs.PendingLinkRequests(ctx, now.Add(11*time.Minute))
 	assert.Empty(t, p, "expired requests leave the feed")
 }
+
+// Orchestrator amendment on #20944: the mock's "Cancel connection" after Allow. Deny of an allowed, unfinished request ends the code at once; a later finish gets the same none as any ended request.
+func TestCancellingAnAllowedRequestEndsTheCodeAtOnce(t *testing.T) {
+	cs, ctx, now := reqRig(t)
+	id, secret, _ := cs.CreateLinkRequest(ctx, "https://hub-c.example.com", "interact", "cred-1", now)
+	code, _, _ := cs.AllowLinkRequest(ctx, id, "interact", now)
+	require.NoError(t, cs.DenyLinkRequest(ctx, id, now), "cancel after Allow")
+	_, _, err := cs.FinishLinkRequest(ctx, id, secret, code, now)
+	assert.ErrorIs(t, err, ErrLinkRequestNone, "the right code is too late once cancelled")
+	assert.ErrorIs(t, cs.DenyLinkRequest(ctx, id, now), ErrLinkRequestState, "a second cancel is a state error, as for any ended request")
+	// a finished request cannot be cancelled
+	id2, secret2, _ := cs.CreateLinkRequest(ctx, "https://hub-d.example.com", "interact", "cred-2", now)
+	code2, _, _ := cs.AllowLinkRequest(ctx, id2, "interact", now)
+	_, _, err = cs.FinishLinkRequest(ctx, id2, secret2, code2, now)
+	require.NoError(t, err)
+	assert.ErrorIs(t, cs.DenyLinkRequest(ctx, id2, now), ErrLinkRequestState)
+}
