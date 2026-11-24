@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/subgentic/coral/internal/foldertrust"
@@ -78,6 +79,22 @@ func codexHookIdentityHash(event string, group, handler map[string]any) (string,
 	return "sha256:" + hex.EncodeToString(sum[:]), true
 }
 
+// codexVersionLess orders version folder names by their dot-separated numbers (1.9 before 1.10); a part that is no number sorts by its text.
+func codexVersionLess(a, b string) bool {
+	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(pa) && i < len(pb); i++ {
+		na, ea := strconv.Atoi(pa[i])
+		nb, eb := strconv.Atoi(pb[i])
+		if ea == nil && eb == nil && na != nb {
+			return na < nb
+		}
+		if (ea != nil || eb != nil) && pa[i] != pb[i] {
+			return pa[i] < pb[i]
+		}
+	}
+	return len(pa) < len(pb)
+}
+
 func codexPluginHookReview(home string) codexPluginHooks {
 	cfgPath := foldertrust.CodexConfigPath(home)
 	b, err := os.ReadFile(cfgPath)
@@ -123,8 +140,10 @@ func codexPluginHookReview(home string) codexPluginHooks {
 		if len(files) == 0 {
 			continue
 		}
-		sort.Strings(files)
-		raw, err := os.ReadFile(files[len(files)-1])
+		sort.Slice(files, func(i, j int) bool {
+			return codexVersionLess(filepath.Base(filepath.Dir(filepath.Dir(files[i]))), filepath.Base(filepath.Dir(filepath.Dir(files[j]))))
+		})
+		raw, err := os.ReadFile(files[len(files)-1]) // the newest version folder, by number (1.10 is after 1.9)
 		var doc struct {
 			Hooks map[string][]map[string]any `json:"hooks"`
 		}
@@ -165,6 +184,7 @@ func codexPluginHookReview(home string) codexPluginHooks {
 // codexHookReviewNote is the card's plain sentence for Codex's hook review: whose hooks it is not, and where it comes from: exact when a plugin's hash differs from the one trusted, "most likely" when the hooks cannot be hashed.
 func codexHookReviewNote(r codexPluginHooks) string {
 	const lead = "These are not Coral's hooks: Coral already trusts its own. "
+	const unchecked = "Hooks from the folder or your own Codex settings are not checked here and may be in this review too. "
 	const risk = "Trust all lets them run outside the sandbox; Continue without trusting skips them."
 	join := func(l []string) (string, string) {
 		word := "plugin"
@@ -180,11 +200,11 @@ func codexHookReviewNote(r codexPluginHooks) string {
 		if len(r.Changed) > 1 {
 			verb = "changed their hooks"
 		}
-		return lead + "The Codex " + word + " " + list + " " + verb + " (new or updated since you last trusted it). " + risk
+		return lead + "The Codex " + word + " " + list + " " + verb + " (new or updated since you last trusted it). " + unchecked + risk
 	}
 	if len(r.Unsure) > 0 {
 		word, list := join(r.Unsure)
-		return lead + "Most likely the Codex " + word + " " + list + " (a plugin update changes its hook). " + risk
+		return lead + "Most likely the Codex " + word + " " + list + " (a plugin update changes its hook). " + unchecked + risk
 	}
 	return lead + "A Codex plugin, the folder or your own Codex settings added or changed one. " + risk
 }

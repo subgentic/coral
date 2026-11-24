@@ -96,8 +96,17 @@ func TestCodexHookReviewNote(t *testing.T) {
 	assert.Contains(t, exact, "not Coral's hooks")
 	assert.Contains(t, exact, "The Codex plugin posthog changed its hook")
 	assert.NotContains(t, exact, "Most likely", "exact: no hedge")
+	assert.Contains(t, exact, "Hooks from the folder or your own Codex settings are not checked here and may be in this review too", "naming a plugin does not clear the others")
+	assert.Contains(t, codexHookReviewNote(codexPluginHooks{Unsure: []string{"odd"}}), "are not checked here")
 	assert.Contains(t, exact, "outside the sandbox")
 	assert.Contains(t, codexHookReviewNote(codexPluginHooks{Changed: []string{"a", "b"}}), "plugins a or b changed their hooks")
 	assert.Contains(t, codexHookReviewNote(codexPluginHooks{Unsure: []string{"odd"}}), "Most likely the Codex plugin odd")
 	assert.Contains(t, codexHookReviewNote(codexPluginHooks{}), "your own Codex settings")
+}
+
+func TestCodexVersionLess(t *testing.T) {
+	assert.True(t, codexVersionLess("1.9", "1.10"), "numbers, not text")
+	assert.True(t, codexVersionLess("1.3.5", "1.3.12"))
+	assert.False(t, codexVersionLess("2.0", "1.10"))
+	assert.True(t, codexVersionLess("1.0", "1.0.1"))
 }
