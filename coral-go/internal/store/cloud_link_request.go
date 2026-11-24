@@ -52,6 +52,7 @@ type LinkRequest struct {
 	Tries     int       `json:"-" db:"tries"`
 	CreatedAt time.Time `json:"created_at" db:"-"`
 	ExpiresAt time.Time `json:"expires_at" db:"-"`
+	Via       string    `json:"via,omitempty" db:"-"` // the name of the key that asked, when one did
 	CreatedS  string    `json:"-" db:"created_at"`
 	ExpiresS  string    `json:"-" db:"expires_at"`
 }
@@ -224,6 +225,10 @@ func (s *CloudStore) PendingLinkRequests(ctx context.Context, now time.Time) ([]
 	}
 	for i := range out {
 		out[i].parse()
+		var via string
+		if err := s.db.GetContext(ctx, &via, `SELECT k.name FROM cloud_link_request q JOIN cloud_link_key k ON k.key_id = q.cred_id WHERE q.request_id = ?`, out[i].ID); err == nil {
+			out[i].Via = via
+		}
 	}
 	return out, nil
 }

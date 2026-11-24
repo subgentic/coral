@@ -645,6 +645,17 @@ CREATE TABLE IF NOT EXISTS cloud_link_request (
 );
 CREATE INDEX IF NOT EXISTS idx_cloud_link_request_hub ON cloud_link_request (hub_origin, created_at);
 
+-- A self-hosted Hub's request key (#20944, design #20901 v5 to v7): named, shown once, kept only as a salted HMAC, revocable. It reaches only create, status and finish of its own join request.
+CREATE TABLE IF NOT EXISTS cloud_link_key (
+    key_id       TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    key_salt     TEXT NOT NULL,
+    key_hash     TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    last_used_at TEXT NOT NULL DEFAULT '',
+    revoked_at   TEXT NOT NULL DEFAULT ''
+);
+
 -- A person's own limit on one link (design v2 2.2): created now and empty; a missing row means the link's own value. Rows only ever lower access.
 CREATE TABLE IF NOT EXISTS cloud_link_user (
     link_id     TEXT NOT NULL,
