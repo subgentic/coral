@@ -44,7 +44,7 @@ const BODY = () => ({
             const rows = await ev(`[...document.querySelectorAll('#cost-limit-waits tbody tr')].filter(r => r.getClientRects().length).map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
             assert.equal(rows.length, 3, JSON.stringify(rows));
             assert.match(rows[0], /Lead Developer.*Mon 23 Nov.*3.*2.*1/); assert.match(rows[1], /QA Engineer.*Mon 23 Nov.*2.*2.*0/); assert.match(rows[2], /Lead Developer.*Sun 22 Nov.*2.*1.*1/);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-limit-waits thead th')].map(h => h.textContent.trim()).filter(Boolean)`), ['Agent', 'Day', 'Waits', 'At reset', 'Early']);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-limit-waits thead th')].map(h => h.textContent.replace(/[^A-Za-z ]+$/, '').trim()).filter(Boolean)`), ['Agent', 'Day', 'Waits', 'At reset', 'Early']);
         });
         await run('the request asks for the page\'s range as days: a day is today, a week is seven', async () => {
             assert.ok((await reqs()).some(r => /days=1(&|$)/.test(r)), 'a day: ' + JSON.stringify(await reqs()));
@@ -116,7 +116,8 @@ const BODY = () => ({
             const rows = await ev(`[...document.querySelectorAll('#cost-limit-waits tbody tr')].filter(r => r.getClientRects().length).map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
             assert.equal(rows.length, 3, JSON.stringify(rows));
             assert.match(rows[0], /Lead Developer/); assert.match(rows[0], /Mon 23 Nov/);
-            assert.match(rows[0], /At reset/, 'a folded row names its columns: ' + rows[0]);
+            const labels = await ev(`[...document.querySelector('#cost-limit-waits tbody tr').children].filter(td => !td.classList.contains('dt-tone-primary')).map(td => getComputedStyle(td, '::before').content.replace(/"/g, ''))`);
+            assert.deepEqual(labels, ['Day', 'Waits', 'At reset', 'Early'], 'a folded row names its columns: ' + JSON.stringify(labels));
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-limit-waits .lw-kpi')].map(k => k.querySelector('b').textContent)`), ['7', '5', '2']);
         });
     } finally { await client.close(); }
