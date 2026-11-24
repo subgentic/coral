@@ -221,6 +221,23 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.showLaunchModal(); window._selectLaunchType('team'); window.showTeamWizardModal(); document.getElementById('team-wizard-directive').value = 'd';
             window.__generateAnswer = { status: 200, body: { job_id: 'j1' } }; window.__jobAnswer = { status: 'done', result: { name: 'Polled', agents: [{ name: 'P1', prompt: 'p' }] } }; window.generateTeamFromWizard(); true`);
         await waitFor(`document.getElementById('team-drafted-note') && !document.getElementById('team-drafted-note').hidden && /Drafted: 1 member\\./.test(document.getElementById('team-drafted-note').textContent)`, 'the polled draft, straight on the Members step', { timeout: 9000 });
+        console.log('A template role\'s reminders go out with the launch (#21056): Overnight run sends its Orchestrator\'s morning summary, Builder and reviewer sends none');
+        for (const [tmpl, expectReminders] of [['Overnight run', true], ['Builder and reviewer', false]]) {
+            await ev(`window.hideLaunchModal(); window.showLaunchModal(); window._selectLaunchType('team'); true`);
+            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step');
+            await ev(`import((window.__coralStatic || '/static/') + 'team_dialogs.js').then(m => m._pickTeamTemplate(${JSON.stringify(tmpl)})); true`);
+            await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length === 3`, `${tmpl} fills its three members`);
+            await ev(`window.__teamLaunches.length = 0; window.__launchAnswer = { status: 200, body: { agents: [{ name: 'A', session_id: 's' }] } };
+                document.getElementById('team-board-name').value = 'crew-2'; document.getElementById('launch-team-dir').value = '/work/project'; window._validateTeamName(); window.launchTeam(); true`);
+            await waitFor(`window.__teamLaunches.length === 1`, `the ${tmpl} request`);
+            const req = await ev(`window.__teamLaunches[0]`);
+            assert.deepEqual(req.agents.map(a => a.name), tmpl === 'Overnight run' ? ['Orchestrator', 'Builder', 'Checker'] : ['Orchestrator', 'Builder', 'Reviewer']);
+            if (expectReminders) {
+                assert.equal(req.agents[0].reminders.length, 1, 'the Orchestrator brings its morning summary');
+                assert.match(req.agents[0].reminders[0].text, /^Morning summary/); assert.equal(req.agents[0].reminders[0].kind, 'daily'); assert.equal(req.agents[0].reminders[0].at, '07:30');
+                assert.ok(req.agents.slice(1).every(a => !a.reminders), 'the other members bring none');
+            } else assert.ok(req.agents.every(a => !a.reminders), 'a template with no reminders sends none');
+        }
         console.log('PASS team dialogs');
     } finally {
       await removeBoards(ev, ['crew-1', 'crew-1-2', 'crew-2', 'crew-dir']);
