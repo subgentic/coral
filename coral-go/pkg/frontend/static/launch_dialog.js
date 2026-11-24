@@ -132,12 +132,21 @@ function _selectLaunchType(type) {
             showName: false,
             cliSlot: 'launch-cli-slot', // a missing CLI is said under the provider, in the reserved note slot (#5835, #7391)
             sections: true, // step 3 is a sectioned dialog (#4950): Agent, Permissions, Advanced
+            remindersPane: !launch.member && !launch.addTo, // New agent's Reminders tab (#21169): saved for the new session when it launches
             skillsPane: !!launch.member, // Edit member and Add member have a Skills section too (#18657): the member's own skills
             wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
             adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
             adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
             value: launch.member ? launch.member.value : { prompt: launch.welcomePrompt?.kind === 'agent' ? launch.welcomePrompt.text : '', agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
         });
+        launch.reminders = null;
+        { const host = document.querySelector('#launch-agent-acf .launch-rem-host'); if (host) importOnce('./launch_reminders.js').then(m => {
+            const tab = () => document.querySelector('.settings-tab[data-section="reminders"] .settings-tab-name');
+            launch.reminders = m.mountLaunchReminders(host, { who: () => document.getElementById('launch-agent-name-input')?.value.trim() || 'this agent', onChange: n => { const t = tab(); if (!t) return; t.querySelector('.launch-rem-count')?.remove(); if (n) t.append(Object.assign(document.createElement('span'), { className: 'launch-rem-count', textContent: String(n) })); } });
+            const acf = document.getElementById('launch-agent-acf'), fill = ({ name, list }) => launch.reminders && launch.reminders.setSource(name, list);
+            if (launch.personaReminders?.list.length) fill(launch.personaReminders);
+            acf.addEventListener('persona-reminders', e => fill(e.detail));
+        }).catch(() => {}); }
         { // the skills are the agent's own choice: they sit at the end of the Agent section (step 3's first), not behind the Advanced entry of the section list, which a phone shows as a dropdown nobody opens (#12569)
             const pane = document.querySelector(`#launch-agent-acf [data-section="${launch.member ? 'skills' : 'agent'}"]`), skills = document.getElementById('launch-skills-row'), slot = document.getElementById('launch-note-slot');
             if (pane && skills) pane.insertBefore(skills, !launch.member && slot && slot.parentNode === pane ? slot : null);
@@ -629,6 +638,7 @@ export async function launchSession() {
     if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = 'Launching...'; }
 
     try {
+        const reminders = launch.mode === 'agent' && launch.reminders ? launch.reminders.drafts() : []; // the Reminders tab's (#21169), saved for the new session below
         const dirInput = document.getElementById(launch.mode === "terminal" ? "launch-terminal-dir" : "launch-dir");
         const result = await _launchOn(server, "/api/sessions/launch", payload, type, { dirInput, retry: launchSession, nameInput: document.getElementById('launch-agent-name-input') }); // the Not Found dialog's Check again launches again, from this dialog's own fields
         if (result) {
@@ -641,6 +651,7 @@ export async function launchSession() {
             const opener = document.getElementById('launch-modal')._focusOpener || null; // where the keyboard was when the dialog opened: closing the dialog puts it back there (#10247)
             hideLaunchModal();
             importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agent is when alerts make sense: once per browser (#10068)
+            if (reminders.length && result.session_id) importOnce('./launch_reminders.js').then(m => m.saveReminders(reminders, result.session_id, server)).then(({ failed }) => { if (failed.length) showToast(`The agent started, but ${failed.length === 1 ? 'a reminder was' : `${failed.length} reminders were`} not saved. Add ${failed.length === 1 ? 'it' : 'them'} on the agent's page.`, true); }).catch(() => showToast("The agent started, but its reminders were not saved. Add them on the agent's page.", true));
             setTimeout(() => { if (!isSignedOut()) loadLiveSessions(); }, 2000); // a signed-out page makes no /api request (#12472)
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
             if (!added) {

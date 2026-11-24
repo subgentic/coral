@@ -61,11 +61,11 @@ const BASE = require('./test_base').BASE;
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`); await settle(200);
             await openNewAgent(ev, waitFor); await toStep3();
         });
-        await S.run('step 3 tabs are real tabs: a tablist with three tabs, aria-selected on one, roving tabindex, each tab controls a tabpanel named by it', async () => {
+        await S.run('step 3 tabs are real tabs: a tablist with four tabs, aria-selected on one, roving tabindex, each tab controls a tabpanel named by it', async () => {
             const t = await ev(`(() => { const tl = window.__na.dialog().querySelector('[role=tablist]'); if (!tl) return null; return { orientation: tl.getAttribute('aria-orientation'), tabs: [...tl.querySelectorAll('[role=tab]')].map(x => ({ name: window.__na.name(x), sel: x.getAttribute('aria-selected'), tab: x.tabIndex, ctrl: (() => { const p = document.getElementById(x.getAttribute('aria-controls') || ''); return p ? { role: p.getAttribute('role'), by: p.getAttribute('aria-labelledby') === x.id } : null; })() })) }; })()`);
-            assert.ok(t, 'a role=tablist'); assert.equal(t.tabs.length, 3);
+            assert.ok(t, 'a role=tablist'); assert.equal(t.tabs.length, N.tabs.length);
             assert.equal(t.tabs.filter(x => x.sel === 'true').length, 1, 'one selected tab');
-            assert.deepEqual(t.tabs.map(x => x.tab).sort(), [-1, -1, 0], 'one tab stop (roving tabindex)');
+            assert.deepEqual(t.tabs.map(x => x.tab).sort(), [-1, -1, -1, 0], 'one tab stop (roving tabindex)');
             for (const x of t.tabs) { assert.ok(x.ctrl, `${x.name}: aria-controls points to a panel`); assert.equal(x.ctrl.role, 'tabpanel', `${x.name}: the panel is a tabpanel`); assert.ok(x.ctrl.by, `${x.name}: the panel is labelled by its tab`); }
         });
         await S.run('tablist keys: the arrows along its axis move and select (wrapping), Home and End go to the first and last', async () => {
@@ -76,10 +76,11 @@ const BASE = require('./test_base').BASE;
             assert.equal((await cur()).name, 'Agent');
             await key(next); assert.deepEqual(await cur(), { name: 'Permissions', focused: true }, `${next} selects and focuses the next tab`);
             await key(next); assert.equal((await cur()).name, 'Advanced');
+            await key(next); assert.equal((await cur()).name, 'Reminders');
             await key(next); assert.equal((await cur()).name, 'Agent', `${next} wraps to the first`);
-            await key(prev); assert.equal((await cur()).name, 'Advanced', `${prev} wraps to the last`);
+            await key(prev); assert.equal((await cur()).name, 'Reminders', `${prev} wraps to the last`);
             await key('Home'); assert.equal((await cur()).name, 'Agent', 'Home');
-            await key('End'); assert.equal((await cur()).name, 'Advanced', 'End');
+            await key('End'); assert.equal((await cur()).name, 'Reminders', 'End');
             await key('Home');
         });
         await S.run('Provider and Mode are radiogroups: one aria-checked, one tab stop, arrows move the choice and the focus, Space chooses; Thinking is one named select a key changes', async () => {

@@ -427,6 +427,7 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
             ...(opts.skillsPane ? [pane('skills', 'Skills', 'auto_awesome', 'Skills this member is told about, besides the team\'s.', '')] : []), // Edit member (#18657): its own skills, in a section of their own
             pane('advanced', 'Advanced', 'tune', '', `${_mk1}${flagsInput}</label>`),
+            ...(opts.remindersPane ? [pane('reminders', 'Reminders', 'schedule', 'Wake this agent at a time you choose. Optional.', '<div class="launch-rem-host"></div>')] : []), // New agent (#21169): the reminders made with it
         ].join('');
     } else if (opts.restart) {
         // Restart (#7391): New Agent's steps without the first, the agent being fixed. Step 1 is the persona page (the name, read-only, and the prompt); step 2 is the tabs Model (with Thinking), Permissions, Advanced. The Provider is said in a line; its select stays, hidden, for the form's reads.
