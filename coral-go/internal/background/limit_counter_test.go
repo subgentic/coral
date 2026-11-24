@@ -143,7 +143,7 @@ func TestTheCounterCountsAScriptedRunExactly(t *testing.T) {
 	assert.Equal(t, limitwaits.Row{Agent: "Backend Dev", Day: "2026-11-23", Waits: 1}, byAgent["Backend Dev"])
 	assert.Equal(t, limitwaits.Row{Agent: "Docs", Day: "2026-11-23", Waits: 1}, byAgent["Docs"])
 	assert.Equal(t, limitwaits.Row{Agent: "Flicker", Day: "2026-11-23", Waits: 1, AtReset: 1}, byAgent["Flicker"], "a read that fails once is not the end of a wait and the start of another")
-	assert.NotContains(t, byAgent, "Old Error", "an error whose reset is three days old is not a wait")
+	assert.Equal(t, limitwaits.Row{Agent: "Old Error", Day: "2026-11-23"}, byAgent["Old Error"], "an error whose reset is three days old is not a wait: the agent is a row with none")
 }
 
 func TestAnAgentThatStillWaitsIsNotCountedTwiceAfterARestart(t *testing.T) {
@@ -206,4 +206,19 @@ func TestACounterThatCannotWriteCountsNothingAndBreaksNothing(t *testing.T) {
 	r.agent("a", "Lead Developer", "alpha")
 	r.limit("a", r.now.Add(time.Hour))
 	assert.NotPanics(t, func() { r.tick(0); r.tick(time.Minute) })
+}
+
+// #21020 (the mock's zero row): the counter notes every agent it sees, so the card draws an agent that had no wait as 0, 0, 0 on a day that had some.
+func TestEveryAgentTheCounterSeesIsARowWithZerosOnADayWithWaits(t *testing.T) {
+	r := newCounterRig(t)
+	r.agent("a", "Lead Developer", "alpha")
+	r.agent("b", "Backend Dev", "alpha")
+	r.agent("c", "Docs", "beta")
+	r.limit("a", r.now.Add(time.Hour))
+	r.tick(0)
+	r.tick(time.Minute)
+	rep, err := r.st.Counts(r.now.Add(-time.Hour), r.now.Add(time.Hour), "alpha", time.UTC)
+	require.NoError(t, err)
+	assert.Equal(t, []limitwaits.Row{{Agent: "Lead Developer", Day: "2026-11-23", Waits: 1}, {Agent: "Backend Dev", Day: "2026-11-23"}}, rep.Rows)
+	assert.Equal(t, 1, rep.Totals.Waits)
 }

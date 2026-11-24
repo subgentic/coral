@@ -42,6 +42,7 @@ type Store struct {
 	db   *sql.DB
 	mu   sync.Mutex
 	path string
+	seen map[string]int64 // an agent's last sighting written, by agent and team: a sighting is written once a quarter of an hour
 }
 
 // Open opens (and makes) the file. Waits older than KeepDays are removed.
@@ -59,11 +60,12 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS limit_waits (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL, agent TEXT NOT NULL, team TEXT NOT NULL DEFAULT '', vendor TEXT NOT NULL DEFAULT '',
 		started_at INTEGER NOT NULL, reset_at INTEGER NOT NULL DEFAULT 0, ended_at INTEGER NOT NULL DEFAULT 0, ended TEXT NOT NULL DEFAULT '');
-		CREATE INDEX IF NOT EXISTS limit_waits_started ON limit_waits(started_at)`); err != nil {
+		CREATE INDEX IF NOT EXISTS limit_waits_started ON limit_waits(started_at);
+		CREATE TABLE IF NOT EXISTS agent_seen (agent TEXT NOT NULL, team TEXT NOT NULL DEFAULT '', slot INTEGER NOT NULL, PRIMARY KEY (agent, team, slot)) WITHOUT ROWID`); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
-	s := &Store{db: db, path: path}
+	s := &Store{db: db, path: path, seen: map[string]int64{}}
 	s.prune(time.Now())
 	for _, suffix := range []string{"", "-wal", "-shm"} {
 		_ = os.Chmod(path+suffix, 0o600)
@@ -77,7 +79,28 @@ func (s *Store) Close() error { return s.db.Close() }
 func (s *Store) prune(now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, _ = s.db.Exec(`DELETE FROM limit_waits WHERE started_at < ?`, now.Add(-KeepDays*24*time.Hour).UnixMilli())
+	cut := now.Add(-KeepDays * 24 * time.Hour)
+	_, _ = s.db.Exec(`DELETE FROM limit_waits WHERE started_at < ?`, cut.UnixMilli())
+	_, _ = s.db.Exec(`DELETE FROM agent_seen WHERE slot < ?`, cut.Unix()/seenSlot)
+}
+
+// seenSlot is how long a sighting stands for, in seconds: the day of a sighting is read in any zone, down to the quarter-hour ones.
+const seenSlot = 15 * 60
+
+// Seen notes that an agent (by its name, on its team) was there at a time: the cost page draws an agent that had no wait as a row of zeros on a day that had some (the approved mock, #21017).
+func (s *Store) Seen(agent, team string, at time.Time) error {
+	slot := at.Unix() / seenSlot
+	k := agent + "\x00" + team
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.seen[k] == slot+1 {
+		return nil
+	}
+	if _, err := s.db.Exec(`INSERT OR IGNORE INTO agent_seen (agent, team, slot) VALUES (?,?,?)`, agent, team, slot); err != nil {
+		return err
+	}
+	s.seen[k] = slot + 1
+	return nil
 }
 
 func ms(t time.Time) int64 {
@@ -211,10 +234,52 @@ func (s *Store) Counts(from, to time.Time, team string, loc *time.Location) (Rep
 	}
 	err = rows.Err()
 	rows.Close()
-	s.mu.Unlock()
 	if err != nil {
+		s.mu.Unlock()
 		return Report{}, err
 	}
+	// an agent seen on a day that had a wait (in this team's view) is a row of its own, with zeros when it had none
+	days := map[string]bool{}
+	for k := range by {
+		days[k.day] = true
+	}
+	if len(days) > 0 {
+		seen, err := s.db.Query(`SELECT agent, team, slot FROM agent_seen WHERE slot >= ? AND slot < ?`, from.Unix()/seenSlot, (to.Unix()+seenSlot-1)/seenSlot)
+		if err != nil {
+			s.mu.Unlock()
+			return Report{}, err
+		}
+		for seen.Next() {
+			var agent, rowTeam string
+			var slot int64
+			if err := seen.Scan(&agent, &rowTeam, &slot); err != nil {
+				seen.Close()
+				s.mu.Unlock()
+				return Report{}, err
+			}
+			t := time.Unix(slot*seenSlot, 0)
+			if t.Before(from) || !t.Before(to) {
+				continue
+			}
+			if rowTeam != "" {
+				teams[rowTeam] = true
+			}
+			if team != "" && rowTeam != team {
+				continue
+			}
+			k := key{agent, t.In(loc).Format("2006-01-02")}
+			if days[k.day] && by[k] == nil {
+				by[k] = &Row{Agent: agent, Day: k.day}
+			}
+		}
+		err = seen.Err()
+		seen.Close()
+		if err != nil {
+			s.mu.Unlock()
+			return Report{}, err
+		}
+	}
+	s.mu.Unlock()
 	for _, r := range by {
 		rep.Rows = append(rep.Rows, *r)
 	}

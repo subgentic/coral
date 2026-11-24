@@ -44,6 +44,7 @@ type limitWaitSink interface {
 	Begin(w limitwaits.Wait) (int64, error)
 	End(id int64, at time.Time, kind string) error
 	Open() ([]limitwaits.Wait, error)
+	Seen(agent, team string, at time.Time) error
 }
 
 type openWait struct {
@@ -162,6 +163,7 @@ func (c *LimitCounter) Tick(ctx context.Context) {
 		if a.SessionID == "" {
 			continue
 		}
+		_ = c.store.Seen(agentName(a), teams[naming.SessionName(a.AgentType, a.SessionID)], now) // the card draws every agent of a team, with zeros when it had no wait
 		reset, limited := c.state(ctx, a, now)
 		w := c.open[a.SessionID]
 		switch {
@@ -204,12 +206,16 @@ func (c *LimitCounter) endedBy(w *openWait, t time.Time) string {
 	return limitwaits.EndedEarly
 }
 
-func (c *LimitCounter) begin(a AgentInfo, reset, now time.Time, teams map[string]string) {
-	name := a.DisplayName
-	if name == "" {
-		name = a.AgentName
+// agentName is the name the cost page shows for an agent.
+func agentName(a AgentInfo) string {
+	if a.DisplayName != "" {
+		return a.DisplayName
 	}
-	w := limitwaits.Wait{SessionID: a.SessionID, Agent: name, Team: teams[naming.SessionName(a.AgentType, a.SessionID)], Vendor: vendorOf(a.AgentType), StartedAt: now, ResetAt: reset}
+	return a.AgentName
+}
+
+func (c *LimitCounter) begin(a AgentInfo, reset, now time.Time, teams map[string]string) {
+	w := limitwaits.Wait{SessionID: a.SessionID, Agent: agentName(a), Team: teams[naming.SessionName(a.AgentType, a.SessionID)], Vendor: vendorOf(a.AgentType), StartedAt: now, ResetAt: reset}
 	id, err := c.store.Begin(w)
 	if err != nil {
 		c.logger.Warn("limit counter: a wait could not be recorded", "session_id", a.SessionID, "err", err)
