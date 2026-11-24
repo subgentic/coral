@@ -484,7 +484,7 @@
 #cost-nav-list .session-list-heading:first-child .view-list-title { margin-top: 2px; }
 
 /* The Limit waits card (#21020, the approved stage-1 mock): a heading, a sentence, three counts and the per-agent-and-day table; the Team select sits in the page bar and is for the Overview only. */
-#cost-dashboard-view:not([data-view="overview"]) #cost-team { display: none; }
+#cost-dashboard-view:not([data-view="overview"]) #cost-team, #cost-dashboard-view:not([data-view="overview"]) #cost-export { display: none; }
 .lw-card { display: grid; gap: 10px; background: var(--card-fill); box-shadow: var(--card-shadow); border: var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad); min-width: 0; }
 .lw-card > * { min-width: 0; }
 .lw-sec { font-weight: var(--fw-title); font-size: var(--fs-lg); color: var(--text-primary); }
@@ -494,3 +494,8 @@
 .lw-kpi b { display: block; font-size: var(--fs-2xl); font-weight: var(--fw-title); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .lw-say { margin: 0; }
 @media (max-width: 500px) { .lw-kpi b { font-size: var(--fs-xl); } }
+
+.cost-export-choices { display: grid; gap: 8px; margin: 12px 0; }
+.modal-content label.cost-export-choice { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0; text-align: left; cursor: pointer; }
+.modal-content label.cost-export-choice input[type="radio"] { flex: none; width: auto; margin: 0; }
+.cost-export-note { margin: 0 0 12px; font-size: var(--fs-sm); color: var(--text-secondary); }
