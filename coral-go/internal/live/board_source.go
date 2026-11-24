@@ -49,7 +49,7 @@ func (b *BoardSource) Agents(ctx context.Context) ([]AgentRow, error) {
 		if s.IsActive == 0 {
 			st.Archived = true
 		}
-		row := AgentRow{Key: id, Name: id, Role: s.JobTitle, Working: st.Working, Waiting: st.Waiting, Sleeping: st.Sleeping, Archived: st.Archived}
+		row := AgentRow{Key: id, Generation: generation(s), Name: id, Role: s.JobTitle, Working: st.Working, Waiting: st.Waiting, Sleeping: st.Sleeping, Archived: st.Archived}
 		if t := b.r.ActiveTaskForSubscriber(ctx, b.project, id); t != nil {
 			row.TaskTitle = t.Title
 		}
@@ -84,3 +84,15 @@ func (b *BoardSource) Posts(ctx context.Context, n int) ([]PostRow, error) {
 
 // parseBoardTime reads a message's stored time (RFC 3339, with or without fractions).
 func parseBoardTime(s string) (time.Time, error) { return time.Parse(time.RFC3339Nano, s) }
+
+// generation is the session's identity for the chat binding: the session it holds and when it joined it (a restart, a resume into another session or a reused name changes it). A subscription with neither has none.
+func generation(s board.Subscriber) string {
+	joined := ""
+	if s.SessionJoinedAt != nil {
+		joined = *s.SessionJoinedAt
+	}
+	if s.SessionName == "" && joined == "" {
+		return ""
+	}
+	return s.SessionName + "@" + joined
+}

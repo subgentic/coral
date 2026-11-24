@@ -18,6 +18,7 @@ type LiveSource interface {
 // never put in a frame.
 type AgentRow struct {
 	Key                                  string
+	Generation                           string // the session's identity for chat (MUST B): session id plus its start; "" means chat is unavailable for this agent. Never in a frame.
 	Name, Role                           string
 	TaskTitle                            string
 	Working, Waiting, Sleeping, Archived bool
