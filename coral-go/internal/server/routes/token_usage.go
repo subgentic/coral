@@ -18,8 +18,9 @@ import (
 
 // TokenUsageHandler provides HTTP handlers for token usage API.
 type TokenUsageHandler struct {
-	ts *store.TokenUsageStore
-	bs *board.Store // board labels: a team's row says its name, not its id (#10936)
+	ts  *store.TokenUsageStore
+	bs  *board.Store     // board labels: a team's row says its name, not its id (#10936)
+	now func() time.Time // tests; nil is the clock
 }
 
 // SetBoardStore lets the by-team answer carry each team's current label.
