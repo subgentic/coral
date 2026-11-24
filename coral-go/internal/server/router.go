@@ -360,6 +360,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	schedHandler.SetKnowledgeTeamCheck(sessHandler.TeamHasKnowledgeToDistill)
 	s.schedHandler = schedHandler
 	s.chiefChecks = routes.NewChiefChecksHandler(s.db, sessHandler)
+	sessHandler.SetTemplateReminders(s.chiefChecks.AddTemplateReminders)
 	workflowHandler := routes.NewWorkflowHandler(s.db, s.cfg)
 	s.workflowHandler = workflowHandler
 	themeHandler := routes.NewThemesHandler(s.cfg)

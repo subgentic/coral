@@ -50,6 +50,8 @@ type launchTeamAgent struct {
 	// ReviewsOnly and ReviewAreas (#8957): the member takes review tasks only, and which areas it reviews (empty: every area). Applied when the member subscribes to the team's board.
 	ReviewsOnly bool     `json:"reviews_only"`
 	ReviewAreas []string `json:"review_areas"`
+	// Reminders are the role's reminders (#21019): created for the member when a person launches the team, under the reminders' own limits.
+	Reminders []templateReminder `json:"reminders"`
 	// grantedMode is the mode the cap gave this member when an agent launched the team (#14336): never read from the request.
 	grantedMode string `json:"-"`
 }
@@ -370,6 +372,12 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 			if sid, _ := entry["session_id"].(string); sid != "" {
 				h.seedTeamGrant(ctx, body.BoardName, sid)
 				seedGrant = false // the first Orchestrator the launch started is the seat
+			}
+		}
+		if _, bad := entry["error"]; !bad && !fromAgent && h.templateReminders != nil && len(agentDef.Reminders) > 0 {
+			if sid, _ := entry["session_id"].(string); sid != "" {
+				made, left := h.templateReminders(ctx, body.BoardName, sid, agentDef.Reminders)
+				entry["reminders"] = map[string]any{"made": made, "left_out": left}
 			}
 		}
 		launched = append(launched, entry)

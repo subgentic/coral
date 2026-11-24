@@ -49,6 +49,9 @@ type SessionsHandler struct {
 	branches     BranchesSource  // the worktrees of the repositories the live agents work in (branches.go); nil until the server wires it
 	opencode     OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
 
+	// templateReminders creates the reminders a template's role brings for the member just started (template_reminders.go); nil until the server wires it.
+	templateReminders func(ctx context.Context, board, sessionID string, rs []templateReminder) (int, []string)
+
 	resourceHook *resources.Hook // the resource queue's shell hook (#13645); nil when the queue is off
 
 	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.
