@@ -336,3 +336,5 @@
 :root .inbox-kind-icon[data-kind="access"]::before { content: 'key'; }
 /* The one-focus design supersedes the old coloured resting Wake/Start surfaces. */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results tr.inbox-kind-row .inbox-review-actions > .inbox-wake { background: color-mix(in srgb, var(--text-primary) 4%, transparent); border-color: var(--text-muted); }
+/* #21206: Dismiss words at 4.5:1 on the unread tint (a read card has more room; the same ink is no loss). */
+:root :is(#group-table-view, .team-needs-list) .inbox-review-actions > .btn.btn-quiet.btn-small:is(.inbox-goaldone-dismiss, .inbox-dismiss), :root .inbox-goaldone-actions .btn.btn-quiet.inbox-goaldone-dismiss, :root :is(#group-table-view, .team-needs-list) .btn.btn-quiet:is(.inbox-goaldone-dismiss, .inbox-dismiss, [data-slot="ignore"]) { color: var(--text-primary); }
