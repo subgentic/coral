@@ -1,5 +1,34 @@
 # Release Notes
 
+## v2.1.12 — Send back and Split for large changes, the Waste card on the Cost page, and clearer Hub key settings
+
+Task numbers in brackets. Built on v2.1.11. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Send back and Split on a large change** (#21059, #21182): when a task in review is over the review size limit, its Large change banner offers Send back (return it to the author) and Split (ask the author to break it into smaller tasks). Team settings has a new over-limit setting. The agent docs describe both actions.
+- **The Waste card on the Cost page** (#21127): waste per agent, as a table on a wide screen and as label and value rows for each agent on a phone.
+- **Clearer Hub key settings** (#21171): Settings, then Network, then Coral Hub, shows the keys self-hosted Hubs use, so you can find, make and revoke them.
+- **A person's terminal is not an agent** (#21170): the health check no longer reports a person's own terminal in a team as idle or waiting, and does not count it.
+- **A closed review can be given again** (#21173): a reviewer whose review task was closed can be asked for the verdict again. The task opens and the reviewer is told.
+
+### Test and gate fixes in this release
+
+- needs_phone_rows waits for a settled table before each tap (#21168), the v2.1.11 retry.
+- The static-tree budget is raised to 8182784 bytes for this batch.
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption and the browser gate (all nine parts, with no retry) are green on the gated commit. No Windows run: no change in this release is Windows-only.
+
+### Not in this release
+
+- The light-theme Inbox (#21161) is held for v2.1.13, with its text contrast fix (#21206).
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+
 ## v2.1.11 — The Cost page follows its Team select, a faster Inbox load, and Coral Live chat (built, switched off)
 
 Task numbers in brackets. Built on v2.1.10. A prerelease until the Operator promotes it.
