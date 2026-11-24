@@ -177,9 +177,11 @@ type Session struct {
 	signinInflight atomic.Int32
 	// control requests (#5918): their own in-flight budget, and when the last local mode message was taken (at most one a second).
 	controlInflight atomic.Int32
-	controlMu       sync.Mutex
-	lastControl     time.Time
-	relaySlot       chan struct{} // connector-opened streams being handled (MaxRelayStreams)
+	// liveInflight: Coral Live push calls in progress (their own budget, so relay and sign-in are never starved by them).
+	liveInflight atomic.Int32
+	controlMu    sync.Mutex
+	lastControl  time.Time
+	relaySlot    chan struct{} // connector-opened streams being handled (MaxRelayStreams)
 	// artifactHook is set only on a tunnel the hub advertised relay_artifact to; artifactInflight
 	// counts its calls in progress.
 	artifactHook     RelayArtifactFunc

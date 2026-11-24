@@ -172,6 +172,9 @@ func (s *Session) serveInbound(st io.ReadWriteCloser, setDeadline func(time.Time
 	if k.kind == KindControl { // its own budget too: a relay burst must not make a mode change wait (and the hub already answers a faster one with 429)
 		inflight, limit = &s.controlInflight, 2
 	}
+	if k.kind == KindLive { // Coral Live pushes: their own small budget too, so a burst of them can't make a relay request come back busy (and the reverse)
+		inflight, limit = &s.liveInflight, 2
+	}
 	if int(inflight.Add(1)) > limit {
 		inflight.Add(-1)
 		_ = setDeadline(time.Now().Add(inboundReadDeadline))
