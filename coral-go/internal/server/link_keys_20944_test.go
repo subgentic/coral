@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
@@ -209,4 +210,31 @@ func TestMakingAndRevokingAKeyIsInTheOperatorActionsLog(t *testing.T) {
 	for _, a := range all {
 		assert.NotContains(t, a.Note+a.Title+a.ItemID, strings.TrimPrefix(key, "lrk_"), "never the key")
 	}
+}
+
+// QA2's SHOULD on #20944: a key sent twice, and a good key sent through a Hub, are refused on a call a key may make (removing either check left every test green).
+func TestAKeySentTwiceOrThroughAHubIsRefused(t *testing.T) {
+	r, _, _, _ := linkedRemoteWithManager(t)
+	h := r.srv.Router()
+	_, key := makeKeyForTest(t, h, "Hub C")
+	_, other := makeKeyForTest(t, h, "Hub D")
+	send := func(mut func(*http.Request)) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("GET", "/api/cloud/link-requests/lr-none", nil)
+		req.Host = "127.0.0.1:8420"
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		req.RemoteAddr = "127.0.0.1:50000"
+		req.Header.Set(linkKeyHeader, key)
+		mut(req)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	assert.Equal(t, 404, send(func(*http.Request) {}).Code, "the control: one good key on a call it may make reaches the handler")
+	rec := send(func(req *http.Request) { req.Header.Add(linkKeyHeader, key) })
+	assert.Equal(t, 403, rec.Code, "the same key twice")
+	assert.Contains(t, rec.Body.String(), "link_key_scope")
+	rec = send(func(req *http.Request) { req.Header.Add(linkKeyHeader, other) })
+	assert.Equal(t, 403, rec.Code, "two different good keys")
+	rec = send(func(req *http.Request) { req.Header.Set(tunnel.ViaHeader, cloud.ViaSecret()) })
+	assert.Equal(t, 403, rec.Code, "through a Hub (the route classifier refuses it first; the identity layer's own check is a second wall)")
 }
