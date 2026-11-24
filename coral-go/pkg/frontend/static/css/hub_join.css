@@ -1,0 +1,35 @@
+/* Hub join controls share the native card and type tokens. */
+.hub-join { max-width: 40rem; min-width: 0; padding: var(--card-pad); margin-block: 16px; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); overflow-wrap: anywhere; }
+.hub-join h3 { font-size: var(--fs-2xl); margin: 0 0 12px; }
+.hub-join h4 { margin: 12px 0 4px; }
+.hub-join p { color: var(--text-secondary); margin: 8px 0 12px; }
+.hub-join label { display: block; margin-block: 12px; }
+.hub-join input, .hub-join select { display: block; max-width: 100%; margin-top: 6px; }
+.hub-join .btn { scroll-margin-block: 8px; min-height: 44px; min-width: 44px; margin: 4px 8px 4px 0; }
+.hub-join-key { border-top: var(--card-border); padding-block: 8px; }
+.hub-join-secret { display: block; padding: 12px; border: var(--card-border); overflow-wrap: anywhere; user-select: all; }
+.hub-join-actions { display: flex; flex-wrap: wrap; }
+.hub-join small, .hub-join dt { color: var(--text-muted); }
+.hub-join-facts { grid-template-columns: minmax(0, 1fr); margin-block: 16px; }
+.hub-join dd { margin: 0; overflow-wrap: anywhere; }
+.hub-join-head { display: flex; gap: 12px; align-items: flex-start; }
+.hub-join-head > div { min-width: 0; }
+.hub-join-head .material-icons { color: var(--text-muted); }
+.hub-join-head h3 { margin-bottom: 4px; }
+.hub-join details { margin-block: 12px; }
+.hub-join summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.hub-join select, .hub-join input { min-height: 44px; font: inherit; color: var(--text-primary); background: var(--card-fill); border: var(--card-border); border-radius: var(--card-radius); padding: 8px; }
+.hub-join-actions .btn-primary { margin-left: auto; }
+@media (max-width: 600px) { .hub-join-actions .btn { flex: 1; } }
+.hub-join-facts dd { margin-bottom: 12px; }
+.hub-join-meta { font-size: var(--fs-md); }
+.hub-join-code { border: var(--card-border); border-radius: var(--card-radius); padding: 16px; margin-block: 16px; }
+.hub-join-code .hub-join-secret { border: 0; padding: 8px 0; }
+.hub-join-digits { font-size: var(--fs-display); font-weight: var(--fw-strong); letter-spacing: var(--ls-code); }
+.hub-join-code > .btn { width: 100%; }
+.hub-join .hub-join-state { color: var(--text-secondary); font-size: var(--fs-base); font-weight: var(--fw-strong); }
+@media (max-width: 600px) { .hub-join > .btn-primary { width: 100%; } }
+.hub-join .notice { margin-block: 12px; }
+.hub-join small { font-size: var(--fs-base); }
+@media (max-width: 767px) { body.phone-nav-on:not(.keyboard-open) .hub-join-requests .btn { scroll-margin-bottom: calc(var(--phone-bar-h) + 8px + env(safe-area-inset-bottom, 0px)); } }
+.hub-join ol { padding-inline-start: var(--space-xl); color: var(--text-secondary); font-size: var(--fs-lg); }
