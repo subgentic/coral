@@ -6,7 +6,7 @@ import { boardFetch } from './server_base.js';
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 export const RS_KEYS = ['rs_on', 'rs_lines', 'rs_files', 'rs_skip', 'rs_scope', 'rs_roles'];
 
-const toValues = s => ({ rs_on: !!s.on, rs_lines: Number(s.lines) || 0, rs_files: Number(s.files) || 0, rs_skip: (s.skip || []).join(', '), rs_scope: (s.only_roles || []).length ? 'roles' : 'team', rs_roles: s.only_roles || [] });
+const toValues = s => ({ rs_on: !!s.on, rs_lines: Number(s.lines) > 0 ? Number(s.lines) : '', rs_files: Number(s.files) > 0 ? Number(s.files) : '', rs_skip: (s.skip || []).join(', '), rs_scope: (s.only_roles || []).length ? 'roles' : 'team', rs_roles: s.only_roles || [] });
 const skipList = text => String(text || '').split(/[,\n]/).map(x => x.trim()).filter(Boolean);
 
 /** Makes the group for one team. `members` resolves to the board's subscribers (the roles offered). */
@@ -25,12 +25,12 @@ export function createReviewSize(team, members) {
     };
     return {
         fields: () => [
-            { key: 'rs_on', type: 'toggle', label: 'Warn when a change is too big to review', help: 'Off by default. Warns only: nothing is blocked or sent back.' },
-            { key: 'rs_lines', type: 'number', label: 'Lines changed over', unit: 'lines (0 is no limit)', min: 0, max: 1000000, integer: true, compact: true, disabledWhen: v => !v.rs_on, attrs: { inputmode: 'numeric' } },
-            { key: 'rs_files', type: 'number', label: 'Files changed over', unit: 'files (0 is no limit)', min: 0, max: 100000, integer: true, compact: true, disabledWhen: v => !v.rs_on, attrs: { inputmode: 'numeric' },
-                help: 'Either limit warns. Leave one at 0 to use only the other.',
+            { key: 'rs_on', type: 'toggle', label: 'Warn when a change is too big to review', help: 'Off by default. Warns only: nothing is blocked or sent back.',
                 validate: (_, v) => (v.rs_on && !(Number(v.rs_lines) > 0) && !(Number(v.rs_files) > 0) ? 'Set a limit for lines or files, or turn the warning off.' : '') },
-            { key: 'rs_skip', type: 'text', label: 'Skip these paths', wide: true, placeholder: '*.lock, **/generated/**', disabledWhen: v => !v.rs_on, help: 'Not counted. Separate paths with commas; * ? and ** work.' },
+            { key: 'rs_lines', type: 'number', label: 'Lines changed over', min: 0, max: 1000000, integer: true, compact: true, disabledWhen: v => !v.rs_on, attrs: { inputmode: 'numeric' } },
+            { key: 'rs_files', type: 'number', label: 'Files changed over', min: 0, max: 100000, integer: true, compact: true, disabledWhen: v => !v.rs_on, attrs: { inputmode: 'numeric' },
+                help: 'Either limit warns. Leave one empty to use only the other.', },
+            { key: 'rs_skip', type: 'text', label: 'Skip these paths (not counted)', wide: true, placeholder: '*.lock, **/generated/**', disabledWhen: v => !v.rs_on, help: 'Separate paths with commas; * ? and ** work.' },
             { key: 'rs_scope', type: 'select', label: 'Applies to', disabledWhen: v => !v.rs_on, options: [{ value: 'team', label: 'Whole team' }, { value: 'roles', label: 'Only these roles' }] },
             { key: 'rs_roles', type: 'multiselect', label: 'Roles', options: roles, visibleWhen: v => v.rs_scope === 'roles', disabledWhen: v => !v.rs_on,
                 help: 'Saved per team. A role can have its own numbers under Roles.',

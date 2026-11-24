@@ -43,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
 
         // 1. the tab: named, in the tablist, panel linked, roving order includes it
         const tab = await ev(`(() => { const t = document.querySelector('#team-settings-workspace .settings-tab[data-section=health]'); const p = document.getElementById(t.getAttribute('aria-controls')); return { role: t.getAttribute('role'), text: t.querySelector('.settings-tab-name').textContent, ctl: !!p, panelRole: p.getAttribute('role'), labelled: p.getAttribute('aria-labelledby') === t.id, tabIndex: t.tabIndex, hidden: p.hidden, order: [...document.querySelectorAll('#team-settings-workspace [role=tablist] [role=tab]')].map(x => x.dataset.section) }; })()`);
-        assert.deepEqual(tab, { role: 'tab', text: 'Health check', ctl: true, panelRole: 'tabpanel', labelled: true, tabIndex: -1, hidden: true, order: ['workflow', 'health', 'messaging', 'reminders', 'prompts'] });
+        assert.deepEqual(tab, { role: 'tab', text: 'Health check', ctl: true, panelRole: 'tabpanel', labelled: true, tabIndex: -1, hidden: true, order: ['workflow', 'health', 'messaging', 'review-size', 'reminders', 'prompts'] });
         await ev(`document.querySelector('#team-settings-workspace .settings-tab[data-section=workflow]').focus(); true`);
         await key('ArrowDown', 'ArrowDown', 40);
         assert.equal(await ev(`document.activeElement.dataset.section`), 'health', 'ArrowDown from Workflow reaches Health check');
