@@ -182,3 +182,45 @@ func TestFrameDoesNotCarryTimesOrSeqFromTheInputRows(t *testing.T) {
 	require.Equal(t, uint64(3), f.Seq)
 	require.Equal(t, int64(1700000005), f.Posts[0].At)
 }
+
+// Security's MUST 1 on slice 1: a character whose lower case has another length (İ, Ⱥ) before a name must not shift the cut and leak the name or panic.
+func TestUnusualCaseCharactersBeforeANameDoNotLeakIt(t *testing.T) {
+	for _, pre := range []string{"İ", "İİİ", "Ⱥ", "ȺȺ İ", "ẞ"} {
+		in := Input{Agents: twoAgents(), Posts: []PostFacts{
+			post("Backend Dev", pre+" thanks Backend Dev and BACKEND dev, also @Ada Lovelace", 1),
+			post("Backend Dev", pre+"qa engineer is here", 2), // a hidden agent's name, any case
+		}}
+		require.NotPanics(t, func() {
+			f := Build(in, Options{}, hubScan())
+			raw, _ := json.Marshal(f)
+			low := strings.ToLower(string(raw))
+			for _, bad := range []string{"backend dev", "ada lovelace", "qa engineer"} {
+				require.NotContains(t, low, bad, "pre=%q", pre)
+			}
+		})
+	}
+}
+
+// MUST 2: the task title takes the same name rule as a post.
+func TestTaskTitleNamesAreReplacedOrDropped(t *testing.T) {
+	ag := twoAgents()
+	ag[0].TaskTitle = "Help Ada Lovelace with the page"
+	ag[1].TaskTitle = "Ask QA Engineer to retest"
+	f := Build(Input{Agents: ag}, Options{}, hubScan())
+	require.Equal(t, "Help Agent 2 with the page", f.Agents[0].Task, "a shown agent's name in a title becomes its role")
+	require.Empty(t, f.Agents[1].Task, "a title that names a hidden agent is dropped")
+	ag[0].TaskTitle = "Tell @nobody-we-know about it"
+	require.Empty(t, Build(Input{Agents: ag}, Options{}, hubScan()).Agents[0].Task, "an unknown @mention drops the title")
+}
+
+// SHOULD 1 and 2: the status is one of four words; a role is scanned like any text.
+func TestStatusIsOneOfFourWordsAndRoleIsScanned(t *testing.T) {
+	ag := twoAgents()
+	ag[0].Status = Status("working on /Users/someone/secret")
+	ag[0].Role = "api_key=" + "sk_live_" + strings.Repeat("a1B2", 6)
+	f := Build(Input{Agents: ag}, Options{}, hubScan())
+	require.Equal(t, "idle", f.Agents[0].Status)
+	require.Equal(t, "Agent 1", f.Agents[0].Role, "a role with a secret is not shown")
+	raw, _ := json.Marshal(f)
+	require.NotContains(t, string(raw), "sk_live_")
+}
