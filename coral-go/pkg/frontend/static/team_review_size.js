@@ -4,9 +4,9 @@
 import { importOnce } from './import_once.js';
 import { boardFetch } from './server_base.js';
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
-export const RS_KEYS = ['rs_on', 'rs_lines', 'rs_files', 'rs_skip', 'rs_scope', 'rs_roles'];
+export const RS_KEYS = ['rs_on', 'rs_lines', 'rs_files', 'rs_skip', 'rs_scope', 'rs_roles', 'rs_over'];
 
-const toValues = s => ({ rs_on: !!s.on, rs_lines: Number(s.lines) > 0 ? Number(s.lines) : '', rs_files: Number(s.files) > 0 ? Number(s.files) : '', rs_skip: (s.skip || []).join(', '), rs_scope: (s.only_roles || []).length ? 'roles' : 'team', rs_roles: s.only_roles || [] });
+const toValues = s => ({ rs_on: !!s.on, rs_lines: Number(s.lines) > 0 ? Number(s.lines) : '', rs_files: Number(s.files) > 0 ? Number(s.files) : '', rs_skip: (s.skip || []).join(', '), rs_scope: (s.only_roles || []).length ? 'roles' : 'team', rs_roles: s.only_roles || [], rs_over: ['send_back', 'split'].includes(s.over_limit) ? s.over_limit : 'warn' });
 const NO_LIMIT = 'Set a limit for lines or files, or turn the warning off.';
 /** An empty box is no limit; a number must be a whole number from 0 to `max`. */
 const whole = (v, max) => (v === null || v === undefined || v === '' || (Number.isInteger(v) && v >= 0 && v <= max) ? '' : `use a whole number from 0 to ${max.toLocaleString('en-US')}.`);
@@ -34,6 +34,8 @@ export function createReviewSize(team, members) {
             { key: 'rs_files', type: 'number', label: 'Files changed over', min: 0, max: 100000, compact: true, disabledWhen: v => !v.rs_on, attrs: { inputmode: 'numeric' },
                 help: 'Either limit warns. Leave one empty to use only the other.', validate: value => whole(value, 100000) },
             { key: 'rs_skip', type: 'text', label: 'Skip these paths (not counted)', wide: true, placeholder: '*.lock, **/generated/**', disabledWhen: v => !v.rs_on, help: 'Separate paths with commas; * ? and ** work.' },
+            { key: 'rs_over', type: 'select', label: 'Over the limit', disabledWhen: v => !v.rs_on, options: [{ value: 'warn', label: 'Warn: show a banner' }, { value: 'send_back', label: 'Send back: ask the author to split' }, { value: 'split', label: 'Split: the Orchestrator files follow-ups' }],
+                help: 'Warn is the default. Send back and Split add a button to the banner; nothing happens until someone presses it.' },
             { key: 'rs_scope', type: 'select', label: 'Applies to', disabledWhen: v => !v.rs_on, options: [{ value: 'team', label: 'Whole team' }, { value: 'roles', label: 'Only these roles' }] },
             { key: 'rs_roles', type: 'multiselect', label: 'Roles', options: roles, visibleWhen: v => v.rs_scope === 'roles', disabledWhen: v => !v.rs_on,
                 help: 'Saved per team. A role can have its own numbers under Roles.',
@@ -54,7 +56,7 @@ export function createReviewSize(team, members) {
         },
         /** Saves the whole setting and shows what the server kept. */
         async save(values) {
-            const body = { ...(base || {}), on: !!values.rs_on, lines: Math.max(0, Math.round(Number(values.rs_lines) || 0)), files: Math.max(0, Math.round(Number(values.rs_files) || 0)), skip: skipList(values.rs_skip), only_roles: values.rs_scope === 'roles' ? [...(values.rs_roles || [])] : [] };
+            const body = { ...(base || {}), on: !!values.rs_on, lines: Math.max(0, Math.round(Number(values.rs_lines) || 0)), files: Math.max(0, Math.round(Number(values.rs_files) || 0)), skip: skipList(values.rs_skip), only_roles: values.rs_scope === 'roles' ? [...(values.rs_roles || [])] : [], over_limit: values.rs_over || 'warn' };
             const r = await boardFetch(team, '/review-size', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             if (!r.ok) {
                 const j = await r.json().catch(() => ({}));

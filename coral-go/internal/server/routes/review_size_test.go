@@ -215,6 +215,11 @@ func TestReviewSizeSplitAsksTheOrchestratorAndSendBackHasItsNote(t *testing.T) {
 	assert.Equal(t, "send_back", v["over_limit"])
 	assert.Contains(t, v["send_back_note"], "900 lines in 1 file")
 	assert.Contains(t, v["send_back_note"], "800 lines")
+	assert.Nil(t, v["split_ask"], "only the Split mode carries its ask")
+	_, err = h.bs.SetReviewSizeSetting(ctx, "team", reviewsize.Setting{On: true, Lines: 800, OverLimit: reviewsize.ModeSplit})
+	require.NoError(t, err)
+	_, v = reviewSizeCall(h, h.TaskReviewSize, http.MethodGet, "/api/board/team/tasks/"+id+"/review-size", "", p, nil)
+	assert.Equal(t, "Split #"+id+" (900 lines in 1 file, limit 800 lines) into follow-up tasks under the limit.", v["split_ask"])
 }
 
 // Send back on the banner (#21059): a task waiting in review whose change is over the limit goes back to its author with the note, and the author is told; a change under the limit, an agent that is
@@ -244,7 +249,11 @@ func TestReviewSizeSendBackReturnsTheTaskToItsAuthor(t *testing.T) {
 	back := func(body string, mod func(*http.Request)) (int, map[string]any) {
 		return reviewSizeCall(h, h.SendBackReviewSize, http.MethodPost, "/api/board/team/tasks/"+id+"/review-size/send-back", body, p, mod)
 	}
-	status := func() string { tk, err := h.bs.GetTask(ctx, "team", task.ID); require.NoError(t, err); return tk.Status }
+	status := func() string {
+		tk, err := h.bs.GetTask(ctx, "team", task.ID)
+		require.NoError(t, err)
+		return tk.Status
+	}
 
 	code, _ := back(`{"note":"split it"}`, nil)
 	assert.Equal(t, http.StatusConflict, code, "the guard is off: nothing is over the limit")

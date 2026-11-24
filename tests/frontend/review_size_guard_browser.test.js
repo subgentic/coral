@@ -67,6 +67,13 @@ const TEAM = 'size-guard-' + Date.now().toString(36);
             await ev(`window.__refuse = ''; window.__puts.length = 0; [...document.querySelectorAll('#team-settings-workspace button')].find(b => b.textContent === 'Save settings').click(); true`);
             await waitFor(`window.__puts.length === 1`, `${at}the setting is saved`);
             const put = await ev('window.__puts[0]');
+            assert.equal(put.over_limit, 'warn', `${at}Warn is the default and goes back with the whole setting`);
+            const overOpts = await ev(`[...${row('rs_over')}.querySelectorAll('option')].map(o => o.value + '|' + o.textContent)`);
+            assert.deepEqual(overOpts, ['warn|Warn: show a banner', 'send_back|Send back: ask the author to split', 'split|Split: the Orchestrator files follow-ups'], `${at}the mock's three choices`);
+            await ev(`(() => { const s = ${row('rs_over')}.querySelector('select'); s.value = 'send_back'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await ev(`window.__puts.length = 0; [...document.querySelectorAll('#team-settings-workspace button')].find(b => b.textContent === 'Save settings').click(); true`);
+            await waitFor(`window.__puts.length === 1`, `${at}the choice is saved`);
+            assert.equal((await ev('window.__puts[0]')).over_limit, 'send_back', `${at}Send back is saved`);
             assert.deepEqual({ on: put.on, lines: put.lines, files: put.files, skip: put.skip, only_roles: put.only_roles }, { on: true, lines: 800, files: 20, skip: ['*.lock', '**/generated/**', 'tests/golden/**'], only_roles: ['Lead Developer'] }, `${at}saved whole: ` + JSON.stringify(put));
             assert.deepEqual(put.roles, { 'Frontend Dev': { lines: 300, files: 0 } }, `${at}a role's own numbers go back as they were read`);
 
@@ -90,6 +97,57 @@ const TEAM = 'size-guard-' + Date.now().toString(36);
             await ev(`window.__verdictCalls = 0; (async () => { const ttp = await import(${S} + 'team_tasks_page.js'); const host = document.getElementById('size-host'); ttp.renderTaskPage(host, { id: 7, title: 'Working', status: 'in_progress', assigned_to: 'Dev', version: 0 }, { backLabel: 'Tasks', onBack() {}, openGoal() {}, project: ${JSON.stringify(TEAM)} }, 'view'); return true; })()`);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: waiting for a request that must NOT happen
             assert.equal(await ev('window.__verdictCalls'), 0, `${at}a task not in review never asks`);
+
+            // 3. Send back and Split (#21059): one button on the banner, a note or a confirmation, then the one POST
+            await ev(`window.__acts = []; (() => { const prev = window.fetch; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
+                if (o.method === 'POST' && /\\/review-size\\/(send-back|split)$/.test(url.pathname)) { window.__acts.push({ path: url.pathname.split('/').pop(), body: o.body ? JSON.parse(o.body) : null }); return window.__actAnswer ? Promise.resolve(new Response(JSON.stringify(window.__actAnswer.body), { status: window.__actAnswer.status, headers: { 'Content-Type': 'application/json' } })) : Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })); }
+                return prev(u, o); }; })(); true`);
+            const base = { applies: true, over: true, lines: 1842, files: 31, skipped_lines: 212, skipped_files: 4, limit_lines: 800, limit_files: 20 };
+            const NOTE = "This change is over the team's limit: 1,842 lines in 31 files (the limit is 800 lines or 20 files). Please split it into smaller changes and submit them for review one at a time.";
+            await ev(`window.__verdictStatus = 200; window.__verdict = ${JSON.stringify({ ...base, over_limit: 'send_back', send_back_note: NOTE })}; true`);
+            await page();
+            await waitFor(`!!document.querySelector('#size-host .review-size-action')`, `${at}Send back puts one button on the banner`);
+            const sb = await ev(`(() => { const e = document.querySelector('#size-host .review-size-banner'); return { text: e.textContent, btns: e.querySelectorAll('button').length, btn: e.querySelector('button').textContent }; })()`);
+            assert.equal(sb.btns, 1); assert.equal(sb.btn, 'Send back to author');
+            assert.match(sb.text, /Your team sends a change this size back to its author\./); assert.match(sb.text, /You can still approve it\./);
+            assert.equal(await ev('window.__acts.length'), 0, `${at}nothing is sent until the button is pressed`);
+            await ev(`document.querySelector('#size-host .review-size-action').click(); true`);
+            await waitFor(`!!document.querySelector('dialog.review-size-dialog[open]')`, `${at}the note opens`);
+            assert.equal(await ev(`document.querySelector('dialog.review-size-dialog h3').textContent`), 'Send back to Dev?');
+            assert.equal(await ev(`document.querySelector('dialog.review-size-dialog textarea').value`), NOTE, `${at}the note is filled in with the size and the limit`);
+            await shot('size-send-back-' + width);
+            await ev(`(() => { const t = document.querySelector('dialog.review-size-dialog textarea'); t.value = t.value + ' Thanks.'; return true; })()`);
+            await ev(`window.__actAnswer = { status: 403, body: { error: 'only the team\\'s orchestrator or the Operator can send a task back for its size' } }; document.querySelector('dialog.review-size-dialog button[type=submit]').click(); true`);
+            await waitFor(`/Not sent back: only the team/.test(document.querySelector('dialog.review-size-dialog .review-size-error').textContent)`, `${at}a refusal is said in the dialog, which stays open`);
+            await ev(`window.__acts.length = 0; window.__actAnswer = null; document.querySelector('dialog.review-size-dialog button[type=submit]').click(); true`);
+            await waitFor(`window.__acts.length === 1 && !document.querySelector('dialog.review-size-dialog')`, `${at}Send back posts the note and closes`);
+            assert.deepEqual(await ev('window.__acts[0]'), { path: 'send-back', body: { note: NOTE + ' Thanks.' } }, `${at}the edited note is what is sent`);
+            // Cancel sends nothing
+            await ev(`window.__acts.length = 0; document.querySelector('#size-host .review-size-action').click(); true`);
+            await waitFor(`!!document.querySelector('dialog.review-size-dialog[open]')`, `${at}the note opens again`);
+            await ev(`[...document.querySelectorAll('dialog.review-size-dialog button')].find(b => b.textContent === 'Cancel').click(); true`);
+            await waitFor(`!document.querySelector('dialog.review-size-dialog')`, `${at}Cancel closes it`);
+            assert.equal(await ev('window.__acts.length'), 0, `${at}Cancel sends nothing`);
+
+            const ASK = 'Split #7 (1,842 lines in 31 files, limit 800 lines or 20 files) into follow-up tasks under the limit.';
+            await ev(`window.__verdict = ${JSON.stringify({ ...base, over_limit: 'split', split_ask: ASK })}; true`);
+            await page();
+            await waitFor(`!!document.querySelector('#size-host .review-size-action')`, `${at}Split puts one button on the banner`);
+            assert.equal(await ev(`document.querySelector('#size-host .review-size-action').textContent`), 'Split into follow-ups');
+            assert.match(await ev(`document.querySelector('#size-host .review-size-banner').textContent`), /Your team splits a change this size into follow-up tasks\./);
+            await ev(`document.querySelector('#size-host .review-size-action').click(); true`);
+            await waitFor(`document.getElementById('confirm-modal-title') && /^Split #7 into follow-ups\\?$/.test(document.getElementById('confirm-modal-title').textContent)`, `${at}the confirmation names the task`);
+            assert.ok((await ev(`document.getElementById('confirm-modal-message').textContent`)).includes(ASK), `${at}the confirmation quotes what the Orchestrator is asked`);
+            assert.equal(await ev('window.__acts.length'), 0, `${at}nothing is sent before the confirmation`);
+            await shot('size-split-' + width);
+            await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(`window.__acts.length === 1`, `${at}Split asks the Orchestrator`);
+            assert.equal((await ev('window.__acts[0]')).path, 'split');
+            // Warn mode keeps the banner as it was: no button
+            await ev(`window.__verdict = ${JSON.stringify({ ...base, over_limit: 'warn' })}; true`);
+            await page();
+            await waitFor(`!!document.querySelector('#size-host .review-size-banner')`, `${at}the Warn banner`);
+            assert.equal(await ev(`document.querySelectorAll('#size-host .review-size-banner button').length`), 0, `${at}Warn has no button`);
         }
         console.log('PASS review size guard: setting off by default, saved whole, refused with the server\'s words; banner only on an oversized change, in the mock\'s words');
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }

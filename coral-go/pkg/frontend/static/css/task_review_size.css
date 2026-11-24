@@ -1,2 +1,6 @@
 /* The review size guard's warning on a task in review (#21027): the banner is the shared .notice .notice-warn; only its second line is set here. */
 .review-size-note { margin-top: 2px; font-size: var(--fs-base); color: var(--text-secondary); }
+.review-size-action { margin: var(--space-md) 0 var(--space-xs); }
+.review-size-dialog textarea { width: 100%; box-sizing: border-box; margin: var(--space-md) 0; font: inherit; }
+.review-size-dialog .review-size-lead { margin: var(--space-xs) 0; color: var(--text-secondary); }
+.review-size-error { min-height: 1em; margin: 0; color: var(--danger); }

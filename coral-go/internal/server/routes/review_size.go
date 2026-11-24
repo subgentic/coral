@@ -61,6 +61,9 @@ func (h *BoardHandler) TaskReviewSize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, v, ok := h.taskSizeVerdict(w, r, project, taskID); ok {
+		if v.Over && v.OverLimit == reviewsize.ModeSplit {
+			v.SplitAsk = v.SplitAskFor(taskID)
+		}
 		writeJSON(w, http.StatusOK, v)
 	}
 }

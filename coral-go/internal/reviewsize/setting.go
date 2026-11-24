@@ -167,6 +167,7 @@ type Verdict struct {
 	// a Split's ask are SplitAskFor(task), because they name the task.
 	OverLimit    string `json:"over_limit,omitempty"`
 	SendBackNote string `json:"send_back_note,omitempty"`
+	SplitAsk     string `json:"split_ask,omitempty"` // what Split asks the Orchestrator; set where the task is known (SplitAskFor)
 }
 
 // Verdict counts a change by the role's limits. A change the guard does not judge has Applies false and nothing else set.
