@@ -1,5 +1,38 @@
 # Release Notes
 
+## v2.1.9 — A calmer Inbox with brighter titles, a second Hub joining by key, and Hub member grants (built, switched off)
+
+Task numbers in brackets. Built on v2.1.8. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **The Inbox leads with each item's title** (#20938, #21000): titles are brighter and come first, row actions are quieter, read state is kept as before, and the Settings join keys use the Settings type scale.
+- **Member grants made through a Hub show in Needs you** (#20909, #20914): each grant a Hub member made is a card with a Revoke that works only on this computer.
+- **A comment picture no longer vanishes after Send** (#20991): when a text reference to the same file got its name, the picture was dropped. The bug came in with v2.1.7.
+- **Join requests from a second Hub, by key, Allow and code** (#20936, #20944, #20959, #20937): make a named request key with `coral cloud keys create`, see the request as a card, Allow it and type the code, or Deny it. A key finishes only its own requests, a key sent twice or through a Hub is refused, and making or revoking a key is logged in the Operator actions.
+- **Managing joins from another computer points to that computer's Hub page** (#20967), with the key guidance line.
+
+#### Built and switched off
+
+- **Grants by Hub members other than the owner** (#20883, #20899, #20926): relayed owner-signed create and revoke, per-link caps, and removing a device ends the grants it signed. Off until the Hub signs those routes.
+- **Managing a second Hub's join through a Hub** (#20966, #20979): relayed Allow, Deny, key make and revoke, and their reads, behind a shut gate. Off until the Operator widens the signed set.
+- **`coral-go/internal/devicekey` changes in this release** (#20966): `relayed.go` and `relayed_auth.go` (the new link kinds), `sealedbox.go` (new) and the test vectors. `codes.go` is unchanged.
+
+### Test and gate fixes in this release
+
+- A v2.1.7 member_grant table gains its new columns and keeps its rows on upgrade (#20920).
+- The active comment picture picker ignores hidden form selectors (#20985).
+- The Hub shell census lists the Inbox's local grant-notice routes (#20998), and a test builds a secret header name in two parts so the repository's header-key scan passes (#21001).
+- Gate: the CI gate passed 2205 of 2205 browser suites with no retry, and the Go, race, gofmt, cross-build and encryption jobs are green, and the Windows run passed all 8 parts with no retry. On the Mac full run, native_download_browser failed; it fails on v2.1.8's base too (5 of 8 runs), so it is a Mac flake from before this release, with a fix under way (#21060). launch_agent_pick_browser failed once there and passed 3 of 3 after. The start-CSS cap is unchanged.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches stay off.
+- native_download_browser can fail on a Mac test run (#21060); downloads themselves are not affected as far as we know.
+
 ## v2.1.8 — Device-signed actions through a Hub, pictures in the rest of the text boxes, and a steadier task preview
 
 Task numbers in brackets. Built on v2.1.7. A prerelease until the Operator promotes it.
