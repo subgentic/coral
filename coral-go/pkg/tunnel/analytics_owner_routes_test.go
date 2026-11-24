@@ -14,7 +14,7 @@ func TestTheAnalyticsReadsAreLaunchTierOwnerRowsWithAClosedQuery(t *testing.T) {
 		{"/api/analytics/inbox-vs-chat", "days=14&team=x1"},
 		{"/api/analytics/resource-queue", "days=14"},
 		{"/api/analytics/efficiency", "metric=tokens_per_commit&group_by=agent&range=7d&team=x1"},
-		{"/api/analytics/tasks", "range=7d&group_by=agent&reviews=1"},
+		{"/api/analytics/tasks", "range=7d&group_by=agent&reviews=1&team=x1"},
 		{"/api/analytics/activity", "team=x1&range=14d"},
 	} {
 		assert.Equal(t, TierLaunch, Classify(http.MethodGet, c.path, c.query), c.path)
