@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -48,6 +49,25 @@ func (h *SessionsHandler) gdocPullComments(ctx context.Context, c *gdocsync.Clie
 	if err != nil {
 		return err
 	}
+	// A team's Doc comments are held as drafts for the reviewer to send from Coral (#21196): the import notifies no one and keeps nothing as the owner's own words. A file of an agent on no team has no board to send
+	// on, so its comments stay as they were.
+	asDrafts := m.Board != "" && m.Board != noTeamBoardID
+	ownerKey, pending := "", map[string]bool{}
+	if asDrafts {
+		if ownerKey = h.gdocOwnerKey(ctx); ownerKey == "" {
+			return nil // no identity to hold the drafts under yet: nothing is imported, and the next pass tries again
+		}
+		if pending, err = h.ss.GdocDraftRefs(ctx, m.Digest); err != nil {
+			return err
+		}
+		keep := map[string]bool{}
+		for _, id := range seen {
+			keep[sh.DocID+"|"+id] = true
+		}
+		if n, derr := h.ss.DeleteGdocDraftsGone(ctx, m.Digest, sh.DocID, keep); derr == nil && n > 0 {
+			slog.Info("[gdoc] drafts of comments deleted in Google were dropped", "count", n)
+		}
+	}
 	md := ""
 	if b, _, ok := h.gdocReadVersion(m.Digest); ok {
 		md = string(b)
@@ -58,7 +78,16 @@ func (h *SessionsHandler) gdocPullComments(ctx context.Context, c *gdocsync.Clie
 			return nil
 		}
 		root, have := mapped[cm.ID]
-		if !have {
+		rootRef := sh.DocID + "|" + cm.ID
+		if !have && asDrafts {
+			if !pending[rootRef] {
+				if full := h.gdocHoldDraft(ctx, ownerKey, m, rootRef, gdocWho(cm.Author), nil, md, &cm, ""); full {
+					return nil // the reviewer holds as many drafts as one version takes: the rest come after some are sent
+				}
+				pending[rootRef] = true
+				budget--
+			}
+		} else if !have {
 			cc := gdocsync.ToCoral(cm, md)
 			body, ok := redactComment(cc.Body)
 			if !ok {
@@ -89,6 +118,22 @@ func (h *SessionsHandler) gdocPullComments(ctx context.Context, c *gdocsync.Clie
 		for _, rp := range cm.Replies {
 			rid := cm.ID + "/" + rp.ID
 			if _, done := mapped[rid]; done || rp.ID == "" {
+				continue
+			}
+			if asDrafts {
+				ref := sh.DocID + "|" + rid
+				if pending[ref] || rp.Content == "" {
+					continue
+				}
+				var parent *int64
+				if have {
+					parent = &root.CommentID
+				}
+				if full := h.gdocHoldDraft(ctx, ownerKey, m, ref, gdocWho(rp.Author), parent, md, nil, gdocsync.Signed(rp.Author, rp.Content)); full {
+					return nil
+				}
+				pending[ref] = true
+				budget--
 				continue
 			}
 			if rp.Content == "" { // a reply that only resolved or reopened the comment has no words to keep
@@ -126,6 +171,54 @@ func (h *SessionsHandler) gdocPullComments(ctx context.Context, c *gdocsync.Clie
 		}
 	}
 	return nil
+}
+
+// gdocOwnerKey is the reviewer key of the owner of this computer, for the imported drafts: the same one the draft routes give them. "" when this computer has no identity for its owner yet.
+func (h *SessionsHandler) gdocOwnerKey(ctx context.Context) string {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/", nil)
+	if err != nil {
+		return ""
+	}
+	issuer, subject, _ := h.ownerIdentity(req)
+	c := commentCaller{Kind: commentCallerOwner, Issuer: issuer, Subject: subject}
+	h.keepOwnerSubject(ctx, &c)
+	if c.Subject == "" {
+		return ""
+	}
+	return c.Issuer + "|" + c.Subject
+}
+
+// gdocHoldDraft keeps one Google comment (root, with its anchor made from the Doc's own words) or reply (words) as a draft of the owner, to be sent from Coral with the others. The text is redacted like any comment, and
+// the name is Google's, kept as untrusted text. full is true when the owner already holds as many drafts as a version takes. Anything else that goes wrong is logged and the comment is tried again next pass.
+func (h *SessionsHandler) gdocHoldDraft(ctx context.Context, owner string, m seriesMember, ref, who string, parent *int64, md string, root *gdocsync.Comment, replyText string) (full bool) {
+	d := store.ReviewDraft{ArtifactID: m.Digest, Owner: owner, Board: m.Board, ParentID: parent, Source: store.ReviewDraftGdoc, SourceName: who, SourceRef: ref}
+	text := replyText
+	if root != nil {
+		cc := gdocsync.ToCoral(*root, md)
+		text = cc.Body
+		anchor := cc.Anchor
+		if anchor.Quote != "" {
+			if q, ok := redactComment(anchor.Quote); ok {
+				anchor.Quote = q
+			} else {
+				anchor = gdocsync.CoralAnchor{Whole: true}
+			}
+		}
+		ab, _ := json.Marshal(anchor)
+		d.AnchorJSON = string(ab)
+	}
+	body, ok := redactComment(text)
+	if !ok {
+		return false // fail closed: not kept until it can be checked
+	}
+	d.Body = body
+	if _, _, err := h.ss.CreateReviewDraft(ctx, d); err != nil {
+		if errors.Is(err, store.ErrDraftLimit) {
+			return true
+		}
+		slog.Warn("[gdoc] a Google comment could not be held as a draft", "error", err)
+	}
+	return false
 }
 
 // gdocWho is a Google author's display name made fit to show: the name only, on one line, cut.

@@ -335,8 +335,20 @@ func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owne
 		return nil, ErrTooManyComments
 	}
 	out := make([]PromotedComment, 0, len(drafts))
+	byRef := map[string]int64{} // the comments made from imported Google comments, by their source: a reply to one of them goes in its thread
 	for _, d := range drafts {
 		parent := d.ParentID
+		by := author
+		if d.Source == ReviewDraftGdoc { // somebody else's words, from the Doc: kept as theirs, never as the owner's
+			by = ArtifactComment{AuthorIssuer: "google-docs", AuthorSubject: "google-docs", AuthorName: d.SourceName + " via Google Docs", AuthorKind: "google"}
+			if i := strings.Index(d.SourceRef, "/"); parent == nil && i > 0 {
+				id, found := byRef[d.SourceRef[:i]]
+				if !found {
+					return nil, ErrBadParent
+				}
+				parent = &id
+			}
+		}
 		if parent != nil {
 			var p struct {
 				Parent  *int64  `db:"parent_id"`
@@ -351,7 +363,7 @@ func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owne
 			}
 		}
 		res, err := tx.ExecContext(ctx, `INSERT INTO artifact_comments (artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, images_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			artifactID, d.Board, parent, d.AnchorJSON, d.Body, author.AuthorIssuer, author.AuthorSubject, author.AuthorName, author.AuthorKind, nowStamp(), d.ImagesJSON)
+			artifactID, d.Board, parent, d.AnchorJSON, d.Body, by.AuthorIssuer, by.AuthorSubject, by.AuthorName, by.AuthorKind, nowStamp(), d.ImagesJSON)
 		if err != nil {
 			return nil, err
 		}
@@ -362,6 +374,9 @@ func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owne
 		var c ArtifactComment
 		if err := tx.GetContext(ctx, &c, "SELECT "+artifactCommentCols+" FROM artifact_comments WHERE id = ?", id); err != nil {
 			return nil, err
+		}
+		if d.SourceRef != "" {
+			byRef[d.SourceRef] = id
 		}
 		out = append(out, PromotedComment{Draft: d, Comment: c})
 	}
@@ -399,4 +414,52 @@ func (s *SessionStore) UndoReviewBatch(ctx context.Context, artifactID, owner, r
 		return err
 	}
 	return tx.Commit()
+}
+
+// GdocDraftRefs are the sources (doc|comment, doc|comment/reply) of the imported Google comments still waiting as drafts on the version, for any reviewer: an import adds each once.
+func (s *SessionStore) GdocDraftRefs(ctx context.Context, artifactID string) (map[string]bool, error) {
+	var refs []string
+	if err := s.reader().SelectContext(ctx, &refs, "SELECT source_ref FROM artifact_review_drafts WHERE artifact_id = ? AND source = ? AND batch_id = ''", artifactID, ReviewDraftGdoc); err != nil {
+		return nil, err
+	}
+	out := make(map[string]bool, len(refs))
+	for _, r := range refs {
+		out[r] = true
+	}
+	return out, nil
+}
+
+// DeleteGdocDraftsGone drops the imported drafts of one Doc whose Google comment no longer exists there (keep is every comment and reply the Doc has now). A draft already sent is a comment and stays.
+func (s *SessionStore) DeleteGdocDraftsGone(ctx context.Context, artifactID, docID string, keep map[string]bool) (int, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback() //nolint:errcheck // a committed transaction has nothing to roll back
+	var rows []struct {
+		ID    int64  `db:"id"`
+		Owner string `db:"owner"`
+		Ref   string `db:"source_ref"`
+	}
+	if err := tx.SelectContext(ctx, &rows, "SELECT id, owner, source_ref FROM artifact_review_drafts WHERE artifact_id = ? AND source = ? AND batch_id = '' AND source_ref LIKE ?", artifactID, ReviewDraftGdoc, docID+"|%"); err != nil {
+		return 0, err
+	}
+	n := 0
+	bumped := map[string]bool{}
+	for _, r := range rows {
+		if keep[r.Ref] {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM artifact_review_drafts WHERE id = ?", r.ID); err != nil {
+			return 0, err
+		}
+		n++
+		if !bumped[r.Owner] {
+			bumped[r.Owner] = true
+			if _, err := bumpReviewRevision(ctx, tx, artifactID, r.Owner); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return n, tx.Commit()
 }

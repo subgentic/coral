@@ -40,9 +40,11 @@ type reviewDraftView struct {
 	Images     []commentImage `json:"images,omitempty"`
 	Source     string         `json:"source"`
 	SourceName string         `json:"source_name,omitempty"`
-	CreatedAt  string         `json:"created_at"`
-	UpdatedAt  string         `json:"updated_at"`
-	Revision   int64          `json:"revision"`
+	// ParentDraftID: an imported Google reply to a comment that is itself still a draft (it has no published thread yet).
+	ParentDraftID *int64 `json:"parent_draft_id,omitempty"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+	Revision      int64  `json:"revision"`
 }
 
 func draftView(d store.ReviewDraft, rev int64) reviewDraftView {
@@ -146,8 +148,20 @@ func (h *SessionsHandler) listReviewDrafts(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	views := make([]reviewDraftView, 0, len(drafts))
+	byRef := map[string]int64{}
 	for _, d := range drafts {
-		views = append(views, draftView(d, rev))
+		if d.SourceRef != "" {
+			byRef[d.SourceRef] = d.ID
+		}
+	}
+	for _, d := range drafts {
+		v := draftView(d, rev)
+		if i := strings.Index(d.SourceRef, "/"); d.Source == store.ReviewDraftGdoc && d.ParentID == nil && i > 0 {
+			if pid, ok := byRef[d.SourceRef[:i]]; ok {
+				v.ParentDraftID = &pid
+			}
+		}
+		views = append(views, v)
 	}
 	canWrite, canSend, reason := true, false, ""
 	targets := []string{}
