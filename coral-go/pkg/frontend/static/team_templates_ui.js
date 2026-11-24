@@ -82,6 +82,39 @@ const BUILTIN_TEAM_TEMPLATES = [
         ],
         flags: "",
     },
+    {
+        name: "Bug sweep",
+        builtin: true,
+        does: "One agent works through your issue list, one reproduces each bug and one fixes it.", you: "You point it at the issue list and read the daily summary of fixed and stuck items.",
+        agents: [
+            { name: "Orchestrator", prompt: "You are the orchestrator of a bug sweep. Work through the issue list the operator names, one issue at a time: give each to the Reproducer, then, once it is reproduced, to the Fixer. Keep a numbered entry for every issue on the board with its state: reproduced, fixed or stuck. An issue that cannot be reproduced, or whose fix fails twice, is marked stuck with the reason; move on to the next. Do not write code yourself.", reminders: [{ text: "Daily summary: post to Needs you which issues were fixed since yesterday, which are stuck and why, and what is next. Keep it to one screen.", kind: "daily", at: "17:00" }] },
+            { name: "Reproducer", prompt: "You are the reproducer. For each issue the Orchestrator gives you, write a failing test or the exact steps that show the bug, and post them. If you cannot reproduce it, say what you tried. Do not fix it. Wait for instructions from the Orchestrator before starting." },
+            { name: "Fixer", prompt: "You are the fixer. For each reproduced issue the Orchestrator gives you, make the failing test pass with the smallest change, in your own worktree, run the tests, and submit the change for review. Wait for instructions from the Orchestrator before starting." },
+        ],
+        flags: "",
+    },
+    {
+        name: "Docs and tests catch-up",
+        builtin: true,
+        does: "A tests writer and a docs writer cover the code that changed this week.", you: "You get a weekly catch-up and review what it adds before it lands.",
+        agents: [
+            { name: "Orchestrator", prompt: "You are the orchestrator of a docs and tests catch-up. Find the code that changed in the last seven days (git log --since='7 days ago' --name-only), list which of it has no tests and which of it has missing or stale docs, and give the tests to the Test Writer and the docs to the Docs Writer. Post the list to the operator before the work starts, and the result when it is done. Do not write code yourself.", reminders: [{ text: "Weekly catch-up, Mondays only: if today is not Monday, do nothing. On Monday, list the code that changed in the last seven days, and hand its missing tests to the Test Writer and its missing docs to the Docs Writer.", kind: "weekdays", at: "09:00" }] },
+            { name: "Test Writer", prompt: "You are the test writer. For the changed code the Orchestrator names, write the tests that are missing, run them, and submit them for review. Do not change the code under test; if a test shows a bug, report it to the Orchestrator. Wait for instructions from the Orchestrator before starting." },
+            { name: "Docs Writer", prompt: "You are the docs writer. For the changed code the Orchestrator names, write the missing docs and correct the stale ones, check that every example you write runs, and submit them for review. Wait for instructions from the Orchestrator before starting." },
+        ],
+        flags: "",
+    },
+    {
+        name: "Research and write-up",
+        builtin: true,
+        does: "A researcher gathers sources and a writer turns them into one report.", you: "You give the question and review the report before it is final.",
+        agents: [
+            { name: "Orchestrator", prompt: "You are the orchestrator. Take the question from the operator, agree with them what the report must answer, then give the Researcher the sources to find and, once the notes are in, the Writer the report to write. The report is one document, sent to the operator for review; it is not final until they approve it. Do not research or write it yourself." },
+            { name: "Researcher", prompt: "You are the researcher. Find the sources the Orchestrator asks for, read them, and post notes with a link and a one-line finding for each. Say plainly what you could not find or are unsure of. Wait for instructions from the Orchestrator before starting." },
+            { name: "Writer", prompt: "You are the writer. Turn the Researcher's notes into one report that answers the question: findings first, then the evidence, with a link for every claim. Do not add a claim the notes do not support. Submit it for the operator's review. Wait for instructions from the Orchestrator before starting." },
+        ],
+        flags: "",
+    },
 ];
 
 // The template picker (#7407): a select of "Blank team" and each template with its member count. (It was a searchable list, #6397; the design's select scales to the templates people save by being a native list.)
