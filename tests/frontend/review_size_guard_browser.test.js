@@ -44,6 +44,18 @@ const TEAM = 'size-guard-' + Date.now().toString(36);
             assert.equal(await ev('window.__puts.length'), 0, `${at}nothing sent for an on switch with no limit`);
             const fill = (k, v) => ev(`(() => { const i = ${row(k)}.querySelector('input'); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await fill('rs_lines', '800'); await fill('rs_files', '20'); await fill('rs_skip', '*.lock, **/generated/**, tests/golden/**');
+            const stale = () => ev(`/Set a limit for lines or files/.test(document.getElementById('team-settings-workspace').textContent) || !!document.querySelector('#team-settings-workspace [aria-invalid=true]')`);
+            await waitFor(`!(/Set a limit for lines or files/.test(document.getElementById('team-settings-workspace').textContent))`, `${at}the no-limit line goes once a limit is entered`);
+            assert.equal(await stale(), false, `${at}no error is left on valid limits`);
+            // Files alone is a limit too: empty Lines, Files only, no error; then Lines emptied again with the switch on says so
+            await fill('rs_lines', '');
+            assert.equal(await stale(), false, `${at}Files alone is enough`);
+            await fill('rs_files', '');
+            await ev(`[...document.querySelectorAll('#team-settings-workspace button')].find(b => b.textContent === 'Save settings').click(); true`);
+            await waitFor(`/Set a limit for lines or files/.test(document.getElementById('team-settings-workspace').textContent)`, `${at}no limit says so again`);
+            await fill('rs_files', '20');
+            await waitFor(`!(/Set a limit for lines or files/.test(document.getElementById('team-settings-workspace').textContent))`, `${at}Files alone clears the no-limit line`);
+            await fill('rs_lines', '800');
             await ev(`(() => { const s = ${row('rs_scope')}.querySelector('select'); s.value = 'roles'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`${row('rs_roles')}.getClientRects().length > 0 && !!${row('rs_roles')}.querySelector('input[value="Lead Developer"]')`, `${at}the roles appear for Only these roles`);
             await ev(`${row('rs_roles')}.querySelector('input[value="Lead Developer"]').click(); true`);
