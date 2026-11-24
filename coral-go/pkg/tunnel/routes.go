@@ -300,6 +300,12 @@ var routeTable = cat(
 		// A picture for a comment (#11650): the owner's alone, as the comment it goes in. The raw file is the body; the machine decides the type by its bytes.
 		"/api/artifacts/{hex64}/comment-images",
 	)),
+	// A reviewer's draft comments on a document (#21189, goal #310): private to the owner, on one exact version, and they notify no one, so the OWNER's alone through the Hub (the machine refuses anyone else before the
+	// handler runs) and Interact for the writes, as a comment is. Their send to an agent is its own, later route (Launch).
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/artifacts/{hex64}/review-drafts", "/api/review-drafts/counts")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/artifacts/{hex64}/review-drafts")),
+	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/artifacts/{hex64}/review-drafts/{id}")),
+	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/review-drafts/{id}")),
 	// The $ skills menu through the Hub (#19430, the Operator's yes for 2.1.0): the computer OWNER's alone, the same two calls as at the dashboard. Searching reads names and descriptions (View); attaching types the
 	// skill's line into a running agent (Interact), so the machine's own mode still caps it. Approval of a skill stays the person's act on the computer.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/skills/search")),

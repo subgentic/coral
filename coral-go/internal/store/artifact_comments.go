@@ -278,6 +278,9 @@ func (s *SessionStore) DeleteArtifactComments(ctx context.Context, artifactID st
 	if err := s.DeleteAsksOfArtifact(ctx, artifactID); err != nil {
 		return 0, err
 	}
+	if err := s.DeleteReviewDraftsOfArtifact(ctx, artifactID); err != nil { // the reviewer's drafts on it too (#21189)
+		return 0, err
+	}
 	n, _ := res.RowsAffected()
 	return n, nil
 }

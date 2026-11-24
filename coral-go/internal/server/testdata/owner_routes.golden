@@ -1,6 +1,7 @@
 DELETE /api/artifacts/{id} launch owner-only
 DELETE /api/artifacts/{id}/comments/lock interact owner-only
 DELETE /api/artifacts/{id}/comments/{cid} interact owner-sees
+DELETE /api/artifacts/{id}/review-drafts/{cid} interact owner-only
 DELETE /api/artifacts/{id}/star interact owner-only
 DELETE /api/artifacts/{id}/trust-preview interact owner-only
 DELETE /api/board/{project}/artifacts/{id}/review interact owner-only
@@ -20,6 +21,7 @@ GET /api/artifacts/{id}/comments view owner-only
 GET /api/artifacts/{id}/meta view owner-only
 GET /api/artifacts/{id}/private view owner-only
 GET /api/artifacts/{id}/readers view owner-only
+GET /api/artifacts/{id}/review-drafts view owner-only
 GET /api/artifacts/{id}/thumbnail view owner-only
 GET /api/artifacts/{id}/trust-preview view owner-only
 GET /api/artifacts/{id}/versions view owner-only
@@ -60,6 +62,7 @@ GET /api/operator-asks view owner-only
 GET /api/proposals view owner-only
 GET /api/resources view owner-only
 GET /api/resources/{name} view owner-only
+GET /api/review-drafts/counts view owner-only
 GET /api/saved view owner-only
 GET /api/saved/{id}/message view owner-only
 GET /api/scheduled/jobs view owner-only
@@ -92,6 +95,7 @@ GET /api/workflows/runs/{runID} interact owner-only
 GET /api/workflows/{workflowID} interact owner-only
 GET /api/workflows/{workflowID}/runs interact owner-only
 PATCH /api/artifacts/{id}/comments/{cid} interact owner-sees
+PATCH /api/artifacts/{id}/review-drafts/{cid} interact owner-only
 PATCH /api/saved/{id} interact owner-only
 POST /api/agent-asks/{id}/answer interact owner-only
 POST /api/agent-asks/{id}/dismiss interact owner-only
@@ -102,6 +106,7 @@ POST /api/artifacts/{id}/comments/{cid}/reopen interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/resolve interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/send launch owner-only
 POST /api/artifacts/{id}/opened interact owner-only
+POST /api/artifacts/{id}/review-drafts interact owner-only
 POST /api/board/{project}/artifacts/{digest}/edit interact owner-only
 POST /api/board/{project}/artifacts/{digest}/edit/send interact owner-only
 POST /api/board/{project}/artifacts/{id}/review interact owner-only

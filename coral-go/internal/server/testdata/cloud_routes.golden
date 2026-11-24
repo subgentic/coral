@@ -5,6 +5,7 @@ DELETE /api/artifacts/{id}/comments/lock interact
 DELETE /api/artifacts/{id}/comments/{cid} interact
 DELETE /api/artifacts/{id}/gdoc/share never
 DELETE /api/artifacts/{id}/keep never
+DELETE /api/artifacts/{id}/review-drafts/{cid} interact
 DELETE /api/artifacts/{id}/star interact
 DELETE /api/artifacts/{id}/trust-preview interact
 DELETE /api/auth/sessions/{id} never
@@ -82,6 +83,7 @@ GET /api/artifacts/{id}/comments view
 GET /api/artifacts/{id}/meta view
 GET /api/artifacts/{id}/private view
 GET /api/artifacts/{id}/readers view
+GET /api/artifacts/{id}/review-drafts view
 GET /api/artifacts/{id}/thumbnail view
 GET /api/artifacts/{id}/trust-preview view
 GET /api/artifacts/{id}/versions view
@@ -203,6 +205,7 @@ GET /api/reminders/agents never
 GET /api/reminders/{reminderID} never
 GET /api/resources view
 GET /api/resources/{name} view
+GET /api/review-drafts/counts view
 GET /api/saved view
 GET /api/saved/{id}/message view
 GET /api/scheduled/jobs view
@@ -339,6 +342,7 @@ GET /ws/coral view
 GET /ws/terminal/{name} view
 PATCH /api/agent/tasks/{taskID} never
 PATCH /api/artifacts/{id}/comments/{cid} interact
+PATCH /api/artifacts/{id}/review-drafts/{cid} interact
 PATCH /api/board/{project} never
 PATCH /api/board/{project}/goals/{goalID} interact
 PATCH /api/board/{project}/tasks/{taskID} interact
@@ -375,6 +379,7 @@ POST /api/artifacts/{id}/comments/{cid}/send launch
 POST /api/artifacts/{id}/gdoc/share never
 POST /api/artifacts/{id}/gdoc/sync never
 POST /api/artifacts/{id}/opened interact
+POST /api/artifacts/{id}/review-drafts interact
 POST /api/auth/hub-signin/dismiss never
 POST /api/auth/password/change never
 POST /api/auth/password/reset never

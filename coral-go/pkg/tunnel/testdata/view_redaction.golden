@@ -14,6 +14,7 @@ GET /api/artifacts/{hex64}/comments redact
 GET /api/artifacts/{hex64}/meta redact
 GET /api/artifacts/{hex64}/private redact
 GET /api/artifacts/{hex64}/readers redact
+GET /api/artifacts/{hex64}/review-drafts redact
 GET /api/artifacts/{hex64}/thumbnail redact
 GET /api/artifacts/{hex64}/trust-preview redact
 GET /api/artifacts/{hex64}/versions redact
@@ -73,6 +74,7 @@ GET /api/pinned-folders redact
 GET /api/proposals redact
 GET /api/resources redact
 GET /api/resources/{name} redact
+GET /api/review-drafts/counts redact
 GET /api/saved redact
 GET /api/saved/{id}/message redact
 GET /api/scheduled/jobs redact
