@@ -1,6 +1,8 @@
 /* The Agent Team form's templates (moved out of team_dialogs.js as it was, #5174; no behaviour change): the built-in templates, the template selector and Save as template. */
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('team_template_tiles.css'); // the tiles' look: not at start (#21023)
 const { _getSavedTeamTemplates, _upsertSavedTeamTemplates } = await importOnce('./persona_store.js');
 const { SHIPPED_CAPABILITIES } = await importOnce('./agent_presets.js');
 const { getAgentConfig } = await importOnce('./agent_config_form.js');
@@ -9,6 +11,7 @@ const BUILTIN_TEAM_TEMPLATES = [
     {
         name: "Coding Team",
         builtin: true,
+        does: "Builds and reviews software: an orchestrator, developers, QA and security.", you: "You describe the goal and approve the reviews.", // the tile's two lines: what the team does, then what the person does (#21023)
         agents: [
             { name: "Orchestrator", prompt: "You are the orchestrator. Break down the task, assign work to the team via the message board, and track progress. Do not write code yourself — delegate to the other agents. Discuss your plan with the operator before posting assignments.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access', 'notebook'] } },
             { name: "Lead Developer", prompt: "You are the lead developer. Implement features, write code, and coordinate with the team via the message board. Wait for instructions from the Orchestrator before starting.", capabilities: { allow: ['file_read', 'file_write', 'shell', 'git_write', 'agent_spawn', 'web_access'] } },
@@ -24,6 +27,7 @@ const BUILTIN_TEAM_TEMPLATES = [
     {
         name: "Consumer Research",
         builtin: true,
+        does: "Runs a study with a panel of simulated customers and reports what they said.", you: "You set the question and read the findings.", // the tile's two lines: what the team does, then what the person does (#21023)
         agents: [
             { name: "Orchestrator", prompt: "You are the research orchestrator. Work with the operator to design and run consumer research studies. When the operator describes a study (product concept, ad copy, pricing test, etc.), coordinate with the Experiment Designer to structure it, then present stimuli to the participant panel and collect their responses. Summarize findings with key themes, sentiment breakdowns, and actionable insights. Discuss study design with the operator before launching each round." },
             { name: "Experiment Designer", prompt: "You are an expert consumer research methodologist. Help the Orchestrator design rigorous studies — define hypotheses, choose methods (focus groups, concept tests, conjoint, A/B message testing), write discussion guides, and structure analysis frameworks. Flag potential biases and suggest controls. After participants respond, help analyze patterns and draft research reports. Wait for instructions from the Orchestrator." },
@@ -43,6 +47,7 @@ const BUILTIN_TEAM_TEMPLATES = [
     {
         name: "Dungeon Master",
         builtin: true,
+        does: "Runs a tabletop story: a narrator and the characters around it.", you: "You play and steer the scene.", // the tile's two lines: what the team does, then what the person does (#21023)
         agents: [
             { name: "Dungeon Master", prompt: "You are the Dungeon Master and orchestrator of this fantasy RPG. You control the world, narrate the story, and manage combat encounters. The adventure begins in the town of Thornhaven, a walled trading post on the edge of the Grimwood Forest. Describe the town — its tavern, blacksmith, market square, and mysterious notice board with quest hooks. Coordinate the player agents and enemy agents via the message board. At each major story beat, STOP and ask the operator (the human) to describe the next area or scenario before continuing. Never advance to a new area without operator approval. Use vivid descriptions and maintain consistent world lore. Roll dice (d20 system) for skill checks and combat." },
             { name: "Warrior", prompt: "You are Kael, a human fighter with a greatsword and chainmail. You are brave, straightforward, and protective of your party. In combat, you charge the front line. In town, you look for work at the tavern or guard posts. Stay in character. Describe your actions in first person. Respond to the Dungeon Master's narration on the message board. Coordinate with your fellow adventurers." },
@@ -96,6 +101,21 @@ for (const template of BUILTIN_TEAM_TEMPLATES) for (const member of template.age
     member.capabilities = { allow: [...SHIPPED_CAPABILITIES], deny: [] };
 }
 
+/** The built-in templates as tiles under "Start from a template" (#21023): name, two lines, role count; the pressed one is the choice the select shows (one state, _chosenTemplate). */
+function _renderTemplateTiles() {
+    const host = document.getElementById('team-template-tiles');
+    if (!host) return;
+    host.onclick = e => { const b = e.target instanceof Element && e.target.closest('.team-tile'); if (b) importOnce('./team_dialogs.js').then(m => m._pickTeamTemplate(b.dataset.name)); }; // one listener on the host: the same pick as the select's (no new action at start)
+    host.replaceChildren(...BUILTIN_TEAM_TEMPLATES.filter(t => t.does).map(t => {
+        const b = document.createElement('button'), d = document.createElement('div'), i = document.createElement('i'), n = t.agents.length;
+        b.type = 'button'; b.className = 'team-tile'; b.dataset.name = t.name; b.setAttribute('aria-pressed', String(t.name === _chosenTemplate));
+        const nm = document.createElement('div'), m = document.createElement('div');
+        nm.className = 'nm'; nm.textContent = t.name; d.className = 'd'; d.append(t.does, i); i.textContent = t.you; m.className = 'm'; m.textContent = `${n} ${n === 1 ? 'role' : 'roles'}`;
+        b.append(nm, d, m); return b;
+    }));
+    host.hidden = !host.childElementCount;
+}
+
 function _allTemplates() { return [..._getSavedTeamTemplates(), ...BUILTIN_TEAM_TEMPLATES]; }
 
 /** The default team's members (#9877, #17817): generic roles that work for any goal, not just code. The Coding Team template has its own coding-specific set. */
@@ -126,6 +146,7 @@ function _renderTeamTemplateSelector(query = '') {
         sel.append(new Option(`${t.name} (${members}${t.builtin ? '' : ', saved'})`, t.name));
     }
     sel.value = [...sel.options].some(o => o.value === _chosenTemplate) ? _chosenTemplate : '';
+    _renderTemplateTiles();
     syncMemberCount();
     const list = document.getElementById('team-agents-list');
     if (list && !list.dataset.countWatched) { list.dataset.countWatched = '1'; new MutationObserver(syncMemberCount).observe(list, { childList: true }); }
@@ -153,6 +174,7 @@ function markTeamTemplate(name) {
     _chosenTemplate = name || '';
     const sel = document.getElementById('team-template-select');
     if (sel) sel.value = [...sel.options].some(o => o.value === _chosenTemplate) ? _chosenTemplate : '';
+    document.querySelectorAll('#team-template-tiles .team-tile').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.name === _chosenTemplate)));
     syncMemberCount();
 }
 
