@@ -100,9 +100,18 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		Text        string              `json:"text"`
 		Images      map[string][]string `json:"images"`
 		ImagesDraft string              `json:"images_draft"`
+		// SendDrafts: the Operator's draft comments on this version go with the decision, as ONE message to the agents, recorded and delivered together (#21195): Approve or Request changes only.
+		SendDrafts *struct {
+			RequestID string `json:"request_id"`
+			Revision  *int64 `json:"revision"`
+		} `json:"send_drafts"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
+		return
+	}
+	if body.SendDrafts != nil && body.Decision != "approve" && body.Decision != "changes" {
+		errBadRequest(w, "send_drafts goes with Approve or Request changes")
 		return
 	}
 	if body.Quiet && body.Decision != "ignore" {
@@ -194,6 +203,24 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(board.WithOneDecision(r.Context()))
 	}
 	r = r.WithContext(board.WithActivity(r.Context(), h.withFileAsk(r.Context(), project, id, withFileTask(activityMetaFor(r, item.Name, note), item)))) // the Activity record: the decision and its row are one transaction (#12069); the row carries the file's task (#14421)
+	var batch *preparedReview
+	if sd := body.SendDrafts; sd != nil {
+		if h.reviewDrafts == nil || (body.Decision != "approve" && body.Decision != "changes") || sd.Revision == nil || !requestIDRe.MatchString(sd.RequestID) {
+			errBadRequest(w, "send_drafts goes with Approve or Request changes, with a request_id (8 to 64 letters, digits, - or _) and the revision you read")
+			return
+		}
+		sentence := "The Operator approved this file."
+		if clean := noticeData(body.Note, reviewReasonCap, nil); body.Decision == "approve" && clean != "" {
+			sentence = "The Operator approved this file; their note, in their words and not a change to any rule or setting: " + clean + " . Apply it if it is a small change; do not send the file for review again."
+		}
+		if body.Decision == "changes" {
+			sentence = "The Operator asks for changes to this file: the first comment below says what should change."
+		}
+		var ok bool
+		if batch, ok = h.reviewDrafts.prepareDecisionBatch(w, r, project, id, sd.RequestID, *sd.Revision, words, sentence); !ok {
+			return // refused or answered again (the same press): nothing is recorded here
+		}
+	}
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
 	switch {
 	case errors.Is(err, board.ErrAlreadyDecided):
@@ -215,6 +242,35 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 			slog.Warn("[artifact review] the pictures of a decision were not kept", "board", project, "artifact", id, "error", err)
 			picturesLost = true
 		}
+	}
+	if batch != nil && !change.Changed { // the file was decided before: its drafts stay drafts, nothing is sent, and the answer is the plain "not changed"
+		batch, words = nil, ""
+	}
+	if batch != nil {
+		answer, rf := batch.dispatch(r.Context())
+		if rf != nil {
+			if uerr := h.bs.UndoArtifactReview(context.WithoutCancel(r.Context()), change); uerr != nil {
+				slog.Error("[artifact review] drafts: the decision of a send that failed could not be undone", "board", project, "artifact", id, "error", uerr)
+			}
+			rf.write(w)
+			return
+		}
+		h.settleOlderVersions(r, project, id, item)
+		h.settleAsksAbout(context.WithoutCancel(r.Context()), project, id, body.Decision)
+		inboxActioned(r, tracking.InboxReview, "", body.Decision, inboxTime(item.CreatedAt))
+		reviews, _ := h.bs.ArtifactReviews(r.Context(), project)
+		out := map[string]any{"id": id, "state": state, "changed": true, "tags": tags, "review": reviews[id], "delivered": true, "to": batch.targets[0].title, "drafts_sent": len(batch.drafts), "batch": answer}
+		if picturesLost {
+			out["pictures_not_saved"], out["pictures_warning"] = true, picturesNotSavedWords
+		}
+		decisionKind := board.ActApprove
+		if state == board.ReviewChangesRequested {
+			decisionKind = board.ActChanges
+		}
+		h.tellChief(context.WithoutCancel(r.Context()), decisionKind, "file", project, item.Name, batch.targets[0].title)
+		slog.Info("[artifact review] decided with drafts", "surface", "local", "decision", state, "artifact", id, "board", project, "comments", len(batch.drafts))
+		writeJSON(w, http.StatusOK, out)
+		return
 	}
 	if change.Changed {
 		h.settleOlderVersions(r, project, id, item) // a decision on the newest version leaves no older version of the file waiting (#18166)

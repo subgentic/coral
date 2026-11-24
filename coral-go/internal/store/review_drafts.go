@@ -295,10 +295,11 @@ type PromotedComment struct {
 	Comment ArtifactComment
 }
 
+// extra are comments that were never drafts (the words of a Request changes): they are made comments too, first, whole-document ones.
 // PromoteReviewDrafts is the first half of a send, in one transaction: when revision is the current one, the reviewer's pending drafts on the version become published comments (a reply goes in its thread), the
 // drafts are marked as carried by the press, and the press is recorded as prepared. author names the owner on the comments. ErrNoDraft when there is nothing to send, ErrStaleRevision when the drafts
 // changed, ErrBatchExists when the press was already recorded. Nothing is delivered here.
-func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owner, requestID string, revision int64, author ArtifactComment) ([]PromotedComment, error) {
+func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owner, requestID string, revision int64, extra []ReviewDraft, author ArtifactComment) ([]PromotedComment, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -318,6 +319,7 @@ func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owne
 	if len(drafts) == 0 {
 		return nil, ErrNoDraft
 	}
+	drafts = append(append([]ReviewDraft(nil), extra...), drafts...)
 	if _, err := tx.ExecContext(ctx, "INSERT INTO artifact_review_batches (request_id, owner, artifact_id, state, created_at) VALUES (?, ?, ?, ?, ?)", requestID, owner, artifactID, ReviewBatchPrepared, nowStamp()); err != nil {
 		var dup int
 		if e2 := tx.GetContext(ctx, &dup, "SELECT COUNT(*) FROM artifact_review_batches WHERE owner = ? AND request_id = ?", owner, requestID); e2 == nil && dup > 0 {
