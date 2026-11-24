@@ -127,12 +127,20 @@ func (h *BoardHandler) noticeText(ctx context.Context, project, text string) str
 
 // postNotice posts a task notice as Coral Task Queue (or, with from, as another reserved sender of Coral's own). Everything quoted in it went through noticeText: it is stored as given, because cleaning it again would remove the zero-width spaces that
 // defuse it (the live @mentions of the people the notice is for are written by the caller from names it knows).
-func (h *BoardHandler) postNotice(ctx context.Context, project, content string, from ...string) {
+func (h *BoardHandler) postNotice(ctx context.Context, project, content string, from ...string) (*board.Message, error) {
 	sender := "Coral Task Queue"
 	if len(from) > 0 && from[0] != "" { // a notice with its own reserved sender (the Chief's decision notice, #12171): still posted here, the one place that posts defused text (the notice census)
 		sender = from[0]
 	}
-	h.bs.PostSystemDefusedMessage(ctx, project, sender, content, nil)
+	return h.bs.PostSystemDefusedMessage(ctx, project, sender, content, nil)
+}
+
+// NoticeText and PostNotice are noticeText and postNotice for the health monitor, which posts a limit notice that quotes a task title (#21018).
+func (h *BoardHandler) NoticeText(ctx context.Context, project, text string) string {
+	return h.noticeText(ctx, project, text)
+}
+func (h *BoardHandler) PostNotice(ctx context.Context, project, sender, text string) (*board.Message, error) {
+	return h.postNotice(ctx, project, text, sender)
 }
 
 // postWakingNotice is postNotice for a notice that asks the agents it names to act now: a review reopened for a new round, a review assigned. An agent parked in `coral-board wait` is inside a tool call with no end, so the line the

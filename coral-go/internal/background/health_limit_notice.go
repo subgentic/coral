@@ -65,10 +65,14 @@ func (m *BoardHealthMonitor) noticeLimitHits(ctx context.Context, project string
 }
 
 func (m *BoardHealthMonitor) postLimitHit(ctx context.Context, project, agent string, a AgentInfo, resets time.Duration, tasks []board.Task, orch string) {
+	if m.defuse == nil || m.postNotice == nil {
+		m.logger.Warn("limit notice not posted: no notice path set", "project", project, "agent", agent)
+		return
+	}
 	work := "no open task"
 	for _, t := range tasks {
 		if t.AssignedTo != nil && board.SameIdentity(*t.AssignedTo, agent) && t.Status == "in_progress" {
-			work = fmt.Sprintf("open task #%d %s", t.ID, teamhealth.ShownText(t.Title, nil))
+			work = fmt.Sprintf("open task #%d %s", t.ID, m.defuse(ctx, project, teamhealth.ShownText(t.Title, nil))) // the title is stored text: defused as every notice that quotes one is
 			break
 		}
 	}
@@ -87,7 +91,7 @@ func (m *BoardHealthMonitor) postLimitHit(ctx context.Context, project, agent st
 	}
 	text := fmt.Sprintf("@%s %s hit its %s usage limit (%s; %s). It cannot work until the limit resets or its plan changes; Coral types nothing to it meanwhile.",
 		to, teamhealth.Name(agent), vendor, work, when)
-	msg, err := m.store.PostSystemMessage(ctx, project, limitNoticeSender, text, nil)
+	msg, err := m.postNotice(ctx, project, limitNoticeSender, text)
 	if err != nil {
 		m.logger.Warn("limit notice could not be posted", "project", project, "agent", agent, "error", err)
 		return

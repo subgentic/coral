@@ -331,7 +331,8 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		healthMonitor.SetLandingWatch(landingWatch)
 		healthMonitor.SetResourceQueue(srv.ResourceQueue()) // a wait in the mac-heavy line is a queue wait, not a wait on the agent ahead (#13707)
 		if bh := srv.BoardHandler(); bh != nil {
-			healthMonitor.SetPausedFn(bh.IsPaused) // the check says when the board is paused, so no nudges can go missing unseen (#11182)
+			healthMonitor.SetNoticeFns(bh.NoticeText, bh.PostNotice) // a limit notice quotes the open task's title: defused, posted through the notice path (#21018)
+			healthMonitor.SetPausedFn(bh.IsPaused)                   // the check says when the board is paused, so no nudges can go missing unseen (#11182)
 		}
 		healthMonitor.SetIdleThresholds(time.Duration(cfg.TaskIdleReminderS)*time.Second, time.Duration(cfg.TaskIdleEscalationS)*time.Second)
 		safeGo(ctx, "board_health_monitor", func() { healthMonitor.Run(ctx) })
