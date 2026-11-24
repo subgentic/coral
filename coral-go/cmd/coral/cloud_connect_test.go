@@ -48,6 +48,7 @@ type fakeCoral struct {
 	connectReply      string // if set, what /api/cloud/connect answers (default: enrolling)
 	deviceReply       string // if set, what the /api/cloud/device* routes answer
 	linkReply         string // if set, what the /api/cloud/links* routes answer
+	keyReply          string // if set, what the /api/cloud/link-keys* routes answer
 }
 
 type fakeRedeem struct {
@@ -134,6 +135,10 @@ func (f *fakeCoral) serve(w http.ResponseWriter, r *http.Request) {
 	case "/api/cloud/connect/cancel":
 		_, _ = io.WriteString(w, idle)
 	default:
+		if f.keyReply != "" && strings.HasPrefix(r.URL.Path, "/api/cloud/link-keys") {
+			_, _ = io.WriteString(w, f.keyReply)
+			return
+		}
 		if f.linkReply != "" && strings.HasPrefix(r.URL.Path, "/api/cloud/links") {
 			_, _ = io.WriteString(w, f.linkReply)
 			return
