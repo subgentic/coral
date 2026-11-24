@@ -625,6 +625,26 @@ CREATE TABLE IF NOT EXISTS link_ask_allow (
     PRIMARY KEY (link_id, ask_kind)
 );
 
+-- A second Hub asks to join (#20936, design #20901): one row per request; nothing here is a link or a grant. The poll secret and the code are kept only as salted HMACs.
+CREATE TABLE IF NOT EXISTS cloud_link_request (
+    request_id  TEXT PRIMARY KEY,
+    hub_origin  TEXT NOT NULL,
+    cap_asked   TEXT NOT NULL,
+    cap_given   TEXT NOT NULL DEFAULT '',
+    state       TEXT NOT NULL,
+    cred_id     TEXT NOT NULL DEFAULT '',
+    poll_salt   TEXT NOT NULL,
+    poll_hash   TEXT NOT NULL,
+    code_salt   TEXT NOT NULL DEFAULT '',
+    code_hash   TEXT NOT NULL DEFAULT '',
+    tries       INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    allowed_at  TEXT NOT NULL DEFAULT '',
+    expires_at  TEXT NOT NULL,
+    ended_at    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_cloud_link_request_hub ON cloud_link_request (hub_origin, created_at);
+
 -- A person's own limit on one link (design v2 2.2): created now and empty; a missing row means the link's own value. Rows only ever lower access.
 CREATE TABLE IF NOT EXISTS cloud_link_user (
     link_id     TEXT NOT NULL,

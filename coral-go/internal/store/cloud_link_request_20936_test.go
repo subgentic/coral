@@ -17,6 +17,8 @@ import (
 func reqRig(t *testing.T) (*CloudStore, context.Context, time.Time) {
 	t.Helper()
 	cs, _, _ := twoLinks(t)
+	_, err := cs.db.ExecContext(context.Background(), `INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, 'launch')`, linkMaxModeKey)
+	require.NoError(t, err)
 	return cs, context.Background(), time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
 }
 
@@ -46,11 +48,11 @@ func TestARequestStartsPendingAndLinksNothing(t *testing.T) {
 func TestARequestIsRefusedBeforeAnyCardForABadAddressCapOrALinkedHub(t *testing.T) {
 	cs, ctx, now := reqRig(t)
 	for _, tc := range []struct{ hub, cap string }{
-		{"http://hub-c.example.com", "view"},          // not https
-		{"https://u:p@hub-c.example.com", "view"},     // userinfo
-		{"https://hub-c.example.com/x", "view"},       // path
-		{"https://hub-c.example.com", "root"},         // cap
-		{"https://hub-c.example.com", ""},             // no cap
+		{"http://hub-c.example.com", "view"},                            // not https
+		{"https://u:p@hub-c.example.com", "view"},                       // userinfo
+		{"https://hub-c.example.com/x", "view"},                         // path
+		{"https://hub-c.example.com", "root"},                           // cap
+		{"https://hub-c.example.com", ""},                               // no cap
 		{"https://" + strings.Repeat("a", 90) + ".example.com", "view"}, // over 80: refused, not cut
 	} {
 		_, _, err := cs.CreateLinkRequest(ctx, tc.hub, tc.cap, "cred-1", now)
