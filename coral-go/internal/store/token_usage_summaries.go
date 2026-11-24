@@ -73,8 +73,18 @@ func (s *TokenUsageStore) getBoardUsage(ctx context.Context, boardName string) (
 	return &summary, nil
 }
 
+// usageBoardClause limits rows (relation alias a, "" for none) to those of one board: the board a row was recorded on, else its session's (the By team and By agent rule). A board that no row names gives no rows (#21037).
+func usageBoardClause(a string) string {
+	return ` AND COALESCE(NULLIF(` + a + `board_name, ''), (SELECT ls.board_name FROM live_sessions ls WHERE ls.session_id = ` + a + `session_id)) = ?`
+}
+
 // GetUsageSummary returns totals grouped by agent_type since a given time.
 func (s *TokenUsageStore) GetUsageSummary(ctx context.Context, since string) ([]UsageSummary, error) {
+	return s.GetUsageSummaryBoard(ctx, since, nil)
+}
+
+// GetUsageSummaryBoard is GetUsageSummary for one team when board is not nil (the page's Team select, #21037); a board with no usage gives no rows.
+func (s *TokenUsageStore) GetUsageSummaryBoard(ctx context.Context, since string, board *string) ([]UsageSummary, error) {
 	var summaries []UsageSummary
 	rel, args := usageCoarseRelation(ctx, s.db.Reader(), since)
 	query := `SELECT agent_type,
@@ -87,6 +97,10 @@ func (s *TokenUsageStore) GetUsageSummary(ctx context.Context, since string) ([]
 	          COUNT(DISTINCT session_id) as num_sessions,
 	          COALESCE(SUM(n_rows), 0) as num_requests
 	   FROM ` + rel + ` u WHERE ` + usageDedup("u.")
+	if board != nil {
+		query += usageBoardClause("u.")
+		args = append(args, *board)
+	}
 	query += ` GROUP BY agent_type`
 	err := s.db.Reader().SelectContext(ctx, &summaries, query, args...)
 	return summaries, err
@@ -97,6 +111,11 @@ func (s *TokenUsageStore) GetUsageSummary(ctx context.Context, since string) ([]
 // models counts in each model's row with its tokens split between them. Usage with no recorded
 // model is one bucket with model "".
 func (s *TokenUsageStore) GetUsageSummaryByModel(ctx context.Context, since string) ([]ModelUsageSummary, error) {
+	return s.GetUsageSummaryByModelBoard(ctx, since, nil)
+}
+
+// GetUsageSummaryByModelBoard is GetUsageSummaryByModel for one team when board is not nil (#21037).
+func (s *TokenUsageStore) GetUsageSummaryByModelBoard(ctx context.Context, since string, board *string) ([]ModelUsageSummary, error) {
 	summaries := []ModelUsageSummary{}
 	rel, args := usageCoarseRelation(ctx, s.db.Reader(), since)
 	query := `SELECT agent_type, COALESCE(model, '') as model,
@@ -109,6 +128,10 @@ func (s *TokenUsageStore) GetUsageSummaryByModel(ctx context.Context, since stri
 	          COUNT(DISTINCT session_id) as num_sessions,
 	          COALESCE(SUM(n_rows), 0) as num_requests
 	   FROM ` + rel + ` u WHERE ` + usageDedup("u.")
+	if board != nil {
+		query += usageBoardClause("u.")
+		args = append(args, *board)
+	}
 	query += ` GROUP BY agent_type, COALESCE(model, '') ORDER BY cost_usd DESC, agent_type, model`
 	err := s.db.Reader().SelectContext(ctx, &summaries, query, args...)
 	return summaries, err
@@ -200,6 +223,11 @@ type BranchUsageSummary struct {
 // at least one git snapshot are included. Each session is attributed to
 // its most recent branch.
 func (s *TokenUsageStore) GetUsageSummaryByBranch(ctx context.Context, since string, branch string) ([]BranchUsageSummary, error) {
+	return s.GetUsageSummaryByBranchBoard(ctx, since, branch, nil)
+}
+
+// GetUsageSummaryByBranchBoard is GetUsageSummaryByBranch for one team when board is not nil (#21037).
+func (s *TokenUsageStore) GetUsageSummaryByBranchBoard(ctx context.Context, since string, branch string, board *string) ([]BranchUsageSummary, error) {
 	rel, args := usageCoarseRelation(ctx, s.db.Reader(), since)
 	query := `SELECT gs.branch,
 	          COALESCE(MAX(gs.pr_number), 0) as pr_number,
@@ -227,6 +255,10 @@ func (s *TokenUsageStore) GetUsageSummaryByBranch(ctx context.Context, since str
 	if branch != "" {
 		query += " AND gs.branch = ?"
 		args = append(args, branch)
+	}
+	if board != nil {
+		query += usageBoardClause("t.")
+		args = append(args, *board)
 	}
 	query += ` GROUP BY gs.branch, gs.remote_url, COALESCE(t.board_name, '') ORDER BY cost_usd DESC`
 	var summaries []BranchUsageSummary

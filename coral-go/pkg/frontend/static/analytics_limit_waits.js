@@ -37,7 +37,7 @@ export function limitWaitsModel(data) {
     };
 }
 
-const state = { table: tableState(), seq: 0, listening: false };
+const state = { table: tableState(), seq: 0 };
 
 function say(host, text, role) {
     const p = el('p', 'empty-state empty-state-tight lw-say', text);
@@ -76,14 +76,14 @@ export function limitWaitsCard(m) {
 
 const teamSelect = () => document.getElementById('cost-team');
 
-/** Fills the Team select with the teams of the range (keeping the choice while it is still one of them). */
-function fillTeams(teams, chosen) {
+/** Adds teams to the Team select (never removes one: the choice stays while it is any team's; the cost page adds the teams that have spend, this card those that had waits). */
+export function addTeams(teams) {
     const sel = teamSelect();
     if (!sel) return;
-    const keep = chosen && teams.includes(chosen) ? chosen : '';
-    sel.replaceChildren(Object.assign(document.createElement('option'), { value: '', textContent: 'All teams' }),
-        ...teams.map(t => Object.assign(document.createElement('option'), { value: t, textContent: t })));
-    sel.value = keep;
+    const have = new Set([...sel.options].map(o => o.value));
+    const keep = sel.value;
+    for (const t of (teams || []).filter(x => typeof x === 'string' && x && !have.has(x))) sel.append(Object.assign(document.createElement('option'), { value: t, textContent: t }));
+    if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
 }
 
 /** Reads the range's waits and draws the card into host. A later call supersedes an earlier one that has not answered. */
@@ -92,8 +92,7 @@ export async function showLimitWaits(host, period) {
     if (!host) return;
     if (isCloud()) { if (section) section.hidden = true; return; } // this computer's own record: not through Coral Hub
     if (section) section.hidden = false;
-    const sel = teamSelect();
-    if (sel && !state.listening) { state.listening = true; sel.addEventListener('change', () => showLimitWaits(host, document.getElementById('cost-time-range')?.value || period)); }
+    const sel = teamSelect(); // the page re-reads everything when it changes (cost_dashboard.js), this card with it
     const team = sel ? sel.value : '';
     const mine = ++state.seq;
     let data = null;
@@ -105,6 +104,6 @@ export async function showLimitWaits(host, period) {
     } catch { data = null; }
     if (mine !== state.seq) return;
     if (!data) { say(host, 'The limit waits could not be read. Refresh to try again.', 'status'); return; }
-    fillTeams(data.teams, team);
+    addTeams(data.teams);
     host.replaceChildren(limitWaitsCard(data));
 }

@@ -26,7 +26,7 @@ const TASKS = [task(1, 0.28, 7, '=HYPERLINK("http://x","go")'), task(2, 0.27, 7,
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(() => { window.__tasks = ${JSON.stringify(TASKS)}; const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o) => { const url = String(u && u.url || u);
-                if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 300, output_tokens: 30, cost_usd: 2.14, num_requests: 3 }, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [], by_agent_name: [] });
+                if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 300, output_tokens: 30, cost_usd: /team=b/.test(url) ? 0.59 : /team=c/.test(url) ? 0.05 : 2.14, num_requests: 3 }, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [], by_agent_name: [] });
                 if (url.includes('/api/board/tasks')) return json({ tasks: window.__tasks });
                 if (url.includes('/api/analytics/limit-waits')) return json({ tracking: true, totals: { waits: 0, at_reset: 0, early: 0 }, rows: [], waiting: 0, teams: ['b', 'c'] });
                 if (url.includes('/api/call-metrics/summary')) return json({ rows: [] });
@@ -77,9 +77,10 @@ const TASKS = [task(1, 0.28, 7, '=HYPERLINK("http://x","go")'), task(2, 0.27, 7,
             assert.deepEqual(shown, Object.keys(byName).sort(), 'the file has the rows the table draws');
             await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('overview')).then(() => true)`);
         });
-        await run('the Team select narrows the file to that team\'s tasks, with no rest row', async () => {
+        await run('the Team select narrows the file to that team\'s tasks and its own page total', async () => {
             await ev(`(() => { const s = document.getElementById('cost-team'); s.value = 'b'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.getElementById('cost-team').value === 'b'`, 'team b', 5000);
+            await waitFor(`/\\$0\\.59/.test(document.getElementById('cost-total-cost')?.textContent || '')`, 'the page total of team b', 10000);
             const f = await csv('task');
             assert.match(f.name, /^coral-cost-by-task-day-b-/);
             assert.equal(f.rows.length, 1 + 3 + 1, JSON.stringify(f.rows));
@@ -91,8 +92,11 @@ const TASKS = [task(1, 0.28, 7, '=HYPERLINK("http://x","go")'), task(2, 0.27, 7,
             await ev(`[...document.querySelectorAll('#cost-export-modal button')].find(b => b.textContent === 'Cancel').click(); true`);
             await ev(`(() => { const s = document.getElementById('cost-team'); s.value = 'c'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`document.getElementById('cost-team').value === 'c'`, 'team c', 5000);
+            await waitFor(`/\\$0\\.05/.test(document.getElementById('cost-total-cost')?.textContent || '')`, 'the page total of team c', 10000);
             const c = await csv('task');
-            assert.equal(c.rows.length, 1 + 1 + 1, JSON.stringify(c.rows));
+            assert.equal(c.rows.length, 1 + 1 + 1 + 1, 'the team\'s task, the cost no task carries (the page total less the tasks), and the Total: ' + JSON.stringify(c.rows));
+            assert.ok(c.rows.some(r => /Not on a task/.test(r)));
+            assert.equal(Number(c.rows[c.rows.length - 1].split(',')[7]), 0.05, 'the Total row is the page total of the team');
             await ev(`(() => { const s = document.getElementById('cost-team'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         });
         await run('the control belongs to the Overview alone, as the Team select does', async () => {

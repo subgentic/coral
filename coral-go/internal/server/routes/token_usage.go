@@ -169,7 +169,8 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	summaries, err := h.ts.GetUsageSummary(r.Context(), since)
+	team := teamParam(q) // the page's Team select (#21037): a team no row names gives empty answers, never every team
+	summaries, err := h.ts.GetUsageSummaryBoard(r.Context(), since, team)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -177,7 +178,7 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 
 	var byAgent []store.AgentUsageSummary
 	if !totalsOnly {
-		if byAgent, err = h.ts.GetUsageSummaryByAgent(r.Context(), since); err != nil {
+		if byAgent, err = h.ts.GetUsageSummaryByAgentBoard(r.Context(), since, derefTeam(team)); err != nil {
 			errInternalServer(w, err.Error())
 			return
 		}
@@ -190,13 +191,16 @@ func (h *TokenUsageHandler) UsageSummary(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	byModel, err := h.ts.GetUsageSummaryByModel(r.Context(), since)
+	byModel, err := h.ts.GetUsageSummaryByModelBoard(r.Context(), since, team)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
 
 	tracked, err := h.ts.GetUsageByThinking(r.Context(), since)
+	if team != nil {
+		tracked = nil // the thinking breakdown is kept by hour, agent type and model only, with no team: a team's usage is all "Not reported" rather than another team's levels (#21037)
+	}
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -392,7 +396,7 @@ func (h *TokenUsageHandler) UsageTimeSeries(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	query := store.TimeSeriesQuery{Since: since, Until: until, Interval: interval, Board: q.Get("board"), GroupBy: groupBy}
+	query := store.TimeSeriesQuery{Since: since, Until: until, Interval: interval, Board: q.Get("board"), Team: teamParam(q), GroupBy: groupBy}
 	var buckets []store.GroupedBucket
 	var err error
 	if groupBy == "goal" {
@@ -480,7 +484,7 @@ func (h *TokenUsageHandler) UsageSummaryByBranch(w http.ResponseWriter, r *http.
 	since := q.Get("since")
 	branch := q.Get("branch")
 
-	branches, err := h.ts.GetUsageSummaryByBranch(r.Context(), since, branch)
+	branches, err := h.ts.GetUsageSummaryByBranchBoard(r.Context(), since, branch, teamParam(q))
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -663,4 +667,19 @@ func usageBound(v string) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+// teamParam is the Team select's value ("team=<board>"), nil when none is given or it is empty: every team.
+func teamParam(q url.Values) *string {
+	if v := q.Get("team"); v != "" {
+		return &v
+	}
+	return nil
+}
+
+func derefTeam(t *string) string {
+	if t == nil {
+		return ""
+	}
+	return *t
 }
