@@ -16,7 +16,7 @@ const LOG = `(() => { window.__coralNoFetchShare = false; if (window.__logged) r
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(`localStorage.clear(); true`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(`localStorage.clear(); true`); await new Promise(r => setTimeout(r, 2500)); // sleep-ok: a server just started finishes its own first indexing (revision bumps) before the cold load is measured
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady(ev);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await new Promise(r => setTimeout(r, 2500)); // sleep-ok: the cold reads and any second read they would cause all happen in this window
@@ -37,6 +37,10 @@ const LOG = `(() => { window.__coralNoFetchShare = false; if (window.__logged) r
             assert.deepEqual(warm.filter(c => c.startsWith('/api/team-artifacts')), [], `${at}returning to Needs you reads no artifacts: ${JSON.stringify(warm)}`);
             console.log(`   ok ${at}cold ${artifacts.length} artifact calls, ${goals.length} goals calls; warm ${warm.length}`);
         }
+        // two panels asking whether a team's artifacts changed, in the same moment, make one status read (#21126)
+        const n = await ev(`(async () => { const m = await import(${S} + 'artifacts_feed.js'); let c = 0; const real = window.fetch; window.fetch = function (u) { if (/\\/api\\/board\\/zz-team\\/status/.test(String(u && u.url || u))) { c++; return Promise.resolve(new Response(JSON.stringify({ artifacts_rev: 7, artifacts_all_rev: 9 }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return real.apply(this, arguments); };
+            try { const r = await Promise.all([m.artifactsUnchanged('zz-team', 7), m.artifactsUnchanged('zz-team', 9, true)]); return JSON.stringify({ c, r }); } finally { window.fetch = real; } })()`);
+        assert.deepEqual(JSON.parse(n), { c: 1, r: [true, true] }, `two concurrent checks make one status read: ${n}`);
         console.log('PASS inbox_cold_reads_browser: a cold Inbox reads each list and count once');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
