@@ -11,7 +11,7 @@ const { startCell } = await importOnce('./computer_start.js'); // New agent, New
 import { rememberFocus } from './dom_morph.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
-const { HUB_JOIN_GUIDANCE } = await importOnce('./hub_join_words.js');
+const { joinGuidance } = await importOnce('./hub_join_words.js');
 import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
 import { showToast } from './utils.js';
@@ -240,7 +240,7 @@ function pageHtml(s) {
             ${factHtml('Agents', escHtml(agentsText(agents)))}
             ${factHtml('Last seen', escHtml(contact))}
         </dl>
-        <p class="item-meta" data-hub-join-guidance>${escHtml(HUB_JOIN_GUIDANCE)}</p>
+        <p class="item-meta" data-hub-join-guidance>${escHtml(joinGuidance(state.hub))}</p>
         ${warningHtml(s)}
         ${below ? `<div class="servers-row-hint server-below-minimum">${escHtml(below)}</div>` : ''}
         ${attention}
