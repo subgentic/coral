@@ -90,3 +90,20 @@ func TestAKeyNeedsAGoodNameAndTheLimitsHold(t *testing.T) {
 	_, _, err = cs.CreateLinkKey(ctx, "one too many", now)
 	assert.ErrorIs(t, err, ErrLinkKeyLimit)
 }
+
+// Security's SHOULD 6 on #20936: the per-credential limits count per key, not in one shared bucket.
+func TestRequestLimitsCountPerKey(t *testing.T) {
+	cs, ctx, now := keyRig(t)
+	a, _, err := cs.CreateLinkKey(ctx, "Hub A2", now)
+	require.NoError(t, err)
+	b, _, err := cs.CreateLinkKey(ctx, "Hub B2", now)
+	require.NoError(t, err)
+	for i := 0; i < linkRequestPerCred; i++ {
+		_, _, err := cs.CreateLinkRequest(ctx, "https://hub-"+string(rune('c'+i))+".example.com", "view", a, now)
+		require.NoError(t, err)
+	}
+	_, _, err = cs.CreateLinkRequest(ctx, "https://hub-z.example.com", "view", a, now)
+	assert.ErrorIs(t, err, ErrLinkRequestBusy, "key A is at its limit")
+	_, _, err = cs.CreateLinkRequest(ctx, "https://hub-y.example.com", "view", b, now)
+	assert.NoError(t, err, "key B has its own")
+}

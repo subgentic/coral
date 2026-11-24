@@ -39,7 +39,7 @@ func TestKeysListAndRevokeAndNeverGuess(t *testing.T) {
 	f2.keyReply = `{"ok":true}`
 	code, out, _ = runKeys(t, f2, "revoke", "lk-0a1b2c3d")
 	require.Equal(t, 0, code, out)
-	assert.Equal(t, []string{`DELETE /api/cloud/link-keys/lk-0a1b2c3d`}, mutating(f2))
+	assert.Equal(t, []string{"DELETE /api/cloud/link-keys/lk-0a1b2c3d "}, mutating(f2))
 	for _, bad := range [][]string{{"create"}, {"create", "a", "b"}, {"revoke"}, {"nope"}} {
 		g := newFakeCoral(t, ready, enrolled)
 		g.keyReply = `{}`
