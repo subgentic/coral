@@ -18,7 +18,7 @@ var routeQueries = map[string]string{
 	"GET /api/analytics/efficiency":               "group_by,metric,range,team",
 	"GET /api/analytics/inbox-vs-chat":            "days,team",
 	"GET /api/analytics/resource-queue":           "days",
-	"GET /api/analytics/tasks":                    "group_by,range,reviews",
+	"GET /api/analytics/tasks":                    "group_by,range,reviews,team",
 	"GET /api/artifacts":                          "board,cursor,limit,starred",
 	"GET /api/artifacts/resolve":                  "link",
 	"GET /api/artifacts/{diff}/comments":          "board,state",
