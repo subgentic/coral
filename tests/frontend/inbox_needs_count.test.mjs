@@ -26,4 +26,22 @@ assert.equal(badge().textContent, String(T.needsCount()) === '0' ? '' : String(T
 // the page and the sidebar call the same function
 const side = fs.readFileSync(path.join(dir, 'inbox_sidebar.js'), 'utf8');
 assert.ok(/key === 'needs' \? needsCount\(/.test(side), "the sidebar's Needs you count is needsCount()");
-console.log('inbox needs count ok');
+// #21006: a second Hub asks the owner for Allow; it is attention, not agent input.
+let joins = 1;
+T.onInboxHooks({ extra: () => joins });
+state.liveSessions = [];
+T.updateInboxTab();
+assert.equal(T.needsCount(0), 1, 'the join request contributes to the same count');
+assert.equal(badge().textContent, '1', 'join-only badge stays one');
+assert.equal(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label'), 'Inbox, 1 need your attention', 'a join-only tab asks for attention');
+state.liveSessions = [waiting('a1', 'local')];
+T.updateInboxTab();
+assert.equal(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label'), 'Inbox, 2 need your attention', 'mixed input and join requests still ask for attention');
+joins = 0;
+T.updateInboxTab();
+assert.equal(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label'), 'Inbox, 1 waiting for input', 'with only an agent the input wording stays');
+state.liveSessions = [];
+T.updateInboxTab();
+assert.equal(document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label'), null, 'no items clears the accessible count');
+assert.equal(badge().hidden, true, 'no items hides the badge');
+console.log('inbox needs count and join attention label ok');

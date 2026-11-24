@@ -42,11 +42,6 @@ export function needsCount(reviews = reviewAttentionCount().value) {
 
 /** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */
 function oldestWaiting() { return Math.min(...[...(state.liveSessions || []).filter(needsYou).map(s => s.waiting_since), ...operatorAsks().map(a => a.at), ...unreadReviewItems().map(a => a.created_at)].map(Date.parse).filter(Number.isFinite)); } // Infinity when nothing waits
-function offerAlertsAgainIfWaited(n) {
-    if (n <= 0 || document.hidden) return;
-    const oldest = oldestWaiting();
-    if (Date.now() - oldest >= 5 * 60 * 1000) importOnce('./alerts_offer.js').then(m => m.offerAlertsAgain(oldest));
-}
 /** The background tab's title carries the same number as the badge (#11837). attention.js loads as soon as something waits (a tab that goes to the background after an item arrived must show it), not before: a page with nothing waiting adds neither the module nor a listener at start. The listener for the tab coming back (the alerts offer, #11893) is registered the first time something waits. */
 let attentionReady = false, comebackHooked = false;
 function tellAttention(n) {
@@ -91,11 +86,14 @@ export function updateInboxTab() {
         if (counter.textContent !== text) counter.textContent = text;
         if (counter.hidden !== (n === 0)) counter.hidden = n === 0;
     }
-    const label = n ? `Inbox, ${n}${reviewCount.complete ? '' : '+'} ${state.grantN || reviewCount.value || failedUnread().length || operatorAsks().length ? 'need your attention' : 'waiting for input'}` : reviewCount.complete ? null : 'Inbox, attention count incomplete';
+    const label = n ? `Inbox, ${n}${reviewCount.complete ? '' : '+'} ${state.grantN || _hooks.extra?.() || reviewCount.value || failedUnread().length || operatorAsks().length ? 'need your attention' : 'waiting for input'}` : reviewCount.complete ? null : 'Inbox, attention count incomplete';
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
     tellAttention(n);
-    offerAlertsAgainIfWaited(n);
+    if (n > 0 && !document.hidden) {
+        const oldest = oldestWaiting();
+        if (Date.now() - oldest >= 5 * 60 * 1000) importOnce('./alerts_offer.js').then(m => m.offerAlertsAgain(oldest));
+    }
     _hooks.goals?.(); // goals that moved (a goal finished) are read again, at most every 30 s and not in a hidden tab: the age tick no longer reads them
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen
     announceNewlyWaiting(tab);
@@ -132,7 +130,7 @@ function announceNewlyWaiting(tab) {
     _announced = now;
     if (!before) return;
     const live = document.getElementById('inbox-live');
-    const shown = !!live && tab.classList.contains('active') && !document.getElementById('inbox-local')?.hidden;
+    const shown = live && tab.classList.contains('active') && !document.getElementById('inbox-local')?.hidden;
     const fresh = rows.filter(s => !before.has(waitingKey(s)));
     if (!shown || !fresh.length) return;
     const span = document.createElement('span'); // a new node each time: the same words for the same agent waiting again are said again
