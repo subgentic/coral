@@ -31,9 +31,15 @@ const BASE = require('./test_base').BASE;
             // an agent waiting on a prompt, working on Task #11 (a live row: its goal and task come with it)
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(({ state }) => { window.__m.add('Waiting dev', 'W', 1, { sleeping: false, board_project: '${team}', session_id: 'waiting-dev' }); window.__m.add('Input dev', 'I', 1, { sleeping: false, board_project: '${team}', session_id: 'input-dev' }); window.__m.add('Stray dev', 'S', 1, { sleeping: false, board_project: '${team}', session_id: 'stray-dev' });
                 const waiting = { waiting_for_input: true, waiting_since: new Date().toISOString() };
-                state.liveSessions = state.liveSessions.map(s => s.session_id === 'waiting-dev' ? { ...s, ...waiting, waiting_kind: 'permission', waiting_summary: 'Allow npm test in the repo?', goal: { id: 1, title: 'Threaded Needs you', board: '${team}' }, task: { id: 11, title: 'Build the story' } }
+                const withWaiting = s => s.session_id === 'waiting-dev' ? { ...s, ...waiting, waiting_kind: 'permission', waiting_summary: 'Allow npm test in the repo?', goal: { id: 1, title: 'Threaded Needs you', board: '${team}' }, task: { id: 11, title: 'Build the story' } }
                     : s.session_id === 'input-dev' ? { ...s, ...waiting, waiting_kind: 'other', waiting_summary: 'Which branch name should I use?', goal: { id: 1, title: 'Threaded Needs you', board: '${team}' }, task: { id: 12, title: 'Write the docs' } }
-                    : s.session_id === 'stray-dev' ? { ...s, ...waiting, waiting_kind: 'permission', waiting_summary: 'Allow a stray command?' } : s); return true; })`);
+                    : s.session_id === 'stray-dev' ? { ...s, ...waiting, waiting_kind: 'permission', waiting_summary: 'Allow a stray command?' } : s;
+                // The live endpoint is read again on startup/resync. Keep the same
+                // fixture there, or a late read removes these waiting rows and
+                // changes the heading's position while the gesture is measured.
+                const entry = window.__m.entry;
+                window.__m.entry = function(a) { return withWaiting(entry.call(this, a)); };
+                state.liveSessions = state.liveSessions.map(withWaiting); return true; })`);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length >= 10`, `${at}the ten items`, 20000);
             check(await ev(`document.querySelectorAll('.dt-group-task').length`) === 0, `${at}with Group by goal off there are no task headings`);
@@ -72,7 +78,12 @@ const BASE = require('./test_base').BASE;
             const press = async q => { if (mobile) await client.Input.dispatchTouchEvent({ type: 'touchStart', touchPoints: [{ x: q.x, y: q.y }] }); else { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: q.x, y: q.y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: q.x, y: q.y, button: 'left', clickCount: 1 }); } };
             const lift = async q => { if (mobile) await client.Input.dispatchTouchEvent({ type: 'touchEnd', touchPoints: [] }); else await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: q.x, y: q.y, button: 'left', clickCount: 1 }); };
             // (a) the real Needs you refresh: while the finger is down a read lands; the redraw is held and drawn right after the lift, so the whole table (the heading button with it) is a new element when the click that follows the lift is sent
-            const tapWithRedraw = async state => { const q = await head(11); await press(q);
+            const tapWithRedraw = async state => {
+                // Exercise a real list refresh at the gesture boundary. The fixture's
+                // waiting/goal/task fields must survive it, not exist only in state.
+                await ev(`window._coralLoadLiveSessions().then(() => true)`);
+                check(await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(({state}) => ['waiting-dev','input-dev','stray-dev'].every(id => state.liveSessions.find(s => s.session_id === id)?.waiting_for_input) && state.liveSessions.find(s => s.session_id === 'waiting-dev')?.task?.id === 11)`), `${at}live refresh retains the waiting agents and their task metadata`);
+                const q = await head(11); await press(q);
                 await ev(`(async () => { window.__oldBody = document.querySelector('#group-table-view tbody'); window.__oldBtn = [...document.querySelectorAll('.dt-group-toggle')].find(x => x.textContent.includes('Task #11')); window.__asks = window.__asks.concat([{ board: '${team}', kind: 'ask', id: 100 + window.__asks.length, asker: 'Developer', text: 'A new question while you press ' + window.__asks.length, cut: false, at: new Date().toISOString(), buttons: [] }]); const m = await import((window.__coralStatic || '/static/') + 'operator_asks.js'); await m.refreshOperatorAsks(true); await m.refreshOperatorAsks(true); return true; })()`);
                 await ev(`new Promise(r => setTimeout(r, 700))`); /* sleep-ok: the read has landed; the page holds the redraw while the finger is down (sidebar_groups, #12636) and draws it right after the lift */
                 await lift(q);
