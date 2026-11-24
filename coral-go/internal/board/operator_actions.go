@@ -107,13 +107,15 @@ const (
 	ActGoalMove       = "goal_move"
 	ActGoalRequestAdd = "goal_request_accept"
 	ActGoalRequestNo  = "goal_request_decline"
-	ActFileComment    = "file_comment"   // the person commented on a file (the note is the comment, redacted and cut) (#17360)
-	ActFileReply      = "file_reply"     // an agent answered in a file's comment thread; asker is the agent (#17360)
-	ActFileReview     = "file_review"    // an agent put a file in Needs you for review; asker is the agent, the note is its question (#17174)
-	ActFileVersion    = "file_version"   // an agent uploaded a new version of a file; asker is the agent, the note says which version (#17360)
-	ActInboxHide      = "inbox_hide"     // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
-	ActAgentSleep     = "agent_sleep"    // the Operator put one agent to sleep (#16972); the item is the agent
-	ActAgentWake      = "agent_wake"     // the Operator woke one agent (#16972)
+	ActFileComment    = "file_comment"  // the person commented on a file (the note is the comment, redacted and cut) (#17360)
+	ActFileReply      = "file_reply"    // an agent answered in a file's comment thread; asker is the agent (#17360)
+	ActFileReview     = "file_review"   // an agent put a file in Needs you for review; asker is the agent, the note is its question (#17174)
+	ActFileVersion    = "file_version"  // an agent uploaded a new version of a file; asker is the agent, the note says which version (#17360)
+	ActInboxHide      = "inbox_hide"    // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
+	ActAgentSleep     = "agent_sleep"   // the Operator put one agent to sleep (#16972); the item is the agent
+	ActAgentWake      = "agent_wake"    // the Operator woke one agent (#16972)
+	ActLinkKeyMake    = "link_key_make" // a request key for a self-hosted Hub was made at this computer (#20959); the item is the key id, the title its name, the note who made it, never the key
+	ActLinkKeyRevoke  = "link_key_revoke"
 	ActSettingChange  = "setting_change" // the Operator saved settings (#16972); the note names the settings, never their values
 )
 

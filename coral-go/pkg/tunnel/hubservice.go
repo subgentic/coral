@@ -73,7 +73,7 @@ func IsServiceRoute(method, decodedPath string) bool {
 	if !ok {
 		return false
 	}
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
 			return r.service
 		}

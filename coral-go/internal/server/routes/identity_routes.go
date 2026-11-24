@@ -163,6 +163,15 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/cloud/devices":                         "list the browsers and passkeys Coral Hub's owner trusts on this computer",  // #19669
 	"PUT /api/cloud/device-web-mode":                 "change the access a newly paired browser starts with",                      // #19669
 	"PUT /api/cloud/devices/{kid}/mode":              "change one paired device's access",                                         // #19669
+	"GET /api/cloud/link-requests":                   "list the Hubs waiting to join this computer",                               // #20936
+	"GET /api/cloud/link-requests/{id}":              "check a join request (its Hub, with its secret)",                           // #20936
+	"POST /api/cloud/link-requests":                  "a Hub asks to join this computer",                                          // #20936
+	"POST /api/cloud/link-requests/{id}/allow":       "allow a Hub to join this computer",                                         // #20936
+	"POST /api/cloud/link-requests/{id}/deny":        "deny a Hub joining this computer",                                          // #20936
+	"POST /api/cloud/link-requests/{id}/finish":      "finish a Hub's join with the code",                                         // #20936
+	"DELETE /api/cloud/link-keys/{id}":               "revoke a Hub's request key",                                                // #20944
+	"GET /api/cloud/link-keys":                       "list the request keys (never the key)",                                     // #20944
+	"POST /api/cloud/link-keys":                      "make a request key for a Hub",                                              // #20944
 	"GET /api/cloud/links":                           "list the Coral Hubs this computer is linked to",                            // #20346
 	"POST /api/cloud/links":                          "add a Coral Hub link",                                                      // #20346
 	"POST /api/cloud/links/cancel":                   "cancel adding a Coral Hub",                                                 // #20385

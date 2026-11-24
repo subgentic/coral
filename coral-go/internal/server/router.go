@@ -82,6 +82,25 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	}
 	relayedOwner, _ := routes.LinkOwnerSources(linkStamps)
 	r.Use(routes.RelayedGuard(relayedVerifier, relayedOwner))
+	routes.SetRelayedSignerMode(func(ctx context.Context, kid string) (string, bool, bool) { // #20966: the mode of the device that signed a relayed join request, and whether it is the owner's, from this computer's own list
+		v := relayedVerifier()
+		if v == nil {
+			return "", false, false
+		}
+		k, err := v.Store.ActiveDeviceKey(ctx, kid, time.Now())
+		if err != nil {
+			return "", false, false
+		}
+		owner, _ := k.PairState()
+		return k.Mode, owner, true
+	})
+	routes.SetRelayedMemberVerify(func(ctx context.Context, digest []byte, kid, sig string) (string, error) { // #20883: the owner's device signing a grant that a Hub carried
+		v := relayedVerifier()
+		if v == nil {
+			return "", errors.New("no device verifier")
+		}
+		return v.VerifyOwnerGrant(ctx, digest, kid, sig, time.Now())
+	})
 	// A tunneled write on a route in pairRecordedRoutes leaves one Operator-actions row with the link and the Hub person, after its handler (#20369); the census (pair_census_test.go) proves each one.
 	r.Use(routes.RecordPairWrites(s.boardStore, pairRecordedRoutes, pairUpgradeRoutes, r))
 	// What the owner's signed grants give a Hub person (#20473, S2): the better of their live grants, lowered by the link's cap read now, must reach the route's tier; the table is read on every request.
@@ -176,6 +195,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 		}
 		return s.cloudHandler.VerifyCLI(r)
 	})
+	s.identity.SetLinkKeys(func(ctx context.Context, key string) (string, bool) { return s.cloudHandler.VerifyLinkKey(ctx, key) }) // a self-hosted Hub's request key: three calls only (#20944)
 	s.identity.SetOtherUser(func(r *http.Request) bool { return s.cloudHandler != nil && s.cloudHandler.OtherUser(r) })
 	if s.cfg.StrictLocalAuth {
 		// Phase 2 (#3418): refuse what the report lists instead of logging it.
@@ -627,6 +647,15 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Get("/api/cloud/links/{id}/asks", s.cloudHandler.LinkAsks) // which asks a Hub added here may answer (#20413): the person at this computer's, never tunneled
 	r.Put("/api/cloud/links/{id}/asks", s.cloudHandler.SetLinkAsk)
 	r.Delete("/api/cloud/links/{id}", s.cloudHandler.RemoveLink)
+	r.Post("/api/cloud/link-requests", s.cloudHandler.LinkRequestCreate) // #20936: a second Hub asks to join; this computer only, never tunneled
+	r.Get("/api/cloud/link-requests", s.cloudHandler.LinkRequestFeed)
+	r.Get("/api/cloud/link-requests/{id}", s.cloudHandler.LinkRequestStatus)
+	r.Post("/api/cloud/link-requests/{id}/allow", s.cloudHandler.LinkRequestAllow)
+	r.Post("/api/cloud/link-requests/{id}/deny", s.cloudHandler.LinkRequestDeny)
+	r.Post("/api/cloud/link-requests/{id}/finish", s.cloudHandler.LinkRequestFinish)
+	r.Post("/api/cloud/link-keys", s.cloudHandler.LinkKeyCreate) // #20944: a self-hosted Hub's request key; this computer only, never tunneled
+	r.Get("/api/cloud/link-keys", s.cloudHandler.LinkKeyList)
+	r.Delete("/api/cloud/link-keys/{id}", s.cloudHandler.LinkKeyRevoke)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be
 	r.Post("/api/cloud/owner-label/arm", s.cloudHandler.ArmOwnerLabel) // #6108: Confirm owner: arms the adoption for a minute, from this computer's dashboard only

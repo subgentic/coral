@@ -682,7 +682,8 @@ type paramKind int
 const (
 	paramPlain paramKind = iota + 1
 	paramFile
-	paramEnum // only the exact values listed for it in the table, and only once
+	paramEnum   // only the exact values listed for it in the table, and only once
+	paramBoxKey // a browser's one-time X25519 public key (#20966): exactly 43 base64url characters, once
 )
 
 // paramSpec is how one query parameter is validated.
@@ -805,6 +806,9 @@ func queryOK(r route, rawQuery string) bool {
 		return false
 	}
 	spec := querySpecs[shapeOf(r.method, r.pattern)]
+	if extra, ok := linkRelayedQueries[shapeOf(r.method, r.pattern)]; ok { // the relayed join's own routes are not in the generated table: their gate is shut when it is generated (#20966)
+		spec = extra
+	}
 	for name, vals := range q {
 		ps, ok := spec[name]
 		if !ok {
@@ -812,6 +816,9 @@ func queryOK(r route, rawQuery string) bool {
 		}
 		if ps.kind == paramEnum && (len(vals) != 1 || !slices.Contains(ps.values, vals[0])) {
 			return false // exact value, once: no look-alikes, no repeats
+		}
+		if ps.kind == paramBoxKey && (len(vals) != 1 || !boxKeyForm(vals[0]) || !slices.Contains(strings.Split(rawQuery, "&"), name+"="+vals[0])) {
+			return false
 		}
 		if ps.kind == paramEnum && exactTextQueries[shapeOf(r.method, r.pattern)] && !slices.Contains(strings.Split(rawQuery, "&"), name+"="+vals[0]) {
 			return false // written as that word, not a percent-encoded form of it (allow=%74rue)
@@ -837,7 +844,7 @@ func RuleFor(method, decodedPath string) (pattern string, tier Tier, ok bool) {
 	if !valid {
 		return "", TierNever, false
 	}
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
 			return r.pattern, r.tier, true
 		}
@@ -856,7 +863,7 @@ func Classify(method, decodedPath, rawQuery string) Tier {
 	if !ok {
 		return TierNever
 	}
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
 			if r.service || r.tier == TierNever || !queryOK(r, rawQuery) {
 				return TierNever // a service route is never a user's, at any tier (hubservice.go): ClassifyService is the Hub's own service stream's
@@ -877,7 +884,7 @@ func ClassifyService(method, decodedPath, rawQuery string) Tier {
 	if !ok {
 		return TierNever
 	}
-	for _, r := range routeTable {
+	for _, r := range table() {
 		if methodMatches(r.method, method) && matchSegments(r.pattern, segs) {
 			if !r.service || r.tier == TierNever || !queryOK(r, rawQuery) {
 				return TierNever
@@ -920,8 +927,8 @@ func currentMode(mode func() Mode) Mode {
 
 // RoutePatterns lists "METHOD pattern tier" for tests and docs.
 func RoutePatterns() []string {
-	out := make([]string, 0, len(routeTable))
-	for _, r := range routeTable {
+	out := make([]string, 0, len(table()))
+	for _, r := range table() {
 		out = append(out, r.method+" "+r.pattern+" "+r.tier.String())
 	}
 	return out

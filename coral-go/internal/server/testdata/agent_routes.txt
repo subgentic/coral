@@ -560,6 +560,15 @@ b GET /api/cloud/devices
 b PUT /api/cloud/device-web-mode
 b PUT /api/cloud/devices/{kid}/mode
 b DELETE /api/cloud/devices/{kid}
+b GET /api/cloud/link-requests
+b GET /api/cloud/link-requests/{id}
+b POST /api/cloud/link-requests
+b POST /api/cloud/link-requests/{id}/allow
+b POST /api/cloud/link-requests/{id}/deny
+b POST /api/cloud/link-requests/{id}/finish
+b DELETE /api/cloud/link-keys/{id}
+b GET /api/cloud/link-keys
+b POST /api/cloud/link-keys
 b GET /api/cloud/links
 b GET /api/cloud/links/{id}/asks
 b POST /api/cloud/links

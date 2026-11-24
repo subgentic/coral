@@ -25,7 +25,11 @@ var KindRoutes = map[Kind][]Route{
 	BoardPost:               {{"POST", "/api/board/{project}/messages"}},
 	KeepFullAccess:          {{"POST", "/api/sessions/live/{name}/keep-full-access"}},
 	HubAutoAccept:           {{"POST", "/api/hub-auto-accept"}},
-	GrantMember:             {{"POST", "/api/member-grants"}, {"DELETE", "/api/member-grants/{id}"}},
+	GrantMember:             {{"POST", "/api/member-grants"}, {"DELETE", "/api/member-grants/{id}"}, {"POST", "/api/board/{project}/member-grants"}, {"DELETE", "/api/board/{project}/member-grants/{id}"}},
+	AllowLink:               {{"POST", "/api/cloud/link-requests/{id}/allow"}},
+	MakeLinkKey:             {{"POST", "/api/cloud/link-keys"}},
+	RevokeLinkKey:           {{"DELETE", "/api/cloud/link-keys/{id}"}},
+	DenyLink:                {{"POST", "/api/cloud/link-requests/{id}/deny"}},
 }
 
 // RoutePath is the path of a signed request target: everything before the query.
@@ -45,6 +49,16 @@ func MatchRoute(k Kind, method, target string) (map[string]string, bool) {
 	}
 	if k == HubAutoAccept { // the value it sets is in the signed query: any other query (or none) signs nothing the computer will accept (#20649)
 		if _, qok := AutoAcceptQuery(target); !qok {
+			return nil, false
+		}
+	}
+	switch k {
+	case AllowLink, MakeLinkKey: // the browser's one-time key is in the signed query, and only it (#20966)
+		if _, qok := BoxQuery(target); !qok {
+			return nil, false
+		}
+	case RevokeLinkKey, DenyLink: // no query to sign
+		if strings.IndexByte(target, '?') >= 0 {
 			return nil, false
 		}
 	}

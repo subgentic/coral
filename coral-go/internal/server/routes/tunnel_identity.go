@@ -10,6 +10,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -63,7 +64,7 @@ func TunnelIdentityGuard(bs *board.Store, operatorAllowed func(*http.Request) bo
 				next.ServeHTTP(w, r)
 				return
 			}
-			if !ok || bs == nil || isBoardChatPost(r) || isAuthenticRelay(r) || isAuthenticHubNotice(r) || isHubSwitchRoute(r) {
+			if !ok || bs == nil || isBoardChatPost(r) || isAuthenticRelay(r) || isAuthenticHubNotice(r) || isHubSwitchRoute(r) || isVerifiedRelayedGrant(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -280,4 +281,11 @@ func tunnelBoardProject(r *http.Request) (string, bool) {
 		return "", false
 	}
 	return project, true
+}
+
+// isVerifiedRelayedGrant is a request the relayed guard verified as the owner's own device giving or ending a member's access (#20883). It names no actor and is not a use of the Operator identity: the handler
+// admits only that signed request, and records its Operator-actions row and its notice itself. A request with no verified signature is never exempt.
+func isVerifiedRelayedGrant(r *http.Request) bool {
+	m, ok := devicekey.RelayedFrom(r.Context())
+	return ok && (m.Kind == devicekey.GrantMember || m.Kind == devicekey.AllowLink || m.Kind == devicekey.MakeLinkKey || m.Kind == devicekey.RevokeLinkKey || m.Kind == devicekey.DenyLink) // the join's three (#20966) are the owner's signed device too
 }
