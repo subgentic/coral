@@ -14,6 +14,9 @@ A remote is an ordinary standalone Coral server. It needs no special mode and no
 !!! note "What the hub does not do"
     A team, its message board and its agents all live on one server. The hub does not make one team span two machines.
 
+!!! tip "Connecting a second self-hosted Coral Hub to one Coral server"
+    If you run a self-hosted Coral Hub and want to connect a second Hub to a Coral server over SSH or with an HTTP join key (Coral v2.1.9 and later), follow [Connect a second self-hosted Hub to a Coral](connect-a-second-hub.md).
+
 ## Set it up
 
 ### 1. Turn on the hub
