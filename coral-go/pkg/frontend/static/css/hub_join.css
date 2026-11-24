@@ -33,3 +33,6 @@
 .hub-join small { font-size: var(--fs-base); }
 @media (max-width: 767px) { body.phone-nav-on:not(.keyboard-open) .hub-join-requests .btn { scroll-margin-bottom: calc(var(--phone-bar-h) + 8px + env(safe-area-inset-bottom, 0px)); } }
 .hub-join ol { padding-inline-start: var(--space-xl); color: var(--text-secondary); font-size: var(--fs-lg); }
+/* #21000: join keys use the existing Settings section/body scale. */
+#hub-join-keys h3 { font-size: var(--fs-xl); }
+#hub-join-keys p { font-size: var(--fs-md); }
