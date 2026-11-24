@@ -87,9 +87,9 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], refreshing: false }; true`);
 
         console.log('3. values set from code');
-        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: ${JSON.stringify(OPUS.value)} }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
+        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: ${JSON.stringify(OPUS.value)} }); true`); await waitFor(`document.querySelector('#acf-t .acf-model-select').value === ${JSON.stringify(OPUS.value)} && JSON.stringify([...document.querySelector('#acf-t .acf-model-select').options].map(o => o.textContent)) === '["Default","Opus 4.1","Sonnet 4.5","Other…","Add a model…"]'`, 'the form shows the set model', 8000);
         b = await box(); assert.equal(b.value, OPUS.value, 'a known model is selected'); assert.equal(b.inputShown, false);
-        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: 'something-else' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
+        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: 'something-else' }); true`); await waitFor(`document.querySelector('#acf-t .acf-model-select').value === 'something-else' && JSON.stringify([...document.querySelector('#acf-t .acf-model-select').options].map(o => o.textContent)) === '["Default","Opus 4.1","Sonnet 4.5","something-else","Other…","Add a model…"]'`, 'the model the list does not name shows as itself', 8000);
         b = await box(); assert.equal(b.value, 'something-else', 'a model the list does not name shows as itself, not under Other… (#5044)');
         assert.deepEqual(b.options, ['Default', 'Opus 4.1', 'Sonnet 4.5', 'something-else', 'Other…', 'Add a model…'], 'in an option of its own, before Other…');
         assert.equal(b.inputValue, 'something-else'); assert.equal(b.inputShown, false, 'and the text box stays hidden');
@@ -99,9 +99,9 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(b.options, ['Default', 'Opus 4.1', 'Sonnet 4.5', 'Other…', 'Add a model…'], 'the option of its own is gone while the text is edited');
         await ev(`{ const s = document.querySelector('#acf-t .acf-model-select'); s.value = ${JSON.stringify(OPUS.value)}; s.dispatchEvent(new Event('change', { bubbles: true })); true }`);
         b = await box(); assert.equal(b.value, OPUS.value); assert.deepEqual(b.options, ['Default', 'Opus 4.1', 'Sonnet 4.5', 'Other…', 'Add a model…'], 'choosing a listed model leaves no extra option');
-        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: 'something-else' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
+        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: 'something-else' }); true`); await waitFor(`document.querySelector('#acf-t .acf-model-select').value === 'something-else' && JSON.stringify([...document.querySelector('#acf-t .acf-model-select').options].map(o => o.textContent)) === '["Default","Opus 4.1","Sonnet 4.5","something-else","Other…","Add a model…"]'`, 'the model the list does not name shows as itself', 8000);
         b = await box(); assert.equal(b.value, 'something-else', 'set from code again: shown as itself');
-        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: '' }); true`); await sleep(300); // sleep-ok: the form's async loads have no completion event
+        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'claude', model: '' }); true`); await waitFor(`document.querySelector('#acf-t .acf-model-select').value === '' && JSON.stringify([...document.querySelector('#acf-t .acf-model-select').options].map(o => o.textContent)) === '["Default","Opus 4.1","Sonnet 4.5","Other…","Add a model…"]'`, 'a blank model is Default', 8000);
         b = await box(); assert.equal(b.value, '', 'a blank model is Default'); assert.deepEqual(b.options, ['Default', 'Opus 4.1', 'Sonnet 4.5', 'Other…', 'Add a model…'], 'and the option for the earlier model is gone');
 
         console.log('4. the agent type switches the list; no list means free text');
