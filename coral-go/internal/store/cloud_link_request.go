@@ -331,7 +331,7 @@ func (s *CloudStore) FinishLinkRequest(ctx context.Context, id, pollSecret, code
 }
 
 // FinishLinkRequestBy is FinishLinkRequest for a caller that is a request key (#20959, defence in depth beside the poll secret): a request made with one key is finished only by that key, and any other key, or
-// none, gets the same none as an unknown request. A person at this computer passes key "" and is not held to it.
+// none (including ""), gets the same none as an unknown request. A request made by the person at this computer (not by a key) may be finished with key ""; a key's request is finished only by its key, the person included.
 func (s *CloudStore) FinishLinkRequestBy(ctx context.Context, id, pollSecret, code, key string, now time.Time) (hub, linkCap string, err error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
