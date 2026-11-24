@@ -508,7 +508,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { font-weight: var(--fw-strong); }
 :is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-row.dt-unread { box-shadow: inset 4px 0 0 var(--accent); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-subtitle { color: var(--text-secondary); }
-#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread :is(.inbox-review-earlier, .inbox-review-earlier a, .btn:not(.btn-primary):not(.btn-danger), .dt-subtitle, .dt-mail-snippet, .chip-tag, .inbox-meta-dir) { color: var(--text-primary); } /* #21206 */
+:root #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread :is(.inbox-ask-subject-link, .dt-subtitle, .dt-mail-snippet, .chip-tag, .inbox-meta-dir) { color: var(--text-primary); } /* #21206 */
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td { background: color-mix(in srgb, var(--text-primary) 4%, var(--table-bg)); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread:hover td, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read:hover td { background: var(--table-hover); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row td { background: none; } /* a folded (phone) row is one block: the tint is on the row, not on each cell */
