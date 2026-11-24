@@ -448,7 +448,8 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
         h.focus({ preventScroll: true });
         return;
     }
-    page.append(factsOf(task, ctx));
+    const facts = factsOf(task, ctx); page.append(facts);
+    if (task.status === 'review_pending') importOnce('./task_review_size.js').then(m => m.showReviewSize(ctx.project, task, facts)).catch(() => {}); // the size guard's warning goes above the facts, only on a change over the limit (#21027)
  if (task.version) { const versions = el('div', 'task-version-slot'); page.append(versions); importOnce('./task_versions.js').then(m => m.taskVersionHistory(ctx.project, task, acts.reload)).then(section => { if (versions.isConnected) versions.append(section); }).catch(() => {}); }
     if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); linkArtifactRefsIn(doc, { server: ctx && ctx.project ? splitKey(ctx.project).server : undefined }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body, ctx && ctx.project ? splitKey(ctx.project).server : undefined); }
     const followUps = followUpsSection(task, ctx); if (followUps) page.append(followUps);
