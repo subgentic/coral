@@ -25,3 +25,13 @@ export function failingOutput(out, { keep = 30, full = false } = {}) {
   if (!fails.length) return [note, ...shown];
   return [`${note}; their [FAIL] lines:`, ...fails, '… the last lines:', ...shown];
 }
+
+// What the runner prints at a RETRY line (#20971): the first attempt's failing check, then its last 40 lines (and the [FAIL] lines above them), so a suite that passes on its retry names its cause
+// where the retry is announced and not only in a block further down, which a Windows log with several shards in it puts far from the line that mentions the suite.
+const CAUSE = /\[FAIL\]|\b\w*Error\b[:\s]|timed out waiting/;
+export function retryOutput(out, { keep = 40 } = {}) {
+  const lines = String(out).trim().split('\n');
+  const cause = lines.find(l => CAUSE.test(l));
+  const head = cause ? `first failing check: ${cause.trim().slice(0, 300)}` : 'the attempt printed no failing check (its last lines follow)';
+  return [head, ...failingOutput(out, { keep })];
+}

@@ -100,7 +100,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifySuites, problems } from './suites.mjs';
 import { durationsFile, loadDurations, orderLongestFirst, partsByDuration } from './suite_order.mjs';
-import { failingOutput } from './failing_output.mjs';
+import { failingOutput, retryOutput } from './failing_output.mjs';
 import { suiteTimeoutS } from './suite_timeout.mjs';
 import { shardDirName } from './shard_dir.mjs';
 import { pruneOldRunFolders, stripOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS, BINARY_HOURS } from './helpers/run_folders.mjs';
@@ -1009,6 +1009,7 @@ async function runOnce(run) {
         }
         if (a < retries) {
           console.log(`RETRY ${phase}${t}  (${r.status === 'timeout' ? `TIMEOUT after ${r.secs}s` : `exit=${r.code} after ${r.secs}s`})${shards > 1 ? `  [shard ${r.shard}]` : ''}${label}`);
+          if (r.out) console.log(retryOutput(r.out).map(l => '      ' + l).join('\n')); // the cause where the retry is announced (#20971)
           // A retry gets a fresh Coral and Chrome: retrying on the same server and browser would repeat a
           // failure caused by their state rather than by the suite.
           const again = await tryShard(i, r.status === 'timeout' ? 'after a TIMEOUT' : 'before a retry');

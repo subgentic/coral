@@ -2,7 +2,7 @@
 // shown as before, and every [FAIL] line above them is printed too, once each and in order.
 //   node failing_output.test.mjs
 import assert from 'node:assert/strict';
-import { failingOutput } from './failing_output.mjs';
+import { failingOutput, retryOutput } from './failing_output.mjs';
 
 const lines = n => Array.from({ length: n }, (_, i) => `line ${i + 1}`);
 
@@ -40,3 +40,17 @@ assert.deepEqual(out, ['… 3 earlier lines not shown (CDP_FULL=1 prints them; r
 assert.match(failingOutput(lines(4).join('\n'), { keep: 3 })[0], /^… 1 earlier line not shown/, 'one hidden line: singular');
 
 console.log('PASS failing_output: hidden [FAIL] lines are printed once each, in order, above the last lines');
+
+// The RETRY block (#20971): the first failing check on top, then the last 40 lines.
+let r = retryOutput(['setup', 'AssertionError [ERR_ASSERTION]: the sentence follows the choice', '    at file:1:2', 'tail'].join('\n'));
+assert.equal(r[0], 'first failing check: AssertionError [ERR_ASSERTION]: the sentence follows the choice');
+assert.deepEqual(r.slice(1), ['setup', 'AssertionError [ERR_ASSERTION]: the sentence follows the choice', '    at file:1:2', 'tail'], 'a short attempt is printed whole under it');
+r = retryOutput(['Error: timed out waiting for spec.txt on the goal', ...lines(60)].join('\n'));
+assert.equal(r[0], 'first failing check: Error: timed out waiting for spec.txt on the goal');
+assert.match(r[1], /^… 21 earlier lines not shown/, 'a long attempt: the last 40 lines, with a note');
+assert.deepEqual(r.slice(-40), lines(60).slice(-40));
+r = retryOutput(['[PASS] a', '[FAIL] 320px dark: the toggle is above the composer', ...lines(60)].join('\n'));
+assert.equal(r[0], 'first failing check: [FAIL] 320px dark: the toggle is above the composer');
+assert.ok(r.includes('[FAIL] 320px dark: the toggle is above the composer'), 'a [FAIL] line above the last 40 is kept too');
+assert.match(retryOutput('nothing useful\nat all')[0], /^the attempt printed no failing check/);
+console.log('PASS failing_output: the RETRY block names the first failing check and keeps the last 40 lines');
