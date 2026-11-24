@@ -306,6 +306,8 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/artifacts/{hex64}/review-drafts")),
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/artifacts/{hex64}/review-drafts/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/review-drafts/{id}")),
+	// Send comments (#21194): hands the owner's own words (redacted, quoted as data) to an agent as ONE message, so it is agent input: Launch, as a comment's send is, and the OWNER's alone.
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, "/api/artifacts/{hex64}/review-drafts/send")),
 	// The $ skills menu through the Hub (#19430, the Operator's yes for 2.1.0): the computer OWNER's alone, the same two calls as at the dashboard. Searching reads names and descriptions (View); attaching types the
 	// skill's line into a running agent (Interact), so the machine's own mode still caps it. Approval of a skill stays the person's act on the computer.
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/skills/search")),

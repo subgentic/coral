@@ -127,7 +127,7 @@ func reviewBoardOf(w http.ResponseWriter, board string) (string, bool) {
 
 // GET /api/artifacts/{id}/review-drafts?board=
 func (h *SessionsHandler) listReviewDrafts(w http.ResponseWriter, r *http.Request) {
-	key, _, ok := h.reviewDraftOwner(w, r)
+	key, caller, ok := h.reviewDraftOwner(w, r)
 	if !ok {
 		return
 	}
@@ -149,12 +149,29 @@ func (h *SessionsHandler) listReviewDrafts(w http.ResponseWriter, r *http.Reques
 	for _, d := range drafts {
 		views = append(views, draftView(d, rev))
 	}
-	canWrite, reason := true, ""
+	canWrite, canSend, reason := true, false, ""
+	targets := []string{}
 	if h.commentLocked(r, id, board) {
 		canWrite, reason = false, "comments_locked"
 	}
+	switch {
+	case len(views) == 0:
+	case h.boardHandler != nil && board != "" && h.boardHandler.IsPaused(board):
+		if reason == "" {
+			reason = "board_paused"
+		}
+	default:
+		ts, _, why := h.reviewTargets(r.Context(), id, board, drafts)
+		for _, t := range ts {
+			targets = append(targets, t.title)
+		}
+		canSend = why == "" && canWrite && h.operatorComment(r, caller)
+		if reason == "" {
+			reason = why
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"drafts": views, "revision": rev, "count": len(views), "limit": store.MaxReviewDrafts, "drafts_supported": true,
-		"can_write": canWrite, "can_send": false, "reason": reason, "targets": []string{}})
+		"can_write": canWrite, "can_send": canSend, "reason": reason, "targets": targets})
 }
 
 // POST /api/artifacts/{id}/review-drafts {board, body, anchor | parent_id, images}
@@ -302,6 +319,14 @@ func (h *SessionsHandler) editReviewDraft(w http.ResponseWriter, r *http.Request
 		errBadRequest(w, "send the revision you read")
 		return
 	}
+	if cur, _, lerr := h.ss.ListReviewDrafts(r.Context(), id, key); lerr == nil { // a locked document takes no change to a draft, as it takes no new one
+		for _, d := range cur {
+			if d.ID == did && h.commentLocked(r, id, d.Board) {
+				commentRefuse(w, http.StatusConflict, "comments_locked", "comments on this artifact are locked")
+				return
+			}
+		}
+	}
 	if len(in.Body) > store.MaxArtifactCommentBody {
 		errPayloadTooLarge(w, "a comment is at most "+strconv.Itoa(store.MaxArtifactCommentBody)+" bytes")
 		return
@@ -371,4 +396,13 @@ func (h *SessionsHandler) reviewDraftCounts(w http.ResponseWriter, r *http.Reque
 		out = append(out, map[string]any{"artifact_id": id, "count": n})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"artifacts": out})
+}
+
+// ReviewDraftCountsFor is how many drafts the owner of this request holds on each version: the Inbox rows say it (#21194). The owner's alone; a read that is not theirs has none.
+func (h *SessionsHandler) ReviewDraftCountsFor(r *http.Request) (map[string]int, error) {
+	issuer, subject, _ := h.ownerIdentity(r)
+	if subject == "" || h.ss == nil {
+		return nil, nil
+	}
+	return h.ss.ReviewDraftCounts(r.Context(), issuer+"|"+subject)
 }

@@ -114,7 +114,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/board/{project}/cross-team/settings": "owner-only-hub",
 		"GET /api/custom-models":                       "owner-only", "PUT /api/custom-models": "owner-only", // #5996
 		"GET /api/custom-modes": "owner-only", "PUT /api/custom-modes": "owner-only", // #15950
-		"GET /api/artifacts/{hex64}/review-drafts": "owner-only", "POST /api/artifacts/{hex64}/review-drafts": "owner-only", "PATCH /api/artifacts/{hex64}/review-drafts/{id}": "owner-only", "DELETE /api/artifacts/{hex64}/review-drafts/{id}": "owner-only", "GET /api/review-drafts/counts": "owner-only", // a reviewer's drafts (#21189)
+		"GET /api/artifacts/{hex64}/review-drafts": "owner-only", "POST /api/artifacts/{hex64}/review-drafts": "owner-only", "POST /api/artifacts/{hex64}/review-drafts/send": "owner-only", "PATCH /api/artifacts/{hex64}/review-drafts/{id}": "owner-only", "DELETE /api/artifacts/{hex64}/review-drafts/{id}": "owner-only", "GET /api/review-drafts/counts": "owner-only", // a reviewer's drafts (#21189)
 		"GET /api/skills/search": "owner-only", "POST /api/sessions/live/{name}/skills": "owner-only", // the $ menu through the Hub (#19430)
 		"GET /api/skills": "owner-only", "GET /api/skills/{hex32}": "owner-only", // the Skills page's two reads through the Hub (#19627)
 		"GET /api/saved":                                "owner-only",

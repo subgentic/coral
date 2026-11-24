@@ -107,6 +107,7 @@ POST /api/artifacts/{id}/comments/{cid}/resolve interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/send launch owner-only
 POST /api/artifacts/{id}/opened interact owner-only
 POST /api/artifacts/{id}/review-drafts interact owner-only
+POST /api/artifacts/{id}/review-drafts/send launch owner-only
 POST /api/board/{project}/artifacts/{digest}/edit interact owner-only
 POST /api/board/{project}/artifacts/{digest}/edit/send interact owner-only
 POST /api/board/{project}/artifacts/{id}/review interact owner-only

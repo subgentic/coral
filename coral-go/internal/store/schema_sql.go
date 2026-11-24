@@ -189,6 +189,17 @@ CREATE TABLE IF NOT EXISTS artifact_review_revisions (
 	revision    INTEGER NOT NULL,
 	PRIMARY KEY (artifact_id, owner)
 );
+-- The send of a reviewer's drafts (#21194): one row per press (request_id is the client's), so the same press again returns what the first one did and posts nothing. state is prepared (the drafts are
+-- promoted to comments, nothing is known to be posted) or sent; result_json is the answer of the first call.
+CREATE TABLE IF NOT EXISTS artifact_review_batches (
+	request_id  TEXT NOT NULL,
+	owner       TEXT NOT NULL,
+	artifact_id TEXT NOT NULL,
+	state       TEXT NOT NULL,
+	result_json TEXT NOT NULL DEFAULT '',
+	created_at  TEXT NOT NULL,
+	PRIMARY KEY (request_id, owner)
+);
 -- When the Operator last opened the threads of an artifact (#12026): one row per thread (its first comment). An agent's reply made after that is "new comments" on the file's row; opening the thread clears it.
 CREATE TABLE IF NOT EXISTS artifact_comment_seen (
 	comment_id INTEGER PRIMARY KEY,

@@ -82,6 +82,8 @@ type teamArtifact struct {
 	// NewComments: how many replies agents have left in the Operator's comment threads on this file since the Operator last opened them (#12026): the file's row says "New comments" and counts as unread again. Absent for none; only the
 	// owner's own list has it.
 	NewComments int `json:"new_comments,omitempty"`
+	// DraftCount: how many draft comments the owner holds on this exact version, not sent yet (#21189). Absent for none; only the owner's own list has it; a draft never moves to a newer version's row.
+	DraftCount int `json:"draft_count,omitempty"`
 	// Version and Versions: which version of its series this artifact is and how many the series has (#11890), present only for an artifact in a series of two or more; the Needs you row says "version 2"
 	// from them, with no request of its own. They come from the upload records, the authority (digestSeries, seriesMembers).
 	Version  int `json:"version,omitempty"`
@@ -322,6 +324,14 @@ func (h *BoardHandler) projectArtifactItemsView(r *http.Request, project, sessio
 			own()
 			for i := range items {
 				items[i].NewComments = news[items[i].ID]
+			}
+		}
+	}
+	if h.draftCounts != nil && len(items) > 0 && operatorOrKeyCaller(r) {
+		if drafts, derr := h.draftCounts(r); derr == nil && len(drafts) > 0 {
+			own()
+			for i := range items {
+				items[i].DraftCount = drafts[items[i].ID]
 			}
 		}
 	}

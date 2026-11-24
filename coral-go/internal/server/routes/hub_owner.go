@@ -150,6 +150,7 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/review-drafts"):                            draftsOwnerOnly,
 	tunnel.OwnerRouteKey("PATCH", "/api/artifacts/{hex64}/review-drafts/{id}"):                      draftsOwnerOnly,
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}/review-drafts/{id}"):                     draftsOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/review-drafts/send"):                       draftsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/review-drafts/counts"):                                        draftsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/goal-images"):                                "through Coral Hub only the account this computer is linked to can add a picture to a goal",
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/versions"):                                  textArtifactsOwnerOnly,
