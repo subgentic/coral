@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/limitwaits"
 	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/resources"
@@ -66,6 +67,7 @@ type Server struct {
 	releasing       sync.WaitGroup     // the release timers not yet finished (#20799)
 	releaseTimers   []*time.Timer      // the post-build memory release timers buildBundleFamily set (#20782)
 	resourceMgr     *resources.Manager // the resource queue, when it is open (its history file closes with the server, #13671)
+	limitWaits      *limitwaits.Store  // the record of the agents' limit waits, when it is open (#21020)
 	cloudHandler    *routes.CloudHandler
 	cloudMgr        atomic.Pointer[cloud.Manager] // the connector, once SetCloud runs (#3966)
 	hubSignin       *auth.HubSignin               // Sign in with Coral Hub (#3966)
@@ -272,6 +274,9 @@ func (s *Server) Close() {
 		// the post-build memory release is cancelled, or finished, before anything it could touch closes (#20782)
 		if s.resourceMgr != nil {
 			s.resourceMgr.Close() // writes what the history still holds
+		}
+		if s.limitWaits != nil {
+			_ = s.limitWaits.Close()
 		}
 		if s.opencode != nil {
 			s.opencode.Close() // every opencode server Coral started ends with it, by its own pid

@@ -22,6 +22,7 @@ export const CARDS = {
     'machine-health-card': 'dense',   // a machine's health row in About
     'start-card': 'regular',          // a first-visit choice in an empty state (Automations)
     'cost-card': 'regular',           // an Analytics figure
+    'lw-card': 'regular',             // the Analytics Limit waits card (#21020)
     'viz-card': 'regular',            // an Analytics chart
     'atab-card': 'regular',           // a chart or table of the Usage, Operator interaction and Team communication tabs
     'eff-card': 'regular',            // an efficiency figure

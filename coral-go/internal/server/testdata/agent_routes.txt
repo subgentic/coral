@@ -75,6 +75,7 @@ b GET /api/agents/models
 b GET /api/analytics/activity
 b GET /api/analytics/efficiency
 b GET /api/analytics/inbox-vs-chat
+b GET /api/analytics/limit-waits
 b GET /api/analytics/resource-queue
 b GET /api/analytics/tasks
 b GET /api/artifacts

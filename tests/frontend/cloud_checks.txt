@@ -28,6 +28,7 @@ node artifact_tag_rules_unit.test.mjs
 node board_ask_badge.test.mjs
 node count_format.test.mjs
 node cost_data.test.mjs
+node analytics_limit_waits.test.mjs
 node model_labels.test.mjs
 node analytics_series.test.mjs
 node board_queue_words.test.mjs
