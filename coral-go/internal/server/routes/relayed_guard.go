@@ -19,6 +19,10 @@ import (
 // link and the Hub person come from the connector's own stamp, the computer from its own key, the method and URI and the body from what arrived. A verified request goes on unchanged (no tier is raised by it); a bad
 // one is refused with the closed reply code and nothing else; a request with none of the headers is not touched. A request that did not come through the connector, and one on a route no kind lists, are never read.
 
+// relayedRequired are the kinds whose request must carry the signature: without it the guard refuses (bad_form), where for the others a request with none of the headers goes on untouched. Giving or ending a member's
+// access (#20883) is one: a Hub request for it with no signature is never a local request and never a grant. The handler asks again (RelayedFrom), so removing either check still leaves the route refused.
+var relayedRequired = map[devicekey.Kind]bool{devicekey.GrantMember: true}
+
 // RelayedGuard is the guard, after the link stamp and before the grant check. verifier is the computer's one device verifier (nil when there is none); ownerLabel is the owner label confirmed for the link the
 // request came through, "" when none.
 func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.Context) (string, error)) func(http.Handler) http.Handler {
@@ -30,16 +34,17 @@ func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.C
 				return
 			}
 			target := r.URL.RequestURI()
-			if _, listed := devicekey.KindOfRoute(r.Method, target); !listed {
+			kind, listed := devicekey.KindOfRoute(r.Method, target)
+			if !listed {
 				next.ServeHTTP(w, r)
 				return
 			}
 			any, whole := relayedHeaders(r)
-			if !any {
+			now := time.Now()
+			if !any && !relayedRequired[kind] {
 				next.ServeHTTP(w, r)
 				return
 			}
-			now := time.Now()
 			refuse := func(key string, err error) {
 				deviceMsgLimiter.failed(key, now)
 				slog.Info("[device] a relayed signed request was refused", "code", devicekey.ReplyCode(err))

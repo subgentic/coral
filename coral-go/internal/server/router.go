@@ -82,6 +82,13 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	}
 	relayedOwner, _ := routes.LinkOwnerSources(linkStamps)
 	r.Use(routes.RelayedGuard(relayedVerifier, relayedOwner))
+	routes.SetRelayedMemberVerify(func(ctx context.Context, digest []byte, kid, sig string) (string, error) { // #20883: the owner's device signing a grant that a Hub carried
+		v := relayedVerifier()
+		if v == nil {
+			return "", errors.New("no device verifier")
+		}
+		return v.VerifyOwnerGrant(ctx, digest, kid, sig, time.Now())
+	})
 	// A tunneled write on a route in pairRecordedRoutes leaves one Operator-actions row with the link and the Hub person, after its handler (#20369); the census (pair_census_test.go) proves each one.
 	r.Use(routes.RecordPairWrites(s.boardStore, pairRecordedRoutes, pairUpgradeRoutes, r))
 	// What the owner's signed grants give a Hub person (#20473, S2): the better of their live grants, lowered by the link's cap read now, must reach the route's tier; the table is read on every request.
