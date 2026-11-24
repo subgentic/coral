@@ -372,18 +372,16 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/settings", boardHandler.PutHealthSettings)
 	// Coral Live (#21047): the person's own controls at this computer, never through the Hub; every one answers 404 live_closed while the gate is shut.
 	liveHandler := routes.NewLiveHandler(boardHandler)
-	liveHandler.SetHubLinks(func(ctx context.Context) []string {
+	liveHandler.SetHubLinks(func(ctx context.Context) []routes.HubLinkInfo {
 		ls, err := store.NewCloudStore(s.db, nil).ListLinks(ctx)
 		if err != nil {
 			return nil
 		}
-		var ids []string
+		var out []routes.HubLinkInfo
 		for _, l := range ls {
-			if l.State == store.LinkStateActive {
-				ids = append(ids, l.LinkID)
-			}
+			out = append(out, routes.HubLinkInfo{ID: l.LinkID, Label: l.Label, Active: l.State == store.LinkStateActive})
 		}
-		return ids
+		return out
 	})
 	r.With(routes.RefuseSignInLink).Get("/api/live/links", liveHandler.ListLinks)
 	r.With(routes.RefuseSignInLink).Post("/api/live/links", liveHandler.CreateLink)

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,8 +33,8 @@ type LiveHandler struct {
 	clock live.Clock
 	// machineID is this computer's own id (tests set it). open is the gate, read once from live.Open.
 	machineID func() (string, error)
-	// hubLinks: this computer's own Hub links that are active now (the router gives the store's). Unset: none.
-	hubLinks func(ctx context.Context) []string
+	// hubLinks: this computer's own Hub links, with whether each is active now (the router gives the store's). Unset: none.
+	hubLinks func(ctx context.Context) []HubLinkInfo
 	open     bool
 }
 
@@ -45,14 +46,49 @@ func NewLiveHandler(h *BoardHandler) *LiveHandler {
 // SetAgentState gives the handler the agents' working, waiting and sleeping state (the sessions the server keeps). Unset, every agent reads as idle.
 func (lh *LiveHandler) SetAgentState(f func(subscriberID string) live.AgentState) { lh.state = f }
 
-// SetHubLinks gives the handler the ids of this computer's active Hub links.
-func (lh *LiveHandler) SetHubLinks(f func(ctx context.Context) []string) { lh.hubLinks = f }
+// HubLinkInfo is one of this computer's own Hub links: its id, the name the person gave it, and whether it is active now.
+type HubLinkInfo struct {
+	ID, Label string
+	Active    bool
+}
+
+// SetHubLinks gives the handler this computer's Hub links.
+func (lh *LiveHandler) SetHubLinks(f func(ctx context.Context) []HubLinkInfo) { lh.hubLinks = f }
 
 func (lh *LiveHandler) activeLinks(ctx context.Context) []string {
 	if lh.hubLinks == nil {
 		return nil
 	}
-	return lh.hubLinks(ctx)
+	var ids []string
+	for _, l := range lh.hubLinks(ctx) {
+		if l.Active {
+			ids = append(ids, l.ID)
+		}
+	}
+	return ids
+}
+
+// liveVia is the Hub link a live link pushes through, as the page shows it: the id, the name the person gave it (never a URL) and whether it is active now.
+type liveVia struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Active bool   `json:"active"`
+}
+
+func (lh *LiveHandler) viaOf(ctx context.Context, id string) liveVia {
+	v := liveVia{ID: id}
+	if lh.hubLinks == nil || id == "" {
+		return v
+	}
+	for _, l := range lh.hubLinks(ctx) {
+		if l.ID == id {
+			v.Active = l.Active
+			if !strings.Contains(l.Label, "://") {
+				v.Name = l.Label
+			}
+		}
+	}
+	return v
 }
 
 func (lh *LiveHandler) linkActive(id string) bool {
@@ -187,6 +223,7 @@ type liveLinkView struct {
 	HubStops     int             `json:"hub_stop_count"`
 	ChatOffWhy   string          `json:"chat_off_why,omitempty"`
 	Draft        liveDraftView   `json:"draft"`
+	Via          liveVia         `json:"via"`
 }
 
 func tp(t time.Time) *time.Time {
@@ -200,6 +237,7 @@ func (lh *LiveHandler) view(ctx context.Context, m *live.Manager, l live.Link) l
 	v := liveLinkView{ID: l.ID, Team: l.Team, Hub: l.HubLink, State: l.State, PausedReason: l.PausedReason, CreatedBy: l.CreatedBy,
 		ExpiresIn: l.Views.ExpiresIn, DelayS: l.Views.DelayS, PeriodDays: l.Views.PeriodDays, LastViewedS: l.LastViewedS, HubStops: l.HubStops, ChatOffWhy: l.ChatOffWhy, Agents: []liveAgentView{},
 		Draft: liveDraftView{ChatKey: l.Views.ChatKey, PeriodDays: l.Views.PeriodDays, ExpiresIn: l.Views.ExpiresIn, DelayS: l.Views.DelayS}}
+	v.Via = lh.viaOf(ctx, l.Via)
 	approvedKeys := map[string]bool{}
 	isLive := l.Approved != nil && l.State == live.StateLive
 	chatKey := l.Views.ChatKey

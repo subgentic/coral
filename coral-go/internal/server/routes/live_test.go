@@ -27,7 +27,9 @@ func openLiveHandler(h *BoardHandler) *LiveHandler {
 	lh := NewLiveHandler(h)
 	lh.open = true
 	lh.machineID = func() (string, error) { return "machine-1", nil }
-	lh.hubLinks = func(context.Context) []string { return []string{"lnk-11111111"} }
+	lh.hubLinks = func(context.Context) []HubLinkInfo {
+		return []HubLinkInfo{{ID: "lnk-11111111", Label: "Acme Hub", Active: true}}
+	}
 	return lh
 }
 
@@ -289,15 +291,49 @@ func TestCreateNeedsOneOfThisComputersActiveHubLinks(t *testing.T) {
 		}
 		return `{"hub_link":"` + liveHub + `","team":"team","via":"` + via + `"}`
 	}
-	lh.hubLinks = func(context.Context) []string { return nil }
+	lh.hubLinks = func(context.Context) []HubLinkInfo { return nil }
 	code, out := create.do(lh, body(""), livePerson)
 	require.Equal(t, http.StatusBadRequest, code)
 	require.Equal(t, "bad_via", out["error"], "no active Hub link")
-	lh.hubLinks = func(context.Context) []string { return []string{"lnk-aaaaaaaa", "lnk-bbbbbbbb"} }
+	lh.hubLinks = func(context.Context) []HubLinkInfo {
+		return []HubLinkInfo{{ID: "lnk-aaaaaaaa", Active: true}, {ID: "lnk-bbbbbbbb", Active: true}}
+	}
 	code, out = create.do(lh, body(""), livePerson)
 	require.Equal(t, "bad_via", out["error"], "two to pick from: the person names one")
 	code, out = create.do(lh, body("lnk-cccccccc"), livePerson)
 	require.Equal(t, "bad_via", out["error"], "not one of this computer's links")
 	code, out = create.do(lh, body("lnk-bbbbbbbb"), livePerson)
 	require.Equal(t, http.StatusOK, code, "%v", out)
+}
+
+// #21073: a link returns the Hub link it pushes through: id, the name the person gave it (never a URL), and whether it is active now.
+func TestALinkReturnsTheHubLinkItUsesWithItsNameNeverAURL(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	_, err := h.bs.Subscribe(ctx, "team", "Backend Dev", "backend", "sess-be", nil, "all")
+	require.NoError(t, err)
+	lh := openLiveHandler(h)
+	var create, list liveCall
+	for _, c := range liveRoutes() {
+		switch c.method + " " + c.path {
+		case "POST /api/live/links":
+			create = c
+		case "GET /api/live/links":
+			list = c
+		}
+	}
+	code, out := create.do(lh, `{"hub_link":"`+liveHub+`","team":"team"}`, livePerson)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	require.Equal(t, map[string]any{"id": "lnk-11111111", "name": "Acme Hub", "active": true}, out["via"])
+
+	lh.hubLinks = func(context.Context) []HubLinkInfo { // renamed to a URL, and paused
+		return []HubLinkInfo{{ID: "lnk-11111111", Label: "https://hub.example/x?k=secret", Active: false}}
+	}
+	_, out = list.do(lh, "", livePerson)
+	via := out["links"].([]any)[0].(map[string]any)["via"]
+	require.Equal(t, map[string]any{"id": "lnk-11111111", "name": "", "active": false}, via)
+
+	lh.hubLinks = func(context.Context) []HubLinkInfo { return nil } // gone
+	_, out = list.do(lh, "", livePerson)
+	require.Equal(t, map[string]any{"id": "lnk-11111111", "name": "", "active": false}, out["links"].([]any)[0].(map[string]any)["via"])
 }
