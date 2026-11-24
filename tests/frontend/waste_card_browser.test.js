@@ -95,6 +95,11 @@ const BODY = () => ({
             assert.ok(await ev(`(() => { const c = document.querySelector('#cost-waste .lw-card').getBoundingClientRect(); return c.left >= 0 && c.right <= innerWidth; })()`), 'the card sits inside the screen');
             const labels = await ev(`[...document.querySelector('#cost-waste tbody tr').children].filter(td => !td.classList.contains('dt-tone-primary')).map(td => getComputedStyle(td, '::before').content.replace(/"/g, ''))`);
             assert.deepEqual(labels, ['Re-read', 'Cache expiries', 'Idle compactions'], JSON.stringify(labels));
+            // four rows an agent, the label at the left edge and the value at the right edge (the mock), the first row "Agent | name"
+            const rows = await ev(`(() => { const tr = document.querySelector('#cost-waste tbody tr'), box = tr.getBoundingClientRect(); return [...tr.children].map(td => { const r = td.getBoundingClientRect(); const tr2 = document.createRange(); tr2.selectNodeContents(td); const v = tr2.getBoundingClientRect(); return { label: getComputedStyle(td, '::before').content.replace(/"/g, ''), gapRight: Math.round(r.right - v.right), gapLeft: Math.round(v.left - r.left) }; }); })()`);
+            assert.equal(rows.length, 4, JSON.stringify(rows));
+            assert.equal(rows[0].label, 'Agent', JSON.stringify(rows));
+            for (const r of rows) assert.ok(r.gapRight <= 2 && r.gapLeft > 40, 'the value is at the right edge: ' + JSON.stringify(rows));
         });
     } finally { await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });
