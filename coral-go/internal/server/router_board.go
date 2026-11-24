@@ -370,7 +370,9 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/health/items", boardHandler.ListHealthItems)     // the open items with their ack ids (#20495)
 	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/review-size", boardHandler.GetReviewSizeSetting) // the review size guard (#21022): the team's setting, the Operator's or the Orchestrator's, never through the Hub
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/review-size", boardHandler.PutReviewSizeSetting)
-	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/tasks/{taskID}/review-size", boardHandler.TaskReviewSize) // the banner's verdict on a task's changes.diff: a warning only
+	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/tasks/{taskID}/review-size", boardHandler.TaskReviewSize)                // the banner's verdict on a task's changes.diff: a warning only
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/review-size/split", boardHandler.SplitReviewSize)        // Split on the banner (#21059): ask the Orchestrator for follow-up tasks
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/review-size/send-back", boardHandler.SendBackReviewSize) // Send back on the banner (#21059): the task returns to its author with the note
 	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/health/settings", boardHandler.GetHealthSettings)
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/settings", boardHandler.PutHealthSettings)
 	// Coral Live (#21047): the person's own controls at this computer, never through the Hub; every one answers 404 live_closed while the gate is shut.

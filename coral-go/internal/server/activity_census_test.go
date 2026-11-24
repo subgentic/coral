@@ -162,6 +162,8 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/live/links/{id}/stop":                                       "Coral Live's own controls at this computer: the person's, behind a shut gate, not an Inbox action (the Needs-you row is a later slice)",
 	"PUT /api/board/{project}/health/settings":                             "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"PUT /api/board/{project}/review-size":                                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
+	"POST /api/board/{project}/tasks/{taskID}/review-size/split":           "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
+	"POST /api/board/{project}/tasks/{taskID}/review-size/send-back":       "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"DELETE /api/board/{project}/health/checks/{name}":                     "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/health/checks":                              "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/health/checks/{name}/pause":                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",

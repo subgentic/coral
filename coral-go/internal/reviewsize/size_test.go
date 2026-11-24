@@ -1,6 +1,7 @@
 package reviewsize
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -71,4 +72,45 @@ func TestBinaryFilesCountAsFilesNotLines(t *testing.T) {
 	r := Check([]File{{Path: "logo.png", Binary: true}, {Path: "a.go", Added: 5}}, Limits{Files: 1})
 	require.True(t, r.Over)
 	require.Equal(t, 5, r.Lines)
+}
+
+// Brief task 10 (#21059): what the team does with a change over the limit. Warn is the default; Send back and Split add a button to the banner, and the verdict carries the words for it.
+func TestOverLimitModeDefaultsToWarnAndRefusesUnknown(t *testing.T) {
+	s, err := Setting{On: true, Lines: 800}.Validate()
+	require.NoError(t, err)
+	require.Equal(t, ModeWarn, s.OverLimit, "no mode saved: Warn")
+	for _, m := range []string{ModeWarn, ModeSendBack, ModeSplit} {
+		got, err := Setting{On: true, Lines: 800, OverLimit: m}.Validate()
+		require.NoError(t, err)
+		require.Equal(t, m, got.OverLimit)
+	}
+	_, err = Setting{On: true, Lines: 800, OverLimit: "delete"}.Validate()
+	require.Error(t, err, "a mode that is not one of the three is refused")
+}
+
+func TestVerdictCarriesTheModeAndItsWords(t *testing.T) {
+	big := []File{{Path: "a.go", Added: 1356, Deleted: 486}}
+	for i := 0; i < 30; i++ {
+		big = append(big, File{Path: fmt.Sprintf("f%d.go", i)})
+	}
+	set := Setting{On: true, Lines: 800, Files: 20, OverLimit: ModeSendBack}
+	v := set.Verdict("Frontend Dev 2", big)
+	require.True(t, v.Over)
+	require.Equal(t, ModeSendBack, v.OverLimit)
+	require.Contains(t, v.SendBackNote, "1,842 lines in 31 files", "the change's size, with thousands separated")
+	require.Contains(t, v.SendBackNote, "800 lines or 20 files", "names the limit")
+	require.Contains(t, v.SendBackNote, "split", "asks for a split")
+
+	set.OverLimit = ModeSplit
+	v = set.Verdict("Frontend Dev 2", big)
+	require.Empty(t, v.SendBackNote)
+	require.Equal(t, "Split #20844 (1,842 lines in 31 files, limit 800 lines or 20 files) into follow-up tasks under the limit.", v.SplitAskFor(20844))
+
+	set.OverLimit = ModeWarn
+	v = set.Verdict("Frontend Dev 2", big)
+	require.Equal(t, ModeWarn, v.OverLimit)
+	require.Empty(t, v.SendBackNote)
+
+	under := set.Verdict("Frontend Dev 2", []File{{Path: "a.go", Added: 10}})
+	require.Empty(t, under.OverLimit, "a change under the limit has no action")
 }

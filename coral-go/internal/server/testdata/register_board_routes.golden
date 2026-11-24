@@ -146,6 +146,8 @@ POST /api/board/{project}/tasks/{taskID}/release-review | (*BoardHandler).Releas
 POST /api/board/{project}/tasks/{taskID}/reminder | (*BoardHandler).RemindTask-fm
 POST /api/board/{project}/tasks/{taskID}/reply | (*BoardHandler).ReplyToTask-fm
 POST /api/board/{project}/tasks/{taskID}/review | (*BoardHandler).DelegateReview-fm
+POST /api/board/{project}/tasks/{taskID}/review-size/send-back | (*BoardHandler).SendBackReviewSize-fm
+POST /api/board/{project}/tasks/{taskID}/review-size/split | (*BoardHandler).SplitReviewSize-fm
 POST /api/board/{project}/tasks/{taskID}/send-back | (*BoardHandler).SendBack-fm
 POST /api/board/{project}/tasks/{taskID}/submit-review | (*BoardHandler).SubmitCompletionReview-fm
 POST /api/board/{project}/waits | (*BoardHandler).RegisterWait-fm
