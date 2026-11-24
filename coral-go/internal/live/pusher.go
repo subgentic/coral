@@ -11,8 +11,9 @@ import (
 // It is the only code that talks to the Hub for Live, through one Transport (the tunnel's "live" kind, live_push/1). Nothing the Hub answers widens anything: stop and pause turn things off,
 // not_live stops frames until a person confirms again, and a reply outside the closed set (reply.go) blocks that link until a person confirms.
 
-// Transport sends one live request and returns the reply body, whatever the HTTP status. An error is a transport failure (no tunnel, closed stream, timeout).
-type Transport func(ctx context.Context, path string, body []byte) ([]byte, error)
+// Transport sends one live request through the tunnel of the Hub link via (the id of one of this computer's own Hub links, never another) and returns the reply body, whatever the HTTP status.
+// An error is a transport failure: no tunnel for that id (it must never fall back to another Hub link), a closed stream, a timeout.
+type Transport func(ctx context.Context, via, path string, body []byte) ([]byte, error)
 
 const (
 	minFrameGap    = 2 * time.Second  // the Hub's rate: at most one push per 2 s per link
@@ -61,6 +62,7 @@ type hubState struct{ notLive, blocked bool }
 
 type outMsg struct {
 	hub      string
+	via      string
 	path     string
 	body     []byte
 	next     time.Time
@@ -138,8 +140,8 @@ func (p *Pusher) queue(now time.Time, msgs []Message) {
 				kept = append(kept, o)
 			}
 		}
-		p.out = append(kept, &outMsg{hub: msg.HubLink, path: path, body: body, next: now, deadline: now.Add(messageRetry), backoff: time.Second})
-		if msg.Kind == "confirm" {
+		p.out = append(kept, &outMsg{hub: msg.HubLink, via: msg.Via, path: path, body: body, next: now, deadline: now.Add(messageRetry), backoff: time.Second})
+		if msg.Kind == "confirm" && msg.Person { // only a person's act lets a blocked link push again, not the confirm Tick sends when chat drops
 			*p.hubOf(msg.HubLink) = hubState{}
 		}
 		if msg.Kind == "paused" {
@@ -204,7 +206,7 @@ func (p *Pusher) flush(ctx context.Context, now time.Time) {
 			kept = append(kept, o)
 			continue
 		}
-		raw, err := p.send(ctx, o.path, o.body)
+		raw, err := p.send(ctx, o.via, o.path, o.body)
 		if err != nil {
 			p.Counts.TransportErr++
 			o.backoff = nextBackoff(o.backoff)
@@ -289,7 +291,7 @@ func (p *Pusher) frame(ctx context.Context, now time.Time, l Link) {
 		p.Counts.TooBig++
 		return
 	}
-	raw, err := p.send(ctx, PathFrame, body)
+	raw, err := p.send(ctx, l.Via, PathFrame, body)
 	if err != nil {
 		p.Counts.TransportErr++
 		s.backoff = nextBackoff(max(s.backoff, time.Second/2))

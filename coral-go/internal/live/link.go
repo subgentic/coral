@@ -145,6 +145,8 @@ func (m *MemStore) Save(l []Link) error {
 type Message struct {
 	Kind         string // "confirm" | "paused"
 	HubLink      string
+	Via          string // the Hub link of this computer it goes through (never the Hub link's uuid above)
+	Person       bool   // a confirm made by a person's act (go-live, re-confirm, resume); false for the one Tick sends when chat drops
 	Chat         bool
 	ChatSince    int64
 	ReconfirmDue int64
@@ -437,10 +439,10 @@ func NoticeAt(l Link) time.Time {
 	return due.Add(-lead)
 }
 
-func (m *Manager) confirmMsg(l *Link) Message {
+func (m *Manager) confirmMsg(l *Link, person bool) Message {
 	_, pauseAt := Deadlines(*l)
 	chat := l.Approved != nil && l.Approved.ChatKey != "" && !l.ChatSince.IsZero()
-	msg := Message{Kind: "confirm", HubLink: l.HubLink, Chat: chat, ReconfirmDue: pauseAt.Unix()}
+	msg := Message{Kind: "confirm", HubLink: l.HubLink, Via: l.Via, Person: person, Chat: chat, ReconfirmDue: pauseAt.Unix()}
 	if chat {
 		msg.ChatSince = l.ChatSince.Unix()
 	}
@@ -493,7 +495,7 @@ func (m *Manager) approve(l *Link, keys []string, hash string) {
 	case "7d":
 		l.ExpiresAt = now.Add(7 * 24 * time.Hour)
 	}
-	m.out = append(m.out, m.confirmMsg(l))
+	m.out = append(m.out, m.confirmMsg(l, true))
 }
 
 // Reconfirm restarts the clock of a live link. A paused or stopped link is resumed or made anew, never re-confirmed.
@@ -512,13 +514,13 @@ func (m *Manager) Reconfirm(id string) (Link, error) {
 		return Link{}, ErrState // the grace is over: Tick pauses it, and resume is the way back
 	}
 	l.ConfirmedAt = now
-	m.out = append(m.out, m.confirmMsg(l))
+	m.out = append(m.out, m.confirmMsg(l, true))
 	return *l, m.saveLocked()
 }
 
 func (m *Manager) pause(l *Link, reason string) {
 	l.State, l.PausedReason = StatePaused, reason
-	m.out = append(m.out, Message{Kind: "paused", HubLink: l.HubLink, Reason: reason})
+	m.out = append(m.out, Message{Kind: "paused", HubLink: l.HubLink, Via: l.Via, Reason: reason})
 }
 
 // Pause is the owner's pause.
@@ -623,7 +625,7 @@ func (m *Manager) Tick(ctx context.Context) error {
 			l.Approved.ChatKey, l.Approved.ChatGen = "", ""
 			l.Views.ChatKey, l.ChatGen, l.ChatSince = "", "", time.Time{}
 			l.ChatOffWhy = "the agent restarted"
-			m.out = append(m.out, m.confirmMsg(l)) // the Hub is told chat is off (it would otherwise keep the old copy)
+			m.out = append(m.out, m.confirmMsg(l, false)) // the Hub is told chat is off (it would otherwise keep the old copy)
 		}
 		if l.State == StateLive {
 			_, pauseAt := Deadlines(*l)

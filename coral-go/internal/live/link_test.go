@@ -168,7 +168,7 @@ func TestTheWholeLinkPausesAtTheEndOfGraceAndTheHubIsToldTheSameInstant(t *testi
 	require.Equal(t, StatePaused, l.State)
 	require.Equal(t, ReasonNotReconfirmed, l.PausedReason)
 	msgs = m.Drain()
-	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Reason: ReasonNotReconfirmed}}, msgs)
+	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Via: testVia, Reason: ReasonNotReconfirmed}}, msgs)
 	_, err := m.Reconfirm("L1")
 	require.ErrorIs(t, err, ErrState, "a paused link is resumed, not re-confirmed")
 }
@@ -278,7 +278,7 @@ func TestOwnerPauseSendsTheOwnerReason(t *testing.T) {
 	m.Drain()
 	_, err := m.Pause("L1")
 	require.NoError(t, err)
-	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Reason: ReasonOwner}}, m.Drain())
+	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Via: testVia, Reason: ReasonOwner}}, m.Drain())
 	_, err = m.Stop("L1")
 	require.NoError(t, err)
 	require.Empty(t, m.Drain(), "stop tells the Hub nothing")
@@ -354,7 +354,7 @@ func TestARestartBringsALinkWithChatBackPausedAndTellsTheHub(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatePaused, l.State)
 	require.Equal(t, ReasonRestart, l.PausedReason)
-	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Reason: ReasonRestart}}, m2.Drain())
+	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Via: testVia, Reason: ReasonRestart}}, m2.Drain())
 	require.ErrorIs(t, m2.CanPush("L1", hubA), ErrState)
 }
 
@@ -388,7 +388,7 @@ func TestALinkFromAnotherComputerComesBackPausedEvenWithoutChat(t *testing.T) {
 	l, _ = other.Get("L1")
 	require.Equal(t, StatePaused, l.State)
 	require.Equal(t, ReasonRestart, l.PausedReason)
-	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Reason: ReasonRestart}}, other.Drain())
+	require.Equal(t, []Message{{Kind: "paused", HubLink: hubA, Via: testVia, Reason: ReasonRestart}}, other.Drain())
 	require.ErrorIs(t, other.CanPush("L1", hubA), ErrState)
 }
 

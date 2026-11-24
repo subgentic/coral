@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -336,4 +337,50 @@ func TestALinkReturnsTheHubLinkItUsesWithItsNameNeverAURL(t *testing.T) {
 	lh.hubLinks = func(context.Context) []HubLinkInfo { return nil } // gone
 	_, out = list.do(lh, "", livePerson)
 	require.Equal(t, map[string]any{"id": "lnk-11111111", "name": "", "active": false}, out["links"].([]any)[0].(map[string]any)["via"])
+}
+
+// #21074: the ticker. A shut gate starts nothing and touches no file; an open one runs the pusher, which sends the go-live confirm through the Transport with the link's own via.
+func TestTheLiveTickerDoesNothingWhileTheGateIsShutAndPushesWhenOpen(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	h.coralDir = t.TempDir()
+	ctx := context.Background()
+	_, err := h.bs.Subscribe(ctx, "team", "Backend Dev", "backend", "sess-be", nil, "all")
+	require.NoError(t, err)
+
+	type call struct{ via, path string }
+	calls := make(chan call, 16)
+	send := func(_ context.Context, via, path string, _ []byte) ([]byte, error) {
+		calls <- call{via, path}
+		return []byte(`{"ok":true}`), nil
+	}
+	shut := NewLiveHandler(h)
+	shut.machineID = func() (string, error) { return "machine-1", nil }
+	done := make(chan struct{})
+	go func() { shut.Run(ctx, send, time.Millisecond); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return at once with the gate shut")
+	}
+	_, statErr := os.Stat(filepath.Join(h.coralDir, "live_links.json"))
+	require.True(t, os.IsNotExist(statErr), "a shut gate reads and writes nothing")
+
+	lh := openLiveHandler(h)
+	m, err := lh.manager()
+	require.NoError(t, err)
+	l, err := m.Create(liveHub, "team", "Operator", "lnk-11111111")
+	require.NoError(t, err)
+	p, err := m.Preview(ctx, l.ID)
+	require.NoError(t, err)
+	_, err = m.GoLive(ctx, l.ID, p.Hash, true)
+	require.NoError(t, err)
+	rctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go lh.Run(rctx, send, time.Millisecond)
+	select {
+	case c := <-calls:
+		require.Equal(t, call{"lnk-11111111", "/live/v1/confirm"}, c)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the open ticker sent nothing")
+	}
 }

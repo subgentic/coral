@@ -241,3 +241,27 @@ func (m *Manager) runLink(ctx context.Context, lc *linkConn, origin string) {
 		lc.set(StateUpgrade, "this Coral version is too old for the hub; update Coral")
 	}
 }
+
+// Live sends one Coral Live request (tunnel.LiveFramePath, LiveConfirmPath or LivePausedPath) through the tunnel of the Hub link linkID and no other (#21074): an added link's own connector, or the Manager's own tunnel
+// when linkID is the enrollment's link. An id with no tunnel now is ErrNotLinked; it never falls back to another Hub link. tunnel.ErrLiveUnsupported when that Hub does not take live pushes.
+func (m *Manager) Live(ctx context.Context, linkID string, path string, body []byte) (tunnel.RelayResponse, error) {
+	if linkID == "" {
+		return tunnel.RelayResponse{}, ErrNotLinked
+	}
+	var cs *tunnel.ClientSession
+	m.lmu.Lock()
+	lc := m.extras[linkID]
+	m.lmu.Unlock()
+	switch {
+	case lc != nil:
+		cs = lc.session.Load()
+	case m.o.Store != nil && m.o.HubURL != "":
+		if l, err := m.o.Store.LinkByOrigin(ctx, m.o.HubURL); err == nil && l.LinkID == linkID && l.State == store.LinkStateActive {
+			cs = m.session.Load()
+		}
+	}
+	if cs == nil {
+		return tunnel.RelayResponse{}, ErrNotLinked
+	}
+	return cs.Live(ctx, path, body)
+}

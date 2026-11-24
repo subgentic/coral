@@ -69,6 +69,7 @@ type Server struct {
 	resourceMgr     *resources.Manager // the resource queue, when it is open (its history file closes with the server, #13671)
 	limitWaits      *limitwaits.Store  // the record of the agents' limit waits, when it is open (#21020)
 	cloudHandler    *routes.CloudHandler
+	liveHandler     *routes.LiveHandler           // Coral Live (#21047); its ticker is StartLive
 	cloudMgr        atomic.Pointer[cloud.Manager] // the connector, once SetCloud runs (#3966)
 	hubSignin       *auth.HubSignin               // Sign in with Coral Hub (#3966)
 	authRoutes      *auth.Routes                  // made in useMiddleware (the Hub sign-in guard needs it), routed in registerAuth
@@ -341,6 +342,22 @@ func (s *Server) StartLinkRemovalRetry(ctx context.Context) {
 	if s.cloudHandler != nil {
 		s.cloudHandler.StartRemovalRetry(ctx)
 	}
+}
+
+// StartLive runs Coral Live's pusher once a second until ctx ends, sending through the tunnel of the Hub link each live link names (never another). While the gate (live.Open, a const) is shut it does nothing.
+func (s *Server) StartLive(ctx context.Context) {
+	if s.liveHandler == nil {
+		return
+	}
+	send := func(ctx context.Context, via, path string, body []byte) ([]byte, error) {
+		m := s.cloudMgr.Load()
+		if m == nil {
+			return nil, cloud.ErrNotLinked
+		}
+		r, err := m.Live(ctx, via, path, body)
+		return r.Body, err
+	}
+	safego.Go("live_pusher", func() { s.liveHandler.Run(ctx, send, time.Second) })
 }
 
 // SetScheduler injects the job scheduler into the tasks handler for launching/killing.

@@ -11,17 +11,24 @@ import (
 )
 
 type sent struct {
+	via  string
 	path string
 	body string
 }
 
+var errNoTunnel = errors.New("no tunnel for that Hub link")
+
 type fakeHub struct {
-	got   []sent
-	reply func(path string, n int) ([]byte, error)
+	noTunnel map[string]bool
+	got      []sent
+	reply    func(path string, n int) ([]byte, error)
 }
 
-func (h *fakeHub) send(_ context.Context, path string, body []byte) ([]byte, error) {
-	h.got = append(h.got, sent{path, string(body)})
+func (h *fakeHub) send(_ context.Context, via, path string, body []byte) ([]byte, error) {
+	h.got = append(h.got, sent{via, path, string(body)})
+	if h.noTunnel[via] {
+		return nil, errNoTunnel
+	}
 	if h.reply != nil {
 		return h.reply(path, len(h.got))
 	}
@@ -269,4 +276,75 @@ func TestAChatOffConfirmIsSentWhenTheAgentRestarts(t *testing.T) {
 	require.Len(t, conf, 2)
 	require.Contains(t, conf[1].body, `"chat":false`)
 	require.Contains(t, conf[1].body, `"chat_since":0`)
+}
+
+// Security's condition (#21071 point 5): every request names the Hub link of its live link, and a link with no tunnel gets nothing from another one.
+func TestEveryRequestNamesTheHubLinkItsLinkPushesThrough(t *testing.T) {
+	p, m, h, clk, _ := pushFixture(t)
+	const hubB = "bbbbbbbb-2222-3333-4444-555555555555"
+	const viaB = "lnk-bbbbbbbb"
+	prev := m.cfg.LinkActive
+	m.cfg.LinkActive = func(id string) bool { return id == viaB || prev(id) }
+	goLive(t, m)
+	ctx := context.Background()
+	m.cfg.NewID = func() string { return "L2" }
+	_, err := m.Create(hubB, "team", "Operator", viaB)
+	require.NoError(t, err)
+	pr, _ := m.Preview(ctx, "L2")
+	_, err = m.GoLive(ctx, "L2", pr.Hash, true)
+	require.NoError(t, err)
+	step(p, clk, 40)
+	byHub := map[string]string{}
+	for _, s := range h.got {
+		var b struct{ Link string }
+		require.NoError(t, json.Unmarshal([]byte(s.body), &b))
+		if old, ok := byHub[b.Link]; ok {
+			require.Equal(t, old, s.via)
+		}
+		byHub[b.Link] = s.via
+	}
+	require.Equal(t, map[string]string{hubA: testVia, hubB: viaB}, byHub)
+
+	// the second link's Hub link has no tunnel: nothing of it goes anywhere else
+	h.noTunnel = map[string]bool{viaB: true}
+	h.got = nil
+	src := m.cfg.Source("team").(*mutSource)
+	src.rows[0].TaskTitle = "Another task"
+	step(p, clk, 40)
+	for _, s := range h.got {
+		var b struct{ Link string }
+		require.NoError(t, json.Unmarshal([]byte(s.body), &b))
+		if b.Link == hubB {
+			require.Equal(t, viaB, s.via, "never sent under the other link")
+		}
+	}
+	require.Greater(t, p.Counts.TransportErr, 0)
+}
+
+// Security SHOULD (#21071 point 6): a Hub that said not_live or sent a bad reply is let in again by a person's confirm or go-live, not by the confirm Tick sends when an agent restarts.
+func TestOnlyAPersonsConfirmLetsABlockedLinkPushAgain(t *testing.T) {
+	p, m, h, clk, src := pushFixture(t)
+	h.reply = func(path string, n int) ([]byte, error) {
+		if path == PathFrame {
+			return []byte(`{"outcome":"not_live"}`), nil
+		}
+		return []byte(`{"ok":true}`), nil
+	}
+	ctx := context.Background()
+	_, _ = m.Create(hubA, "team", "Operator", testVia)
+	_, _ = m.SetViews(ctx, "L1", Views{ChatKey: "backend"})
+	pr, _ := m.Preview(ctx, "L1")
+	_, err := m.GoLive(ctx, "L1", pr.Hash, true)
+	require.NoError(t, err)
+	step(p, clk, 40)
+	require.Len(t, h.only(PathFrame), 1)
+	src.rows[0].Generation = "s1@t2" // the agent restarts: Tick sends a chat-off confirm
+	h.reply = nil
+	step(p, clk, 100)
+	require.Len(t, h.only(PathConfirm), 2, "the Tick confirm was sent")
+	require.Len(t, h.only(PathFrame), 1, "and it did not let the link push again")
+	_, err = m.Reconfirm("L1")
+	require.NoError(t, err)
+	step(p, clk, 40)
+	require.Greater(t, len(h.only(PathFrame)), 1, "a person's confirm did")
 }

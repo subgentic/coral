@@ -103,6 +103,29 @@ func (lh *LiveHandler) linkActive(id string) bool {
 	return false
 }
 
+// Run is the pusher's ticker: about every `every` (a second in production) until ctx ends it applies the clock and pushes. With the gate shut it returns at once and reads and writes nothing.
+func (lh *LiveHandler) Run(ctx context.Context, send live.Transport, every time.Duration) {
+	if !lh.open {
+		return
+	}
+	m, err := lh.manager()
+	if err != nil {
+		return // no machine id: fail closed, nothing is pushed
+	}
+	p := live.NewPusher(m, send)
+	defer p.Wipe()
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			p.Step(ctx)
+		}
+	}
+}
+
 func (lh *LiveHandler) manager() (*live.Manager, error) {
 	lh.mu.Lock()
 	defer lh.mu.Unlock()

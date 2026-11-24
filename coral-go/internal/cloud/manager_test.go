@@ -52,6 +52,7 @@ type fakeHub struct {
 	verifyEnd  atomic.Value // string: appended to the verification_url the start answer names (the link's #p= fragment, #16726); unset: none
 	pairing    atomic.Value // map[string]any: the pairing{} object the poll answer carries (#16726); unset: none
 	signin     atomic.Value // signinFunc: answers Hub sign-in (#3966); unset: not advertised
+	liveHook   atomic.Value // func(tunnel.LiveRequest) []byte: takes Coral Live pushes (#21074); unset: live_push/1 is not advertised
 	onMode     atomic.Value // func(tunnel.Mode): takes the local mode message (#5918); unset: local_mode/1 is not advertised
 	routeMu    sync.Mutex
 	routeSeen  []string // the X-Coral-Route header of each /tunnel dial
@@ -167,6 +168,9 @@ func newFakeHub(t *testing.T) *fakeHub {
 				if _, ok := h.onMode.Load().(func(tunnel.Mode)); ok {
 					caps = append(caps, tunnel.CapabilityLocalMode)
 				}
+				if _, ok := h.liveHook.Load().(func(tunnel.LiveRequest) []byte); ok {
+					caps = append(caps, tunnel.CapabilityLive)
+				}
 				return caps
 			},
 			MinLocalModeGap: 100 * time.Millisecond, // the real hub's is a second; a test holds its own messages to 300 ms
@@ -174,6 +178,13 @@ func newFakeHub(t *testing.T) *fakeHub {
 				if f, ok := h.onMode.Load().(func(tunnel.Mode)); ok {
 					f(mode)
 				}
+			},
+			OnLive: func(_ context.Context, _ *tunnel.Session, req tunnel.LiveRequest) tunnel.RelayResponse {
+				f, _ := h.liveHook.Load().(func(tunnel.LiveRequest) []byte)
+				if f == nil {
+					return tunnel.RelayResponse{Status: 404}
+				}
+				return tunnel.RelayResponse{Status: 200, Body: f(req)}
 			},
 			OnSignin: func(ctx context.Context, s *tunnel.Session, req tunnel.SigninRequest) tunnel.SigninResponse {
 				return h.signin.Load().(signinFunc)(req)
