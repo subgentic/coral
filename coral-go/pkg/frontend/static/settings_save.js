@@ -19,6 +19,7 @@ const { settingsAtOpen, setSettingsAtOpen, setPayloadAtOpen } = await importOnce
 
 /** Close Settings; its rows persist independently. Docs links continue after it closes. */
 export function hideSettingsModal(force, onClosed) {
+    document.dispatchEvent(new document.defaultView.CustomEvent('coral:settings-closed'));
     document.activeElement?.closest('#settings-modal') && document.activeElement.blur();
     document.getElementById("settings-modal").style.display = "none";
     restoreSavedTheme().catch(() => {}); // a theme previewed in the dialog and not saved goes back to the saved one (#10481)

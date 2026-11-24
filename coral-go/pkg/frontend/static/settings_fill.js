@@ -140,6 +140,7 @@ export async function _fillMachineSettings(s) {
         importOnce('./hub_mode_setting.js').then(m => m.loadHubModeSetting()).catch(() => {});
         whenPaneShown('settings-pane-cleanup', 'dropbox', () => importOnce('./dropbox_settings.js').then(m => m.loadDropbox()).catch(() => {})); // the Dropbox backup block of Storage and cleanup (#14609)
         whenPaneShown('settings-pane-cleanup', 'google', () => importOnce('./google_settings.js').then(m => m.loadGoogle()).catch(() => {})); // the Google sign-in block of Storage and cleanup (#20022)
+        whenPaneShown('settings-pane-network', 'joinKeys', () => importOnce('./hub_join.js').then(m => m.initJoinKeys()).catch(() => {}));
         importOnce('./setup_code_setting.js').then(m => m.initSetupCode()).catch(() => {}); // read only while Coral Hub and remote access is the pane in view (#6410)
     }
 }

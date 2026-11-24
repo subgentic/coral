@@ -24,11 +24,11 @@ import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy In
 
 const INBOX_URL = '/inbox';
 document.addEventListener('coral:reviews-changed', e => { countsRefresh?.(!e.detail?.countsUnchanged); updateInboxTab(); });
-onProposalsChanged(() => updateInboxTab()); // what agents asked to add and wait for the Operator's approval is a Needs you row (#11389)
-onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
-onOperatorAsksChanged(() => updateInboxTab()); // a question an agent asked the Operator is a Needs you row (#11417)
-document.addEventListener('coral:asked-dismissed', () => updateInboxTab()); // a question asked before Coral restarted leaves Needs you (#10368)
-document.addEventListener('coral:welcome-changed', () => updateInboxTab()); // a welcome item done, dismissed or hidden redraws Needs you (#11443)
+onProposalsChanged(updateInboxTab); // what agents asked to add and wait for the Operator's approval is a Needs you row (#11389)
+onRunsChanged(updateInboxTab); // a failed run nobody has opened is a Needs you row (#9296)
+onOperatorAsksChanged(updateInboxTab); // a question an agent asked the Operator is a Needs you row (#11417)
+document.addEventListener('coral:asked-dismissed', updateInboxTab); // a question asked before Coral restarted leaves Needs you (#10368)
+document.addEventListener('coral:welcome-changed', updateInboxTab); // a welcome item done, dismissed or hidden redraws Needs you (#11443)
 
 /** How many agents are waiting for input right now, from the feed's list. */
 export function waitingCount() {
@@ -37,7 +37,7 @@ export function waitingCount() {
 
 /** The ONE number of things that need the person: the tab's badge, the sidebar's Needs you count and the page header all read it, so they cannot disagree (#15380 D). Only what is live is counted: rows kept from a computer that is offline are shown, not counted (#15380 C). */
 export function needsCount(reviews = reviewAttentionCount().value) {
-    return waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount();
+    return (_hooks.extra?.() || 0) + waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount();
 }
 
 /** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */
