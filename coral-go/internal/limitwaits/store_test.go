@@ -171,3 +171,43 @@ func TestTheFileIsPrivateToItsOwner(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
 }
+
+// The approved mock (#21017) draws an agent that had no wait: Backend Dev on Sun 22 Nov with 0, 0 and 0. Every agent of the team seen on a day that had a wait is a row.
+func TestAnAgentSeenOnADayWithWaitsIsARowWithZeros(t *testing.T) {
+	s, _ := openT(t)
+	scriptedRun(t, s)
+	require.NoError(t, s.Seen("Backend Dev", "alpha", at(22, 11, 0)))
+	require.NoError(t, s.Seen("Backend Dev", "alpha", at(22, 11, 1))) // the same agent looked at again is one row
+	require.NoError(t, s.Seen("Backend Dev", "alpha", at(21, 11, 0))) // a day with no wait at all is not drawn
+	require.NoError(t, s.Seen("Lead Developer", "alpha", at(22, 12, 0)))
+	require.NoError(t, s.Seen("Docs", "beta", at(23, 12, 0)))
+	rep, err := s.Counts(at(18, 0, 0), at(25, 0, 0), "", utc)
+	require.NoError(t, err)
+	assert.Equal(t, Totals{Waits: 7, AtReset: 5, Early: 2}, rep.Totals, "an agent with no wait adds nothing to the counts")
+	assert.Equal(t, []Row{
+		{Agent: "Lead Developer", Day: "2026-11-23", Waits: 3, AtReset: 2, Early: 1},
+		{Agent: "QA Engineer", Day: "2026-11-23", Waits: 2, AtReset: 2, Early: 0},
+		{Agent: "Docs", Day: "2026-11-23"},
+		{Agent: "Lead Developer", Day: "2026-11-22", Waits: 2, AtReset: 1, Early: 1},
+		{Agent: "Backend Dev", Day: "2026-11-22"},
+	}, rep.Rows)
+	rep, err = s.Counts(at(18, 0, 0), at(25, 0, 0), "alpha", utc)
+	require.NoError(t, err)
+	assert.Len(t, rep.Rows, 4, "a team's rows are its own agents: Docs is beta's")
+	assert.NotContains(t, rep.Rows, Row{Agent: "Docs", Day: "2026-11-23"})
+	assert.Equal(t, []string{"alpha", "beta"}, rep.Teams)
+}
+
+func TestTheDayOfASightingIsTheLocalDayAndOnlyTheRangeIsRead(t *testing.T) {
+	s, _ := openT(t)
+	wait(t, s, "Lead Developer", "alpha", at(23, 9, 0), EndedAtReset)
+	require.NoError(t, s.Seen("Backend Dev", "alpha", at(22, 23, 30))) // 23 Nov, 01:30 at UTC+2
+	zone := time.FixedZone("x", 2*3600)
+	rep, err := s.Counts(at(22, 0, 0), at(24, 0, 0), "", zone)
+	require.NoError(t, err)
+	assert.Contains(t, rep.Rows, Row{Agent: "Backend Dev", Day: "2026-11-23"})
+	rep, err = s.Counts(at(23, 0, 0), at(24, 0, 0), "", utc)
+	require.NoError(t, err)
+	assert.NotContains(t, rep.Rows, Row{Agent: "Backend Dev", Day: "2026-11-22"}, "outside the range")
+	assert.Len(t, rep.Rows, 1)
+}
