@@ -57,8 +57,10 @@ type BoardHealthMonitor struct {
 	devPending map[string][]deviationSaid // per board: the deviation findings the check composed last, said once it is delivered (board_health_deviation.go)
 	// claudeLimit is the limit of a Claude agent, from its transcript (the notice only); nil: none is read.
 	claudeLimit func(ctx context.Context, a AgentInfo, now time.Time) (resets time.Duration, blocked bool)
-	limitHits   map[string]time.Time       // project|session: the last scan that saw this agent blocked by a usage limit, so a hit is posted once (health_limit_notice.go)
-	offShown    map[string][]offBooksShown // per board: the off-the-books occurrences the check composed last, said once it is delivered (board_health_offbooks.go)
+	defuse      func(ctx context.Context, project, text string) string                          // stored text a notice quotes, made unable to mention anyone (the board handler's noticeText); set by SetNoticeFns
+	postNotice  func(ctx context.Context, project, sender, text string) (*board.Message, error) // the one place that posts defused text (the board handler's postNotice); set by SetNoticeFns
+	limitHits   map[string]time.Time                                                            // project|session: the last scan that saw this agent blocked by a usage limit, so a hit is posted once (health_limit_notice.go)
+	offShown    map[string][]offBooksShown                                                      // per board: the off-the-books occurrences the check composed last, said once it is delivered (board_health_offbooks.go)
 }
 
 func NewBoardHealthMonitor(store *board.Store, interval time.Duration) *BoardHealthMonitor {
@@ -81,6 +83,12 @@ func (m *BoardHealthMonitor) SetAgents(ts *store.TaskStore, rt AgentRuntime, dis
 		_, err := deliverAutomated(ctx, rt, m.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, typedHealth(text), "health check", false, false) // what reaches a terminal is the typed form (goal #7)
 		return err
 	}
+}
+
+// SetNoticeFns gives the check the board handler's way to quote stored text in a notice: defuse is its noticeText, post its postNotice (the notice census allows only that one
+// place to post defused text). Without them a notice that quotes stored text is not posted.
+func (m *BoardHealthMonitor) SetNoticeFns(defuse func(ctx context.Context, project, text string) string, post func(ctx context.Context, project, sender, text string) (*board.Message, error)) {
+	m.defuse, m.postNotice = defuse, post
 }
 
 // SetLandingWatch gives the check the landing alert's repository view.

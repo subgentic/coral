@@ -131,3 +131,23 @@ func TestAClaudeLimitInItsTranscriptIsOnePostToo(t *testing.T) {
 	h.m.scan(ctx)
 	assert.Len(t, h.limitPosts(), 1)
 }
+
+// The open task's title is stored text: the notice quotes it defused, so a title that names a member does not mention them (#21018, the notice census).
+func TestALimitNoticeDefusesTheTaskTitle(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 40*time.Minute)
+	task, err := h.s.CreateTask(ctx, "team", "Ask @Orchestrator and @all about Dev: now", "", "high", "Orchestrator", "Dev")
+	require.NoError(t, err)
+	_, err = h.s.ClaimTask(ctx, "team", "Dev", task.ID)
+	require.NoError(t, err)
+	h.m.limit = func(_ context.Context, a AgentInfo) (time.Duration, bool) { return time.Hour, a.SessionID == h.sid(2) }
+	h.now = h.now.Add(11 * time.Minute)
+	h.m.scan(ctx)
+	posts := h.limitPosts()
+	require.Len(t, posts, 1)
+	assert.Equal(t, 1, strings.Count(posts[0], "@Orchestrator"), "only the notice's own live mention: %q", posts[0])
+	assert.NotContains(t, posts[0], "@all")
+	assert.NotContains(t, posts[0], "Dev: now", "the Name: form defused too")
+}

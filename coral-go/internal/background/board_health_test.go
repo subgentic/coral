@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/teamhealth"
 )
@@ -48,6 +49,11 @@ func newCheckHarness(t *testing.T) *checkHarness {
 	h := &checkHarness{t: t, s: healthMonitorStore(t), now: time.Now().UTC().Add(time.Minute), sig: map[string]agentSignal{}, sent: map[string][]string{}}
 	h.m = NewBoardHealthMonitor(h.s, 10*time.Minute)
 	h.m.now = func() time.Time { return h.now }
+	h.m.SetNoticeFns(func(ctx context.Context, project, text string) string { // as the board handler's noticeText and postNotice
+		return board.DefuseMentions(clitext.Clean(text), h.s.BoardMentionNames(ctx, project))
+	}, func(ctx context.Context, project, sender, text string) (*board.Message, error) {
+		return h.s.PostSystemDefusedMessage(ctx, project, sender, text, nil)
+	})
 	h.m.discover = func(context.Context) ([]AgentInfo, error) { return h.agents, nil }
 	h.m.signal = func(_ context.Context, id string) (agentSignal, bool) { s, ok := h.sig[id]; return s, ok }
 	h.m.deliver = func(_ context.Context, a AgentInfo, _ string, text string) error {
