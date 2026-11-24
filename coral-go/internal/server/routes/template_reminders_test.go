@@ -57,3 +57,28 @@ func TestLaunchingATemplateWithRemindersCreatesThem(t *testing.T) {
 	}
 	assert.Contains(t, fmt.Sprint(notes["Builder"]), "every 15 minutes", "what was left out is said in the launch reply")
 }
+
+// A template's reminder can be weekly (#21085): a day and a time, "Mon 09:00".
+func TestLaunchingATemplateWithAWeeklyReminderCreatesIt(t *testing.T) {
+	e := newLaunchEnv(t)
+	ch := NewChiefChecksHandler(e.h.db, e.h)
+	e.h.SetTemplateReminders(ch.AddTemplateReminders)
+	code, out := e.post("/api/sessions/launch-team", e.h.LaunchTeam, map[string]any{"working_dir": t.TempDir(), "board_name": "catchup", "agent_type": "claude", "agents": []map[string]any{
+		{"name": "Orchestrator", "prompt": "lead", "reminders": []map[string]any{
+			{"text": "Weekly catch-up.", "kind": "weekly", "at": "Mon 09:00", "timezone": "UTC"},
+			{"text": "Not a day.", "kind": "weekly", "at": "09:00", "timezone": "UTC"},
+		}},
+	}})
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	checks, err := ch.sched.ChiefChecks(context.Background())
+	require.NoError(t, err)
+	var weekly []store.ChiefCheck
+	for _, c := range checks {
+		if c.IsReminder() {
+			weekly = append(weekly, c)
+		}
+	}
+	require.Len(t, weekly, 1, "the one with a day is kept, the one without is refused")
+	assert.Equal(t, "weekly", weekly[0].ScheduleKind)
+	assert.Equal(t, "Mon 09:00", weekly[0].At)
+}
