@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 	"unicode/utf16"
 
 	"github.com/go-chi/chi/v5"
@@ -176,6 +177,7 @@ type gdocRig struct {
 	h     *SessionsHandler
 	ss    *store.SessionStore
 	drive *gdocStandIn
+	board string // the board the series' upload records name ("": none, the legacy rig)
 }
 
 func newGdocRig(t *testing.T, on bool) *gdocRig {
@@ -191,6 +193,10 @@ func newGdocRig(t *testing.T, on bool) *gdocRig {
 		return gdocsync.NewClientAt(ds.URL, func() (string, error) { return "tok-SECRET-123", nil }), nil
 	}
 	gdocMac = func() bool { return true }
+	// The hour's write bound is package-wide and keyed by series: a rig starts with it empty, so one test's passes never throttle the next.
+	gdocWrites.mu.Lock()
+	gdocWrites.at = map[string][]time.Time{}
+	gdocWrites.mu.Unlock()
 	t.Cleanup(func() { gdocClientFor, gdocMac, gdocConnected = oldClient, oldMac, oldConn })
 	if on {
 		require.NoError(t, ss.SetSetting(context.Background(), setreg.GdocShare, "true"))
@@ -304,7 +310,7 @@ func (g *gdocRig) writeSeriesVersionBy(t *testing.T, sid, digest string, n int, 
 	t.Helper()
 	dir := uploadsDir(g.h.cfg.CoralDir(), "s1")
 	require.NoError(t, os.MkdirAll(dir, 0o700))
-	rec := agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Digest: digest}, CreatedAt: "2026-11-20T00:00:00Z", SeriesID: sid, Version: n, Uploader: uploader}
+	rec := agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Digest: digest}, CreatedAt: "2026-11-20T00:00:00Z", SeriesID: sid, Version: n, Uploader: uploader, Board: g.board}
 	b, _ := json.Marshal(rec)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, digest+".json"), b, 0o600))
 }
