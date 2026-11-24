@@ -60,14 +60,17 @@ func AllowMemberGatesForTest(t interface{ Cleanup(func()) }) {
 
 // Bounds on a grant.
 const (
-	MemberViewMaxDays       = 30 // the longest a view grant lives
-	MemberFullMaxDays       = 7  // the longest a full grant lives
-	MemberGrantDefaultDays  = 7
-	MemberGrantsPerScope    = 20 // live grants on one board or agent
-	MemberGrantsPerPerson   = 5  // live grants for one (link, Hub person)
-	MemberFullPerComputer   = 3  // live full grants on this computer
-	maxMemberGrantLabelRune = 40
-	maxMemberScopeID        = 200
+	MemberViewMaxDays      = 30 // the longest a view grant lives
+	MemberFullMaxDays      = 7  // the longest a full grant lives
+	MemberGrantDefaultDays = 7
+	MemberGrantsPerScope   = 20 // live grants on one board or agent
+	MemberGrantsPerPerson  = 5  // live grants for one (link, Hub person)
+	MemberFullPerComputer  = 3  // live full grants on this computer
+	// What one link may do through a Hub (#20899, Security's SHOULD on #20883): hold this many live grants made through a Hub, and make this many in an hour (revoked ones still count). A grant made at this computer is in neither.
+	MemberRelayedLivePerLink    = 15
+	MemberRelayedPerLinkPerHour = 10
+	maxMemberGrantLabelRune     = 40
+	maxMemberScopeID            = 200
 )
 
 var (
@@ -342,6 +345,20 @@ func (s *Store) CreateMemberGrant(ctx context.Context, in NewMemberGrant) (*Memb
 			return nil, memberErr("that already has as many people with access as Coral allows")
 		}
 	}
+	if in.ViaHub {
+		if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE via_hub = 1 AND link_id = ? AND `+live, in.LinkID, g.CreatedAt); err != nil {
+			return nil, err
+		}
+		if n >= MemberRelayedLivePerLink {
+			return nil, memberErr("this Hub link already holds as many people with access as Coral allows through a Hub: end some at this computer first")
+		}
+		if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE via_hub = 1 AND link_id = ? AND created_at >= ?`, in.LinkID, now.Add(-time.Hour).Format(time.RFC3339)); err != nil {
+			return nil, err
+		}
+		if n >= MemberRelayedPerLinkPerHour {
+			return nil, memberErr("this Hub link has given too many people access in the last hour: try again later")
+		}
+	}
 	if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE link_id = ? AND hub_user = ? AND `+live, in.LinkID, in.HubUser, g.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -435,6 +452,8 @@ const (
 	MemberRevokedHere   = "this computer"
 	MemberRevokedSigned = "signed device"
 	MemberRevokedLink   = "link removed"
+	// MemberRevokedDeviceGone is for a grant ended with the removal of the owner device that signed it (#20899).
+	MemberRevokedDeviceGone = "device removed"
 )
 
 // RevokeMemberGrantBy is RevokeMemberGrant that records what ended the grant.
@@ -512,6 +531,30 @@ func (s *Store) MemberGrantByID(ctx context.Context, grantID string) (*MemberGra
 		return nil, err
 	}
 	return &g, nil
+}
+
+// CountLiveGrantsSignedBy is how many live grants an owner device signed (#20899).
+func (s *Store) CountLiveGrantsSignedBy(ctx context.Context, kid string, now time.Time) (int, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM member_grant WHERE signed_by = ? AND revoked_at IS NULL AND expires_at > ?`, kid, now.UTC().Format(time.RFC3339))
+	return n, err
+}
+
+// RevokeMemberGrantsSignedBy ends every live grant an owner device signed, as its removal does when the person asks for it (#20899). It returns how many it ended.
+func (s *Store) RevokeMemberGrantsSignedBy(ctx context.Context, kid string, now time.Time) (int, error) {
+	gs := []MemberGrant{}
+	if err := s.db.SelectContext(ctx, &gs, `SELECT `+memberGrantCols+` FROM member_grant WHERE signed_by = ? AND revoked_at IS NULL AND expires_at > ?`, kid, now.UTC().Format(time.RFC3339)); err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, g := range gs {
+		if _, err := s.RevokeMemberGrantBy(ctx, g.GrantID, now, MemberRevokedDeviceGone); err == nil {
+			n++
+		} else if !errors.Is(err, ErrNoMemberGrant) {
+			return n, err
+		}
+	}
+	return n, nil
 }
 
 // MemberGrantAuditCount is how many audit rows a grant has (for tests).

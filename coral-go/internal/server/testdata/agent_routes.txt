@@ -692,3 +692,4 @@ b GET /api/member-grants
 b POST /api/member-grants
 b GET /api/relayed-grant-notices
 b POST /api/relayed-grant-notices/{id}/revoke
+b GET /api/cloud/devices/{kid}/signed-grants

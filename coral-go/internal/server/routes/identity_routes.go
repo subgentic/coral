@@ -174,6 +174,7 @@ var operatorOnlyRoutes = map[string]string{
 	"PUT /api/cloud/links/{id}/asks":                 "change which asks a linked Coral Hub may answer",                           // #20413
 	"DELETE /api/cloud/links/{id}":                   "remove one Coral Hub link",                                                 // #20346
 	"DELETE /api/cloud/devices/{kid}":                "remove one paired device",                                                  // #19669
+	"GET /api/cloud/devices/{kid}/signed-grants":     "count the access one paired device gave, for removing it",                  // #20899
 	"POST /api/cloud/devices/clear-clock":            "reset the clock mark for signed device messages",                           // #19669
 	"POST /api/device-keys/message":                  "send a signed device message (only a Hub-forwarded browser does)",          // #19669
 	"POST /api/device-keys/certificate":              "send a passkey certificate for a new device",                               // #19669

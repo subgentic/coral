@@ -62,7 +62,7 @@ func TestALinkHoldsOnlySoManyLiveGrantsMadeThroughAHub(t *testing.T) {
 	}
 	_, err := s.CreateMemberGrant(ctx, hubGrant(200, mgLink))
 	require.ErrorIs(t, err, ErrMemberGrant)
-	assert.Contains(t, err.Error(), "too many")
+	assert.Contains(t, err.Error(), "already holds as many")
 	_, err = s.CreateMemberGrant(ctx, hubGrant(200, "lnk-cccc3333"))
 	assert.NoError(t, err, "another link has its own count")
 }
