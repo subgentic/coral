@@ -16,6 +16,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/dropbox"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/live"
 	"github.com/subgentic/coral/internal/secrets"
 )
@@ -36,6 +37,22 @@ type LiveHandler struct {
 	// hubLinks: this computer's own Hub links, with whether each is active now (the router gives the store's). Unset: none.
 	hubLinks func(ctx context.Context) []HubLinkInfo
 	open     bool
+	// sessions and chatRead are how the board source finds an agent's session and reads its chat (the sessions handler gives them, SetChat). Unset: no agent has chat.
+	sessions live.SessionLookup
+	chatRead live.ChatReader
+	// activeCache keeps the set of active Hub links for linkActiveTTL: the pusher asks twice per link every second and each ask was a store read.
+	cacheMu     sync.Mutex
+	cacheAt     time.Time
+	cacheActive map[string]bool
+}
+
+// linkActiveTTL is how long the active Hub links are remembered. A paused or removed Hub link has no tunnel, so a push through it is refused by the transport anyway (cloud.Manager.Live): this only bounds how
+// long the check before it can be one tick behind.
+const linkActiveTTL = 2 * time.Second
+
+// SetChat gives the handler the way to find an agent's session and read its chat. Without it no agent has chat.
+func (lh *LiveHandler) SetChat(s live.SessionLookup, r live.ChatReader) {
+	lh.sessions, lh.chatRead = s, r
 }
 
 // NewLiveHandler makes the handler over the board's store and data folder.
@@ -95,12 +112,16 @@ func (lh *LiveHandler) linkActive(id string) bool {
 	if id == "" {
 		return false
 	}
-	for _, a := range lh.activeLinks(context.Background()) {
-		if a == id {
-			return true
+	lh.cacheMu.Lock()
+	defer lh.cacheMu.Unlock()
+	if lh.cacheActive == nil || time.Since(lh.cacheAt) >= linkActiveTTL {
+		set := map[string]bool{}
+		for _, a := range lh.activeLinks(context.Background()) {
+			set[a] = true
 		}
+		lh.cacheActive, lh.cacheAt = set, time.Now()
 	}
-	return false
+	return lh.cacheActive[id]
 }
 
 // Run is the pusher's ticker: about every `every` (a second in production) until ctx ends it applies the clock and pushes. With the gate shut it returns at once and reads and writes nothing.
@@ -146,9 +167,8 @@ func (lh *LiveHandler) manager() (*live.Manager, error) {
 	state := lh.state
 	m, err := live.NewManager(live.Config{
 		Clock: lh.clock, Store: st, Computer: computer, LinkActive: lh.linkActive,
-		Source: func(team string) live.LiveSource { return live.NewBoardSource(lh.h.bs, team, state) },
-		// Chat is the chat slice's: until it lands no agent has it.
-		ChatAvailable: lh.chat,
+		Source:        func(team string) live.LiveSource { return lh.boardSource(team, state) },
+		ChatAvailable: lh.chatAvailable,
 		Redactor:      secrets.HubRedactor(func() bool { return true }),
 	})
 	if err != nil {
@@ -156,6 +176,23 @@ func (lh *LiveHandler) manager() (*live.Manager, error) {
 	}
 	lh.mgr = m
 	return m, nil
+}
+
+// boardSource is the source of one team's facts, with chat wired when the sessions handler gave the way to it.
+func (lh *LiveHandler) boardSource(team string, state func(string) live.AgentState) *live.BoardSource {
+	b := live.NewBoardSource(lh.h.bs, team, state)
+	if lh.sessions != nil && lh.chatRead != nil {
+		b.WithChat(lh.sessions, lh.chatRead)
+	}
+	return b
+}
+
+// chatAvailable: an agent has chat only when its session is known (it has a generation) and chat is tested for its CLI (jsonl.ChatSupported).
+func (lh *LiveHandler) chatAvailable(a live.AgentRow) bool {
+	if lh.chat != nil {
+		return lh.chat(a)
+	}
+	return a.Generation != "" && jsonl.ChatSupported(a.Type)
 }
 
 func liveErr(w http.ResponseWriter, status int, code string) {
@@ -271,7 +308,7 @@ func (lh *LiveHandler) view(ctx context.Context, m *live.Manager, l live.Link) l
 		chatKey = l.Approved.ChatKey
 		v.ExpiresIn, v.DelayS, v.PeriodDays = l.Approved.ExpiresIn, l.Approved.DelayS, l.Approved.PeriodDays
 	}
-	if rows, err := live.NewBoardSource(lh.h.bs, l.Team, lh.state).Agents(ctx); err == nil {
+	if rows, err := lh.boardSource(l.Team, lh.state).Agents(ctx); err == nil {
 		for _, r := range rows {
 			if r.Key == "" || r.Archived {
 				continue

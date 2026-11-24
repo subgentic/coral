@@ -28,6 +28,9 @@ func (s *Server) registerBoard(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/agent-asks/{id}/images", agentAsks.UploadImage)                    // the Operator's picture for the answer, kept as the asking agent's artifact
 	r.With(routes.RefuseSignInLink).Post("/api/notifications", notifHandler.Create) // text people read: no sign-in link (#232, the server side)
 	s.registerBoardAPI(r, boardHandler, h.sess)
+	if s.liveHandler != nil { // Coral Live chat (#21094): how an agent's session is found and its chat read
+		s.liveHandler.SetChat(h.sess.LiveChat())
+	}
 	s.registerOneShotTasks(r)
 }
 

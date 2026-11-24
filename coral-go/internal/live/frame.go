@@ -22,7 +22,7 @@ type Frame struct {
 }
 
 // Agent is one agent the owner chose to show. Role is its only display field (the role name, else "Agent N"); the real name and any owner label are
-// not on the wire in the first proof (coral-hub's strict decode, #270101). Chat is per agent, on the one chosen agent only, and absent in this slice.
+// not on the wire in the first proof (coral-hub's strict decode, #270101). Chat is on the one chosen agent only (at most maxChat messages), and absent otherwise.
 type Agent struct {
 	Role   string `json:"role"`
 	Status string `json:"status"`
@@ -30,7 +30,7 @@ type Agent struct {
 	Chat   []Chat `json:"chat,omitempty"`
 }
 
-// Chat is one chat message of the chosen agent, or {w:true} for a withheld one (a later slice fills it).
+// Chat is one chat message of the chosen agent, or {w:true} for a withheld one. From is "person" (what a person typed to the agent) or "agent" (its reply): a closed pair.
 type Chat struct {
 	From string `json:"from,omitempty"`
 	Text string `json:"text,omitempty"`

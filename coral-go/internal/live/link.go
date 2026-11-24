@@ -372,6 +372,11 @@ func agentKeys(rows []AgentRow) []string {
 	return keys
 }
 
+func withChat(c ViewChoice, key, gen string) ViewChoice {
+	c.ChatKey, c.ChatGen = key, gen
+	return c
+}
+
 func shownSet(keys []string) ViewChoice {
 	c := ViewChoice{Shown: map[string]bool{}}
 	for _, k := range keys {
@@ -396,7 +401,7 @@ func (m *Manager) Preview(ctx context.Context, id string) (Preview, error) {
 		return Preview{}, err
 	}
 	keys := agentKeys(rows)
-	in, err := Gather(ctx, src, shownSet(keys))
+	in, err := Gather(ctx, src, withChat(shownSet(keys), cp.Views.ChatKey, cp.ChatGen))
 	if err != nil {
 		return Preview{}, err
 	}
@@ -690,7 +695,7 @@ func (m *Manager) Frame(ctx context.Context, id string, seq uint64) (Frame, erro
 	if cp.State != StateLive || cp.Approved == nil {
 		return Frame{}, ErrState
 	}
-	in, err := Gather(ctx, m.cfg.Source(cp.Team), shownSet(cp.Approved.AgentKeys))
+	in, err := Gather(ctx, m.cfg.Source(cp.Team), withChat(shownSet(cp.Approved.AgentKeys), cp.Approved.ChatKey, cp.Approved.ChatGen))
 	if err != nil {
 		return Frame{}, err
 	}

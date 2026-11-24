@@ -20,6 +20,7 @@ type AgentFacts struct {
 	Status    Status
 	TaskTitle string
 	Shown     bool
+	Chat      []ChatRow // the chosen agent's newest messages, when it is the one with chat on
 }
 
 // PostFacts is one board post: the author's real name, its text and its time.
@@ -42,6 +43,7 @@ const (
 	windowPosts     = 3
 	minBoundaryName = 4
 	maxPosts        = 50
+	maxChat         = 12 // the chat window: the last 12 messages
 	maxText         = 500
 	maxTask         = 120
 	maxLabel        = 40
@@ -119,7 +121,7 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 		if t, ok := publicText(clean(a.TaskTitle, maxTask), label); ok && scan(red, t) && scan(red, a.TaskTitle) {
 			task = t
 		}
-		f.Agents = append(f.Agents, Agent{Role: roles[i], Status: statusWord(a.Status), Task: task})
+		f.Agents = append(f.Agents, Agent{Role: roles[i], Status: statusWord(a.Status), Task: task, Chat: buildChat(a.Chat, label, red)})
 	}
 	posts := in.Posts
 	if len(posts) > maxPosts {
@@ -141,18 +143,45 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 		}
 		items[i] = Post{From: author, Text: text, At: p.At.Unix()}
 	}
-	// A secret can be cut across posts: neither half is one alone. Scan the joined text of each run of windowPosts neighbouring posts, and treat a run that
-	// holds a hit, with no post in it a hit already, as a hit at every post of the run (the neighbour rule below then withholds around them).
-	for i := 0; i+1 < len(posts); i++ {
-		for size := 2; size <= windowPosts; size++ { // runs of 2 and of 3: a token cut in two ends where the next post begins
+	raws := make([]string, len(posts))
+	for i, p := range posts {
+		raws[i] = p.Text
+	}
+	for i, w := range spreadHits(red, raws, hit) {
+		if w {
+			items[i] = Post{W: true}
+		}
+	}
+	for _, it := range items {
+		if it.W && len(f.Posts) > 0 && f.Posts[len(f.Posts)-1].W {
+			continue // a run of withheld posts is one marker: a count does not leak
+		}
+		f.Posts = append(f.Posts, it)
+	}
+	return f
+}
+
+// spreadHits is the rule both posts and chat messages follow: a secret can be cut across neighbouring items, so the joined text of each run of windowPosts items is scanned too, and a run that holds a hit, with
+// no item in it a hit already, is a hit at every item of the run; then every item within hitNeigh before and after a hit is withheld (design note section 4). hit is changed; the result says which items to withhold.
+// unixOrZero is a time's unix seconds, 0 for a message with no readable time (omitted from the frame).
+func unixOrZero(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.Unix()
+}
+
+func spreadHits(red redact.Redactor, raws []string, hit []bool) []bool {
+	for i := 0; i+1 < len(raws); i++ {
+		for size := 2; size <= windowPosts; size++ { // runs of 2 and of 3: a token cut in two ends where the next item begins
 			end := i + size
-			if end > len(posts) {
+			if end > len(raws) {
 				break
 			}
 			var parts []string
-			explained := false // a post in the run that is a hit on its own already explains a hit of the run
-			for j, p := range posts[i:end] {
-				parts = append(parts, p.Text)
+			explained := false // an item in the run that is a hit on its own already explains a hit of the run
+			for j, r := range raws[i:end] {
+				parts = append(parts, r)
 				explained = explained || hit[i+j]
 			}
 			if explained {
@@ -168,23 +197,63 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 			}
 		}
 	}
+	w := make([]bool, len(raws))
 	for i := range hit {
 		if !hit[i] {
 			continue
 		}
 		for j := i - hitNeigh; j <= i+hitNeigh; j++ {
-			if j >= 0 && j < len(items) {
-				items[j] = Post{W: true}
+			if j >= 0 && j < len(w) {
+				w[j] = true
 			}
 		}
 	}
-	for _, it := range items {
-		if it.W && len(f.Posts) > 0 && f.Posts[len(f.Posts)-1].W {
-			continue // a run of withheld posts is one marker: a count does not leak
-		}
-		f.Posts = append(f.Posts, it)
+	return w
+}
+
+// buildChat makes the chosen agent's chat: the last maxChat messages, each cut at maxText, a real name replaced by its label, scanned whole (cut and uncut), the joined neighbours scanned too, and a hit withholds
+// the messages around it (spreadHits). A message nobody can judge is {w:true}; a run of them is one marker.
+func buildChat(rows []ChatRow, label map[string]string, red redact.Redactor) []Chat {
+	if len(rows) > maxChat {
+		rows = rows[len(rows)-maxChat:]
 	}
-	return f
+	if len(rows) == 0 {
+		return nil
+	}
+	items := make([]Chat, len(rows))
+	hit := make([]bool, len(rows))
+	raws := make([]string, len(rows))
+	for i, r := range rows {
+		raws[i] = r.Text
+		from := "agent"
+		if r.From == "person" {
+			from = "person"
+		}
+		text, ok := publicText(r.Text, label)
+		if !ok || text == "" {
+			items[i] = Chat{W: true}
+			continue
+		}
+		if !scan(red, text) || !scan(red, r.Text) {
+			items[i] = Chat{W: true}
+			hit[i] = true
+			continue
+		}
+		items[i] = Chat{From: from, Text: text, At: unixOrZero(r.At)}
+	}
+	for i, w := range spreadHits(red, raws, hit) {
+		if w {
+			items[i] = Chat{W: true}
+		}
+	}
+	var out []Chat
+	for _, it := range items {
+		if it.W && len(out) > 0 && out[len(out)-1].W {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 // statusWord maps to the four words the public sees; anything else is idle.
