@@ -484,7 +484,7 @@
 #cost-nav-list .session-list-heading:first-child .view-list-title { margin-top: 2px; }
 
 /* The Limit waits card (#21020, the approved stage-1 mock): a heading, a sentence, three counts and the per-agent-and-day table; the Team select sits in the page bar and is for the Overview only. */
-#cost-dashboard-view:not([data-view="overview"]) #cost-team, #cost-dashboard-view:not([data-view="overview"]) #cost-export { display: none; }
+#cost-dashboard-view:not([data-view="overview"]) #cost-export { display: none; } /* the Team select stays on every view: every view follows it (#21111); Export CSV is the Overview's */
 .lw-card { display: grid; gap: 10px; background: var(--card-fill); box-shadow: var(--card-shadow); border: var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad); min-width: 0; }
 .lw-card > * { min-width: 0; }
 .lw-sec { font-weight: var(--fw-title); font-size: var(--fs-lg); color: var(--text-primary); }

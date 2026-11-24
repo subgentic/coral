@@ -12,7 +12,7 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// GET /api/analytics/tasks?range=24h|7d|14d|30d|90d&group_by=agent|team|model|provider[&reviews=1] (#17206, the Operator's "how many tasks is each agent completing"): the tasks completed in a window,
+// GET /api/analytics/tasks?range=24h|7d|14d|30d|90d&group_by=agent|team|model|provider[&reviews=1][&team=<board>] (#17206, the Operator's "how many tasks is each agent completing"): the tasks completed in a window,
 // from every board on this computer, counted like the usage breakdowns: one series per group over daily buckets (hourly for 24h), and a table row per group (completed, failed, median time claimed to done,
 // tokens and cost per task). A task is "completed" when its status is completed (a cancelled one is not), so with reviews=1 the total is the count `coral-board task list` shows for the same window; the
 // default leaves out the reviewers' own tasks ("Review #N"), which are not work on the product. "Failed" is the part of Completed whose outcome is failed. Who did the work, and the time, are the
@@ -91,6 +91,11 @@ func (h *TasksAnalyticsHandler) Tasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reviews := q.Get("reviews") == "1"
+	team := strings.TrimSpace(q.Get("team")) // the cost page's Team select (#21111): that board's tasks only; a board no task names answers empty, never every team
+	if team != "" && !commentBoardRe.MatchString(team) {
+		errBadRequest(w, "team must be a team name")
+		return
+	}
 	now := h.clock()
 	step := 24 * time.Hour
 	bucket := "day"
@@ -172,6 +177,9 @@ func (h *TasksAnalyticsHandler) Tasks(w http.ResponseWriter, r *http.Request) {
 	}
 	groups := map[string]*acc{}
 	for _, t := range tasks {
+		if team != "" && t.Board != team {
+			continue
+		}
 		done, err := time.Parse(time.RFC3339, t.CompletedAt)
 		if err != nil || done.Before(first) || done.After(now.Add(time.Second)) {
 			continue

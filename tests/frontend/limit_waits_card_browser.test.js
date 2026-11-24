@@ -69,10 +69,10 @@ const BODY = () => ({
             await ev(`(() => { const s = document.getElementById('cost-team'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await setRange('week');
         });
-        await run('the card and the Team select belong to the Overview alone', async () => {
+        await run('the card belongs to the Overview alone; the Team select stays, as every view follows it', async () => {
             await ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].find(b => /^Usage/.test(b.textContent.trim())).click(); true`);
             await waitFor(`document.getElementById('cost-dashboard-view').dataset.view === 'usage'`, 'another view', 8000);
-            assert.equal(await ev(`document.getElementById('cost-team').getClientRects().length`), 0, 'the Team select is not on another view');
+            assert.ok(await ev(`document.getElementById('cost-team').getClientRects().length > 0`), 'the Team select stays on another view (#21111): it narrows that view too');
             assert.equal(await ev(`document.getElementById('cost-limit-waits-section').getClientRects().length`), 0, 'nor the card');
             await ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].find(b => /^Overview/.test(b.textContent.trim())).click(); true`);
             await waitFor(`document.getElementById('cost-limit-waits-section').getClientRects().length > 0`, 'back on the Overview', 8000);
