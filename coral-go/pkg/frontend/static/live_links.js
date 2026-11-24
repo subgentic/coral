@@ -27,3 +27,18 @@ export async function localLiveLinks(team, signal) {
     })();
     return pending;
 }
+
+// Display the approved snapshot, never an unconfirmed chat selection.
+export const liveChatRole = link => link?.agents?.find(a => a.chat && a.in_view !== false)?.role || '';
+export function liveRenewalCopy(link) {
+    const role = liveChatRole(link);
+    const remaining = Date.parse(link?.reconfirm_due) - Date.now();
+    const due = remaining <= 0 ? 'now' : role ? `in ${Math.ceil(remaining / 3600000)} hours` : `in ${Math.ceil(remaining / 86400000)} days`;
+    return role ? `Re-confirm due ${due}. One confirmation renews roles, status, task titles, posts and ${role}’s chat together.` : `Re-confirm due ${due}, at the end of this link’s 90-day period. Chat is off. One confirmation renews the whole link.`;
+}
+export function liveRenewalNotice(link) {
+    const role = liveChatRole(link);
+    const remaining = Date.parse(link?.reconfirm_due) - Date.now();
+    const due = remaining <= 0 ? 'now' : role ? `in ${Math.ceil(remaining / 3600000)} hours` : `in ${Math.ceil(remaining / 86400000)} days`;
+    return role ? `Notice: re-confirm this link ${due}. Its seven-day period covers everything it shows. After the due time there is 24 hours of grace, then the entire link pauses.` : `Notice: re-confirm this link ${due}. Its 90-day period covers roster and posts. After the due time there are 14 days of grace, then the entire link pauses.`;
+}

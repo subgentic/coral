@@ -4,7 +4,7 @@ import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 const { answeredLocally } = await importOnce('./owner_refusal.js');
 const { createLiveControlsShell } = await importOnce('./live_controls.js');
-const { localLiveLinks } = await importOnce('./live_links.js');
+const { localLiveLinks, liveChatRole, liveRenewalCopy, liveRenewalNotice } = await importOnce('./live_links.js');
 const { renderLivePreview } = await importOnce('./live_public_preview.js');
 await loadStyles('live_controls.css');
 const API = '/api/live/links';
@@ -85,7 +85,8 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
     function renderControls() {
         const live = link?.state === 'live', stopped = link?.state === 'stopped', paused = link?.state === 'paused';
         const canCreate = !link || stopped;
-        field('state').textContent = link?.state || 'Not created';
+        const due = live && link?.notice_at && Date.now() >= Date.parse(link.notice_at);
+        field('state').textContent = due ? 'Live · re-confirm soon' : link?.state || 'Not created';
         field('state').classList.toggle('coral-live-live', live);
         field('team').disabled = true;
         hub.disabled = !canCreate || busy; if (link && !canCreate) hub.value = link.hub || '';
@@ -110,23 +111,22 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
             label.append(input, words); chatRows.append(label);
         }
         field('needs').hidden = !live;
-        const due = link?.notice_at && Date.now() >= Date.parse(link.notice_at);
         field('needs-title').textContent = due ? 'Re-confirm your live link' : 'Coral Live is on';
-        field('needs-copy').textContent = 'Chat: ' + (link?.agents?.find(a => a.chat && a.in_view !== false)?.role || 'off') + '.';
+        field('needs-copy').textContent = due ? liveRenewalCopy(link) : 'Roles, status, task titles and posts are live. Chat: ' + (liveChatRole(link) || 'off') + '.';
         const facts = link ? [`Created by ${link.created_by || 'you'}`, teamLabel, link.live_since ? `Live since ${date(link.live_since)}` : ''] : [];
         if (Number.isInteger(link?.last_viewed_age_s) && link.last_viewed_age_s >= 0 && link.last_viewed_age_s <= 31 * 86400) {
             facts.push(`Last viewed ${link.last_viewed_age_s < 60 ? 'less than a minute' : Math.floor(link.last_viewed_age_s / 60) + ' minutes'} ago (as the Hub reports)`);
         }
         field('needs-facts').textContent = facts.filter(Boolean).join(' · ');
         field('renew').hidden = !link?.reconfirm_due && !link?.chat_off_why;
-        field('renew').textContent = (link?.chat_off_why ? 'Chat is off. Review the current agent before enabling it again. ' : '') + (link?.reconfirm_due ? `One re-confirm covers everything this link shows. Re-confirm by ${date(link.reconfirm_due)}. After grace, the whole link pauses${link.pause_at ? ' at ' + date(link.pause_at) : ''}.` : '');
+        field('renew').textContent = paused && link?.paused_reason === 'not_reconfirmed' ? 'Re-confirm missed. All public content is paused, even if the Hub cannot be reached. Review the preview and confirm at this computer to resume.' : link?.chat_off_why ? 'Agent session changed. The previous chat permission does not carry over. Select this session and read a new preview.' : due ? liveRenewalNotice(link) : '';
         field('link').hidden = !link;
         field('load-preview').disabled = !link || stopped || busy;
         field('confirm-wrap').hidden = !preview;
         if (!preview && (paused || stopped)) field('public').textContent = paused ? 'Not live right now. This view is paused.' : 'Not live right now. This link has ended.';
         field('confirm').disabled = busy || !preview;
         field('confirm').checked = read;
-        field('confirm-text').textContent = `${selectedKey() ? (selectedRole() + "'s chat includes my typed messages and the agent's replies, shown ") + (edit().delay_s || 30) + ' seconds late. ' : 'Chat is off. '}I read the preview. Anyone with the link can read it. This confirms everything the link shows.`;
+        field('confirm-text').textContent = selectedKey() ? `I read the preview. ${selectedRole()}'s chat includes my typed messages and the agent's replies, shown ${edit().delay_s || 30} seconds late. Anyone with the link can read it. This confirms everything the link shows.` : 'I read the preview. Roles, status, task titles and posts will be public. Chat is off. This confirms everything the link shows.';
         field('actions').replaceChildren();
         if (canCreate) button('Create preview link', () => run(async () => {
             const next = await request('', 'POST', { hub_link: hub.value.trim(), team: teamLabel, via: chosenVia });
@@ -144,7 +144,7 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
                 const mine = revision;
                 const body = action === 'reconfirm' ? {} : action === 'resume' ? { hash: preview.hash } : { hash: preview.hash, read: true };
                 const next = await request(path(action), 'POST', body);
-                if (alive() && mine === revision) { link = next; dirty = false; read = false; renderLivePreview(field('public'), preview.frame, { teamLabel, live: true, delaySeconds: link.delay_s || 30 }); tell('Sharing confirmed at this computer.'); }
+                if (alive() && mine === revision) { link = next; dirty = false; read = false; renderLivePreview(field('public'), preview.frame, { teamLabel, live: true, delaySeconds: link.delay_s || 30 }); tell(''); }
             }), true, busy || !preview || !read);
             if (live) button('Pause', () => run(async () => {
                 invalidate(); const mine = revision;

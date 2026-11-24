@@ -3,7 +3,7 @@
 import { importOnce } from './import_once.js';
 const { answeredLocally } = await importOnce('./owner_refusal.js');
 import { loadStyles } from './lazy_styles.js';
-const { attentionLinks, localLiveLinks, onLiveLinks } = await importOnce('./live_links.js');
+const { attentionLinks, localLiveLinks, onLiveLinks, liveRenewalCopy } = await importOnce('./live_links.js');
 let host = null, team = ''; 
 export const liveAttentionCount = () => attentionLinks().length;
 export function watchLiveAttention(fn) { return onLiveLinks(() => { paint(); fn(); }); }
@@ -33,7 +33,7 @@ function paint() {
         const copy = document.createElement('p');
         copy.textContent = link.state === 'paused' ? 'Re-confirm missed. The whole link is paused. Review and confirm at this computer to resume.' : `${link.team} · Created by ${link.created_by || 'you'}${link.live_since ? ' · Live since ' + new Date(Date.parse(link.live_since)).toLocaleString() : ''}`;
         const chat = document.createElement('p');
-        chat.textContent = 'Chat: ' + (link.agents?.find(a => a.chat && a.in_view !== false)?.role || 'off') + '.';
+        chat.textContent = due && link.state === 'live' ? liveRenewalCopy(link) : 'Chat: ' + (link.agents?.find(a => a.chat && a.in_view !== false)?.role || 'off') + '.';
         const viewed = document.createElement('small');
         if (Number.isInteger(link.last_viewed_age_s) && link.last_viewed_age_s >= 0 && link.last_viewed_age_s <= 31 * 86400) viewed.textContent = `Last viewed ${Math.floor(link.last_viewed_age_s / 60)} minutes ago (as the Hub reports)`;
         const note = document.createElement('p'); note.className = 'coral-live-muted'; note.textContent = 'Stopping ends new sharing. What a viewer already copied cannot be recalled.';

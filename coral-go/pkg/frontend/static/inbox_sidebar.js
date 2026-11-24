@@ -430,7 +430,6 @@ let liveAttention = null;
 if (!isCloud()) importOnce('./live_needs.js').then(m => {
     liveAttention = m;
     m.watchLiveAttention(() => { updateInboxTab(); renderInboxNav(true); });
-    onInboxHooks({ live: m.liveAttentionCount });
     m.refreshLiveAttention();
 }).catch(() => {});
 
@@ -1938,7 +1937,7 @@ function mountInbox() {
     new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; persistNeedsFilters(); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
     $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
     if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
-    onInboxHooks({ extra: HJ.joinCount, goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; liveAttention?.refreshLiveAttention(); renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
+    onInboxHooks({ extra: () => HJ.joinCount() + (liveAttention?.liveAttentionCount() || 0), goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; liveAttention?.refreshLiveAttention(); renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
     saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
     saved.mountInboxSavedBar($('inbox-saved-bar'));
 }

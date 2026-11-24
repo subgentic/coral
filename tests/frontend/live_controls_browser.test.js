@@ -21,7 +21,7 @@ const BASE = require('./test_base').BASE;
     if(p==='/api/live/links'&&method==='POST'){window.__created=true;return reply(window.__link);}
     if(p.endsWith('/views')){window.__link={...window.__link,draft:body,agents:window.__link.agents.map(a=>({...a,draft_chat:a.key===body.chat_key}))};return reply(window.__link)}
     if(p.endsWith('/preview')){const frame={...window.__frame,agents:window.__link.agents.map(a=>({role:a.role,status:a.status,task:a.key==='agent-one'?'Build the public preview':'Review the phone layout',...(a.key===window.__link.draft.chat_key?{chat:window.__frame.agents[0].chat}:{})}))};const value={hash:'current-hash',frame};return window.__holdPreview?new Promise(resolve=>window.__releasePreview=()=>resolve(new Response(JSON.stringify(value)))):reply(value)}
-    if(p.endsWith('/go-live')||p.endsWith('/resume')||p.endsWith('/reconfirm')){if(window.__badHash)return reply({error:'bad_hash'},409);window.__link={...window.__link,...window.__link.draft,agents:window.__link.agents.map(a=>({...a,in_view:true,chat:a.key===window.__link.draft.chat_key})),state:'live',live_since:new Date().toISOString(),notice_at:new Date(Date.now()-3600000).toISOString(),reconfirm_due:new Date(Date.now()+3600000).toISOString(),pause_at:new Date(Date.now()+25*3600000).toISOString()};return reply(window.__link)}
+    if(p.endsWith('/go-live')||p.endsWith('/resume')||p.endsWith('/reconfirm')){if(window.__badHash)return reply({error:'bad_hash'},409);window.__link={...window.__link,...window.__link.draft,agents:window.__link.agents.map(a=>({...a,in_view:true,chat:a.key===window.__link.draft.chat_key})),state:'live',live_since:new Date().toISOString(),notice_at:new Date(Date.now()-3600000).toISOString(),reconfirm_due:new Date(Date.now()+24*3600000).toISOString(),pause_at:new Date(Date.now()+48*3600000).toISOString()};return reply(window.__link)}
     if(p.endsWith('/pause')||p.endsWith('/stop')){window.__link={...window.__link,state:p.endsWith('/stop')?'stopped':'paused'};return reply(window.__link)}
     throw Error('unexpected live route '+p);
    };return true;
@@ -68,7 +68,12 @@ const BASE = require('./test_base').BASE;
   assert.equal(await ev(`${q('needs')}.hidden`),false,'live notice cannot be dismissed');
   assert.equal(await ev(`${q('needs-title')}.textContent`),'Re-confirm your live link','RFC3339 notice_at drives the due notice');
   assert.equal(await ev(`${q('needs-facts')}.textContent.includes('Invalid Date')`),false);
-  assert.equal(await ev(`${q('renew')}.textContent.includes(new Date(window.__link.reconfirm_due).toLocaleString())`),true,'RFC3339 deadline is displayed');
+  const renewal = 'Re-confirm due in 24 hours. One confirmation renews roles, status, task titles, posts and Frontend Dev’s chat together.';
+  assert.equal(await ev(`${q('needs-copy')}.textContent`),renewal);
+  assert.equal(await ev(`${q('state')}.textContent`),'Live · re-confirm soon');
+  assert.equal(await ev(`${q('renew')}.textContent`),'Notice: re-confirm this link in 24 hours. Its seven-day period covers everything it shows. After the due time there is 24 hours of grace, then the entire link pauses.');
+  assert.equal(await ev(`${q('confirm-text')}.textContent`),"I read the preview. Frontend Dev's chat includes my typed messages and the agent's replies, shown 30 seconds late. Anyone with the link can read it. This confirms everything the link shows.");
+  assert.equal(await ev(`${q('status-line')}.textContent`),'');
   assert.equal(await ev(`${q('needs-facts')}.textContent.includes('viewers')`),false);
   assert.equal(await ev(`${q('link')}.textContent`),'The link is on the Hub page.');
   await click(`${q('actions')}.querySelectorAll('button')[1]`);await settled();
@@ -90,10 +95,10 @@ const BASE = require('./test_base').BASE;
   assert.equal(await ev(`document.querySelector('#live-inbox').textContent.includes('Dismiss')`),false);
   assert.equal(await ev(`window.__liveNeeds.liveAttentionCount()`),1);
   await click(`document.querySelector('[data-agent-key="agent-two"]')`);await settled();
-  assert.equal(await ev(`document.querySelector('#live-inbox').textContent.includes('Chat: Frontend Dev.')`),true,'draft edit cannot misstate the approved live chat');
+  assert.equal(await ev(`document.querySelector('#live-inbox').textContent.includes('posts and Frontend Dev’s chat together.')`),true,'draft edit cannot misstate the approved live chat');
   await ev(`window.__liveUI.destroy();window.__liveUI=window.__liveModule.mountLiveControls(document.querySelector('#live-proof'),{team:'test-team',teamLabel:'test-team',links:[window.__link]});true`);
   assert.equal(await ev(`document.querySelector('[data-agent-key="agent-two"]').checked`),true,'reload edits the saved draft');
-  assert.equal(await ev(`${q('needs-copy')}.textContent`),'Chat: Frontend Dev.','reload keeps the approved live display');
+  assert.equal(await ev(`${q('needs-copy')}.textContent`),renewal,'reload keeps the approved live display');
   assert.equal(await ev(`${q('actions')}.querySelector('button').textContent`),'Go live','saved draft requires a fresh go-live');
   await ev(`window.__holdPreview=true;true`);await click(q('load-preview'));await waitFor('!!window.__releasePreview','held preview');
   await click(`document.querySelector('[data-stop]')`);await waitFor(`${q('state')}.textContent==='stopped'`,'Stop ends link');
