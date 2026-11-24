@@ -34,9 +34,9 @@ const BASE = require('./test_base').BASE;
     const rowTexts = () => ev(`Array.from(document.querySelectorAll('#ar-host .agent-rem-list .chief-check-card')).map(li => li.textContent)`);
     const say = () => ev(`document.querySelector('#ar-host .agent-rem-say')?.textContent || ''`);
     const formSay = () => ev(`document.querySelector('dialog.chief-check-editor .chief-check-error')?.textContent || ''`);
-    const fill = (text, kind, when, every) => ev(`(() => { if (!document.querySelector('dialog.chief-check-editor')) document.querySelector('#ar-host .agent-rem-new').click(); const f = document.querySelector('dialog.chief-check-editor form'); const set = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const fill = (text, kind, when, every, day) => ev(`(() => { if (!document.querySelector('dialog.chief-check-editor')) document.querySelector('#ar-host .agent-rem-new').click(); const f = document.querySelector('dialog.chief-check-editor form'); const set = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
         set(f.querySelector('textarea'), ${JSON.stringify(text)}); const sel = f.querySelectorAll('select'); set(sel[0], ${JSON.stringify(kind)});
-        if (${JSON.stringify(when)}) set(f.querySelector('input[type=datetime-local],input[type=time]'), ${JSON.stringify(when)}); if (${JSON.stringify(every)}) set(sel[1], ${JSON.stringify(every)}); return true; })()`);
+        if (${JSON.stringify(when)}) set(f.querySelector('input[type=datetime-local],input[type=time]'), ${JSON.stringify(when)}); if (${JSON.stringify(every)}) set(sel[1], ${JSON.stringify(every)}); if (${JSON.stringify(day)}) set(sel[2], ${JSON.stringify(day)}); return true; })()`);
     const submit = async () => { await ev(`document.querySelector('dialog.chief-check-editor form button[type=submit]').click(); true`); await settle(300); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -67,6 +67,16 @@ const BASE = require('./test_base').BASE;
             await submit();
             p = await ev(`window.__rem.posts`);
             check(`${theme}: Monday to Friday sends the time only`, p[2].kind === 'weekdays' && p[2].at === '08:15', JSON.stringify(p[2]));
+
+            await fill('Catch up', 'weekly', '07:30', '', 'Wed');
+            check(`${theme}: Weekly shows a day next to the time, and no other kind does`, (await ev(`!document.querySelector('dialog.chief-check-editor select:nth-of-type(1)') ? false : [...document.querySelectorAll('dialog.chief-check-editor label')].find(l => l.firstChild.textContent === 'Day').hidden === false`)));
+            await submit();
+            p = await ev(`window.__rem.posts`);
+            check(`${theme}: a weekly reminder sends the day and the time together`, p[3].kind === 'weekly' && p[3].at === 'Wed 07:30', JSON.stringify(p[3]));
+            await fill('Tidy', 'daily', '07:00');
+            check(`${theme}: the day is hidden again for Daily`, await ev(`[...document.querySelectorAll('dialog.chief-check-editor label')].find(l => l.firstChild.textContent === 'Day').hidden`));
+            await ev(`[...document.querySelectorAll('dialog.chief-check-editor button')].find(b => b.textContent === 'Cancel').click(); true`); await settle(100);
+            await ev(`[...document.querySelectorAll('dialog.chief-check-editor button')].find(b => b.textContent === 'Discard changes').click(); true`); await settle(200);
 
             await ev(`window.__rem.addStatus = 400; true`);
             await fill('Too late', 'daily', '07:00');

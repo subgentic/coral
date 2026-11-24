@@ -41,8 +41,17 @@ func nextFire(c store.ChiefCheck, now time.Time) time.Time {
 		}
 		m := time.Duration(c.EveryMinutes) * time.Minute
 		return now.Truncate(m).Add(m)
-	case "daily", "weekdays":
-		clock, err := time.Parse("15:04", c.At)
+	case "daily", "weekdays", "weekly":
+		at, wd := c.At, -1
+		if c.ScheduleKind == "weekly" {
+			name, rest, _ := strings.Cut(c.At, " ")
+			n, ok := store.WeekdayNumber(name)
+			if !ok {
+				return time.Time{}
+			}
+			at, wd = rest, n
+		}
+		clock, err := time.Parse("15:04", at)
 		if err != nil {
 			return time.Time{}
 		}
@@ -50,6 +59,9 @@ func nextFire(c store.ChiefCheck, now time.Time) time.Time {
 		for d := 0; d < 8; d++ {
 			day := local.AddDate(0, 0, d)
 			if c.ScheduleKind == "weekdays" && (day.Weekday() == time.Saturday || day.Weekday() == time.Sunday) {
+				continue
+			}
+			if wd >= 0 && int(day.Weekday()) != wd {
 				continue
 			}
 			t := time.Date(day.Year(), day.Month(), day.Day(), clock.Hour(), clock.Minute(), 0, 0, loc)

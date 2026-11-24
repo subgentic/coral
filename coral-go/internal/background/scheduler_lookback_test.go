@@ -18,12 +18,18 @@ import (
 // earlier run. fired reports whether evaluateJob started a run.
 func evaluateAt(t *testing.T, updated time.Time, lastRun *time.Time, now time.Time) (fired bool) {
 	t.Helper()
+	return weeklyEvaluateAt(t, "0 9 * * *", updated, lastRun, now)
+}
+
+// weeklyEvaluateAt is evaluateAt for any cron line.
+func weeklyEvaluateAt(t *testing.T, cronExpr string, updated time.Time, lastRun *time.Time, now time.Time) (fired bool) {
+	t.Helper()
 	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "sessions.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	ctx := context.Background()
 	ss := store.NewScheduleStore(db)
-	job, err := ss.CreateScheduledJob(ctx, &store.ScheduledJob{Name: "daily", CronExpr: "0 9 * * *", Timezone: "UTC", RepoPath: "/tmp", Prompt: "p", Enabled: 1})
+	job, err := ss.CreateScheduledJob(ctx, &store.ScheduledJob{Name: "daily", CronExpr: cronExpr, Timezone: "UTC", RepoPath: "/tmp", Prompt: "p", Enabled: 1})
 	require.NoError(t, err)
 	stamp := updated.UTC().Format(store.ISOFormat)
 	_, err = db.ExecContext(ctx, `UPDATE scheduled_jobs SET created_at = ?, updated_at = ? WHERE id = ?`, stamp, stamp, job.ID)

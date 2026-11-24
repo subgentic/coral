@@ -16,34 +16,34 @@ import (
 func TestBuildReminderFromTheOptions(t *testing.T) {
 	now := time.Date(2026, 11, 17, 9, 0, 0, 0, time.UTC)
 
-	body, said, err := buildReminder("Check CI", "2h", "", "", "", "", "", now)
+	body, said, err := buildReminder("Check CI", "2h", "", "", "", "", "", "", now)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"text": "Check CI", "kind": "once", "timezone": "UTC", "at": "2026-11-17T11:00"}, body, "a time from now is one UTC minute, so no zone is needed")
 	assert.Contains(t, said, "once, at ")
 
-	body, _, err = buildReminder("Poll", "", "", "15m", "", "", "", now)
+	body, _, err = buildReminder("Poll", "", "", "15m", "", "", "", "", now)
 	require.NoError(t, err)
 	assert.Equal(t, "every", body["kind"])
 	assert.Equal(t, 15, body["every_minutes"])
 
-	body, said, err = buildReminder("Standup", "", "", "", "", "09:30", "Europe/Berlin", now)
+	body, said, err = buildReminder("Standup", "", "", "", "", "09:30", "", "Europe/Berlin", now)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"text": "Standup", "kind": "weekdays", "at": "09:30", "timezone": "Europe/Berlin"}, body)
 	assert.Contains(t, said, "Monday to Friday at 09:30 (Europe/Berlin)")
 
-	body, _, err = buildReminder("Daily", "", "", "", "08:00", "", "UTC", now)
+	body, _, err = buildReminder("Daily", "", "", "", "08:00", "", "", "UTC", now)
 	require.NoError(t, err)
 	assert.Equal(t, "daily", body["kind"])
 
-	_, _, err = buildReminder("", "2h", "", "", "", "", "", now)
+	_, _, err = buildReminder("", "2h", "", "", "", "", "", "", now)
 	assert.Error(t, err, "no text")
-	_, _, err = buildReminder("x", "", "", "", "", "", "", now)
+	_, _, err = buildReminder("x", "", "", "", "", "", "", "", now)
 	assert.Error(t, err, "no time")
-	_, _, err = buildReminder("x", "2h", "", "15m", "", "", "", now)
+	_, _, err = buildReminder("x", "2h", "", "15m", "", "", "", "", now)
 	assert.Error(t, err, "two times")
-	_, _, err = buildReminder("x", "soon", "", "", "", "", "", now)
+	_, _, err = buildReminder("x", "soon", "", "", "", "", "", "", now)
 	assert.Error(t, err, "not a time")
-	_, _, err = buildReminder("x", "", "", "7s", "", "", "", now)
+	_, _, err = buildReminder("x", "", "", "7s", "", "", "", "", now)
 	assert.Error(t, err, "not whole minutes")
 }
 
@@ -89,4 +89,15 @@ func TestReminderLineNamesWhoItIsForAndHowItRepeats(t *testing.T) {
 	assert.Equal(t, "#7 [open] every 15 min, for Dev, set by agent: Check CI", line)
 	line = reminderLine(map[string]any{"id": 8.0, "state": "none", "schedule_kind": "once", "at": "2026-11-17T11:00", "timezone": "UTC", "target_name": "Helper", "origin": "orchestrator", "name": "Review", "enabled": false})
 	assert.Equal(t, "#8 [off] once 2026-11-17T11:00 UTC, for Helper, set by orchestrator: Review", line)
+}
+
+// A weekly reminder (#21085): one day of the week and a time, in the given time zone.
+func TestBuildReminderWeekly(t *testing.T) {
+	now := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+	body, said, err := buildReminder("Catch-up", "", "", "", "", "", "Mon 09:00", "Europe/Berlin", now)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"text": "Catch-up", "kind": "weekly", "at": "Mon 09:00", "timezone": "Europe/Berlin"}, body)
+	assert.Contains(t, said, "Mon 09:00")
+	_, _, err = buildReminder("x", "", "", "", "08:00", "", "Mon 09:00", "UTC", now)
+	require.Error(t, err, "one schedule only")
 }
