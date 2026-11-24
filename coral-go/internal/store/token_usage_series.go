@@ -124,7 +124,10 @@ func (s *TokenUsageStore) GetUsageTimeSeriesBoard(ctx context.Context, since str
 
 // TimeSeriesQuery is what a usage time series reads: the rows recorded from Since (inclusive) to Until (exclusive), either may be empty; Interval 5m, 1h or 1d (1h
 // otherwise); Board "" for every board; GroupBy "" for the one total series, or team, agent, provider or model for a series each.
-type TimeSeriesQuery struct{ Since, Until, Interval, Board, GroupBy string }
+type TimeSeriesQuery struct {
+	Since, Until, Interval, Board, GroupBy string
+	Team                                   *string // the page's Team select (#21037): the board a row names, else its session's; a team no row names gives no rows. Board is the older, exact-column filter
+}
 
 // TimeSeriesSeries is one group's usage in one bucket.
 type TimeSeriesSeries struct {
@@ -196,6 +199,10 @@ func (s *TokenUsageStore) GetUsageTimeSeriesGrouped(ctx context.Context, q TimeS
 	if q.Board != "" {
 		query += ` AND u.board_name = ?`
 		args = append(args, q.Board)
+	}
+	if q.Team != nil {
+		query += usageBoardClause("u.")
+		args = append(args, *q.Team)
 	}
 	if q.Until != "" {
 		query += ` AND u.recorded_at < ?`

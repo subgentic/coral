@@ -238,7 +238,7 @@ export async function showCostDashboard() {
     showView('cost-dashboard-view');
     showViews();
     const exp = document.getElementById('cost-export');
-    if (exp && !exp.dataset.bound) { exp.dataset.bound = '1'; exp.addEventListener('click', _openCostExport); } // the Export CSV control (#21021): bound here, so the start path carries nothing for it
+    if (exp && !exp.dataset.bound) { exp.dataset.bound = '1'; exp.addEventListener('click', _openCostExport); document.getElementById('cost-team')?.addEventListener('change', () => _refreshCostDashboard(true)); } // the Team select re-reads the whole page (#21037) // the Export CSV control (#21021): bound here, so the start path carries nothing for it
     await _refreshCostDashboard();
     stopCostDashboard(); // clear any existing timer
     _costRefreshTimer = pollEvery(_refreshCostDashboard, 15000);
@@ -327,7 +327,7 @@ async function _refreshCalendarCost() {
     const { calendarSince } = await importOnce('./cost_data.js');
     const since = calendarSince(Date.now());
     try {
-        const [day, month] = await Promise.all([since.today, since.month].map(s => readNow(`/api/token-usage/summary?since=${encodeURIComponent(s)}`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))));
+        const [day, month] = await Promise.all([since.today, since.month].map(s => _readTeam(`/api/token-usage/summary?since=${encodeURIComponent(s)}`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))));
         const cost = d => formatCost((d && d.totals && d.totals.cost_usd) || 0, { zeroAsTwo: true });
         el.replaceChildren(...(day && month ? [`Today ${cost(day)}`, `This month ${cost(month)}`] : []).map(t => Object.assign(document.createElement('span'), { textContent: t })));
     } catch { el.replaceChildren(); }
@@ -344,8 +344,8 @@ export async function _recheckTotals(view) {
         await _refreshDone;
         const { costRange, providerRows, modelRows, agentRows } = await importOnce('./cost_data.js');
         const { sinceParam } = costRange(_period(), Date.now());
-        const r = await readNow(`/api/token-usage/${view === 'team' ? 'by-team' : 'summary'}${sinceParam}`, { cache: 'no-store' }), d = r.ok ? await r.json() : null;
-        if (d && view === 'team') _renderTeamTable(d.teams || []);
+        const r = await _readTeam(`/api/token-usage/${view === 'team' ? 'by-team' : 'summary'}${sinceParam}`, { cache: 'no-store' }), d = r.ok ? await r.json() : null;
+        if (d && view === 'team') _renderTeamTable(_teamRows(d.teams));
         else if (d && view === 'provider') _renderProviderTable(providerRows(d.by_agent_type));
         else if (d && view === 'model') _renderModelTable(modelRows(d.by_model));
         else if (d) _renderAgentTable(agentRows(d.by_agent, state.liveSessions));
@@ -395,17 +395,17 @@ async function _readCostDashboard({ force = false } = {}) {
     _refreshCallMetrics(period, hoursAgo); // the calls view follows the range too, with the page's own refresh (#7719)
     syncEfficiency(period); // Tokens per commit and Task time: the comparison on Coral Hub's page too (coral-hub #261001)
     importOnce('./analytics_limit_waits.js').then(m => m.showLimitWaits(document.getElementById('cost-limit-waits'), period)).catch(e => console.error('[cost-dashboard] limit waits:', e)); // the Limit waits card (#21020)
-    importOnce('./analytics_servers.js').then(m => m.showByComputer(document.getElementById('cost-by-computer'), sinceParam, period)).catch(e => console.error('[cost-dashboard] by computer:', e)); // this computer and each linked one (#16017): its own read, its own errors
+    importOnce('./analytics_servers.js').then(m => m.showByComputer(document.getElementById('cost-by-computer'), sinceParam + (_team() ? `${sinceParam ? '&' : '?'}team=${encodeURIComponent(_team())}` : ''), period)).catch(e => console.error('[cost-dashboard] by computer:', e)); // this computer and each linked one (#16017): its own read, its own errors
     if (!isCloud()) showSpend(document.getElementById('cost-spend'), period, document.getElementById('cost-task-time'), force); // tokens per commit and task time, one team (#7526, #7530): its own read, its own errors; Coral Hub's page has the comparison only (the spend route is not the Hub's)
 
     const readServer = machineNow();
     try {
         const [summaryResp, taskResp, tsResp, teamResp, branchResp] = await Promise.all([
-            readNow(`/api/token-usage/summary${sinceParam}`).catch(() => null),
+            _readTeam(`/api/token-usage/summary${sinceParam}`).catch(() => null),
             readCostTasks({full: force}).catch(() => null), // all projected pages, including zero-cost tasks (#17251)
-            readNow(`/api/token-usage/timeseries${tsParams}`).catch(() => null),
-            readNow(`/api/token-usage/by-team${sinceParam}`).catch(() => null),
-            readNow(`/api/token-usage/by-branch${sinceParam}`).catch(() => null),
+            _readTeam(`/api/token-usage/timeseries${tsParams}`).catch(() => null),
+            _readTeam(`/api/token-usage/by-team${sinceParam}`).catch(() => null),
+            _readTeam(`/api/token-usage/by-branch${sinceParam}`).catch(() => null),
         ]);
 
         if (isCloud()) { const grantee = !!summaryResp && summaryResp.status === 403; _ownerOnly(grantee); if (grantee) return; }
@@ -459,7 +459,8 @@ async function _readCostDashboard({ force = false } = {}) {
         if (teamResp && teamResp.ok) {
             const data = await teamResp.json();
             noteBoardLabels(data.teams, 'board_name'); // the team's current name from the answer itself: a board this page has not met by another route shows its name, not its id (#10936)
-            _renderTeamTable(data.teams || []);
+            _renderTeamTable(_teamRows(data.teams));
+            importOnce('./analytics_limit_waits.js').then(m => m.addTeams((data.teams || []).map(r => r.board_name))).catch(() => {}); // the Team select lists every team with spend, not only those with a limit wait
         }
 
         // Render branch breakdown
@@ -542,7 +543,7 @@ async function _refreshSeries(view = _currentView()) {
     const untilMs = Date.now(), sinceMs = untilMs - _periodHours() * 3600000, interval = _periodInterval();
     const readServer = machineNow();
     try {
-        const resp = await readNow(`/api/token-usage/timeseries?since=${encodeURIComponent(new Date(sinceMs).toISOString())}&interval=${interval}&group_by=${v.group}`, { cache: 'no-store' });
+        const resp = await _readTeam(`/api/token-usage/timeseries?since=${encodeURIComponent(new Date(sinceMs).toISOString())}&interval=${interval}&group_by=${v.group}`, { cache: 'no-store' });
         if (!resp.ok) throw await responseUpdateError(resp, readServer) || new Error('unavailable');
         if (readServer !== machineNow()) return;
         const data = await resp.json();
@@ -596,7 +597,7 @@ async function _refreshOverview() {
     if (!host) return;
     const hours = _periodHours(), untilMs = Date.now(), sinceMs = untilMs - hours * 3600000, interval = _periodInterval(), iso = ms => encodeURIComponent(new Date(ms).toISOString());
     const readServer = machineNow();
-    const read = async url => { const resp = await readNow(url, { cache: 'no-store' }); if (!resp.ok) throw await responseUpdateError(resp, readServer) || new Error('unavailable'); return (await resp.json()).buckets || []; };
+    const read = async url => { const resp = await _readTeam(url, { cache: 'no-store' }); if (!resp.ok) throw await responseUpdateError(resp, readServer) || new Error('unavailable'); return (await resp.json()).buckets || []; };
     try {
         const [now, byTeam, prior] = await Promise.all([
             read(`/api/token-usage/timeseries?since=${iso(sinceMs)}&interval=1d`),
@@ -739,7 +740,12 @@ function _showCostTaskDetail(taskId) {
 }
 
 /** Tasks claimed or finished in this range; unstamped tasks remain visible. Every projected cursor page is read. */
-const _tasksInRange = tasks => tasks.filter(t => !t.untasked && (!_costSince || !(t.completed_at || t.claimed_at) || Date.parse(t.completed_at || t.claimed_at) >= _costSince));
+/** The page bar's Team select (#21037): "" is every team. The token-usage reads carry it as team=<board> (a team no row names answers empty, never everything); By team keeps its own read and shows the team's row. */
+const _team = () => document.getElementById('cost-team')?.value || '';
+const _withTeam = url => { const t = _team(); return t && !url.includes('/by-team') ? `${url}${url.includes('?') ? '&' : '?'}team=${encodeURIComponent(t)}` : url; };
+const _readTeam = (url, opts) => readNow(_withTeam(url), opts);
+const _teamRows = rows => (_team() ? (rows || []).filter(r => r.board_name === _team()) : rows || []);
+const _tasksInRange = tasks => tasks.filter(t => !t.untasked && (!_team() || (t.board_id || '') === _team()) && (!_costSince || !(t.completed_at || t.claimed_at) || Date.parse(t.completed_at || t.claimed_at) >= _costSince));
 
 /** The cost no task carries (an agent between tasks, chats, the Operator's own sessions): the page's total less what the tasks add up to, as a row of its own so the table's rows agree with Total cost (walk 80). */
 function _untaskedRow(costTasks) {
@@ -805,12 +811,12 @@ function _renderGoalTable(tasks) {
     ], rows, 'No goal costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: g => g.id, rowName: g => g.title || '' });
 }
 
-/** Export CSV (#21021): the chooser; the file is built from the rows the By task and By goal tables draw now, for the page's range and the Team select (a team's tasks: the cost no task carries is not split by team). */
+/** Export CSV (#21021): the chooser; the file is built from the rows the By task and By goal tables draw now, for the page's range and the Team select (a team's tasks, with the cost no task carries of that team's own total). */
 export async function _openCostExport() {
     const { openExportDialog, taskCsv, goalCsv } = await importOnce('./cost_export.js');
     const team = document.getElementById('cost-team')?.value || '';
     const model = by => {
-        const costTasks = _tasksInRange(_rawData.task || []).filter(t => !team || (t.board_id || '') === team), rest = team ? null : _untaskedRow(costTasks);
+        const costTasks = _tasksInRange(_rawData.task || []), rest = _untaskedRow(costTasks);
         return { csv: by === 'goal' ? goalCsv(_goalRows(costTasks, rest)) : taskCsv(costTasks, rest) };
     };
     openExportDialog({ period: _period(), team, model });
