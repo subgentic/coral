@@ -5,7 +5,7 @@
 .team-tile[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .team-tile .nm { font-weight: var(--fw-strong); font-size: var(--fs-xl); }
 .team-tile .d { font-size: var(--fs-lg); line-height: var(--lh-ui); }
-.team-tile .d span, .team-tile .d i { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.team-tile .d span, .team-tile .d i { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
 .team-tile .d i { font-style: normal; color: var(--text-secondary); }
 .team-tile .m { font-size: var(--fs-base); color: var(--text-secondary); }
 @media (max-width: 760px) { .team-template-tiles { grid-template-columns: 1fr; } }

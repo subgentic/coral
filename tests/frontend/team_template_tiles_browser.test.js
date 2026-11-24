@@ -33,7 +33,7 @@ const WANT = [
             await t.type('input', N.teamName, 'alpha'); await t.type('input', N.folder, '/work/payments-app');
             await t.click('button', N.next); await t.step(2); await settle(500);
             const read = () => ev(`(() => { const tiles = [...document.querySelectorAll('#team-template-tiles .team-tile')], sel = document.getElementById('team-template-select');
-                return { tiles: tiles.map(b => { const r = b.getBoundingClientRect(), d = b.querySelector('.d'); return { name: b.querySelector('.nm')?.textContent, does: d && d.firstChild?.textContent, you: d?.querySelector('i')?.textContent, roles: b.querySelector('.m')?.textContent, pressed: b.getAttribute('aria-pressed'), l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, clipped: d ? d.scrollHeight > d.clientHeight + 1 : null, shown: b.offsetParent !== null && r.width > 100 && r.height > 40 }; }),
+                return { tiles: tiles.map(b => { const r = b.getBoundingClientRect(), d = b.querySelector('.d'); return { name: b.querySelector('.nm')?.textContent, does: d && d.firstChild?.textContent, you: d?.querySelector('i')?.textContent, roles: b.querySelector('.m')?.textContent, pressed: b.getAttribute('aria-pressed'), l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, clipped: d ? [...d.querySelectorAll('span, i')].some(e => e.scrollHeight > e.clientHeight + 1) : null, shown: b.offsetParent !== null && r.width > 100 && r.height > 40 }; }),
                     sel: sel.value, members: document.querySelectorAll('#team-agents-list .team-agent-row').length, vw: innerWidth }; })()`);
             const a = await read();
             if (a.tiles.length !== WANT.length) { problems.push(`${label}: ${a.tiles.length} tiles, want the ${WANT.length} built-in templates: ${WANT.map(w => w[0]).join(', ')}`); continue; }
@@ -63,16 +63,16 @@ const WANT = [
             await ev(`(() => { const s = document.getElementById('team-template-select'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(400);
             const d = await read();
             if (d.tiles.some(x => x.pressed !== 'false')) problems.push(`${label}: Blank team leaves a tile pressed`);
-            // longer text (a new or saved template) is cut at two lines with an ellipsis, the full text in the title (mock section 4)
+            // longer text (a new or saved template) is cut at four lines with an ellipsis, the full text in the title (mock section 4)
             const LONG = 'A much longer description that keeps going well past two lines so the tile has to cut it with an ellipsis instead of growing: ' + 'more words '.repeat(12);
             await ev(`import('/static/team_templates_ui.js').then(m => { m.BUILTIN_TEAM_TEMPLATES[0].does = ${JSON.stringify(LONG)}; m.BUILTIN_TEAM_TEMPLATES[0].you = ${JSON.stringify(LONG + ' You.')}; m._renderTeamTemplateSelector(); window.__longDone = true; })`);
             await waitFor(`window.__longDone === true && document.querySelector('#team-template-tiles .team-tile .d span')?.title === ${JSON.stringify(LONG)}`);
             const lg = await ev(`(() => { const d = document.querySelector('#team-template-tiles .team-tile .d'), q = d.querySelector('span'), i = d.querySelector('i'), lh = parseFloat(getComputedStyle(q).lineHeight);
                 return { lines: [q.getBoundingClientRect().height / lh, i.getBoundingClientRect().height / lh], full: [q.scrollHeight > q.clientHeight + 1, i.scrollHeight > i.clientHeight + 1], titles: [q.title, i.title], ell: [getComputedStyle(q).webkitLineClamp, getComputedStyle(i).webkitLineClamp] }; })()`);
-            if (lg.lines.some(n => n > 2.05)) problems.push(`${label}: long text is ${lg.lines} lines tall, want at most 2 each`);
+            if (lg.lines.some(n => n > 4.05)) problems.push(`${label}: long text is ${lg.lines} lines tall, want at most 4 each`);
             if (!lg.full.every(Boolean)) problems.push(`${label}: the long fixture was not cut (${lg.full})`);
             if (lg.titles[0] !== LONG || lg.titles[1] !== LONG + ' You.') problems.push(`${label}: the title does not keep the full text`);
-            if (lg.ell.some(x => x !== '2')) problems.push(`${label}: no two-line clamp ${lg.ell}`);
+            if (lg.ell.some(x => x !== '4')) problems.push(`${label}: no two-line clamp ${lg.ell}`);
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'New team template tiles:\n  ' + problems.join('\n  '));
