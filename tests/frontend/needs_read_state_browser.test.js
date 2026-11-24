@@ -1,5 +1,6 @@
-// Needs you reads like a mailbox (#11668, the operator's Gmail shot): the "read" pill is gone; an unread review row's name is bold on a lighter row, a read row is regular weight with muted text on the plain table; a screen
-// reader still hears "unread" or "read" in the row; the muted text keeps 4.5:1 on its row. Dark and light themes, and the automatic (OS) mode with no data-theme set by the test (the app resolves it), 1440 and 390. Review rows (two unread, two read) stubbed in the page. Drives Chrome over CDP through agent_view_harness.js.
+// #21161: both read and unread card titles lead; the rail, background and accessible marker retain read state.
+// File glyphs keep their non-status blue palette and at least 4.5:1 contrast in both states.
+// Dark, light and automatic (OS) themes; 1280 and 390 px; two read and two unread review cards.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
@@ -15,7 +16,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-theme', 'system');` }); // the theme the person picked is System: the page resolves it from the OS (theme_init.js)
-        for (const [w, h, mobile, os] of [[1440, 800, false, 'dark'], [1440, 800, false, 'light'], [390, 800, true, 'dark'], [390, 800, true, 'light']]) { // os: the system's colour scheme, which an automatic theme follows
+        for (const [w, h, mobile, os] of [[1280, 900, false, 'dark'], [1280, 900, false, 'light'], [390, 800, true, 'dark'], [390, 800, true, 'light']]) { // os: the system's colour scheme, which an automatic theme follows
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: os }] });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
@@ -41,13 +42,17 @@ const { removeBoards } = require('./helpers/board_cleanup');
                     const lum = c => { const [r, g, b] = rgba(c).slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
                     const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
                     const info = n => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('plan-' + n + '.md')), name = tr.querySelector('.inbox-review-name'), td = name.closest('td'), cs = getComputedStyle(name), tcs = getComputedStyle(td);
-                        return { weight: Number(cs.fontWeight), bg: plain(name), bgLum: lum(plain(name)), color: cs.color, contrast: contrast(cs.color, plain(name)), text: (tr.querySelector('.inbox-review-item .sr-only') || {}).textContent || '', pill: [...tr.querySelectorAll('.dt-tag')].some(t => t.textContent.trim() === 'read'), cls: tr.className }; };
+                        const meta = getComputedStyle(tr.querySelector('.inbox-meta')), icon = tr.querySelector('.inbox-kind-icon'), ics = getComputedStyle(icon);
+                        return { bgRgb: rgba(plain(name)), metaColor: meta.color, metaWeight: Number(meta.fontWeight), iconColor: ics.color, iconBg: ics.backgroundColor, iconContrast: contrast(ics.color, ics.backgroundColor), rail: getComputedStyle(tr).boxShadow, weight: Number(cs.fontWeight), bg: plain(name), bgLum: lum(plain(name)), color: cs.color, contrast: contrast(cs.color, plain(name)), text: (tr.querySelector('.inbox-review-item .sr-only') || {}).textContent || '', pill: [...tr.querySelectorAll('.dt-tag')].some(t => t.textContent.trim() === 'read'), cls: tr.className }; };
                     return { unread: info(1), read: info(2) }; })()`);
                 await shot(`needs-read-state-${w}-${theme}${theme === 'auto' ? '-os-' + os : ''}`);
                 check(!m.read.pill && !m.unread.pill, at + 'there is no "read" pill');
-                check(m.unread.weight >= 600 && m.read.weight <= 500, at + `an unread name is bold and a read one regular: ${m.unread.weight} / ${m.read.weight}`);
-                check(m.unread.bgLum > m.read.bgLum, at + `an unread row is lighter than a read one: ${m.unread.bg} / ${m.read.bg}`);
-                check(m.read.color !== m.unread.color, at + `a read row's text is muted: ${m.read.color} / ${m.unread.color}`);
+                check(m.unread.weight >= 600 && m.read.weight >= 600, at + `both unread and read titles stay prominent (#21161): ${m.unread.weight} / ${m.read.weight}`);
+                check(m.unread.bg !== m.read.bg && m.unread.bgRgb[2] - m.unread.bgRgb[0] > 10 && /4px/.test(m.unread.rail), at + `unread cards keep their stronger tinted background and 4px rail (#21161 Operator correction): ${m.unread.bg} / ${m.read.bg}, ${m.unread.rail}`);
+                check(m.read.color === m.unread.color && m.read.color !== m.read.metaColor && m.read.weight > m.read.metaWeight, at + `a read title leads its metadata and keeps the unread title ink (#21161): ${m.read.color} / ${m.unread.color}`);
+                check(m.read.rail !== m.unread.rail, at + 'the unread rail still distinguishes read state');
+                check(m.read.iconColor === m.unread.iconColor && m.read.iconBg === m.unread.iconBg && m.read.iconColor !== m.read.metaColor, at + 'file icons retain their blue palette in both read states');
+                check(m.read.iconContrast >= 4.5 && m.unread.iconContrast >= 4.5, at + 'file glyph contrast is at least 4.5:1: ' + JSON.stringify(m));
                 check(m.read.contrast >= 4.5 && m.unread.contrast >= 4.5, at + `contrast is at least 4.5:1: ${m.unread.contrast.toFixed(2)} / ${m.read.contrast.toFixed(2)}`);
                 check(/unread/.test(m.unread.text) && /read/.test(m.read.text) && !/unread/.test(m.read.text), at + 'a screen reader still hears unread and read');
             }
