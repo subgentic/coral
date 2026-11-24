@@ -24,6 +24,7 @@ DELETE /api/board/{project}/tasks/{taskID}/reminder interact
 DELETE /api/board/{project}/waits never
 DELETE /api/chief/checks/{checkID} never
 DELETE /api/cloud/devices/{kid} never
+DELETE /api/cloud/link-keys/{id} never
 DELETE /api/cloud/links/{id} never
 DELETE /api/folder-tags/{folderName}/{tagID} never
 DELETE /api/launch-disclosure/ack never
@@ -152,6 +153,7 @@ GET /api/chief/checks never
 GET /api/chief/checks/{checkID} never
 GET /api/chief/triggers never
 GET /api/cloud/devices never
+GET /api/cloud/link-keys never
 GET /api/cloud/link-requests never
 GET /api/cloud/link-requests/{id} never
 GET /api/cloud/links never
@@ -452,6 +454,7 @@ POST /api/cloud/cross-team-links interact
 POST /api/cloud/devices/clear-clock never
 POST /api/cloud/disconnect never
 POST /api/cloud/guide-revoked never
+POST /api/cloud/link-keys never
 POST /api/cloud/link-requests never
 POST /api/cloud/link-requests/{id}/allow never
 POST /api/cloud/link-requests/{id}/deny never

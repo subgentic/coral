@@ -79,9 +79,10 @@ type IdentityObserver struct {
 
 	// Strict local auth (#3418), set once before serving (SetStrict).
 	strict    bool
-	validKey  func(*http.Request) bool                  // a valid API key in the request
-	verifyCLI func(*http.Request) (*http.Request, bool) // a valid command-line signature
-	otherUser func(*http.Request) bool                  // a loopback caller running as another OS user
+	validKey  func(*http.Request) bool                                   // a valid API key in the request
+	verifyCLI func(*http.Request) (*http.Request, bool)                  // a valid command-line signature
+	otherUser func(*http.Request) bool                                   // a loopback caller running as another OS user
+	linkKey   func(ctx context.Context, key string) (id string, ok bool) // a self-hosted Hub's request key (#20944)
 
 	mu         sync.Mutex
 	callers    map[string]int64
@@ -122,6 +123,11 @@ func (o *IdentityObserver) SetVerifiers(validKey func(*http.Request) bool, verif
 	o.validKey, o.verifyCLI = validKey, verifyCLI
 }
 
+// SetLinkKeys gives the observer the check of a request key (X-Link-Request-Key, #20944).
+func (o *IdentityObserver) SetLinkKeys(f func(ctx context.Context, key string) (string, bool)) {
+	o.linkKey = f
+}
+
 // SetOtherUser gives the observer the peer check: a signed request from another OS user is
 // refused 403 other_user (as the cloud routes say), not 401.
 func (o *IdentityObserver) SetOtherUser(f func(*http.Request) bool) { o.otherUser = f }
@@ -154,6 +160,10 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if o == nil {
 			next.ServeHTTP(w, r)
+			return
+		}
+		if key := r.Header.Get(linkKeyHeader); key != "" || len(r.Header.Values(linkKeyHeader)) > 0 {
+			o.serveLinkKey(w, r, next, key)
 			return
 		}
 		if !strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/ws/") {

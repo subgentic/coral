@@ -25,8 +25,11 @@ import (
 
 const linkRequestSecretHeader = "X-Link-Request-Secret"
 
-// linkRequestCaller is who may make, poll and finish a request: the person at this computer (the dashboard or the signed command line). A later slice adds the self-hosted Hub's own key.
+// linkRequestCaller is who may make, poll and finish a request: the person at this computer (the dashboard or the signed command line). Or a self-hosted Hub's own request key, for these three calls.
 func (h *CloudHandler) linkRequestCaller(w http.ResponseWriter, r *http.Request) (cred string, refused bool) {
+	if id := linkKeyCaller(r); id != "" { // a self-hosted Hub's request key, admitted by the identity layer for these three calls only
+		return id, h.noLinkStore(w)
+	}
 	if h.refuseCloud(w, r, allowDashboard|allowCLI) || h.noLinkStore(w) {
 		return "", true
 	}
@@ -35,6 +38,10 @@ func (h *CloudHandler) linkRequestCaller(w http.ResponseWriter, r *http.Request)
 
 // linkRequestHuman is the person at this computer: Allow, Deny and the feed. Not an agent, not a key.
 func (h *CloudHandler) linkRequestHuman(w http.ResponseWriter, r *http.Request) bool {
+	if linkKeyCaller(r) != "" {
+		errForbidden(w, "Only the person at this computer can answer a request to join")
+		return true
+	}
 	if h.refuseCloud(w, r, allowDashboard|allowCLI) || h.noLinkStore(w) {
 		return true
 	}
@@ -105,6 +112,8 @@ type linkRequestView struct {
 	// Links is how many this computer has now, and Max the most it can have ("1 of 8").
 	Links int `json:"links"`
 	Max   int `json:"max"`
+	// Via is the name of the request key that asked ("via key <name>"), when a key did.
+	Via string `json:"via,omitempty"`
 }
 
 // LinkRequestFeed: GET /api/cloud/link-requests. The waiting requests, for the card: the Hub's address (Hub B's one supplied word) and the access it asked. No secret, no code.
@@ -120,7 +129,7 @@ func (h *CloudHandler) LinkRequestFeed(w http.ResponseWriter, r *http.Request) {
 	links, _ := h.links.ListLinks(r.Context())
 	out := make([]linkRequestView, 0, len(ps))
 	for _, p := range ps {
-		out = append(out, linkRequestView{ID: p.ID, Hub: cleanSavedField(p.Hub), CapAsked: p.CapAsked, CreatedAt: p.CreatedAt.UTC().Format(time.RFC3339), ExpiresAt: p.ExpiresAt.UTC().Format(time.RFC3339), Links: len(links), Max: store.MaxCloudLinks})
+		out = append(out, linkRequestView{ID: p.ID, Hub: cleanSavedField(p.Hub), CapAsked: p.CapAsked, CreatedAt: p.CreatedAt.UTC().Format(time.RFC3339), ExpiresAt: p.ExpiresAt.UTC().Format(time.RFC3339), Links: len(links), Max: store.MaxCloudLinks, Via: cleanSavedField(p.Via)})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"requests": out})
 }
@@ -200,8 +209,15 @@ func (h *CloudHandler) LinkRequestFinish(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	id := chi.URLParam(r, "id")
+	if finishFailuresOver(time.Now()) {
+		httputil.WriteActionLimit(w, int(finishFailureWindow.Seconds()), "rate_limited", "Too many wrong codes just now. Try again in a few minutes.")
+		return
+	}
 	hub, linkCap, err := h.links.FinishLinkRequest(r.Context(), id, body.PollSecret, body.Code, time.Now())
 	if err != nil {
+		if errors.Is(err, store.ErrLinkRequestCode) {
+			noteFinishFailure(time.Now())
+		}
 		h.linkRequestErr(w, err)
 		return
 	}

@@ -116,7 +116,7 @@ func TestAKeyMakesPollsAndFinishesItsOwnJoinAndCannotAllowIt(t *testing.T) {
 	require.Equal(t, 200, ok.Code, ok.Body.String())
 	assert.EqualValues(t, 1, hub.starts.Load())
 	ls, _ := cs.ListLinks(context.Background())
-	assert.Len(t, ls, 2)
+	assert.Len(t, ls, 1, "the Hub's own approval makes the link, as with `links add`")
 }
 
 func TestAKeyReachesNothingElseAndABadOneReachesNothing(t *testing.T) {

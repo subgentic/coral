@@ -169,6 +169,9 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/cloud/link-requests/{id}/allow":       "allow a Hub to join this computer",                                         // #20936
 	"POST /api/cloud/link-requests/{id}/deny":        "deny a Hub joining this computer",                                          // #20936
 	"POST /api/cloud/link-requests/{id}/finish":      "finish a Hub's join with the code",                                         // #20936
+	"DELETE /api/cloud/link-keys/{id}":               "revoke a Hub's request key",                                                // #20944
+	"GET /api/cloud/link-keys":                       "list the request keys (never the key)",                                     // #20944
+	"POST /api/cloud/link-keys":                      "make a request key for a Hub",                                              // #20944
 	"GET /api/cloud/links":                           "list the Coral Hubs this computer is linked to",                            // #20346
 	"POST /api/cloud/links":                          "add a Coral Hub link",                                                      // #20346
 	"POST /api/cloud/links/cancel":                   "cancel adding a Coral Hub",                                                 // #20385

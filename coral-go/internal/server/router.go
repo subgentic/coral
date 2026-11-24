@@ -176,6 +176,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 		}
 		return s.cloudHandler.VerifyCLI(r)
 	})
+	s.identity.SetLinkKeys(func(ctx context.Context, key string) (string, bool) { return s.cloudHandler.VerifyLinkKey(ctx, key) }) // a self-hosted Hub's request key: three calls only (#20944)
 	s.identity.SetOtherUser(func(r *http.Request) bool { return s.cloudHandler != nil && s.cloudHandler.OtherUser(r) })
 	if s.cfg.StrictLocalAuth {
 		// Phase 2 (#3418): refuse what the report lists instead of logging it.
@@ -633,6 +634,9 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/cloud/link-requests/{id}/allow", s.cloudHandler.LinkRequestAllow)
 	r.Post("/api/cloud/link-requests/{id}/deny", s.cloudHandler.LinkRequestDeny)
 	r.Post("/api/cloud/link-requests/{id}/finish", s.cloudHandler.LinkRequestFinish)
+	r.Post("/api/cloud/link-keys", s.cloudHandler.LinkKeyCreate) // #20944: a self-hosted Hub's request key; this computer only, never tunneled
+	r.Get("/api/cloud/link-keys", s.cloudHandler.LinkKeyList)
+	r.Delete("/api/cloud/link-keys/{id}", s.cloudHandler.LinkKeyRevoke)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be
 	r.Post("/api/cloud/owner-label/arm", s.cloudHandler.ArmOwnerLabel) // #6108: Confirm owner: arms the adoption for a minute, from this computer's dashboard only
