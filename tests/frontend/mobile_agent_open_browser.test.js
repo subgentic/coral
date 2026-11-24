@@ -22,8 +22,11 @@ const DEVICES = [
     };
     // Condition waits (#3118): the app says when startup is done; the suite waits for what it checks next.
     const { waitFor, coralReady } = require('./helpers/wait').bind(evaluate);
+    // The app's own startup loads can re-render the list after the rows were seeded and held, replacing them with the server's empty list: the target is waited for, and the rows are seeded again when they were replaced.
     const tap = async selector => {
-        const p = await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; e.scrollIntoView({block:'center'}); const b = e.getBoundingClientRect(); return {x: b.x + b.width/2, y: b.y + b.height/2}; })()`);
+        const where = () => evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) { if (window.__seedRows) window.__seedRows(); return null; } e.scrollIntoView({block:'center'}); const b = e.getBoundingClientRect(); return {x: b.x + b.width/2, y: b.y + b.height/2}; })()`);
+        let p = await where();
+        for (const end = Date.now() + 8000; !p && Date.now() < end;) { await new Promise(r => setTimeout(r, 50)); p = await where(); }
         assert.ok(p, `${selector} exists`);
         await Input.dispatchTouchEvent({ type: 'touchStart', touchPoints: [p] });
         await Input.dispatchTouchEvent({ type: 'touchEnd', touchPoints: [] });

@@ -9,7 +9,7 @@ const { connect } = require('./agent_view_harness');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const { guardSettings } = require('./helpers/settings_guard');
 const { coralReady } = require('./helpers/wait');
-const { DATA_WORLD, httpJson } = require('./helpers/census_world');
+const { DATA_WORLD, httpJson, removeScratchWhenFree } = require('./helpers/census_world');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -32,6 +32,6 @@ const BASE = require('./test_base').BASE;
         assert.ok(!/notes\.txt/.test([...seen][0]), "the census's data world answers every read of the list: the real folder's notes.txt never shows (" + [...seen][0] + ')');
         console.log('keyboard_census_redraw: the list stayed ' + [...seen][0]);
     } finally {
-        if (standIn) await standIn.stop().catch(() => {}); if (work) fs.rmSync(work, { recursive: true, force: true }); await guard.restore().catch(() => {}); await client.close().catch(() => {});
+        if (standIn) await standIn.stop().catch(() => {}); if (work) await removeScratchWhenFree(fs, work, standIn && standIn.sid); await guard.restore().catch(() => {}); await client.close().catch(() => {});
     }
 })().catch(e => { console.error(e); process.exit(1); });

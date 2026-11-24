@@ -15,7 +15,7 @@ const { STUB, HEX } = require('./helpers/comments_scale');
 const kb = require('./helpers/keyboard_census');
 const { FETCH_COUNTER, sceneReady, KNOWN_SLOW } = require('./helpers/scene_ready');
 const { GOALS_STUB, SHOW_ALL_GOALS } = require('./helpers/goals_stub');
-const { DATA_WORLD, CENSUS_LIVE, terminalAtWindowSize, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./helpers/census_world');
+const { DATA_WORLD, CENSUS_LIVE, terminalAtWindowSize, httpJson, removeScratchWhenFree, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./helpers/census_world');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -283,7 +283,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         await load(); await ev(`window.switchNavTab('agents'); true`);
         await ev(STUB({ filename: 'release-notes.md', content: '# Release notes\n\nThe build is green.\n', mediaType: 'text/markdown', comments: [] }));
         await dlg('dialog: artifact viewer', { opener: '[data-on-click="m-go-home"]', open: () => ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', { filename: 'release-notes.md' })).then(() => true)`) });
-    } finally { await httpJson('DELETE', `/api/board/${TEAM}`).catch(() => {}); if (standIn) await standIn.stop().catch(() => {}); if (work) fs.rmSync(work, { recursive: true, force: true }); await guard.restore().catch(() => {}); await client.close(); }
+    } finally { await httpJson('DELETE', `/api/board/${TEAM}`).catch(() => {}); if (standIn) await standIn.stop().catch(() => {}); if (work) await removeScratchWhenFree(fs, work, standIn && standIn.sid); await guard.restore().catch(() => {}); await client.close(); }
     const bad = results.filter(r => r.error).map(r => `${r.name}: the scene did not open (${r.error})`).concat(found, required(results, requiredScenes('keyboard')));
     if (process.env.KEYBOARD_REPORT) { require('node:fs').writeFileSync(process.env.KEYBOARD_REPORT, results.map(r => `${r.name}: ${r.error || r.stops + ' stops'}${process.env.KEYBOARD_PATHS ? '\n    ' + r.path : ''}`).join('\n') + '\n--\n' + bad.join('\n') + '\n'); process.exit(0); }
     assert.deepEqual(bad, [], 'keyboard-only problems on a desktop:\n  ' + bad.join('\n  '));

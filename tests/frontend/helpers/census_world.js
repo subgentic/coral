@@ -92,6 +92,17 @@ const DATA_WORLD = `(() => {
 })();`;
 async function httpJson(method, p, body) { const r = await fetch(BASE + p, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }); let data = null; try { data = await r.json(); } catch { /* no body */ } return { status: r.status, data }; }
 
+// A census's scratch folder is the stand-in agent's working directory. Coral's kill returns before the pane's process has let go of it, and Windows will not remove a folder a process is still in
+// (EBUSY, 3 of the last 10 windows-tests runs, #20965). So the folder is removed once the session is gone from the live list; a folder that is still held after that is left to the temp folder's own cleanup, it is not what the census checks.
+async function removeScratchWhenFree(fs, dir, sid) {
+    for (const end = Date.now() + 10000; Date.now() < end;) {
+        const live = (await httpJson('GET', '/api/sessions/live').catch(() => null))?.data;
+        if (!Array.isArray(live) || !live.some(x => x && x.session_id === sid)) break;
+        await new Promise(r => setTimeout(r, 100));
+    }
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { if (e.code !== 'EBUSY' && e.code !== 'EPERM') throw e; }
+}
+
 // What only the censuses' world adds (#417), installed after the harness's PRELOAD (which makes window.__m):
 //   - the live list is the census's own. The harness serves GET /api/sessions/live from its mocked agents and detaches the feed in install(), but a feed
 //     message that landed before install() still carried the server's list: a coral_diff with the stand-in agent added it next to the mocked rows, and
@@ -142,4 +153,4 @@ async function terminalAtWindowSize(ev, waitFor, openTerminal) {
     await waitFor(`window.getTerminal().buffer.active.baseY === 0`, "the terminal's own scrollback cleared", 5000);
 }
 
-module.exports = { WF, RUN, RUN_OK, RUN_LIVE, JOB, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING, DATA_WORLD, CENSUS_LIVE, terminalAtWindowSize, httpJson };
+module.exports = { WF, RUN, RUN_OK, RUN_LIVE, JOB, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING, DATA_WORLD, CENSUS_LIVE, terminalAtWindowSize, httpJson, removeScratchWhenFree };

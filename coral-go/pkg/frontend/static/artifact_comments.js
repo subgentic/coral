@@ -163,9 +163,10 @@ export function attachComments(dialog, body, host, opts = {}) {
                 setSheet(opts.initialOpen ?? remembered() ?? (st.video ? true : false)); /* no remembered choice: shut, whatever the file has (it opened for one file and not the next, #15119) */ // a docked pane too narrow for the column (it would be a sheet over the document) starts closed too (#14846: it opened over the file and froze it); the viewer: closed until the person opens it, and then as they left it, so the file has the whole width (#12225); the docked preview keeps opening when there are comments
             }
             if (st.wantThread != null) { const w = st.wantThread; st.wantThread = null; if (data.comments.some(c => c.id === w)) { setSheet(true); activate(w, false); } } // the thread the address names (#15253)
+            if (st.composeLater) { const later = st.composeLater; st.composeLater = null; if (data.canComment && !data.locked) { st.composing = { anchor: later.anchor }; st.error = ''; setSheet(true); render(); focusComposer(); } } // a Comment pressed before the comments came (#20965)
         } catch (e) {
             if (hex !== st.hex || gen !== ctxGen) return;
-            st.gone = true; st.data = null; // no comments routes here (an older Coral, a hub that does not carry them): the viewer is as it was
+            st.gone = true; st.data = null; st.composeLater = null; // no comments routes here (an older Coral, a hub that does not carry them): the viewer is as it was
         }
         render(); paint();
     }
@@ -583,7 +584,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */
         // The computer whose artifact it is: the caller's, else the one on show (the rule renderArtifact reads the content by); a bare /api/ route is the hub's own and 404s there (#6245).
-        open(hex, server, board, series = false) { liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); importOnce('./open_link.js').then(m => { st.wantThread = m.takeThread('coral://artifacts/' + hex); }).catch(() => {}); },
+        open(hex, server, board, series = false) { liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composeLater = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); importOnce('./open_link.js').then(m => { st.wantThread = m.takeThread('coral://artifacts/' + hex); }).catch(() => {}); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
         /** The document drawn is not text the comments can point into (HTML in its frame, a picture, a PDF, a table, a video, a download): the panel is there for a comment on the whole document. */
         /** Mark up in the viewer (#12367): the marked copy of the picture on show starts a comment on the whole file, in the tray with the text box ready, and the panel (a phone's sheet) opens on it. Resolves false when this person cannot comment here. */
@@ -599,6 +600,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         isComposing: () => !!(st.composing && st.composing.anchor),
         /** A comment on an anchor the caller made (the lines selected in an agent's diff, #12536): the composer opens on it, in the panel. Resolves false when this person cannot comment here. */
         composeOn(anchor) {
+            if (st.hex && !st.data && !st.gone) { st.composeLater = { anchor }; return true; } // the comments are still coming: the composer opens when they have, a press on Comment is not lost (#20965)
             if (!st.hex || !st.data || !st.data.canComment || st.data.locked) return false;
             st.composing = { anchor }; st.error = ''; setSheet(true); render(); focusComposer();
             return true;
@@ -621,6 +623,6 @@ export function attachComments(dialog, body, host, opts = {}) {
             refresh();
         },
         docRendered(source, text) { st.source = source || ''; st.text = !!text; if (!st.text) { render(); return; } region(true); refresh(); },
-        close() { liveStop(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
+        close() { liveStop(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; st.composeLater = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
     };
 }
