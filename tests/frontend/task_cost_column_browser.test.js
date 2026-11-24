@@ -41,7 +41,8 @@ const { framesJs } = require('./helpers/wait');
         assert.deepEqual(m.heads, ['state', 'task', 'who'], '680 px: the heads are Status, Task and Agent: ' + JSON.stringify(m));
         assert.deepEqual(m.gone, [], 'no priority, type, cost or time cell is drawn in the dock: ' + JSON.stringify(m));
         assert.ok(m.name && m.status, 'the row has its task and its status'); assert.ok(m.scrolls <= 1, 'and it does not scroll sideways');
-        assert.ok(m.widths.state <= m.chip + 48, 'Status fits its chip, it does not take a third of the line: ' + JSON.stringify(m.widths) + ' chip ' + m.chip);
+        // The column is as wide as its head or its chip, whichever is wider, plus padding, so its width follows the font (107 px with the chip at 65 on the Mac, 114 on the mini's: #20924, a fixed 48 px of slack over the chip failed at 113): the check is that it stays a fifth of the line, far from the third it once took.
+        assert.ok(m.widths.state <= m.list * 0.2, 'Status fits its chip, it does not take a third of the line: ' + JSON.stringify(m.widths) + ' chip ' + m.chip);
         assert.ok(m.widths.task > m.list * 0.6, 'Task takes the rest of the line: ' + JSON.stringify(m.widths));
         await ev(`document.getElementById('agentic-state').style.width = '420px'; true`);
         await waitFor(`document.getElementById('board-task-list').getBoundingClientRect().width < 460`, 'the narrow dock');
