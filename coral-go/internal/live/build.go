@@ -14,9 +14,7 @@ import (
 // slice). It is not a session row, so nothing else can reach a frame. Shown is the owner's choice at this computer; a new agent starts false.
 type AgentFacts struct {
 	RealName  string
-	Label     string
 	Role      string
-	CLI       string
 	Status    Status
 	TaskTitle string
 	Shown     bool
@@ -96,10 +94,7 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 			continue
 		}
 		n++
-		l := clean(a.Label, maxLabel)
-		if l == "" {
-			l = clean(a.Role, maxLabel)
-		}
+		l := clean(a.Role, maxLabel)
 		if l == "" {
 			l = "Agent " + itoa(n)
 		}
@@ -110,7 +105,7 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 		if !scan(red, task) || !safeText(task) {
 			task = ""
 		}
-		f.Agents = append(f.Agents, Agent{Label: l, Role: clean(a.Role, maxLabel), CLI: clean(a.CLI, maxLabel), Status: string(a.Status), Task: task})
+		f.Agents = append(f.Agents, Agent{Role: l, Status: string(a.Status), Task: task})
 	}
 	posts := in.Posts
 	if len(posts) > maxPosts {
@@ -122,15 +117,15 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 		author, ok := publicAuthor(p.Author, label)
 		text, ok2 := publicText(p.Text, label)
 		if !ok || !ok2 {
-			items[i] = Post{Withheld: true, Text: MarkerMessage}
+			items[i] = Post{W: true}
 			continue
 		}
 		if !scan(red, text) || !scan(red, p.Text) {
-			items[i] = Post{Withheld: true, Text: MarkerMessage}
+			items[i] = Post{W: true}
 			hit[i] = true
 			continue
 		}
-		items[i] = Post{Author: author, Text: text, At: p.At.Unix()}
+		items[i] = Post{From: author, Text: text, At: p.At.Unix()}
 	}
 	for i := range hit {
 		if !hit[i] {
@@ -138,12 +133,12 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 		}
 		for j := i - hitNeigh; j <= i+hitNeigh; j++ {
 			if j >= 0 && j < len(items) {
-				items[j] = Post{Withheld: true, Text: MarkerMessage}
+				items[j] = Post{W: true}
 			}
 		}
 	}
 	for _, it := range items {
-		if it.Withheld && len(f.Posts) > 0 && f.Posts[len(f.Posts)-1].Withheld {
+		if it.W && len(f.Posts) > 0 && f.Posts[len(f.Posts)-1].W {
 			continue // a run of withheld posts is one marker: a count does not leak
 		}
 		f.Posts = append(f.Posts, it)

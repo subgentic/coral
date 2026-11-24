@@ -21,22 +21,28 @@ type Frame struct {
 	Posts  []Post  `json:"posts"`
 }
 
-// Agent is one agent the owner chose to show. Label is the owner's public label, else the role, else "Agent N"; the real name is never here.
+// Agent is one agent the owner chose to show. Role is its only display field (the role name, else "Agent N"); the real name and any owner label are
+// not on the wire in the first proof (coral-hub's strict decode, #270101). Chat is per agent, on the one chosen agent only, and absent in this slice.
 type Agent struct {
-	Label  string `json:"label"`
 	Role   string `json:"role"`
-	CLI    string `json:"cli"`
 	Status string `json:"status"`
 	Task   string `json:"task"`
+	Chat   []Chat `json:"chat,omitempty"`
 }
 
-// Post is a board post, or the one fixed marker that stands for a run of withheld ones (no author, no time, no count).
+// Chat is one chat message of the chosen agent, or {w:true} for a withheld one (a later slice fills it).
+type Chat struct {
+	From string `json:"from,omitempty"`
+	Text string `json:"text,omitempty"`
+	At   int64  `json:"at,omitempty"`
+	W    bool   `json:"w,omitempty"`
+}
+
+// Post is a board post, or {w:true} standing for a run of withheld ones: no author, no time, no text, no count. The viewer's fixed words are built by the
+// Hub, never sent from here.
 type Post struct {
-	Author   string `json:"author"`
-	Text     string `json:"text"`
-	At       int64  `json:"at"`
-	Withheld bool   `json:"withheld"`
+	From string `json:"from,omitempty"`
+	Text string `json:"text,omitempty"`
+	At   int64  `json:"at,omitempty"`
+	W    bool   `json:"w,omitempty"`
 }
-
-// MarkerMessage is the only text a withheld post carries. The computer sends no count and no dropped text.
-const MarkerMessage = "... (message withheld) ..."
