@@ -143,7 +143,7 @@ function _renderTemplateTiles() {
         const b = document.createElement('button'), d = document.createElement('div'), i = document.createElement('i'), n = t.agents.length;
         b.type = 'button'; b.className = 'team-tile'; b.dataset.name = t.name; b.setAttribute('aria-pressed', String(t.name === _chosenTemplate));
         const nm = document.createElement('div'), m = document.createElement('div');
-        nm.className = 'nm'; nm.textContent = t.name; d.className = 'd'; d.append(t.does, i); i.textContent = t.you; m.className = 'm'; m.textContent = `${n} ${n === 1 ? 'role' : 'roles'}`;
+        nm.className = 'nm'; nm.textContent = t.name; d.className = 'd'; const y = document.createElement('span'); y.textContent = y.title = t.does; d.append(y, i); i.textContent = i.title = t.you; m.className = 'm'; m.textContent = `${n} ${n === 1 ? 'role' : 'roles'}`;
         b.append(nm, d, m); return b;
     }));
     host.hidden = !host.childElementCount;
