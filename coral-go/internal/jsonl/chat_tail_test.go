@@ -176,3 +176,38 @@ func TestChatTailReadsTheEndOfALongSession(t *testing.T) {
 	assert.Equal(t, "new c", got[0].Text)
 	assert.Equal(t, "new n", got[11].Text)
 }
+
+// QA on #21094: a compaction summary, injected context and a notification are not chat, for each CLI (what each writes is in chatEntrySkipped).
+func TestChatTailLeavesOutCompactionSummariesAndInjectedContextForEveryCLI(t *testing.T) {
+	const secret = "WHOLEPROJECTSTATE"
+	lines := map[string]string{
+		at.Claude: `{"type":"user","isCompactSummary":true,"isVisibleInTranscriptOnly":true,"timestamp":"2026-01-01T00:00:01Z","message":{"role":"user","content":"This session is being continued from a previous conversation that ran out of context. Summary: ` + secret + `"}}
+{"type":"user","timestamp":"2026-01-01T00:00:02Z","message":{"role":"user","content":"This session is being continued from a previous conversation. ` + secret + `"}}
+{"type":"user","timestamp":"2026-01-01T00:00:03Z","message":{"role":"user","content":"[SYSTEM NOTIFICATION - NOT USER INPUT] ` + secret + `"}}
+{"type":"user","timestamp":"2026-01-01T00:00:04Z","message":{"role":"user","content":"Base directory for this skill: /x ` + secret + `"}}
+{"type":"user","isSidechain":true,"timestamp":"2026-01-01T00:00:05Z","message":{"role":"user","content":"a subagent prompt ` + secret + `"}}
+{"type":"user","timestamp":"2026-01-01T00:00:06Z","message":{"role":"user","content":"typed words"}}`,
+		at.Codex: `{"timestamp":"2026-01-01T00:00:01Z","type":"compacted","payload":{"message":"` + secret + `"}}
+{"timestamp":"2026-01-01T00:00:02Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Another language model started to solve this problem and produced a summary ` + secret + `"}]}}
+{"timestamp":"2026-01-01T00:00:03Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"` + secret + `"}]}}
+{"timestamp":"2026-01-01T00:00:04Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"typed words"}]}}`,
+		at.Pi: `{"type":"compaction","summary":"` + secret + `","timestamp":"2026-01-01T00:00:01Z"}
+{"type":"branch_summary","summary":"` + secret + `","timestamp":"2026-01-01T00:00:02Z"}
+{"type":"custom_message","display":true,"content":"` + secret + `","timestamp":"2026-01-01T00:00:03Z"}
+{"type":"message","timestamp":"2026-01-01T00:00:04Z","message":{"role":"user","content":[{"type":"text","text":"typed words"}]}}`,
+		at.Agy: `{"type":"USER_INPUT","timestamp":"2026-01-01T00:00:01Z","content":"<CONTEXT_SUMMARY>` + secret + `</CONTEXT_SUMMARY> typed words"}`,
+	}
+	for typ, body := range lines {
+		t.Run(typ, func(t *testing.T) {
+			got := chatMessagesIn([]byte(body+"\n"), typ)
+			for _, m := range got {
+				assert.NotContains(t, m.Text, secret, "context a CLI wrote reached the chat")
+				assert.NotContains(t, m.Text, "SYSTEM NOTIFICATION")
+				assert.NotContains(t, m.Text, "Base directory")
+			}
+			if typ != at.Agy {
+				assert.Equal(t, []string{"user:typed words"}, asLines(got))
+			}
+		})
+	}
+}

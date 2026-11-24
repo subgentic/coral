@@ -99,6 +99,9 @@ func chatMessagesIn(buf []byte, agentType string) []ChatMessage {
 		if json.Unmarshal(line, &entry) != nil {
 			continue
 		}
+		if chatEntrySkipped(entry, agentType) {
+			continue
+		}
 		for _, m := range parseTranscriptEntry(entry, names, agentType) {
 			if c, ok := chatMessageOf(m); ok {
 				out = append(out, c)
@@ -106,6 +109,43 @@ func chatMessagesIn(buf []byte, agentType string) []ChatMessage {
 		}
 	}
 	return out
+}
+
+// chatEntrySkipped says a whole transcript entry is context the CLI wrote, not words a person typed or an agent said (QA on #21094). Claude Code marks a compaction summary (the whole project state)
+// isCompactSummary, text it injected itself isMeta, a note only the transcript shows isVisibleInTranscriptOnly, and a subagent's turns isSidechain. Pi's extensions add "custom_message" entries and its
+// compaction writes "compaction" and "branch_summary": only a plain "message" entry is chat. Codex writes its compaction as a "compacted" item and its context as developer, system and turn_context items, and
+// its parser reads only user and assistant messages; agy's CONTEXT_SUMMARY block is cut by its parser and caught again by contextText.
+func chatEntrySkipped(entry map[string]any, agentType string) bool {
+	switch agentType {
+	case at.Pi:
+		t, _ := entry["type"].(string)
+		return t != "message"
+	case at.Codex, at.Agy, at.Antigravity, at.Gemini:
+		return false
+	}
+	for _, k := range []string{"isCompactSummary", "isMeta", "isVisibleInTranscriptOnly", "isSidechain"} {
+		if entry[k] == true {
+			return true
+		}
+	}
+	return false
+}
+
+// contextText says a user turn is context a CLI put in, by its opening words, for the entries that carry no flag (a defence behind chatEntrySkipped): a compaction summary, a notification, a loaded skill.
+func contextText(text string) bool {
+	t := strings.TrimSpace(text)
+	for _, p := range []string{
+		"This session is being continued from a previous conversation",
+		"[SYSTEM NOTIFICATION",
+		"Base directory for this skill:",
+		"Another language model started to solve this problem", // Codex's compaction summary prefix
+		"<summary>", "<CONTEXT_SUMMARY>", "<system-reminder>", "<environment_context>",
+	} {
+		if strings.HasPrefix(t, p) {
+			return true
+		}
+	}
+	return strings.Contains(t, "<CONTEXT_SUMMARY>")
 }
 
 // chatMessageOf is the allowlist: a parsed entry is a chat message only when it is a user turn a person typed or an assistant turn with words. Anything else, whatever its role, is not.
@@ -131,7 +171,7 @@ func chatMessageOf(m map[string]any) (ChatMessage, bool) {
 		text = agent.PersonText(text)
 	}
 	text = plainLineMax(text, chatMaxRunes)
-	if text == "" || (role == "user" && (agent.IsCoralDelivery(text) || coralInjected(text))) {
+	if text == "" || (role == "user" && (agent.IsCoralDelivery(text) || coralInjected(text) || contextText(text))) {
 		return ChatMessage{}, false
 	}
 	at, _ := m["timestamp"].(string)
