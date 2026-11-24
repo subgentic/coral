@@ -52,8 +52,8 @@ const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_o
                 }
                 const tiles = await ev(`['html','video','md'].map(type=>{const e=document.querySelector('${T} .inbox-kind-icon[data-kind="review"][data-type="'+type+'"]');if(!e)return null;const c=getComputedStyle(e);return {bg:c.backgroundColor,fg:c.color,border:c.borderColor};})`);
                 check(tiles.every(Boolean) && tiles.every(t=>JSON.stringify(t)===JSON.stringify(tiles[0])), at+theme+': HTML, video and Markdown reviews share the same tile palette: '+JSON.stringify(tiles));
-                const blue=await ev(`(()=>{const e=document.createElement('span');e.style.background='var(--bg-tertiary)';document.body.append(e);const c=getComputedStyle(e).backgroundColor;e.remove();return c;})()`);
-                check(tiles[0]?.bg===blue,at+theme+': review tiles use the approved neutral surface (#20938)');
+                const blue=await ev(`(()=>{const e=document.createElement('span');e.style.background='var(--needs-icon-blue-bg)';document.body.append(e);const c=getComputedStyle(e).backgroundColor;e.remove();return c;})()`);
+                check(tiles[0]?.bg===blue,at+theme+': review tiles use the blue file palette (#21161, replacing the neutral surface of #20938)');
                 const symbols=await ev(`['html','video','md'].map(type=>{const icon=document.querySelector('${T} .inbox-kind-icon[data-kind="review"][data-type="'+type+'"]');return {ink:getComputedStyle(icon).color,strokes:[...icon.querySelectorAll('svg [stroke]:not([stroke="none"])')].map(p=>getComputedStyle(p).stroke),fills:[...icon.querySelectorAll('svg [fill]:not([fill="none"])')].map(p=>getComputedStyle(p).fill)};})`);
                 check(symbols.every(s=>s.strokes.length&&s.strokes.every(c=>c===s.ink)&&s.fills.every(c=>c===s.ink)),at+theme+': SVG strokes and fills inherit the shared review ink: '+JSON.stringify(symbols));
                 await ev(`document.querySelector('${T} .inbox-kind-icon[data-type="html"]').closest('tr').scrollIntoView({block:'start',behavior:'instant'});true`); await ev(framesJs(2));

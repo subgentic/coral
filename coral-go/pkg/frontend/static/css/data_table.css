@@ -505,15 +505,14 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* Needs you reads like a mailbox (#11668, the operator's Gmail shot): unread and read titles stay bold (#21161); the read row has a quieter background and supporting text; no dot, no pill (a screen reader hears "read" or "unread" in the row). Unread cards use an accent tint in both themes (#21161); the read card stays quieter. */
 :is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: none; }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary)); }
-#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { font-weight: var(--fw-strong); } /* #21161: read titles retain their hierarchy. */
-:is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-row.dt-unread { box-shadow: inset 4px 0 0 var(--accent); } /* #21161: stronger unread rail; titles remain strong in both states. */
+#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-primary { font-weight: var(--fw-strong); }
+:is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list) .dt-row.dt-unread { box-shadow: inset 4px 0 0 var(--accent); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read .dt-subtitle { color: var(--text-secondary); }
-[data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread td { background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary)); }
+#group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread :is(.inbox-review-earlier, .inbox-review-earlier a, .btn:not(.btn-primary):not(.btn-danger), .dt-subtitle, .dt-mail-snippet, .chip-tag, .inbox-meta-dir) { color: var(--text-primary); } /* #21206 */
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read td { background: color-mix(in srgb, var(--text-primary) 4%, var(--table-bg)); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-unread:hover td, #group-table-view[data-group="hub-inbox:needs"] .dt-row.dt-read:hover td { background: var(--table-hover); }
 #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row td { background: none; } /* a folded (phone) row is one block: the tint is on the row, not on each cell */
 #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row.dt-unread { background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary)); }
-[data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row.dt-unread { background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary)); }
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row.dt-read { background: color-mix(in srgb, var(--text-primary) 4%, var(--table-bg)); }
 
 /* Gmail's hover actions (#11669, the operator): on a wide screen with a pointer a Needs you row's actions are drawn at its hover or keyboard focus, in their own slots; the rest of the time that space says how long it has waited. They are only transparent otherwise: still in the Tab order and in the page for a screen reader. */
