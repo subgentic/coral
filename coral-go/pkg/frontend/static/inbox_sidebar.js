@@ -430,7 +430,7 @@ let liveAttention = null;
 if (!isCloud()) importOnce('./live_needs.js').then(m => {
     liveAttention = m;
     m.watchLiveAttention(() => { updateInboxTab(); renderInboxNav(true); });
-    onInboxHooks({ liveCount: m.liveAttentionCount });
+    onInboxHooks({ live: m.liveAttentionCount });
     m.refreshLiveAttention();
 }).catch(() => {});
 

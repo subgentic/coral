@@ -24,7 +24,7 @@ mock and isolated built controls at 390/1440 px in dark/light themes.
 
 Contract amendments authorized by the Orchestrator:
 
-- Hub UUID input replaces the Hub selector; the computer never receives a URL.
+- Share through lists only this computer’s active Hub links and sends the selected `via`. A separate box takes the copied Hub UUID; the computer never receives a public URL.
   The link line says “The link is on the Hub page”.
 - No viewer count. Last-viewed age is shown only when valid and reported by Hub.
 - One chat checkbox per agent; selecting another replaces the previous pick.
@@ -65,7 +65,7 @@ bytes versus 8,030,208. Its documented standing tree-plus-64-KiB policy allows
 8,112,128; the change applies that value with its reason in the commit message.
 Startup JavaScript/CSS caps and their baselines are unchanged.
 
-## Final validation
+## Round-one validation
 
 - Full `CORAL_START_BASE=815ce65f8f npm --prefix tests/frontend run test:cloud`: 452 checks, exit 0.
 - `run_cdp_suites.mjs --only live_controls_browser --shards 1 --retries 0`: 1/1 passed, 1.8 seconds total.
@@ -74,3 +74,20 @@ Startup JavaScript/CSS caps and their baselines are unchanged.
 - Four final screenshots opened: 390/1440 px, dark/light.
 
 Validation ran on production source at cf3723ae4c; the final amendment adds this report only.
+
+## Review correction (#21065)
+
+The routes’ link timestamps are RFC3339 strings, unlike public-frame message times (epoch seconds). Controls and persistent cards now parse the link times with `Date.parse`. The updated browser fixture uses the actual string shape and fails on the prior revision specifically because the due notice stays at “Coral Live is on”. The fix also restores the active-Hub picker beside the copied-ID box, sends `via`, caches a list-route 404 for the page session, and restores the unrelated Inbox helper and Boolean conversion. Only the newly added Live hook key is shortened to preserve zero startup growth.
+
+The Hub list is read from this computer’s existing `/api/cloud/links` route after the local-only mount guard. Paused/revoked/removing links are excluded. With two active Hubs the person must choose. An existing link after reload uses the disabled placeholder “Hub selected when created”: `liveLinkView` does not expose its saved `via`, so the UI does not guess a Hub name.
+
+### Correction validation
+
+- Full `test:cloud`: 452 checks, exit 0.
+- Updated controller browser suite: 1/1 pass, 1.8 seconds total. Same suite on 658af6edba fails at the RFC3339 due-notice assertion.
+- Frontend Go package: pass, 34.205 seconds.
+- Startup delta against 815ce65f8f: JS 0 gz bytes; CSS 0 gz bytes.
+- Four corrected screenshots opened (390/1440, dark/light).
+- Production source validated at 578f26a004; final amendment adds this correction report only.
+
+Updated comparison: coral://artifacts/0abbc3aff03f21ea2e64e6ca575f627e333b16a6dfa5f88737b129a1c17c1645

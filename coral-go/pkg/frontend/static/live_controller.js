@@ -8,7 +8,7 @@ const { localLiveLinks } = await importOnce('./live_links.js');
 const { renderLivePreview } = await importOnce('./live_public_preview.js');
 await loadStyles('live_controls.css');
 const API = '/api/live/links';
-const WORDS = { bad_hash: 'The preview changed. Load and read a new preview before confirming.', chat_unavailable: 'Chat sharing is not available yet. Your previous selection is unchanged.', bad_period: 'This renewal period is not available.', not_found: 'This live link is no longer available.', live_closed: 'Coral Live is not enabled.' };
+const WORDS = { bad_hash: 'The preview changed. Load and read a new preview before confirming.', chat_unavailable: 'Chat sharing is not available yet. Your previous selection is unchanged.', bad_via: 'Choose an active Hub link on this computer.', bad_period: 'This renewal period is not available.', not_found: 'This live link is no longer available.', live_closed: 'Coral Live is not enabled.' };
 
 export { localLiveLinks };
 
@@ -20,10 +20,14 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
     let link = links.find(item => item.team === teamLabel && item.state !== 'stopped') || null;
     let preview = null, read = false, busy = false, revision = 0, dirty = false, stopping = false, createExpiry = 'none', createDelay = 30;
     // The Hub gives the person this id; this computer never receives the URL/token.
+    const via = field('hub');
+    via.setAttribute('aria-label', 'Share through');
+    let hubLinks = [], chosenVia = '';
     const hub = document.createElement('input');
     hub.type = 'text'; hub.maxLength = 36; hub.autocomplete = 'off'; hub.setAttribute('aria-label', 'Hub link id');
     hub.placeholder = 'Link id copied from the Hub page';
-    field('hub').replaceWith(hub);
+    const idLabel = document.createElement('label'); idLabel.className = 'coral-live-field';
+    idLabel.append('Hub link id', hub); field('hub').closest('.coral-live-fields').append(idLabel);
     const chatHost = field('chat').closest('label');
     const chatRows = document.createElement('div'); chatHost.replaceWith(chatRows);
     const alive = () => !life.signal.aborted && root.isConnected;
@@ -75,7 +79,7 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
         if (primary) b.className = 'coral-live-primary'; b.disabled = disabled;
         b.onclick = action; field('actions').append(b);
     };
-    const date = seconds => Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000).toLocaleString() : '';
+    const date = value => { const time = Date.parse(value); return Number.isFinite(time) ? new Date(time).toLocaleString() : ''; };
     const selectedKey = () => link?.draft ? link.draft.chat_key || '' : link?.agents?.find(a => a.chat)?.key || '';
     const selectedRole = () => link?.agents?.find(a => a.key === selectedKey())?.role || '';
     function renderControls() {
@@ -85,6 +89,9 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
         field('state').classList.toggle('coral-live-live', live);
         field('team').disabled = true;
         hub.disabled = !canCreate || busy; if (link && !canCreate) hub.value = link.hub || '';
+        via.replaceChildren(new Option(canCreate ? 'Choose a Hub link' : 'Hub selected when created', ''));
+        for (const item of hubLinks) via.append(new Option(item.label || item.hub_origin || item.link_id, item.link_id));
+        via.value = chosenVia; via.disabled = !canCreate || busy;
         field('expiry').disabled = busy;
         field('delay').disabled = busy;
         field('expiry').value = canCreate ? createExpiry : edit().expires_in || 'none';
@@ -103,7 +110,7 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
             label.append(input, words); chatRows.append(label);
         }
         field('needs').hidden = !live;
-        const due = link?.notice_at && Date.now() >= link.notice_at * 1000;
+        const due = link?.notice_at && Date.now() >= Date.parse(link.notice_at);
         field('needs-title').textContent = due ? 'Re-confirm your live link' : 'Coral Live is on';
         field('needs-copy').textContent = 'Chat: ' + (link?.agents?.find(a => a.chat && a.in_view !== false)?.role || 'off') + '.';
         const facts = link ? [`Created by ${link.created_by || 'you'}`, teamLabel, link.live_since ? `Live since ${date(link.live_since)}` : ''] : [];
@@ -122,13 +129,13 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
         field('confirm-text').textContent = `${selectedKey() ? (selectedRole() + "'s chat includes my typed messages and the agent's replies, shown ") + (edit().delay_s || 30) + ' seconds late. ' : 'Chat is off. '}I read the preview. Anyone with the link can read it. This confirms everything the link shows.`;
         field('actions').replaceChildren();
         if (canCreate) button('Create preview link', () => run(async () => {
-            const next = await request('', 'POST', { hub_link: hub.value.trim(), team: teamLabel });
+            const next = await request('', 'POST', { hub_link: hub.value.trim(), team: teamLabel, via: chosenVia });
             if (alive()) {
                 link = next;
                 if (createExpiry !== 'none' || createDelay !== 30) link = await request(path('views'), 'PUT', { chat_key: '', period_days: 90, expires_in: createExpiry, delay_s: createDelay });
                 invalidate(); field('changed').hidden = true;
             }
-        }), true, busy || !hub.value.trim());
+        }), true, busy || !hub.value.trim() || !hubLinks.some(item => item.link_id === chosenVia));
         else {
             const changed = dirty || link.agents?.some(a => a.in_view === false) || link.draft && (selectedKey() !== (link.agents?.find(a => a.chat)?.key || '') || ['expires_in', 'delay_s', 'period_days'].some(key => link.draft[key] !== link[key]));
             const action = paused ? 'resume' : live && !changed ? 'reconfirm' : 'go-live';
@@ -150,6 +157,7 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
         field('needs-open').disabled = busy;
     }
     hub.oninput = renderControls;
+    via.onchange = () => { chosenVia = via.value; renderControls(); };
     field('confirm').onchange = e => { read = e.target.checked && !!preview; renderControls(); };
     field('expiry').onchange = e => { if (!link || link.state === 'stopped') { createExpiry = e.target.value; renderControls(); } else writeViews(selectedKey(), e.target.value, edit().delay_s); };
     field('delay').onchange = e => { if (!link || link.state === 'stopped') { createDelay = Number(e.target.value); renderControls(); } else writeViews(selectedKey(), edit().expires_in, e.target.value); };
@@ -164,5 +172,13 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
     root.querySelector('[data-stop]').onclick = stop;
     field('needs-open').onclick = () => field('state').scrollIntoView({ block: 'center', behavior: 'smooth' });
     field('status-line').textContent = ''; renderControls();
+    fetch('/api/cloud/links', { signal: life.signal }).then(async response => {
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        if (!alive()) return;
+        hubLinks = Array.isArray(data.links) ? data.links.filter(item => item.state === 'active' && /^lnk-[0-9a-f]{8}$/.test(item.link_id)) : [];
+        if (!link && hubLinks.length === 1) chosenVia = hubLinks[0].link_id;
+        renderControls();
+    }).catch(() => { if (alive()) tell('Hub links could not be loaded. Reopen these controls to try again.'); });
     return { root, destroy() { life.abort(); revision++; preview = null; root.remove(); } };
 }

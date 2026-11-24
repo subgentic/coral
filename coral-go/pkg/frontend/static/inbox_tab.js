@@ -37,7 +37,7 @@ export function waitingCount() {
 
 /** The ONE number of things that need the person: the tab's badge, the sidebar's Needs you count and the page header all read it, so they cannot disagree (#15380 D). Only what is live is counted: rows kept from a computer that is offline are shown, not counted (#15380 C). */
 export function needsCount(reviews = reviewAttentionCount().value) {
-    return (_hooks.extra?.() || 0) + (state.grantN || 0) + waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount() + (_hooks.liveCount?.() || 0);
+    return (_hooks.extra?.() || 0) + (state.grantN || 0) + waitingCount() + reviews + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount() + closedByAgentCount() + skillCount() + (_hooks.live?.() || 0);
 }
 
 /** Something has waited for the person 5 minutes with alerts still off: the offer comes back once (alerts_offer.js decides whether this browser may be offered again). */
@@ -86,7 +86,7 @@ export function updateInboxTab() {
         if (counter.textContent !== text) counter.textContent = text;
         if (counter.hidden !== (n === 0)) counter.hidden = n === 0;
     }
-    const label = n ? `Inbox, ${n}${reviewCount.complete ? '' : '+'} ${_hooks.liveCount?.() || state.grantN || _hooks.extra?.() || reviewCount.value || failedUnread().length || operatorAsks().length ? 'need your attention' : 'waiting for input'}` : reviewCount.complete ? null : 'Inbox, attention count incomplete';
+    const label = n ? `Inbox, ${n}${reviewCount.complete ? '' : '+'} ${_hooks.live?.() || state.grantN || _hooks.extra?.() || reviewCount.value || failedUnread().length || operatorAsks().length ? 'need your attention' : 'waiting for input'}` : reviewCount.complete ? null : 'Inbox, attention count incomplete';
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
     tellAttention(n);

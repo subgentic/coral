@@ -28,10 +28,10 @@ function paint() {
     for (const link of links) {
         const card = document.createElement('section'); card.className = 'coral-live-card coral-live-needs';
         const title = document.createElement('h2');
-        const due = link.state === 'paused' || link.notice_at && Date.now() >= link.notice_at * 1000;
+        const due = link.state === 'paused' || link.notice_at && Date.now() >= Date.parse(link.notice_at);
         title.textContent = due ? 'Re-confirm your live link' : 'Coral Live is on';
         const copy = document.createElement('p');
-        copy.textContent = link.state === 'paused' ? 'Re-confirm missed. The whole link is paused. Review and confirm at this computer to resume.' : `${link.team} · Created by ${link.created_by || 'you'}${link.live_since ? ' · Live since ' + new Date(link.live_since * 1000).toLocaleString() : ''}`;
+        copy.textContent = link.state === 'paused' ? 'Re-confirm missed. The whole link is paused. Review and confirm at this computer to resume.' : `${link.team} · Created by ${link.created_by || 'you'}${link.live_since ? ' · Live since ' + new Date(Date.parse(link.live_since)).toLocaleString() : ''}`;
         const chat = document.createElement('p');
         chat.textContent = 'Chat: ' + (link.agents?.find(a => a.chat && a.in_view !== false)?.role || 'off') + '.';
         const viewed = document.createElement('small');
