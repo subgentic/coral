@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,39 +35,69 @@ func TestCodexHookReviewIsReadWithOneHook(t *testing.T) {
 	assert.Equal(t, "Trust all and continue", s.Options[1].Label)
 }
 
-func TestCodexPluginHookNames(t *testing.T) {
+// A made-up plugin hook. Codex keeps, as trusted_hash, the sha256 of the compact key-sorted JSON of its identity; the test writes that JSON out by hand, so the code is not checked against itself.
+const posthogHookFile = `{"hooks":{"PermissionRequest":[{"matcher":"^mcp__demo__run$","hooks":[{"type":"command","command":"\"${PLUGIN_ROOT}/hooks/demo-gate.sh\"","timeout":5}]}]}}`
+const demoIdentity = `{"event_name":"permission_request","hooks":[{"async":false,"command":"\"${PLUGIN_ROOT}/hooks/demo-gate.sh\"","timeout":5,"type":"command"}],"matcher":"^mcp__demo__run$"}`
+
+var posthogTrusted = func() string {
+	sum := sha256.Sum256([]byte(demoIdentity))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}()
+
+func codexFixture(t *testing.T, plugins map[string]string, trust map[string]string) string {
+	t.Helper()
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", "")
 	codex := filepath.Join(home, ".codex")
-	hook := func(market, name string) {
-		d := filepath.Join(codex, "plugins", "cache", market, name, "1.3.5", "hooks")
+	var cfg []string
+	for name, hookFile := range plugins {
+		d := filepath.Join(codex, "plugins", "cache", "m", name, "1.0", "hooks")
 		require.NoError(t, os.MkdirAll(d, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(d, "codex-hooks.json"), []byte("{}"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(d, "codex-hooks.json"), []byte(hookFile), 0o644))
+		cfg = append(cfg, `[plugins."`+name+`@m"]`, `enabled = true`)
 	}
-	hook("posthog", "posthog")
-	hook("m", "off-plugin")
-	require.NoError(t, os.MkdirAll(filepath.Join(codex, "plugins", "cache", "m", "no-hooks", "1"), 0o755))
-	cfg := strings.Join([]string{
-		`model = "x"`,
-		`[plugins."posthog@posthog"]`,
-		`enabled = true`,
-		`[plugins."off-plugin@m"]`,
-		`enabled = false`,
-		`[plugins."no-hooks@m"]`,
-		`enabled = true`,
-		`[hooks.state."posthog@posthog:hooks/codex-hooks.json:permission_request:0:0"]`,
-		`trusted_hash = "sha256:abc"`,
-	}, "\n")
-	require.NoError(t, os.WriteFile(filepath.Join(codex, "config.toml"), []byte(cfg), 0o644))
-	assert.Equal(t, []string{"posthog"}, codexPluginHookNames(home), "enabled plugins that ship a hook file")
-	assert.Nil(t, codexPluginHookNames(t.TempDir()), "no config: no names")
+	for key, h := range trust {
+		cfg = append(cfg, `[hooks.state."`+key+`"]`, `trusted_hash = "`+h+`"`, `trusted_content_hash = "sha256:`+strings.Repeat("0", 64)+`"`)
+	}
+	require.NoError(t, os.MkdirAll(codex, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(codex, "config.toml"), []byte(strings.Join(cfg, "\n")), 0o644))
+	return home
+}
+
+func TestCodexPluginHookReviewNamesTheChangedPlugin(t *testing.T) {
+	key := "posthog@m:hooks/codex-hooks.json:permission_request:0:0"
+	// two plugins ship hooks; only posthog's trusted hash is stale
+	home := codexFixture(t, map[string]string{"posthog": posthogHookFile, "other": strings.ReplaceAll(posthogHookFile, "demo-gate.sh", "other.sh")},
+		map[string]string{key: "sha256:" + strings.Repeat("a", 64), "other@m:hooks/codex-hooks.json:permission_request:0:0": "sha256:x"})
+	r := codexPluginHookReview(home)
+	assert.Equal(t, []string{"other", "posthog"}, r.Changed, "both hashes differ from the trusted ones")
+
+	// trusted at the hash Codex wrote for this very hook: that plugin is not the one asked about
+	trusted := map[string]string{key: posthogTrusted}
+	home = codexFixture(t, map[string]string{"posthog": posthogHookFile}, trusted)
+	assert.Empty(t, codexPluginHookReview(home).Changed, "the stored hash equals the current hook's: nothing changed")
+
+	// the hook file changed since: the stored hash no longer matches, and only that plugin is named
+	home = codexFixture(t, map[string]string{"posthog": strings.ReplaceAll(posthogHookFile, `"timeout":5`, `"timeout":9`), "quiet": strings.ReplaceAll(posthogHookFile, "demo-gate.sh", "quiet.sh")},
+		map[string]string{key: posthogTrusted, "quiet@m:hooks/codex-hooks.json:permission_request:0:0": "sha256:" + strings.Repeat("b", 64)})
+	r = codexPluginHookReview(home)
+	assert.Contains(t, r.Changed, "posthog")
+
+	// a hook with a key this cannot hash exactly is unsure, not changed
+	home = codexFixture(t, map[string]string{"odd": strings.ReplaceAll(posthogHookFile, `"timeout":5`, `"timeout":5,"statusMessage":"x"`)}, nil)
+	r = codexPluginHookReview(home)
+	assert.Equal(t, []string{"odd"}, r.Unsure)
+	assert.Empty(t, r.Changed)
+	assert.Equal(t, codexPluginHooks{}, codexPluginHookReview(t.TempDir()), "no config: nothing named")
 }
 
 func TestCodexHookReviewNote(t *testing.T) {
-	one := codexHookReviewNote([]string{"posthog"})
-	assert.Contains(t, one, "not Coral's hooks")
-	assert.Contains(t, one, "Codex plugin posthog")
-	assert.Contains(t, one, "outside the sandbox")
-	assert.Contains(t, codexHookReviewNote([]string{"a", "b"}), "plugins a or b")
-	assert.Contains(t, codexHookReviewNote(nil), "your own Codex settings")
+	exact := codexHookReviewNote(codexPluginHooks{Changed: []string{"posthog"}})
+	assert.Contains(t, exact, "not Coral's hooks")
+	assert.Contains(t, exact, "The Codex plugin posthog changed its hook")
+	assert.NotContains(t, exact, "Most likely", "exact: no hedge")
+	assert.Contains(t, exact, "outside the sandbox")
+	assert.Contains(t, codexHookReviewNote(codexPluginHooks{Changed: []string{"a", "b"}}), "plugins a or b changed their hooks")
+	assert.Contains(t, codexHookReviewNote(codexPluginHooks{Unsure: []string{"odd"}}), "Most likely the Codex plugin odd")
+	assert.Contains(t, codexHookReviewNote(codexPluginHooks{}), "your own Codex settings")
 }
