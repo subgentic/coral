@@ -29,14 +29,22 @@ async function request(path, method = 'GET', body) {
 }
 async function copy(text, note) { try { await navigator.clipboard.writeText(text); note.textContent = 'Copied.'; } catch { note.textContent = 'Could not copy. Select and copy the code below.'; } }
 export async function initJoinKeys() {
-    if (!local()) return;
     const anchor = document.getElementById('net-group-hub');
     if (!anchor || document.getElementById('hub-join-keys')) return;
     await loadStyles('hub_join.css');
     const host = el('section', null, 'hub-join'); host.id = 'hub-join-keys'; anchor.append(host);
     document.addEventListener('coral:settings-closed', () => { host.replaceChildren(); host.remove(); }, { once: true });
+    if (!local()) {
+        host.append(el('h3', 'Keys for a self-hosted Hub'), line('Manage self-hosted Hub keys at the computer: open its dashboard, then Settings → Network → Coral Hub → Keys for a self-hosted Hub.'));
+        return;
+    }
+    const steps = (created = false) => {
+        const list = el('ol');
+        for (const text of (created ? ['Return to your self-hosted Hub’s Add computer.', 'Paste this key into its key field.', 'Approve its connection request in this computer’s Inbox, then enter the connection code in the Hub.'] : ['In your Hub, open Add computer.', 'For an SSH connection, the Hub can run coral cloud keys create "My Hub" on this computer as the user running Coral. Or create a key here and paste it into Add computer.', 'For an HTTP connection, create a key here. Enter this computer’s address and paste the key into your Hub’s Add computer.', 'Review the Hub’s request in this computer’s Inbox, choose its access, and enter the connection code back in the Hub.'])) list.append(el('li', text));
+        return list;
+    };
     let keys = [], busy = false;
-    const title = () => { host.replaceChildren(el('h3', 'Hub join keys'), line('A separate key for each self-hosted Hub. Keys can only request, check and finish their own join.')); };
+    const title = () => { host.replaceChildren(el('h3', 'Keys for a self-hosted Hub'), line('Create a separate key for each Hub you run. A key lets that Hub request a connection to this computer. You still choose its access and approve the connection here.')); };
     const error = e => { const n = line(e.message); n.setAttribute('role', 'alert'); host.append(n); };
     async function load() {
         title(); host.append(line('Loading keys…'));
@@ -45,16 +53,19 @@ export async function initJoinKeys() {
     }
     function list(note = '') {
         title(); if (note) { const n = line(note); n.setAttribute('role', 'status'); host.append(n); }
-        host.append(line(`${keys.length} of 8 live keys at this computer`));
+        const actions = el('div', null, 'hub-join-actions hub-key-toolbar');
+        const create = button('Create key', createForm, true); create.disabled = keys.length >= 8;
+        actions.append(el('small', `${keys.length} of 8 live keys · reusable until revoked`), create); host.append(actions);
+        if (!keys.length) host.append(line('No keys yet. Create one for your first self-hosted Hub.'));
+        if (create.disabled) host.append(line('You have 8 live keys. Revoke one before creating another.'));
         for (const k of keys) {
-            const row = el('div', null, 'hub-join-key'); const meta = line(`Created ${new Date(k.created_at).toLocaleString()} · Last used ${k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'Never'}`); meta.className = 'hub-join-meta'; row.append(el('h4', k.name), meta, button('Revoke', () => confirm(k))); host.append(row);
+            const row = el('div', null, 'hub-join-key'); const meta = line(`Created ${new Date(k.created_at).toLocaleString()} · Last used ${k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'Never'}`); meta.className = 'hub-join-meta'; const words = el('div'); words.append(el('h4', k.name), meta); row.append(words, button('Revoke', () => confirm(k))); host.append(row);
         }
-        const create = button('Create key', createForm, true); create.disabled = keys.length >= 8; host.append(create);
-        if (create.disabled) host.append(line('Revoke a key before creating another.'));
-        host.append(line('A key grants no access. Review the actual Hub address and access in Needs you, then Allow and share the connection code. Hosted Coral Hub does not need a key.'));
+        const guide = el('details'); guide.open = true;
+        guide.append(el('summary', 'Connect your self-hosted Hub'), steps(), line('These keys request Hub connections. They are separate from this computer’s general API key. Keep each key in the Hub it was made for; keys work until you revoke them.')); host.append(guide);
     }
     function confirm(k) {
-        title(); host.append(el('h4', `Revoke ${k.name}?`), line('On this computer. This stops new and waiting joins using this key. Existing Hub connections stay connected.'));
+        title(); host.append(el('h4', `Revoke ${k.name}’s key?`), line('It can no longer request a connection. Any connection request it left waiting will end. Existing Hub connections stay connected.'));
         const yes = button('Revoke key', async () => {
             if (busy) return; busy = true; yes.disabled = true;
             try { await request('link-keys/' + encodeURIComponent(k.id), 'DELETE'); keys = keys.filter(x => x.id !== k.id); list(`${k.name} revoked.`); }
@@ -63,8 +74,8 @@ export async function initJoinKeys() {
         }); host.append(yes, button('Cancel', () => list())); yes.focus();
     }
     function createForm() {
-        title(); const form = el('form'), label = el('label', 'Key name'), input = el('input'); input.required = true; input.maxLength = 40; label.append(input);
-        const submit = el('button', 'Create key', 'btn btn-primary'); submit.type = 'submit'; form.append(label, submit, button('Cancel', () => list())); host.append(form); input.focus();
+        title(); const form = el('form'), label = el('label', 'Hub name · Required · 40 characters max'), input = el('input'); input.required = true; input.maxLength = 40; input.placeholder = 'e.g. Home Hub'; label.append(input);
+        const submit = el('button', 'Create key', 'btn btn-primary'); submit.type = 'submit'; form.append(el('h4', 'Create key'), label, line('Use a unique name so you can recognize and revoke this Hub’s key later. Keys have no expiry.'), submit, button('Cancel', () => list())); host.append(form); input.focus();
         form.addEventListener('submit', async event => {
             event.preventDefault(); if (busy || !input.value.trim()) return; busy = true; form.querySelectorAll('button').forEach(b => b.disabled = true);
             try {
@@ -78,7 +89,7 @@ export async function initJoinKeys() {
                 const clear = () => { secret.textContent = ''; made.key = ''; };
                 const box = el('div', null, 'hub-join-code'); box.append(el('small', 'Join key · shown once'), secret, button('Copy key', () => copy(made.key, note)));
                 const actions = el('div', null, 'hub-join-actions'); actions.append(button('Revoke', () => { clear(); confirm(made); }), button('Done', () => { clear(); load(); }, true));
-                host.append(box, actions, note, line('Created at this computer. For a self-hosted Hub only.'));
+                host.append(box, note, steps(true), actions, line('Created at this computer. For a self-hosted Hub only.'));
                 host.scrollIntoView({ block: 'start' });
 
             } catch (e) { error(e); form.querySelectorAll('button').forEach(b => b.disabled = false); }

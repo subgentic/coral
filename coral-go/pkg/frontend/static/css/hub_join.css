@@ -36,3 +36,15 @@
 /* #21000: join keys use the existing Settings section/body scale. */
 #hub-join-keys h3 { font-size: var(--fs-xl); }
 #hub-join-keys p { font-size: var(--fs-md); }
+
+/* #21171: a distinct Settings section, with the action beside each key. */
+#hub-join-keys { max-width: 56rem; }
+#hub-join-keys .hub-join-key { display: flex; align-items: center; gap: 12px; padding-block: 16px; }
+#hub-join-keys .hub-join-key > div { flex: 1; min-width: 0; }
+#hub-join-keys .hub-join-key h4 { margin: 0; }
+#hub-join-keys .hub-key-toolbar { align-items: center; gap: 12px; margin-block: 16px; }
+#hub-join-keys .hub-key-toolbar small { margin-right: auto; }
+#hub-join-keys details { border-top: var(--card-border); padding-top: 16px; }
+#hub-join-keys ol { font-size: var(--fs-md); }
+#hub-join-keys li { padding-block: 4px; }
+@media (max-width: 600px) { #hub-join-keys .hub-key-toolbar small { flex-basis: 100%; } }
