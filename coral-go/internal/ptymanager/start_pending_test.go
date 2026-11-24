@@ -21,6 +21,10 @@ func TestMarkStartPending_StandsForTheStartsOwnDelay(t *testing.T) {
 }
 
 func TestMarkStartPending_DoneNotesWhenItWasTyped(t *testing.T) {
+	// the typed time is package state keyed by session: forget it now and at the end, so a second run (-count) or another order does not find the last one's (#21078)
+	forget := func() { pendingStarts.Lock(); delete(pendingStarts.until, "s-18991-typed"); delete(pendingStarts.typed, "s-18991-typed"); pendingStarts.Unlock() }
+	forget()
+	t.Cleanup(forget)
 	done := MarkStartPending("s-18991-typed", 0)
 	if _, ok := StartTypedAt("s-18991-typed"); ok {
 		t.Fatal("typed before it was")
