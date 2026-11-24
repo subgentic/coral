@@ -23,6 +23,7 @@ import { h } from './cloud.js';
 import { formatLastSeen, updateNotice, RELEASES_URL, DOWNLOAD_URL, serverVersion, serverAgentCount, belowMinimumText } from './server_status.js';
 import { accessChanged } from './hub_access.js';
 import { state } from './state.js';
+const { HUB_JOIN_GUIDANCE } = await importOnce('./hub_join_words.js');
 import { note } from './nav.js';
 import { serverFetch, sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
@@ -328,6 +329,7 @@ function machinePage(s) {
             ...fact('Last seen', seenWords(s)), // the list column's word, online or not: one word for one fact (#9798, UI/UX)
             ...fact('Hub access', accessPicker(s, isBusy, helpId))),
         detailCell(s, live, online, isBusy, helpId),
+        h('p', { className: 'item-meta', 'data-hub-join-guidance': '', text: HUB_JOIN_GUIDANCE }),
         launchDisclosureLine(s),
         h('div', { className: 'servers-page-start' }, startFor(s)), // the three starts, by Rename and More (the list rows have none, #20747) (mock #20111)
         h('div', { className: 'item-bar servers-page-bar cs-actions' }, rowActions(s, isBusy)));
