@@ -84,7 +84,7 @@ export function mountGoalArtifactsList(host, { team, goalId, onOpen = () => {}, 
     }
 
     async function load(more) {
-        if (st.busy) return;
+        if (st.busy) { if (!more) st.again = true; return; } // a refresh asked while a read is going is run when it ends: that read may have been answered before what the refresh is for (#20945)
         st.busy = true;
         try {
             const data = await read(team, goalId, `sort=${encodeURIComponent(st.sort)}&limit=${pageSize()}${more && st.cursor ? `&cursor=${encodeURIComponent(st.cursor)}` : ''}`);
@@ -103,6 +103,7 @@ export function mountGoalArtifactsList(host, { team, goalId, onOpen = () => {}, 
         }
         st.busy = false;
         draw();
+        if (st.again) { st.again = false; load(false); }
     }
 
     draw();

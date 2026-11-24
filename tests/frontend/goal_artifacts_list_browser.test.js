@@ -67,6 +67,17 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`document.querySelector('#team-panel-goals #goal-tab-artifacts').getAttribute('aria-selected')`), 'true', 'still on the Artifacts tab');
         console.log('   ✓');
         console.log('PASS goal artifacts list: 20 then Load more, 5 on a phone, only the goal\'s files, the count and the open list follow the rollup');
+        console.log('4. A refresh asked while the first read is still going is not lost (#20945: a file shared as the goal page opened never showed, on a slow computer)');
+        const G3 = await goal('Slow first read');
+        await done('Only', ['early.txt'], G3);
+        await ev(`(() => { const orig = window.fetch; window.__release = null; window.fetch = function (...a) { const u = String(a[0] && a[0].url || a[0]); if (!window.__held && /artifacts\\?goal=/.test(u)) { window.__held = true; return orig.apply(this, a).then(r => new Promise(res => { window.__release = () => res(r); })); } return orig.apply(this, a); }; return true; })()`);
+        await mount(G3); // its first read is answered by the server now (one file) and held back from the list
+        await waitFor(`typeof window.__release === 'function'`, 'the first read is out and held', 10000);
+        await done('Later', ['late.txt'], G3); // the file arrives after that read was answered
+        await ev(`window.__ga.refresh(); true`); // what Add files does when it is done, while the first read is still going
+        await ev(`window.__release(); true`);
+        await waitFor(`/late\\.txt/.test(document.getElementById('ga-host').textContent)`, 'late.txt after the refresh', 10000);
+        console.log('   ✓');
         console.log('N. A goal with no artifacts says how a file gets there (#10157)');
         const empty = await goal('Nothing yet');
         await mount(empty);
