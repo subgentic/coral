@@ -27,7 +27,7 @@ export function reviewSizeBanner(v) {
     return box;
 }
 
-/** Reads the verdict for a task and puts the banner before `anchor` (the task's facts) when the change is over the limit. Never throws: a task with no diff, a refusal or a failed read shows nothing. */
+/** Reads the verdict for a task and puts the banner before the task's facts (the third argument) when the change is over the limit. Never throws: a task with no diff, a refusal or a failed read shows nothing. */
 export async function showReviewSize(project, task, anchor) {
     try {
         const r = await boardFetch(project, `/tasks/${pathId(task.id)}/review-size`);
