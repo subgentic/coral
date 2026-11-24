@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -51,10 +52,12 @@ func codexFixture(t *testing.T, plugins map[string]string, trust map[string]stri
 	codex := filepath.Join(home, ".codex")
 	var cfg []string
 	for name, hookFile := range plugins {
-		d := filepath.Join(codex, "plugins", "cache", "m", name, "1.0", "hooks")
-		require.NoError(t, os.MkdirAll(d, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(d, "codex-hooks.json"), []byte(hookFile), 0o644))
-		cfg = append(cfg, `[plugins."`+name+`@m"]`, `enabled = true`)
+		if hookFile != "" { // "" is a plugin with no hook file
+			d := filepath.Join(codex, "plugins", "cache", "m", name, "1.0", "hooks")
+			require.NoError(t, os.MkdirAll(d, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(d, "codex-hooks.json"), []byte(hookFile), 0o644))
+		}
+		cfg = append(cfg, `[plugins."`+name+`@m"]`, `enabled = `+strconv.FormatBool(!strings.HasPrefix(name, "off-"))) // an "off-" plugin is switched off
 	}
 	for key, h := range trust {
 		cfg = append(cfg, `[hooks.state."`+key+`"]`, `trusted_hash = "`+h+`"`, `trusted_content_hash = "sha256:`+strings.Repeat("0", 64)+`"`)
@@ -78,16 +81,23 @@ func TestCodexPluginHookReviewNamesTheChangedPlugin(t *testing.T) {
 	assert.Empty(t, codexPluginHookReview(home).Changed, "the stored hash equals the current hook's: nothing changed")
 
 	// the hook file changed since: the stored hash no longer matches, and only that plugin is named
+	quietIdentity := strings.ReplaceAll(demoIdentity, "demo-gate.sh", "quiet.sh")
+	quietSum := sha256.Sum256([]byte(quietIdentity))
 	home = codexFixture(t, map[string]string{"posthog": strings.ReplaceAll(posthogHookFile, `"timeout":5`, `"timeout":9`), "quiet": strings.ReplaceAll(posthogHookFile, "demo-gate.sh", "quiet.sh")},
-		map[string]string{key: posthogTrusted, "quiet@m:hooks/codex-hooks.json:permission_request:0:0": "sha256:" + strings.Repeat("b", 64)})
+		map[string]string{key: posthogTrusted, "quiet@m:hooks/codex-hooks.json:permission_request:0:0": "sha256:" + hex.EncodeToString(quietSum[:])})
 	r = codexPluginHookReview(home)
-	assert.Contains(t, r.Changed, "posthog")
+	assert.Equal(t, []string{"posthog"}, r.Changed, "only the plugin whose hook changed is named; quiet is trusted at its own hash")
 
 	// a hook with a key this cannot hash exactly is unsure, not changed
 	home = codexFixture(t, map[string]string{"odd": strings.ReplaceAll(posthogHookFile, `"timeout":5`, `"timeout":5,"statusMessage":"x"`)}, nil)
 	r = codexPluginHookReview(home)
 	assert.Equal(t, []string{"odd"}, r.Unsure)
 	assert.Empty(t, r.Changed)
+	// a switched-off plugin with a stale hook, and an enabled plugin with no hook file, are named by no one
+	home = codexFixture(t, map[string]string{"off-plugin": posthogHookFile, "no-hooks": ""}, nil)
+	r = codexPluginHookReview(home)
+	assert.Empty(t, r.Changed, "a plugin that is off is not asked about")
+	assert.Empty(t, r.Unsure)
 	assert.Equal(t, codexPluginHooks{}, codexPluginHookReview(t.TempDir()), "no config: nothing named")
 }
 
