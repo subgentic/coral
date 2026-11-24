@@ -499,6 +499,8 @@
 .lw-kpi { border: var(--card-border); background: var(--card-fill); border-radius: var(--radius-md); padding: 10px 12px; min-width: 0; }
 .lw-kpi b { display: block; font-size: var(--fs-2xl); font-weight: var(--fw-title); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .lw-say { margin: 0; }
+/* the Waste table on a phone (the approved stage-2 mock, #21127): each line's label at the left edge and its value at the right, the agent's name in a labeled line too */
+@media (max-width: 600px) { .lw-spread [data-label] { justify-content: space-between; align-items: baseline; } .lw-spread [data-label]:first-child::before { content: attr(data-label); color: var(--text-secondary); font-size: var(--fs-sm); } }
 @media (max-width: 500px) { .lw-kpi b { font-size: var(--fs-xl); } }
 
 .cost-export-choices { display: grid; gap: 8px; margin: 12px 0; }

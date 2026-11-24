@@ -56,10 +56,13 @@ export function wasteCard(m) {
         { key: 'expiries', label: 'Cache expiries', cell: r => num(r.expiries), align: 'end' },
         { key: 'compactions', label: 'Idle compactions', cell: r => num(r.compactions), align: 'end' },
     ];
-    card.append(dataTable({
-        label: 'Waste per agent', columns: cols, rows: m.rows, rowKey: r => r.agent, keepOrder: true, fold: 'labeled', state: state.table,
+    const table = dataTable({
+        label: 'Waste per agent', columns: cols, rows: m.rows, rowKey: r => r.agent, keepOrder: true, fold: 'labeled', bare: true, state: state.table,
         empty: { line: 'No agent used input in this range.' },
-    }).el);
+    });
+    const spread = el('div', 'lw-spread'); // on a phone each line's value sits at the right edge (cost_dashboard.css)
+    spread.append(table.el);
+    card.append(spread);
     const terms = el('p', 'lw-note');
     WASTE_TERMS.forEach(([term, text], i) => { if (i) terms.append(' '); terms.append(el('b', '', term), `: ${text}`); });
     card.append(terms);
