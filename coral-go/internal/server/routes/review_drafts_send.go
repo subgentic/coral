@@ -31,9 +31,13 @@ var requestIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
 
 // reviewTarget is an agent a review is for.
 type reviewTarget struct {
-	t     commentTarget
-	title string
+	t      commentTarget
+	title  string
+	noTeam bool // the agent that uploaded a file of the reserved no-team key: each comment is typed into its session (#21202)
 }
+
+// noTeamReviewTitle names the one agent a no-team file's comments go to: it has no board, so no job title to show.
+const noTeamReviewTitle = "the agent that uploaded it"
 
 // RegisterReviewDraftsSend adds the send route. A press's outcome is read by sending the same request_id again: it answers the first answer and posts nothing.
 func (h *SessionsHandler) RegisterReviewDraftsSend(r chi.Router) {
@@ -42,6 +46,19 @@ func (h *SessionsHandler) RegisterReviewDraftsSend(r chi.Router) {
 
 // reviewTargets are the agents a send reaches: the one that uploaded the file and the agents already in the threads the drafts reply to. It is the same set a comment of the owner's reaches.
 func (h *SessionsHandler) reviewTargets(ctx context.Context, id, b string, drafts []store.ReviewDraft) ([]reviewTarget, []board.Subscriber, string) {
+	if b == noTeamBoardID && h.boardHandler != nil && h.ss != nil { // a file of an agent on no team (#21202): the one session that uploaded it, as a no-team comment goes
+		if _, ok := h.boardHandler.noTeamManagedArtifact(ctx, id); !ok {
+			return nil, nil, "no_uploader"
+		}
+		switch ups := h.boardHandler.noTeamUploaders(ctx, id); len(ups) {
+		case 0:
+			return nil, nil, "no_uploader"
+		case 1:
+			return []reviewTarget{{t: commentTarget{sessionID: ups[0]}, title: noTeamReviewTitle, noTeam: true}}, nil, ""
+		default:
+			return nil, nil, "ambiguous_uploader" // the same bytes uploaded by two agents name no one of them (#13539)
+		}
+	}
 	if b == "" || b == noTeamBoardID || h.bs == nil || h.ss == nil {
 		return nil, nil, "no_board"
 	}
@@ -367,6 +384,8 @@ func reviewNoTargetWords(why string) string {
 		return "this file is on no team's board, so there is no agent to send the comments to"
 	case "no_uploader":
 		return "no agent of this board uploaded this file, so there is no one to send the comments to"
+	case "ambiguous_uploader":
+		return "more than one agent uploaded this file, so Coral cannot tell which one to send the comments to"
 	}
 	return "could not read the board"
 }
@@ -422,6 +441,12 @@ func (h *SessionsHandler) deliverReview(ctx context.Context, id, b, requestID, v
 	var results []reviewSendResult
 	delivered := false
 	for _, tg := range targets {
+		if tg.noTeam {
+			res := h.typeNoTeamReview(ctx, id, tg.t.sessionID, items)
+			delivered = delivered || res.State == "sent"
+			results = append(results, res)
+			continue
+		}
 		res := reviewSendResult{Agent: tg.title}
 		ls, err := h.ss.GetLiveSession(ctx, tg.t.sessionID)
 		if err != nil || ls == nil || ls.IsArchived == 1 || ls.AgentType == "terminal" {
@@ -475,6 +500,47 @@ func (h *SessionsHandler) deliverReview(ctx context.Context, id, b, requestID, v
 		h.boardHandler.notifyFn(b)
 	}
 	return results, delivered
+}
+
+// typeNoTeamReview types each comment of a send into the session that uploaded a no-team file (#21202), one line each through the same gate and frame as a no-team comment (typedNoTeamComment,
+// typedNoTeamGdocComment): there is no board, so no ask and no thread to answer in. It stops at the first line that is not typed; any typed line makes it sent, with how many when not all.
+func (h *SessionsHandler) typeNoTeamReview(ctx context.Context, id, sessionID string, items []reviewItem) reviewSendResult {
+	res := reviewSendResult{Agent: noTeamReviewTitle}
+	if h.boardHandler == nil {
+		res.State, res.Reason = "failed", "failed"
+		return res
+	}
+	item, ok := h.boardHandler.noTeamManagedArtifact(ctx, id)
+	if !ok {
+		res.State, res.Reason = "failed", "no_uploader"
+		return res
+	}
+	typed := 0
+	for _, it := range items {
+		text := it.body
+		if it.snippet != "" {
+			text += " (on the text: " + it.snippet + ")"
+		}
+		line := typedNoTeamComment(id, text, item.Name)
+		if it.google != "" {
+			line = typedNoTeamGdocComment(id, text, item.Name, it.google)
+		}
+		ok, why := h.boardHandler.tellNoTeamUploader(ctx, sessionID, line)
+		if !ok {
+			if typed == 0 {
+				res.State, res.Reason = "failed", why
+				return res
+			}
+			break
+		}
+		typed++
+	}
+	res.State = "sent"
+	if typed < len(items) {
+		res.Reason = fmt.Sprintf("only %d of %d comments were typed", typed, len(items))
+	}
+	slog.Info("[review drafts] comments typed into a no-team agent", "artifact", id, "comments", typed)
+	return res
 }
 
 // replayOf is what a press that was already recorded answers: the first answer when it went out (replayed true), an honest "unknown" when it stopped half way.
