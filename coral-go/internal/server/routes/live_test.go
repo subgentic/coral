@@ -193,19 +193,19 @@ func TestTheLiveFlowThroughTheRoutes(t *testing.T) {
 	assert.Equal(t, "7d", out["expires_in"])
 
 	// after go-live a draft edit leaves the live view as it was, and the response says which is which
-	code, out = call("PUT", "/views", `{"period_days":10,"expires_in":"24h","delay_s":300}`)
+	code, out = call("PUT", "/views", `{"period_days":10,"expires_in":"24h","delay_s":30}`)
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	assert.Equal(t, "7d", out["expires_in"], "the live card reads the approved view")
 	assert.EqualValues(t, 60, out["delay_s"])
 	draft := out["draft"].(map[string]any)
 	assert.Equal(t, "24h", draft["expires_in"], "the draft is its own object")
-	assert.EqualValues(t, 300, draft["delay_s"])
+	assert.EqualValues(t, 30, draft["delay_s"])
 	for _, a := range out["agents"].([]any) {
 		assert.Equal(t, true, a.(map[string]any)["in_view"])
 	}
 	_, err = h.bs.Subscribe(ctx, "team", "Late Joiner", "ux", "sess-late", nil, "all")
 	require.NoError(t, err)
-	_, out = call("PUT", "/views", `{"period_days":10,"expires_in":"24h","delay_s":300}`)
+	_, out = call("PUT", "/views", `{"period_days":10,"expires_in":"24h","delay_s":30}`)
 	late := map[string]any{}
 	for _, a := range out["agents"].([]any) {
 		m := a.(map[string]any)

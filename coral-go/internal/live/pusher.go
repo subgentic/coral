@@ -23,6 +23,8 @@ const (
 	maxSmallBytes  = 256
 	maxBackoff     = time.Minute
 	defaultDelayS  = 30
+	maxFrameAge    = 120 * time.Second // coral-hub Security: no frame is pushed more than this after it was built; an older one is dropped and a fresh one built
+	MaxDelayS      = 90                // the longest delay a link may ask for: a frame waits its delay and must still go out inside maxFrameAge
 	protocolStrike = 3
 )
 
@@ -259,11 +261,12 @@ func (p *Pusher) frame(ctx context.Context, now time.Time, l Link) {
 	if err != nil {
 		return
 	}
+	p.dropOld(s, now) // frames held across a failure backoff are too old to send: only a fresh one goes
 	key := frameKey(f)
 	if n := len(s.buf); n == 0 || s.buf[n-1].key != key {
 		s.buf = append(s.buf, buffered{at: now, key: key, f: f})
 	}
-	delay := time.Duration(l.Approved.DelayS) * time.Second
+	delay := time.Duration(min(l.Approved.DelayS, MaxDelayS)) * time.Second
 	if l.Approved.DelayS == 0 {
 		delay = defaultDelayS * time.Second
 	}
@@ -278,6 +281,10 @@ func (p *Pusher) frame(ctx context.Context, now time.Time, l Link) {
 	}
 	out := s.buf[rel]
 	s.buf = append([]buffered(nil), s.buf[rel:]...)
+	if now.Sub(out.at) > maxFrameAge { // checked again right before sending
+		s.buf = nil
+		return
+	}
 	if now.Sub(s.lastSent) < minFrameGap || (out.key == s.lastKey && now.Sub(s.lastSent) < keepAlive) {
 		return
 	}
@@ -327,6 +334,17 @@ func (p *Pusher) frame(ctx context.Context, now time.Time, l Link) {
 		p.Counts.BadFrame++
 		s.retryAt = now.Add(30 * time.Second)
 	}
+}
+
+// dropOld forgets the held frames built more than maxFrameAge ago.
+func (p *Pusher) dropOld(s *pushState, now time.Time) {
+	kept := s.buf[:0:0]
+	for _, b := range s.buf {
+		if now.Sub(b.at) <= maxFrameAge {
+			kept = append(kept, b)
+		}
+	}
+	s.buf = kept
 }
 
 // frameKey is the picture without its sequence number.

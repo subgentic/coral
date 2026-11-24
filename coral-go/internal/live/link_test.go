@@ -114,7 +114,7 @@ func TestOnlyTheApprovedSnapshotIsPushed(t *testing.T) { // MUST A
 	require.Len(t, f.Agents, 2)
 	// an agent that joins later is not shown, and editing the draft changes nothing pushed
 	src.rows = append(src.rows, AgentRow{Key: "newbie", Generation: "s3@t1", Name: "New Nina", Role: "ux", TaskTitle: "Secret plan"})
-	_, err = m.SetViews(ctx, "L1", Views{PeriodDays: 10, ExpiresIn: "24h", DelayS: 300})
+	_, err = m.SetViews(ctx, "L1", Views{PeriodDays: 10, ExpiresIn: "24h", DelayS: 30})
 	require.NoError(t, err)
 	f, err = m.Frame(ctx, "L1", 2)
 	require.NoError(t, err)

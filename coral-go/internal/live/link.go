@@ -66,7 +66,7 @@ type Views struct {
 	ChatKey    string `json:"chat_key"` // the agent whose chat is shown, "" for none
 	PeriodDays int    `json:"period_days"`
 	ExpiresIn  string `json:"expires_in"` // none | 24h | 7d
-	DelayS     int    `json:"delay_s"`    // 30 | 60 | 300
+	DelayS     int    `json:"delay_s"`    // 30 | 60
 }
 
 // Approved is the snapshot taken at go-live: the only thing a frame is built from (MUST A).
@@ -304,7 +304,7 @@ func (m *Manager) SetViews(ctx context.Context, id string, v Views) (Link, error
 	switch v.DelayS {
 	case 0:
 		v.DelayS = 30
-	case 30, 60, 300:
+	case 30, 60: // 300 is refused: a frame held that long would be older than maxFrameAge when it goes out
 	default:
 		return Link{}, ErrBadViews
 	}

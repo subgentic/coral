@@ -348,3 +348,42 @@ func TestOnlyAPersonsConfirmLetsABlockedLinkPushAgain(t *testing.T) {
 	step(p, clk, 40)
 	require.Greater(t, len(h.only(PathFrame)), 1, "a person's confirm did")
 }
+
+// coral-hub Security: no frame goes out more than 120 s after it was built; a frame held across failures is dropped and a fresh one built.
+func TestAFrameBuiltMoreThanTwoMinutesAgoIsNeverSentAfterFailures(t *testing.T) {
+	p, m, h, clk, src := pushFixture(t)
+	goLive(t, m)
+	step(p, clk, 1)
+	src.rows[0].TaskTitle = "OLDPICTURE"
+	failing := true
+	h.reply = func(path string, n int) ([]byte, error) {
+		if path == PathFrame && failing {
+			return nil, errors.New("tunnel down")
+		}
+		return []byte(`{"ok":true}`), nil
+	}
+	step(p, clk, 40) // the old picture is built, released after its delay, and its send fails
+	require.Greater(t, p.Counts.TransportErr, 0)
+	src.rows[0].TaskTitle = "NEWPICTURE"
+	clk.add(200 * time.Second) // a long outage: the backoff ran out long ago, the held frame is far older than 120 s
+	failing = false
+	h.got = nil
+	step(p, clk, 1)
+	for _, s := range h.only(PathFrame) {
+		require.NotContains(t, s.body, "OLDPICTURE", "a frame older than 120 s was sent")
+	}
+	step(p, clk, 40)
+	fr := h.only(PathFrame)
+	require.NotEmpty(t, fr, "a fresh frame goes out after its own delay")
+	for _, s := range fr {
+		require.NotContains(t, s.body, "OLDPICTURE")
+	}
+	require.Contains(t, fr[len(fr)-1].body, "NEWPICTURE")
+}
+
+func TestADelayAboveNinetySecondsIsRefused(t *testing.T) {
+	m, _, _, _ := fixture(t)
+	goLive(t, m)
+	_, err := m.SetViews(context.Background(), "L1", Views{PeriodDays: 10, ExpiresIn: "24h", DelayS: 300})
+	require.ErrorIs(t, err, ErrBadViews)
+}
