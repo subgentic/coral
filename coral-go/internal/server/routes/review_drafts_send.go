@@ -495,41 +495,40 @@ func (h *SessionsHandler) replayOf(rec store.ReviewBatch, artifactID string) (*r
 
 // ReviewDraftSender is the half of a decision with drafts that lives with the comments (#21195): the board's review route asks it to check and prepare the send, records the decision, then delivers.
 type ReviewDraftSender interface {
-	prepareDecisionBatch(w http.ResponseWriter, r *http.Request, project, id, requestID string, revision int64, words, decision string) (*preparedReview, bool)
+	prepareDecisionBatch(w http.ResponseWriter, r *http.Request, project, id, requestID string, revision int64, words, decision string) (p *preparedReview, replay map[string]any, ok bool)
 }
 
 // SetReviewDrafts wires the drafts' half of a decision.
 func (h *BoardHandler) SetReviewDrafts(s ReviewDraftSender) { h.reviewDrafts = s }
 
-// prepareDecisionBatch checks a send that goes with a decision: the owner's own press, the file's drafts and everything a plain send checks. It answers the request itself and returns false when the decision must not be
-// recorded (a refusal) or has been answered already (the same press again).
-func (h *SessionsHandler) prepareDecisionBatch(w http.ResponseWriter, r *http.Request, project, id, requestID string, revision int64, words, decision string) (*preparedReview, bool) {
+// prepareDecisionBatch checks a send that goes with a decision: the owner's own press, the file's drafts and everything a plain send checks. It answers a refusal itself and returns false. The same press again
+// returns the first send's answer as replay (ok false, nothing written): the caller answers it in the shape of a first decision.
+func (h *SessionsHandler) prepareDecisionBatch(w http.ResponseWriter, r *http.Request, project, id, requestID string, revision int64, words, decision string) (*preparedReview, map[string]any, bool) {
 	key, caller, ok := h.reviewDraftOwner(w, r)
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 	if !h.operatorComment(r, caller) {
 		commentRefuse(w, http.StatusForbidden, "owner_only", "only the person at this computer can send comments to an agent")
-		return nil, false
+		return nil, nil, false
 	}
 	if _, _, isDoc := h.reviewDocOf(id); !isDoc {
 		commentRefuse(w, http.StatusBadRequest, "drafts_not_supported", "drafts are for documents; a goal, a diff or a video comment goes as it is written")
-		return nil, false
+		return nil, nil, false
 	}
 	p, rf, replay := h.prepareReviewSend(r, key, caller, id, project, requestID, revision, words, decision)
 	switch {
 	case replay != nil:
-		writeJSON(w, http.StatusOK, replay)
-		return nil, false
+		return nil, replay, false
 	case rf != nil:
 		if rf.status == http.StatusTooManyRequests {
 			httputil.WriteActionLimit(w, 60, "rate_limited", "too many comments sent to agents; try again later")
 		} else {
 			rf.write(w)
 		}
-		return nil, false
+		return nil, nil, false
 	}
-	return p, true
+	return p, nil, true
 }
 
 // reviewDocOf says whether id is a document that takes drafts: a file by its digest and not a video.
