@@ -31,14 +31,19 @@ To add a weekly reminder from the dashboard (on an agent's Reminders section in 
 
 ### Review size guard
 
-In a team's **Settings** tab, open **Review size guard** (on this computer only, not through Coral Hub) to warn reviewers when a task in review has a large diff. It is **off by default** and warns without blocking:
+In a team's **Settings** tab, open **Review size guard** (on this computer only, not through Coral Hub) to warn reviewers when a task in review has a large diff. It is **off by default** and never blocks a review automatically:
 
 - **Warn when a change is too big to review**: turns the warning on or off.
 - **Lines changed over** (`0` to `1,000,000`) and **Files changed over** (`0` to `100,000`): whole numbers. Either limit warns; leave one empty to check only the other.
 - **Skip these paths (not counted)**: comma-separated path patterns (such as `*.lock, **/generated/**`; `*`, `?` and `**` work).
+- **Over the limit**: **Warn: show a banner** (the default), **Send back: ask the author to split**, or **Split: the Orchestrator files follow-ups**. **Send back** and **Split** add a button to the banner; nothing happens until someone presses it.
 - **Applies to**: **Whole team** or **Only these roles** (then select one or more **Roles**).
 
-When a task in review exceeds a limit for its author's role, the task page shows a **Large change.** warning banner above the task details with the changed lines and files, your team's limit, any skipped lines and paths, and the note: *This is a warning only. You can still review and approve it.*
+When a task in review exceeds a limit for its author's role, the task page shows a **Large change.** warning banner above the task details with the changed lines and files, your team's limit, and any skipped lines and paths:
+
+- **Warn: show a banner**: shows *This is a warning only. You can still review and approve it.*
+- **Send back: ask the author to split**: adds **Send back to author** (*Your team sends a change this size back to its author.* / *You can still approve it.*). Pressing it opens **Send back to `<author>`?** with an editable **Note to the author** pre-filled with the change's size and limit; **Send back** returns the task to its author to split and resubmit.
+- **Split: the Orchestrator files follow-ups**: adds **Split into follow-ups** (*Your team splits a change this size into follow-up tasks.* / *You can still approve it.*). Pressing it opens **Split `#<id>` into follow-ups?**; **Ask the Orchestrator to split** posts a request on the board for the team's Orchestrator to file follow-up tasks under the limit while the review stays open.
 
 ## Create and inspect tasks
 
