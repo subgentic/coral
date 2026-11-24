@@ -252,3 +252,12 @@ func TestShortNamesAreMatchedOnWordBoundariesOnly(t *testing.T) {
 	require.Equal(t, "lead also thanks Alexander and lead.", f.Posts[0].Text, "'also' and 'Alexander' are not garbled")
 	require.False(t, f.Posts[1].W, "a hidden short name inside 'bold' is not a mention")
 }
+
+// QA's SHOULD: one name inside another ("Ada" and "Ada Lovelace"): the longer is replaced first, so no half of it goes out.
+func TestNestedNamesReplaceTheLongerFirst(t *testing.T) {
+	ag := []AgentFacts{{RealName: "Ada", Role: "lead", Status: StatusIdle, Shown: true}, {RealName: "Ada Lovelace", Role: "builder", Status: StatusIdle, Shown: true}}
+	for i := 0; i < 20; i++ { // map order differs between runs
+		f := Build(Input{Agents: ag, Posts: []PostFacts{post("Ada", "one Ada Lovelace shipped it, thanks Ada", 1)}}, Options{}, hubScan())
+		require.Equal(t, "one builder shipped it, thanks lead", f.Posts[0].Text)
+	}
+}
