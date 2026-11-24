@@ -209,3 +209,26 @@ func TestAnalyticsTasksBucketsAndNotRecorded(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, code, bad)
 	}
 }
+
+// #21111: the cost page's Team select narrows the tasks read to one board's tasks; the teams add up to the whole, and a board that no task names answers empty, never every team.
+func TestAnalyticsTasksFollowTheTeamSelect(t *testing.T) {
+	e := newTasksEnv(t)
+	h := time.Hour
+	e.done("alpha", "one", "Alpha Dev", effSessA, 3*h, 2*h, "completed", "")
+	e.done("alpha", "two", "Beta Dev", effSessB, 3*h, 2*h, "completed", "")
+	e.done("beta", "three", "Alpha Dev", effSessA, 2*h, h, "completed", "")
+
+	_, all := e.get("range=14d&group_by=agent")
+	_, alpha := e.get("range=14d&group_by=agent&team=alpha")
+	_, beta := e.get("range=14d&group_by=agent&team=beta")
+	assert.Equal(t, 3, all.Total.Completed)
+	assert.Equal(t, 2, alpha.Total.Completed)
+	assert.Equal(t, 1, beta.Total.Completed)
+	assert.Equal(t, all.Total.Completed, alpha.Total.Completed+beta.Total.Completed, "the teams add up to the whole")
+	assert.Equal(t, 1, alpha.count("Alpha Dev"), "only the tasks of that team")
+	_, none := e.get("range=14d&group_by=agent&team=nosuchteam")
+	assert.Equal(t, 0, none.Total.Completed)
+	assert.Empty(t, none.Groups, "a team no task names is empty, never every team")
+	code, _ := e.get("range=14d&team=" + string(make([]byte, 0)) + "a%20b")
+	assert.Equal(t, 400, code, "a team is a team name")
+}

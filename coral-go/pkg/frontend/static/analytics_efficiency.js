@@ -19,7 +19,7 @@ const SECTIONS = {
 };
 const groupsOf = cfg => GROUPS.filter(g => !(cfg.metric === 'task_time' && g[0] === 'task') && !(isCloud() && g[0] === 'all')); // on Coral Hub's page All (the team's spend picker, one more route) is not offered: the comparison is the page // every task is a group of one: a task has no comparison to make with itself
 const state = {}; // view key -> { group, data, loading, error, seq }
-let range = '24h';
+let range = '24h', lastTeam = '';
 const RANGE_WORDS = { '24h': 'in the last 24 hours', '7d': 'in the last 7 days', '30d': 'in the last 30 days' };
 
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -77,7 +77,8 @@ async function read(cfg, group, signal) {
     const server = machineNow(); // the computer picked on a Hub-served dashboard (this one otherwise, #15730)
     if (!machineOnline(server)) throw new Error(`${machineLabel(server)} is offline, so its comparison cannot be read.`);
     if (isCloud() && server === 'local') throw new Error('Coral Hub has no computer of its own to read'); // never a same-origin read in cloud (#19591)
-    const r = server === 'local' ? await fetch(`/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}`, { signal }) : await serverFetch(server, `/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}`, { signal });
+    const team = document.getElementById('cost-team')?.value || '', url = `/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}${team ? `&team=${encodeURIComponent(team)}` : ''}`; // the page bar's Team select (#21111)
+    const r = server === 'local' ? await fetch(url, { signal }) : await serverFetch(server, url, { signal });
     if (!r.ok) throw new Error(server === 'local' ? `Could not load the comparison (${r.status}).` : `${machineLabel(server)} would not give its comparison (${r.status}): it may be an older Coral that needs an update.`);
     const d = await r.json();
     if (!d || !Array.isArray(d.groups) || d.groups.some(g => !g || typeof g.label !== 'string')) throw new Error('Could not load the comparison: unexpected answer.');
@@ -94,7 +95,7 @@ function refresh(key) {
 
 /** The page refreshed (or the range changed): the comparison is read again for the open view. */
 export function syncEfficiency(period) {
-    const next = rangeOf(period), changed = next !== range; range = next;
+    const team = document.getElementById('cost-team')?.value || '', next = rangeOf(period), changed = next !== range || team !== lastTeam; range = next; lastTeam = team; // the Team select re-reads it too (#21111)
     for (const key of Object.keys(SECTIONS)) { if (!build(key)) continue; const s = state[key]; if (changed) s.data = null; const sec = document.getElementById(SECTIONS[key].section); if (sec && !sec.hidden) refresh(key); }
 }
 document.addEventListener(MACHINE_EVENT, () => { for (const key of Object.keys(SECTIONS)) { const s = state[key]; if (!s) continue; s.data = null; const sec = document.getElementById(SECTIONS[key].section); if (sec && !sec.hidden) refresh(key); } }); // another computer was picked: the old numbers are not shown for it (#15730)

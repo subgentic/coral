@@ -280,7 +280,8 @@ export function showSpend(host, period, timeHost, force = false) {
     const range = rangeOf(period);
     const list = teams();
     const saved = isCloud() ? '' : browserLocal.get(TEAM_KEY) || '';
-    const team = list.includes(model.team) ? model.team : (list.includes(saved) ? saved : (list[0] || ''));
+    const bar = document.getElementById('cost-team')?.value || ''; // the page bar's Team select (#21111) picks the team here when it is one of these
+    const team = bar && list.includes(bar) ? bar : list.includes(model.team) ? model.team : (list.includes(saved) ? saved : (list[0] || ''));
     const changed = team !== model.team || range !== model.range;
     model.team = team; model.range = range;
     if (!host.dataset.built) {

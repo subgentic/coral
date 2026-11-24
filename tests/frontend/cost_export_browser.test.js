@@ -99,7 +99,7 @@ const TASKS = [task(1, 0.28, 7, '=HYPERLINK("http://x","go")'), task(2, 0.27, 7,
             assert.equal(Number(c.rows[c.rows.length - 1].split(',')[7]), 0.05, 'the Total row is the page total of the team');
             await ev(`(() => { const s = document.getElementById('cost-team'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         });
-        await run('the control belongs to the Overview alone, as the Team select does', async () => {
+        await run('Export CSV belongs to the Overview alone', async () => {
             await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('task')).then(() => true)`);
             await waitFor(`getComputedStyle(document.getElementById('cost-export')).display === 'none'`, 'hidden on By task', 5000);
             await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => m.selectView('overview')).then(() => true)`);

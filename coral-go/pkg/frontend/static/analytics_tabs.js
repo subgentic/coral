@@ -57,6 +57,7 @@ function teamKeysOnServer(sessions, boardKeys, server) {
     return [...keys];
 }
 const teams = () => (isCloud() ? teamKeysOnServer(state.liveSessions, boards.keys, machineNow()) : spendTeamKeys(state.liveSessions, false, boards.keys)).sort((a, b) => teamLabel(a).localeCompare(teamLabel(b)));
+const pageTeam = () => document.getElementById('cost-team')?.value || ''; // the page bar's Team select (#21111): "" is every team
 const todayUTC = () => new Date().toISOString().slice(0, 10);
 
 /** Opens one of the three tabs: draws what it has and reads again. `host` is the tab's section. */
@@ -68,7 +69,7 @@ export async function showTab(key, host, force = false) {
     else if (key !== 'usage' && key !== RQ) {
         await readBoards();
         const list = teams(), saved = isCloud() ? '' : browserLocal.get(TEAM_KEY) || '';
-        m.team = list.includes(m.team) ? m.team : (list.includes(saved) ? saved : (list[0] || ''));
+        m.team = pageTeam() && list.includes(pageTeam()) ? pageTeam() : list.includes(m.team) ? m.team : (list.includes(saved) ? saved : (list[0] || ''));
     }
     draw(key);
     if (force || !m.data || m.stale) load(key);
@@ -84,13 +85,13 @@ async function load(key) {
         if (key === 'usage') {
             const days = D.daysOf(m.range), since = new Date(Date.parse(todayUTC() + 'T00:00:00Z') - (2 * days - 1) * 86400000).toISOString();
             if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
-            const r = await serverFetch(server, `/api/token-usage/timeseries?since=${encodeURIComponent(since)}&interval=1d&group_by=${encodeURIComponent(m.group)}`);
+            const r = await serverFetch(server, `/api/token-usage/timeseries?since=${encodeURIComponent(since)}&interval=1d&group_by=${encodeURIComponent(m.group)}${pageTeam() ? `&team=${encodeURIComponent(pageTeam())}` : ''}`);
             if (seq !== m.seq) return;
             if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
             m.data = (await r.json()).buckets || []; m.status = 'ok'; m.day = -1; m.turns = null;
         } else if (key === 'tasks') {
             if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
-            const r = await serverFetch(server, `/api/analytics/tasks?range=${encodeURIComponent(m.range)}&group_by=${encodeURIComponent(m.group)}${m.reviews ? '&reviews=1' : ''}`);
+            const r = await serverFetch(server, `/api/analytics/tasks?range=${encodeURIComponent(m.range)}&group_by=${encodeURIComponent(m.group)}${m.reviews ? '&reviews=1' : ''}${pageTeam() ? `&team=${encodeURIComponent(pageTeam())}` : ''}`);
             if (seq !== m.seq) return;
             if (r.status === 401 || r.status === 403 || r.status === 404) { m.status = 'guest'; m.data = null; draw(key); return; }
             if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
@@ -103,7 +104,7 @@ async function load(key) {
             if (!r.ok) throw await responseUpdateError(r, server) || new Error(String(r.status));
             m.data = await r.json(); m.status = 'ok';
         } else if (key === IVC) {
-            const team = m.team ? splitKey(m.team).name : '';
+            const team = pageTeam() || (m.team ? splitKey(m.team).name : '');
             if (!machineOnline(server)) { m.status = 'offline'; m.data = null; draw(key); return; }
             const r = await serverFetch(server, `/api/analytics/inbox-vs-chat?days=${D.daysOf(m.range)}${team ? `&team=${encodeURIComponent(team)}` : ''}`);
             if (seq !== m.seq) return;
@@ -165,7 +166,7 @@ function draw(key) {
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
     else if (m.status === 'error') { const p = say(m.update || (machineNow() === 'local' ? 'This could not be read.' : `${machineLabel(machineNow())} could not be read.`)); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
     else if (!m.data) root.append(say('Loading…'));
-    else root.append(...({ usage: drawUsage, tasks: mm => T.drawTasks(mm.data, { phone: phone(), group: mm.group }), operator: drawOperator, [IVC]: drawInbox, comm: drawComm, [RQ]: mm => Q.drawQueue(mm.data, phone()) }[key])(m));
+    else root.append(...({ usage: drawUsage, tasks: mm => T.drawTasks(mm.data, { phone: phone(), group: mm.group }), operator: drawOperator, [IVC]: drawInbox, comm: drawComm, [RQ]: mm => [...(pageTeam() ? [say('All teams: this view is for the whole computer.')] : []), ...[].concat(Q.drawQueue(mm.data, phone()))] }[key])(m));
     const focus = host.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
     host.replaceChildren(root);
     if (focus) {

@@ -260,7 +260,7 @@ async function _refreshCallMetrics(period, hours) {
         if (!response.ok) throw await responseUpdateError(response, readServer) || new Error('metrics unavailable');
         if (readServer !== machineNow()) return;
         const data = await response.json();
-        const rows = shownCallMetrics(data.rows || []);
+        const rows = shownCallMetrics(data.rows || []).filter(r => !_team() || r.board_name === _team()); // the Team select (#21111): the calls the rows name that team for
         // Metrics past the raw-row cap are not stored (#5359): say so, so a gap after a burst is not read as quiet (#5368).
         const dropped = data.cap_dropped > 0 ? `<p class="empty-state">${Number(data.cap_dropped)} calls were not recorded since Coral started: the call metrics table was full.</p>` : '';
         // The server keeps calls for a limited time (#3261) and answers with the window it used: a longer range says so.
@@ -680,6 +680,12 @@ function _renderModelTable(rows) {
 /** Usage by thinking level (#4969). "Not reported" is the usage whose turn recorded no level (a CLI that writes none, or from before it was tracked):
  *  never the level an agent was launched with. "Thinking" is the tokens the CLI reported for thinking, shown apart: it is not added to any total. */
 function _renderThinkingTable(rows) {
+    if (_team()) { // the levels are kept by hour, provider and model, with no team (#21111): a team's usage is not shown as all "Not reported"
+        _rawData.thinking = [];
+        const host = document.getElementById('cost-by-thinking');
+        if (host) emptyState(host, 'Thinking levels are counted for the whole computer, not per team. Choose All teams to see them.', 'empty-state');
+        return;
+    }
     const total = rows.reduce((n, r) => n + (r.cost_usd || 0), 0);
     rows.forEach(r => { r.cost_pct = total > 0 ? (r.cost_usd || 0) / total : 0; });
     _rawData.thinking = rows;

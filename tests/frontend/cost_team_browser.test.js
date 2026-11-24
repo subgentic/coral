@@ -24,12 +24,14 @@ const TASKS = [task(1, 0.28, 7, '=HYPERLINK("http://x","go")'), task(2, 0.27, 7,
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`(() => { window.__reqs = []; window.__tasks = ${JSON.stringify(TASKS)}; const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
+        await ev(`(() => { window.__reqs = []; window.__calls = [{ operation: 'x', call_type: 'tool', agent_name: 'A', board_name: 'b', calls: 3, errors: 0, avg_duration_ms: 5 }, { operation: 'y', call_type: 'tool', agent_name: 'B', board_name: 'c', calls: 9, errors: 0, avg_duration_ms: 5 }]; window.__tasks = ${JSON.stringify(TASKS)}; const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o) => { const url = String(u && u.url || u); window.__reqs.push(url);
                 if (url.includes('/api/token-usage/summary')) return json({ totals: { input_tokens: 300, output_tokens: 30, cost_usd: /team=b/.test(url) ? 0.59 : /team=c/.test(url) ? 0.05 : 2.14, num_requests: 3 }, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [], by_agent_name: [] });
                 if (url.includes('/api/board/tasks')) return json({ tasks: window.__tasks });
                 if (url.includes('/api/analytics/limit-waits')) return json({ tracking: true, totals: { waits: 0, at_reset: 0, early: 0 }, rows: [], waiting: 0, teams: ['b', 'c'] });
-                if (url.includes('/api/call-metrics/summary')) return json({ rows: [] });
+                if (url.includes('/api/call-metrics/summary')) return json({ rows: window.__calls });
+                if (url.includes('/api/analytics/tasks')) return json({ range: '14d', group_by: 'agent', bucket: 'day', buckets: [], total: { completed: 0, failed: 0 }, groups: [] });
+                if (url.includes('/api/analytics/resource-queue')) return json({});
                 if (url.includes('/api/token-usage/by-team')) return json({ teams: [{ board_name: 'b', board_label: 'b', cost_usd: 0.59, input_tokens: 1, output_tokens: 1, cache_read_tokens: 0, cache_write_tokens: 0, total_tokens: 2, num_agents: 1 }, { board_name: 'c', board_label: 'c', cost_usd: 0.05, input_tokens: 1, output_tokens: 1, cache_read_tokens: 0, cache_write_tokens: 0, total_tokens: 2, num_agents: 1 }] });
                 if (url.includes('/api/token-usage/by-branch')) return json({ branches: [] });
                 if (url.includes('/api/token-usage/timeseries')) return json({ buckets: [] });
@@ -68,6 +70,20 @@ const TASKS = [task(1, 0.28, 7, '=HYPERLINK("http://x","go")'), task(2, 0.27, 7,
             assert.ok(!(await ev(`window.__reqs`)).some(u => u.includes('team=')));
             await view('team');
             await waitFor(`document.querySelectorAll('#cost-by-team tbody tr').length === 2`, 'both teams', 10000);
+        });
+        await run('the Team select stays on every view and the tabs and tables carry the team', async () => {
+            await pick('b');
+            await view('usage');
+            assert.ok(await ev(`document.getElementById('cost-team').getClientRects().length > 0`), 'visible on Usage');
+            await ev(`window.__reqs.length = 0; true`);
+            await view('tasks');
+            await waitFor(`window.__reqs.some(u => u.includes('/api/analytics/tasks') && u.includes('team=b'))`, 'tasks read with the team', 10000);
+            await view('thinking');
+            assert.match(await ev(`document.getElementById('cost-by-thinking').textContent`), /not per team/);
+            await view('calls');
+            await waitFor(`document.querySelectorAll('#call-metrics-summary tbody tr').length >= 1`, 'call rows', 10000);
+            assert.equal(await ev(`document.querySelectorAll('#call-metrics-summary tbody tr').length`), 1, 'only the team\'s calls');
+            await pick('');
         });
     } finally { await client.close(); }
 })().catch(e => { console.error('FAIL', e); process.exit(1); });
