@@ -86,6 +86,8 @@ type promptScreen struct {
 	// only to the person's own dashboard and for a folder Coral may trust (#14110, prompt_trust.go).
 	TrustFolder string `json:"trust_folder,omitempty"`
 	TrustOffer  bool   `json:"trust_offer,omitempty"`
+	// HookNote: for Codex's hook review, whose hooks the review is not about and where they likely come from (#21209); "" on any other screen.
+	HookNote string `json:"hook_note,omitempty"`
 	// TrustWhy: the plain reason there is no Yes on the folder-trust menu when none is offered (#14572); "" when the offer is made or the menu is another.
 	TrustWhy string `json:"trust_why,omitempty"`
 	// RateLimit: Codex's 'Approaching rate limits' notice may be answered whole from a row, to the person's own dashboard only (#14774): the model it offers. Absent for everyone else and for any other menu.
