@@ -1,4 +1,4 @@
-// #20938: real Inbox cards, resting versus pointer/keyboard focus, titles and neutral tiles.
+// #20938: real Inbox cards, resting versus pointer/keyboard focus, titles and colored file tiles (#21161 supersedes the neutral file tile).
 const assert = require('node:assert/strict'), fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady, nextFrame } = require('./helpers/wait');
@@ -17,13 +17,13 @@ const { BASE } = require('./test_base');
  await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
  await waitFor(`document.querySelectorAll('${row}').length===4`,'two goals and two document cards',15000);
  await ev(`(()=>{const s=document.createElement('style');s.textContent='*,*::before,*::after{transition:none !important}';document.head.append(s);return true})()`);
- const state=()=>ev(`(()=>{const probe=document.createElement('span');probe.style.cssText='color:var(--text-primary);background:var(--bg-tertiary)';document.body.append(probe);const p=getComputedStyle(probe),primary=p.color,tile=p.backgroundColor;probe.style.color='var(--text-secondary)';const secondary=getComputedStyle(probe).color;probe.style.color='var(--success-text,var(--success))';const green=getComputedStyle(probe).color;const rows=[...document.querySelectorAll('${row}')].map(r=>{const b=r.querySelector('.inbox-main-action'),t=(r.querySelector('.inbox-review-name')||r.querySelector('.inbox-v4-heading-text')),i=r.querySelector('.inbox-kind-icon');return {action:b&&getComputedStyle(b).color,title:t&&getComputedStyle(t).color,weight:t&&Number(getComputedStyle(t).fontWeight),tile:i&&getComputedStyle(i).backgroundColor}});probe.remove();return {rows,primary,secondary,tile,green}})()`);
+ const state=()=>ev(`(()=>{const probe=document.createElement('span');probe.style.cssText='color:var(--text-primary);background:var(--bg-tertiary)';document.body.append(probe);const p=getComputedStyle(probe),primary=p.color,tile=p.backgroundColor;probe.style.color='var(--text-secondary)';const secondary=getComputedStyle(probe).color;probe.style.color='var(--success-text,var(--success))';const green=getComputedStyle(probe).color;const rows=[...document.querySelectorAll('${row}')].map(r=>{const b=r.querySelector('.inbox-main-action'),t=(r.querySelector('.inbox-review-name')||r.querySelector('.inbox-v4-heading-text')),i=r.querySelector('.inbox-kind-icon');return {kind:i?.dataset.kind,action:b&&getComputedStyle(b).color,title:t&&getComputedStyle(t).color,weight:t&&Number(getComputedStyle(t).fontWeight),tile:i&&getComputedStyle(i).backgroundColor}});probe.remove();return {rows,primary,secondary,tile,green}})()`);
  for(const theme of ['dark','light']){
  await ev(`document.documentElement.setAttribute('data-theme','${theme}');document.activeElement?.blur();true`);
  await client.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:0,y:0});await nextFrame(ev);
  await ev(`document.getAnimations().forEach(a=>{try{a.finish()}catch{}});true`);
  let s=await state();assert.ok(s.rows.every(r=>r.action===s.secondary),'resting actions neutral '+JSON.stringify(s));
- assert.ok(s.rows.every(r=>r.tile===s.tile),'all kinds have neutral tiles '+JSON.stringify(s));
+ assert.ok(s.rows.every(r=>r.kind==='review'?r.tile!==s.tile:r.tile===s.tile),'file tiles keep color; other resting tiles stay neutral (#21161) '+JSON.stringify(s));
  assert.ok(s.rows.every(r=>r.title===s.primary&&r.weight>=600),'titles are strongest text '+JSON.stringify(s));
  await ev(`document.querySelector('${row}').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));true`);
  s=await state();assert.equal(s.rows.filter(r=>r.action===s.green).length,1,'one tapped card accent '+JSON.stringify(s));
