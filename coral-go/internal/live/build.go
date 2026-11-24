@@ -39,6 +39,7 @@ type Input struct {
 type Options struct{ Seq uint64 }
 
 const (
+	windowPosts     = 3
 	minBoundaryName = 4
 	maxPosts        = 50
 	maxText         = 500
@@ -139,6 +140,33 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 			continue
 		}
 		items[i] = Post{From: author, Text: text, At: p.At.Unix()}
+	}
+	// A secret can be cut across posts: neither half is one alone. Scan the joined text of each run of windowPosts neighbouring posts, and treat a run that
+	// holds a hit, with no post in it a hit already, as a hit at every post of the run (the neighbour rule below then withholds around them).
+	for i := 0; i+1 < len(posts); i++ {
+		for size := 2; size <= windowPosts; size++ { // runs of 2 and of 3: a token cut in two ends where the next post begins
+			end := i + size
+			if end > len(posts) {
+				break
+			}
+			var parts []string
+			explained := false // a post in the run that is a hit on its own already explains a hit of the run
+			for j, p := range posts[i:end] {
+				parts = append(parts, p.Text)
+				explained = explained || hit[i+j]
+			}
+			if explained {
+				continue
+			}
+			for _, sep := range []string{"\n", ""} {
+				if !scan(red, strings.Join(parts, sep)) {
+					for j := i; j < end; j++ {
+						hit[j] = true
+					}
+					break
+				}
+			}
+		}
 	}
 	for i := range hit {
 		if !hit[i] {
