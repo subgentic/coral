@@ -355,6 +355,23 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	})
 	safeGo(ctx, "limit_resume", func() { limitResumer.Run(ctx) })
 
+	// The agents' limit waits are counted for the cost page (#21020), whether or not Coral resumes at the reset: each wait, and how it ended (at the reset, early, or neither).
+	if lw := srv.LimitWaitsStore(); lw != nil {
+		limitCounter := background.NewLimitCounter(time.Minute, lw)
+		limitCounter.SetAgents(agentRT, discoverFn, func(ctx context.Context) map[string]string {
+			teams := map[string]string{}
+			if bs := srv.BoardStore(); bs != nil {
+				if subs, err := bs.GetAllSubscriptions(ctx); err == nil {
+					for sessionName, sub := range subs {
+						teams[sessionName] = sub.Project
+					}
+				}
+			}
+			return teams
+		})
+		safeGo(ctx, "limit_counter", func() { limitCounter.Run(ctx) })
+	}
+
 	// A large context is compacted at a quiet moment, for every team that has not turned it off (on by default since #15066, #14849).
 	var pausedFn func(string) bool
 	if bh := srv.BoardHandler(); bh != nil {

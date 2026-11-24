@@ -69,6 +69,7 @@ GET /api/agents/models launch
 GET /api/analytics/activity launch
 GET /api/analytics/efficiency launch
 GET /api/analytics/inbox-vs-chat launch
+GET /api/analytics/limit-waits never
 GET /api/analytics/resource-queue launch
 GET /api/analytics/tasks launch
 GET /api/artifacts view

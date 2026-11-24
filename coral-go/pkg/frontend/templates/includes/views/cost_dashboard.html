@@ -21,6 +21,9 @@
                 <option value="week">Last 7 days</option>
                 <option value="month">Last 30 days</option>
             </select>
+            <select id="cost-team" class="field cost-time-select" aria-label="Team"><!-- beside the range, as in the approved stage-1 mock (#21020): filters the Limit waits card; only the Overview has it (cost_dashboard.css) -->
+                <option value="">All teams</option>
+            </select>
             <button class="btn" data-on-click="cost-refresh">
                 <span class="material-icons" style="font-size:var(--fs-xl);line-height:1" aria-hidden="true">refresh</span> Refresh
             </button>
@@ -77,6 +80,7 @@
         </div>
     </div>
 
+    <section class="cost-section" id="cost-limit-waits-section" data-cview="overview" aria-label="Limit waits"><div id="cost-limit-waits"></div></section><!-- how often an agent was stopped by a vendor limit and how it went on (#21020) -->
     <p class="empty-state empty-state-tight cost-counts-note" id="cost-counts-note" data-cview="overview" data-empty="1" hidden></p><!-- a range with nothing counted says what is counted, so the zeros are not bare (#10521) -->
 
     <details class="disclosure cost-help" id="cost-help" data-cview="overview">
