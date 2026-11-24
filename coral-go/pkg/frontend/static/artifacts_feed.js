@@ -1,14 +1,13 @@
 /* Artifact revisions are freshness hints. Missing fields on older servers keep
  * the existing timed reads; only an explicit matching token can skip a list. */
-import { boardFetch } from './server_base.js';
+import { importOnce } from './import_once.js';
 const revisions = new Map(), listeners = new Set();
 let readEpoch = 0;
 export const artifactReadEpoch = () => readEpoch;
 export const invalidateArtifactReads = () => { readEpoch++; };
 export const artifactRevision = value => Number.isSafeInteger(value) && value > 0 ? value : null;
 export function publishArtifactsRev(brief, reconnect = false) {
-    if (reconnect) readEpoch++;
-    if (reconnect) for (const fn of [...listeners]) fn(null, null, true);
+    if (reconnect) { readEpoch++; for (const fn of [...listeners]) fn(null, null, true); }
     if (!brief || typeof brief !== 'object') return;
     for (const [team, raw] of Object.entries(brief)) {
         const rev = artifactRevision(raw);
@@ -26,11 +25,9 @@ export function onArtifactsRev(fn) { listeners.add(fn); return () => listeners.d
 export async function artifactsUnchanged(team, loaded, all = false) {
     if (artifactRevision(loaded) === null) return false;
     try {
-        const r = await boardFetch(team, '/status', { cache: 'no-store' });
-        if (!r.ok) return false;
-        const rev = artifactRevision((await r.json())[all ? 'artifacts_all_rev' : 'artifacts_rev']);
-        if (rev === null) return false;
+        const rev = artifactRevision((await (await importOnce('./status_read.js')).statusRead(team))?.[all ? 'artifacts_all_rev' : 'artifacts_rev']);
         if (!all) {
+
             if (rev !== loaded) publishArtifactsRev({ [team]: rev });
             else if (!revisions.has(team)) revisions.set(team, rev);
         }
