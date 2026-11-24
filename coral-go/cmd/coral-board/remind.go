@@ -17,13 +17,14 @@ import (
 
 const remindUsageText = `Usage: coral-board remind <add|list|show|done|cancel> ...
 
-  remind add "<text>" (--in 2h | --at <time> | --every 30m | --daily 09:00 | --weekdays 09:00)
+  remind add "<text>" (--in 2h | --at <time> | --every 30m | --daily 09:00 | --weekdays 09:00 | --weekly "Mon 09:00")
              [--to <member>] [--board <project>] [--tz <zone>] [--no-wake]
       A reminder for an agent: Coral tells it the text at that time, through the board, and the reminder stays open
       until it runs 'remind done'. You are the agent unless --to names another member of the team.
         --in 2h, --at 2026-11-18 09:00, --at 09:00   once (--at 09:00 is the next time the clock shows it)
         --every 15m                                  repeat every 5, 15, 30 or 60 minutes (an agent's own: 15 or more)
         --daily 09:00, --weekdays 09:00              every day, or Monday to Friday, at that time in --tz
+        --weekly "Mon 09:00"                         one day a week (Mon to Sun) at that time in --tz
       Who may: the Operator (any agent), an agent (for itself), the team's Orchestrator (for a member, while the
       Operator's grant is on). --no-wake: do not wake the agent if it is asleep. An agent keeps at most 20.
   remind list [--team] [--board <project>]    Your reminders (--team: the team's, the Orchestrator only)
@@ -120,9 +121,9 @@ func everyMinutes(s string) (int, error) {
 }
 
 // buildReminder turns the options into the API's body; a bad combination is an error.
-func buildReminder(text, in, at, every, daily, weekdays, tz string, now time.Time) (map[string]any, string, error) {
+func buildReminder(text, in, at, every, daily, weekdays, weekly, tz string, now time.Time) (map[string]any, string, error) {
 	n := 0
-	for _, v := range []string{in, at, every, daily, weekdays} {
+	for _, v := range []string{in, at, every, daily, weekdays, weekly} {
 		if v != "" {
 			n++
 		}
@@ -131,7 +132,7 @@ func buildReminder(text, in, at, every, daily, weekdays, tz string, now time.Tim
 		return nil, "", errors.New("say what to be reminded of: coral-board remind add \"<text>\" --in 2h")
 	}
 	if n != 1 {
-		return nil, "", errors.New("give exactly one of --in, --at, --every, --daily, --weekdays")
+		return nil, "", errors.New("give exactly one of --in, --at, --every, --daily, --weekdays, --weekly")
 	}
 	body := map[string]any{"text": text}
 	switch {
@@ -159,6 +160,9 @@ func buildReminder(text, in, at, every, daily, weekdays, tz string, now time.Tim
 		if weekdays != "" {
 			kind, at = "weekdays", weekdays
 		}
+		if weekly != "" { // "Mon 09:00": the day (Mon to Sun) and the time
+			kind, at = "weekly", weekly
+		}
 		zone := strings.TrimSpace(tz)
 		if zone == "" {
 			zone = localZone()
@@ -167,24 +171,25 @@ func buildReminder(text, in, at, every, daily, weekdays, tz string, now time.Tim
 			return nil, "", errors.New("could not tell this computer's time zone: add --tz Europe/Berlin (or set TZ)")
 		}
 		body["kind"], body["at"], body["timezone"] = kind, at, zone
-		return body, fmt.Sprintf("%s at %s (%s)", map[string]string{"daily": "every day", "weekdays": "Monday to Friday"}[kind], at, zone), nil
+		return body, fmt.Sprintf("%s at %s (%s)", map[string]string{"daily": "every day", "weekdays": "Monday to Friday", "weekly": "every week"}[kind], at, zone), nil
 	}
 }
 
 func remindAdd(args []string) {
-	text, rest := splitTitle(args, map[string]bool{"in": true, "at": true, "every": true, "daily": true, "weekdays": true, "tz": true, "to": true, "board": true})
+	text, rest := splitTitle(args, map[string]bool{"in": true, "at": true, "every": true, "daily": true, "weekdays": true, "weekly": true, "tz": true, "to": true, "board": true})
 	fs := flag.NewFlagSet("remind add", flag.ContinueOnError)
 	in := fs.String("in", "", "once, this long from now (30m, 2h, 3d)")
 	at := fs.String("at", "", "once, at this time")
 	every := fs.String("every", "", "repeat every 5, 15, 30 or 60 minutes")
 	daily := fs.String("daily", "", "every day at HH:mm")
 	weekdays := fs.String("weekdays", "", "Monday to Friday at HH:mm")
-	tz := fs.String("tz", "", "the time zone for --daily and --weekdays")
+	weekly := fs.String("weekly", "", "one day a week at \"Mon 09:00\" (Mon to Sun)")
+	tz := fs.String("tz", "", "the time zone for --daily, --weekdays and --weekly")
 	to := fs.String("to", "", "the member it is for (default: you)")
 	boardFlag := fs.String("board", "", "the team (default: the one you joined)")
 	noWake := fs.Bool("no-wake", false, "do not wake the agent if it is asleep")
 	clihelp.ParseFlags(fs, rest, func() string { return remindUsageText })
-	body, when, err := buildReminder(strings.TrimSpace(text), *in, *at, *every, *daily, *weekdays, *tz, time.Now())
+	body, when, err := buildReminder(strings.TrimSpace(text), *in, *at, *every, *daily, *weekdays, *weekly, *tz, time.Now())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(2)
@@ -263,7 +268,7 @@ func reminderLine(m map[string]any) string {
 		when = "once " + fmt.Sprint(m["at"]) + " " + fmt.Sprint(m["timezone"])
 	case "interval":
 		when = fmt.Sprintf("every %v min", m["every_minutes"])
-	case "daily", "weekdays":
+	case "daily", "weekdays", "weekly":
 		when = kind + " " + fmt.Sprint(m["at"]) + " " + fmt.Sprint(m["timezone"])
 	}
 	state := fmt.Sprint(m["state"])

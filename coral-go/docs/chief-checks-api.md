@@ -18,7 +18,7 @@ Fields: `name`, `instruction`, `target_board`, `target_session`, `notify_mode`,
 `enabled`, `wake_if_asleep` (default false), optional `source_key`, and schedule.
 `notify_mode` is `only_if_found`, `every_time`, or `daily_brief`.
 Schedules use an IANA `timezone` and either `schedule_kind: interval` with
-`every_minutes: 5|15|30|60`, or `schedule_kind: daily|weekdays` with `at: HH:mm`.
+`every_minutes: 5|15|30|60`, or `schedule_kind: daily|weekdays` with `at: HH:mm`, or `schedule_kind: weekly` with `at: "Mon 09:00"` (Mon to Sun, a space, HH:mm).
 The target must still be an active board member. Credentials and sign-in links
 are refused visibly; instructions are never silently redacted. Source keys
 identify a UI source, and carry no connector configuration.

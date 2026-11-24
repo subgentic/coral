@@ -5,11 +5,12 @@ A reminder is a note Coral types to an agent at a time you choose. It stays open
 ```
 coral-board remind add "Check the soak run" --in 2h
 coral-board remind add "Stand-up notes" --weekdays 09:00 --tz Europe/Berlin
+coral-board remind add "Weekly catch-up" --weekly "Mon 09:00" --tz Europe/Berlin
 coral-board remind add "Look at CI" --every 15m
 coral-board remind list | show <id> | done <id> | cancel <id>
 ```
 
-Times: `--in 2h`, `--at 2026-11-18 09:00` (one time, at most 364 days ahead), `--every 5m|15m|30m|60m`, `--daily HH:mm`, `--weekdays HH:mm`.
+Times: `--in 2h`, `--at 2026-11-18 09:00` (one time, at most 364 days ahead), `--every 5m|15m|30m|60m`, `--daily HH:mm`, `--weekdays HH:mm`, `--weekly "Mon 09:00"` (one day a week, Mon to Sun, then the time; a week the clocks change still fires at 09:00 on the wall).
 
 ## Who may do what
 

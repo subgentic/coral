@@ -50,6 +50,18 @@ type ChiefCheck struct {
 // IsReminder is whether the check is a reminder set for an agent (#19162) rather than one of Chief's own checks.
 func (c ChiefCheck) IsReminder() bool { return c.Origin != "" && c.Origin != "chief" }
 
+var weekdayNames = []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
+
+// WeekdayNumber is the cron number (0 Sunday to 6 Saturday) of "Mon" and its like; the names are the three letters, exactly.
+func WeekdayNumber(name string) (int, bool) {
+	for i, n := range weekdayNames {
+		if n == name {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
 // ChiefCron produces only the supported five-field schedules, never approximations.
 func ChiefCron(c ChiefCheck) (string, error) {
 	if strings.TrimSpace(c.Name) == "" || utf8.RuneCountInString(c.Name) > 120 || strings.TrimSpace(c.Instruction) == "" || len(c.Instruction) > 8192 || len(c.SourceKey) > 120 || (c.TargetBoard == "" && !c.IsReminder()) || c.TargetSession == "" { // a reminder for an agent on no team has no board (#19531); Chief's own checks always do
@@ -82,14 +94,22 @@ func ChiefCron(c ChiefCheck) (string, error) {
 			return "", errors.New("interval must be 5, 15, 30 or 60 minutes")
 		}
 	}
-	if c.ScheduleKind != "daily" && c.ScheduleKind != "weekdays" {
+	if c.ScheduleKind != "daily" && c.ScheduleKind != "weekdays" && c.ScheduleKind != "weekly" {
 		return "", errors.New("invalid schedule")
 	}
-	at, err := time.Parse("15:04", c.At)
-	if err != nil || at.Format("15:04") != c.At {
+	clock, days := c.At, "*"
+	if c.ScheduleKind == "weekly" { // a weekly reminder keeps its day in the time, "Mon 09:00" (#21085): one day of the week, the job's time zone
+		day, rest, ok := strings.Cut(c.At, " ")
+		d, known := WeekdayNumber(day)
+		if !ok || !known {
+			return "", errors.New("weekly needs a day of the week and a time, like Mon 09:00")
+		}
+		clock, days = rest, strconv.Itoa(d)
+	}
+	at, err := time.Parse("15:04", clock)
+	if err != nil || at.Format("15:04") != clock {
 		return "", errors.New("time must be HH:mm")
 	}
-	days := "*"
 	if c.ScheduleKind == "weekdays" {
 		days = "1-5"
 	}
