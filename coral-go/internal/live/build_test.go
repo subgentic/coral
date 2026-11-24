@@ -224,3 +224,31 @@ func TestStatusIsOneOfFourWordsAndRoleIsScanned(t *testing.T) {
 	raw, _ := json.Marshal(f)
 	require.NotContains(t, string(raw), "sk_live_")
 }
+
+// QA Engineer's items on slice 1 (#21026): split names, role closed like text, short names on word boundaries.
+func TestNamesSplitByWhiteSpaceAreStillNames(t *testing.T) {
+	for _, split := range []string{"Backend  Dev", "Backend\nDev", "Backend Dev", "backend \t dev", "BACKEND DEV"} {
+		f := Build(Input{Agents: twoAgents(), Posts: []PostFacts{post("Ada Lovelace", "thanks "+split+" for it", 1)}}, Options{}, hubScan())
+		raw, _ := json.Marshal(f)
+		require.NotContains(t, strings.ToLower(string(raw)), "dev", "split=%q", split)
+		require.Equal(t, "thanks backend for it", f.Posts[0].Text, "split=%q", split)
+	}
+	hidden := Build(Input{Agents: twoAgents(), Posts: []PostFacts{post("Ada Lovelace", "ask QA  Engineer", 1)}}, Options{}, hubScan())
+	require.True(t, hidden.Posts[0].W, "a hidden agent's name split by spaces withholds the post")
+}
+
+func TestARoleThatNamesSomeoneIsNotShown(t *testing.T) {
+	ag := twoAgents()
+	ag[0].Role = "Ada Lovelace's helper"
+	f := Build(Input{Agents: ag}, Options{}, hubScan())
+	require.Equal(t, "Agent 1", f.Agents[0].Role)
+	ag[0].Role = "see coral://artifacts/abc"
+	require.Equal(t, "Agent 1", Build(Input{Agents: ag}, Options{}, hubScan()).Agents[0].Role, "an id in a role is not shown")
+}
+
+func TestShortNamesAreMatchedOnWordBoundariesOnly(t *testing.T) {
+	ag := []AgentFacts{{RealName: "Al", Role: "lead", Status: StatusIdle, Shown: true}, {RealName: "Bo", Role: "qa", Status: StatusIdle, Shown: false}}
+	f := Build(Input{Agents: ag, Posts: []PostFacts{post("Al", "Al also thanks Alexander and Al.", 1), post("Al", "a bold move", 2)}}, Options{}, hubScan())
+	require.Equal(t, "lead also thanks Alexander and lead.", f.Posts[0].Text, "'also' and 'Alexander' are not garbled")
+	require.False(t, f.Posts[1].W, "a hidden short name inside 'bold' is not a mention")
+}
