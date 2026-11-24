@@ -1,0 +1,10 @@
+.team-template-tiles { flex: 1 1 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 6px; }
+.team-template-tiles[hidden] { display: none; }
+.team-tile { text-align: left; font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-secondary); border-radius: var(--radius-xl); padding: 14px; display: grid; gap: 6px; align-content: start; }
+.team-tile:hover { background: var(--bg-tertiary); }
+.team-tile[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.team-tile .nm { font-weight: var(--fw-strong); font-size: var(--fs-xl); }
+.team-tile .d { font-size: var(--fs-lg); line-height: var(--lh-ui); }
+.team-tile .d i { font-style: normal; color: var(--text-secondary); display: block; }
+.team-tile .m { font-size: var(--fs-base); color: var(--text-secondary); }
+@media (max-width: 760px) { .team-template-tiles { grid-template-columns: 1fr; } }
