@@ -107,6 +107,14 @@ func (s *Store) ListSubscribers(ctx context.Context, project string) ([]Subscrib
 	return subs, err
 }
 
+// ListAllSubscribers returns every subscription of a project, left ones included (Coral Live's name rule must know the name of an agent that has gone, as an old post may name it). One row per subscriber id: the newest.
+func (s *Store) ListAllSubscribers(ctx context.Context, project string) ([]Subscriber, error) {
+	var subs []Subscriber
+	err := s.reader().SelectContext(ctx, &subs,
+		`SELECT * FROM board_subscribers WHERE project = ? AND id IN (SELECT MAX(id) FROM board_subscribers WHERE project = ? GROUP BY subscriber_id) ORDER BY subscribed_at, id`, project, project)
+	return subs, err
+}
+
 // GetSubscription returns the active subscription for a subscriber.
 func (s *Store) GetSubscription(ctx context.Context, subscriberID string) (*Subscriber, error) {
 	var sub Subscriber
