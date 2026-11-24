@@ -44,7 +44,7 @@ var reviewedFileOpens = map[string]string{
 	"artifacts.go:storeArtifactFileAs:ReadFile":                           "the upload's own record in uploads/<session>/<server hex>.json, read to keep the task link an earlier upload of the same bytes made (#7739)",
 	"artifacts_store.go:readSidecar:ReadFile":                             "an object's sidecar, hex name",
 	"auto_attach.go:NewAutoAttacher:ReadFile":                             "server data folder (auto-attach-bytes)",
-	"board_task_read.go:BoardHandler.taskDiff:ReadFile":            "the task id is an int64; the server's artifacts folder",
+	"board_task_read.go:BoardHandler.taskDiff:ReadFile":                   "the task id is an int64; the server's artifacts folder",
 	"changes_diff_filter.go:isBinaryFile:Open":                            "an untracked name git lists, under diffPathHidden and an Lstat regular-file check",
 	"file_explorer.go:serveExplorerDirectory:Open":                        "the explorer: no abs or '..', EvalSymlinks + Rel inside the root, strict roots",
 	"sessions_changes.go:SessionsHandler.Diff:ReadFile":                   "isPathWithinDir on the resolved path; strict callers get diffPathRefused",
