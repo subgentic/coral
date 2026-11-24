@@ -70,7 +70,7 @@ func requireTwoLineDescription(t *testing.T, block string) {
 }
 
 // Brief task 8 (#21058): the next three solo templates. Each has an Orchestrator (the Members step needs one) and two roles named by what they do, two lines for its card, and no
-// working mode; Bug sweep and Docs and tests catch-up carry their reminder on the Orchestrator, Research and write-up has none.
+// working mode; Bug sweep carries its reminder on the Orchestrator; Docs and tests catch-up and Research and write-up have none (the weekly one waits for the weekly kind, #21085).
 func TestTheNextThreeSoloTemplates(t *testing.T) {
 	src := frontendSource(t, "team_templates_ui.js")
 	for _, c := range []struct {
@@ -79,7 +79,7 @@ func TestTheNextThreeSoloTemplates(t *testing.T) {
 		reminder string // a pattern for the one reminder, "" for none
 	}{
 		{"Bug sweep", []string{"Orchestrator", "Reproducer", "Fixer"}, `text: "Daily summary: [^"]*Needs you[^"]*", kind: "daily", at: "[0-2][0-9]:[0-5][0-9]"`},
-		{"Docs and tests catch-up", []string{"Orchestrator", "Test Writer", "Docs Writer"}, `text: "Weekly catch-up, Mondays only: [^"]*", kind: "weekdays", at: "[0-2][0-9]:[0-5][0-9]"`},
+		{"Docs and tests catch-up", []string{"Orchestrator", "Test Writer", "Docs Writer"}, ""}, // no reminder yet: a weekly Monday one comes with the weekly reminder kind (#21085)
 		{"Research and write-up", []string{"Orchestrator", "Researcher", "Writer"}, ""},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -89,7 +89,9 @@ func TestTheNextThreeSoloTemplates(t *testing.T) {
 			require.NotRegexp(t, `\bmode: "`, block)
 			if c.reminder == "" {
 				require.NotContains(t, block, "reminders:")
-				require.Contains(t, block, "review", "the report goes to the person for review")
+				if c.name == "Research and write-up" {
+					require.Contains(t, block, "review", "the report goes to the person for review")
+				}
 				return
 			}
 			require.Equal(t, 1, strings.Count(block, "reminders:"))
