@@ -1,0 +1,221 @@
+package routes
+
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/httputil"
+	"github.com/subgentic/coral/internal/store"
+)
+
+// A second Hub asks to join this Coral (#20936, design #20901 v4). Every route here is the person at this computer's: never tunneled (the tunnel table has none of them), never an agent's, never a Hub's. A request is a
+// pending row: it links nothing and grants nothing. Allow shows the code once, in its own response; finish checks it and runs the same enroll `coral cloud links add` runs.
+//
+//	POST /api/cloud/link-requests              {hub, cap}  -> {request_id, poll_secret, expires_at}   (the secret is shown once)
+//	GET  /api/cloud/link-requests                           -> {requests: [...]} the waiting ones (the Needs-you card); no secret, no code
+//	GET  /api/cloud/link-requests/{id}         X-Link-Request-Secret -> {state}  pending|allowed|denied|expired|done
+//	POST /api/cloud/link-requests/{id}/allow   {cap?}      -> {code, cap}   the person at this computer only; the code is in no other read
+//	POST /api/cloud/link-requests/{id}/deny    {}          -> {ok}
+//	POST /api/cloud/link-requests/{id}/finish  {poll_secret, code} -> {enrollment}   takes no address: only the origin that was allowed
+
+const linkRequestSecretHeader = "X-Link-Request-Secret"
+
+// linkRequestCaller is who may make, poll and finish a request: the person at this computer (the dashboard or the signed command line). A later slice adds the self-hosted Hub's own key.
+func (h *CloudHandler) linkRequestCaller(w http.ResponseWriter, r *http.Request) (cred string, refused bool) {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || h.noLinkStore(w) {
+		return "", true
+	}
+	return "", false
+}
+
+// linkRequestHuman is the person at this computer: Allow, Deny and the feed. Not an agent, not a key.
+func (h *CloudHandler) linkRequestHuman(w http.ResponseWriter, r *http.Request) bool {
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || h.noLinkStore(w) {
+		return true
+	}
+	if !humanInputCaller(r) {
+		errForbidden(w, "Only the person at this computer can answer a request to join")
+		return true
+	}
+	return false
+}
+
+func (h *CloudHandler) linkRequestErr(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, store.ErrLinkRequestNone):
+		errNotFound(w, "No such request")
+	case errors.Is(err, store.ErrLinkRequestState):
+		writeError(w, http.StatusConflict, "link_request_state", "That request is not waiting for that")
+	case errors.Is(err, store.ErrLinkRequestCode):
+		writeError(w, http.StatusForbidden, "wrong_code", "That is not the code")
+	case errors.Is(err, store.ErrLinkRequestCap):
+		errBadRequest(w, "A Hub cannot be given more than it asked for")
+	case errors.Is(err, store.ErrLinkExists):
+		writeError(w, http.StatusConflict, "already_linked", store.ErrLinkExists.Error())
+	case errors.Is(err, store.ErrTooManyLinks):
+		writeError(w, http.StatusConflict, "too_many_links", "This computer is linked to the most Hubs it can be.")
+	case errors.Is(err, store.ErrSecondLinkNotYet):
+		writeError(w, http.StatusConflict, "second_link_not_yet", "This Coral links to one Hub for now. Remove that link first.")
+	case errors.Is(err, store.ErrLinkRequestBusy):
+		httputil.WriteActionLimit(w, 0, "link_request_busy", "Too many requests are waiting. Answer or wait for them first.")
+	case errors.Is(err, store.ErrLinkRequestRate):
+		httputil.WriteActionLimit(w, 0, "rate_limited", "Too many requests in the last hour. Try again later.")
+	case errors.Is(err, store.ErrLinkRequestMuted):
+		httputil.WriteActionLimit(w, 0, "link_request_muted", "That Hub's requests were denied twice. It may ask again in an hour.")
+	default:
+		errBadRequest(w, cleanSavedField(err.Error())) // an address or cap that is not valid: our own words
+	}
+}
+
+// LinkRequestCreate: POST /api/cloud/link-requests.
+func (h *CloudHandler) LinkRequestCreate(w http.ResponseWriter, r *http.Request) {
+	cred, refused := h.linkRequestCaller(w, r)
+	if refused || !requireJSON(w, r) {
+		return
+	}
+	var body struct {
+		Hub string `json:"hub"`
+		Cap string `json:"cap"`
+	}
+	if err := decodeJSONLimit(r, &body, 4096); err != nil {
+		errBadRequest(w, "send {\"hub\": the Hub's address, \"cap\": \"view\", \"interact\" or \"launch\"}")
+		return
+	}
+	now := time.Now()
+	id, secret, err := h.links.CreateLinkRequest(r.Context(), body.Hub, body.Cap, cred, now)
+	if err != nil {
+		h.linkRequestErr(w, err)
+		return
+	}
+	slog.Info("cloud: link request made", "request", id, "cred", cred)
+	writeJSON(w, http.StatusOK, map[string]any{"request_id": id, "poll_secret": secret, "state": "pending", "expires_at": now.Add(store.LinkRequestPendingTTL).UTC().Format(time.RFC3339)})
+}
+
+type linkRequestView struct {
+	ID        string `json:"id"`
+	Hub       string `json:"hub"`
+	CapAsked  string `json:"cap_asked"`
+	CreatedAt string `json:"created_at"`
+	ExpiresAt string `json:"expires_at"`
+	// Links is how many this computer has now, and Max the most it can have ("1 of 8").
+	Links int `json:"links"`
+	Max   int `json:"max"`
+}
+
+// LinkRequestFeed: GET /api/cloud/link-requests. The waiting requests, for the card: the Hub's address (Hub B's one supplied word) and the access it asked. No secret, no code.
+func (h *CloudHandler) LinkRequestFeed(w http.ResponseWriter, r *http.Request) {
+	if h.linkRequestHuman(w, r) {
+		return
+	}
+	ps, err := h.links.PendingLinkRequests(r.Context(), time.Now())
+	if err != nil {
+		errInternalServer(w, "Could not read the requests")
+		return
+	}
+	links, _ := h.links.ListLinks(r.Context())
+	out := make([]linkRequestView, 0, len(ps))
+	for _, p := range ps {
+		out = append(out, linkRequestView{ID: p.ID, Hub: cleanSavedField(p.Hub), CapAsked: p.CapAsked, CreatedAt: p.CreatedAt.UTC().Format(time.RFC3339), ExpiresAt: p.ExpiresAt.UTC().Format(time.RFC3339), Links: len(links), Max: store.MaxCloudLinks})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"requests": out})
+}
+
+// LinkRequestStatus: GET /api/cloud/link-requests/{id}, the poll secret in X-Link-Request-Secret (never the URL, which is logged).
+func (h *CloudHandler) LinkRequestStatus(w http.ResponseWriter, r *http.Request) {
+	if _, refused := h.linkRequestCaller(w, r); refused {
+		return
+	}
+	st, err := h.links.LinkRequestStatus(r.Context(), chi.URLParam(r, "id"), r.Header.Get(linkRequestSecretHeader), time.Now())
+	if err != nil {
+		h.linkRequestErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"state": st})
+}
+
+// LinkRequestAllow: POST /api/cloud/link-requests/{id}/allow {cap?}. The person here allows, optionally a lower cap; the 8-digit code is in this response and nowhere else.
+func (h *CloudHandler) LinkRequestAllow(w http.ResponseWriter, r *http.Request) {
+	if h.linkRequestHuman(w, r) || !requireJSON(w, r) {
+		return
+	}
+	var body struct {
+		Cap string `json:"cap"`
+	}
+	_ = decodeJSONLimit(r, &body, 1024)
+	id := chi.URLParam(r, "id")
+	req, err := h.links.LinkRequestByID(r.Context(), id, time.Now())
+	if err != nil {
+		h.linkRequestErr(w, err)
+		return
+	}
+	if body.Cap == "" {
+		body.Cap = req.CapAsked
+	}
+	code, given, err := h.links.AllowLinkRequest(r.Context(), id, body.Cap, time.Now())
+	if err != nil {
+		h.linkRequestErr(w, err)
+		return
+	}
+	slog.Info("cloud: link request allowed", "request", id, "hub", req.Hub, "cap", given)
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"code": code, "cap": given, "expires_in": int(store.LinkRequestAllowedTTL.Seconds())})
+}
+
+// LinkRequestDeny: POST /api/cloud/link-requests/{id}/deny.
+func (h *CloudHandler) LinkRequestDeny(w http.ResponseWriter, r *http.Request) {
+	if h.linkRequestHuman(w, r) || !requireJSON(w, r) {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if err := h.links.DenyLinkRequest(r.Context(), id, time.Now()); err != nil {
+		h.linkRequestErr(w, err)
+		return
+	}
+	slog.Info("cloud: link request denied", "request", id)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// LinkRequestFinish: POST /api/cloud/link-requests/{id}/finish {poll_secret, code}. It takes no address. One transaction checks the secret, the clock, the tries and the code and marks the request used; then the existing
+// enroll (the one `coral cloud links add` runs) goes to the origin that was allowed, with the cap given.
+func (h *CloudHandler) LinkRequestFinish(w http.ResponseWriter, r *http.Request) {
+	if _, refused := h.linkRequestCaller(w, r); refused || !requireJSON(w, r) {
+		return
+	}
+	var body struct {
+		PollSecret string `json:"poll_secret"`
+		Code       string `json:"code"`
+	}
+	if err := decodeJSONLimit(r, &body, 1024); err != nil {
+		errBadRequest(w, "send {\"poll_secret\": ..., \"code\": ...}")
+		return
+	}
+	m := h.manager()
+	if m == nil {
+		errInternalServer(w, "The Coral Hub connector is not available") // before the request is used up
+		return
+	}
+	id := chi.URLParam(r, "id")
+	hub, linkCap, err := h.links.FinishLinkRequest(r.Context(), id, body.PollSecret, body.Code, time.Now())
+	if err != nil {
+		h.linkRequestErr(w, err)
+		return
+	}
+	pe, err := m.AddLinkByOrigin(r.Context(), hub, linkCap)
+	slog.Info("cloud: link request finished", "request", id, "hub", hub, "ok", err == nil)
+	var rl *cloud.RateLimitedError
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]any{"enrollment": viewOfEnrollment(*pe)})
+	case errors.As(err, &rl):
+		httputil.WriteActionLimit(w, 0, "rate_limited", "That Hub is busy. Ask again in a moment.")
+	case errors.Is(err, cloud.ErrHubUnavailable), errors.Is(err, cloud.ErrHubResponse):
+		writeError(w, http.StatusBadGateway, "hub_unreachable", "Coral could not get a code from that Hub. Ask again.")
+	default:
+		h.linkRequestErr(w, err)
+	}
+}

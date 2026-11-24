@@ -627,6 +627,12 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Get("/api/cloud/links/{id}/asks", s.cloudHandler.LinkAsks) // which asks a Hub added here may answer (#20413): the person at this computer's, never tunneled
 	r.Put("/api/cloud/links/{id}/asks", s.cloudHandler.SetLinkAsk)
 	r.Delete("/api/cloud/links/{id}", s.cloudHandler.RemoveLink)
+	r.Post("/api/cloud/link-requests", s.cloudHandler.LinkRequestCreate) // #20936: a second Hub asks to join; this computer only, never tunneled
+	r.Get("/api/cloud/link-requests", s.cloudHandler.LinkRequestFeed)
+	r.Get("/api/cloud/link-requests/{id}", s.cloudHandler.LinkRequestStatus)
+	r.Post("/api/cloud/link-requests/{id}/allow", s.cloudHandler.LinkRequestAllow)
+	r.Post("/api/cloud/link-requests/{id}/deny", s.cloudHandler.LinkRequestDeny)
+	r.Post("/api/cloud/link-requests/{id}/finish", s.cloudHandler.LinkRequestFinish)
 	r.Post("/api/cloud/rekey", s.cloudHandler.Rekey)                   // #3698
 	r.Get("/api/cloud/owner-label", s.cloudHandler.OwnerLabel)         // #6108: is the owner recorded, and who would be
 	r.Post("/api/cloud/owner-label/arm", s.cloudHandler.ArmOwnerLabel) // #6108: Confirm owner: arms the adoption for a minute, from this computer's dashboard only

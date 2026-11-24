@@ -55,7 +55,7 @@ func TestLinkRequestRoutesRefuseAnAgentToken(t *testing.T) {
 func TestASecondHubJoinsByRequestAllowAndCode(t *testing.T) {
 	r, cs, _, _ := linkedRemoteWithManager(t)
 	store.AllowSecondLinkForTest(t)
-	_, err := r.db.ExecContext(context.Background(), `INSERT OR REPLACE INTO user_settings (key, value) VALUES ('cloud_link_max_mode', 'launch')`)
+	_, err := r.db.ExecContext(context.Background(), `INSERT OR REPLACE INTO user_settings (key, value) VALUES ('cloud_max_mode', 'launch')`)
 	require.NoError(t, err)
 	hub := newStubHub(t)
 	js := map[string]string{"Content-Type": "application/json"}
@@ -93,11 +93,12 @@ func TestASecondHubJoinsByRequestAllowAndCode(t *testing.T) {
 	code := regexp.MustCompile(`"code":"(\d{8})"`).FindStringSubmatch(al.Body.String())
 	require.Len(t, code, 2, al.Body.String())
 	assert.Equal(t, 409, call(h, "POST", "/api/cloud/link-requests/"+made.ID+"/allow", `{"cap":"interact"}`, js).Code, "no second code")
-	for _, p := range []string{"/api/cloud/link-requests", "/api/cloud/link-requests/" + made.ID + "?poll_secret=" + made.Secret} {
-		body := call(h, "GET", p, "", js).Body.String()
+	sec := map[string]string{"Content-Type": "application/json", "X-Link-Request-Secret": made.Secret}
+	for _, p := range []string{"/api/cloud/link-requests", "/api/cloud/link-requests/" + made.ID} {
+		body := call(h, "GET", p, "", sec).Body.String()
 		assert.NotContains(t, body, code[1], "the code is in no read: "+p)
 	}
-	st := call(h, "GET", "/api/cloud/link-requests/"+made.ID+"?poll_secret="+made.Secret, "", js)
+	st := call(h, "GET", "/api/cloud/link-requests/"+made.ID, "", sec)
 	assert.Contains(t, st.Body.String(), `"allowed"`)
 
 	// A wrong code is refused and counted; the right one starts the existing enroll to the Hub that was allowed.
@@ -142,8 +143,9 @@ func TestDenyAndTheEarlyRefusalsMakeNoCard(t *testing.T) {
 	id := m["request_id"].(string)
 	assert.Equal(t, 200, call(h, "POST", "/api/cloud/link-requests/"+id+"/deny", `{}`, js).Code)
 	assert.NotContains(t, call(h, "GET", "/api/cloud/link-requests", "", js).Body.String(), id)
-	st := call(h, "GET", "/api/cloud/link-requests/"+id+"?poll_secret="+m["poll_secret"].(string), "", js)
+	st := call(h, "GET", "/api/cloud/link-requests/"+id, "", map[string]string{"X-Link-Request-Secret": m["poll_secret"].(string)})
 	assert.Contains(t, st.Body.String(), `"denied"`)
-	assert.Equal(t, 404, call(h, "GET", "/api/cloud/link-requests/"+id+"?poll_secret=wrong", "", js).Code, "a wrong secret and an unknown request look the same")
-	assert.Equal(t, 404, call(h, "GET", "/api/cloud/link-requests/req-unknown?poll_secret=wrong", "", js).Code)
+	bad := map[string]string{"X-Link-Request-Secret": "wrong"}
+	assert.Equal(t, 404, call(h, "GET", "/api/cloud/link-requests/"+id, "", bad).Code, "a wrong secret and an unknown request look the same")
+	assert.Equal(t, 404, call(h, "GET", "/api/cloud/link-requests/req-unknown", "", bad).Code)
 }
