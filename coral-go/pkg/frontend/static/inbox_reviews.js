@@ -18,6 +18,8 @@ let savedActivated = false;
 export function activateSavedReviews() {
     if (savedActivated) return pending || Promise.resolve();
     savedActivated = true;
+    // Only a Hub waits to be asked for Saved; everywhere else every pass already reads it, so a forced read here (it discards the shared answers) only read the lists twice at a cold start.
+    if (!isCloud()) return pending || refreshReviews(true, { reuse: true });
     return pending ? pending.then(() => refreshReviews(true)) : refreshReviews(true);
 }
 let activated = false, refreshAgain = false, freshnessDirty = false;

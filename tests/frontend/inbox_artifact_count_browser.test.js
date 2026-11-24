@@ -34,7 +34,8 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`window.__counts.length >= 1`, 'the first count read', 8000);
             const first = await asks();
             assert.equal(first, 1, 'one count read on opening: ' + first);
-            const reviewReads = await ev(`window.__reviewCounts`);
+            // the browser's own record of what went to the network: the summary is read at idle after the first paint, which on a quick page is before this suite's wrapper is in (#21114), so the wrapper's list can miss it
+            const reviewReads = await ev(`performance.getEntriesByType('resource').map(e => e.name).filter(n => /\\/api\\/team-artifacts\\?[^#]*waiting=1/.test(n) && /limit=1(&|$)/.test(n))`);
             assert.equal(reviewReads.length, 1, 'the tagged waiting summary is also read exactly once on opening');
             assert.deepEqual(Object.fromEntries(new URL(reviewReads[0], BASE).searchParams), {tag:'for review',waiting:'1',muted:'0',versions:'newest',limit:'1'}, 'the second stream is only the bounded review-attention summary');
             const url = await ev(`window.__counts[0]`);
