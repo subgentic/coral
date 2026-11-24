@@ -46,6 +46,7 @@ func (h *HealthNudges) nudgeGoalDone(ctx context.Context, project string, bySess
 	if err != nil {
 		return
 	}
+	subs = withoutTerminals(subs, nil) // #21170
 	orch, _ := h.store.TeamOrchestrator(ctx, project)
 	r := &healthRun{h: h, project: project, hs: hs, now: now}
 	for _, g := range page.Goals {

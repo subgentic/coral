@@ -31,6 +31,7 @@ func (m *BoardHealthMonitor) noticeLimitHits(ctx context.Context, project string
 	if err != nil {
 		return
 	}
+	subs = withoutTerminals(subs, bySession) // #21170
 	orch, _ := m.store.TeamOrchestrator(ctx, project)
 	var tasks []board.Task
 	loaded := false

@@ -188,6 +188,7 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 	if err != nil {
 		return
 	}
+	subs = withoutTerminals(subs, bySession) // a person's terminal is not an agent (#21170)
 	tasks, err := h.store.ListOpenTaskStates(ctx, project)
 	if err != nil {
 		return
@@ -459,6 +460,7 @@ func (h *HealthNudges) remindAsks(ctx context.Context, project string, bySession
 	if err != nil {
 		return
 	}
+	subs = withoutTerminals(subs, bySession) // #21170
 	r := &healthRun{h: h, project: project, hs: hs, now: now}
 	after := healthMinutes(hs.AskReminder.AfterMin)
 	for _, o := range open {

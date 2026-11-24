@@ -917,6 +917,8 @@ hour and acts again next hour. The board setting `health_nudges` = `off` turns t
 
 ### The orchestrator's health check
 
+A person's terminal opened in a team (New terminal) is not an agent to the check: it gets no idle, waiting, claim, peek or off-the-books item, and it is not in the counts (#21170). Coral tells it by its session, whose name starts with `terminal-`.
+
 Every few minutes (the board's `health` settings: on, interval, recipient, all-clear line) Coral types a check to the orchestrator, or the recipient the team chose, alone, never as a board post. It is one line of at most 4096 bytes (a newline typed into a terminal would be an Enter), shown here as a list. It is an **action list** (#11729): what the orchestrator is to do, oldest first, each line saying who, what, for how long and the verb; the counts come last. Every line is a rule Coral computes from what it has, never a judgment:
 
 ```

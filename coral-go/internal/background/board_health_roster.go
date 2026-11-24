@@ -248,6 +248,7 @@ func (m *BoardHealthMonitor) escalateWaits(ctx context.Context, project string) 
 	if err != nil {
 		return
 	}
+	subs = withoutTerminals(subs, nil) // #21170
 	tasks := map[int64]board.Task{}
 	if open, err := m.store.ListOpenTaskStates(ctx, project); err == nil {
 		for _, t := range open {

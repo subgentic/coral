@@ -236,6 +236,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 		}
 		subs = kept
 	}
+	subs = withoutTerminals(subs, bySession) // a person's terminal is not an agent: no idle, waiting or peek items, no count (#21170)
 	all, err := m.store.ListOpenTaskStates(ctx, project)
 	if err != nil {
 		return "", 0, nil, err

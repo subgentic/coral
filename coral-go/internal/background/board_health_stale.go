@@ -196,6 +196,7 @@ func (m *BoardHealthMonitor) sweepProject(ctx context.Context, project string, b
 	if err != nil {
 		return
 	}
+	subs = withoutTerminals(subs, bySession) // #21170
 	asleep, _ := m.store.SleepingSubscribers(ctx, project)
 	in := staleInput{Now: tick, Open: open, InReview: inReview, Asleep: map[string]bool{}, Gone: map[string]bool{}, LastPost: map[string]time.Time{}, GoalClosed: map[int64]bool{},
 		Title: func(s string) string { return teamhealth.ShownText(s, nil) }}
