@@ -151,3 +151,130 @@ func TestTaskReviewSizeVerdict(t *testing.T) {
 	code, _ = verdict(nil)
 	assert.Equal(t, http.StatusNotFound, code)
 }
+
+// Brief task 10 (#21059): Split asks the team's Orchestrator to file follow-up tasks for a change over the limit. Send back is the review's own Request changes with the verdict's note, so it
+// needs no route of its own; the verdict carries the note and the team's mode.
+func TestReviewSizeSplitAsksTheOrchestratorAndSendBackHasItsNote(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	ctx := context.Background()
+	h.SetTaskArtifactWriter(t.TempDir(), func(context.Context, *board.Task, string) error { return nil })
+	_, err := h.bs.Subscribe(ctx, "team", "Dev", "Developer", "claude-dev", nil, "all")
+	require.NoError(t, err)
+	task, err := h.bs.CreateTask(ctx, "team", "Big change", "", "medium", "Orchestrator", "Frontend Dev 2")
+	require.NoError(t, err)
+	var d strings.Builder
+	d.WriteString("diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1,0 +1,900 @@\n" + strings.Repeat("+x\n", 900))
+	require.NoError(t, writeChangesArtifact(h.taskArtifactPath(task.BoardID, task.ID), []byte(d.String())))
+	id := strconv.FormatInt(task.ID, 10)
+	p := map[string]string{"project": "team", "taskID": id}
+	split := func(mod func(*http.Request)) (int, map[string]any) {
+		return reviewSizeCall(h, h.SplitReviewSize, http.MethodPost, "/api/board/team/tasks/"+id+"/review-size/split", "", p, mod)
+	}
+	asked := func() []string {
+		msgs, err := h.bs.ListMessages(ctx, "team", 100, 0, 0)
+		require.NoError(t, err)
+		var out []string
+		for _, m := range msgs {
+			if strings.Contains(m.Content, "Split #"+id) {
+				out = append(out, m.Content)
+			}
+		}
+		return out
+	}
+
+	code, _ := split(nil)
+	assert.Equal(t, http.StatusConflict, code, "the guard is off: nothing is over the limit")
+	_, err = h.bs.SetReviewSizeSetting(ctx, "team", reviewsize.Setting{On: true, Lines: 800, Files: 20, OverLimit: reviewsize.ModeSplit})
+	require.NoError(t, err)
+
+	code, _ = split(func(r *http.Request) {
+		*r = *r.WithContext(context.WithValue(r.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "sid-dev", SessionName: "claude-dev"}))
+	})
+	assert.Equal(t, http.StatusForbidden, code, "an agent that is not the Orchestrator cannot ask for a split")
+	code, _ = split(func(r *http.Request) { r.Header.Set(tunnel.ViaHeader, "1") })
+	assert.Equal(t, http.StatusForbidden, code, "never through Coral Hub")
+	assert.Equal(t, tunnel.TierNever, tunnel.Classify(http.MethodPost, "/api/board/team/tasks/7/review-size/split", ""))
+	assert.Empty(t, asked(), "the refused calls asked nobody")
+
+	code, out := split(nil)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	got := asked()
+	require.Len(t, got, 1)
+	assert.Contains(t, got[0], "@Orchestrator", "the Orchestrator is the one asked")
+	assert.Contains(t, got[0], "900 lines in 1 file, limit 800 lines or 20 files")
+
+	_, err = h.bs.SetReviewSizeSetting(ctx, "team", reviewsize.Setting{On: true, Lines: 5000})
+	require.NoError(t, err)
+	code, _ = split(nil)
+	assert.Equal(t, http.StatusConflict, code, "a change under the limit is not split")
+
+	_, err = h.bs.SetReviewSizeSetting(ctx, "team", reviewsize.Setting{On: true, Lines: 800, OverLimit: reviewsize.ModeSendBack})
+	require.NoError(t, err)
+	_, v := reviewSizeCall(h, h.TaskReviewSize, http.MethodGet, "/api/board/team/tasks/"+id+"/review-size", "", p, nil)
+	assert.Equal(t, "send_back", v["over_limit"])
+	assert.Contains(t, v["send_back_note"], "900 lines in 1 file")
+	assert.Contains(t, v["send_back_note"], "800 lines")
+}
+
+// Send back on the banner (#21059): a task waiting in review whose change is over the limit goes back to its author with the note, and the author is told; a change under the limit, an agent that is
+// not the Orchestrator and Coral Hub cannot use it.
+func TestReviewSizeSendBackReturnsTheTaskToItsAuthor(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	ctx := context.Background()
+	h.SetTaskArtifactWriter(t.TempDir(), func(context.Context, *board.Task, string) error { return nil })
+	for _, s := range []struct{ id, title, session string }{{"Frontend Dev 2", "Frontend", "claude-fe"}} {
+		_, err := h.bs.Subscribe(ctx, "team", s.id, s.title, s.session, nil, "all")
+		require.NoError(t, err)
+	}
+	task, err := h.bs.CreateTask(ctx, "team", "Big change", "", "medium", "Orchestrator", "Frontend Dev 2")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "team", "Frontend Dev 2", task.ID)
+	require.NoError(t, err)
+	_, err = h.bs.SubmitCompletionReview(ctx, "team", task.ID, "Frontend Dev 2", "built", "success", "needs review", []board.TaskArtifact{{Name: "fix", Kind: board.PatchKind, URI: "coral://artifacts/d1", Digest: "d1", Revision: "base1"}})
+	require.NoError(t, err)
+	_, _, err = h.bs.HandToOrchestrator(ctx, "team", task.ID, "Frontend Dev 2")
+	require.NoError(t, err)
+	var d strings.Builder
+	d.WriteString("diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1,0 +1,900 @@\n" + strings.Repeat("+x\n", 900))
+	require.NoError(t, writeChangesArtifact(h.taskArtifactPath(task.BoardID, task.ID), []byte(d.String())))
+	id := strconv.FormatInt(task.ID, 10)
+	p := map[string]string{"project": "team", "taskID": id}
+	back := func(body string, mod func(*http.Request)) (int, map[string]any) {
+		return reviewSizeCall(h, h.SendBackReviewSize, http.MethodPost, "/api/board/team/tasks/"+id+"/review-size/send-back", body, p, mod)
+	}
+	status := func() string { tk, err := h.bs.GetTask(ctx, "team", task.ID); require.NoError(t, err); return tk.Status }
+
+	code, _ := back(`{"note":"split it"}`, nil)
+	assert.Equal(t, http.StatusConflict, code, "the guard is off: nothing is over the limit")
+	_, err = h.bs.SetReviewSizeSetting(ctx, "team", reviewsize.Setting{On: true, Lines: 800, OverLimit: reviewsize.ModeSendBack})
+	require.NoError(t, err)
+
+	code, _ = back(`{"note":"split it"}`, func(r *http.Request) {
+		*r = *r.WithContext(context.WithValue(r.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "sid-fe", SessionName: "claude-fe"}))
+	})
+	assert.Equal(t, http.StatusForbidden, code, "the author cannot send its own task back through the banner")
+	code, _ = back(`{"note":"split it"}`, func(r *http.Request) { r.Header.Set(tunnel.ViaHeader, "1") })
+	assert.Equal(t, http.StatusForbidden, code, "never through Coral Hub")
+	assert.Equal(t, tunnel.TierNever, tunnel.Classify(http.MethodPost, "/api/board/team/tasks/7/review-size/send-back", ""))
+	code, _ = back(`{"note":"split it","extra":1}`, nil)
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, "review_pending", status(), "the refused calls changed nothing")
+
+	code, out := back(`{"note":"This change is over the team's limit: please split it."}`, nil)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	assert.Equal(t, "pending", status(), "back with its author")
+	msgs, err := h.bs.ListMessages(ctx, "team", 100, 0, 0)
+	require.NoError(t, err)
+	told := false
+	for _, m := range msgs {
+		if strings.Contains(m.Content, "@Frontend Dev 2 [Task #"+id+" sent back by") && strings.Contains(m.Content, "please split it") {
+			told = true
+		}
+	}
+	assert.True(t, told, "the author is told on the board, with the note")
+
+	code, _ = back(`{"note":"again"}`, nil)
+	assert.NotEqual(t, http.StatusOK, code, "a task already back with its author is not sent back twice")
+}

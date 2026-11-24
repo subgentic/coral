@@ -2,6 +2,8 @@ package reviewsize
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -29,7 +31,15 @@ type Setting struct {
 	Skip      []string              `json:"skip"`
 	OnlyRoles []string              `json:"only_roles"` // empty: the whole team
 	Roles     map[string]RoleLimits `json:"roles"`
+	OverLimit string                `json:"over_limit"` // what a change over the limit gets (#21059): warn (the default), send_back or split
 }
+
+// What the team does with a change over the limit. Send back and Split add a button to the warning; nothing happens until a person presses it.
+const (
+	ModeWarn     = "warn"
+	ModeSendBack = "send_back"
+	ModeSplit    = "split"
+)
 
 // Validate cleans a setting (trims, drops blanks and repeats) and refuses what is out of range. A setting that is off is always accepted: it is the default.
 func (s Setting) Validate() (Setting, error) {
@@ -66,6 +76,13 @@ func (s Setting) Validate() (Setting, error) {
 			return s, errors.New("roles: a role with its own numbers needs a lines or a files limit")
 		}
 		own[name] = l
+	}
+	switch s.OverLimit {
+	case "":
+		s.OverLimit = ModeWarn
+	case ModeWarn, ModeSendBack, ModeSplit:
+	default:
+		return s, errors.New("over_limit: warn, send_back or split")
 	}
 	s.Skip, s.OnlyRoles = skip, roles
 	if len(own) == 0 {
@@ -146,6 +163,10 @@ type Verdict struct {
 	SkippedFiles int  `json:"skipped_files"`
 	LimitLines   int  `json:"limit_lines"`
 	LimitFiles   int  `json:"limit_files"`
+	// What the team does with it (#21059): only on a change that is over the limit. SendBackNote is the note the author is sent back with (the person can edit it first); the words of
+	// a Split's ask are SplitAskFor(task), because they name the task.
+	OverLimit    string `json:"over_limit,omitempty"`
+	SendBackNote string `json:"send_back_note,omitempty"`
 }
 
 // Verdict counts a change by the role's limits. A change the guard does not judge has Applies false and nothing else set.
@@ -155,5 +176,51 @@ func (s Setting) Verdict(role string, files []File) Verdict {
 		return Verdict{}
 	}
 	r := Check(files, l)
-	return Verdict{Applies: true, Over: r.Over, Lines: r.Lines, Files: r.Files, SkippedLines: r.SkippedLines, SkippedFiles: r.SkippedFiles, LimitLines: l.Lines, LimitFiles: l.Files}
+	v := Verdict{Applies: true, Over: r.Over, Lines: r.Lines, Files: r.Files, SkippedLines: r.SkippedLines, SkippedFiles: r.SkippedFiles, LimitLines: l.Lines, LimitFiles: l.Files}
+	if v.Over {
+		v.OverLimit = s.OverLimit
+		if v.OverLimit == "" {
+			v.OverLimit = ModeWarn
+		}
+		if v.OverLimit == ModeSendBack {
+			v.SendBackNote = "This change is over the team's limit: " + v.size() + " (the limit is " + v.limits() + "). Please split it into smaller changes and submit them for review one at a time."
+		}
+	}
+	return v
+}
+
+// SplitAskFor is what the Orchestrator is asked when a change over the limit is to be split (#21059).
+func (v Verdict) SplitAskFor(taskID int64) string {
+	return fmt.Sprintf("Split #%d (%s, limit %s) into follow-up tasks under the limit.", taskID, v.size(), v.limits())
+}
+
+func (v Verdict) size() string {
+	return fmt.Sprintf("%s %s in %s %s", group(v.Lines), plural(v.Lines, "line"), group(v.Files), plural(v.Files, "file"))
+}
+
+func (v Verdict) limits() string {
+	var out []string
+	if v.LimitLines > 0 {
+		out = append(out, fmt.Sprintf("%s %s", group(v.LimitLines), plural(v.LimitLines, "line")))
+	}
+	if v.LimitFiles > 0 {
+		out = append(out, fmt.Sprintf("%s %s", group(v.LimitFiles), plural(v.LimitFiles, "file")))
+	}
+	return strings.Join(out, " or ")
+}
+
+func plural(n int, one string) string {
+	if n == 1 {
+		return one
+	}
+	return one + "s"
+}
+
+// group writes a number with its thousands separated, as the banner does.
+func group(n int) string {
+	s := strconv.Itoa(n)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
 }

@@ -45,6 +45,8 @@ var signInGuardedRoutes = []string{
 	"POST /api/board/{project}/health/ack",
 	"PUT /api/board/{project}/health/settings",
 	"PUT /api/board/{project}/review-size",
+	"POST /api/board/{project}/tasks/{taskID}/review-size/split",
+	"POST /api/board/{project}/tasks/{taskID}/review-size/send-back",
 	"DELETE /api/board/{project}/health/checks/{name}",
 	"POST /api/board/{project}/health/checks",
 	"POST /api/board/{project}/health/checks/{name}/pause",

@@ -615,6 +615,8 @@ b GET /api/board/{project}/proposals
 b GET /api/proposals
 b POST /api/board/{project}/proposals/{id}/approve
 b POST /api/board/{project}/proposals/{id}/reject
+c POST /api/board/{project}/tasks/{taskID}/review-size/send-back
+c POST /api/board/{project}/tasks/{taskID}/review-size/split
 b GET /api/skills
 b GET /api/skills/search
 b POST /api/sessions/live/{name}/skills
