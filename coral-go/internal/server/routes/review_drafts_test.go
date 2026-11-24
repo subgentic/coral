@@ -127,6 +127,11 @@ func TestDraftRulesAreThoseOfAComment(t *testing.T) {
 	assert.Equal(t, "comments_locked", out["code"])
 	_, out = rig.do(http.MethodGet, draftsPath(cmtDoc), cmtAsOwner, nil)
 	assert.Equal(t, false, out["can_write"])
+	_, held := rig.do(http.MethodGet, draftsPath(cmtDoc), cmtAsOwner, nil)
+	first := held["drafts"].([]any)[0].(map[string]any)
+	pcode, pout := rig.do(http.MethodPatch, fmt.Sprintf("%s/%d", draftsPath(cmtDoc), int64(first["id"].(float64))), cmtAsOwner, map[string]any{"body": "edited while locked", "revision": held["revision"]})
+	assert.Equal(t, http.StatusConflict, pcode, "an edit is refused too: %v", pout)
+	assert.Equal(t, "comments_locked", pout["code"])
 	assert.Equal(t, "comments_locked", out["reason"])
 }
 

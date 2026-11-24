@@ -70,3 +70,8 @@ func (h *BoardHandler) attachGoalNews(r *http.Request, goals ...*board.Goal) {
 		}
 	}
 }
+
+// SetDraftCounts tells the board where to read the reviewer's draft comments, per artifact id (#21194): the file's row says how many are waiting to be sent. nil: none.
+func (h *BoardHandler) SetDraftCounts(fn func(r *http.Request) (map[string]int, error)) {
+	h.draftCounts = fn
+}

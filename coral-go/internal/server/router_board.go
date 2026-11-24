@@ -109,6 +109,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetInboxSettings(func(ctx context.Context) (map[string]string, error) { // the switches of what reaches Needs you (#12144)
 		return sessStore.GetSettings(ctx)
 	})
+	boardHandler.SetDraftCounts(sessHandler.ReviewDraftCountsFor)                   // the owner's draft comments, per file (#21194)
 	boardHandler.SetCommentNews(func(ctx context.Context) (map[string]int, error) { // replies agents left in the Operator's comment threads that they have not opened, per file (#12026)
 		replies, err := sessStore.UnseenAgentReplies(ctx)
 		if err != nil {

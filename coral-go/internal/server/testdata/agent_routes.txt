@@ -336,6 +336,7 @@ b POST /api/artifacts/{id}/comments/{cid}/resolve
 b POST /api/artifacts/{id}/comments/{cid}/send
 b POST /api/artifacts/{id}/comment-images
 b POST /api/artifacts/{id}/review-drafts
+b POST /api/artifacts/{id}/review-drafts/send
 b PATCH /api/artifacts/{id}/review-drafts/{cid}
 b DELETE /api/artifacts/{id}/review-drafts/{cid}
 c GET /api/artifacts/{id}/review-drafts

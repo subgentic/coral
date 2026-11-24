@@ -510,6 +510,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	sessHandler.RegisterAgentArtifacts(r)
 	sessHandler.RegisterArtifactComments(r)                                                 // #5176
 	sessHandler.RegisterReviewDrafts(r)                                                     // #21189
+	sessHandler.RegisterReviewDraftsSend(r)                                                 // #21194
 	sessHandler.RegisterGdocShare(r)                                                        // #19996
 	s.goBackground(func(ctx context.Context) { sessHandler.GdocSyncRun(ctx, time.Minute) }) // #20010 C: one loop for every shared Doc; a pass does nothing while the switch is off
 	sessHandler.RegisterTerminalLogs(r)

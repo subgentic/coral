@@ -57,6 +57,7 @@ var activityCommentsOut = map[string]string{
 	"POST /api/artifacts/{id}/comment-images":         "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
 	"DELETE /api/artifacts/{id}/review-drafts/{cid}":  "a reviewer's private drafts notify no one and are out of the audit with document comments (the Operator's call, 2026-11-05; #21189)",
 	"PATCH /api/artifacts/{id}/review-drafts/{cid}":   "a reviewer's private drafts notify no one and are out of the audit with document comments (the Operator's call, 2026-11-05; #21189)",
+	"POST /api/artifacts/{id}/review-drafts/send":     "sending comments to an agent is a document comment send: out of the audit with them (the Operator's call, 2026-11-05; #21194)",
 	"POST /api/artifacts/{id}/review-drafts":          "a reviewer's private drafts notify no one and are out of the audit with document comments (the Operator's call, 2026-11-05; #21189)",
 	"POST /api/artifacts/{id}/comments":               "document and video comments are out of the audit (the Operator's call, 2026-11-05)",
 	"POST /api/artifacts/{id}/comments/{cid}/reopen":  "document and video comments are out of the audit (the Operator's call, 2026-11-05)",

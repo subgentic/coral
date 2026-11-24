@@ -28,6 +28,7 @@ var pairRecordedRoutes = routes.PairRecorded{
 	"PATCH /api/saved/{id}":                           true,
 	"POST /api/artifacts/{id}/comment-images":         true,
 	"POST /api/artifacts/{id}/review-drafts":          true,
+	"POST /api/artifacts/{id}/review-drafts/send":     true,
 	"PATCH /api/artifacts/{id}/review-drafts/{cid}":   true,
 	"DELETE /api/artifacts/{id}/review-drafts/{cid}":  true,
 	"POST /api/artifacts/{id}/comments":               true,

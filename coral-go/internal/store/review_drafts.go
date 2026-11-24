@@ -48,6 +48,7 @@ type ReviewDraft struct {
 const reviewDraftCols = "id, artifact_id, owner, board, parent_id, anchor_json, body, images_json, source, source_name, source_ref, batch_id, created_at, updated_at"
 
 type reviewTx interface {
+	SelectContext(ctx context.Context, dest any, query string, args ...any) error
 	GetContext(ctx context.Context, dest any, query string, args ...any) error
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
@@ -238,4 +239,162 @@ func (s *SessionStore) DeleteReviewDraftsOfArtifact(ctx context.Context, artifac
 	}
 	_, err := s.db.ExecContext(ctx, "DELETE FROM artifact_review_revisions WHERE artifact_id = ?", artifactID)
 	return err
+}
+
+// ReviewBatch is the record of one press of "Send comments".
+type ReviewBatch struct {
+	RequestID  string `db:"request_id"`
+	Owner      string `db:"owner"`
+	ArtifactID string `db:"artifact_id"`
+	State      string `db:"state"` // ReviewBatchPrepared or ReviewBatchSent
+	ResultJSON string `db:"result_json"`
+	CreatedAt  string `db:"created_at"`
+}
+
+const (
+	ReviewBatchPrepared = "prepared"
+	ReviewBatchSent     = "sent"
+)
+
+// ErrBatchExists is a press (request id) that was already recorded.
+var ErrBatchExists = errors.New("this press was already recorded")
+
+// GetReviewBatch is the record of a press, ok false when there is none.
+func (s *SessionStore) GetReviewBatch(ctx context.Context, owner, requestID string) (ReviewBatch, bool, error) {
+	var b ReviewBatch
+	err := s.reader().GetContext(ctx, &b, "SELECT request_id, owner, artifact_id, state, result_json, created_at FROM artifact_review_batches WHERE owner = ? AND request_id = ?", owner, requestID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ReviewBatch{}, false, nil
+	}
+	return b, err == nil, err
+}
+
+// FinishReviewBatch records the answer of a press that went out and drops the drafts it carried.
+func (s *SessionStore) FinishReviewBatch(ctx context.Context, owner, requestID, artifactID, resultJSON string) (int64, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback() //nolint:errcheck // a committed transaction has nothing to roll back
+	if _, err := tx.ExecContext(ctx, "DELETE FROM artifact_review_drafts WHERE artifact_id = ? AND owner = ? AND batch_id = ?", artifactID, owner, requestID); err != nil {
+		return 0, err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE artifact_review_batches SET state = ?, result_json = ? WHERE owner = ? AND request_id = ?", ReviewBatchSent, resultJSON, owner, requestID); err != nil {
+		return 0, err
+	}
+	rev, err := bumpReviewRevision(ctx, tx, artifactID, owner)
+	if err != nil {
+		return 0, err
+	}
+	return rev, tx.Commit()
+}
+
+// PromotedComment is a draft made a published comment by PromoteReviewDrafts.
+type PromotedComment struct {
+	Draft   ReviewDraft
+	Comment ArtifactComment
+}
+
+// PromoteReviewDrafts is the first half of a send, in one transaction: when revision is the current one, the reviewer's pending drafts on the version become published comments (a reply goes in its thread), the
+// drafts are marked as carried by the press, and the press is recorded as prepared. author names the owner on the comments. ErrNoDraft when there is nothing to send, ErrStaleRevision when the drafts
+// changed, ErrBatchExists when the press was already recorded. Nothing is delivered here.
+func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owner, requestID string, revision int64, author ArtifactComment) ([]PromotedComment, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() //nolint:errcheck // a committed transaction has nothing to roll back
+	cur, err := currentReviewRevision(ctx, tx, artifactID, owner)
+	if err != nil {
+		return nil, err
+	}
+	if cur != revision {
+		return nil, ErrStaleRevision
+	}
+	var drafts []ReviewDraft
+	if err := tx.SelectContext(ctx, &drafts, "SELECT "+reviewDraftCols+" FROM artifact_review_drafts WHERE artifact_id = ? AND owner = ? AND batch_id = '' ORDER BY id", artifactID, owner); err != nil {
+		return nil, err
+	}
+	if len(drafts) == 0 {
+		return nil, ErrNoDraft
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO artifact_review_batches (request_id, owner, artifact_id, state, created_at) VALUES (?, ?, ?, ?, ?)", requestID, owner, artifactID, ReviewBatchPrepared, nowStamp()); err != nil {
+		var dup int
+		if e2 := tx.GetContext(ctx, &dup, "SELECT COUNT(*) FROM artifact_review_batches WHERE owner = ? AND request_id = ?", owner, requestID); e2 == nil && dup > 0 {
+			return nil, ErrBatchExists
+		}
+		return nil, err
+	}
+	var n int
+	if err := tx.GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_comments WHERE artifact_id = ? AND deleted_at IS NULL", artifactID); err != nil {
+		return nil, err
+	}
+	if n+len(drafts) > MaxArtifactComments {
+		return nil, ErrTooManyComments
+	}
+	out := make([]PromotedComment, 0, len(drafts))
+	for _, d := range drafts {
+		parent := d.ParentID
+		if parent != nil {
+			var p struct {
+				Parent  *int64  `db:"parent_id"`
+				Deleted *string `db:"deleted_at"`
+			}
+			err := tx.GetContext(ctx, &p, "SELECT parent_id, deleted_at FROM artifact_comments WHERE id = ? AND artifact_id = ?", *parent, artifactID)
+			if errors.Is(err, sql.ErrNoRows) || (err == nil && (p.Parent != nil || p.Deleted != nil)) {
+				return nil, ErrBadParent // the thread was deleted since the draft was written: nothing is sent
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+		res, err := tx.ExecContext(ctx, `INSERT INTO artifact_comments (artifact_id, board, parent_id, anchor_json, body, author_issuer, author_subject, author_name, author_kind, created_at, images_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			artifactID, d.Board, parent, d.AnchorJSON, d.Body, author.AuthorIssuer, author.AuthorSubject, author.AuthorName, author.AuthorKind, nowStamp(), d.ImagesJSON)
+		if err != nil {
+			return nil, err
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return nil, err
+		}
+		var c ArtifactComment
+		if err := tx.GetContext(ctx, &c, "SELECT "+artifactCommentCols+" FROM artifact_comments WHERE id = ?", id); err != nil {
+			return nil, err
+		}
+		out = append(out, PromotedComment{Draft: d, Comment: c})
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE artifact_review_drafts SET batch_id = ? WHERE artifact_id = ? AND owner = ? AND batch_id = ''", requestID, artifactID, owner); err != nil {
+		return nil, err
+	}
+	if _, err := bumpReviewRevision(ctx, tx, artifactID, owner); err != nil {
+		return nil, err
+	}
+	return out, tx.Commit()
+}
+
+// UndoReviewBatch takes back a press that reached no one: its comments are deleted, its drafts are pending again and the record of the press goes, so the person can press again.
+func (s *SessionStore) UndoReviewBatch(ctx context.Context, artifactID, owner, requestID string, commentIDs []int64) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // a committed transaction has nothing to roll back
+	for _, id := range commentIDs {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM artifact_comments WHERE id = ? AND artifact_id = ?", id, artifactID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM artifact_comment_asks WHERE comment_id = ?", id); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE artifact_review_drafts SET batch_id = '' WHERE artifact_id = ? AND owner = ? AND batch_id = ?", artifactID, owner, requestID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM artifact_review_batches WHERE owner = ? AND request_id = ?", owner, requestID); err != nil {
+		return err
+	}
+	if _, err := bumpReviewRevision(ctx, tx, artifactID, owner); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

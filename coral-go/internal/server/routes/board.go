@@ -100,6 +100,8 @@ type BoardHandler struct {
 	goalDoneEdit func(ctx context.Context, key string, max int, edit func([]string) []string) ([]string, error)
 	// commentNews says, per artifact id, how many replies agents left in the Operator's comment threads that the Operator has not opened (#12026); nil: none.
 	commentNews func(ctx context.Context) (map[string]int, error)
+	// draftCounts says, per artifact id, how many draft comments the owner holds on that exact version (#21194, #21189); nil: none. Only the owner's own list carries it.
+	draftCounts func(r *http.Request) (map[string]int, error)
 	// listEdits limits how often one owner session edits a board's list (#5508).
 	listEdits editLimiter
 	// hubSwitches limits Coral Hub's requests to turn a team's cross-team switches on or off (#5572); hubCrossTeamLock reads the local lock.
