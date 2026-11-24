@@ -525,6 +525,8 @@ b PUT /api/artifacts/{id}/comments/lock
 b PUT /api/artifacts/{id}/keep
 b GET /api/artifacts/resolve
 a GET /api/board/{project}/health/settings
+c GET /api/board/{project}/review-size
+c GET /api/board/{project}/tasks/{taskID}/review-size
 b PUT /api/artifacts/{id}/private
 b PUT /api/artifacts/{id}/star
 b PUT /api/auth/hub-origins
@@ -544,6 +546,7 @@ b PUT /api/board/{project}/artifacts/{id}/tags
 b POST /api/board/{project}/member-grants
 b PUT /api/board/{project}/guide-roster
 a PUT /api/board/{project}/health/settings
+c PUT /api/board/{project}/review-size
 b PUT /api/board/{project}/orchestrator-grant
 b PUT /api/board/{project}/settings
 b PUT /api/board/{project}/subscribers/{subscriberID}/review-settings

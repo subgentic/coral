@@ -131,6 +131,7 @@ GET /api/board/{project}/proposals view
 GET /api/board/{project}/queue view
 GET /api/board/{project}/relay-targets never
 GET /api/board/{project}/reminder view
+GET /api/board/{project}/review-size never
 GET /api/board/{project}/search never
 GET /api/board/{project}/settings view
 GET /api/board/{project}/settings/log never
@@ -143,6 +144,7 @@ GET /api/board/{project}/tasks/{taskID}/artifact-content view
 GET /api/board/{project}/tasks/{taskID}/changes.diff view
 GET /api/board/{project}/tasks/{taskID}/cost view
 GET /api/board/{project}/tasks/{taskID}/history view
+GET /api/board/{project}/tasks/{taskID}/review-size never
 GET /api/board/{project}/waits view
 GET /api/board/{project}/waits/poll view
 GET /api/board/{project}/working-mode view
@@ -621,6 +623,7 @@ PUT /api/board/{project}/guide-roster launch
 PUT /api/board/{project}/health/checks/{name} never
 PUT /api/board/{project}/health/settings never
 PUT /api/board/{project}/orchestrator-grant launch
+PUT /api/board/{project}/review-size never
 PUT /api/board/{project}/settings launch
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never
 PUT /api/board/{project}/tasks/{taskID}/goal interact

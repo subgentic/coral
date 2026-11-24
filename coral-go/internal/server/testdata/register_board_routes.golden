@@ -52,6 +52,7 @@ GET /api/board/{project}/proposals | (*BoardHandler).ListProposals-fm
 GET /api/board/{project}/queue | (*BoardHandler).MergeQueue-fm
 GET /api/board/{project}/relay-targets | (*BoardHandler).ListRelayTargets-fm
 GET /api/board/{project}/reminder | (*BoardHandler).GetSubscriberReminder-fm
+GET /api/board/{project}/review-size | (*BoardHandler).GetReviewSizeSetting-fm
 GET /api/board/{project}/search | (*BoardHandler).SearchBoardWork-fm
 GET /api/board/{project}/settings | (*BoardHandler).GetBoardSettings-fm
 GET /api/board/{project}/settings/log | (*BoardHandler).GetCrossTeamLog-fm
@@ -64,6 +65,7 @@ GET /api/board/{project}/tasks/{taskID}/artifact-content | (*BoardHandler).TeamA
 GET /api/board/{project}/tasks/{taskID}/changes.diff | (*BoardHandler).TaskChangesDiff-fm
 GET /api/board/{project}/tasks/{taskID}/cost | (*BoardHandler).TaskLiveCost-fm
 GET /api/board/{project}/tasks/{taskID}/history | (*BoardHandler).TaskHistory-fm
+GET /api/board/{project}/tasks/{taskID}/review-size | (*BoardHandler).TaskReviewSize-fm
 GET /api/board/{project}/waits | (*BoardHandler).GetActiveWait-fm
 GET /api/board/{project}/waits/poll | (*BoardHandler).PollWait-fm
 GET /api/board/{project}/working-mode | (*BoardHandler).GetWorkingMode-fm
@@ -159,6 +161,7 @@ PUT /api/board/{project}/guide-roster | (*BoardHandler).GuideRoster-fm
 PUT /api/board/{project}/health/checks/{name} | (*BoardHandler).ChangeHealthCheckRoute-fm
 PUT /api/board/{project}/health/settings | (*BoardHandler).PutHealthSettings-fm
 PUT /api/board/{project}/orchestrator-grant | (*SessionsHandler).OrchestratorGrant-fm
+PUT /api/board/{project}/review-size | (*BoardHandler).PutReviewSizeSetting-fm
 PUT /api/board/{project}/settings | (*BoardHandler).UpdateBoardSettings-fm
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | (*BoardHandler).SetReviewSettings-fm
 PUT /api/board/{project}/tasks/{taskID}/goal | (*BoardHandler).SetTaskGoal-fm
