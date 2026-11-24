@@ -13,6 +13,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
 const CMD = '/bin/zsh -lc "git add coral-go/pkg/frontend/static/css/permission_card_dialog.css coral-go/pkg/frontend/static/inbox_agent_card.js tests/frontend/permission_card_layout_browser.test.js && git diff --cached --stat && git diff --cached -- coral-go/pkg/frontend/static | head -n 400 && echo done-with-the-longest-line-of-all"'; // about 330 characters, no spaces to wrap at but a few
 const LONGCMD = CMD + ' ' + 'x'.repeat(80) + ' ' + 'y'.repeat(60); // over 400
 const SHAPES = {
+    no_choices: { title: '', question: '', target: '', ask_id: 'no-choice', options: [] },
+    long_question: { title: 'Review this request', question: 'Please read every detail before answering. '.repeat(80), target: LONGCMD, ask_id: 'long-question', options: [{n:1,label:'Allow once',action:'select'},{n:2,label:'Reject',action:'select'}] },
     codex: { title: 'Would you like to run the following command?', question: 'Would you like to run the following command?', target: LONGCMD, ask_id: 'a-codex', options: [
         { n: 1, label: 'Yes, proceed (y)', action: 'select' },
         { n: 2, label: "Yes, and don't ask again for commands that start with `/bin/zsh -lc git add` (p)", action: 'select' },
@@ -44,11 +46,15 @@ const SHAPES = {
         const past = parts.filter(p => p.r.right > dr.right + 1 || p.r.left < dr.left - 1).map(p => p.t);
         const wide = parts.filter(p => p.over > 1).map(p => p.t + ' +' + p.over);
         const foot = d.querySelector('.inbox-ask-buttons'), fr = R(foot), cmd = d.querySelector('.inbox-ask-text:last-of-type, .inbox-ask-text');
-        return { dialog: { l: Math.round(dr.left), r: Math.round(dr.right), t: Math.round(dr.top), b: Math.round(dr.bottom), vw, vh }, inViewport: dr.left >= -1 && dr.right <= vw + 1 && dr.top >= -1 && dr.bottom <= vh + 1, overlaps, past, wide, n: parts.length,
+        const color = getComputedStyle(d).color, background = getComputedStyle(d).backgroundColor;
+        const rgb = s => (s.match(/[0-9.]+/g)||[]).map(Number), bg = rgb(background), fg = rgb(color);
+        const lum = c => c.slice(0,3).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
+        const contrast = (Math.max(lum(bg),lum(fg))+.05)/(Math.min(lum(bg),lum(fg))+.05);
+        return { height: dr.height, opaque: bg.length===3||bg[3]===1, contrast, background, color, dialog: { l: Math.round(dr.left), r: Math.round(dr.right), t: Math.round(dr.top), b: Math.round(dr.bottom), vw, vh }, inViewport: dr.left >= -1 && dr.right <= vw + 1 && dr.top >= -1 && dr.bottom <= vh + 1, overlaps, past, wide, n: parts.length,
             footBelowBody: fr.top >= R(d.querySelector('.inbox-card-body')).bottom - 1, footInside: fr.bottom <= dr.bottom + 1, display: getComputedStyle(d).display, cmdWraps: !cmd || cmd.scrollWidth <= cmd.clientWidth + 1 }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [w, h, mobile, zoom] of [[1440, 900, false, '100%'], [390, 844, true, '100%'], [390, 844, true, '200%']]) {
+        for (const [w, h, mobile, zoom] of [[1280, 900, false, '100%'], [390, 844, true, '100%'], [390, 844, true, '200%']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(INBOX_WORLD);
@@ -68,10 +74,12 @@ const SHAPES = {
                     const at = `${w}px ${zoom} ${theme} ${shape}: `;
                     await ev(`window.__card = ${JSON.stringify(card)}; true`);
                     await ev(`document.querySelector('${T} tbody tr .dt-primary').click(); true`);
-                    await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-ask-offers-list button')`, at + 'the card dialog', 8000); await ev(framesJs(4));
+                    await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-card-body')?.textContent`, at + 'the card dialog', 8000); await ev(framesJs(4));
                     const m = await measure();
-                    check(!!m && m.n >= 6, at + 'the card drew its parts: ' + JSON.stringify(m));
+                    check(!!m && m.n >= (shape === 'no_choices' ? 4 : 6), at + 'the card drew its parts: ' + JSON.stringify(m));
                     if (m) {
+                        check(m.opaque && m.contrast >= 4.5, at + 'opaque theme panel and 4.5:1 contrast: '+JSON.stringify(m));
+                        if (shape === 'no_choices' && zoom === '100%') check(m.height < 360, at + 'no choices fits content, height '+m.height);
                         check(m.inViewport, at + 'the dialog is inside the window: ' + JSON.stringify(m.dialog));
                         check(m.overlaps.length === 0, at + 'no two parts overlap: ' + m.overlaps.join('; '));
                         check(m.past.length === 0, at + 'nothing is past the dialog edge: ' + m.past.join('; '));
@@ -79,7 +87,7 @@ const SHAPES = {
                         check(m.footBelowBody && m.footInside, at + 'Open agent and Close are a row under the body, inside the dialog');
                         check(m.display === 'flex', at + 'the card is a column, not the question dialog\'s grid: ' + m.display);
                     }
-                    if (theme === 'dark' && shape === 'codex') await shot(`permission_card_${w}_${zoom.replace('%', '')}`);
+                    await shot(`permission_card_${w}_${zoom.replace('%', '')}_${theme}_${shape}`);
                     await ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(b => b.textContent === 'Close')?.click(); true`);
                     await waitFor(`!document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'Close closes the card', 4000);
                 }
