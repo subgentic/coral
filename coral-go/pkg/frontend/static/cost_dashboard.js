@@ -237,6 +237,8 @@ function _getFilterExtractor(table, field) {
 export async function showCostDashboard() {
     showView('cost-dashboard-view');
     showViews();
+    const exp = document.getElementById('cost-export');
+    if (exp && !exp.dataset.bound) { exp.dataset.bound = '1'; exp.addEventListener('click', _openCostExport); } // the Export CSV control (#21021): bound here, so the start path carries nothing for it
     await _refreshCostDashboard();
     stopCostDashboard(); // clear any existing timer
     _costRefreshTimer = pollEvery(_refreshCostDashboard, 15000);
@@ -778,23 +780,40 @@ function _renderTaskTable(tasks) {
 }
 
 /** By goal: the tasks' cost added up per goal, the tasks of no goal together, and the cost no task carries. */
-function _renderGoalTable(tasks) {
-    const container = document.getElementById('cost-by-goal');
-    if (!container) return;
-    const costTasks = _tasksInRange(tasks), by = new Map();
+/** The rows of By goal for the tasks of the range: the tasks' cost added up per goal, the tasks of no goal together, and the cost no task carries (the page's table and the Export CSV draw the same rows). */
+function _goalRows(costTasks, rest) {
+    const by = new Map();
     for (const t of costTasks) {
         const key = t.goal_id || 0, g = by.get(key) || { id: key, title: key ? (t.goal_title || `Goal ${key}`) : 'Tasks with no goal', tasks: 0, cost_usd: 0, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 };
         g.tasks++; for (const f of ['cost_usd', 'input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens']) g[f] += t[f] || 0;
         by.set(key, g);
     }
-    const rows = [...by.values()], rest = _untaskedRow(costTasks);
+    const rows = [...by.values()];
     if (rest) rows.push({ id: -1, title: rest.title, tasks: 0, cost_usd: rest.cost_usd, input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, untasked: true });
+    return rows;
+}
+
+function _renderGoalTable(tasks) {
+    const container = document.getElementById('cost-by-goal');
+    if (!container) return;
+    const costTasks = _tasksInRange(tasks), rows = _goalRows(costTasks, _untaskedRow(costTasks));
     _drawTable(container, 'goal', [
         { key: 'title', label: 'Goal', primary: true, sort: true, sortValue: g => g.title || '', cell: g => g.title, width: 'grow' },
         _costCol(rows),
         _numCol('tasks', 'Tasks', g => g.tasks, g => (g ? String(g) : '')),
         _tokCol('input_tokens', 'New input tokens'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
     ], rows, 'No goal costs in this range yet. They appear once an agent has worked on a board task.', { rowKey: g => g.id, rowName: g => g.title || '' });
+}
+
+/** Export CSV (#21021): the chooser; the file is built from the rows the By task and By goal tables draw now, for the page's range and the Team select (a team's tasks: the cost no task carries is not split by team). */
+export async function _openCostExport() {
+    const { openExportDialog, taskCsv, goalCsv } = await importOnce('./cost_export.js');
+    const team = document.getElementById('cost-team')?.value || '';
+    const model = by => {
+        const costTasks = _tasksInRange(_rawData.task || []).filter(t => !team || (t.board_id || '') === team), rest = team ? null : _untaskedRow(costTasks);
+        return { csv: by === 'goal' ? goalCsv(_goalRows(costTasks, rest)) : taskCsv(costTasks, rest) };
+    };
+    openExportDialog({ period: _period(), team, model });
 }
 
 // ── Live Indicator ───────────────────────────────────────────
