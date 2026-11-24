@@ -71,6 +71,7 @@ GET /api/analytics/inbox-vs-chat launch
 GET /api/analytics/limit-waits never
 GET /api/analytics/resource-queue launch
 GET /api/analytics/tasks launch
+GET /api/analytics/waste never
 GET /api/artifacts view
 GET /api/artifacts/resolve view
 GET /api/artifacts/series/{series_id} view

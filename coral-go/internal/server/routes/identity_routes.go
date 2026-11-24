@@ -69,6 +69,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/waiting-on-agent":                         "read what the Operator answered or commented that an agent has not acted on yet (their words)",
 	"GET /api/analytics/inbox-vs-chat":                  "read how much the Operator did in the Inbox and how much in a chat (counts only, #12158)",
 	"GET /api/analytics/limit-waits":                    "read how often each agent was stopped by a usage limit and how it resumed, per day (names and counts only, #21020)",
+	"GET /api/analytics/waste":                          "read each agent's re-read share of input, cache expiries and idle compactions (names and counts only, #21057)",
 	"GET /api/analytics/resource-queue":                 "read how much the resource queue is used and whether it helps coordination (numbers only, #13671)",
 	"GET /api/chief":                                    "read which agent the Operator recorded as Chief (#11470)",
 	"GET /api/board/{project}/orchestrator-grant":       "read what a board's orchestrator may do",

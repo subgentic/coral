@@ -853,6 +853,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/token-usage/turns", tokenHandler.UsageTurns)
 	r.Get("/api/token-usage/by-team", tokenHandler.UsageSummaryByBoard)
 	r.Get("/api/token-usage/by-branch", tokenHandler.UsageSummaryByBranch)
+	r.Get("/api/analytics/waste", tokenHandler.Waste) // the cost page's Waste card (#21057): names and counts only, the Operator's alone, this computer only
 
 	// Tags
 	r.Get("/api/tags", sysHandler.ListTags)
