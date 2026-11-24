@@ -80,10 +80,10 @@ func (h *ChiefChecksHandler) AddTemplateReminders(ctx context.Context, board, se
 				why("a reminder can repeat at most every 15 minutes")
 				continue
 			}
-		case "daily", "weekdays":
+		case "daily", "weekdays", "weekly":
 			check.ScheduleKind, check.At = r.Kind, r.At
 		default:
-			why("a template's reminder repeats: every, daily or weekdays")
+			why("a template's reminder repeats: every, daily, weekdays or weekly")
 			continue
 		}
 		if _, err := store.ChiefCron(check); err != nil {
