@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/subgentic/coral/pkg/redact"
 )
@@ -37,12 +38,13 @@ type Input struct {
 type Options struct{ Seq uint64 }
 
 const (
-	maxPosts   = 50
-	maxText    = 500
-	maxTask    = 120
-	maxLabel   = 40
-	hitNeigh   = 5 // posts withheld before and after a post that was withheld for a secret (design note section 4)
-	ownerLabel = "Operator"
+	minBoundaryName = 4
+	maxPosts        = 50
+	maxText         = 500
+	maxTask         = 120
+	maxLabel        = 40
+	hitNeigh        = 5 // posts withheld before and after a post that was withheld for a secret (design note section 4)
+	ownerLabel      = "Operator"
 )
 
 var (
@@ -96,8 +98,8 @@ func Build(in Input, opt Options, red redact.Redactor) Frame {
 		}
 		n++
 		l := clean(a.Role, maxLabel)
-		if l != "" && (!scan(red, l) || !safeText(l)) {
-			l = "" // a role no rule can judge is not shown: Agent N instead
+		if l != "" && (!scan(red, l) || !safeText(l) || namesAnyone(l, in.Agents)) {
+			l = "" // a role no rule can judge, or that carries a real name, is not shown: Agent N instead
 		}
 		if l == "" {
 			l = "Agent " + itoa(n)
@@ -165,6 +167,16 @@ func statusWord(s Status) string {
 	return string(StatusIdle)
 }
 
+// namesAnyone reports whether text holds any agent's real name.
+func namesAnyone(t string, agents []AgentFacts) bool {
+	for _, a := range agents {
+		if r := strings.TrimSpace(a.RealName); r != "" && len(nameSpans(nameRE(r), r, t)) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func safeText(s string) bool { return !pathRE.MatchString(s) && !idRE.MatchString(s) }
 
 // publicAuthor is the label of a shown agent. A hidden agent's post is withheld (MUST 5). Someone who is no agent is the Operator, never a real name.
@@ -193,19 +205,19 @@ func publicText(text string, label map[string]string) (string, bool) {
 		if real == "" {
 			continue
 		}
-		re := nameRE(real)
-		if !re.MatchString(t) {
+		spans := nameSpans(nameRE(real), real, t)
+		if len(spans) == 0 {
 			continue
 		}
 		if l == "" {
 			return "", false
 		}
-		t = re.ReplaceAllLiteralString(t, l) // indexes are the original string's: a character whose lower case has another length cannot shift a cut
+		t = replaceSpans(t, spans, l)
 	}
 	t = clean(t, maxText)
 	// nothing a real name is left: a name the replacement missed withholds the post (the owner's label rule would be void otherwise)
 	for real := range label {
-		if real != "" && nameRE(real).MatchString(t) {
+		if real != "" && len(nameSpans(nameRE(real), real, t)) > 0 {
 			return "", false
 		}
 	}
@@ -215,16 +227,70 @@ func publicText(text string, label map[string]string) (string, bool) {
 // startsWithKnown reports whether s begins with a known real name (a mention may be followed by more words), ignoring case.
 func startsWithKnown(s string, label map[string]string) bool {
 	for real := range label {
-		if real != "" && regexp.MustCompile(`(?i)^`+regexp.QuoteMeta(real)).MatchString(s) {
+		if real != "" && strings.HasPrefix(s, "") && prefixName(s, real) {
 			return true
 		}
 	}
 	return false
 }
 
-// nameRE matches a real name, with an optional @ before it, ignoring case. The text is never sliced by an index found in a lower-cased copy.
+// prefixName reports whether s begins with the real name on a word boundary.
+func prefixName(s, real string) bool {
+	for _, sp := range nameSpans(nameRE(real), real, s) {
+		if sp[0] == 0 || (sp[0] == 1 && s[0] == '@') {
+			return true
+		}
+	}
+	return false
+}
+
+// nameRE matches a real name, with an optional @ before it, ignoring case, with any run of white space (double spaces, line breaks, no-break spaces)
+// between its words. The text is never sliced by an index found in a lower-cased copy: the indexes below are the original string's.
 func nameRE(real string) *regexp.Regexp {
-	return regexp.MustCompile(`(?i)@?` + regexp.QuoteMeta(real))
+	words := strings.Fields(real)
+	for i, w := range words {
+		words[i] = regexp.QuoteMeta(w)
+	}
+	return regexp.MustCompile(`(?i)@?` + strings.Join(words, `[\s\p{Z}]+`))
+}
+
+func isWord(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' }
+
+// nameSpans are the matches of re in t. A short name (under minBoundaryName characters) must stand on word boundaries, so "al" does not garble "also";
+// a longer one is matched anywhere, so a name run into a word is still found.
+func nameSpans(re *regexp.Regexp, real, t string) [][2]int {
+	var out [][2]int
+	short := utf8.RuneCountInString(real) < minBoundaryName
+	for _, m := range re.FindAllStringIndex(t, -1) {
+		if !short {
+			out = append(out, [2]int{m[0], m[1]}) // a long name is matched anywhere: a name run into a word still names someone
+			continue
+		}
+		if m[0] > 0 {
+			if r, _ := utf8.DecodeLastRuneInString(t[:m[0]]); isWord(r) {
+				continue
+			}
+		}
+		if m[1] < len(t) {
+			if r, _ := utf8.DecodeRuneInString(t[m[1]:]); isWord(r) {
+				continue
+			}
+		}
+		out = append(out, [2]int{m[0], m[1]})
+	}
+	return out
+}
+
+func replaceSpans(t string, spans [][2]int, repl string) string {
+	var b strings.Builder
+	last := 0
+	for _, sp := range spans {
+		b.WriteString(t[last:sp[0]])
+		b.WriteString(repl)
+		last = sp[1]
+	}
+	b.WriteString(t[last:])
+	return b.String()
 }
 
 func itoa(n int) string {
