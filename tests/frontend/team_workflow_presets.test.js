@@ -54,6 +54,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
       { label: 'Workflow', selected: 'true' },
       { label: 'Health check', selected: 'false' }, // #4230: the real settings API returns a health object
       { label: 'Messaging', selected: 'false' }, // #5516: shown whether or not the allowlist is in force
+      { label: 'Review size guard', selected: 'false' }, // #21138: the shipped review-size section
       { label: 'Agent reminders', selected: 'false' }, // #19288: the per-agent reminders switch
       { label: 'Prompts', selected: 'false' },
     ], 'Team settings should expose clear section tabs');

@@ -170,7 +170,7 @@ export function mountLiveControls(host, { team, teamLabel, links }) {
         renderLivePreview(field('public'), next.frame, { teamLabel, live: link.state === 'live', delaySeconds: edit().delay_s || 30 });
     });
     root.querySelector('[data-stop]').onclick = stop;
-    field('needs-open').onclick = () => field('state').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    field('needs-open').onclick = () => field('state').scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     field('status-line').textContent = ''; renderControls();
     fetch('/api/cloud/links', { signal: life.signal }).then(async response => {
         if (!response.ok) throw new Error();
