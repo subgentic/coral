@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"testing"
 
@@ -153,6 +154,28 @@ func TestTheSamePressOfADecisionAnswersTheFirstAndDoesNothingMore(t *testing.T) 
 	assert.Equal(t, true, again["replayed"])
 	assert.Len(t, c.messages(t), 1)
 	assert.Len(t, c.comments(t), 1)
+	// one shape (Orchestrator on #21185): the replay is the first answer's {state, review, batch, ...}, the batch the first one's, with replayed beside them
+	keys := func(m map[string]any) []string {
+		var k []string
+		for key := range m {
+			if key != "replayed" {
+				k = append(k, key)
+			}
+		}
+		sort.Strings(k)
+		return k
+	}
+	assert.Equal(t, keys(first), keys(again))
+	assert.Equal(t, first["state"], again["state"])
+	assert.Equal(t, first["review"], again["review"])
+	assert.Equal(t, first["to"], again["to"])
+	assert.Equal(t, first["drafts_sent"], again["drafts_sent"])
+	fb, _ := first["batch"].(map[string]any)
+	ab, _ := again["batch"].(map[string]any)
+	require.NotNil(t, ab, again)
+	assert.Equal(t, fb["request_id"], ab["request_id"])
+	assert.Equal(t, fb["comment_ids"], ab["comment_ids"])
+	assert.Equal(t, true, ab["replayed"])
 }
 
 func TestSendDraftsGoesOnlyWithApproveOrChanges(t *testing.T) {

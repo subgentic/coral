@@ -217,8 +217,12 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 			sentence = "The Operator asks for changes to this file: the first comment below says what should change."
 		}
 		var ok bool
-		if batch, ok = h.reviewDrafts.prepareDecisionBatch(w, r, project, id, sd.RequestID, *sd.Revision, words, sentence); !ok {
-			return // refused or answered again (the same press): nothing is recorded here
+		var replay map[string]any
+		if batch, replay, ok = h.reviewDrafts.prepareDecisionBatch(w, r, project, id, sd.RequestID, *sd.Revision, words, sentence); !ok {
+			if replay != nil { // the same press again: the first answer's shape, with the file's review as it is now (Orchestrator on #21185: one shape for the dashboard and Hub callers)
+				h.writeDecisionReplay(w, r, project, id, state, replay, strings.TrimSpace(words) != "")
+			}
+			return // refused or answered again: nothing is recorded here
 		}
 	}
 	change, tags, err := h.bs.DecideArtifactReview(r.Context(), project, id, state, time.Now())
@@ -608,4 +612,30 @@ func (h *BoardHandler) settleOlderVersions(r *http.Request, project, id string, 
 			slog.Warn("[artifact review] an older version was not settled", "board", project, "artifact", m.Digest, "error", err)
 		}
 	}
+}
+
+// writeDecisionReplay answers a decision with drafts pressed again (the same request id) in the shape of its first answer: the state, the review and the send's first answer as batch, each marked replayed.
+func (h *BoardHandler) writeDecisionReplay(w http.ResponseWriter, r *http.Request, project, id, state string, replay map[string]any, withWords bool) {
+	reviews, _ := h.bs.ArtifactReviews(r.Context(), project)
+	all, _ := h.bs.ArtifactTags(r.Context(), project)
+	tags := all[id]
+	if tags == nil {
+		tags = []string{}
+	}
+	out := map[string]any{"id": id, "state": state, "changed": true, "tags": tags, "review": reviews[id], "delivered": true, "to": "", "drafts_sent": 0, "batch": replay, "replayed": true}
+	if results, ok := replay["results"].([]any); ok && len(results) > 0 {
+		if first, ok := results[0].(map[string]any); ok {
+			if to, ok := first["agent"].(string); ok {
+				out["to"] = to
+			}
+		}
+	}
+	if ids, ok := replay["comment_ids"].([]any); ok {
+		n := len(ids)
+		if withWords && n > 0 { // the words of a Request changes were the first comment, not a draft
+			n--
+		}
+		out["drafts_sent"] = n
+	}
+	writeJSON(w, http.StatusOK, out)
 }
