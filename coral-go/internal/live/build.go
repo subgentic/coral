@@ -3,6 +3,7 @@ package live
 import (
 	"bytes"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -177,6 +178,23 @@ func namesAnyone(t string, agents []AgentFacts) bool {
 	return false
 }
 
+// namesLongestFirst orders the real names longest first, so "Ada Lovelace" is replaced before "Ada" and no half of a name is left behind (QA's SHOULD).
+func namesLongestFirst(label map[string]string) []string {
+	var names []string
+	for real := range label {
+		if real != "" {
+			names = append(names, real)
+		}
+	}
+	sort.Slice(names, func(i, j int) bool {
+		if len(names[i]) != len(names[j]) {
+			return len(names[i]) > len(names[j])
+		}
+		return names[i] < names[j]
+	})
+	return names
+}
+
 func safeText(s string) bool { return !pathRE.MatchString(s) && !idRE.MatchString(s) }
 
 // publicAuthor is the label of a shown agent. A hidden agent's post is withheld (MUST 5). Someone who is no agent is the Operator, never a real name.
@@ -201,10 +219,8 @@ func publicText(text string, label map[string]string) (string, bool) {
 			return "", false // an @mention of nobody we know
 		}
 	}
-	for real, l := range label {
-		if real == "" {
-			continue
-		}
+	for _, real := range namesLongestFirst(label) {
+		l := label[real]
 		spans := nameSpans(nameRE(real), real, t)
 		if len(spans) == 0 {
 			continue
