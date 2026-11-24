@@ -62,7 +62,7 @@ func clean(s string, max int) string {
 		if unicode.Is(unicode.Cc, r) && r != '\n' && r != '\t' {
 			continue
 		}
-		if unicode.Is(unicode.Cf, r) || r == ' ' || r == ' ' {
+		if unicode.Is(unicode.Cf, r) || r == '\u2028' || r == '\u2029' {
 			continue
 		}
 		b.WriteRune(r)

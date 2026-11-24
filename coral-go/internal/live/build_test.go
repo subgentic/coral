@@ -152,7 +152,7 @@ func TestPathsIdsAndControlCharactersAreNotShown(t *testing.T) {
 	in := Input{Agents: twoAgents(), Posts: []PostFacts{
 		post("Backend Dev", "see coral://artifacts/abc123 for it", 1),
 		post("Backend Dev", "edited /Users/someone/work/file.go today", 2),
-		post("Backend Dev", "zero​width and ‮right-to-left", 3),
+		post("Backend Dev", "zero\u200bwidth and \u202eright-to-left", 3),
 		post("Backend Dev", strings.Repeat("x", 900), 4),
 	}}
 	f := Build(in, Options{}, hubScan())
@@ -160,8 +160,8 @@ func TestPathsIdsAndControlCharactersAreNotShown(t *testing.T) {
 	s := string(raw)
 	require.NotContains(t, s, "coral://")
 	require.NotContains(t, s, "/Users/")
-	require.NotContains(t, s, "​")
-	require.NotContains(t, s, "‮")
+	require.NotContains(t, s, "\u200b")
+	require.NotContains(t, s, "\u202e")
 	require.Equal(t, "see for it", strings.Join(strings.Fields(f.Posts[0].Text), " "), "an id is cut out")
 	require.Len(t, []rune(f.Posts[len(f.Posts)-1].Text), 500, "a post is cut at 500 characters")
 }

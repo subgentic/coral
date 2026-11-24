@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/subgentic/coral/internal/fsreplace"
 )
 
 // Open is the gate (design: every slice ships shut). While it is false no route answers and nothing is read or written. Only a reviewed change sets it, and only the Operator's release decision opens it.
@@ -52,5 +54,5 @@ func (f FileStore) Save(ls []Link) error {
 		os.Remove(name)
 		return err
 	}
-	return os.Rename(name, f.Path)
+	return fsreplace.Rename(name, f.Path)
 }
