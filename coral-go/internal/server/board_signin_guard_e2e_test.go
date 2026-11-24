@@ -231,6 +231,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"DELETE /api/artifacts/{id}":                                           "a delete: no text is kept",
 	"DELETE /api/artifacts/{id}/comments/lock":                             "a delete: no text is kept",
 	"DELETE /api/artifacts/{id}/comments/{cid}":                            "a delete: no text is kept",
+	"DELETE /api/artifacts/{id}/review-drafts/{cid}":                       "a delete: no text is kept",
 	"DELETE /api/artifacts/{id}/keep":                                      "a delete: no text is kept",
 	"DELETE /api/artifacts/{id}/trust-preview":                             "a delete: no text is kept",
 	"DELETE /api/artifacts/{id}/star":                                      "a delete: no text is kept",

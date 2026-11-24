@@ -164,6 +164,31 @@ CREATE TABLE IF NOT EXISTS artifact_comments (
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_comments_artifact ON artifact_comments(artifact_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_artifact_comments_parent ON artifact_comments(parent_id);
+-- A reviewer's draft comments on a document (#21189, goal #310): private to the reviewer, on one exact version, held until the reviewer sends them. A table of its own, never artifact_comments, so no read
+-- of a published comment (threads, counts, news, an agent's read, Google sync) can return a draft. revision is per (artifact, reviewer) and goes up on every change, for a client's stale-write check.
+CREATE TABLE IF NOT EXISTS artifact_review_drafts (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	artifact_id TEXT NOT NULL,
+	owner       TEXT NOT NULL,
+	board       TEXT NOT NULL DEFAULT '',
+	parent_id   INTEGER,
+	anchor_json TEXT NOT NULL DEFAULT '',
+	body        TEXT NOT NULL,
+	images_json TEXT NOT NULL DEFAULT '',
+	source      TEXT NOT NULL DEFAULT 'local',
+	source_name TEXT NOT NULL DEFAULT '',
+	source_ref  TEXT NOT NULL DEFAULT '',
+	batch_id    TEXT NOT NULL DEFAULT '',
+	created_at  TEXT NOT NULL,
+	updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_artifact_review_drafts_owner ON artifact_review_drafts(owner, artifact_id);
+CREATE TABLE IF NOT EXISTS artifact_review_revisions (
+	artifact_id TEXT NOT NULL,
+	owner       TEXT NOT NULL,
+	revision    INTEGER NOT NULL,
+	PRIMARY KEY (artifact_id, owner)
+);
 -- When the Operator last opened the threads of an artifact (#12026): one row per thread (its first comment). An agent's reply made after that is "new comments" on the file's row; opening the thread clears it.
 CREATE TABLE IF NOT EXISTS artifact_comment_seen (
 	comment_id INTEGER PRIMARY KEY,

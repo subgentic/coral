@@ -82,6 +82,7 @@ func newCmtRig(t *testing.T) *cmtRig {
 	})
 	r.Use(NewIdempotency().Middleware)
 	h.RegisterArtifactComments(r)
+	h.RegisterReviewDrafts(r)
 	h.RegisterEditSend(r)
 	h.RegisterAgentArtifacts(r)
 	srv := httptest.NewServer(r)

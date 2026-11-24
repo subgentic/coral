@@ -1,6 +1,7 @@
 DELETE /api/agent/ui/{id} | token-bound
 DELETE /api/artifacts/{id}/comments/{cid} | token-session | operator-only
 DELETE /api/artifacts/{id}/gdoc/share | token-session | operator-only
+DELETE /api/artifacts/{id}/review-drafts/{cid} | token-session | operator-only
 DELETE /api/board/remotes | board-unchecked | operator-only
 DELETE /api/board/{project} | board-claims | operator-only
 DELETE /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
@@ -39,6 +40,7 @@ GET /api/artifacts/series/{series_id}/versions | token-session
 GET /api/artifacts/{id} | token-session
 GET /api/artifacts/{id}/comments | token-session
 GET /api/artifacts/{id}/meta | token-session
+GET /api/artifacts/{id}/review-drafts | token-session
 GET /api/artifacts/{id}/thumbnail | token-session | operator-only
 GET /api/artifacts/{id}/versions | token-session
 GET /api/board/projects | board-unchecked
@@ -107,6 +109,7 @@ GET /api/needs-you | token-session | operator-only
 GET /api/operator-asks | token-session | operator-only
 GET /api/reminders | token-session
 GET /api/reminders/{reminderID} | token-session
+GET /api/review-drafts/counts | token-session
 GET /api/session-artifacts | token-session
 GET /api/sessions/history | unbound | operator-only
 GET /api/sessions/history/counts | unbound | operator-only
@@ -165,6 +168,7 @@ GET /api/token-usage/turns | token-session | operator-only
 GET /api/waiting-on-agent | token-session | operator-only
 PATCH /api/agent/tasks/{taskID} | token-bound
 PATCH /api/artifacts/{id}/comments/{cid} | token-session | operator-only
+PATCH /api/artifacts/{id}/review-drafts/{cid} | token-session | operator-only
 PATCH /api/board/{project} | board-claims | operator-only
 PATCH /api/board/{project}/goals/{goalID} | board-claims
 PATCH /api/board/{project}/tasks/{taskID} | board-claims
@@ -190,6 +194,7 @@ POST /api/artifacts/{id}/comments/{cid}/reply | token-session
 POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only
 POST /api/artifacts/{id}/gdoc/share | token-session | operator-only
 POST /api/artifacts/{id}/gdoc/sync | token-session | operator-only
+POST /api/artifacts/{id}/review-drafts | token-session | operator-only
 POST /api/board/remotes | board-unchecked | operator-only
 POST /api/board/{project}/agents/{subscriber}/interrupt | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/restart | board-claims +token-session

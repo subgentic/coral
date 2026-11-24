@@ -230,6 +230,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if strings.HasPrefix(p, "/api/artifacts/") && strings.HasSuffix(p, "/trust-preview") {
 				continue
 			}
+			// A reviewer's draft comments on a document (#21189) are the owner's alone through the hub: the old list never had them.
+			if strings.HasSuffix(p, "/review-drafts") || strings.Contains(p, "/review-drafts/") || p == "/api/review-drafts/counts" {
+				continue
+			}
 			// The trusted-device list (#19971) is read through the hub by the owner alone: the old list never had it.
 			if m == http.MethodGet && (p == "/api/device-keys/list" || p == "/api/device-keys/link") {
 				continue

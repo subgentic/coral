@@ -1,6 +1,7 @@
 DELETE /api/artifacts/{id} recorded
 DELETE /api/artifacts/{id}/comments/lock recorded
 DELETE /api/artifacts/{id}/comments/{cid} recorded
+DELETE /api/artifacts/{id}/review-drafts/{cid} recorded
 DELETE /api/artifacts/{id}/star recorded
 DELETE /api/artifacts/{id}/trust-preview recorded
 DELETE /api/board/{project} recorded
@@ -16,6 +17,7 @@ DELETE /api/sessions/live/{name}/tasks/{taskID} recorded
 GET /ws/coral recorded
 GET /ws/terminal/{name} recorded
 PATCH /api/artifacts/{id}/comments/{cid} recorded
+PATCH /api/artifacts/{id}/review-drafts/{cid} recorded
 PATCH /api/board/{project}/goals/{goalID} recorded
 PATCH /api/board/{project}/tasks/{taskID} recorded
 PATCH /api/board/{project}/tasks/{taskID}/amend recorded
@@ -33,6 +35,7 @@ POST /api/artifacts/{id}/comments/{cid}/reopen recorded
 POST /api/artifacts/{id}/comments/{cid}/resolve recorded
 POST /api/artifacts/{id}/comments/{cid}/send recorded
 POST /api/artifacts/{id}/opened recorded
+POST /api/artifacts/{id}/review-drafts recorded
 POST /api/auto-accept/disable-all recorded
 POST /api/board/{project}/artifacts/{digest}/edit recorded
 POST /api/board/{project}/artifacts/{digest}/edit/send recorded

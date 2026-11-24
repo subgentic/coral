@@ -146,6 +146,11 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}/comments/lock"):                          textCommentsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments/{id}/send"):                       textCommentsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comment-images"):                           textCommentsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/review-drafts"):                             draftsOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/review-drafts"):                            draftsOwnerOnly,
+	tunnel.OwnerRouteKey("PATCH", "/api/artifacts/{hex64}/review-drafts/{id}"):                      draftsOwnerOnly,
+	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}/review-drafts/{id}"):                     draftsOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/review-drafts/counts"):                                        draftsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/goal-images"):                                "through Coral Hub only the account this computer is linked to can add a picture to a goal",
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/versions"):                                  textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/series/{series}"):                                   textArtifactsOwnerOnly,
@@ -239,6 +244,8 @@ const textSavedOwnerOnly = "through Coral Hub the saved messages are for the acc
 const textHubAutoAcceptOwnerOnly = "through Coral Hub only the account this computer is linked to can turn Coral Hub auto-accept on or off; on this computer use Settings > Coral Hub and remote access"
 
 const textHubDropboxOwnerOnly = "through Coral Hub only the account this computer is linked to can share a file to Dropbox (#16109)"
+
+const draftsOwnerOnly = "through Coral Hub only the account this computer is linked to can keep review drafts (#21189)"
 
 const textCommentsOwnerOnly = "through Coral Hub only the account this computer is linked to can comment on artifacts (#7052)"
 
