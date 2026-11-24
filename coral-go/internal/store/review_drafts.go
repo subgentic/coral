@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sort"
 	"strings"
 )
 
@@ -319,6 +320,8 @@ func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owne
 	if len(drafts) == 0 {
 		return nil, ErrNoDraft
 	}
+	// an imported Google root goes before its replies, whatever their ids (a root deleted in Coral comes back on the next pull, after its reply)
+	sort.SliceStable(drafts, func(i, j int) bool { return !isGdocReply(drafts[i]) && isGdocReply(drafts[j]) })
 	drafts = append(append([]ReviewDraft(nil), extra...), drafts...)
 	if _, err := tx.ExecContext(ctx, "INSERT INTO artifact_review_batches (request_id, owner, artifact_id, state, created_at) VALUES (?, ?, ?, ?, ?)", requestID, owner, artifactID, ReviewBatchPrepared, nowStamp()); err != nil {
 		var dup int
@@ -344,7 +347,7 @@ func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owne
 			if i := strings.Index(d.SourceRef, "/"); parent == nil && i > 0 {
 				id, found := byRef[d.SourceRef[:i]]
 				if !found {
-					return nil, ErrBadParent
+					continue // its root is neither sent nor in this send (deleted here, or not pulled yet): the reply stays held, the rest is sent
 				}
 				parent = &id
 			}
@@ -379,14 +382,23 @@ func (s *SessionStore) PromoteReviewDrafts(ctx context.Context, artifactID, owne
 			byRef[d.SourceRef] = id
 		}
 		out = append(out, PromotedComment{Draft: d, Comment: c})
+		if d.ID != 0 {
+			if _, err := tx.ExecContext(ctx, "UPDATE artifact_review_drafts SET batch_id = ? WHERE id = ? AND artifact_id = ? AND owner = ? AND batch_id = ''", requestID, d.ID, artifactID, owner); err != nil {
+				return nil, err
+			}
+		}
 	}
-	if _, err := tx.ExecContext(ctx, "UPDATE artifact_review_drafts SET batch_id = ? WHERE artifact_id = ? AND owner = ? AND batch_id = ''", requestID, artifactID, owner); err != nil {
-		return nil, err
+	if len(out) == len(extra) {
+		return nil, ErrNoDraft // every draft is a reply still held: nothing of the reviewer's to send
 	}
 	if _, err := bumpReviewRevision(ctx, tx, artifactID, owner); err != nil {
 		return nil, err
 	}
 	return out, tx.Commit()
+}
+
+func isGdocReply(d ReviewDraft) bool {
+	return d.Source == ReviewDraftGdoc && d.ParentID == nil && strings.Contains(d.SourceRef, "/")
 }
 
 // UndoReviewBatch takes back a press that reached no one: its comments are deleted, its drafts are pending again and the record of the press goes, so the person can press again.
