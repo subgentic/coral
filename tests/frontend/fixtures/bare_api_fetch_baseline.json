@@ -1,6 +1,10 @@
 {
   "about": "Bare fetch() calls of /api paths on data a computer holds, each with why it is this computer alone (#12617). A call not here must go through serverFetch with its server. Only ever shorter.",
   "files": {
+    "analytics_efficiency.js": {
+      "count": 1,
+      "reason": "the Analytics page is this computer's: every one of its cost and efficiency routes is a bare path, and the page has no computer switch"
+    },
     "analytics_limit_waits.js": {
       "count": 1,
       "reason": "the limit waits are this computer's own record (a local-only route, the card is not drawn through Coral Hub), and the Analytics page has no computer switch"

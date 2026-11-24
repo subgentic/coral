@@ -77,8 +77,8 @@ async function read(cfg, group, signal) {
     const server = machineNow(); // the computer picked on a Hub-served dashboard (this one otherwise, #15730)
     if (!machineOnline(server)) throw new Error(`${machineLabel(server)} is offline, so its comparison cannot be read.`);
     if (isCloud() && server === 'local') throw new Error('Coral Hub has no computer of its own to read'); // never a same-origin read in cloud (#19591)
-    const team = document.getElementById('cost-team')?.value || '', url = `/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}${team ? `&team=${encodeURIComponent(team)}` : ''}`; // the page bar's Team select (#21111)
-    const r = server === 'local' ? await fetch(url, { signal }) : await serverFetch(server, url, { signal });
+    const team = document.getElementById('cost-team')?.value || '', tq = team ? `&team=${encodeURIComponent(team)}` : ''; // the page bar's Team select (#21111)
+    const r = server === 'local' ? await fetch(`/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}${tq}`, { signal }) : await serverFetch(server, `/api/analytics/efficiency?metric=${cfg.metric}&group_by=${encodeURIComponent(group)}&range=${range}${tq}`, { signal });
     if (!r.ok) throw new Error(server === 'local' ? `Could not load the comparison (${r.status}).` : `${machineLabel(server)} would not give its comparison (${r.status}): it may be an older Coral that needs an update.`);
     const d = await r.json();
     if (!d || !Array.isArray(d.groups) || d.groups.some(g => !g || typeof g.label !== 'string')) throw new Error('Could not load the comparison: unexpected answer.');
