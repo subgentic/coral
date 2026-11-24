@@ -4,6 +4,7 @@
  * markup), without controls or the characters that reorder or hide text, and cut to a length a link can show. */
 
 import { serverFetch } from './server_base.js';
+import { importOnce } from './import_once.js';
 
 const names = new Map(); // hex -> the stored name ('' when it has none or can't be read)
 const asked = new Set();
@@ -55,10 +56,7 @@ export function learnArtifactNames(hexes, server) { // server: the one the text 
                 rememberArtifactName(hex, d && d.name);
                 const label = names.get(hex);
                 if (!label) return;
-                for (const a of document.querySelectorAll(`a.mb-artifact-ref[data-artifact="${hex}"]`)) {
-                    a.textContent = label;
-                    if (a.hasAttribute('aria-label')) a.setAttribute('aria-label', `${label}: id ${hex}`); // a screen reader's name, where the link has one
-                }
+                return importOnce('./artifact_name_links.js').then(m => m.relabelArtifactLinks(hex, label));
             })
             .catch(() => { names.set(hex, ''); });
     }
