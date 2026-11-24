@@ -617,6 +617,9 @@ func (h *BoardHandler) settleOlderVersions(r *http.Request, project, id string, 
 // writeDecisionReplay answers a decision with drafts pressed again (the same request id) in the shape of its first answer: the state, the review and the send's first answer as batch, each marked replayed.
 func (h *BoardHandler) writeDecisionReplay(w http.ResponseWriter, r *http.Request, project, id, state string, replay map[string]any, withWords bool) {
 	reviews, _ := h.bs.ArtifactReviews(r.Context(), project)
+	if rv, ok := reviews[id]; ok && rv.State != "" {
+		state = rv.State // the decision the first press recorded, not this request's (QA INFO 3 on #21185)
+	}
 	all, _ := h.bs.ArtifactTags(r.Context(), project)
 	tags := all[id]
 	if tags == nil {

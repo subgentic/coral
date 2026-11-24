@@ -176,6 +176,11 @@ func TestTheSamePressOfADecisionAnswersTheFirstAndDoesNothingMore(t *testing.T) 
 	assert.Equal(t, fb["request_id"], ab["request_id"])
 	assert.Equal(t, fb["comment_ids"], ab["comment_ids"])
 	assert.Equal(t, true, ab["replayed"])
+	// the same press id with another decision in the body answers the decision recorded (QA INFO 3)
+	code, other := c.decide(t, "changes", "", "decide-0007", rev)
+	require.Equal(t, http.StatusOK, code, other)
+	assert.Equal(t, first["state"], other["state"])
+	assert.Len(t, c.messages(t), 1)
 }
 
 func TestSendDraftsGoesOnlyWithApproveOrChanges(t *testing.T) {
