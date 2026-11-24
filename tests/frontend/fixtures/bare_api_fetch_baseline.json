@@ -9,6 +9,10 @@
       "count": 1,
       "reason": "the limit waits are this computer's own record (a local-only route, the card is not drawn through Coral Hub), and the Analytics page has no computer switch"
     },
+    "analytics_waste.js": {
+      "count": 1,
+      "reason": "the waste figures are this computer's own transcripts and usage (a local-only route, the card is not drawn through Coral Hub), and the Analytics page has no computer switch"
+    },
     "automation_runs.js": {
       "count": 1,
       "reason": "Recent runs (#13183) are this computer's jobs and workflows runs: Automations has no server switch and the route is not on the Hub's allowlist"
