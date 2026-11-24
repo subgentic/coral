@@ -31,6 +31,13 @@ type deviceList struct {
 	ClockNotice string      `json:"clock_notice,omitempty"`
 }
 
+// removedDeviceReply is the device list after a removal, plus (#20926) a plain word when ending the grants the device signed did not work: the device is gone, and this many grants are still live.
+type removedDeviceReply struct {
+	deviceList
+	GrantsRevokeFailed bool `json:"grants_revoke_failed,omitempty"`
+	GrantsStillLive    *int `json:"grants_still_live,omitempty"`
+}
+
 func (h *CloudHandler) deviceList(r *http.Request) (deviceList, error) {
 	ctx := r.Context()
 	out := deviceList{WebMode: h.ss.DeviceWebMode(ctx), Devices: []deviceRow{}}
@@ -179,10 +186,21 @@ func (h *CloudHandler) RemoveDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The person may also end the access this device signed (#20899): the list asks (DeviceSignedGrants) and says so with ?revoke_grants=1.
+	var failed bool
+	var stillLive *int
 	if r.URL.Query().Get("revoke_grants") == "1" && h.bs != nil {
+		before, cerr := h.bs.CountLiveGrantsSignedBy(ctx, kid, time.Now())
 		n, gerr := h.bs.RevokeMemberGrantsSignedBy(ctx, kid, time.Now())
 		if gerr != nil {
 			slog.Warn("cloud: could not end the grants a removed device signed", "kid", kid, "error", gerr)
+			failed = true
+			if cerr == nil {
+				left := before - n
+				if left < 0 {
+					left = 0
+				}
+				stillLive = &left
+			}
 		} else if n > 0 {
 			slog.Info("cloud: grants ended with their device", "kid", kid, "count", n)
 		}
@@ -193,7 +211,7 @@ func (h *CloudHandler) RemoveDevice(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "Could not read the device list")
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, removedDeviceReply{deviceList: out, GrantsRevokeFailed: failed, GrantsStillLive: stillLive})
 }
 
 // DeviceSignedGrants: GET /api/cloud/devices/{kid}/signed-grants: how many live grants of access this owner device signed, so removing it can offer to end them too (#20899). Local only, like the rest of the device list.
