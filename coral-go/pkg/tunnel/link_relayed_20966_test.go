@@ -1,0 +1,52 @@
+package tunnel
+
+import (
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+// #20966: a Hub's owner may Allow a second Hub's request to join, and make or revoke that Hub's request key, signed by the owner's own device. The three routes are shut (never, as before) until
+// LinkRequestRelayedOpen is true, which changes only in a commit Security reads; open, they are the owner's, Interact tier, and nobody else's. Deny, the feed and the key list stay this computer's.
+var linkRelayedCases = []struct{ method, path, query string }{
+	{http.MethodPost, "/api/cloud/link-requests/lr-1/allow", "box_pk=" + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+	{http.MethodPost, "/api/cloud/link-keys", "box_pk=" + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+	{http.MethodDelete, "/api/cloud/link-keys/lk-aaaa1111", ""},
+}
+
+func TestLinkRoutesAreShutUntilTheRelayedGateOpens(t *testing.T) {
+	assert.False(t, LinkRequestRelayedOpen, "ships shut")
+	for _, r := range linkRelayedCases {
+		assert.Equal(t, TierNever, Classify(r.method, r.path, r.query), "%s %s shut", r.method, r.path)
+	}
+	OpenLinkRelayedForTest(t)
+	for _, r := range linkRelayedCases {
+		assert.Equal(t, TierInteract, Classify(r.method, r.path, r.query), "%s %s open", r.method, r.path)
+		_, mode := OwnerRoute(r.method, r.path)
+		assert.Equal(t, OwnerHubOnly, mode, "%s %s is the owner's, through a Hub only", r.method, r.path)
+		assert.True(t, IsRelayedRoute(r.method, r.path), "%s %s takes the relayed signature headers", r.method, r.path)
+		assert.True(t, ForwardsDeviceHeaders(r.method, r.path), "%s %s", r.method, r.path)
+	}
+	// Nothing else of the join is a Hub's, open or shut.
+	for _, r := range [][2]string{{http.MethodPost, "/api/cloud/link-requests/lr-1/deny"}, {http.MethodGet, "/api/cloud/link-requests"}, {http.MethodGet, "/api/cloud/link-keys"},
+		{http.MethodPost, "/api/cloud/link-requests"}, {http.MethodPost, "/api/cloud/link-requests/lr-1/finish"}, {http.MethodGet, "/api/cloud/link-requests/lr-1"}} {
+		assert.Equal(t, TierNever, Classify(r[0], r[1], ""), "%s %s stays this computer's", r[0], r[1])
+	}
+	assert.Equal(t, TierNever, Classify(http.MethodPost, "/api/cloud/link-keys", "box_pk=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&x=1"), "no other parameter")
+	assert.Equal(t, TierNever, Classify(http.MethodDelete, "/api/cloud/link-keys/lk-aaaa1111", "x=1"), "revoke takes no query")
+}
+
+func TestLinkRelayedGateIsShutAgainAfterATest(t *testing.T) {
+	for _, r := range linkRelayedCases {
+		assert.Equal(t, TierNever, Classify(r.method, r.path, r.query))
+	}
+}
+
+func TestTheTwoGatesAreIndependent(t *testing.T) {
+	OpenLinkRelayedForTest(t)
+	assert.Equal(t, TierNever, Classify(http.MethodPost, "/api/member-grants", ""), "opening the join's gate opens no member route")
+	assert.False(t, MemberRelayedIsOpen())
+	assert.False(t, strings.Contains(strings.Join(RoutePatterns(), "\n"), "POST /api/member-grants "), "and the table does not list it")
+}

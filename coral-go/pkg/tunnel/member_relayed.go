@@ -44,8 +44,13 @@ var routeTableOpen = cat(memberRelayedRoutes, routeTable)
 
 // table is the table in force: the base one, or the open one while the gate is open.
 func table() []route {
-	if memberRelayedOpen.Load() {
+	switch member, link := memberRelayedOpen.Load(), linkRelayedOpen.Load(); {
+	case member && link:
+		return routeTableBoth
+	case member:
 		return routeTableOpen
+	case link:
+		return routeTableLink
 	}
 	return routeTable
 }
