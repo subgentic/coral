@@ -196,7 +196,7 @@ func rebuildRemoteNeeds(machine string, body []byte) (items []NeedsYouItem, coun
 			if len(opts) != len(it.Options) {
 				opts = nil
 			}
-			if it.Permission || asksPermission(opts) { // a permission prompt: the Hub repeats the one-time rule (#21256); the computer's own press-time check is the one that counts
+			if it.Permission { // a permission prompt: the Hub repeats the one-time rule (#21256); the computer's own press-time check is the one that counts
 				if kept := permissionOptions(opts); len(kept) != len(opts) {
 					opts = nil
 				}

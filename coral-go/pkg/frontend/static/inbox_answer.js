@@ -26,7 +26,7 @@ const LASTING = /don.?t ask|install|always|never|allow all|all edits|session|con
 // A permission's choice is a button only when the WHOLE label (a trailing key hint like "(y)" and final punctuation dropped) is one of these one-time forms, and nothing else (Security Reviewer, #10462): Yes, Allow or Approve,
 // optionally "once", "this once", "proceed", "continue", Antigravity's "run command"; No, Deny or Reject, optionally "cancel" or Codex's "and tell <CLI> what to do differently". Everything else, including every phrasing that
 // lasts ("never ask again", "forever", "trust this workspace", "for the rest of this task") and every one that names a place, is left to Open.
-const ONE_TIME = /^(?:(?:yes|allow|approve)(?:,? (?:once|this once|proceed|continue|run command))?|(?:no|deny|reject)(?:,? (?:cancel|and tell \w+ what to do differently))?)$/i;
+const ONE_TIME = /^(?:(?:yes|allow|approve)(?:,? (?:once|this once|proceed|continue|run command))?|(?:no|deny|reject)(?:,? (?:cancel|exit|skip|and tell \w+ what to do differently))?)$/i;
 const PERMISSION_WORDS = /^(yes|allow|approve)\b/i, SCOPE = /project|director|folder|repositor|\ball\b|\bfrom\b|\/|~/i;
 const KEY_HINT = /\s*\((?:[a-z]|esc|enter|tab|shift\+tab|ctrl\+[a-z])\)$/i; // only a key in brackets is a hint: any other bracket ("(always)", "(all projects)") stays in the label, so the full match fails
 // The answers of a request that can only be rejected: the No form of each CLI's words (the server accepts only these, 409 only_reject, for the rest).

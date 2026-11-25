@@ -175,10 +175,10 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 	return out
 }
 
-// needsYouMenu is what an agent item offers of the menu on its agent's screen: a permission prompt (the hooks say so, or the menu has a Yes) offers its one-time Yes and No only (#21256); any other
-// dialog offers its menu as read (#19864).
+// needsYouMenu is what an agent item offers of the menu on its agent's screen: a permission prompt (the hooks say so) offers its one-time Yes and No only (#21256); any other
+// dialog, a Yes/No about a folder or an update included, offers its menu as read (#19864).
 func needsYouMenu(item NeedsYouItem, opts []NeedsYouOption) []NeedsYouOption {
-	if item.Permission || asksPermission(opts) {
+	if item.Permission {
 		return permissionOptions(opts)
 	}
 	if item.Dialog {
