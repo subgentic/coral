@@ -47,6 +47,7 @@ func (h *SystemHandler) SavedList(w http.ResponseWriter, r *http.Request) {
 	if refuseUnlessOperator(w, r, "see the saved messages") {
 		return
 	}
+	noteKeyOnlyRead(w, r, "saved")
 	w.Header().Set("Cache-Control", "no-store") // the bookmarks are the owner's notes (#5763)
 	q := r.URL.Query()
 	state := q.Get("state")

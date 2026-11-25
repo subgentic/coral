@@ -191,7 +191,7 @@ func TestAllowedIsTheListedDecisionsAndNothingElse(t *testing.T) {
 			t.Errorf("%v allowed", bad)
 		}
 	}
-	if n := len(Routes()); n != 91 { // 91 since generation 15 (#15729, the delete of unlisted received files); 90 since generation 14 (#15729, the acknowledgement of artifact retention); 89 since generation 13 (#15720, the delete of ended agents' terminal logs); 88 since generation 12 (#15717, a team's daily-knowledge writes); 84 since generation 11 (#15715, the team import from a folder); 83 since generation 10 (#15713, the private mark of an artifact); 82 since generation 9 (#15708, the person-only reads of audit group 4); 66 since generation 8 (#15697, pause and resume of an agent's notices); 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
+	if n := len(Routes()); n != 95 { // 95 since generation 16 (#21285, the owner's reads of the saved messages and the skills); 91 since generation 15 (#15729, the delete of unlisted received files); 90 since generation 14 (#15729, the acknowledgement of artifact retention); 89 since generation 13 (#15720, the delete of ended agents' terminal logs); 88 since generation 12 (#15717, a team's daily-knowledge writes); 84 since generation 11 (#15715, the team import from a folder); 83 since generation 10 (#15713, the private mark of an artifact); 82 since generation 9 (#15708, the person-only reads of audit group 4); 66 since generation 8 (#15697, pause and resume of an agent's notices); 64 since generation 7 (#15380, the Hub's read of a computer's Needs you); 63 before it (#14730, the owner turns scripts on and off for one version of an HTML file); 61 since generation 6 (#13910, the opened version of a file); 60 since generation 5 (#13834, the done-state of a goal)
 		t.Errorf("the allowlist has %d routes: a new one needs a reason and a review (Security's tiers, #13694)", n)
 	}
 	first := 0
@@ -277,6 +277,12 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 		{"GET", "/api/artifacts/abc/opened", 6, false, false},
 		{"POST", "/api/board/t/asks/9/buttons/b/settle", 2, true, true},
 		{"POST", "/api/sessions/live/x/send", 1, true, true},
+		{"GET", "/api/saved", 15, false, true}, // #21285: the owner's reads of the saved messages and the skills are generation 16: a generation 15 remote gets them unstamped
+		{"GET", "/api/saved", 16, true, true},
+		{"GET", "/api/saved/9/message", 16, true, true},
+		{"GET", "/api/skills", 16, true, true},
+		{"GET", "/api/skills/0123456789abcdef0123456789abcdef", 16, true, true},
+		{"GET", "/api/skills/3/files", 16, false, false},
 		{"POST", "/api/skills/3/approve", 2, false, false},
 		{"POST", "/api/artifacts/abc/comment-images", 2, false, false},
 		{"POST", "/api/board/t/goal-images", 2, false, false},
@@ -288,7 +294,7 @@ func TestARouteIsStampedOnlyForARemoteThatListsIt(t *testing.T) {
 			t.Errorf("MustBeSigned(%s %s) = %v, want %v", c.m, c.p, got, c.must)
 		}
 	}
-	if RoutesVersion != 15 {
+	if RoutesVersion != 16 {
 		t.Errorf("RoutesVersion = %d: it moves with a widening, and the remote's health answer reports it", RoutesVersion)
 	}
 }
@@ -403,5 +409,14 @@ func TestTheTooLongSentenceIsInTheWordsOfWhatThePersonWasDoing(t *testing.T) {
 	code, text = TooLong("POST", "/api/sessions/live/x/send")
 	if code != "hub_message_too_long" || !strings.Contains(text, "This message is too long") {
 		t.Errorf("an agent message: %s %q", code, text)
+	}
+}
+
+func TestTheSkillsMenuSearchIsNotAdmittedByTheSkillsViewEntry(t *testing.T) {
+	if !Allowed("GET", "/api/skills/"+strings.Repeat("a", 32)) {
+		t.Fatal("the skills view is on the list")
+	}
+	if Allowed("GET", "/api/skills/search") {
+		t.Fatal("the menu search must not be admitted")
 	}
 }

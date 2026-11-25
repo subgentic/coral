@@ -392,7 +392,7 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 	if caller.Kind == commentCallerAgent { // the asked agent has read the threads: the owner's thread says "seen by" (#11722)
 		_ = h.ss.MarkAsksSeen(r.Context(), id, caller.Subject, time.Now())
 	}
-	if caller.Kind == commentCallerOwner { // the Operator opened the file's comments: an agent's replies in their threads are seen, and the file's row stops saying "new comments" (#12026)
+	if caller.Kind == commentCallerOwner && humanInputCaller(r) { // a read with the server's API key and no stamp lists the comments but marks nothing seen: that is a person's act (#21285). The Operator opened the file's comments: an agent's replies in their threads are seen, and the file's row stops saying "new comments" (#12026)
 		if changed, err := h.ss.MarkThreadsSeenChanged(r.Context(), id, time.Now()); err == nil && changed && h.bs != nil {
 			h.bs.NoteAllArtifactsChanged()
 		}
