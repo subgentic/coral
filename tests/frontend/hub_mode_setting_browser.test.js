@@ -25,7 +25,7 @@ const BASE = require('./test_base').BASE;
         const dd = box && box.closest('.sv-row');
         return box && { checked: box.checked, disabled: box.disabled, label: (document.getElementById(box.getAttribute('aria-labelledby')) || {}).textContent,
             described: (box.getAttribute('aria-describedby') || '').split(' ').every(id => !!document.getElementById(id)),
-            status: st.textContent, restart: !btn.hidden, shown: !!dd && !dd.hidden && box.offsetParent !== null };
+            status: st.textContent.trim(), restart: !btn.hidden, shown: !!dd && !dd.hidden && box.offsetParent !== null };
     })()`);
     const openSettings = async () => {
         await ev(`(async () => { await showSettingsModal('network'); return true; })()`);
@@ -93,7 +93,7 @@ const BASE = require('./test_base').BASE;
         // a read of the saved state that was asked for before the press and answers after it (Settings opened again, a slow machine) must not put the old state back over the person's own change
         await ev(`window.__hubGetDelay = 700; import((window.__coralStatic || '/static/') + 'hub_mode_setting.js').then(m => m.loadHubModeSetting()); true`);
         await ev(`(() => { document.getElementById('settings-hub-mode-enabled').click(); return true; })()`);
-        await waitFor(`document.getElementById('settings-hub-mode-status').textContent === ''`, 'off', 5000);
+        await waitFor(`document.getElementById('settings-hub-mode-status').textContent.trim() === ''`, 'off', 5000);
         await new Promise(res => setTimeout(res, 1100)); // sleep-ok: the late read answers about now: it must not put On back
         await ev(`window.__hubGetDelay = 0; true`); await Page.removeScriptToEvaluateOnNewDocument({ identifier: late });
         r = await row();

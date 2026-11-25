@@ -6,6 +6,7 @@
 
 const URL_MODE = '/api/system/hub-mode';
 const $ = id => document.getElementById(id);
+const NBSP = '\u00a0';
 
 let _wired = false;
 let _last = null;
@@ -34,7 +35,8 @@ function render(st, error = '') {
     } else {
         text = st.running ? 'On: this Coral is a hub (the Computers tab).' : '';
     }
-    status.textContent = error ? error + ' ' + text : text;
+    const line = (error ? error + ' ' + text : text) || NBSP;
+    if (status.textContent !== line) status.textContent = line; // never empty: the line is read after the pane opens, and a line that is there only when it has words moved the pane (#21385)
     restart.hidden = !(st.restart_required && st.can_restart && !st.forced);
 }
 
