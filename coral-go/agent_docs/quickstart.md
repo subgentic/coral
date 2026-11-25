@@ -17,7 +17,7 @@ The example output and timings in steps 4-5 are illustrative: they come from a t
 | **git** | Worktree and branch features need a real repository. |
 | **An agent CLI** | At least one of `claude`, `codex`, `agy` (Antigravity), or `pi` — **installed and authenticated**. Coral drives these tools; it does not install, configure, or authenticate them. |
 
-Coral supports exactly four agent CLIs:
+Coral supports exactly six agent CLIs, the six the New agent form offers:
 
 | Agent | Binary | Install and sign in |
 |---|---|---|
@@ -25,6 +25,8 @@ Coral supports exactly four agent CLIs:
 | Codex | `codex` | [openai/codex](https://github.com/openai/codex) |
 | Antigravity CLI | `agy` | [antigravity.google](https://antigravity.google), or `curl -fsSL https://antigravity.google/cli/install.sh \| bash` |
 | Pi.dev | `pi` | [pi.dev](https://pi.dev) |
+| OpenCode | `opencode` | [opencode.ai](https://opencode.ai) |
+| Hermes | `hermes` | [hermes-agent.nousresearch.com](https://hermes-agent.nousresearch.com) (not offered on Windows) |
 
 Follow each vendor's current instructions; install commands change and Coral does not
 maintain them. Where a CLI is missing, Coral's prerequisite check and the Launch dialog link to
