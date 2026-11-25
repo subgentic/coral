@@ -85,9 +85,7 @@ const BUDGET = { ...Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+
         }
 
         if (process.env.TB_DUMP) assert.fail('TABLE ' + global.__tb.join(' | '));
-        assert.equal(await ev(`document.querySelector('#hub-join-keys details').open`), false, 'connection steps start folded, within the unchanged Network budget');
-        await ev(`document.querySelector('#hub-join-keys summary').click(); true`);
-        assert.equal(await ev(`document.querySelector('#hub-join-keys details').open`), true, 'the connection guide opens on request');
+        assert.equal(await ev(`document.querySelector('#hub-join-keys details').open`), true, 'the approved connection guide starts open');
         assert.match(await ev(`document.querySelector('#hub-join-keys details').innerText`), /SSH connection[\s\S]*HTTP connection/, 'both connection methods stay available');
         // every Hub row has its explanation as a visible hint line under its label (#7405: the (i) buttons are gone), the control still described by it; a long one shows a first line and a Learn more that opens the rest, by keyboard too
         await ev(`document.getElementById('settings-tab-network').click(); true`);

@@ -61,7 +61,7 @@ export async function initJoinKeys() {
         for (const k of keys) {
             const row = el('div', null, 'hub-join-key'); const meta = line(`Created ${new Date(k.created_at).toLocaleString()} · Last used ${k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'Never'}`); meta.className = 'hub-join-meta'; const words = el('div'); words.append(el('h4', k.name), meta); row.append(words, button('Revoke', () => confirm(k))); host.append(row);
         }
-        const guide = el('details', null, 'sv-fold'); // Connection steps are available on demand; keep the initial Network pane concise.
+        const guide = el('details'); guide.open = true;
         guide.append(el('summary', 'Connect your self-hosted Hub'), steps(), line('These keys request Hub connections. They are separate from this computer’s general API key. Keep each key in the Hub it was made for; keys work until you revoke them.')); host.append(guide);
     }
     function confirm(k) {
