@@ -87,7 +87,11 @@ export function mountSecondHubJoin({ taken = [], onClose = () => {}, opener = nu
             go.disabled = true; go.textContent = 'Asking…';
             const r = await call('POST', '/api/servers/join', body);
             if (gone) return;
-            if (!r.ok || !r.data.join) { draft.id = body.id; return form(said(r, way === 'ssh' ? 'Could not reach it over SSH. Check the address and that you can sign in to it with your SSH agent.' : 'The computer refused the key or could not be reached.')); }
+            if (!r.ok || !r.data.join) { // the mock's own panel: Not connected, what was tried, the reason the Hub got, and one next step (Edit address)
+                draft.id = body.id; const why = said(r, '');
+                return ended(way === 'ssh' ? 'Could not reach it over SSH' : 'The computer refused the key or could not be reached',
+                    way === 'ssh' ? `Check the address and that you can sign in to it with your SSH agent. This Hub shows the reason it got: ${why || 'none given'}.` : `Check the address and the key. This Hub shows the reason it got: ${why || 'none given'}.`, way === 'ssh' ? 'Edit address' : 'Edit address and key');
+            }
             draft.id = body.id; join = r.data.join; asked = level; allowed = ''; wrong = 0; waiting();
         });
         panel('Connect a Coral computer to this Hub.', f, null, 'Add computer'); // the form carries its own foot: its submit is inside it
@@ -101,7 +105,7 @@ export function mountSecondHubJoin({ taken = [], onClose = () => {}, opener = nu
         const host2 = (() => { try { return new URL(draft.url || draft.address).host; } catch { return 'that computer'; } })();
         const note = el('p', 'shj-sub'); note.append('Open the Coral at ', el('strong', '', host2 || 'that computer'), ' and go to its ', el('strong', '', 'Inbox'), '. A card says ', el('strong', '', 'Another Hub wants to connect'), '. Choose ', el('strong', '', 'Allow'), ' there.');
         const s = el('div', 'shj-status'); s.setAttribute('role', 'status'); s.setAttribute('aria-live', 'polite'); const d = el('div'); const p1 = el('p'); p1.append(el('strong', '', 'Waiting for Allow on the Coral')); d.append(p1, note); s.append(el('i', 'shj-dot'), d);
-        const pills = el('div', 'shj-pills'); pills.append(el('span', 'shj-pill', `Asked for: ${levelName(asked)}`), el('span', 'shj-pill', way === 'ssh' ? 'Over SSH' : 'With a key'));
+        const pills = el('div', 'shj-pills'); pills.append(el('span', 'chip chip-tag', `Asked for: ${levelName(asked)}`), el('span', 'chip chip-tag', way === 'ssh' ? 'Over SSH' : 'With a key'));
         const steps = el('ol', 'shj-steps'); for (const t of ['On the Coral: Inbox, then Allow.', 'It shows an 8-digit code once.', 'Come back here and type it.']) steps.append(el('li', '', t));
         body.append(s, pills, steps);
         const wait = el('button', 'btn', 'Waiting…'); wait.disabled = true;
@@ -160,11 +164,11 @@ export function mountSecondHubJoin({ taken = [], onClose = () => {}, opener = nu
         done.focus();
     }
 
-    function ended(titleText, text) {
+    function ended(titleText, text, again = 'Ask again') {
         stop();
         const body = el('div', 'shj-body'); const s = status('shj-bad', titleText, text, 'alert');
         body.append(s);
-        panel('Not connected.', body, foot(button('Close', () => end(false), 'btn btn-quiet'), button('Ask again', () => form(), 'btn btn-primary')), `Add computer: ${title()}`);
+        panel('Not connected.', body, foot(button('Close', () => end(false), 'btn btn-quiet'), button(again, () => form(), 'btn btn-primary')), `Add computer: ${title()}`);
     }
 
     function end(done) { stop(); gone = true; if (dialog.open) dialog.close(); dialog.remove(); if (opener && opener.isConnected) opener.focus(); onClose(done); }
