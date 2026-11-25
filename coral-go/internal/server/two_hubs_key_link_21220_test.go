@@ -63,7 +63,8 @@ func joinFromHub(t *testing.T, w *keyLinkWorld, h *e2eHub, serverID, key, asked,
 
 	code, b = asPerson(t, h, "GET", "/api/servers/join/"+join, nil)
 	require.Equal(t, 200, code, string(b))
-	assert.JSONEq(t, `{"state":"allowed"}`, string(b))
+	assert.JSONEq(t, `{"state":"allowed","cap":"`+given+`"}`, string(b), "the level the person gave is said once they have allowed, before the code (#21221); the code never is")
+	assert.NotContains(t, string(b), m[1])
 	wrong := "00000000"
 	if m[1] == wrong {
 		wrong = "11111111"
@@ -73,6 +74,7 @@ func joinFromHub(t *testing.T, w *keyLinkWorld, h *e2eHub, serverID, key, asked,
 	code, b = asPerson(t, h, "POST", "/api/servers/join/"+join+"/code", map[string]string{"code": m[1]})
 	require.Equal(t, 201, code, string(b))
 	assert.Contains(t, string(b), `"key_kind":"link"`)
+	assert.Contains(t, string(b), `"cap":"`+given+`"`, "the linked reply says the level that was given (#21221)")
 	assert.NotContains(t, string(b), key)
 }
 
