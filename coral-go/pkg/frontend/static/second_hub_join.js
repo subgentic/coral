@@ -31,19 +31,21 @@ async function call(method, path, body) {
 }
 const said = (r, fallback) => (r.data && (r.data.error || r.data.message)) || fallback;
 
-/** Mounts the join in host. taken: the ids in the list. onClose(linked) ends it. Returns { unmount() }. */
-export function mountSecondHubJoin(host, { taken = [], onClose = () => {} } = {}) {
+/** Opens the join in a dialog, as the approved mock draws it. taken: the ids in the list. onClose(how) ends it: true when linked, false when cancelled, 'advanced' when the person chose the URL and key form. opener: where the focus goes back to. Returns { unmount() }. */
+export function mountSecondHubJoin({ taken = [], onClose = () => {}, opener = null } = {}) {
     const uid = `shj-${++seq}`;
     let way = 'ssh', level = 'interact', draft = {}, join = null, asked = '', allowed = '', wrong = 0, timer = null, gone = false;
     const stop = () => { if (timer) { clearTimeout(timer); timer = null; } };
-    const root = el('div', 'shj'); host.replaceChildren(root);
+    const dialog = el('dialog', 'modal-content dlg-form reminder-dialog shj-dialog'), root = el('div', 'shj'); dialog.setAttribute('aria-label', 'Add computer'); dialog.append(root);
+    dialog.addEventListener('cancel', ev => { ev.preventDefault(); end(false); }); // Escape
+    document.body.append(dialog);
     const field = (id, label, input, help) => { const w = el('div', 'shj-field'), l = el('label', '', label); l.htmlFor = id; input.id = id; w.append(l, input); if (help) { const h = el('p', 'shj-help', help); h.id = `${id}-help`; input.setAttribute('aria-describedby', h.id); w.append(h); } return w; };
     const button = (text, fn, cls = 'btn') => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', fn); return b; };
     const status = (kind, title, text, role = 'status') => { const s = el('div', `shj-status ${kind}`), d = el('div'), p = el('p'); s.setAttribute('role', role); p.append(el('strong', '', title)); d.append(p, el('p', 'shj-sub', text)); s.append(el('i', 'shj-dot'), d); return s; };
     const head = (sub) => { const h = el('div', 'shj-head'); h.append(el('p', 'shj-sub', sub)); return h; };
     const foot = (...btns) => { const f = el('div', 'shj-foot'); f.append(...btns); return f; };
     const title = () => draft.label || draft.id || '';
-    const panel = (sub, body, footer, heading) => { const h = head(sub); if (heading) h.prepend(el('h4', '', heading)); root.replaceChildren(...[h, body, footer].filter(Boolean)); const adv = host.parentElement && host.parentElement.querySelector('.servers-advanced'); if (adv) adv.hidden = !!footer; };
+    const panel = (sub, body, footer, heading) => { const h = head(sub); if (heading) h.prepend(el('h4', '', heading)); root.replaceChildren(...[h, body, footer].filter(Boolean)); };
 
     function form(err = '') {
         stop();
@@ -71,7 +73,7 @@ export function mountSecondHubJoin(host, { taken = [], onClose = () => {} } = {}
         const readDraft = () => ({ address: addr.value.trim(), url: url ? url.value.trim() : draft.url, label: label.value.trim() });
         const error = el('p', 'shj-error', err); error.setAttribute('role', 'alert'); error.hidden = !err;
         const go = el('button', 'btn btn-primary', 'Ask to connect'); go.type = 'submit';
-        f.append(error, foot(button('Cancel', () => end(false), 'btn btn-quiet'), go));
+        f.append(error, foot(button('Cancel', () => end(false), 'btn btn-quiet'), go), button('Advanced: add by URL and key', () => end('advanced'), 'btn btn-quiet shj-advanced'));
         f.addEventListener('submit', async ev => {
             ev.preventDefault(); draft = readDraft();
             const bad = m => { error.hidden = false; error.textContent = m; };
@@ -89,7 +91,8 @@ export function mountSecondHubJoin(host, { taken = [], onClose = () => {} } = {}
             draft.id = body.id; join = r.data.join; asked = level; allowed = ''; wrong = 0; waiting();
         });
         panel('Connect a Coral computer to this Hub.', f, null, 'Add computer'); // the form carries its own foot: its submit is inside it
-        if (!document.activeElement?.closest?.('.servers-advanced')) addr.focus(); // not over a field of the URL and key form the person is already in
+        if (!dialog.open) dialog.showModal();
+        addr.focus();
     }
 
     function waiting() {
@@ -164,7 +167,7 @@ export function mountSecondHubJoin(host, { taken = [], onClose = () => {} } = {}
         panel('Not connected.', body, foot(button('Close', () => end(false), 'btn btn-quiet'), button('Ask again', () => form(), 'btn btn-primary')), `Add computer: ${title()}`);
     }
 
-    function end(done) { stop(); gone = true; onClose(done); }
+    function end(done) { stop(); gone = true; if (dialog.open) dialog.close(); dialog.remove(); if (opener && opener.isConnected) opener.focus(); onClose(done); }
     form();
-    return { unmount() { stop(); gone = true; host.replaceChildren(); } };
+    return { unmount() { stop(); gone = true; if (dialog.open) dialog.close(); dialog.remove(); } };
 }
