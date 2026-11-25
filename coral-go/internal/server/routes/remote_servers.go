@@ -65,6 +65,8 @@ type RemoteHealth struct {
 	Status  string // store.RemoteStatus*
 	Version string
 	Err     string
+	// OwnerLinks is the remote's hub_owner_links: 1 or more when it keeps one owner stamp secret per hub (#21213), 0 for an older Coral that holds one.
+	OwnerLinks int
 }
 
 // normalizeRemoteURL reduces a URL to scheme://host[:port] and rejects
@@ -283,13 +285,14 @@ func CheckRemoteHealth(ctx context.Context, baseURL, apiKey string, allowPrivate
 		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: fmt.Sprintf("remote returned HTTP %d", resp.StatusCode)}
 	}
 	var body struct {
-		Status  string `json:"status"`
-		Version string `json:"version"`
+		Status     string `json:"status"`
+		Version    string `json:"version"`
+		OwnerLinks int    `json:"hub_owner_links"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&body); err != nil || body.Status != "ok" {
 		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "remote is not running Coral"}
 	}
-	return RemoteHealth{Status: store.RemoteStatusOnline, Version: body.Version}
+	return RemoteHealth{Status: store.RemoteStatusOnline, Version: body.Version, OwnerLinks: body.OwnerLinks}
 }
 
 func localServerEntry() map[string]any {
@@ -562,6 +565,16 @@ func (h *RemoteServersHandler) OwnerSecret(w http.ResponseWriter, r *http.Reques
 		errInternalServer(w, "internal error")
 		return
 	}
+	// The line names this hub too when the computer keeps one secret per hub (#21213), so this hub's never replaces another's there. An older Coral, or one this hub cannot ask now, takes the two-part
+	// line it always did (a third part would be refused there).
+	line := id + " " + secret
+	if hub := HubLinkID(); hub != "" {
+		if key, kerr := h.store.DecryptedKey(r.Context(), id); kerr == nil {
+			if health := CheckRemoteHealth(r.Context(), cur.URL, key, cur.AllowPrivate, h.healthTimeout); health.OwnerLinks >= hubowner.LinksVersion {
+				line += " " + hub
+			}
+		}
+	}
 	if err := h.store.SetOwnerSecret(r.Context(), id, secret); err != nil {
 		remoteErr(w, err)
 		return
@@ -569,7 +582,7 @@ func (h *RemoteServersHandler) OwnerSecret(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]string{
 		"remote_id":  id,
-		"setup_line": id + " " + secret,
+		"setup_line": line,
 		"command":    "coral hub-owner-secret",
 		"notice":     "Shown once. Run the command at that computer and paste the line when it asks. Until then this hub's decisions for it are refused.",
 	})

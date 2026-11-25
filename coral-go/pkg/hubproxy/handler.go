@@ -215,6 +215,9 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 			if stamper != nil { // after the allowlist: whatever a browser sent under this name is already gone
 				if v, ok := stamper.OwnerStamp(out.Method, hubowner.Target(out.URL), stampBody); ok {
 					out.Header.Set(hubowner.Header, v)
+					if id := ownerLink(out.Context()); hubowner.ValidHubID(id) {
+						out.Header.Set(hubowner.LinkHeader, id) // which of the remote's hub secrets to check: a remote with one secret per hub (#21213); an older remote ignores it
+					}
 				}
 			}
 		},

@@ -49,9 +49,11 @@ func TestHealthEndpointContract(t *testing.T) {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		assert.Equal(t, []string{"hub", "hub_owner_routes", "hub_owner_stamp", "hub_owner_stamp_at", "instance_id", "status", "version"}, keys, "exact field set")
+		assert.Equal(t, []string{"hub", "hub_owner_leftover", "hub_owner_links", "hub_owner_routes", "hub_owner_stamp", "hub_owner_stamp_at", "instance_id", "status", "version"}, keys, "exact field set")
 		assert.Equal(t, false, body["hub_owner_stamp"], "no owner stamp secret is installed here (#11378)")
 		assert.Equal(t, "", body["hub_owner_stamp_at"], "and so there is no time for it")
+		assert.Equal(t, false, body["hub_owner_leftover"], "no leftover single-file secret")
+		assert.EqualValues(t, hubowner.LinksVersion, body["hub_owner_links"], "one owner stamp secret per hub (#21213): a hub sends its id with the secret it installs only to a Coral that says so")
 		assert.EqualValues(t, hubowner.RoutesVersion, body["hub_owner_routes"], "the generation of the owner-stamp allowlist this computer accepts (#13694): a hub stamps a widened route only for a remote that lists it")
 		assert.IsType(t, "", body["instance_id"], "the id of this server run (#245): a command checks it before it sends a credential to the address in the lock file")
 		assert.Equal(t, "ok", body["status"])
@@ -101,4 +103,29 @@ func TestHealthSaysWhenTheHubOwnerStampSecretIsInstalled(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		assert.Equal(t, false, get(), "a secret file readable by others is not an installed secret")
 	}
+}
+
+// #21251: the health answer flags (a boolean, never a name or a secret) a leftover single-file owner secret that a hub's link shadows.
+func TestHealthFlagsALeftoverSingleFileOwnerSecret(t *testing.T) {
+	dir := t.TempDir()
+	cfg := newE2EConfig(t, dir)
+	db, err := storetest.Open(t, cfg.DBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stack := newTermStack(t)
+	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
+	ts := httptest.NewServer(srv.Router())
+	t.Cleanup(ts.Close)
+	leftover := func() any {
+		resp, err := http.Get(ts.URL + "/api/health")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		return body["hub_owner_leftover"]
+	}
+	require.NoError(t, hubowner.WriteFile(cfg.CoralDir(), "ssh-box", strings.Repeat("ab", 32)))
+	assert.Equal(t, false, leftover(), "a single file alone is not flagged")
+	require.NoError(t, hubowner.Install(cfg.CoralDir(), hubowner.Link{Hub: strings.Repeat("a", 32), Remote: "ssh-box", Secret: strings.Repeat("cd", 32)}, time.Now()))
+	assert.Equal(t, true, leftover(), "a link and the single file under the same name")
 }

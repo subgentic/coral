@@ -306,7 +306,7 @@ func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr.checkHealth = pr.realCheckHealth
 	pr.eula = hubEULAState
 	pr.installOwner = func(ctx context.Context, p *provisionPlan, secret string) error {
-		return pr.runner.InstallOwnerSecret(ctx, p.Target, pr.ownerFolder(p), p.ServerID, secret)
+		return pr.runner.InstallOwnerSecret(ctx, p.Target, pr.ownerFolder(p), p.ServerID, secret, HubLinkID(), hubDisplayName())
 	}
 	return pr
 }

@@ -269,7 +269,7 @@ func TestInstallOwnerSecretGoesOnStdinNeverInArgv(t *testing.T) {
 	r, home, argsLog, _ := startSide(t)
 	tg, _ := ParseTarget("rich@box.example.com")
 	secret := strings.Repeat("ab", 32)
-	if err := r.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", secret); err != nil {
+	if err := r.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", secret, "", ""); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(argsLog + ".owner.stdin")
@@ -501,7 +501,7 @@ func TestInstallOwnerSecretThatFailsSaysWhy(t *testing.T) {
 		t.Fatal(err)
 	}
 	tg, _ := ParseTarget("rich@box.example.com")
-	err := Runner{SSH: ssh}.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", strings.Repeat("ab", 32))
+	err := Runner{SSH: ssh}.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", strings.Repeat("ab", 32), "", "")
 	var oe *OwnerSecretError
 	if !errors.As(err, &oe) {
 		t.Fatalf("err = %v, want an OwnerSecretError", err)
@@ -523,7 +523,7 @@ func TestInstallOwnerSecretFailureKeepsTheSecretOutOfTheKeptStderr(t *testing.T)
 		t.Fatal(err)
 	}
 	tg, _ := ParseTarget("rich@box.example.com")
-	err := Runner{SSH: ssh}.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", secret)
+	err := Runner{SSH: ssh}.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", secret, "", "")
 	var oe *OwnerSecretError
 	if !errors.As(err, &oe) {
 		t.Fatalf("err = %v", err)
@@ -612,5 +612,75 @@ func TestCreateLinkKeyRunsOnlyKeysCreateAndTakesOnlyAKey(t *testing.T) {
 				t.Errorf("%s: the far side's output is in the error: %v", name, err)
 			}
 		}
+	}
+}
+
+// #21213: the hub sends its hub id and name so the far Coral keeps its secret beside other hubs'; a Coral older than that refuses the two fields (exit 2) and gets the install it always had.
+func TestInstallOwnerSecretSendsTheHubAndFallsBackForAnOlderCoral(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the far ssh is a #!/bin/sh stand-in, which Windows cannot run; the shipped code does not depend on it")
+	}
+	hub := strings.Repeat("a", 32)
+	for name, c := range map[string]struct {
+		script string
+		calls  int
+		last   string
+	}{
+		"a newer Coral":  {"#!/bin/sh\ncat >>\"$LOG\"\necho >>\"$LOG\"\nexit 0\n", 1, `"hub":"` + hub + `"`},
+		"an older Coral": {"#!/bin/sh\nin=$(cat)\necho \"$in\" >>\"$LOG\"\ncase \"$in\" in *'\"hub\"'*) echo 'coral hub-owner-secret: stdin is not {remote, secret}' >&2; exit 2;; esac\nexit 0\n", 2, `{"remote":"ssh-box","secret":"`},
+	} {
+		dir := t.TempDir()
+		ssh := filepath.Join(dir, "ssh")
+		log := filepath.Join(dir, "log")
+		if err := os.WriteFile(ssh, []byte(strings.ReplaceAll(c.script, "$LOG", log)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		tg, _ := ParseTarget("rich@box.example.com")
+		if err := (Runner{SSH: ssh}).InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", strings.Repeat("ab", 32), hub, "Studio hub"); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		b, _ := os.ReadFile(log)
+		lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+		if len(lines) != c.calls {
+			t.Fatalf("%s: %d installs, want %d: %q", name, len(lines), c.calls, b)
+		}
+		if !strings.Contains(lines[0], `"hub":"`+hub+`"`) || !strings.Contains(lines[0], `"name":"Studio hub"`) {
+			t.Errorf("%s: the first install did not name the hub: %q", name, lines[0])
+		}
+		if last := lines[len(lines)-1]; !strings.Contains(last, c.last) || c.calls == 2 && strings.Contains(last, `"hub"`) {
+			t.Errorf("%s: last install %q", name, last)
+		}
+	}
+	// a newer Coral's own refusal (exit 2, a bad hub id) is not retried without the hub: only the older Coral's unknown-field words fall back (Security INFO 3)
+	{
+		dir := t.TempDir()
+		ssh := filepath.Join(dir, "ssh")
+		log := filepath.Join(dir, "log")
+		if err := os.WriteFile(ssh, []byte(strings.ReplaceAll("#!/bin/sh\ncat >>\"$LOG\"\necho >>\"$LOG\"\necho \"coral hub-owner-secret: the hub's id is not valid\" >&2\nexit 2\n", "$LOG", log)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		tg, _ := ParseTarget("rich@box.example.com")
+		err := (Runner{SSH: ssh}).InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", strings.Repeat("ab", 32), hub, "Studio hub")
+		var oe *OwnerSecretError
+		if !errors.As(err, &oe) || oe.ExitCode != 2 {
+			t.Fatalf("a newer Coral's refusal: %v", err)
+		}
+		b, _ := os.ReadFile(log)
+		if n := len(strings.Split(strings.TrimSpace(string(b)), "\n")); n != 1 {
+			t.Errorf("a newer Coral's refusal was retried without the hub: %d installs %q", n, b)
+		}
+	}
+	// any other failure is not retried: it is the far computer's answer
+	dir := t.TempDir()
+	ssh := filepath.Join(dir, "ssh")
+	if err := os.WriteFile(ssh, []byte(strings.ReplaceAll("#!/bin/sh\ncat >>\"$LOG\"\necho >>\"$LOG\"\nexit 1\n", "$LOG", filepath.Join(dir, "log"))), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("rich@box.example.com")
+	if err := (Runner{SSH: ssh}).InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", strings.Repeat("ab", 32), hub, ""); err == nil {
+		t.Fatal("a refusal was taken")
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "log")); strings.Count(strings.TrimSpace(string(b)), "\n") != 0 {
+		t.Errorf("retried after exit 1: %q", b)
 	}
 }

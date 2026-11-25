@@ -125,8 +125,24 @@ func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
 // InstallOwnerSecret installs the secret the hub signs its owner stamps for this computer with (#11378): the far Coral's own `hub-owner-secret` command writes it (0600) under the id this hub knows the
 // computer by. Both go on stdin; nothing of them is in argv. A failure keeps the start of the far computer's stderr for the hub's log (#13251) with the secret and the id taken out of it first: a far command that echoed its stdin
 // in an error would otherwise put the secret in the log, and no general redactor knows a random hub-owner secret.
-func (r Runner) InstallOwnerSecret(ctx context.Context, t Target, version, remoteID, secret string) error {
-	payload, err := json.Marshal(map[string]string{"remote": remoteID, "secret": secret})
+func (r Runner) InstallOwnerSecret(ctx context.Context, t Target, version, remoteID, secret, hub, hubName string) error {
+	if hub != "" { // this hub's link id and name (#21213): a Coral that keeps one secret per hub keeps this one beside other hubs'
+		err := r.installOwnerSecret(ctx, t, version, map[string]string{"remote": remoteID, "secret": secret, "hub": hub, "name": hubName}, secret)
+		var oe *OwnerSecretError
+		if !errors.As(err, &oe) || oe.ExitCode != 2 || !strings.Contains(oe.Stderr, olderOwnerSecretRefusal) {
+			return err
+		}
+		// a Coral older than #21213 refusing the two fields (exit 2 with its unknown-field words, nothing else): it holds one secret, installed as before
+	}
+	return r.installOwnerSecret(ctx, t, version, map[string]string{"remote": remoteID, "secret": secret}, secret)
+}
+
+// olderOwnerSecretRefusal is what a Coral older than #21213 says when stdin has a field it does not know (its {remote, secret} only): the one refusal the install falls back on. A newer Coral says
+// "{remote, secret, hub, name}" there, so its refusals (a bad hub id, say) are never retried without the hub.
+const olderOwnerSecretRefusal = "stdin is not {remote, secret}"
+
+func (r Runner) installOwnerSecret(ctx context.Context, t Target, version string, in map[string]string, secret string) error {
+	payload, err := json.Marshal(in)
 	if err != nil {
 		return err
 	}

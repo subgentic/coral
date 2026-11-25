@@ -101,13 +101,14 @@ func CheckTargetHealth(ctx context.Context, t proxy.Target, timeout time.Duratio
 		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "remote did not answer"}
 	}
 	var body struct {
-		Status  string `json:"status"`
-		Version string `json:"version"`
+		Status     string `json:"status"`
+		Version    string `json:"version"`
+		OwnerLinks int    `json:"hub_owner_links"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&body); err != nil || body.Status != "ok" {
 		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "remote is not a Coral server"}
 	}
-	return RemoteHealth{Status: store.RemoteStatusOnline, Version: body.Version}
+	return RemoteHealth{Status: store.RemoteStatusOnline, Version: body.Version, OwnerLinks: body.OwnerLinks}
 }
 
 // updateSSH is PATCH /api/servers/{id} for a server reached over SSH: its label and its key can be edited. It has no URL and no private-network switch, and a request that names either is refused,
