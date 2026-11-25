@@ -65,12 +65,12 @@ func TestACodexLaunchRunsAndRecordsWhatThePickSaid(t *testing.T) {
 		stored  string
 		bypass  bool
 	}{
-		"Default":                         {body: map[string]any{"permission_mode": "default"}, stored: "default"},
-		"nothing chosen (the saved Auto)": {body: map[string]any{}, sandbox: "workspace-write never", stored: "auto"},
-		"Auto":                            {body: map[string]any{"flags": []string{"--sandbox", "workspace-write", "-a", "never"}}, sandbox: "workspace-write never", stored: "auto"},
-		"Plan":                            {body: map[string]any{"flags": []string{"--sandbox", "read-only", "-a", "on-request"}}, sandbox: "read-only on-request", stored: "plan"},
-		"Bypass":                          {body: map[string]any{"flags": []string{"--dangerously-bypass-approvals-and-sandbox"}}, stored: "bypassPermissions", bypass: true},
-		"an old saved Accept edits":       {body: map[string]any{"flags": []string{"--sandbox", "workspace-write", "-a", "on-request"}}, sandbox: "workspace-write on-request", stored: "default"},
+		"Default (Auto's own flags, #21335)": {body: map[string]any{"permission_mode": "default"}, sandbox: "workspace-write never", stored: "default"},
+		"nothing chosen (the saved Auto)":    {body: map[string]any{}, sandbox: "workspace-write never", stored: "auto"},
+		"Auto":                               {body: map[string]any{"flags": []string{"--sandbox", "workspace-write", "-a", "never"}}, sandbox: "workspace-write never", stored: "auto"},
+		"Plan":                               {body: map[string]any{"flags": []string{"--sandbox", "read-only", "-a", "on-request"}}, sandbox: "read-only on-request", stored: "plan"},
+		"Bypass":                             {body: map[string]any{"flags": []string{"--dangerously-bypass-approvals-and-sandbox"}}, stored: "bypassPermissions", bypass: true},
+		"an old saved Accept edits":          {body: map[string]any{"flags": []string{"--sandbox", "workspace-write", "-a", "on-request"}}, sandbox: "workspace-write on-request", stored: "default"},
 	} {
 		cmd, stored := launch(c.body)
 		got := ""

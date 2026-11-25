@@ -137,6 +137,7 @@ function _syncEnforcement(container) {
         const lm = launchedMode(agentType, permMode, caps);
         override.textContent = !lm.narrowed ? ''
             : fullOn ? 'Use Full access is ticked: this agent runs with Full access whatever its capabilities say.'
+            : permMode === 'default' && agentType === 'codex' ? `Default is Auto for Codex, and the capabilities narrow it: ${lm.text}.${offered ? ' Tick Use Full access for this agent, below, to override that.' : ''}`
             : permMode === 'default' ? `No Mode chosen, so the capabilities decide: ${lm.text}.${offered ? ' Tick Use Full access for this agent, below, to override that.' : ''}`
             : `The capabilities narrow this Mode: ${lm.text}.${offered ? ' Tick Use Full access for this agent, below, to override that.' : ''}`;
         override.hidden = !override.textContent;

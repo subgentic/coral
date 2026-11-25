@@ -17,7 +17,12 @@ func TestCodexCoralSandboxDefault(t *testing.T) {
 	assert.NotContains(t, cmd, "dangerously-bypass")
 	assert.NotContains(t, cmd, "writable_roots", "Coral's token and board-state files only need read access")
 	assert.True(t, SkipsPermissionPrompts("codex", PermissionFlagsForAgent("codex", p.PermissionMode)), "Hub classification remains skipping")
-	for _, mode := range []string{"default", "plan", "acceptEdits", "bypassPermissions"} {
+	p.PermissionMode = "default" // the Default pick is the Auto pick (#21335)
+	cmd, err = (&CodexAgent{}).LaunchCommand(p)
+	require.NoError(t, err)
+	assert.Contains(t, cmd, "--sandbox workspace-write -a never", "default")
+	assert.Contains(t, cmd, "sandbox_workspace_write.network_access=true", "default")
+	for _, mode := range []string{"plan", "acceptEdits", "bypassPermissions"} {
 		p.PermissionMode = mode
 		cmd, err = (&CodexAgent{}).LaunchCommand(p)
 		require.NoError(t, err)
@@ -83,13 +88,14 @@ func TestCodexBoardMemberWithShellChipsReachesCoral(t *testing.T) {
 	}
 	// not a member of a board: the preset keeps its own network policy, as before
 	assert.NotContains(t, launch(LaunchParams{PermissionMode: "auto", Capabilities: shell}), net)
-	// on-request keeps asking: the person who chose to be asked is asked (a board call raises its approval)
+	// Default is Auto (#21335): a role's chips narrow its sandbox, they no longer make it ask, so these board members run workspace-write and never and reach Coral like the others
 	for name, caps := range map[string]*Capabilities{
 		"files only":      {Allow: []string{CapFileRead, CapFileWrite}},
 		"shell with deny": {Allow: []string{CapShell}, Deny: []string{"Bash(rm:*)"}},
 	} {
 		cmd := launch(LaunchParams{PermissionMode: "default", Capabilities: caps, BoardName: "coral-go-team"})
-		assert.NotContains(t, cmd, net, name)
+		assert.Contains(t, cmd, "--sandbox workspace-write -a never", name)
+		assert.Contains(t, cmd, net, name)
 	}
 	assert.NotContains(t, launch(LaunchParams{PermissionMode: "acceptEdits", BoardName: "coral-go-team"}), net, "accept edits asks")
 	assert.NotContains(t, launch(LaunchParams{PermissionMode: "plan", BoardName: "coral-go-team"}), net, "read-only")
@@ -123,14 +129,14 @@ func TestCodexAutoSentAsFlagsReachesCoralLikeTheMode(t *testing.T) {
 	}
 	// the other pairs and the other modes keep their own policy
 	for name, flags := range map[string][]string{
-		"on-request":    {"--sandbox", "workspace-write", "-a", "on-request"},
-		"read-only":     {"--sandbox", "read-only", "-a", "never"},
-		"untrusted":     {"--sandbox", "workspace-write", "-a", "untrusted"},
-		"bypass":        {"--dangerously-bypass-approvals-and-sandbox"},
-		"nothing typed": nil,
+		"on-request": {"--sandbox", "workspace-write", "-a", "on-request"},
+		"read-only":  {"--sandbox", "read-only", "-a", "never"},
+		"untrusted":  {"--sandbox", "workspace-write", "-a", "untrusted"},
+		"bypass":     {"--dangerously-bypass-approvals-and-sandbox"},
 	} {
 		assert.NotContains(t, launch(LaunchParams{Flags: flags}), net, name)
 	}
+	assert.Contains(t, launch(LaunchParams{}), net, "nothing typed is Default, which is Auto (#21335)")
 	// a person's own network setting still wins
 	cmd := launch(LaunchParams{Flags: []string{"--sandbox", "workspace-write", "-a", "never", "-c", "sandbox_workspace_write.network_access=false"}})
 	assert.Less(t, strings.Index(cmd, "network_access=true"), strings.Index(cmd, "network_access=false"), cmd)

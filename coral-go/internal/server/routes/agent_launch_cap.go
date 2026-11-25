@@ -52,11 +52,11 @@ func modeRank(agentType, mode string) int {
 		switch mode {
 		case "bypassPermissions":
 			return rankOpen
-		case "auto", "dontAsk":
-			return rankJudged // --sandbox workspace-write -a never
+		case "auto", "dontAsk", "", "default":
+			return rankJudged // --sandbox workspace-write -a never; Default is Auto for Codex (the Operator's decision, #21335), so it ranks as Auto: an agent cannot start a Default Codex a Plan agent could not start as Auto
 		case "plan":
 			return rankAsks // --sandbox read-only
-		default: // default, acceptEdits and none: --sandbox workspace-write -a on-request
+		default: // acceptEdits: --sandbox workspace-write -a on-request
 			return rankEdits
 		}
 	case agentType == at.Hermes:
@@ -156,7 +156,13 @@ func effectiveRank(agentType, mode string, caps *agent.Capabilities, keepFull bo
 		return dontAskRank(caps) // Don't ask denies whatever the allow list does not cover: its rank is what that list covers (Security's SHOULD on #14336)
 	}
 	r := modeRank(agentType, mode)
-	if cr, ok := capsRank(agentType, caps); ok {
+	if cr, ok := capsRank(agentType, caps); ok && agentType == at.Codex && (mode == "" || mode == "default" || mode == "auto" || mode == "dontAsk") {
+		// Capabilities narrow a Codex Default or Auto launch's sandbox and never make it ask (#21335): read-only stays read-only, anything else runs workspace-write that never asks
+		if cr == rankAsks {
+			return rankAsks
+		}
+		return rankJudged
+	} else if ok {
 		switch mode {
 		case "", "default", "auto", "dontAsk":
 			if mode == "" || mode == "default" {

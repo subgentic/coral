@@ -9,6 +9,7 @@ import (
 func TestCodexModeNoteSaysWhyTheFlagsAreNotTheModes(t *testing.T) {
 	narrow := &Capabilities{Allow: []string{"shell"}, Deny: []string{"git_write"}}
 	wide := &Capabilities{Allow: []string{"shell"}}
+	readOnly := &Capabilities{Allow: []string{"file_read"}}
 	for _, tc := range []struct {
 		name string
 		caps *Capabilities
@@ -18,13 +19,15 @@ func TestCodexModeNoteSaysWhyTheFlagsAreNotTheModes(t *testing.T) {
 	}{
 		{"Bypass, no capabilities", nil, "bypassPermissions", false, ""},
 		{"Plan, no capabilities", nil, "plan", false, ""},
-		{"Default, no capabilities: Codex's own config decides", nil, "default", false, ""},
+		{"Default, no capabilities: Auto's own flags, nothing narrows them (#21335)", nil, "default", false, ""},
 		{"Bypass narrowed by Shell with limits", narrow, "bypassPermissions", false, "narrow this mode to workspace writes, asks first"},
-		{"Auto narrowed by Shell with limits", narrow, "auto", false, "narrow this mode to workspace writes, asks first"},
+		{"Auto with Shell with limits: the limits no longer make it ask, so nothing differs from the mode (#21335)", narrow, "auto", false, ""},
+		{"Auto narrowed to read-only by file_read", readOnly, "auto", false, "narrow this mode to read-only"},
 		{"Plan with Shell with limits stays Plan", narrow, "plan", false, ""},
 		{"Bypass with Shell, no limits stands", wide, "bypassPermissions", false, ""},
-		{"Default with Shell, no limits runs Auto's pair", wide, "default", false, "capabilities set them: workspace writes, never asks"},
-		{"Default with Shell with limits", narrow, "default", false, "capabilities set them: workspace writes, asks first"},
+		{"Default with Shell, no limits runs Auto's pair, which is the mode (#21335)", wide, "default", false, ""},
+		{"Default with Shell with limits is still Auto's pair (#21335)", narrow, "default", false, ""},
+		{"Default with file_read: Auto narrowed to read-only (#21335)", readOnly, "default", false, "Default is Auto for Codex, and the agent's capabilities narrow it to read-only"},
 		{"Full access kept, whatever the capabilities say", narrow, "plan", true, "Full access is kept"},
 	} {
 		got := CodexModeNote(tc.caps, tc.mode, tc.keep)

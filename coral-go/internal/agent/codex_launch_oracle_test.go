@@ -247,13 +247,22 @@ func (a *CodexAgent) launchCommandBefore4845(params LaunchParams) (string, error
 	permissionApplied := false
 	if perms := TranslateToCodexPermissions(params.Capabilities); perms != nil {
 		permissionApplied = true
-		// The two deliberate changes since #4845 (#6422, #6425): no bypass is read from capabilities, and an explicit mode is applied with the capabilities only narrowing it.
+		// The deliberate changes since #4845 (#6422, #6425, #21335): no bypass is read from capabilities, and an explicit mode is applied with the capabilities only narrowing it.
 		pair := codexPairOf(perms)
 		if m, ok := codexPairForMode(params.PermissionMode); ok {
 			if perms.FullAuto {
 				pair = codexPair{codexSandboxNone, "never"}
 			}
 			pair = narrowCodexPair(m, pair)
+		} else if codexUnattendedMode(params.PermissionMode) {
+			// The third deliberate change since #4845 (#21335): the Default pick is Auto, so capabilities narrow its sandbox and never turn it into asking a person.
+			if perms.FullAuto {
+				pair = codexPair{"workspace-write", "never"}
+			}
+			pair = narrowCodexPair(codexPair{"workspace-write", "never"}, pair)
+		}
+		if codexUnattendedMode(params.PermissionMode) && pair.approval != "never" {
+			pair.approval = "never"
 		}
 		if pair.sandbox == codexSandboxNone && pair.approval == "never" {
 			bypassSandbox = true

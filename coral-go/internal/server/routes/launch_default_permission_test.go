@@ -107,7 +107,11 @@ func TestAClaudeLaunchWithNoChosenPermissionModeStartsInAuto(t *testing.T) {
 		require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", saved))
 		cmd, stored = launch(map[string]any{"agent_type": at.Codex})
 		assert.Equal(t, saved, stored)
-		assert.NotContains(t, cmd, "sandbox_workspace_write.network_access=true")
+		if saved == "default" { // Default is Auto for Codex (#21335)
+			assert.Contains(t, cmd, "sandbox_workspace_write.network_access=true")
+		} else {
+			assert.NotContains(t, cmd, "sandbox_workspace_write.network_access=true")
+		}
 		if saved == "bypassPermissions" {
 			assert.Contains(t, cmd, "--dangerously-bypass-approvals-and-sandbox")
 		}

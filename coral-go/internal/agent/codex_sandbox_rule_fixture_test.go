@@ -55,7 +55,14 @@ func TestCodexSandboxRuleFixture(t *testing.T) {
 			assert.Equal(t, c.Expect.Search, perms.Search, "search")
 			assert.False(t, bypass, "capabilities alone are never the no-sandbox case (#6422)")
 			assert.True(t, applied)
-			assert.Equal(t, c.Flags, flags, "the exact flags a launch passes: %s", strings.Join(flags, " "))
+			// The fixture is the rule of the translation, what the capabilities alone would ask. A launch with no mode is Default, which is Auto (#21335): the same sandbox, and never an approval prompt.
+			want := append([]string(nil), c.Flags...)
+			for i := 0; i+1 < len(want); i++ {
+				if want[i] == "-a" && want[i+1] == "on-request" {
+					want[i+1] = "never"
+				}
+			}
+			assert.Equal(t, want, flags, "the exact flags a launch passes: %s", strings.Join(flags, " "))
 		})
 	}
 }

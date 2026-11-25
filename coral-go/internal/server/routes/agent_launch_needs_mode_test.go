@@ -102,10 +102,10 @@ func TestAnAgentsCodexLaunchOnABoardNeedsAMode(t *testing.T) {
 	rec, _ = launch(true, onBoard(nil))
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	assert.Equal(t, agentLaunchNeedsModeCode, jsonCode(t, rec))
-	// and the Operator's explicit "default" stays bare ask-first too
+	// and the Operator's own "default" is Auto's launch (#21335: Default for Codex is Auto, so it reaches Coral); the cap above still refuses it to an agent that is not Auto itself
 	rec, cmd = launch(false, onBoard(nil))
 	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	assert.NotContains(t, cmd, "network_access=true")
+	assert.Contains(t, cmd, "network_access=true")
 	require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", ""))
 
 	// another type with no mode is not refused (Claude's agent launch asks, and reaches Coral through hooks)

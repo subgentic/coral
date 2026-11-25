@@ -90,22 +90,19 @@ func codexModeMatrix(t *testing.T, version string) {
 		"narrow": {"allow": []string{"shell"}, "deny": []string{"git_write"}},
 		"wide":   {"allow": []string{"shell"}},
 	}
-	// What a launch types, by pick, Full access and capability set. Capabilities only narrow an explicit mode (#6425), and with Default (no explicit mode) Shell with no deny is Auto's pair (#6422).
+	// What a launch types, by pick, Full access and capability set. Capabilities only narrow an explicit mode (#6425); Default is Auto (#21335), and neither Default nor Auto is made to ask by them.
 	want := func(c codexMatrixCase) string {
 		if c.keep {
 			return "bypass"
 		}
 		switch c.pick + "/" + c.caps {
-		case "default/":
-			return "(none: Codex's own config)"
-		case "default/narrow", "auto/narrow", "bypass/narrow":
+		case "bypass/narrow":
 			return "workspace-write on-request"
-		case "auto/wide", "auto/":
+		case "auto/wide", "auto/", "auto/narrow", "default/", "default/narrow", "default/wide":
+			// Default is Auto (#21335): capabilities narrow what it may touch and never make it ask, so every one of these is Auto's own launch
 			if agent.CodexVersionAtLeast(version, "0.163.0") {
 				return "approve-for-me"
 			}
-			return "workspace-write never"
-		case "default/wide":
 			return "workspace-write never"
 		case "plan/", "plan/narrow", "plan/wide":
 			return "read-only on-request"

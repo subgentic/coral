@@ -46,7 +46,7 @@ func TestCodexLaunchPresetWinsOverStoredSandboxFlags(t *testing.T) {
 	cmd := build(LaunchParams{Capabilities: readOnly, Flags: []string{"--sandbox", "danger-full-access", "-a", "never"}})
 	assert.Contains(t, cmd, "--sandbox read-only")
 	assert.NotContains(t, cmd, "danger-full-access")
-	assert.NotContains(t, cmd, " -a never")
+	assert.Contains(t, cmd, "--sandbox read-only -a never", "Default is Auto (#21335): the preset narrows the sandbox and the stored never stands, nothing asks")
 	assert.Equal(t, 1, strings.Count(cmd, " --sandbox "), cmd)
 	cmd = build(LaunchParams{Flags: []string{"--sandbox", "read-only", "--sandbox", "workspace-write"}})
 	assert.Contains(t, cmd, "--sandbox workspace-write")
@@ -76,7 +76,7 @@ func TestCodexLaunchCollapsesEverySpellingOfTheSandboxAndApproval(t *testing.T) 
 		}
 		return n
 	}
-	preset := &Capabilities{Allow: []string{"file_read"}} // read-only, on-request
+	preset := &Capabilities{Allow: []string{"file_read"}} // read-only; Default is Auto, so it does not ask (#21335)
 	for name, flags := range map[string][]string{
 		"-s X":                 {"-s", "danger-full-access"},
 		"--sandbox=X":          {"--sandbox=danger-full-access"},
@@ -89,7 +89,7 @@ func TestCodexLaunchCollapsesEverySpellingOfTheSandboxAndApproval(t *testing.T) 
 		cmd := build(LaunchParams{Capabilities: preset, Flags: flags})
 		assert.Equal(t, 1, sandboxes(cmd), "%s: one sandbox setting", name)
 		assert.Equal(t, 1, approvals(cmd), "%s: one approval setting", name)
-		assert.Contains(t, cmd, "--sandbox read-only -a on-request", "%s: the preset's pair wins", name)
+		assert.Contains(t, cmd, "--sandbox read-only -a never", "%s: the preset's sandbox wins", name)
 		assert.NotContains(t, cmd, "danger-full-access", name)
 	}
 	// With no preset the later one wins, in whatever spelling.

@@ -34,12 +34,21 @@ func TestCodexAutoIsTheAutoReviewOnACodexThatHasIt(t *testing.T) {
 		{"--full-auto", LaunchParams{Flags: []string{"--full-auto"}}},
 		{"permission-mode flag", LaunchParams{Flags: []string{"--permission-mode", "auto"}}},
 		{"resume", LaunchParams{PermissionMode: "auto", ResumeSessionID: "99999999-2222-3333-4444-555555555555"}},
+		// #21335 (the Operator): Default is Auto, so it gets the auto-review too, whatever its capabilities, whose Shell rule used to make it ask
+		{"Default (no mode)", LaunchParams{}},
+		{"Default, named", LaunchParams{PermissionMode: "default"}},
+		{"Default with Shell and no deny", LaunchParams{Capabilities: &Capabilities{Allow: []string{"shell"}}}},
+		{"Default with a role's Shell deny list", LaunchParams{PermissionMode: "default", Capabilities: &Capabilities{Allow: []string{"shell"}, Deny: []string{"git_write"}}}},
+		{"Default with coral-hub's narrow shell list (#21335)", LaunchParams{PermissionMode: "default", Capabilities: &Capabilities{Allow: []string{"file_read", "file_write", "web_access", "shell:npm *", "shell:npx *", "shell:coral-board *"}}}},
+		{"Auto narrowed by a role's Shell rule", LaunchParams{PermissionMode: "auto", Capabilities: &Capabilities{Allow: []string{"shell"}, Deny: []string{"git_write"}}}},
 	} {
 		cmd := codexAutoLaunch(t, "0.163.0", c.params)
 		assert.Contains(t, cmd, "--approve-for-me", c.name)
 		assert.NotContains(t, cmd, "--sandbox", c.name+": --approve-for-me carries the sandbox")
 		assert.NotContains(t, cmd, " never", c.name+": and the approval policy")
-		assert.Contains(t, cmd, "network_access=true", c.name+": Coral's own calls still reach it")
+		if c.params.Capabilities == nil { // a capabilities preset keeps its own network policy unless the agent is on a board (TestCodexBoardMemberWithShellChipsReachesCoral)
+			assert.Contains(t, cmd, "network_access=true", c.name+": Coral's own calls still reach it")
+		}
 		assert.Equal(t, 1, strings.Count(cmd, "--approve-for-me"), c.name)
 		for _, v := range []string{"0.162.9", "0.162.0", "0.100.1"} { // a version READ as older keeps today's pair
 			old := codexAutoLaunch(t, v, c.params)
@@ -55,8 +64,6 @@ func TestCodexAutoIsTheAutoReviewOnACodexThatHasIt(t *testing.T) {
 }
 
 func TestCodexAutoReviewLeavesEveryOtherPickAlone(t *testing.T) {
-	wide := &Capabilities{Allow: []string{"shell"}}
-	narrow := &Capabilities{Allow: []string{"shell"}, Deny: []string{"git_write"}}
 	for _, c := range []struct {
 		name   string
 		params LaunchParams
@@ -66,8 +73,7 @@ func TestCodexAutoReviewLeavesEveryOtherPickAlone(t *testing.T) {
 		{"Accept edits", LaunchParams{PermissionMode: "acceptEdits"}, "--sandbox workspace-write -a on-request"},
 		{"Bypass", LaunchParams{PermissionMode: "bypassPermissions"}, "--dangerously-bypass-approvals-and-sandbox"},
 		{"Full access kept", LaunchParams{PermissionMode: "auto", KeepFullAccess: true}, "--dangerously-bypass-approvals-and-sandbox"},
-		{"Auto narrowed by a role's Shell rule", LaunchParams{PermissionMode: "auto", Capabilities: narrow}, "--sandbox workspace-write -a on-request"},
-		{"Default with Shell and no deny (set by the capabilities, not an Auto pick)", LaunchParams{Capabilities: wide}, "--sandbox workspace-write -a never"},
+		{"Default with read-only capabilities: narrowed, and no longer asking (#21335)", LaunchParams{Capabilities: &Capabilities{Allow: []string{"file_read"}}}, "--sandbox read-only -a never"},
 	} {
 		cmd := codexAutoLaunch(t, "0.170.0", c.params)
 		assert.Contains(t, cmd, c.want, c.name)

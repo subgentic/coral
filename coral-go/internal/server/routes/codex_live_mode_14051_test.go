@@ -70,11 +70,11 @@ func TestACodexRowSaysItsLiveModeAndWhenARelaunchWouldNarrowIt(t *testing.T) {
 	require.Equal(t, "Read-only", s["codex_live_mode"].(map[string]any)["label"])
 	require.Nil(t, s["codex_relaunch_narrows"], "a relaunch that WIDENS is not a warning of this kind")
 
-	store1(nil, nil, nil) // nothing stored: the CLI's own config decides on a relaunch, so nothing can be said to be narrower
+	store1(nil, nil, nil) // nothing stored: Default, which is Auto (#21335), so a relaunch gives workspace writes that never ask
 	turn("never", "danger-full-access")
 	s = row()
 	require.Equal(t, "Full access", s["codex_live_mode"].(map[string]any)["label"])
-	require.Nil(t, s["codex_relaunch_narrows"])
+	require.Equal(t, map[string]any{"live": "Full access", "launch": "Workspace write, never asks"}, s["codex_relaunch_narrows"], "Full access now, a relaunch gives Auto")
 }
 
 // Only Codex rows carry it, and a Codex row whose rollout has no turn_context yet says nothing about a mode.
