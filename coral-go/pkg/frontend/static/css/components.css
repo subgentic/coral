@@ -3632,7 +3632,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .cli-recheck-status:not(:empty) { margin-top: 10px; }
 
 /* Coral Hub and remote access layout nits (#5985): a status line that is empty takes no room; "Run as a hub" is label left, switch right like every other row; Disconnect aligns with the row's left edge. */
-#settings-remote-access-status:empty, #settings-hub-mode-status:empty, #settings-debug-input-log-status:empty { display: none; }
+#settings-remote-access-status:empty, #settings-debug-input-log-status:empty { display: none; }
 #settings-cloud .settings-cloud-actions { margin: 6px 0; padding: 0; justify-content: flex-start; }
 #settings-cloud .settings-cloud-actions .btn { margin-left: 0; }
 /* The Coral Hub card (#6579): the status line and Disconnect or Cancel are one row; the level question and, once linked, a closed "More Coral Hub permissions" follow; Connect sits under the question. */
