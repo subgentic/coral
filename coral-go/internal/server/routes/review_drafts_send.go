@@ -54,7 +54,13 @@ func (h *SessionsHandler) reviewTargets(ctx context.Context, id, b string, draft
 		case 0:
 			return nil, nil, "no_uploader"
 		case 1:
-			return []reviewTarget{{t: commentTarget{sessionID: ups[0]}, title: noTeamReviewTitle, noTeam: true}}, nil, ""
+			title := noTeamReviewTitle
+			if n, err := h.ss.GetDisplayName(ctx, ups[0]); err == nil && n != nil { // the review bar's "To:" names the uploader (#21273); the constant stays for an agent with no name
+				if c := cleanAgentName(*n); c != "" {
+					title = c
+				}
+			}
+			return []reviewTarget{{t: commentTarget{sessionID: ups[0]}, title: title, noTeam: true}}, nil, ""
 		default:
 			return nil, nil, "ambiguous_uploader" // the same bytes uploaded by two agents name no one of them (#13539)
 		}
