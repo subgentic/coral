@@ -22,6 +22,8 @@
 .shj-code { font-size: var(--fs-xl); max-width: 14em; font-variant-numeric: tabular-nums; }
 .shj-status { display: flex; gap: var(--space-sm); align-items: flex-start; padding: var(--space-sm) var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); }
 .shj-status p { margin: 0; }
+.shj-status > div > p:first-child { font-size: var(--fs-lg); } /* the headline is the mock's 14 px */
+.shj-pills .chip { border: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-base); }
 .shj-dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: var(--accent); }
 .shj-ok .shj-dot { background: var(--success-text); }
 .shj-bad .shj-dot { background: var(--error-text); }
