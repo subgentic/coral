@@ -581,6 +581,37 @@ func classifyLaunchError(err error) string {
 	return tracking.FailInternal
 }
 
+// launchErrorClass says what a launch error was, as one fixed value (#21453): a type, or fixed words from the error, chosen here and never the text itself.
+// It is sent with launch_result so an "internal" failure can be told apart; nothing of the message, a path or a name leaves the computer.
+func launchErrorClass(err error) string {
+	if err == nil {
+		return ""
+	}
+	var mount *agent.CLIUntrustedMountError
+	switch {
+	case errors.Is(err, errLaunchSettings):
+		return tracking.ClassSettingsUnreadable
+	case errors.As(err, &mount):
+		return tracking.ClassCLIUntrustedMount
+	case errors.Is(err, agent.ErrRealGeminiCLI):
+		return tracking.ClassCLIWrongBinary
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "is not executable") || strings.Contains(msg, "the cli path"):
+		return tracking.ClassCLIPathInvalid
+	case strings.Contains(msg, "cannot launch with") && strings.Contains(msg, "provider"):
+		return tracking.ClassModelMismatch
+	case strings.Contains(msg, "environment is empty"):
+		return tracking.ClassEnvEmpty
+	case strings.Contains(msg, "can't write") || strings.Contains(msg, "cannot write") || strings.Contains(msg, "temp") || strings.Contains(msg, "no space left") || strings.Contains(msg, "permission denied"):
+		return tracking.ClassLaunchFiles
+	case strings.Contains(msg, "pty") || strings.Contains(msg, "tmux") || strings.Contains(msg, "terminal"):
+		return tracking.ClassTerminalStart
+	}
+	return tracking.ClassOther
+}
+
 // launchDirError is the error for a launch working directory that is not an
 // existing directory, or "" when it is usable.
 // isExtendedDrivePath reports whether p is a local drive in the extended-length form: \?\ and a drive letter and a colon.
