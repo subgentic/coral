@@ -68,7 +68,7 @@ func TestApprovalFeed8040ConfirmedAnswerPushesFreshEvidence(t *testing.T) {
 			working := displayFixture(t, "approved-working.txt")
 			mock.onRaw = func(string) { term.show(working) }
 			answered := time.Now()
-			resp, err := http.Post(server.URL+"/api/sessions/live/"+name+"/answer-prompt", "application/json", strings.NewReader(`{"session_id":"`+sid+`","agent_type":"codex","n":1,"label":"Yes, proceed (y)"}`))
+			resp, err := postAsDashboard(server.URL+"/api/sessions/live/"+name+"/answer-prompt", "application/json", strings.NewReader(`{"session_id":"`+sid+`","agent_type":"codex","n":1,"label":"Yes, proceed (y)"}`))
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			var body map[string]any
@@ -145,7 +145,7 @@ func TestApprovalFeed8040RejectedAnswerDoesNotRefresh(t *testing.T) {
 	h.terminal = term
 	kicks, unsubscribe := h.wsKick.subscribe()
 	defer unsubscribe()
-	resp, err := http.Post(server.URL+"/api/sessions/live/"+name+"/answer-prompt", "application/json", strings.NewReader(`{"session_id":"`+sid+`","agent_type":"codex","n":1,"label":"stale menu label"}`))
+	resp, err := postAsDashboard(server.URL+"/api/sessions/live/"+name+"/answer-prompt", "application/json", strings.NewReader(`{"session_id":"`+sid+`","agent_type":"codex","n":1,"label":"stale menu label"}`))
 	require.NoError(t, err)
 	resp.Body.Close()
 	require.Equal(t, 409, resp.StatusCode)

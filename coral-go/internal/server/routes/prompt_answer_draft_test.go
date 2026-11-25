@@ -44,7 +44,7 @@ func TestAnswerPromptSendsNoKeyOverADraft(t *testing.T) {
 			term.outputs["a-draft"] = screen
 			term.mu.Unlock()
 			b, _ := json.Marshal(map[string]any{"n": 1, "label": "buy milk", "session_id": sid, "agent_type": agentType})
-			resp, err := http.Post(server.URL+"/api/sessions/live/a-draft/answer-prompt", "application/json", bytes.NewReader(b))
+			resp, err := postAsDashboard(server.URL+"/api/sessions/live/a-draft/answer-prompt", "application/json", bytes.NewReader(b))
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			assert.Equal(t, http.StatusConflict, resp.StatusCode)
@@ -73,7 +73,7 @@ func TestAnswerPromptClaudeNeedsAnOpenRequest(t *testing.T) {
 			handler.hints.note(sid, event)
 		}
 		b, _ := json.Marshal(map[string]any{"n": 1, "label": "Yes", "session_id": sid, "agent_type": "claude"})
-		resp, err := http.Post(server.URL+"/api/sessions/live/c-hooks/answer-prompt", "application/json", bytes.NewReader(b))
+		resp, err := postAsDashboard(server.URL+"/api/sessions/live/c-hooks/answer-prompt", "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		term.mu.Lock()

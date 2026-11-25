@@ -1047,8 +1047,8 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if hubAutomationAtPermission(r, screen) { // the Hub's own automation, with no owner stamp, never answers a permission prompt (#21256, Security's condition 1)
-		writeError(w, http.StatusForbidden, "not_the_person", "Only the person can answer a permission prompt through Coral Hub.")
+	if notThePersonAtPermission(r, screen) { // only the person answers a permission prompt: an unstamped Hub, an API or link key, or an unverified CLI is refused (#21256, Security's condition 1)
+		writeError(w, http.StatusForbidden, "not_the_person", "Only the person can answer a permission prompt. Open the agent to answer it.")
 		return
 	}
 	if body.TrustFolder != "" && isTrustYes(screen, opt) && (screen.TrustFolder != body.TrustFolder || !h.trustOffered(r, body.SessionID, screen)) { // a row's lasting Yes: only for the folder it showed, a folder Coral may trust, from the person's own dashboard (#14110)

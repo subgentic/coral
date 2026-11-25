@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,9 +145,21 @@ func TestAPressFromNeedsYouIsCheckedOnTheCoral(t *testing.T) {
 	code, why := p.press(t, 1, yes, "needs_you")
 	assert.Equal(t, http.StatusForbidden, code, "a caller that is not the person (no dashboard, no stamped owner) is refused")
 	assert.Equal(t, "not_the_person", why)
-	caller = callerHub // the Hub's own automation: no genuine owner stamp
-	code, _ = p.press(t, 1, yes, "")
-	assert.Equal(t, http.StatusForbidden, code, "Hub automation without the owner's stamp never answers a permission prompt, from Needs you or not")
+	screen, ok := parsePromptScreenFor("codex", codexExecScreen(t))
+	require.True(t, ok)
+	lasting := screen.Options[1].Label
+	// Every caller that is not the person is refused at a permission prompt, whatever its kind, with or without "from", the lasting grant included (Security's round 1 MUST): the Hub's
+	// unstamped automation, a self-hosted Hub's unsigned key, a link key, an unverified CLI.
+	for _, kind := range []string{callerHub, callerAPIKey, callerLinkKey, callerCLISigned} {
+		caller = kind
+		for _, from := range []string{"", "needs_you"} {
+			code, why = p.press(t, 1, yes, from)
+			assert.Equal(t, http.StatusForbidden, code, "%s (from %q) never answers a permission prompt's Yes", kind, from)
+			assert.Equal(t, "not_the_person", why, kind)
+			code, _ = p.press(t, 2, lasting, from)
+			assert.Equal(t, http.StatusForbidden, code, "%s (from %q) never answers a permission prompt's lasting grant", kind, from)
+		}
+	}
 	assert.Empty(t, p.keys(), "nothing is typed on a refusal")
 
 	caller = callerDashCookie
@@ -153,9 +167,7 @@ func TestAPressFromNeedsYouIsCheckedOnTheCoral(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, code, "a label mismatch is refused")
 	assert.Empty(t, p.keys(), "a label that is not the one on screen types nothing")
 
-	screen, ok := parsePromptScreenFor("codex", codexExecScreen(t))
-	require.True(t, ok)
-	code, why = p.press(t, 2, screen.Options[1].Label, "needs_you")
+	code, why = p.press(t, 2, lasting, "needs_you")
 	assert.Equal(t, http.StatusConflict, code, "the lasting grant's own digit, with its exact label, is refused from Needs you")
 	assert.Equal(t, "lasting_choice", why)
 	assert.Empty(t, p.keys())
@@ -235,4 +247,18 @@ func TestAPermissionPromptOnlyTheScreenSawIsANeedsYouItemWithNoLastingGrant(t *t
 	for _, o := range items[0].Options {
 		assert.True(t, oneTimeChoice(o.Label), "no lasting grant is offered: %q", o.Label)
 	}
+}
+
+// postAsDashboard is http.Post as the person's own dashboard sends it (a same-origin fetch): only the person answers a permission prompt (#21256), so a test that answers one as the dashboard says so.
+func postAsDashboard(target, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPost, target, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	if u, err := url.Parse(target); err == nil {
+		req.Header.Set("Origin", u.Scheme+"://"+u.Host)
+	}
+	return http.DefaultClient.Do(req)
 }

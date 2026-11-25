@@ -66,7 +66,7 @@ func TestAnswerPrompt_AgyNavigatesWithArrows(t *testing.T) {
 					}
 				}
 				b, _ := json.Marshal(map[string]any{"n": 2, "label": "Use a Google Cloud project", "session_id": sid, "agent_type": agentType})
-				resp, err := http.Post(server.URL+"/api/sessions/live/agy-login/answer-prompt", "application/json", bytes.NewReader(b))
+				resp, err := postAsDashboard(server.URL+"/api/sessions/live/agy-login/answer-prompt", "application/json", bytes.NewReader(b))
 				require.NoError(t, err)
 				defer resp.Body.Close()
 				var body map[string]any
@@ -158,7 +158,7 @@ func TestAnswerPrompt_AgyPermissionMenu142(t *testing.T) {
 		}
 	}
 	b, _ := json.Marshal(map[string]any{"n": 2, "label": s.Options[1].Label, "session_id": sid, "agent_type": "agy"})
-	resp, err := http.Post(server.URL+"/api/sessions/live/agy-perm/answer-prompt", "application/json", bytes.NewReader(b))
+	resp, err := postAsDashboard(server.URL+"/api/sessions/live/agy-perm/answer-prompt", "application/json", bytes.NewReader(b))
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	var body map[string]any

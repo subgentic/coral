@@ -60,7 +60,7 @@ func TestAnswerPrompt_CodexHookTrust(t *testing.T) {
 		base = server.URL + "/api/sessions/live/codex-hooks"
 		answer = func(n int, label string) (int, map[string]any) {
 			b, _ := json.Marshal(map[string]any{"n": n, "label": label, "session_id": sid, "agent_type": "codex"})
-			resp, err := http.Post(base+"/answer-prompt", "application/json", bytes.NewReader(b))
+			resp, err := postAsDashboard(base+"/answer-prompt", "application/json", bytes.NewReader(b))
 			require.NoError(t, err)
 			defer resp.Body.Close()
 			var body map[string]any
@@ -191,7 +191,7 @@ func TestAnswerPrompt_ClaudeStillOpen(t *testing.T) {
 	fastPromptChecks(t)
 	terminal.outputs["claude-open"] = screenPermission
 	b, _ := json.Marshal(map[string]any{"n": 1, "label": "Yes", "session_id": sid, "agent_type": "claude"})
-	resp, err := http.Post(server.URL+"/api/sessions/live/claude-open/answer-prompt", "application/json", bytes.NewReader(b))
+	resp, err := postAsDashboard(server.URL+"/api/sessions/live/claude-open/answer-prompt", "application/json", bytes.NewReader(b))
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	var body map[string]any

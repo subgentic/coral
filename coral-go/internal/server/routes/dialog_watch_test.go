@@ -136,7 +136,7 @@ func TestAnAnswerSentClearsTheDialogAtOnce(t *testing.T) {
 	require.NotNil(t, atDialogOf(t, server.URL, sid), "at the permission menu")
 
 	b, _ := json.Marshal(map[string]any{"n": 1, "label": "Yes", "session_id": sid, "agent_type": "claude"})
-	resp, err := http.Post(server.URL+"/api/sessions/live/claude-"+sid+"/answer-prompt", "application/json", bytes.NewReader(b))
+	resp, err := postAsDashboard(server.URL+"/api/sessions/live/claude-"+sid+"/answer-prompt", "application/json", bytes.NewReader(b))
 	require.NoError(t, err)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)

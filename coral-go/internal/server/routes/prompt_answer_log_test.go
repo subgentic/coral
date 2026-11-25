@@ -55,7 +55,7 @@ func TestAnswerPromptLogLineHasNoOptionText(t *testing.T) {
 	opt := reply.PromptOptions.Options[1] // "Yes, and always allow access to <folder> from this project": its label holds a path
 	require.Contains(t, opt.Label, "cc-probe", "the option under test names a folder: "+opt.Label)
 	b, _ := json.Marshal(map[string]any{"n": 2, "label": opt.Label, "session_id": sid, "agent_type": "claude"})
-	resp, err := http.Post(base+"/answer-prompt", "application/json", bytes.NewReader(b))
+	resp, err := postAsDashboard(base+"/answer-prompt", "application/json", bytes.NewReader(b))
 	require.NoError(t, err)
 	var got map[string]any
 	json.NewDecoder(resp.Body).Decode(&got)
