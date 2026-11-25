@@ -158,11 +158,21 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 	// On a computer enrolled to a Coral Hub team each owner reads only the rows where they are the actor (by their stable id), the Operator's choice (#12070): the computer's own person, at the computer, reads all
 	// of them, and so does the one owner of a personal machine. What the record says of the others is not in the answer: not their rows, not their count, not the id of a row that broke.
 	scoped := ""
+	var ownerRows *board.ActivityFilter
 	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
 		if id := hubOwnerRequest(r); id.team {
 			scoped = activityActor(id)
 			f.Actor = scoped
+		} else if id.owner {
+			// A personal computer (#21435): the Hub reads the owner's rows alone: the person at the computer, the Hub's owner (the self-hosted Hub's stamp, and this account's own label), and the owner's agent
+			// files. Not hub:unknown and not any other hub:<x>: the Hub refused the whole page for those, and they are not the owner's to read.
+			ownerRows = &board.ActivityFilter{Actors: []string{"local", "hub:owner", activityActor(id)}, ActorPrefixes: []string{"agent:"}}
 		}
+	} else if kind, _ := r.Context().Value(callerKindKey{}).(string); kind == callerHubOwner {
+		ownerRows = &board.ActivityFilter{Actors: []string{"local", "hub:owner"}, ActorPrefixes: []string{"agent:"}} // the self-hosted Hub's signed owner stamp, as above
+	}
+	if ownerRows != nil {
+		f.Actors, f.ActorPrefixes = ownerRows.Actors, ownerRows.ActorPrefixes
 	}
 	for _, k := range []string{"goal", "task"} { // only the rows about this goal or task (#14421); a row from before they were saved has neither and is never matched
 		if v := q.Get(k); v != "" {
@@ -220,6 +230,14 @@ func (h *BoardHandler) ListActivity(w http.ResponseWriter, r *http.Request) {
 		}
 		if scoped != "" { // the chain is checked whole; what a team's owner is told of it is theirs alone
 			n, err := h.bs.CountActivityBy(r.Context(), scoped)
+			if err != nil {
+				errInternalServer(w, "could not check the record")
+				return
+			}
+			chk.Rows, chk.FirstBad = n, 0
+		}
+		if ownerRows != nil {
+			n, err := h.bs.CountActivityWhere(r.Context(), *ownerRows)
 			if err != nil {
 				errInternalServer(w, "could not check the record")
 				return

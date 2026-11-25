@@ -32,15 +32,18 @@ func TestTheAutomationsReadsAreOwnerRefuseAtTheirOldTier(t *testing.T) {
 		assert.Equal(t, OwnerRefuse, mode, "owner only: "+c.path)
 		assert.True(t, IsOwnerRoute(http.MethodGet, c.path), c.path)
 	}
-	// the writes keep their classes and are not owner routes
+	// the writes keep their classes and are not owner routes (a run opened, .../seen, is an OwnerSees route since #21435: stamped so the Activity row names the owner; its class is unchanged)
+	for _, p := range []string{"/api/workflows/runs/9/seen", "/api/scheduled/runs/9/seen"} {
+		assert.Equal(t, TierInteract, Classify(http.MethodPost, p, ""), p)
+		_, mode := OwnerRoute(http.MethodPost, p)
+		assert.Equal(t, OwnerSees, mode, p)
+	}
 	for _, w := range []struct {
 		method, path string
 		tier         Mode
 	}{
 		{http.MethodPost, "/api/workflows/3/trigger", TierLaunch},
 		{http.MethodPost, "/api/workflows/runs/9/kill", TierInteract},
-		{http.MethodPost, "/api/workflows/runs/9/seen", TierInteract},
-		{http.MethodPost, "/api/scheduled/runs/9/seen", TierInteract},
 		{http.MethodPost, "/api/scheduled/jobs", TierNever},
 		{http.MethodPut, "/api/scheduled/jobs/7", TierNever},
 		{http.MethodDelete, "/api/scheduled/jobs/7", TierNever},

@@ -500,11 +500,14 @@ func (s *Store) VerifyActivity(ctx context.Context) (ActivityCheck, error) {
 type ActivityFilter struct {
 	Team, Action string
 	Actor        string // only this actor's rows (a team's owner reads their own rows alone: the Operator's choice, #12070)
-	BeforeID     int64  // rows older than this id (the next page)
-	BeforeAt     string // with BeforeID: rows older than this (time, id), the cursor a merge of several computers' records pages by
-	Limit        int
-	GoalID       int64 // only the rows about this goal (0: any); a row from before the columns has none and is never matched (#14421)
-	TaskID       int64 // only the rows about this task (0: any)
+	// OwnerOf (#21435): on a personal computer the Hub's owner reads only their own rows: these actors exactly, and the actors that start with one of the prefixes (the agent files' "agent:"). Empty: no such filter.
+	Actors        []string
+	ActorPrefixes []string
+	BeforeID      int64  // rows older than this id (the next page)
+	BeforeAt      string // with BeforeID: rows older than this (time, id), the cursor a merge of several computers' records pages by
+	Limit         int
+	GoalID        int64 // only the rows about this goal (0: any); a row from before the columns has none and is never matched (#14421)
+	TaskID        int64 // only the rows about this task (0: any)
 }
 
 // ActivityRecordID is this computer's record's own id (see operator_actions_record).
@@ -518,6 +521,34 @@ func (s *Store) ActivityRecordID(ctx context.Context) (string, error) {
 func (s *Store) ListActivity(ctx context.Context, f ActivityFilter) ([]OperatorAction, error) {
 	rows, _, err := s.ActivityPage(ctx, f)
 	return rows, err
+}
+
+// activityActorsClause is the SQL and arguments of the Actors / ActorPrefixes filter (" AND (...)"), or "" when neither is set. A prefix is matched by its length and bytes, never as a pattern.
+func activityActorsClause(f ActivityFilter) (string, []any) {
+	if len(f.Actors) == 0 && len(f.ActorPrefixes) == 0 {
+		return "", nil
+	}
+	var parts []string
+	var args []any
+	if len(f.Actors) > 0 {
+		parts = append(parts, `actor IN (`+strings.TrimSuffix(strings.Repeat("?,", len(f.Actors)), ",")+`)`)
+		for _, a := range f.Actors {
+			args = append(args, a)
+		}
+	}
+	for _, p := range f.ActorPrefixes {
+		parts = append(parts, `substr(actor, 1, ?) = ?`)
+		args = append(args, len([]rune(p)), p)
+	}
+	return ` AND (` + strings.Join(parts, ` OR `) + `)`, args
+}
+
+// CountActivityWhere is how many rows the filter's actor clause lets through (the check's count for a reader who sees only part of the record).
+func (s *Store) CountActivityWhere(ctx context.Context, f ActivityFilter) (int, error) {
+	c, a := activityActorsClause(f)
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM operator_actions WHERE 1 = 1`+c, a...)
+	return n, err
 }
 
 // ActivityPage is ListActivity and whether more rows exist past the page (it reads one more than the limit). The limit is at most ActivityMaxLimit and 50 when not given; the order is (time, id) newest
@@ -536,6 +567,10 @@ func (s *Store) ActivityPage(ctx context.Context, f ActivityFilter) ([]OperatorA
 	if f.Actor != "" {
 		q += ` AND actor = ?`
 		args = append(args, f.Actor)
+	}
+	if c, a := activityActorsClause(f); c != "" {
+		q += c
+		args = append(args, a...)
 	}
 	if f.GoalID > 0 {
 		q += ` AND goal_id = ?`

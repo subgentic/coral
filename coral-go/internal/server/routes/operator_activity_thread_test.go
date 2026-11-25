@@ -120,7 +120,7 @@ func TestTheHubOwnersReadCarriesTheThreadToo(t *testing.T) {
 	ctx := context.Background()
 	goal, err := e.h.bs.CreateGoal(ctx, "alpha", board.GoalInput{Title: "Ship it", CreatedBy: "Alice"})
 	require.NoError(t, err)
-	require.NoError(t, e.h.bs.RecordActivity(ctx, board.ActivityMeta{Actor: "hub:hub-user-1234abcd", Source: "hub"}, board.ActGoalEdit, "goal", itoa(goal.ID), "", "alpha"))
+	require.NoError(t, e.h.bs.RecordActivity(ctx, board.ActivityMeta{Actor: activityActor(hubOwnerRequest(hubReq(t, "POST", "/api/board/alpha/goals/1", "owner", "hub-user-1234abcd"))), Source: "hub"}, board.ActGoalEdit, "goal", itoa(goal.ID), "", "alpha"))
 	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: "hub-user-1234abcd"}
 	code, out := getActivity(t, act.URL, "?goal="+itoa(goal.ID), owner)
 	require.Equal(t, http.StatusOK, code, out)
