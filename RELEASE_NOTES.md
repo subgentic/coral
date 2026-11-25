@@ -1,5 +1,25 @@
 # Release Notes
 
+## v2.1.15 — Commenting works again in the Inbox review dialog, and a Codex hooks review shows in Needs you
+
+Task numbers in brackets. Built on v2.1.14, with only these two fixes. A prerelease until the Operator promotes it.
+
+### Changes
+
+- **You can comment in the Inbox review dialog again** (#21425): in v2.1.14, on a new browser, the review dialog showed the comment box but you could not type in it or send, on a computer or a phone. Now the comments column is open and usable as soon as the dialog opens, at every size. A comments panel you closed on another document no longer locks it.
+- **A Codex agent stuck at "Hooks need review" shows in Needs you** (#21427): when a restarted Codex agent stops at its hooks review, Coral now shows a Needs you card and the yellow dot right away. The team status says the agent needs input instead of "Free". Coral never answers the review for you.
+
+### Test and gate fixes in this release
+
+- The review-dialog comment test now clicks and types like a person, on a fresh profile and with a remembered "closed", at 1600x1000 and 390x844. The old test clicked a hidden button from code, which is how the v2.1.14 bug got through (#21422, #21425).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption and the browser gate are green on the gated commit. No Windows run: no change in this release is Windows-only.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+- Through a Hub, the Activity page can show "Nothing yet." for a computer; the fix is planned for v2.1.16 (#21432, #21435).
+
 ## v2.1.14 — Draft comments on documents, a self-hosted Hub that joins with its own key, permission prompts answered from Needs you, and a two-row phone agent bar
 
 Task numbers in brackets. Built on v2.1.13. A prerelease until the Operator promotes it.
