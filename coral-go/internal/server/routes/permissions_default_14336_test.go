@@ -64,14 +64,19 @@ func TestAnUnsetSavedDefaultMeansTheShippedDefaultAndASavedDefaultWinsEverywhere
 			assert.Contains(t, cmd, shipped, "team member, unset")
 			// a saved "default" wins everywhere, the new default included
 			require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", "default"))
+			// Claude's Default asks; Codex's Default is Auto (#21335), so a saved Default is the shipped pair there
+			check := assert.NotContains
+			if cli == at.Codex {
+				check = func(t assert.TestingT, s, contains interface{}, msgAndArgs ...interface{}) bool {
+					return assert.Contains(t, s, shipped, msgAndArgs...)
+				}
+			}
 			for label, cmd := range map[string]string{"single": single("d-single-saved-" + cli)} {
-				assert.NotContains(t, cmd, shipped, label+", saved default")
-				assert.NotContains(t, cmd, "-a never", label)
+				check(t, cmd, shipped, label+", saved default")
 			}
 			code, out, cmd = teamOf(t, rig, cli, "d-team-saved-"+cli, map[string]any{"name": "A"}, nil)
 			require.Equal(t, http.StatusOK, code, out)
-			assert.NotContains(t, cmd, shipped, "team member, saved default")
-			assert.NotContains(t, cmd, "-a never", "team member, saved default")
+			check(t, cmd, shipped, "team member, saved default")
 		})
 	}
 }

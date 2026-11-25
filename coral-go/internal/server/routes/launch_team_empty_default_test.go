@@ -19,7 +19,7 @@ import (
 )
 
 // A team launch whose member has no mode, no flags and no capabilities starts the CLI in the new default (#14336, decision A/B: full permissions, inside each CLI's own sandbox): Claude in
-// Auto, Codex in workspace-write with no approvals, never "no sandbox". A member that names Default (the form's explicit pick) stays in the CLI's confirm mode (#6415).
+// Auto, Codex in workspace-write with no approvals, never "no sandbox". A Claude member that names Default (the form's explicit pick) stays in the CLI's confirm mode (#6415); Codex's Default is Auto (#21335).
 func TestATeamMemberWithNothingChosenSendsNoAutoFlags(t *testing.T) {
 	for _, cli := range []string{at.Claude, at.Codex} {
 		for _, explicit := range []bool{false, true} {
@@ -47,11 +47,8 @@ func TestATeamMemberWithNothingChosenSendsNoAutoFlags(t *testing.T) {
 				case cli == at.Claude:
 					assert.Contains(t, cmd, "--permission-mode default")
 					assert.NotContains(t, cmd, "--permission-mode auto")
-				case !explicit:
+				default: // Codex: nothing chosen and an explicit Default are both Auto (#21335), inside its sandbox
 					assert.Contains(t, cmd, "--sandbox workspace-write -a never", "Codex stays in its sandbox")
-				default:
-					assert.NotContains(t, cmd, "-a never")
-					assert.NotContains(t, cmd, "--sandbox workspace-write")
 				}
 			})
 		}
