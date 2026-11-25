@@ -129,3 +129,10 @@ function reviewFixturePage(input, base, boards, options = {}) {
 }
 module.exports.reviewFixtureDigest = reviewFixtureDigest;
 module.exports.reviewFixturePage = reviewFixturePage;
+
+/** Capability default for legacy published-comment fixtures, never a network fallback. */
+function reviewFixtureDrafts(input, base) {
+    return /\/api\/artifacts\/[a-f0-9]{64}\/review-drafts$/.test(new URL(String(input), base).pathname)
+        ? { drafts_supported: false, drafts: [], count: 0, revision: 0, can_write: false, can_send: false } : null;
+}
+module.exports.reviewFixtureDrafts = reviewFixtureDrafts;

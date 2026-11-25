@@ -93,8 +93,12 @@ func (h *SessionsHandler) reviewDraftOwner(w http.ResponseWriter, r *http.Reques
 		commentRefuse(w, http.StatusForbidden, "comments_forbidden", "only the person at this computer can keep review drafts")
 		return "", caller, false
 	}
-	h.keepOwnerSubject(r.Context(), &caller)
-	if caller.Subject == "" {
+	// Reading drafts and capability must not create the install owner identity.
+	// Until the first write there are no drafts for this local owner.
+	if r.Method != http.MethodGet {
+		h.keepOwnerSubject(r.Context(), &caller)
+	}
+	if caller.Subject == "" && r.Method != http.MethodGet {
 		commentRefuse(w, http.StatusServiceUnavailable, "owner_identity_unavailable", "this computer could not make an identity for its owner, so the draft was not kept")
 		return "", caller, false
 	}
