@@ -102,7 +102,7 @@ func (m *Manager) startKeyBridge(root context.Context, l store.CloudLink, cp tun
 		}
 	})}
 	go func() { defer safego.Recover("cloud/key_bridge:serve"); _ = srv.Serve(ln) }()
-	go func() { <-ctx.Done(); _ = srv.Close(); _ = ln.Close() }()
+	go func() { defer safego.Recover("cloud/key_bridge:close"); <-ctx.Done(); _ = srv.Close(); _ = ln.Close() }()
 	b.local = &tunnel.LocalHandler{
 		BaseURL:         m.o.LocalBaseURL,
 		AllowRequest:    tunnel.AllowRequest(b.mode), // this link's own cap, read on every request: the same table as a tunnel link's
@@ -120,14 +120,14 @@ func (m *Manager) startKeyBridge(root context.Context, l store.CloudLink, cp tun
 		cancel()
 		return nil, err
 	}
-	go func() { <-ctx.Done(); cs.Close() }()
+	go func() { defer safego.Recover("cloud/key_bridge:close-client"); <-ctx.Done(); cs.Close() }()
 	select {
 	case b.session = <-sessions:
 	case <-time.After(10 * time.Second):
 		cancel()
 		return nil, errors.New("cloud: the key link's tunnel did not open")
 	}
-	go func() { <-ctx.Done(); b.session.Close() }()
+	go func() { defer safego.Recover("cloud/key_bridge:close-session"); <-ctx.Done(); b.session.Close() }()
 	target := hubproxy.TunnelTarget{Session: b.session}
 	r := chi.NewRouter()
 	r.Handle("/api/remote/{server}/*", hubproxy.NewWithOptions(oneTarget{id: l.LinkID, t: target}, hubproxy.Options{AllowedOrigins: []string{keyBridgeOrigin}, KeepOwnerStamp: true}))

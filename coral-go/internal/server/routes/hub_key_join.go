@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/hubowner"
@@ -337,7 +338,7 @@ func (h *RemoteServersHandler) JoinStart(w http.ResponseWriter, r *http.Request)
 	}
 	id, ok := h.joins.put(&keyJoin{serverID: body.ID, label: label, url: norm, allowPrivate: body.AllowPrivate, key: key, requestID: reqID, secret: secret, expires: time.Now().Add(keyJoinTTL)})
 	if !ok {
-		writeError(w, http.StatusTooManyRequests, "too_many_joins", "Too many joins are waiting: finish or wait for them first."+orphan)
+		httputil.WriteActionLimit(w, 60, "too_many_joins", "Too many joins are waiting: finish or wait for them first."+orphan) // a per-action limit: marked, so the dashboard does not read it as an overloaded server
 		return
 	}
 	slog.Info("hub: asked a computer to join", "server", body.ID, "join", id)
