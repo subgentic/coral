@@ -13,8 +13,9 @@ const { coralReady } = require('./helpers/wait');
 // Keep the old section budgets plus the words in those authored lines (HELP_LINES /
 // HINTS); long explanations remain in Docs and never inflate the dialog.
 // Notifications includes the existing Inbox block; retain an allowance of 220 words for its labels/help and team notice (180 until #17022 and #17169 added the "Needs Desktop alerts on." lines and the test-alert row; #18814).
+// #21268: Notifications +10: "While this tab is open." on the two Alert rows (the Hub's Phone notifications row shows only on a Hub, which this test is not).
 // #17210: Files and Git +17 for the preview-size label and help.
-const BEFORE = { 'Coral Hub and remote access':186, 'Storage and backup':151, Updates:20, 'Teams and Chief':80, Appearance:80, Notifications:72+220, 'Files and Git':40, 'Security and privacy':61 };
+const BEFORE = { 'Coral Hub and remote access':186, 'Storage and backup':151, Updates:20, 'Teams and Chief':80, Appearance:80, Notifications:72+220+10, 'Files and Git':40, 'Security and privacy':61 };
 // #18814: Files and Git +1 (the Reset word beside a setting that is not at its default)
 // #18814: Storage and backup +4 (the Hub share row's rule and its Sharing details link, shown since #16599's Dropbox rows)
 // #17538: Storage and backup +22 (Local backup heading, the data-folder path, Copy path button, and the one-line backup note)

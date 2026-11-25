@@ -1,5 +1,6 @@
 import { importOnce } from './import_once.js';
 import { isCloud } from './server_base.js';
+import { state } from './state.js';
 import { browserLocal } from './safe_storage.js';
 const { TERMINAL_BACKEND_IDS, backendHint } = await importOnce('./terminal_backend.js');
 export { TERMINAL_BACKEND_IDS, backendHint };
@@ -22,6 +23,10 @@ const GENERAL_FIELDS = [
 /** The alert kinds wait for Desktop alerts to be on (the dialog redraws its rows on every change, so the rule lives in the field, not only in the fill). */
 const alertsOff = () => { const e = document.getElementById('settings-desktop-notify'); return !e || !e.checked; };
 
+/** Through a Hub (#21268): where phone pushes are switched on. The switches below are this tab's own alerts and send no push; the Hub's own page (same origin, a plain link, no route of Coral's) holds the push switch. */
+const HUB_PUSH_FIELD = { key: 'hub_push', type: 'notice', render: slot => { const t = document.createElement('span'), p = document.createElement('p'), a = document.createElement('a');
+    t.className = 'sv-label'; t.textContent = 'Phone notifications'; p.className = 'sv-help'; a.className = 'sv-learn'; a.id = 'settings-hub-push'; a.href = '/account#push-panel'; a.textContent = 'Turn on in your Hub account'; p.append(a); slot.append(t, p); } };
+
 const NOTIFICATIONS_FIELDS = [
     { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'A message in Coral when an agent needs input.' },
     { key: 'desktop_notify', type: 'toggle', id: 'settings-desktop-notify', label: 'Desktop alerts',
@@ -30,8 +35,8 @@ const NOTIFICATIONS_FIELDS = [
     { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p);
         const t = document.createElement('button'); t.type = 'button'; t.id = 'settings-desktop-test'; t.className = 'btn btn-small'; t.textContent = 'Send a test alert'; t.hidden = true; slot.append(t); } }, // shown while the switch is on (walk 53, #17169)
     // This browser's own choices about those alerts (not saved on the server); they apply while Desktop alerts is on.
-    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', help: 'Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
-    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', help: 'Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
+    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', help: 'While this tab is open. Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
+    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', help: 'While this tab is open. Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
     { key: 'alert_sound', type: 'toggle', id: 'settings-alert-sound', label: 'Play a sound with alerts', help: "Your computer's own alert sound.", disabledWhen: () => alertsOff() },
 ];
 
@@ -331,7 +336,7 @@ export function drawSettingsGroups(modal, mount) {
     const defaultFields = agents.filter(f => !TEAM_KEYS.has(f.key) && !ADVANCED_KEYS.has(f.key));
     const agentAdvanced = agents.filter(f => ADVANCED_KEYS.has(f.key) && f.type !== 'heading');
     for (const [hostId, fields] of [['settings-general-rows', [...general, ...display, live('settings-engine-more')]],
-        ['settings-updates-rows', [checkUpdates]], ['settings-team-rows', pick(agents, TEAM_KEYS)], ['settings-notifications-rows', NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-agents-rows', [defaultType, ...defaultFields, advanced('settings-defaults-advanced'), ...agentAdvanced, ...TERMINAL_BACKEND_FIELDS, live('settings-tools-folder-dl')]], ['settings-providers-rows', PROVIDERS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
+        ['settings-updates-rows', [checkUpdates]], ['settings-team-rows', pick(agents, TEAM_KEYS)], ['settings-notifications-rows', state.hub ? [HUB_PUSH_FIELD, ...NOTIFICATIONS_FIELDS] : NOTIFICATIONS_FIELDS], ['settings-inbox-rows', INBOX_FIELDS], ['settings-files-rows', FILES_FIELDS], ['settings-agents-rows', [defaultType, ...defaultFields, advanced('settings-defaults-advanced'), ...agentAdvanced, ...TERMINAL_BACKEND_FIELDS, live('settings-tools-folder-dl')]], ['settings-providers-rows', PROVIDERS_FIELDS], ['settings-cleanup-rows', CLEANUP_FIELDS], ['settings-security-rows', SECURITY_FIELDS], ['settings-network-rows', NETWORK_FIELDS]]) {
         const host = modal.querySelector(`#${hostId}`);
         if (host && !host.firstChild) mount(host, { mode: 'settings', saveBar: false, fields: (typeof fields === 'function' ? fields(host) : fields).map(field => {
             if (!field.help?.more) return field;
