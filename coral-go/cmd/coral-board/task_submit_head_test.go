@@ -26,11 +26,11 @@ func TestSubmitReviewSendsTheHeadItWasGiven(t *testing.T) {
 		}
 		require.NotEmpty(t, sent, "stdout %q stderr %q requests %v", res.stdout, res.stderr, gs.requests())
 		assert.Contains(t, sent, `"head":"abc1234def5678"`, strings.Join(args, " "))
-		assert.NotContains(t, sent, worktreeHead(), "the folder's HEAD is not what was named")
+		assert.NotContains(t, sent, worktreeHead(""), "the folder's HEAD is not what was named")
 	}
 }
 
-// #19263: from the shared checkout (or main) with no --head, submit-review refuses rather than send that folder's HEAD; --branch names the work.
+// #19263, #21445: from the shared checkout (or main) with no --head, submit-review records no head rather than send that folder's HEAD; --branch names the work.
 func TestSubmitReviewRefusesTheSharedCheckoutsHeadAndTakesABranch(t *testing.T) {
 	root := t.TempDir()
 	git := func(args ...string) string {
@@ -50,7 +50,7 @@ func TestSubmitReviewRefusesTheSharedCheckoutsHeadAndTakesABranch(t *testing.T) 
 
 	gs := newGoalServer(t)
 	res := goalRun(t, gs, "task", "submit-review", "5", "--reason", "r", "--message", "ok  \tgithub.com/x/pkg\t0.1s")
-	assert.Equal(t, 1, res.code, res.stderr)
+	assert.Equal(t, 0, res.code, "#21445: a submit from the shared checkout goes with no head (a submit with no code needs none), not refused: "+res.stderr)
 	assert.Contains(t, res.stderr, "--head <sha>")
 	for _, r := range gs.requests() {
 		assert.NotContains(t, r, mainHead, "nothing was sent")
