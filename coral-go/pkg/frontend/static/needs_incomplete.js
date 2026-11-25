@@ -1,5 +1,6 @@
 /* A row read the Inbox could not make (#13841): when a computer refuses a kind's read (401/403) or has no such route (404), or the read fails, that kind is NOT "nothing waiting": the Inbox says "Not everything is shown"
- * and names what it could not read, instead of dropping the kind in silence. Only a 200 with an empty list means nothing is waiting. No imports (the Inbox tab's badge loads this at start). */
+ * and names what it could not read, instead of dropping the kind in silence. Only a 200 with an empty list means nothing is waiting. Only importOnce (the Inbox tab's badge loads this at start). */
+import { importOnce } from './import_once.js';
 const gaps = new Map(); // "<kind>|<source>" -> { kind, source }
 const KIND_WORDS = { questions: 'questions', proposals: 'proposals', skills: 'skills', goals: 'goals' };
 const tell = () => { if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent('coral:reviews-changed', { detail: { countsUnchanged: true } })); };
@@ -14,7 +15,7 @@ export function readOutcome(kind, source, ok, refused = false, update = '') {
     return moved;
 }
 let words = null, loading = null;
-const refusedWords = () => loading ||= import('./needs_refused.js').then(m => (words = m));
+const refusedWords = () => loading ||= importOnce('./needs_refused.js').then(m => (words = m));
 /** The kinds and computers the Inbox could not read now. */
 export const readGaps = () => [...gaps.values()];
 /** One sentence for the Inbox's note, or '' when everything was read. A computer is named when it is not this one. */
