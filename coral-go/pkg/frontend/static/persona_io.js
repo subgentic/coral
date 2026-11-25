@@ -240,6 +240,7 @@ function _selectAgentPreset(name) {
             agentType: persona.agentType || persona.agent_type || current.agentType,
             model: persona.model || current.model,
             capabilities: persona.capabilities,
+            capabilitiesAreDefaults: true, // a role's tools are a starting point, not a Codex Default choice (#21363)
         });
         if (nameInput) nameInput.value = persona.name;
     } else {

@@ -86,7 +86,9 @@ export function _togglePermChip(btn) {
             shellSection.style.display = btn.classList.contains('active') ? '' : 'none';
         }
     }
-    _syncEnforcement(btn.closest('[data-acf-uid]'));
+    const form = btn.closest('[data-acf-uid]');
+    if (form) form._acfCapsDefault = null; // a chip turned by hand is the person's, kept whatever the Mode is (#21363)
+    _syncEnforcement(form);
 }
 
 // The line says what the CLI enforces; an advanced step (the flag that turns Codex's network off) is behind Learn more, named for what it explains, one short line visible (UI/UX's #7492 note).
@@ -115,12 +117,25 @@ function _renderEnforcedLine(line, e, container) {
 // (#4545, Security's #4550): Codex keeps only a sandbox and an approval mode and Antigravity only a mode, so
 // for them a new Deny entry can't be added (an existing one can be removed: it still changes the mode, shown
 // in the line) and shell patterns are marked as not enforced. Coral adds no permission layer of its own.
+// The chips a template, Getting started or a role fills in are a starting point, not a choice (#21363): for Codex on Default (which is Auto: no limits) none is lit, since a lit chip narrows the sandbox; on another Mode or provider they are as given. A chip or the Shell box touched by hand ends this.
+function _syncDefaultCaps(container) {
+    const d = container._acfCapsDefault, uid = container.dataset.acfUid;
+    if (!d || !uid) return;
+    const type = container.querySelector('.acf-agent-type')?.value || 'claude';
+    const mode = container.querySelector('.acf-permission-mode')?.value || 'default';
+    const shown = type === 'codex' && mode === 'default' ? null : d;
+    _setPermissions(`${uid}-perms`, shown);
+    const sum = container.querySelector('.acf-perms-summary');
+    if (sum && sum.textContent.startsWith('(')) sum.textContent = `(${[shown?.allow?.length && `${shown.allow.length} allow`, shown?.deny?.length && `${shown.deny.length} deny`].filter(Boolean).join(', ') || 'default'})`; // the count follows the chips
+}
+
 function _syncEnforcement(container) {
     if (!container) return;
     const uid = container.dataset.acfUid;
     const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
     const modeSelect = container.querySelector('.acf-permission-mode');
     if (modeSelect) _updatePermModeDescription(modeSelect); // the CLI's own modes and words first (#10381): a mode it lacks falls to Default before anything reads the value
+    _syncDefaultCaps(container);
     const permMode = modeSelect?.value
         || defaultPermissionMode(_settingsFor(_acfServer(container)), agentType);
     const caps = _getPermissions(`${uid}-perms`) || {};
@@ -457,13 +472,14 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
 }
 
 function initAcfPermissions(container, uid, { caps, v }) {
+    container._acfCapsDefault = v.capabilitiesAreDefaults && caps ? structuredClone(caps) : null;
     _setPermissions(`${uid}-perms`, caps);
     setThinking(container, v.thinking); // a form opened for a running agent shows the level it started with (#4969)
     setThinkingActual(container, v.thinking, v.thinkingActual); // and, under it, what the agent last ran at when that differs (#5105)
     _syncEnforcement(container);
     trackPermissionPick(container.querySelector('.acf-permission-mode')); // a mode picked here is the person's, whatever the agent type does next (#5836)
     container.querySelector('.acf-permission-mode')?.addEventListener('change', () => _syncEnforcement(container));
-    container.querySelector('.perms-shell-input')?.addEventListener('input', () => _syncEnforcement(container));
+    container.querySelector('.perms-shell-input')?.addEventListener('input', () => { container._acfCapsDefault = null; _syncEnforcement(container); });
     container.querySelector('.acf-use-full-access-input')?.addEventListener('change', () => _syncEnforcement(container)); // the note follows the box (#14085)
 }
 
@@ -768,6 +784,7 @@ export function setAgentConfig(containerId, values) {
         }
     }
 
+    container._acfCapsDefault = v.capabilitiesAreDefaults && v.capabilities ? structuredClone(v.capabilities) : null; // from a template, Getting started or a role, not a saved choice (#21363)
     if (uid) _setPermissions(`${uid}-perms`, v.capabilities || null);
     _syncEnforcement(container);
 
