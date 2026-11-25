@@ -636,3 +636,51 @@ func TestInstallOwnerSecretSendsTheHubAndFallsBackForAnOlderCoral(t *testing.T) 
 		t.Errorf("retried after exit 1: %q", b)
 	}
 }
+
+// #21220: the hub makes its own request key over SSH with exactly one command, `coral cloud keys create <name>`, and takes the key only when stdout is exactly a key. A name that could break out of its quotes is
+// refused before anything runs; whatever else the far side printed is never in the error.
+func TestCreateLinkKeyRunsOnlyKeysCreateAndTakesOnlyAKey(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the far ssh is a #!/bin/sh stand-in, which Windows cannot run; the shipped code does not depend on it")
+	}
+	text, err := remoteText(CmdCreateLinkKey, "2.1.12", "Hub B")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, `/2.1.12/root/coral" cloud keys --home "$h" create 'Hub B'`) {
+		t.Errorf("the command: %q", text)
+	}
+	for _, bad := range []string{"Hub'B", "Hub;rm", "$(id)", "a`b`", "", " lead", strings.Repeat("a", 41), "x..y"} {
+		if _, err := remoteText(CmdCreateLinkKey, "2.1.12", bad); !errors.Is(err, ErrNotAllowed) {
+			t.Errorf("name %q was allowed", bad)
+		}
+	}
+	key := "lrk_0a1b2c3d_" + strings.Repeat("ef", 16)
+	for name, c := range map[string]struct {
+		script string
+		want   string
+	}{
+		"a key":             {"#!/bin/sh\necho 'Made the request key lk-0a1b2c3d (Hub B).' >&2\necho " + key + "\n", key},
+		"not a key":         {"#!/bin/sh\necho 'lrk_secret-looking-but-not-a-key " + strings.Repeat("ab", 20) + "'\n", ""},
+		"an older Coral":    {"#!/bin/sh\necho 'unknown command: keys' >&2\nexit 2\n", ""},
+		"the server is off": {"#!/bin/sh\necho 'Coral is not running " + strings.Repeat("cd", 20) + "' >&2\nexit 1\n", ""},
+	} {
+		dir := t.TempDir()
+		ssh := filepath.Join(dir, "ssh")
+		if err := os.WriteFile(ssh, []byte(c.script), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		tg, _ := ParseTarget("rich@box.example.com")
+		got, err := (Runner{SSH: ssh}).CreateLinkKey(context.Background(), tg, "2.1.12", "Hub B")
+		if got != c.want {
+			t.Errorf("%s: got %q, want %q", name, got, c.want)
+		}
+		if c.want == "" {
+			if !errors.Is(err, ErrNoLinkKey) {
+				t.Errorf("%s: %v", name, err)
+			} else if strings.Contains(err.Error(), "secret-looking") || strings.Contains(err.Error(), strings.Repeat("ab", 20)) || strings.Contains(err.Error(), strings.Repeat("cd", 20)) {
+				t.Errorf("%s: the far side's output is in the error: %v", name, err)
+			}
+		}
+	}
+}

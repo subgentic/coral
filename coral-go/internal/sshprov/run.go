@@ -96,6 +96,9 @@ const (
 	CmdCheckDataDir
 	// CmdRecordDataDir writes arg 0 (a folder relative to the home folder, or an absolute one CmdCheckDataDir passed) into <install>/datadir, so the start after an upgrade keeps it (#16021).
 	CmdRecordDataDir
+	// CmdCreateLinkKey runs the Coral of version arg 0's `coral cloud keys create <name>` (#21220): it makes this hub's request key on the far computer, the key alone on stdout, shown once. Arg 1 is the key's
+	// name (letters, digits, space, . _ -). The key is kept only in the hub's sealed remote-server record; it is never logged.
+	CmdCreateLinkKey
 )
 
 // ourCoralPids lists, one per line, the PIDs of this user's processes that run a Coral from the install folder: the program is the first word of the command line and is exactly <install>/<version>/root/coral (the version folder is one name that does not start with a dot, so "." and ".." are not one, #16041).
@@ -228,7 +231,11 @@ var specs = map[Command]spec{
 		args: []*regexp.Regexp{versionRe, archRe, sha256Re}, timeout: 10 * time.Minute},
 	CmdReadBackend:      {template: "cat \"$HOME/" + InstallDir + "/backend\" 2>/dev/null"},
 	CmdReadInstalledSum: {template: "cat \"$HOME/" + InstallDir + "/%s/package.sha256\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
+	CmdCreateLinkKey:    {template: readDataDir + "\"$HOME/" + InstallDir + "/%[1]s/root/coral\" cloud keys --home \"$h\" create '%[2]s'", args: []*regexp.Regexp{versionRe, linkKeyNameRe}},
 }
+
+// linkKeyNameRe is a request key's name as the hub sends it over SSH (CmdCreateLinkKey): no quote, no shell character, at most 40.
+var linkKeyNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$`)
 
 // ErrNotAllowed is a command or argument the closed list does not allow.
 var ErrNotAllowed = errors.New("sshprov: that remote command is not allowed")
