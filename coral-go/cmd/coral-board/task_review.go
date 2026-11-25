@@ -98,11 +98,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 			}
 		}
 		if h == "" {
-			h = worktreeHead()
-			if h != "" && !announceHead(os.Stderr, "", h) {
-				fmt.Fprintln(os.Stderr, "refusing to submit this folder's HEAD: it is the shared checkout or main, not your work. Name the commit with --head <sha> or the branch with --branch <name>")
-				clierr.Exit1()
-			}
+			h = defaultSubmitHead(os.Stderr, "") // #21445: the worktree's own head, else none (and a note on how to name it)
 		}
 		if h != "" {
 			body["head"] = h
@@ -381,11 +377,31 @@ func lastSeenRevision(project string, id int64) int {
 	return loadSeenRounds()[fmt.Sprintf("%s/%d#revision", project, id)]
 }
 
-// worktreeHead is the commit checked out where the command runs, or "" outside a repository (#18135).
-func worktreeHead() string {
+// defaultSubmitHead is the head a submit records when --head and --branch are not given (#21445): HEAD of the folder dir ("" is where the command runs) when that is a linked worktree on its own branch and the
+// commit is on origin; else "", and the note says why and how to name it. A submit with no code, from the shared checkout, records none; it is no longer refused.
+func defaultSubmitHead(w io.Writer, dir string) string {
+	h := worktreeHead(dir)
+	if h == "" {
+		return ""
+	}
+	if !announceHead(w, dir, h) {
+		fmt.Fprintln(w, "not recording a head: this folder is the shared checkout or main, not your work. Name the commit with --head <sha> or the branch with --branch <name>; a submit with no code needs none")
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if out, err := gitutil.Command(ctx, dir, "branch", "-r", "--contains", h).Output(); err != nil || strings.TrimSpace(string(out)) == "" {
+		fmt.Fprintf(w, "not recording a head: commit %s is not on origin. Push it, then name it with --head <sha>\n", h[:min(len(h), 10)])
+		return ""
+	}
+	return h
+}
+
+// worktreeHead is the commit checked out in dir ("" is where the command runs), or "" outside a repository (#18135).
+func worktreeHead(dir string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	out, err := gitutil.Command(ctx, "", "rev-parse", "HEAD").Output()
+	out, err := gitutil.Command(ctx, dir, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return ""
 	}
@@ -408,7 +424,8 @@ func announceHead(w io.Writer, dir, h string) (ok bool) {
 	top := git("rev-parse", "--show-toplevel")
 	fmt.Fprintf(w, "submitting %s from %s\n", h, top)
 	branch := git("rev-parse", "--abbrev-ref", "HEAD")
-	shared := git("rev-parse", "--git-dir") == git("rev-parse", "--git-common-dir")
+	// Both as absolute paths: from a subdirectory git prints --git-dir absolute and --git-common-dir as "../.git", which never compared equal (#21445).
+	shared := git("rev-parse", "--path-format=absolute", "--git-dir") == git("rev-parse", "--path-format=absolute", "--git-common-dir")
 	if shared || branch == "main" || branch == "master" {
 		fmt.Fprintf(w, "warning: this is %s (branch %q), not a worktree of the task's branch: if %s is not the commit you mean, resubmit with --head <sha>\n", map[bool]string{true: "the shared checkout", false: "a worktree"}[shared], branch, h[:min(len(h), 10)])
 		return false
