@@ -59,7 +59,7 @@ func TestALaunchRecordsOnlyAModeItsCLIHas(t *testing.T) {
 		},
 		at.Codex: {
 			"default": {"default", "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"}, "plan": {"plan", "--sandbox read-only -a on-request"}, // Default is Auto for Codex (#21335)
-			"acceptEdits": {"default", "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"}, // the mode Codex lacks is recorded as Default, and its command is Default's, which is Auto
+			"acceptEdits": {"acceptEdits", "--sandbox workspace-write -a on-request"}, // a saved Accept edits is a choice to be asked: it is recorded as Accept edits and runs workspace writes that ask, never Auto (#21335)
 			"auto":        {"auto", "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"}, "bypassPermissions": {"bypassPermissions", "--dangerously-bypass-approvals-and-sandbox"},
 			"dontAsk": {"dontAsk", "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"},
 		},

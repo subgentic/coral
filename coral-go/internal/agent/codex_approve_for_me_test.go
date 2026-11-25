@@ -92,3 +92,12 @@ func TestCodexAutoNoteSaysWhichAutoRuns(t *testing.T) {
 	assert.Empty(t, CodexAutoNote([]string{"--sandbox", "read-only", "-a", "on-request"}, nil, "plan", false))
 	assert.Empty(t, CodexAutoNote([]string{"--dangerously-bypass-approvals-and-sandbox"}, nil, "auto", true))
 }
+
+// #21335: Default is Auto, so a person's Accept edits (a choice to be asked) must not be recorded as Default: it stays Accept edits through a restart, a wake and a resurrect, and launches on-request.
+func TestCodexAcceptEditsIsRecordedAsAcceptEditsAndNeverRunsAuto(t *testing.T) {
+	assert.Equal(t, "acceptEdits", PermissionModeForCLI("codex", "acceptEdits"))
+	cmd := codexAutoLaunch(t, "0.170.0", LaunchParams{PermissionMode: PermissionModeForCLI("codex", "acceptEdits")})
+	assert.Contains(t, cmd, "--sandbox workspace-write -a on-request")
+	assert.NotContains(t, cmd, "--approve-for-me")
+	assert.NotContains(t, cmd, " -a never")
+}

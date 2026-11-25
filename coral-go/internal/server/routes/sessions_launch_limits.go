@@ -154,4 +154,4 @@ func agentLaunchUnsupervisedMessage(agentType string) string {
 // agentLaunchNeedsModeCode is the code of the refusal of an agent starting a Codex that names no permission mode on a board (#7552, Security's decision on #7527's caveat).
 const agentLaunchNeedsModeCode = "agent_launch_needs_mode"
 
-const agentLaunchNeedsModeMessage = "an agent's Codex launch with no permission mode asks first, and a Codex that asks first cannot reach Coral from its sandbox: ask the Operator to start it (the Operator's launch gets Auto)"
+const agentLaunchNeedsModeMessage = "an agent's Codex launch with no permission mode, or with Default (which is Auto for Codex), would do more without asking than the agent that makes it, and a Codex that asks first cannot reach Coral from its sandbox: ask the Operator to start it (the Operator's launch gets Auto)"
