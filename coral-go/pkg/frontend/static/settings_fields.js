@@ -35,8 +35,8 @@ const NOTIFICATIONS_FIELDS = [
     { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p);
         const t = document.createElement('button'); t.type = 'button'; t.id = 'settings-desktop-test'; t.className = 'btn btn-small'; t.textContent = 'Send a test alert'; t.hidden = true; slot.append(t); } }, // shown while the switch is on (walk 53, #17169)
     // This browser's own choices about those alerts (not saved on the server); they apply while Desktop alerts is on.
-    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', help: 'While this tab is open. Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
-    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', help: 'While this tab is open. Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
+    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', help: 'Tab open. Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
+    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', help: 'Tab open. Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
     { key: 'alert_sound', type: 'toggle', id: 'settings-alert-sound', label: 'Play a sound with alerts', help: "Your computer's own alert sound.", disabledWhen: () => alertsOff() },
 ];
 
@@ -51,7 +51,7 @@ const INBOX_FIELDS = [
     { key: 'inbox_away', type: 'toggle', id: 'settings-inbox-away', label: 'While you were away', help: 'When you come back after a while, Needs you says what finished and which agents are idle.', default: true },
     { key: 'inbox_teams_title', type: 'heading', id: 'settings-inbox-teams-title', label: 'Included teams' },
     { key: 'inbox_teams', type: 'notice', render: slot => { const p = document.createElement('p'); p.className = 'sv-help'; p.textContent = 'The switches above apply to the teams ticked here; a team you untick has its optional kinds muted.'; const host = document.createElement('div'); host.id = 'settings-inbox-teams'; host.className = 'settings-inbox-teams'; slot.append(p, host); } },
-    { key: 'inbox_digest_time', type: 'text', id: 'settings-inbox-digest-time', label: 'Time of the daily items', help: 'When the digest is made and the day\'s decisions are asked for, in 24-hour time.', default: '09:00', attrs: { inputmode: 'numeric', maxlength: '5', placeholder: '09:00', pattern: '([01][0-9]|2[0-3]):[0-5][0-9]', 'aria-label': 'Time of the daily items, HH:MM' } },
+    { key: 'inbox_digest_time', type: 'text', id: 'settings-inbox-digest-time', label: 'Time of the daily items', help: 'When the digest and decisions are made, in 24-hour time.', default: '09:00', attrs: { inputmode: 'numeric', maxlength: '5', placeholder: '09:00', pattern: '([01][0-9]|2[0-3]):[0-5][0-9]', 'aria-label': 'Time of the daily items, HH:MM' } },
     { key: 'inbox_muted', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-inbox-muted'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
 ];
 
