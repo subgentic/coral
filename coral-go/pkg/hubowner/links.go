@@ -100,6 +100,26 @@ func Links(dir string) ([]Link, error) {
 	return append(out, more...), nil
 }
 
+// Leftover is the single-file secret of an older hub's install that a hub with its own link now shadows: it names this computer the same way a link does, so it is most likely that hub's old secret, still
+// accepted until someone removes it (Install with a hub id leaves the single file alone, #21213). ok is false when there is no single file, or no link holds the same computer name (#21251).
+func Leftover(dir string) (Link, bool) {
+	links, err := Links(dir)
+	if err != nil || len(links) == 0 || links[0].Hub != "" {
+		return Link{}, false
+	}
+	for _, l := range links[1:] {
+		if l.Remote == links[0].Remote {
+			return links[0], true
+		}
+	}
+	return Link{}, false
+}
+
+// LeftoverNote is the line a person is shown about a leftover single-file secret.
+func LeftoverNote(l Link) string {
+	return "a leftover older secret under the same computer name as a hub's link: it still works; run coral hub-owner-secret --remove " + l.Remote + " to end it"
+}
+
 func readLinks(dir string) ([]Link, error) {
 	b, ok, err := readPrivate(dir, LinksFileName, maxLinksFile)
 	if err != nil || !ok {

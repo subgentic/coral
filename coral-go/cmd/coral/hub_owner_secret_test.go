@@ -180,3 +180,26 @@ func TestHubOwnerSecretTakesTheHubsIDAndListsAndRemovesLinks(t *testing.T) {
 	assert.Equal(t, "ssh-box", ls[0].Remote)
 	assert.Equal(t, 2, runHubOwnerSecretWith([]string{"--home", dir, "--list", "--remove", hub}, strings.NewReader(""), &out, &errb, write, noTerminal), "one or the other")
 }
+
+// #21251: --list flags a leftover single-file secret under a link's computer name, with the line to remove it, and flags nothing else.
+func TestHubOwnerSecretListFlagsALeftoverSingleFile(t *testing.T) {
+	noAgentEnv(t)
+	hub := strings.Repeat("a", 32)
+	write := func(string, hubowner.Link) error { return nil }
+	dir := t.TempDir()
+	var out, errb bytes.Buffer
+	list := func() string {
+		out.Reset()
+		require.Equal(t, 0, runHubOwnerSecretWith([]string{"--home", dir, "--list"}, strings.NewReader(""), &out, &errb, write, noTerminal), errb.String())
+		return out.String()
+	}
+	require.NoError(t, hubowner.WriteFile(dir, "mac", strings.Repeat("cd", 32)))
+	assert.NotContains(t, list(), "leftover", "a single file alone")
+	require.NoError(t, hubowner.Install(dir, hubowner.Link{Hub: hub, Name: "Studio hub", Remote: "mac", Secret: strings.Repeat("ab", 32)}, time.Now()))
+	got := list()
+	assert.Contains(t, got, "leftover")
+	assert.Contains(t, got, "coral hub-owner-secret --remove mac")
+	assert.NotContains(t, got, strings.Repeat("cd", 32))
+	assert.NotContains(t, got, strings.Repeat("ab", 32))
+	assert.Equal(t, 1, strings.Count(got, "leftover"), "only the single file's line")
+}
