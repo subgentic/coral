@@ -120,3 +120,12 @@ func TestCodexVersionLess(t *testing.T) {
 	assert.False(t, codexVersionLess("2.0", "1.10"))
 	assert.True(t, codexVersionLess("1.0", "1.0.1"))
 }
+
+func TestCodexPluginNamesCannotLeaveTheCacheFolder(t *testing.T) {
+	home := codexFixture(t, map[string]string{"posthog": posthogHookFile}, nil)
+	cfg := filepath.Join(home, ".codex", "config.toml")
+	b, err := os.ReadFile(cfg)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(cfg, append(b, []byte("\n[plugins.\"..@..\"]\nenabled = true\n")...), 0o644))
+	assert.Equal(t, []string{"posthog"}, codexPluginHookReview(home).Changed, "a '..' plugin is skipped; the real one is still named")
+}
