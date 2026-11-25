@@ -193,7 +193,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
         // An incomplete read is not an empty record: keep its notice even without rows.
         // All failures still use the existing error; all refusals keep their missing-computer notice.
-        empty: !failed && missingComputers().length ? null : { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : unread.some(u => u.update) ? missingWords(missingComputers(), shownComputers()) : 'The record could not be read.') : narrowed ? 'No action matches the search and filters.' : onlyNotes ? 'Nothing important yet.' : 'Nothing yet.',
+        empty: loaded && !loading && !failed && missingComputers().length ? null : { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : unread.some(u => u.update) ? missingWords(missingComputers(), shownComputers()) : 'The record could not be read.') : narrowed ? 'No action matches the search and filters.' : onlyNotes ? 'Nothing important yet.' : 'Nothing yet.',
             hint: loaded && !failed && onlyNotes ? 'Delivery notes, like words sent to an agent, are under Everything.' : loaded && !failed && !narrowed ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
         signature: JSON.stringify([list.map(keyOf), check, loaded, failed, denied, more, missingComputers(), multipleServers(), grouped, grouped ? taskSignature : '']),
         node: () => {
@@ -235,7 +235,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
             wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
-            const gaps = missingWords(missingComputers(), shownComputers());
+            const gaps = loaded && !loading ? missingWords(missingComputers(), shownComputers()) : '';
             if (gaps) { // the mock's "Partial multi-computer view" notice: the same icon, heading and sentence as the record check (#19924)
                 const n = DT.el('div', 'activity-check activity-check-partial'), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
                 tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', partialTitle), DT.el('span', 'activity-check-detail', gaps));

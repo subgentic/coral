@@ -78,6 +78,24 @@ reset(online(['srv1']), { local: { status: 403 }, srv1: { status: 403 } });
 await AC.refresh();
 assert.equal(AC.total(), 0);
 
+// #21409: a known offline computer does not replace the loading state before the read answers.
+reset([{ id: 'srv1', label: 'SRV1', status: 'offline' }], { local: { ids: [] } });
+assert.equal(AC.spec({}, {}).empty?.line, 'Reading the record…', 'before the first read');
+assert.equal(AC.spec({}, {}).node().querySelector('.activity-check-partial'), null);
+const realFetch = globalThis.fetch;
+let answerRead;
+const pendingRead = new Promise(resolve => { answerRead = resolve; });
+globalThis.fetch = async (...args) => { await pendingRead; return realFetch(...args); };
+try {
+    const reading = AC.refresh();
+    assert.equal(AC.spec({}, {}).empty?.line, 'Reading the record…', 'while the read is in flight');
+    assert.equal(AC.spec({}, {}).node().querySelector('.activity-check-partial'), null);
+    answerRead();
+    await reading;
+    assert.equal(AC.spec({}, {}).empty, null, 'the answered partial read keeps its notice');
+    assert.match(AC.spec({}, {}).node().textContent, /SRV1 \(offline\)/);
+} finally { answerRead(); globalThis.fetch = realFetch; }
+
 // #21399: partial failure is not an empty record. The renderer must keep the notice node,
 // including when the answering computer returned no actions. A retry removes the notice.
 reset(online(['srv1']), { local: { ids: [] }, srv1: { status: 502 } });
