@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
-const { coralReady } = require('./helpers/wait');
+const { coralReady, nextFrame } = require('./helpers/wait');
 
 const MEASURE = `(() => { const pane = document.getElementById('settings-pane-notifications'), I = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1, vis = e => e && e.offsetParent !== null;
     const rows = [...pane.querySelectorAll('.sv-row')].filter(vis);
@@ -25,7 +25,7 @@ const MEASURE = `(() => { const pane = document.getElementById('settings-pane-no
     const problems = [];
     const shot = async (Page, n) => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const open = async ({ ev, waitFor }) => { await coralReady(ev, 'startup', 'settings'); await ev(`(async () => { await window.showSettingsModal('notifications'); return true; })()`);
-        await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-desktop-notify') && document.querySelectorAll('#settings-pane-notifications .settings-reset:not([hidden])').length > 0`, 'Notifications with a Reset'); await ev(`document.fonts.ready.then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true)))))`); };
+        await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-desktop-notify') && document.querySelectorAll('#settings-pane-notifications .settings-reset:not([hidden])').length > 0`, 'Notifications with a Reset'); await ev(`document.fonts.ready.then(() => true)`); await nextFrame(ev); };
     // the Hub
     {
         const h = await connect(); const { client, Page, Emulation, ev } = h;
@@ -41,7 +41,7 @@ const MEASURE = `(() => { const pane = document.getElementById('settings-pane-no
                 if (m.overlaps.length) problems.push(`${tag}: text under a Reset: ${m.overlaps}`);
                 if (m.blockShown && !m.blockRows) problems.push(`${tag}: What reaches Needs you is shown with no rows`);
                 if (m.helpH > m.lines * m.lh + 6) problems.push(`${tag}: the Desktop alerts hint is ${Math.round(m.helpH)} px for ${m.lines} lines of ${m.lh} px`);
-                if (!m.alerts.every(t => /while this tab is open/i.test(t))) problems.push(`${tag}: the Alert rows do not say they work while this tab is open ${JSON.stringify(m.alerts)}`);
+                if (!m.alerts.every(t => /tab open/i.test(t))) problems.push(`${tag}: the Alert rows do not say the tab must be open ${JSON.stringify(m.alerts)}`);
                 if (!m.hub) problems.push(`${tag}: no Phone notifications row`);
                 else {
                     if (m.hub.href !== '/account#push-panel' || m.hub.abs !== m.hub.origin + '/account#push-panel') problems.push(`${tag}: the link goes to ${m.hub.abs}`);
