@@ -1345,8 +1345,6 @@
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] { flex-wrap: wrap; } /* only while ⋯ is open: the second line holds Search, the panel and the rest */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more]::before { content: ''; order: 4; flex: 0 0 100%; height: 0; }
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more):not([hidden]):not([style*="display: none"]):not([style*="display:none"]):not(.terminal-branch) { display: inline-flex !important; order: 5; } /* what a mode hid stays hidden */
-    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > [data-word] { width: auto; gap: 6px; padding-inline: 12px; } /* the second line's icons say their word: a title does not show on touch (walk 49) */
-    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > [data-word]::after { content: attr(data-word); font-size: var(--fs-md); }
     body.live-session-active:not(.popout-mode) #popout-panel-toggle-btn { display: none !important; } /* its id sets display: flex !important (above) */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] #popout-panel-toggle-btn { display: flex !important; order: 5; }
 }
