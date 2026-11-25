@@ -64,7 +64,12 @@ export async function showSettingsModal(group) {
         } else if (peer) { peer.hidden = true; peer.textContent = ''; }
     }).catch(() => {});
 
-    if (isCloud()) applyCloudSettingsDialog();
+    if (isCloud()) {
+        applyCloudSettingsDialog();
+        // The Hub row of Notifications is the Hub's own (#21268), and What reaches Needs you has only the computer's rows: no heading over nothing.
+        document.getElementById('settings-hub-push')?.closest('.sv-row')?.removeAttribute('hidden');
+        for (const block of document.querySelectorAll('#settings-modal .settings-inbox-block')) if (!block.querySelector('.sv-row:not([hidden])')) block.hidden = true;
+    }
 
     openSettingsGroup(typeof group === 'string' ? group : undefined); // the group last used here, or the one asked for
     const modalEl = document.getElementById('settings-modal');

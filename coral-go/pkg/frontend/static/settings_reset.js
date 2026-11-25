@@ -35,10 +35,15 @@ export function refreshSettingsResets(modal) {
         const box = button.parentElement;
         box.hidden = defaulted(e);
         button.disabled = e.disabled || e.readOnly || e.dataset.saving === '1';
+        // A label that leaves no room beside it wraps the Reset onto a line of its own: that line has the Reset's height, so it is drawn under the label and not over it (#21268). Beside the label it still adds no height.
+        box.removeAttribute('data-below');
+        const rects = box.previousElementSibling?.getClientRects(), last = rects && rects[rects.length - 1];
+        if (!box.hidden && last && box.getBoundingClientRect().top >= last.bottom - 1) box.setAttribute('data-below', '');
     }
 }
 
 export function wireSettingsResets(modal, reset) {
+    if (!modal._resetResize) { modal._resetResize = true; window.addEventListener('resize', () => refreshSettingsResets(modal)); }
     if (!modal._resetObserver) {
         modal._resetObserver = new MutationObserver(() => refreshSettingsResets(modal));
         modal._resetObserver.observe(modal, { childList: true, subtree: true });
