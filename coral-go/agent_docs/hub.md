@@ -251,4 +251,6 @@ At Interact or Launch a hub user can create, assign and complete tasks and post 
 
 ### Coral Hub access limits
 
+Choose whether remote users can look, interact or launch agents.
+
 The hub can read everything you view through it. This is the most Coral Hub can ever do here: its owner can limit it further for each computer but never raise it, and only you can change it, here. Interact lets a hub user type into running agents, which can run commands; Launch also lets them start, stop, sleep, wake and restart agents. Disconnect removes the token from this computer; revoke the computer on the hub's Computers page to cut it off from there.

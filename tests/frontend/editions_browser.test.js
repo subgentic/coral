@@ -211,7 +211,7 @@ async function run() {
             await ev(`Object.assign(window.__cloud, { state: 'connected', label: 'My Laptop', user_code: '', verification_url: '' }); true`);
             await until(`!!document.querySelector('#editions-modal [data-editions="done"]:not([hidden])')`, 'connected', 6000);
             s = await screen();
-            check(`${label}: connected: the status, the answer kept, Done instead of Skip`, !!s && s.status === 'Connected to Coral Hub as My Laptop.' && s.mode && s.modeValue === 'launch' && !s.autoOn && s.done && !s.skip && !s.code, JSON.stringify(s));
+            check(`${label}: connected: the status, the answer kept, Done instead of Skip`, !!s && s.status === 'Connected: My Laptop' && s.mode && s.modeValue === 'launch' && !s.autoOn && s.done && !s.skip && !s.code, JSON.stringify(s));
             await click('#editions-modal [data-cloud-mode][value="interact"]');
             await until(`window.__cloud.max_mode === 'interact'`, 'the mode saved');
             check(`${label}: the mode is set through /api/cloud/max-mode`, (await ev('window.__cloudCalls')).includes('PUT /api/cloud/max-mode {"mode":"interact"}'), JSON.stringify(await ev('window.__cloudCalls')));

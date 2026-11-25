@@ -2,7 +2,7 @@
 //   - the artifact viewer's "Who can read this" is reached with Tab: the page's Tab trap (modal_chrome.js) did not count a <summary>, so from Close (the
 //     last control it knew) it went back to Download and the disclosure could not be reached;
 //   - Team settings > Messaging at 200% text on a 390 px phone: the "Link a team on another Coral" button wraps, it is not one line cut off by the panel;
-//   - Settings > Coral Hub and remote access: the access list's label reads as a sentence ("What may Coral Hub do on this computer?").
+//   - Settings > Coral Hub and remote access: the access list has its approved concise label ("Access").
 // Drives Chrome over CDP against the isolated dev server through agent_view_harness.js; run_cdp_suites.mjs finds it by name.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -64,10 +64,10 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(b.clipped, false, 'the label is not cut off: ' + JSON.stringify(b)); assert.ok(b.right <= b.dialogRight + 1, 'and the button stays in the panel: ' + JSON.stringify(b));
         await ev(`document.getElementById('qa-ts-host')?.remove(); document.documentElement.style.fontSize = ''; true`);
 
-        console.log('3. Coral Hub and remote access: the access list reads as a sentence');
+        console.log('3. Coral Hub and remote access: the access list has its concise label');
         await start(1280, 900, false);
         await ev(`(async () => { await window.showSettingsModal('network'); return true; })()`);
-        assert.equal(await ev(`document.querySelector('label[for="settings-cloud-max-mode"]').textContent.trim()`), 'What may Coral Hub do on this computer?');
+        assert.equal(await ev(`document.querySelector('label[for="settings-cloud-max-mode"]').textContent.trim()`), 'Access');
         console.log('   ✓');
     } finally { await removeBoards(ev, [TEAM]); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

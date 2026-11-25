@@ -85,13 +85,13 @@ const { coralReady } = require('./helpers/wait');
             // D. connected at View, the Operator linked and on
             await ev(`window.__op = { linked: true, disabled: false }; true`);
             await reload({ state: 'connected', label: 'work-laptop', server_id: 'srv_1', user_code: undefined });
-            await waitFor(`/Connected to Coral Hub as work-laptop/.test(document.getElementById('settings-cloud-status').textContent) && !document.getElementById('settings-cloud-more').hidden`, 'connected', 8000);
+            await waitFor(`/Connected: work-laptop/.test(document.getElementById('settings-cloud-status').textContent) && !document.getElementById('settings-cloud-more').hidden`, 'connected', 8000);
             const row = await ev(`(() => { const a = document.getElementById('settings-cloud-status').getBoundingClientRect(), b = document.getElementById('settings-cloud-disconnect').getBoundingClientRect(); return { sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 30, disconnect: !document.getElementById('settings-cloud-disconnect').hidden }; })()`);
             assert.equal(row.disconnect, true); assert.equal(row.sameRow || mobile, true, at + 'the status and Disconnect share a row');
             await waitFor(`!document.getElementById('settings-cloud-operator-line').hidden`, 'the Operator line', 8000);
-            assert.equal(await text('#settings-cloud-operator-line'), 'Coral Hub may act as the Operator.', at + 'the Operator state is said outside the disclosure');
+            assert.equal(await text('#settings-cloud-operator-line'), 'Hub Operator access: on', at + 'the Operator state is said outside the disclosure');
             assert.equal(await ev(`document.getElementById('settings-cloud-more').open`), false, at + 'More Coral Hub permissions starts closed');
-            assert.equal(await text('#settings-cloud-more-summary'), 'More Coral Hub permissions: may change cross-team settings and act as the Operator', at + 'the summary names the permissive switches that are on');
+            assert.equal(await text('#settings-cloud-more-summary'), 'More permissions: cross-team settings, Operator decisions', at + 'the summary names the permissive switches that are on');
             assert.equal(await ev(`document.getElementById('settings-cloud-max-mode').value`), 'launch' === 'x' ? '' : await ev(`document.getElementById('settings-cloud-max-mode').value`));
             // the Operator switch: "let", on when the stored opt-out is off, and each flip stores the opposite
             await ev(`document.querySelector('#settings-cloud-more > summary').click(); true`);
@@ -101,7 +101,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`window.__calls.some(c => c[0] === 'operator')`, 'the Operator save', 8000);
             assert.deepEqual(await ev(`window.__calls.filter(c => c[0] === 'operator').pop()[1]`), { disabled: true }, at + 'turning the switch off stores the opt-out (disabled: true)');
             await waitFor(`/may not act as the Operator/.test(document.getElementById('settings-cloud-operator-line').textContent)`, 'the line follows', 8000);
-            assert.equal(await text('#settings-cloud-more-summary'), 'More Coral Hub permissions: may change cross-team settings', at + 'and the summary stops naming it');
+            assert.equal(await text('#settings-cloud-more-summary'), 'More permissions: cross-team settings', at + 'and the summary stops naming it');
             assert.equal(await flip('settings-cloud-hub-operator'), false, at + 'turning it on asks first: the switch stays off until Turn on (the risk notice, settings_risks.js)');
             await waitFor(`document.getElementById('confirm-modal-title').textContent === 'Turn on Let Coral Hub act as the Operator?'`, 'the question before turning it on', 8000);
             await ev(`document.getElementById('confirm-modal-yes').click(); true`);

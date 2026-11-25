@@ -55,9 +55,9 @@ const { coralReady } = require('./helpers/wait');
         // END Agents
 
         // PANE Network
-        assert.match(await row('settings-remote-access-enabled'), /Lets other devices control agents and read files as you do; unencrypted unless TLS is on\./, 'Coral Hub and remote access: Remote access says its risk before the switch, in the visible line');
+        assert.match(await row('settings-remote-access-enabled'), /Remote control of agents and files; unencrypted unless TLS is on\./, 'Coral Hub and remote access: Remote access says its risk before the switch, in the visible line');
         assert.equal(await ev(`document.getElementById('settings-remote-access-enabled').closest('.sv-row').querySelector('a.sv-learn').getAttribute('href')`), '/docs/settings-system', 'the full explanation is linked in Docs');
-        assert.match(await row('settings-hub-mode-enabled'), /Adds a Computers tab; whoever signs in here controls every computer you add\./, 'Coral Hub and remote access: Manage other computers says its risk before the switch');
+        assert.match(await row('settings-hub-mode-enabled'), /Adds Computers; anyone signed in controls every added computer\./, 'Coral Hub and remote access: Manage other computers says its risk before the switch');
         // END Network
         console.log('PASS Settings tour words');
     } finally { await client.close(); await guard.restore(); }

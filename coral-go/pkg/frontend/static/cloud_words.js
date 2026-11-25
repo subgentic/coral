@@ -4,24 +4,24 @@
  *   spellCode:      a one-time code as a screen reader should say it ("W X Y Z, 1 2 3 4"): a code read as a word is useless.
  *   describe, rekeyText, enrolledRetrying, autoAcceptChangedText, severalAccountsText and the fixed sentences: what the connect panel says about the status (#8386). */
 
-const list = items => items.length < 2 ? items.join('') : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+const list = items => items.join(', ');
 
 /** { text, warn }: "More Coral Hub permissions: may change cross-team settings and act as the Operator" or ": none on"; warn is the sentence for tokens that are visible to view-only hub users, or ''.
  *  `st` is the connector status, `operatorOn` whether the Operator switch is on (true, false, or null when this page cannot tell). */
 export function morePermsWords(st, operatorOn) {
     const on = [];
-    if (st && st.hub_cross_team_settings !== false) on.push('change cross-team settings');
-    if (operatorOn === true) on.push('act as the Operator');
-    if (st && st.hub_relaunch_updates === true) on.push('relaunch Coral to install updates');
+    if (st && st.hub_cross_team_settings !== false) on.push('cross-team settings');
+    if (operatorOn === true) on.push('Operator decisions');
+    if (st && st.hub_relaunch_updates === true) on.push('relaunch for updates');
     return {
-        text: 'More Coral Hub permissions: ' + (on.length ? 'may ' + list(on) : 'none on'),
+        text: 'More permissions: ' + (on.length ? list(on) : 'none on'),
         warn: st && st.redact_tokens === false ? 'Tokens are visible to view-only hub users' : '',
     };
 }
 
 /** The Operator's state as a sentence for the status area, or '' when it does not apply (not linked, or this page cannot tell). */
 export function operatorLine(operatorOn) {
-    if (operatorOn === true) return 'Coral Hub may act as the Operator.';
+    if (operatorOn === true) return 'Hub Operator access: on';
     if (operatorOn === false) return 'Coral Hub may not act as the Operator.';
     return '';
 }
@@ -73,8 +73,9 @@ export function autoAcceptChangedText(st) {
     if (!c || typeof c !== 'object' || (c.by !== 'hub' && c.by !== 'local')) return '';
     const d = typeof c.at === 'string' ? new Date(c.at) : null;
     const at = d && !Number.isNaN(d.getTime()) ? d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
-    const what = st.allow_hub_auto_accept === false ? 'Turned off' : 'Turned on';
-    const who = c.by === 'hub' ? `from Coral Hub by ${cleanLabel(c.user) || 'a Coral Hub user'}` : 'on this computer';
+    const conciseHubOn = c.by === 'hub' && st.allow_hub_auto_accept !== false;
+    const what = st.allow_hub_auto_accept === false ? 'Turned off' : conciseHubOn ? 'Enabled' : 'Turned on';
+    const who = c.by === 'hub' ? `${conciseHubOn ? 'by' : 'from Coral Hub by'} ${cleanLabel(c.user) || 'a Coral Hub user'}` : 'on this computer';
     return `${what} ${who}${at ? ', ' + at : ''}`;
 }
 
@@ -118,7 +119,7 @@ export function describe(st) {
         case 'connecting':
             return 'Connecting' + (st.label ? ' as "' + st.label + '"' : '') + '…';
         case 'connected':
-            return 'Connected to Coral Hub' + (st.label ? ' as ' + st.label : '') + '.';
+            return st.label ? 'Connected: ' + st.label : 'Connected to Coral Hub.';
         case 'retrying':
             if (enrolledRetrying(st)) return 'Connected to Coral Hub' + (st.label ? ' as ' + st.label : '') + ' (reconnecting…). Coral keeps working locally meanwhile.';
             return 'Not connected right now (' + (st.last_error || 'retrying') + '). Coral keeps working locally and will reconnect on its own.';

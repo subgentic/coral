@@ -44,7 +44,7 @@ const BASE = require('./test_base').BASE;
         await openSettings();
         let r = await row();
         assert.ok(r.shown, 'shown in Settings');
-        assert.equal(r.label, 'Manage other computers from this one', 'the switch is named by its heading');
+        assert.equal(r.label, 'Manage other computers', 'the switch is named by its heading');
         assert.ok(r.described, 'the toggle is described by the explanation and the status');
         assert.equal(r.checked, false);
         assert.equal(r.status, '', 'off says nothing: the switch shows it');
