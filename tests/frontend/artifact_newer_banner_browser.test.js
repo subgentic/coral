@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
                 check(!/^An older version/.test(b.pill), at + 'the header pill does not say it twice: ' + JSON.stringify(b.pill));
                 const [r, g, bl] = (b.color.match(/\d+(\.\d+)?/g) || []).map(Number); check(r > g && r >= bl || r > 150 && g > 100 && bl < 140, at + 'the banner is in the warning colour, not grey: ' + b.color);
             }
-            check(await ev(`(() => { const t = document.querySelector('#artifact-viewer .ac-toggle'); return !!t && t.getClientRects().length > 0; })()`), at + 'the comments button is still there');
+            check(await ev(`(() => { const v = document.querySelector('#artifact-viewer'); const t = v.querySelector('.ac-toggle'), composer = v.querySelector('.ac-composer .ac-input'); return (!!t && t.getClientRects().length > 0) || (v.classList.contains('av-draft-document') && !!composer && composer.getClientRects().length > 0); })()`), at + 'comments remain reachable through the toggle or the visible private-review composer');
             await ev(`document.querySelector('#artifact-viewer .artifact-newer-banner .artifact-review-newest')?.click(); true`);
             let sw = true; try { await waitFor(`(() => { const v = document.querySelector('#artifact-viewer'); return !!v && !v.querySelector('.artifact-newer-banner:not([hidden])') && /v3/.test((v.querySelector('.artifact-viewer-chips') || {}).textContent || '') ; })()`, at + 'v3 open', 10000); } catch { sw = false; }
             check(sw, at + 'Open v3 switched to v3 and the banner went');

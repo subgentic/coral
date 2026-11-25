@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -162,4 +163,23 @@ func TestGoalAndDiffSubjectsTakeNoDrafts(t *testing.T) {
 			assert.Equal(t, "drafts_not_supported", out["code"])
 		}
 	}
+}
+
+// Capability/list reads must not mutate settings, even for refused artifacts.
+func TestReviewDraftReadsDoNotCreateOwnerIdentity(t *testing.T) {
+	rig := newCmtRigDefaultOwner(t)
+	for _, path := range []string{draftsPath(cmtDoc), draftsPath("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), "/api/review-drafts/counts"} {
+		_, _ = rig.do(http.MethodGet, path, cmtAsOwner, nil)
+		settings, err := rig.ss.GetSettings(context.Background())
+		require.NoError(t, err)
+		assert.NotContains(t, settings, ArtifactCommentsOwnerIDSetting, path)
+	}
+	code, out := newDraft(t, rig, cmtDoc, "first saved draft")
+	require.Equal(t, http.StatusCreated, code, "%v", out)
+	settings, err := rig.ss.GetSettings(context.Background())
+	require.NoError(t, err)
+	require.Len(t, settings[ArtifactCommentsOwnerIDSetting], 32)
+	code, out = rig.do(http.MethodGet, draftsPath(cmtDoc), cmtAsOwner, nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.EqualValues(t, 1, out["count"], "the first write still has a durable owner")
 }

@@ -11,7 +11,7 @@
 
 .ac-panel { flex: 0 0 340px; width: 340px; overflow-y: auto; scroll-padding-top: 4rem; padding: var(--space-md); gap: var(--space-sm); box-sizing: border-box; } /* a .pane .pane-aside (layout.css): the surface, the column and the left edge are the pane's; scroll-padding: a card scrolled into view stops under the sticky header, not behind it (#18900) */
 .ac-panel[hidden] { display: none; }
-.ac-head { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; position: sticky; top: calc(-1 * var(--space-md)); z-index: 1; margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) 0; padding: var(--space-md); background: var(--bg-secondary); }
+.ac-head { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; position: sticky; top: calc(-1 * var(--space-md)); z-index: 2; margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) 0; padding: var(--space-md); background: var(--bg-secondary); }
 .ac-title { margin: 0; font-size: var(--fs-lg, 1rem); flex: 1 1 auto; }
 .ac-count { margin-left: 8px; color: var(--text-muted); font-weight: var(--fw-regular); }
 .ac-panel .ac-showresolved, .ac-panel .ac-showearlier { border: 0; background: transparent; color: var(--text-secondary); border-radius: var(--radius-md); padding: 2px 8px; font-size: var(--fs-sm, 0.8125rem); cursor: pointer; }

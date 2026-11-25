@@ -12,6 +12,7 @@ function stubFetch(HEX, MD) {
         const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
+            if (url.includes('/api/artifacts/${HEX}/review-drafts')) return json({ drafts_supported: false, drafts: [], count: 0, revision: 0, can_write: false, can_send: false });
             if (url.includes('/api/artifacts/${HEX}/comments')) {
                 window.__calls.push({ method, url, body: o && o.body ? JSON.parse(o.body) : null });
                 if (window.__missing) return json({ error: 'not found' }, 404);

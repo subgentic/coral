@@ -35,8 +35,8 @@ const NOTIFICATIONS_FIELDS = [
     { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p);
         const t = document.createElement('button'); t.type = 'button'; t.id = 'settings-desktop-test'; t.className = 'btn btn-small'; t.textContent = 'Send a test alert'; t.hidden = true; slot.append(t); } }, // shown while the switch is on (walk 53, #17169)
     // This browser's own choices about those alerts (not saved on the server); they apply while Desktop alerts is on.
-    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', help: 'While this tab is open. Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
-    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', help: 'While this tab is open. Needs Desktop alerts on.', disabledWhen: () => alertsOff() },
+    { key: 'alert_needs_input', type: 'toggle', id: 'settings-alert-needs-input', label: 'Alert when an agent needs input', help: 'While this tab is open, with Desktop alerts on.', disabledWhen: () => alertsOff() },
+    { key: 'alert_reply', type: 'toggle', id: 'settings-alert-reply', label: 'Alert when an agent finishes a reply', help: 'While this tab is open, with Desktop alerts on.', disabledWhen: () => alertsOff() },
     { key: 'alert_sound', type: 'toggle', id: 'settings-alert-sound', label: 'Play a sound with alerts', help: "Your computer's own alert sound.", disabledWhen: () => alertsOff() },
 ];
 

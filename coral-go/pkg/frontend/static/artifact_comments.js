@@ -165,7 +165,7 @@ export function attachComments(dialog, body, host, opts = {}) {
                 if (!st.reviewDrafts) st.reviewDrafts = createDraftReview({ hex, server: st.server, board: st.board });
                 try {
                     const drafts = await st.reviewDrafts.refresh();
-                    if (drafts && !drafts.can_write) { data.canComment = false; data.reason ||= 'Draft comments cannot be changed here. Your saved drafts stay private.'; }
+                    if (drafts?.drafts_supported && !drafts.can_write) { data.canComment = false; data.reason ||= 'Draft comments cannot be changed here. Your saved drafts stay private.'; }
                 }
                 catch (e) { data.canComment = false; data.reason ||= 'Private draft comments could not be loaded. Retry before adding a comment.'; }
                 if (hex !== st.hex || gen !== ctxGen) return;
@@ -201,7 +201,7 @@ export function attachComments(dialog, body, host, opts = {}) {
                 try { await st.reviewDrafts.refresh(); }
                 catch { data.canComment = false; data.reason ||= 'Private draft comments could not be loaded. Retry before adding a comment.'; }
             }
-            if (st.reviewDrafts && !st.reviewDrafts.snapshot().data?.can_write) { data.canComment = false; data.reason ||= 'Draft comments cannot be changed here. Your saved drafts stay private.'; }
+            if (st.reviewDrafts?.snapshot().data?.drafts_supported && !st.reviewDrafts.snapshot().data.can_write) { data.canComment = false; data.reason ||= 'Draft comments cannot be changed here. Your saved drafts stay private.'; }
             const draftsChanged = priorDrafts !== JSON.stringify(st.reviewDrafts?.snapshot().data);
             if (gen !== ctxGen || hex !== st.hex || server !== st.server || board !== st.board || series !== st.series || !st.data || (!draftsChanged && sigOf(data) === sigOf(st.data)) || panelSelection()) return; // selected text waits: the next tick draws what changed once it is let go
             const added = data.comments.filter(c => !c.deleted).length - st.data.comments.filter(c => !c.deleted).length, top = panel.scrollTop;
