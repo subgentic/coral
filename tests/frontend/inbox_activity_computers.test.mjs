@@ -78,6 +78,30 @@ reset(online(['srv1']), { local: { status: 403 }, srv1: { status: 403 } });
 await AC.refresh();
 assert.equal(AC.total(), 0);
 
+// #21399: partial failure is not an empty record. The renderer must keep the notice node,
+// including when the answering computer returned no actions. A retry removes the notice.
+reset(online(['srv1']), { local: { ids: [] }, srv1: { status: 502 } });
+await AC.refresh();
+let partial = AC.spec({}, {});
+assert.equal(partial.empty, null, 'keep the notice instead of rendering Nothing yet');
+assert.match(partial.node().textContent, /Activity from 1 computer \(SRV1\) could not be read\./);
+assert.equal(partial.rows.length, 0);
+plan.local.ids = [{ id: 11, at: at(1) }];
+await AC.refresh();
+partial = AC.spec({}, {});
+assert.equal(partial.rows.length, 1, 'the answering computer keeps its row');
+assert.match(partial.node().textContent, /Activity from 1 computer \(SRV1\) could not be read\./);
+plan.local = { status: 502 };
+await AC.refresh();
+assert.equal(AC.spec({}, {}).empty.line, 'The record could not be read.', 'all failures keep the existing error');
+reset(online(['srv1', 'srv2']), { local: { ids: [] }, srv1: { status: 502 }, srv2: { status: 502 } });
+await AC.refresh();
+assert.match(AC.spec({}, {}).node().textContent, /Activity from 2 computers could not be read\./);
+plan = {};
+await AC.refresh();
+assert.equal(AC.spec({}, {}).empty.line, 'Nothing yet.', 'only a fully answered empty read says Nothing yet');
+assert.equal(AC.spec({}, {}).node().querySelector('.activity-check-partial'), null);
+
 // older actions: each computer has its own cursor (its own smallest id), never another's
 const many = (from, n, t0) => Array.from({ length: n }, (_, i) => ({ id: from - i, at: at(t0 + i) }));
 reset(online(['srv1']), { local: { ids: many(1000, 200, 0) }, srv1: { ids: [{ id: 5000, at: at(1) }] } });

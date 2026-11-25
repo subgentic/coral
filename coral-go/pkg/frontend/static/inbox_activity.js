@@ -187,10 +187,13 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
     const parts = r => { const p = partsOf(r); return grouped && byTask && r.goal_id && r.task_id ? { ...p, about: '' } : p; };
     const groupFor = grouped ? Threads.activityGroupLookup(list, teamLabel, parts, tasks, byTask) : null;
     const opens = r => (r.item_kind === 'job_run' && !!jobRunParts(r.item_id)) || (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) || (r.item_kind === 'agent' && r.item_id && r.action !== 'agents_record') || (['goal', 'question', 'task', 'message', 'workflow_run'].includes(r.item_kind) && /^\d+$/.test(r.item_id)) || (r.item_kind === 'chat' && !!r.item_id);
+    const readFailures = unread.filter(u => u.why === 'could not be read' || u.update);
+    const partialTitle = readFailures.length ? `Activity from ${readFailures.length} computer${readFailures.length === 1 ? ` (${serverLabel(readFailures[0].id)})` : 's'} could not be read.` : 'Partial multi-computer view';
     const narrowed = AF.isFiltered(f), onlyNotes = !narrowed && f.important === true && shown().length > 0; // the view is Important (the default, not a filter the person set) and every row read is a delivery note (#19219)
     return { title: 'Activity', noun: ['action', 'actions'], rows: list,
-        // All sources refusing is not an empty record: keep the node with its missing-computer notice.
-        empty: denied && missingComputers().length ? null : { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : unread.some(u => u.update) ? missingWords(missingComputers(), shownComputers()) : 'The record could not be read.') : narrowed ? 'No action matches the search and filters.' : onlyNotes ? 'Nothing important yet.' : 'Nothing yet.',
+        // An incomplete read is not an empty record: keep its notice even without rows.
+        // All failures still use the existing error; all refusals keep their missing-computer notice.
+        empty: !failed && missingComputers().length ? null : { line: !loaded || loading ? 'Reading the record…' : failed ? (denied ? 'Only the account this computer is linked to can see the Activity record.' : unread.some(u => u.update) ? missingWords(missingComputers(), shownComputers()) : 'The record could not be read.') : narrowed ? 'No action matches the search and filters.' : onlyNotes ? 'Nothing important yet.' : 'Nothing yet.',
             hint: loaded && !failed && onlyNotes ? 'Delivery notes, like words sent to an agent, are under Everything.' : loaded && !failed && !narrowed ? 'Each time you approve, ask for changes, deny, ignore or answer something in Needs you, a line is added here.' : undefined },
         signature: JSON.stringify([list.map(keyOf), check, loaded, failed, denied, more, missingComputers(), multipleServers(), grouped, grouped ? taskSignature : '']),
         node: () => {
@@ -235,7 +238,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const gaps = missingWords(missingComputers(), shownComputers());
             if (gaps) { // the mock's "Partial multi-computer view" notice: the same icon, heading and sentence as the record check (#19924)
                 const n = DT.el('div', 'activity-check activity-check-partial'), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
-                tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', 'Partial multi-computer view'), DT.el('span', 'activity-check-detail', gaps));
+                tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', partialTitle), DT.el('span', 'activity-check-detail', gaps));
                 n.append(tile, text); n.setAttribute('role', 'status'); wrap.prepend(n);
             }
             if (more) { const b = DT.el('button', 'btn btn-small activity-more', 'Show older actions'); b.type = 'button'; b.addEventListener('click', () => refresh(null, { next: true })); wrap.append(b); }
