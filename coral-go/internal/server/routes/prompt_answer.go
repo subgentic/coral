@@ -1043,7 +1043,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		errConflict(w, "The prompt changed. Answer it in the terminal.")
 		return
 	}
-	if body.From == "needs_you" { // checked on the label the screen shows NOW, after the re-read: a menu that changed under the button types nothing (#21256, Security)
+	if body.From == "needs_you" && body.SessionID != "" && h.deriveSingleSessionState(r.Context(), body.SessionID, 0).WaitingKind == "permission" { // only a hooked permission wait: a screen-only dialog's press goes the #19864 way (Orchestrator, #21256). Checked on the label the screen shows NOW, after the re-read: a menu that changed under the button types nothing (#21256, Security)
 		if status, code, why := needsYouPress(r, opt.Label); status != 0 {
 			writeError(w, status, code, why)
 			return
