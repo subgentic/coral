@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('phone_agent_bar.css'); // the phone agent page's second row (#21257): with the robot, when an agent opens, not at start
+document.querySelector('#live-session-view .terminal-header')?.setAttribute('data-more', ''); // the row is always shown (the approved mock); the ⋯ opens the details card only
 const { agentCopyIn } = await importOnce('./agent_copy_button.js');
 
 /** Each time an agent opens: the robot is on its page, and an open Branches tab follows the agent (it moved here from sessions.js so the start path carries one lazy call, #15152). */
