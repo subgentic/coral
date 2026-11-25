@@ -646,10 +646,10 @@ func TestNeedsYouDialogItemCarriesItsOptionsAsWords(t *testing.T) {
 
 // #19872 (QA's SHOULD): a computer's option whose number is above 9 is dropped by the Hub merge, never clamped to 9 (it would name another option's key); a menu with one dropped is named in none of it.
 func TestHubMergeDropsAnOptionNumberAboveNine(t *testing.T) {
-	body := []byte(`{"counts":{"agent":1},"items":[{"kind":"agent","id":"agent:s1","line":"x","dialog":true,"options":[{"n":1,"label":"Yes"},{"n":12,"label":"Twelve"}]},{"kind":"agent","id":"agent:s2","line":"y","dialog":true,"options":[{"n":1,"label":"Yes"},{"n":9,"label":"Nine"}]}]}`)
+	body := []byte(`{"counts":{"agent":1},"items":[{"kind":"agent","id":"agent:s1","line":"x","dialog":true,"options":[{"n":1,"label":"Yes"},{"n":12,"label":"Twelve"}]},{"kind":"agent","id":"agent:s2","line":"y","dialog":true,"options":[{"n":1,"label":"Red"},{"n":9,"label":"Nine"}]}]}`) // not a permission menu (no Yes): a permission menu keeps only its one-time choices (#21256)
 	got, _, ok := rebuildRemoteNeeds("m2", body)
 	require.True(t, ok)
 	require.Len(t, got, 2)
 	assert.Nil(t, got[0].Options, "an option numbered 12 is dropped, and the partial menu is not offered")
-	assert.Equal(t, []NeedsYouOption{{N: 1, Label: "Yes"}, {N: 9, Label: "Nine"}}, got[1].Options, "9 is kept as 9")
+	assert.Equal(t, []NeedsYouOption{{N: 1, Label: "Red"}, {N: 9, Label: "Nine"}}, got[1].Options, "9 is kept as 9")
 }
