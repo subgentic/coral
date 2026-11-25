@@ -234,3 +234,5 @@
 @media (max-width: 760px) {
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-review-item > .inbox-blocks-closes.inbox-holds-inline { display: inline-flex; align-items: center; gap: 5px; justify-self: start; width: fit-content; max-width: 100%; box-sizing: border-box; padding: 3px 9px; border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-secondary); background: transparent; white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-base); font-weight: var(--fw-regular); }
 }
+
+:root :is(#group-table-view[data-group="hub-inbox:needs"], .team-needs-list, .inbox-needs-results) .inbox-v4-row.inbox-v4-row.inbox-v4-row :is(.inbox-review-from.inbox-v4-heading, .sr-only, .inbox-header-board, .inbox-proposal-expired) { color: color-mix(in srgb, var(--text-primary) 78%, var(--bg-secondary)); } /* #21253 */
