@@ -57,7 +57,7 @@ export function permissionDescription(type, value) {
 // Codex launches these as workspace-write that never asks, which has the network on (Security's #7503); so does Codex with nothing chosen (the saved default or Auto). Default is not one of them since #10362: it sends no flags
 export const CODEX_NETWORK_MODES = ['auto', 'dontAsk']; // not Default: an explicit Default sends no flags (#10362), so Codex runs its own default, which asks
 export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
-const CODEX_ACCEPT_EDITS_DESCRIPTION = 'Workspace sandbox that asks before it acts (the network is Coral\'s, as in Auto).'; // #21335: the one Codex mode that still asks
+const CODEX_ACCEPT_EDITS_DESCRIPTION = 'Workspace sandbox that asks before it acts. It has no network, so a board member in this mode cannot reach Coral.'; // #21335: the one Codex mode that still asks
 const CODEX_DEFAULT_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.'; // Default is Auto for Codex (the Operator, #21335); before it sent no flags, so its sandbox had no network and its board calls stalled (#10362, #10381)
 
 // The modes in which an agent's launch of a worker is refused: agent.SkipsPermissionPrompts keeps only Default as asking (Plan too, for the CLIs other than Claude, #5894)
