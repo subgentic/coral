@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
@@ -77,6 +78,7 @@ func goalDoneReadKey(team string, id int64, total int, updatedAt string) string 
 // ones the Operator hid. One item per goal; a goal that closes, gets a task, or is blocked is no longer one.
 func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden, read map[string]bool, news map[string]int) ([]NeedsYouItem, error) {
 	quiet := h.goalDoneQuietFor(ctx)
+	driven := h.goalDoneDriven(ctx, project)
 	var items []NeedsYouItem
 	cursor := ""
 	for {
@@ -95,6 +97,10 @@ func (h *BoardHandler) goalDoneItems(ctx context.Context, project string, hidden
 			if read[goalDoneReadKey(project, g.ID, r.Total, g.UpdatedAt)] && news[goalSubject(project, g.ID)] == 0 { // a read goal counts again while agents have replied in the Operator's thread on it and they have not opened it (#12073)
 				continue // opened at this total and last change: read, not counted (a task done since has a new total, a goal reopened or edited a new last change, and the item is back)
 			}
+			if driven.skips(g) { // #21442: a goal with a driver, or one that was an item once, is not put in front of the Operator again
+				continue
+			}
+			driven.record(ctx, h, g)
 			items = append(items, NeedsYouItem{Kind: "goal_done", Line: needsYouLine("Goal #" + strconv.FormatInt(g.ID, 10) + " looks done: " + g.Title), Team: project, ID: "goal_done:" + project + ":" + strconv.FormatInt(g.ID, 10), At: needsYouTime(goalDoneArrival(g, quiet)), NewComments: news[goalSubject(project, g.ID)]})
 		}
 		if page.NextCursor == "" {
@@ -158,4 +164,105 @@ func goalDoneArrival(g board.Goal, quiet time.Duration) string {
 		}
 	}
 	return g.UpdatedAt
+}
+
+// goalDoneDrivenState is what #21442 reads once for a board: whether the setting brings back the items of driven goals, who could drive a goal (the active members and the Orchestrator), and the goals already shown once.
+type goalDoneDrivenState struct {
+	showAll bool
+	active  []board.Subscriber
+	orch    string
+	shown   []string // entries "team|goal|looks-done time": the goals that were an item
+	known   bool     // the lists were read; when not, nothing is held back by them (a failure never hides an item)
+	project string
+}
+
+func (h *BoardHandler) goalDoneDriven(ctx context.Context, project string) goalDoneDrivenState {
+	s := goalDoneDrivenState{project: project}
+	if h.inboxSettings == nil {
+		return s
+	}
+	st, err := h.inboxSettings(ctx)
+	if err != nil {
+		return s
+	}
+	if setreg.Bool(st, setreg.GoalDoneDrivenItems) {
+		s.showAll = true
+		return s
+	}
+	s.shown = goalDoneListFrom(st, setreg.GoalDoneShown)
+	subs, err := h.bs.ListSubscribers(ctx, project)
+	if err != nil {
+		return s
+	}
+	s.active = subs
+	s.orch, _ = h.bs.TeamOrchestrator(ctx, project)
+	s.known = true
+	return s
+}
+
+// hasDriver: the goal's driver is an active member of the board, or it has none and the team has an active Orchestrator (the one its driver's notice goes to).
+func (s goalDoneDrivenState) hasDriver(g board.Goal) bool {
+	who := g.Driver
+	if who == "" {
+		who = s.orch
+	}
+	if who == "" {
+		return false
+	}
+	for _, sub := range s.active {
+		if sub.IsActive != 0 && board.SameIdentity(sub.SubscriberID, who) {
+			return true
+		}
+	}
+	return false
+}
+
+func goalDoneShownPrefix(project string, id int64) string {
+	return project + "|" + strconv.FormatInt(id, 10) + "|"
+}
+
+// goalDoneEpisode names the all-done state of a goal: when it looked done and how many tasks it had.
+func goalDoneEpisode(g board.Goal) string {
+	at := ""
+	if g.LooksDoneAt != nil {
+		at = *g.LooksDoneAt
+	}
+	return at + "|" + strconv.Itoa(g.Rollup.Total)
+}
+
+// skips: not an item. With the setting on, never. Otherwise a goal with a driver is not, and a goal is one only for the all-done state it was first shown at: the entry keeps the time it looked done, a goal
+// reopened and done again has another and is not shown a second time.
+func (s goalDoneDrivenState) skips(g board.Goal) bool {
+	if s.showAll || !s.known {
+		return false
+	}
+	if s.hasDriver(g) {
+		return true
+	}
+	prefix := goalDoneShownPrefix(s.project, g.ID)
+	seen := false
+	for _, e := range s.shown {
+		if strings.HasPrefix(e, prefix) {
+			seen = true
+			if e == prefix+goalDoneEpisode(g) {
+				return false
+			}
+		}
+	}
+	return seen
+}
+
+// record keeps the first time a goal is an item (best effort: a goal that cannot be recorded is shown, as before).
+func (s goalDoneDrivenState) record(ctx context.Context, h *BoardHandler, g board.Goal) {
+	if s.showAll || !s.known || h.goalDoneEdit == nil {
+		return
+	}
+	prefix := goalDoneShownPrefix(s.project, g.ID)
+	for _, e := range s.shown {
+		if strings.HasPrefix(e, prefix) {
+			return
+		}
+	}
+	entry := prefix + goalDoneEpisode(g)
+	_, _ = h.goalDoneEdit(ctx, setreg.GoalDoneShown, goalDoneHiddenMax, func(l []string) []string { return append(withoutPrefix(l, prefix), entry) })
 }
