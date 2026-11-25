@@ -28,7 +28,7 @@ const HUB_PUSH_FIELD = { key: 'hub_push', type: 'notice', render: slot => { cons
     t.className = 'sv-label'; t.textContent = 'Phone notifications'; p.className = 'sv-help'; a.className = 'sv-learn'; a.id = 'settings-hub-push'; a.href = '/account#push-panel'; a.textContent = 'Turn on in your Hub account'; p.append(a); slot.append(t, p); } };
 
 const NOTIFICATIONS_FIELDS = [
-    { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'A message in Coral when an agent needs input.' },
+    { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'When an agent needs input.' },
     { key: 'desktop_notify', type: 'toggle', id: 'settings-desktop-notify', label: 'Desktop alerts',
         help: { text: 'An alert on this computer while this tab is in the background.', more: 'This browser only. Shows the agent and computer names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
     // Why the switch above did not turn on (#10068): a browser that blocks alerts, or a permission box that was dismissed. Filled by settings_fill.js.

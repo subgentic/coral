@@ -33,6 +33,14 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
     const api = (method, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
+    const leave = async () => {
+        await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+        await waitFor(`document.querySelector('#artifact-viewer').hidden || [...document.querySelectorAll('#confirm-modal button')].some(b => b.checkVisibility() && b.textContent.trim() === 'Leave and keep drafts')`, 'viewer closed or saved-draft leave confirmation');
+        if (!(await ev(`document.querySelector('#artifact-viewer').hidden`))) {
+            await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => b.textContent.trim() === 'Leave and keep drafts').click(); true`);
+            await waitFor(`document.querySelector('#artifact-viewer').hidden`, 'saved drafts kept and viewer closed');
+        }
+    };
     const list = async (hex) => (await api('GET', `/api/artifacts/${hex}/comments?state=all`)).body;
     try {
         assert.ok(DATA, 'run under run_cdp_suites.mjs (CORAL_TEST_DATA_DIR names the isolated server\'s folder)');
@@ -51,7 +59,8 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
             await coralReady(ev);
             for (const k of KINDS) {
                 const tag = `${w.label} ${k.name}`;
-                await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${k.hex}', { filename: ${JSON.stringify(k.name)}, mediaType: ${JSON.stringify(k.mediaType)} })); true`);
+                await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${k.hex}', { filename: ${JSON.stringify(k.name)}, mediaType: ${JSON.stringify(k.mediaType)} })).then(() => true)`);
+                await waitFor(`(() => { const d = document.querySelector('#artifact-viewer'); return !!d && !d.hidden && d.dataset.contentPending !== '1' && d.querySelector('.artifact-viewer-dropbox-share')?.dataset.hex === '${k.hex}' && ${k.mediaType.startsWith('video/') ? "d.classList.contains('avc-video')" : 'true'}; })()`, `${tag}: this file is rendered`, 10000);
                 // the panel loads its threads, so the toggle is there once the comments are known
                 await waitFor(`(() => { const t = document.querySelector('.ac-toggle'); return !!t && !t.hidden; })()`, `${tag}: the Comments button`, 10000);
                 check(`${tag}: the Comments button is offered`, await ev(`!document.querySelector('.ac-toggle').hidden`));
@@ -79,8 +88,8 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
                     // doubling the 16 UI writes past the real 20-writes/minute author cap.
                     const sql = value => "'" + String(value).replace(/'/g, "''") + "'";
                     sqliteExec(path.join(DATA, 'sessions.db'), `INSERT INTO artifact_comments (artifact_id,board,anchor_json,body,author_issuer,author_subject,author_name,author_kind,created_at,images_json) VALUES (${sql(k.hex)},'',${sql(JSON.stringify(draft.anchor))},${sql(draft.body)},'local','published-fixture','Published reviewer','owner',${sql(new Date().toISOString())},'[]');`);
-                    await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
-                    await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${k.hex}', { filename: ${JSON.stringify(k.name)}, mediaType: ${JSON.stringify(k.mediaType)} })); true`);
+                    await leave();
+                    await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${k.hex}', { filename: ${JSON.stringify(k.name)}, mediaType: ${JSON.stringify(k.mediaType)} })).then(() => true)`);
                 }
                 await waitFor(`document.querySelectorAll('.ac-panel .ac-card').length === ${wi + 1}`, `${tag}: the new card`, 6000);
                 const d = await list(k.hex);
@@ -88,7 +97,7 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
                 check(`${tag}: the card says where the comment is: ${k.mediaType.startsWith('video/') ? 'the video time' : 'the whole document'}`, await ev(`[...document.querySelectorAll('.ac-panel .ac-card .ac-quote')].every(q => ${k.mediaType.startsWith('video/') ? '/^Video: /' : '/The whole document/'}.test(q.textContent))`));
                 check(`${tag}: Resolve and Reply are there, and Lock for the owner`, await ev(`(() => { const t = document.querySelector('.ac-panel').textContent; return /Resolve/.test(t) && /Reply/.test(t) && !!document.querySelector('.ac-panel .ac-lock'); })()`));
                 // clean up: the artifact's comments go with it, and the viewer closes
-                await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+                await leave();
             }
         }
         // a text anchor on a picture is still refused by the server, with the reason (the viewer never sends one)
