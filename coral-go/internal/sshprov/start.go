@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -419,4 +420,27 @@ func (r Runner) RecordDataDir(ctx context.Context, t Target, dir string) error {
 		return &StartError{ExitCode: res.ExitCode}
 	}
 	return nil
+}
+
+// linkKeyRe is a request key as `coral cloud keys create` prints it (store.CreateLinkKeyVia): lrk_, its id part and its secret.
+var linkKeyRe = regexp.MustCompile(`^lrk_[0-9a-f]{8}_[0-9a-f]{32}$`)
+
+// ErrNoLinkKey is a far Coral that made no request key: an older Coral with no `coral cloud keys` (before v2.1.9), a server that is not running, or a refusal. Nothing it printed is in the error.
+var ErrNoLinkKey = errors.New("sshprov: the computer did not make a request key")
+
+// CreateLinkKey makes this hub's request key on the far computer (#21220), with the Coral of version, named name, and returns it. The key is read from stdout only when it is exactly a key: anything else the far
+// side printed is never returned, logged or kept. A failure keeps the exit code and the start of stderr, with any long hex run taken out, for the hub's log.
+func (r Runner) CreateLinkKey(ctx context.Context, t Target, version, name string) (string, error) {
+	res, err := r.Run(ctx, t, CmdCreateLinkKey, version, name)
+	if err != nil {
+		return "", err
+	}
+	if res.ExitCode != 0 {
+		return "", fmt.Errorf("%w (exit code %d): %s", ErrNoLinkKey, res.ExitCode, longHex.ReplaceAllString(res.Stderr, "[hex]"))
+	}
+	key := strings.TrimSpace(res.Stdout)
+	if !linkKeyRe.MatchString(key) {
+		return "", ErrNoLinkKey
+	}
+	return key, nil
 }
