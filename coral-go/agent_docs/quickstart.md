@@ -15,7 +15,7 @@ The example output and timings in steps 4-5 are illustrative: they come from a t
 |---|---|
 | **tmux** | Not needed. Agents run in Coral's built-in terminal (pty) by default on every system. tmux is needed only if you choose it (Settings > Defaults, or `--backend tmux`) to keep agents running after Coral quits; the macOS app bundles tmux 3.7c, and elsewhere you install it first. See [Platform support](#platform-support). |
 | **git** | Worktree and branch features need a real repository. |
-| **An agent CLI** | At least one of `claude`, `codex`, `agy` (Antigravity), or `pi` — **installed and authenticated**. Coral drives these tools; it does not install, configure, or authenticate them. |
+| **An agent CLI** | At least one of `claude`, `codex`, `agy` (Antigravity), `pi`, `opencode`, or `hermes` (not on Windows) — **installed and authenticated**. Coral drives these tools; it does not install, configure, or authenticate them. |
 
 Coral supports exactly six agent CLIs, the six the New agent form offers:
 
