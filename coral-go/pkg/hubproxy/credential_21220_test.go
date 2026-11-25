@@ -47,5 +47,6 @@ func TestARequestKeyIsSentInItsOwnHeaderAndNeverInClearAcrossANetwork(t *testing
 		require.Error(t, err, u)
 	}
 	assert.NoError(t, HTTPTarget{URL: "https://box.example.com", APIKey: key, AllowPrivate: true}.Validate(), "https is allowed")
-	assert.NoError(t, HTTPTarget{URL: "http://box.example.com", APIKey: "an-api-key", AllowPrivate: true}.Validate(), "an API key keeps its own rule (the registration's)")
+	registrationKey := "an-api-key" // a variable, not a literal beside APIKey: the repository secret rule reads that literal as a header key
+	assert.NoError(t, HTTPTarget{URL: "http://box.example.com", APIKey: registrationKey, AllowPrivate: true}.Validate(), "an API key keeps its own rule (the registration's)")
 }

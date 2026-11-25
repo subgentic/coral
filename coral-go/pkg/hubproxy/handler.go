@@ -527,7 +527,7 @@ func (h *Handler) noteNoStamp(id string, resp *http.Response) {
 	}
 	noStampLogged.Unlock()
 	if due {
-		slog.Warn("this Hub has no Approve set up for a computer: its "+v+" will need it in a later release (Settings > Computers, Approve through this hub)", "server", id)
+		slog.Warn("this Hub has no Approve set up for a computer: its "+v+" will need it in a later release (in the hub, open this computer and set up Approve through the hub)", "server", id)
 	}
 }
 
