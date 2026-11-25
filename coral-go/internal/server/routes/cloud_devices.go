@@ -74,7 +74,7 @@ func (h *CloudHandler) TunnelDevices(w http.ResponseWriter, r *http.Request) {
 	}{out.Devices})
 }
 
-// TunnelLink: GET /api/device-keys/link: the link this request arrived on (lnk-<8 hex>), for Coral Hub's owner (#20903, coral-hub #20897), so the Hub can name it in the v3 text a browser signs. It is the connector's own stamp read from the request context, never from a body or query; nothing is stored. Owner only, Launch tier, read only. A local call has no link and gets 404.
+// TunnelLink: GET /api/device-keys/link: the link this request arrived on (lnk-<8 hex>) and, when this computer has a key, its own key id ("computer", #21331), for Coral Hub's owner (#20903, coral-hub #20897), so the Hub can name it in the v3 text a browser signs. It is the connector's own stamp read from the request context, never from a body or query; nothing is stored. Owner only, Launch tier, read only. A local call has no link and gets 404.
 func (h *CloudHandler) TunnelLink(w http.ResponseWriter, r *http.Request) {
 	if refuseNonOwner(w, r) {
 		return
@@ -84,9 +84,14 @@ func (h *CloudHandler) TunnelLink(w http.ResponseWriter, r *http.Request) {
 		errNotFound(w, "no link: this request did not come through a Hub")
 		return
 	}
-	writeJSON(w, http.StatusOK, struct {
-		Link string `json:"link"`
-	}{v.LinkID})
+	out := struct {
+		Link     string `json:"link"`
+		Computer string `json:"computer,omitempty"` // this computer's own key id, for the Hub's signer to say which pinned computer it signs for (#21331); left out when there is no key yet, never empty
+	}{Link: v.LinkID}
+	if m := h.manager(); m != nil {
+		out.Computer = m.ComputerID()
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // sprintfClock is the notice for a clock behind the last accepted device message: it says what the clock was compared with and how to fix it.

@@ -53,6 +53,14 @@ func (m *Manager) DisplayFingerprint() string {
 	return devicekey.DisplayFingerprint(m.o.ComputerKey.Pub())
 }
 
+// ComputerID is this computer's own key id, the 43-character base64url value every signed message names as "computer" and the pairing browser pins (#21331); empty when this computer has no key yet. It is a hash of a public key the Hub is sent anyway.
+func (m *Manager) ComputerID() string {
+	if m.o.ComputerKey == nil {
+		return ""
+	}
+	return m.o.ComputerKey.Computer()
+}
+
 // PairingSecretHeld reports whether a live secret is held (tests and the start of a pairing; it says nothing of the value).
 func (m *Manager) PairingSecretHeld() bool {
 	m.pair.mu.Lock()
