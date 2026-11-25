@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-
-	"github.com/subgentic/coral/internal/cloud"
 )
 
 // An agent at a permission prompt is a Needs you item with Yes and No (#21256, coral-hub #273334: the Operator, signed in through the Hub on a phone, was never offered the answer to a Codex agent's
@@ -76,14 +74,11 @@ func needsYouPress(r *http.Request, label string) (int, string, string) {
 	return 0, "", ""
 }
 
-// hubAutomationAtPermission: a request that came through Coral Hub WITHOUT the owner's genuine stamp (the Hub's own automation at the Interact tier) may not answer a permission prompt (Security's condition 1
-// on #21256). The person through the Hub (a stamped request) and this computer's own dashboard are not affected.
-func hubAutomationAtPermission(r *http.Request, screen promptScreen) bool {
+// notThePersonAtPermission: only the person (this computer's dashboard, the owner through a Hub with a genuine stamp, or a verified signed CLI: humanInputCaller) may answer a permission prompt, a screen
+// with a Yes. Every other caller is refused whatever its kind: the Hub's unstamped automation (callerHub), a self-hosted Hub's unsigned key (callerAPIKey), a link key (callerLinkKey) or an unverified
+// CLI, with or without "from" (Security's condition 1 on #21256, round 1 MUST).
+func notThePersonAtPermission(r *http.Request, screen promptScreen) bool {
 	if humanInputCaller(r) {
-		return false
-	}
-	kind, _ := r.Context().Value(callerKindKey{}).(string)
-	if !cloud.Tunneled(r) && kind != callerHub && kind != callerHubOwner {
 		return false
 	}
 	for _, o := range screen.Options {

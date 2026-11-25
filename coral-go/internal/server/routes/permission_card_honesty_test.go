@@ -97,7 +97,7 @@ func TestEveryAgentsPermissionCardShowsTheWholeRequestOrOffersOnlyReject(t *test
 
 				answer := func(n int, label string) (int, map[string]any) {
 					b, _ := json.Marshal(map[string]any{"n": n, "label": label, "session_id": sid, "agent_type": agent})
-					r, err := http.Post(base+"/answer-prompt", "application/json", bytes.NewReader(b))
+					r, err := postAsDashboard(base+"/answer-prompt", "application/json", bytes.NewReader(b))
 					require.NoError(t, err)
 					defer r.Body.Close()
 					var body map[string]any

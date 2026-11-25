@@ -208,7 +208,7 @@ func TestAnswerPrompt(t *testing.T) {
 	}
 	answerText := func(n int, label, text string) (int, map[string]any) {
 		b, _ := json.Marshal(map[string]any{"n": n, "label": label, "text": text, "session_id": ident["session_id"], "agent_type": ident["agent_type"]})
-		resp, err := http.Post(base+"/answer-prompt", "application/json", bytes.NewReader(b))
+		resp, err := postAsDashboard(base+"/answer-prompt", "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		var body map[string]any
@@ -217,7 +217,7 @@ func TestAnswerPrompt(t *testing.T) {
 	}
 	answer := func(n int, label string) (int, map[string]any) {
 		b, _ := json.Marshal(map[string]any{"n": n, "label": label, "session_id": ident["session_id"], "agent_type": ident["agent_type"]})
-		resp, err := http.Post(base+"/answer-prompt", "application/json", bytes.NewReader(b))
+		resp, err := postAsDashboard(base+"/answer-prompt", "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		var body map[string]any
@@ -301,7 +301,7 @@ func TestAnswerPrompt(t *testing.T) {
 	var lastCode string
 	askAnswer := func(id string) int {
 		b, _ := json.Marshal(map[string]any{"n": 1, "label": "Yes", "ask_id": id, "session_id": sid, "agent_type": "claude"})
-		resp, err := http.Post(base+"/answer-prompt", "application/json", bytes.NewReader(b))
+		resp, err := postAsDashboard(base+"/answer-prompt", "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		var body map[string]any

@@ -179,8 +179,8 @@ func TestFolderTrust_RowOffer_And_Answer(t *testing.T) {
 		assert.Equal(t, project, po.TrustFolder, "the folder is read for the card either way")
 		assert.False(t, po.TrustOffer)
 		code, body := answerAs(t, e, 2, "Yes, I trust this folder", project, false)
-		assert.Equal(t, http.StatusConflict, code)
-		assert.Equal(t, "trust_changed", body["code"])
+		assert.Equal(t, http.StatusForbidden, code, "only the person answers a menu with a Yes (#21256)")
+		assert.Equal(t, "not_the_person", body["code"])
 		assert.Zero(t, e.term.enters["claude-trust"])
 	})
 	t.Run("a spoofed heading and path above the real one: no folder, no Yes", func(t *testing.T) { // Security's MUST on #14110
