@@ -75,6 +75,22 @@ func (w *keyLinkWorld) join(t *testing.T, hub, asked, given string) (keyID, key 
 	return keyID, key, l
 }
 
+// sendBody is send with a body.
+func (w *keyLinkWorld) sendBody(t *testing.T, method, path, key, body string, hdr map[string]string) (int, string) {
+	t.Helper()
+	req, err := http.NewRequest(method, w.r.url()+path, strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set(linkKeyHeader, key)
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b)
+}
+
 // get sends a request to the real server with the key alone, as the Hub's proxy does.
 func (w *keyLinkWorld) send(t *testing.T, method, path, key string, hdr map[string]string) (int, string) {
 	t.Helper()
@@ -131,7 +147,8 @@ func TestAKeyLinkReachesThisComputerAtItsCapAndEndsWithTheLinkOrTheKey(t *testin
 	_ = keyID
 }
 
-// Security's MUST 3 on #21220: lowering a key link's cap ends the streams its key holds open (a terminal it could type into) within seconds, not only the next request.
+// Security's MUST 3 on #21220: lowering a key link's cap ends the streams its key holds open within seconds, not only the next request. And Security's round 1 MUST: at Interact a key link is
+// still never the person: typing into the agent (Send, Keys, a terminal frame) and answering its prompt are refused, and so are the person-only reads; the stream itself stays open to watch.
 func TestLoweringAKeyLinksCapEndsItsOpenTerminalStream(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the terminal is a /bin/sh shell here")
@@ -149,14 +166,25 @@ func TestLoweringAKeyLinksCapEndsItsOpenTerminalStream(t *testing.T) {
 	c, _, err := websocket.Dial(ctx, u, &websocket.DialOptions{HTTPHeader: http.Header{linkKeyHeader: {key}}})
 	require.NoError(t, err)
 	defer c.CloseNow()
-	require.NoError(t, wsjson.Write(ctx, c, map[string]any{"type": "terminal_input", "data": "echo key-link-$((40+2))\n"}))
-	var got strings.Builder
-	for !strings.Contains(got.String(), "key-link-42") {
+	require.NoError(t, wsjson.Write(ctx, c, map[string]any{"type": "terminal_input", "data": "echo key-link-$((40+2))\n", "id": 7}))
+	for {
 		typ, data, err := c.Read(ctx)
-		require.NoError(t, err, "terminal output so far: %q", got.String())
-		if typ == websocket.MessageBinary {
-			got.Write(data)
+		require.NoError(t, err)
+		if typ == websocket.MessageText && strings.Contains(string(data), `"id":7`) {
+			assert.Contains(t, string(data), "terminal_input_failed")
+			assert.Contains(t, string(data), "key_link_person_act", "typed by a key link: refused, never typed")
+			break
 		}
+	}
+	jsonHdr := map[string]string{"Content-Type": "application/json"}
+	for _, p := range []string{"/send", "/keys", "/answer-prompt"} {
+		code, body := w.sendBody(t, "POST", "/api/sessions/live/"+sname+p, key, `{"command":"echo hi","keys":["Enter"],"answer":"1","session_id":"`+sid+`"}`, jsonHdr)
+		assert.Equal(t, 403, code, "%s through a key link: %s", p, body)
+		assert.Contains(t, body, "key_link_person_act", p)
+	}
+	for _, p := range []string{"/api/operator-asks", "/api/needs-you"} {
+		code, body := w.send(t, "GET", p, key, nil)
+		assert.NotEqual(t, 200, code, "a person-only read through a key link: %s", body)
 	}
 
 	rec := call(w.h, "PUT", "/api/cloud/links/"+l.LinkID+"/cap", `{"mode":"view"}`, map[string]string{"Content-Type": "application/json"})

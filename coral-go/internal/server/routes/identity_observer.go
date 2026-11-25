@@ -16,6 +16,7 @@ import (
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // Identity phase 1 (#3387): LOG-ONLY. Every request is classified by who it comes
@@ -32,6 +33,9 @@ const (
 	callerDashCookie    = "dashboard_cookie"
 	callerDashNoCookie  = "dashboard_no_cookie" // this computer's browser, no session cookie
 	callerHub           = "coral_hub"           // through the Coral Hub tunnel
+	// callerKeyLink is a self-hosted Hub's request key carried through its key link's in-process tunnel (#21220): the tunnel's rules and the link's cap, as callerHub, but never the person
+	// (humanInputCaller is false): typing into a terminal, answering a prompt and the person-only routes wait for the link's own owner stamp (#21261).
+	callerKeyLink       = "coral_hub_key_link"
 	callerAPIKey        = "api_key"
 	callerLocalOther    = "local_other" // curl, scripts, the CLI without a token
 	callerCLISigned     = "cli_signed"  // a command-line signature (#3418): the local Operator
@@ -84,7 +88,8 @@ type IdentityObserver struct {
 	otherUser     func(*http.Request) bool                                   // a loopback caller running as another OS user
 	linkKey       func(ctx context.Context, key string) (id string, ok bool) // a self-hosted Hub's request key (#20944)
 	keyLinks      func(w http.ResponseWriter, r *http.Request, keyID string) bool
-	linkKeyFailed func(r *http.Request) // counts a wrong request key against its address (the API key's rate limit) // carries a linked key's request through its link (#21220); false when the key has no link
+	hostedLink    func(ctx context.Context, linkID string) bool // whether a tunneled request's link is a hosted Hub's (not a request key's, #21220); nil: every tunneled request is callerHub
+	linkKeyFailed func(r *http.Request)                         // counts a wrong request key against its address (the API key's rate limit) // carries a linked key's request through its link (#21220); false when the key has no link
 
 	mu         sync.Mutex
 	callers    map[string]int64
@@ -133,6 +138,12 @@ func (o *IdentityObserver) SetLinkKeyFailures(f func(r *http.Request)) {
 // SetKeyLinks gives the observer the way a linked request key's requests are carried (#21220): through the key's link, at its cap. It reports false, writing nothing, for a key with no active link.
 func (o *IdentityObserver) SetKeyLinks(f func(w http.ResponseWriter, r *http.Request, keyID string) bool) {
 	o.keyLinks = f
+}
+
+// SetHostedLinks tells a hosted Hub's link from a key link (#21220): a tunneled request whose link is not one it answers true for is callerKeyLink, never the person. It fails closed: a
+// link it cannot read is not a hosted one.
+func (o *IdentityObserver) SetHostedLinks(f func(ctx context.Context, linkID string) bool) {
+	o.hostedLink = f
 }
 
 // SetLinkKeys gives the observer the check of a request key (X-Link-Request-Key, #20944).
@@ -334,7 +345,7 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 		// refused, never ignored. A request with no credential at all keeps working outside
 		// strict mode (counted in the identity report as local_other); with strict local
 		// auth, every caller needs one.
-		claimed := caller == callerCLISigned || caller == callerAPIKey || caller == callerHub
+		claimed := caller == callerCLISigned || caller == callerAPIKey || caller == callerHub || caller == callerKeyLink
 		if claimed || o.strictFor(r) { // a credential that is present decides first: the same branch either way, without asking whose connection it is (#9803)
 			r2, ok := o.admit(r, caller)
 			if !ok {
@@ -350,7 +361,7 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 					}
 					o.refuse(w, http.StatusUnauthorized, "cli_signature_required",
 						"The command-line signature is not valid for this Coral: another data folder's token, a used or expired signature, or a coral command from another version (since v1.4.70 the signature covers the query too). Use the coral command that came with this Coral.")
-				case callerAPIKey, callerHub:
+				case callerAPIKey, callerHub, callerKeyLink:
 					w.Header().Set(auth.RefusedHeader, "key") // a hub that holds this key shows "Key rejected" for it, not "Unreachable" (#8089)
 					o.refuse(w, http.StatusUnauthorized, "invalid_credential",
 						"The credential sent is not valid for this Coral (a wrong API key, or a Coral Hub stamp that isn't this connector's): it is refused, never ignored")
@@ -512,6 +523,9 @@ func (o *IdentityObserver) classify(r *http.Request) string {
 	case isAgentTool(r):
 		return callerAgentNoToken
 	case cloud.Tunneled(r):
+		if o.hostedLink != nil && !o.hostedLink(r.Context(), r.Header.Get(tunnel.LinkHeader)) {
+			return callerKeyLink
+		}
 		return callerHub
 	case r.Header.Get("X-API-Key") != "" || r.URL.Query().Get("api_key") != "" || strings.HasPrefix(strings.ToLower(r.Header.Get("Authorization")), "bearer "):
 		return callerAPIKey

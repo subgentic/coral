@@ -971,6 +971,9 @@ func normalizeLabel(s string) string {
 // never answered by mistake.
 // POST /api/sessions/live/{name}/answer-prompt {"session_id","agent_type","n","label"}
 func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
+	if refuseKeyLinkPersonAct(w, r) { // a key link is never the person (#21220)
+		return
+	}
 	name := chi.URLParam(r, "name")
 	var body struct {
 		SessionID      string `json:"session_id"`

@@ -102,7 +102,7 @@ func actorFor(r *http.Request, caller string) (Actor, bool) {
 	switch caller {
 	case callerCLISigned, callerAPIKey, callerDashCookie, callerHubOwner:
 		return Actor{Kind: ActorOperator, Name: "Operator"}, true
-	case callerHub:
+	case callerHub, callerKeyLink:
 		return hubActor(r), true
 	case callerOpen:
 		return Actor{}, false // the liveness check and the command line's hello: nobody acts
