@@ -20,8 +20,7 @@ const LONG = { name: 'senior-frontend-developer-two-with-a-very-long-name', team
             await ev(`window.selectLiveSession(${JSON.stringify(name)}, 'claude', 'tb-id', 'local'); true`);
             await waitFor(`document.getElementById('terminal-header-label')?.textContent === ${JSON.stringify(name)} && document.querySelector('.terminal-header').getClientRects().length > 0`, `${at}the header`, 10000);
             await waitFor(`!!document.getElementById('agent-bar-more') && document.getElementById('agent-bar-more').getClientRects().length > 0`, `${at}the ⋯`, 8000);
-            await ev(`if (document.getElementById('agent-bar-more').getAttribute('aria-expanded') !== 'true') document.getElementById('agent-bar-more').click(); true`);
-            await waitFor(`document.querySelector('.terminal-header').hasAttribute('data-more')`, `${at}the ⋯ open`, 4000);
+            await waitFor(`document.querySelector('.terminal-header').hasAttribute('data-more') && document.querySelector('#popout-panel-toggle-btn').getClientRects().length > 0`, `${at}the row of buttons, without pressing the ⋯ (the approved mock shows it always)`, 6000);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: layout settles after the row opens
             const m = await ev(`(() => { const r = e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
                 const vis = e => e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';

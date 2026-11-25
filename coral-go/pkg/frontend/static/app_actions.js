@@ -52,15 +52,13 @@ let _agentBarMoreOff = null;
 const detailsCard = () => document.getElementById('agent-phone-details');
 function closeAgentBarMoreCard() { const d = detailsCard(); if (d) d.open = false; if (_agentBarMoreOff) { _agentBarMoreOff(); _agentBarMoreOff = null; } }
 function closeAgentBarMore() {
-    const b = document.getElementById('agent-bar-more'), h = document.querySelector('#live-session-view .terminal-header');
+    const b = document.getElementById('agent-bar-more');
     if (b) b.setAttribute('aria-expanded', 'false');
-    if (h) h.removeAttribute('data-more');
     closeAgentBarMoreCard();
 }
 function openAgentBarMore(btn) {
-    const d = detailsCard(), h = btn.closest('.terminal-header');
+    const d = detailsCard();
     btn.setAttribute('aria-expanded', 'true');
-    if (h) h.toggleAttribute('data-more', true);
     if (d) d.open = true;
     if (_agentBarMoreOff) _agentBarMoreOff();
     const outside = e => { if (e.target.closest && (e.target.closest('#agent-phone-details') || e.target.closest('#agent-bar-more'))) return; closeAgentBarMoreCard(); };

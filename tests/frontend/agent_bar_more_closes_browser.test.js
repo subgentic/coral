@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
             const state = () => ev(`(() => { const d = document.getElementById('agent-phone-details'), b = document.getElementById('agent-bar-more'); return { open: d.open, expanded: b.getAttribute('aria-expanded'), more: document.querySelector('.terminal-header').hasAttribute('data-more') }; })()`);
             const openMore = async () => { if ((await state()).expanded === 'true') await ev(`document.getElementById('agent-bar-more').click(); true`); await ev(`document.getElementById('agent-bar-more').click(); true`); await waitFor(`document.getElementById('agent-phone-details').open`, `${w}: ⋯ opens the card`, 4000); assert.deepEqual(await state(), { open: true, expanded: 'true', more: true }); };
             const cardClosed = { open: false, expanded: 'true', more: true }; // the card is gone; the controls the ⋯ revealed (Find, the panel toggle) stay until the ⋯ is tapped
-            const closed = { open: false, expanded: 'false', more: false };
+            const closed = { open: false, expanded: 'false', more: true }; // the row of buttons is always shown (#21257); the ⋯ opens the card only
 
             await openMore();
             await ev(`document.getElementById('live-history-messages').click(); true`); // a tap outside the card and the row
