@@ -48,12 +48,16 @@ type CloudLink struct {
 	LastError      *string `json:"last_error" db:"last_error"`
 	// Source is "enrollment" for the link the one enrollment mirrors, "added" for one added here (#20368). Never sent anywhere.
 	Source string `json:"-" db:"source"`
+	// KeyID is the request key a self-hosted Hub's link answers to (#21220, source "key"); "" for a tunnel link. Never sent anywhere.
+	KeyID string `json:"-" db:"key_id"`
 }
 
 // Link sources.
 const (
 	LinkSourceEnrollment = "enrollment"
 	LinkSourceAdded      = "added"
+	// LinkSourceKey is a self-hosted Hub's link (#21220): no token and no tunnel of its own; its Hub reaches this computer with its request key, at the link's cap.
+	LinkSourceKey = "key"
 )
 
 // ErrNoCloudLink is returned for a link id or origin that is not linked.
@@ -154,7 +158,7 @@ func HubAddressHasPath(raw string) bool {
 // ListLinks returns every link, oldest first, without tokens.
 func (s *CloudStore) ListLinks(ctx context.Context) ([]CloudLink, error) {
 	var out []CloudLink
-	err := s.db.SelectContext(ctx, &out, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error, source
+	err := s.db.SelectContext(ctx, &out, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error, source, key_id
 		FROM cloud_link ORDER BY created_at, rowid`)
 	if err == nil {
 		s.liveCap(ctx, out)
@@ -179,7 +183,7 @@ func (s *CloudStore) LinkByOrigin(ctx context.Context, hubURL string) (*CloudLin
 		return nil, ErrNoCloudLink
 	}
 	var l CloudLink
-	err = s.db.GetContext(ctx, &l, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error, source
+	err = s.db.GetContext(ctx, &l, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error, source, key_id
 		FROM cloud_link WHERE hub_origin = ?`, origin)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoCloudLink
