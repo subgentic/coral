@@ -336,6 +336,24 @@ func (h *SessionsHandler) commentBoards(r *http.Request, c commentCaller, commen
 	return boards
 }
 
+// noTeamThreadsSentTo are the threads of the reserved no-team board a send of the Operator's review asked this agent into (#21202): an agent on no team reads those, in full, and no other thread of that board
+// (Security's INFO 6 on #13539, narrowed to what was sent to it). The ask is the record of the send; it is closed at once, so it grants the read and nothing else.
+func (h *SessionsHandler) noTeamThreadsSentTo(ctx context.Context, c commentCaller, comments []store.ArtifactComment) map[int64]bool {
+	out := map[int64]bool{}
+	if c.Kind != commentCallerAgent || c.Subject == "" {
+		return out
+	}
+	for _, t := range comments {
+		if t.Board != noTeamBoardID || t.ParentID != nil {
+			continue
+		}
+		if a, found, err := h.ss.GetArtifactAsk(ctx, t.ID, c.Subject); err == nil && found && a.Board == noTeamBoardID {
+			out[t.ID] = true
+		}
+	}
+	return out
+}
+
 func (h *SessionsHandler) hubWriteOn(r *http.Request) bool {
 	st, err := h.ss.GetSettings(r.Context())
 	if err != nil {
@@ -403,9 +421,14 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 		for _, b := range boards {
 			keep[b] = true
 		}
+		sentTo := h.noTeamThreadsSentTo(r.Context(), caller, all)
 		filtered := all[:0]
 		for _, t := range all {
-			if keep[t.Board] {
+			root := t.ID
+			if t.ParentID != nil {
+				root = *t.ParentID
+			}
+			if keep[t.Board] || sentTo[root] {
 				filtered = append(filtered, t)
 			}
 		}

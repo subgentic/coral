@@ -41,6 +41,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("no-team approval with a note", typedNoTeamApproved("report.md", strings.Repeat("a", 64), "Tidy the title."), typedNoTeamApproved(h, strings.Repeat("a", 64), h)),
 		typedcensus.C("no-team denial", typedNoTeamDenied("report.md", strings.Repeat("a", 64), "Wrong template."), typedNoTeamDenied(h, strings.Repeat("a", 64), h)),
 		typedcensus.C("no-team comment", typedNoTeamComment(strings.Repeat("a", 64), "Please add the Q4 table.", "report.md"), typedNoTeamComment(strings.Repeat("a", 64), h, h)),
+		typedcensus.C("no-team review", typedNoTeamReview(strings.Repeat("a", 64), "report.md", 2), typedNoTeamReview(strings.Repeat("a", 64), h, 1)),
 		typedcensus.C("single agent answer", typedAgentAskAnswer("Which database?", "Postgres"), typedAgentAskAnswer(h, h)),
 		typedcensus.C("single agent dismissed", typedAgentAskDismissed("Which database?"), typedAgentAskDismissed(h)),
 		typedcensus.C("dialog timeout", dialogTimeoutNotice, dialogTimeoutNotice),

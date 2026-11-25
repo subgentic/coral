@@ -37,38 +37,54 @@ func TestDraftsOnANoTeamFileAreTypedIntoTheAgentThatUploadedIt(t *testing.T) {
 	assert.Equal(t, noTeamSession, targets[0].t.sessionID, "the session of the upload record")
 
 	req := httptest.NewRequest(http.MethodPost, draftsPath(id)+"/send", nil)
-	_, rev, err := sh.ss.ListReviewDrafts(ctx, id, key)
+	send := func(requestID string) (map[string]any, *reviewRefusal) {
+		_, rev, err := sh.ss.ListReviewDrafts(ctx, id, key)
+		require.NoError(t, err)
+		p, rf, replay := sh.prepareReviewSend(req, key, caller, id, noTeamBoardID, requestID, rev, "", "")
+		require.Nil(t, rf, "%v", rf)
+		require.Nil(t, replay)
+		return p.dispatch(ctx)
+	}
+	pending := func() int {
+		left, _, err := sh.ss.ListReviewDrafts(ctx, id, key)
+		require.NoError(t, err)
+		return len(left)
+	}
+
+	// a gone uploader: nothing typed, nothing sent, every draft stays, and no thread was opened to it
+	setLive(false)
+	_, rf := send("noteam-0001")
+	require.NotNil(t, rf)
+	assert.Equal(t, "not_delivered", rf.body["code"])
+	assert.Empty(t, mock.sentTo(name))
+	assert.Equal(t, 2, pending(), "a send that was not typed keeps every draft")
+	asks, err := sh.ss.ListArtifactAsks(ctx, id)
 	require.NoError(t, err)
-	p, rf, replay := sh.prepareReviewSend(req, key, caller, id, noTeamBoardID, "noteam-0001", rev, "", "")
-	require.Nil(t, rf, "%v", rf)
-	require.Nil(t, replay)
-	answer, rf := p.dispatch(ctx)
+	assert.Empty(t, asks, "a send taken back grants no read")
+
+	// the uploader goes away after one typing: the send is still ONE short line, typed once
+	setLive(true)
+	calls := 0
+	bh.liveSessionType = func(context.Context, string) (string, bool, error) { calls++; return "claude", calls == 1, nil }
+	answer, rf := send("noteam-0002")
 	require.Nil(t, rf, "%v", rf)
 	assert.Equal(t, "sent", answer["status"])
 	sent := mock.sentTo(name)
-	require.Len(t, sent, 2, "one typed line per comment")
-	assert.Contains(t, sent[0], "Please add the Q4 table.")
-	assert.Contains(t, sent[0], "coral://artifacts/"+id)
-	assert.Contains(t, sent[1], "Numbers look off here.")
-	assert.Contains(t, sent[1], "Google Doc", "a Google comment says it is somebody else's words")
-	left, _, err := sh.ss.ListReviewDrafts(ctx, id, key)
-	require.NoError(t, err)
-	assert.Empty(t, left)
+	require.Len(t, sent, 1, "ONE typed line for every comment")
+	assert.Contains(t, sent[0], "sent you 2 comments")
+	assert.Contains(t, sent[0], "coral-agent artifact comments coral://artifacts/"+id, "the read that shows them in full")
+	assert.NotContains(t, sent[0], "Q4 table", "no comment's words are typed")
+	assert.Equal(t, 0, pending())
 
-	// a gone uploader: nothing typed, the comments are taken back and stay drafts
-	setLive(false)
-	hold("One more thing.", store.ReviewDraft{Source: store.ReviewDraftLocal})
-	_, rev, err = sh.ss.ListReviewDrafts(ctx, id, key)
+	// the agent is asked into exactly the threads sent, closed at once (no reminder to answer: there is no board to reply on)
+	asks, err = sh.ss.ListArtifactAsks(ctx, id)
 	require.NoError(t, err)
-	p, rf, _ = sh.prepareReviewSend(req, key, caller, id, noTeamBoardID, "noteam-0002", rev, "", "")
-	require.Nil(t, rf)
-	_, rf = p.dispatch(ctx)
-	require.NotNil(t, rf)
-	assert.Equal(t, "not_delivered", rf.body["code"])
-	assert.Len(t, mock.sentTo(name), 2, "nothing more was typed")
-	left, _, err = sh.ss.ListReviewDrafts(ctx, id, key)
-	require.NoError(t, err)
-	assert.Len(t, left, 1)
+	require.Len(t, asks, 2)
+	for _, a := range asks {
+		assert.Equal(t, noTeamSession, a.AgentSession)
+		assert.Equal(t, noTeamBoardID, a.Board)
+		assert.NotNil(t, a.ClosedAt, "closed: it grants the read, not a reply or a reminder")
+	}
 }
 
 // A no-team file nobody uploaded, or one two agents uploaded, names no one: Send is not offered, with the reason.

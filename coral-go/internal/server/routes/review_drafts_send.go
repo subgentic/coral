@@ -442,7 +442,7 @@ func (h *SessionsHandler) deliverReview(ctx context.Context, id, b, requestID, v
 	delivered := false
 	for _, tg := range targets {
 		if tg.noTeam {
-			res := h.typeNoTeamReview(ctx, id, tg.t.sessionID, items)
+			res := h.typeNoTeamReview(ctx, id, tg.t.sessionID, len(items), roots)
 			delivered = delivered || res.State == "sent"
 			results = append(results, res)
 			continue
@@ -502,44 +502,41 @@ func (h *SessionsHandler) deliverReview(ctx context.Context, id, b, requestID, v
 	return results, delivered
 }
 
-// typeNoTeamReview types each comment of a send into the session that uploaded a no-team file (#21202), one line each through the same gate and frame as a no-team comment (typedNoTeamComment,
-// typedNoTeamGdocComment): there is no board, so no ask and no thread to answer in. It stops at the first line that is not typed; any typed line makes it sent, with how many when not all.
-func (h *SessionsHandler) typeNoTeamReview(ctx context.Context, id, sessionID string, items []reviewItem) reviewSendResult {
-	res := reviewSendResult{Agent: noTeamReviewTitle}
+// typeNoTeamReview tells the session that uploaded a no-team file about a send (#21202): the agent is asked into exactly the threads the send carries, so its comment read shows those threads in full and
+// no other thread of the reserved board (Security's INFO 6 on #13539, narrowed to what was sent to it), then ONE short line names the file and that read. The asks are closed at once: there is no board
+// to reply on, so no reminder to answer is typed. It is sent only when the line was typed; otherwise the caller takes the send back and every draft stays.
+func (h *SessionsHandler) typeNoTeamReview(ctx context.Context, id, sessionID string, n int, roots []int64) reviewSendResult {
+	res := reviewSendResult{Agent: noTeamReviewTitle, State: "failed", Reason: "failed"}
 	if h.boardHandler == nil {
-		res.State, res.Reason = "failed", "failed"
 		return res
 	}
 	item, ok := h.boardHandler.noTeamManagedArtifact(ctx, id)
 	if !ok {
-		res.State, res.Reason = "failed", "no_uploader"
+		res.Reason = "no_uploader"
 		return res
 	}
-	typed := 0
-	for _, it := range items {
-		text := it.body
-		if it.snippet != "" {
-			text += " (on the text: " + it.snippet + ")"
+	now := time.Now()
+	seen := map[int64]bool{}
+	for _, rid := range roots {
+		if seen[rid] {
+			continue
 		}
-		line := typedNoTeamComment(id, text, item.Name)
-		if it.google != "" {
-			line = typedNoTeamGdocComment(id, text, item.Name, it.google)
+		seen[rid] = true
+		if _, _, err := h.ss.CreateArtifactAsk(ctx, rid, id, noTeamBoardID, sessionID, noTeamReviewTitle, now); err != nil {
+			slog.Warn("[review drafts] a no-team ask was not recorded", "error", err)
+			return res
 		}
-		ok, why := h.boardHandler.tellNoTeamUploader(ctx, sessionID, line)
-		if !ok {
-			if typed == 0 {
-				res.State, res.Reason = "failed", why
-				return res
-			}
-			break
+		if err := h.ss.CloseArtifactAsks(ctx, rid, now); err != nil {
+			slog.Warn("[review drafts] a no-team ask was not closed", "error", err)
+			return res
 		}
-		typed++
 	}
-	res.State = "sent"
-	if typed < len(items) {
-		res.Reason = fmt.Sprintf("only %d of %d comments were typed", typed, len(items))
+	if ok, why := h.boardHandler.tellNoTeamUploader(ctx, sessionID, typedNoTeamReview(id, item.Name, n)); !ok {
+		res.Reason = why
+		return res
 	}
-	slog.Info("[review drafts] comments typed into a no-team agent", "artifact", id, "comments", typed)
+	res.State, res.Reason = "sent", ""
+	slog.Info("[review drafts] a no-team agent was told of the comments sent to it", "artifact", id, "comments", n)
 	return res
 }
 
