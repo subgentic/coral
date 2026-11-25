@@ -5,7 +5,7 @@
 // its value after the warm-up. Measured when written (50 rounds): every count flat except the heap (+0.5 MB) and 8 listeners from a first use; the bounds below sit
 // above that noise and well under what one missed removeEventListener per round (+50) or one stray interval per round (+50) adds.
 // CYCLES=n runs more rounds; TEARDOWN_HANG_SELFTEST=1 makes round 3 wait on a promise that never settles (the suite must fail within TEARDOWN_STEP_ms naming the step); TEARDOWN_LEAK_SELFTEST=1 adds a deliberate leak (a listener on window, an interval, a ResizeObserver per round) the bounds must catch; TEARDOWN_NODE_MUTANT=attached|detached leaks one element with a text child (2 nodes) per round (left in the page, or held in a JS array, never attached) and the nodes bound must catch it.
-// nodes (#21381): what our code can leak, not Chrome's Nodes metric. That metric also counts removed nodes Chrome itself keeps for a while with no JS object, about 100 on a slow runner (a heap snapshot of a red run: 2500 DOM objects in the heap against 12 100 counted, nothing detached growing), so it stepped +102 on a cold first run with the DOM and the mutations identical to a green run. The count here is every node in the document (elements, text, comments, shadow roots) plus every node a script can still reach after a forced GC that is not in the document (a removed node something holds). Chrome's number is printed for information.
+// nodes (#21381): what our code can leak, not Chrome's Nodes metric. That metric also counts removed nodes Chrome itself keeps for a while with no JS object, about 100 on a slow runner (a heap snapshot of a red run: 2500 DOM objects in the heap against 12 100 counted, nothing detached growing), so it stepped +102 on a cold first run with the DOM and the mutations identical to a green run. The count here is every node in the document (elements, text, comments, shadow roots) plus detached nodes of the fixed classes below that a script can still reach after a forced GC. Chrome's number is printed for information.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -13,6 +13,25 @@ const HEX = 'a'.repeat(64);
 const MD = '# Title\n\ntext [link](https://example.test)\n\n```js\nconst x = 1;\n```\n';
 const PANES = ['general', 'agents', 'files', 'terminal', 'notifications', 'network', 'security', 'cleanup', 'updates'];
 const DIALOGS = ['showLaunchModal', 'showCreateTaskModal', 'showDefaultPromptsModal', 'showServersModal', 'showOpenFolderModal', 'showTeamWizardModal', 'showJobModal', 'showAgentTaskDetailModal'];
+// Fixed coverage for script-held detached nodes. Review additions/removals explicitly:
+// never derive this list from the current document. Live document nodes of every
+// class are counted separately; detached instances of unlisted classes are not.
+const DETACHED_NODE_CLASSES = Object.freeze([
+    'Text', 'Comment', 'DocumentFragment', 'ShadowRoot', 'HTMLElement',
+    'HTMLHtmlElement', 'HTMLHeadElement', 'HTMLBodyElement', 'HTMLTitleElement',
+    'HTMLMetaElement', 'HTMLLinkElement', 'HTMLStyleElement', 'HTMLScriptElement',
+    'HTMLDivElement', 'HTMLSpanElement', 'HTMLButtonElement', 'HTMLInputElement',
+    'HTMLAnchorElement', 'HTMLLabelElement', 'HTMLParagraphElement', 'HTMLHeadingElement',
+    'HTMLBRElement', 'HTMLHRElement', 'HTMLPreElement', 'HTMLQuoteElement',
+    'HTMLLIElement', 'HTMLUListElement', 'HTMLOListElement', 'HTMLDListElement',
+    'HTMLSelectElement', 'HTMLOptionElement', 'HTMLOptGroupElement', 'HTMLDataListElement',
+    'HTMLTextAreaElement', 'HTMLImageElement', 'HTMLTableElement', 'HTMLTableSectionElement',
+    'HTMLTableRowElement', 'HTMLTableCellElement', 'HTMLTableCaptionElement',
+    'HTMLFormElement', 'HTMLFieldSetElement', 'HTMLLegendElement', 'HTMLDialogElement',
+    'HTMLDetailsElement', 'HTMLTemplateElement', 'HTMLCanvasElement', 'HTMLIFrameElement',
+    'SVGElement', 'SVGSVGElement', 'SVGPathElement', 'SVGRectElement', 'SVGCircleElement',
+    'SVGLineElement', 'SVGGElement', 'SVGDefsElement', 'SVGUseElement', 'SVGTextElement',
+]);
 const CYCLES = Number(process.env.CYCLES || 50), SELFTEST = !!process.env.TEARDOWN_LEAK_SELFTEST;
 // obs: 1 (#13132): launch_cards.js (#13109) keeps ONE IntersectionObserver on a goal card that is drawn but hidden, until it is shown; the warm-up has no hidden card, so the end has one standing watcher. It does not grow with the rounds
 // (+1 at 10, 50 and 100 rounds); a leak per round (the self-test adds one) is far past it.
@@ -73,13 +92,11 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); // a settle for the page
         const within = (p, what) => { let t; return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`stalled ${STEP_MS} ms in ${what}`)), STEP_MS); })]).finally(() => clearTimeout(t)); };
         // Settings' panes arm a watcher that waits until the pane is first laid out (whenPaneShown, settings_fill.js): a pane shown for 10 ms in a round may not be laid out before the next, so whether the two on Storage and cleanup (and the providers' two) are still waiting when the count is taken depended on timing (+2, about 1 run in 8: #18996). It is one standing watcher per key whatever the rounds, not a leak: every pane is shown long enough to be laid out before each count.
         const settlePanes = async () => { for (const p of [...PANES.filter(x => x !== 'cleanup'), 'cleanup']) { await ev(`window.showSettingsModal(${JSON.stringify(p)}); true`); await wait(p === 'cleanup' ? 400 : 60); } await ev(`window.hideSettingsModal(); true`); await wait(50); }; // Storage and cleanup is shown last and longest: its watchers are armed when its fill runs, a moment after it shows, and must see it laid out
-        // Every node in the document, shadow roots included, plus every Node object the page can still reach that is not in the document (queryObjects over each DOM class's prototype, after the GC the caller just ran).
+        // Every node in the document, shadow roots included, plus detached Node objects of the fixed classes that the page can still reach (queryObjects over each listed prototype, after the GC the caller just ran).
         const ourNodes = async () => {
             const live = await ev(`(() => { let n = 0; const walk = root => { const w = document.createTreeWalker(root, NodeFilter.SHOW_ALL); for (let x = w.currentNode; x; x = w.nextNode()) { n++; if (x.shadowRoot) walk(x.shadowRoot); } }; walk(document); return n; })()`);
-            // the classes in the document now, and the ones a dialog or a viewer commonly builds: a class that is in neither and is held detached would not be seen, but the mutant in this suite (a div) is, and a leak is a pattern, not one odd class
-            const names = await ev(`(() => { const s = new Set(['Text', 'Comment', 'DocumentFragment', 'HTMLElement', 'HTMLDivElement', 'HTMLSpanElement', 'HTMLButtonElement', 'HTMLInputElement', 'HTMLAnchorElement', 'HTMLLabelElement', 'HTMLParagraphElement', 'HTMLLIElement', 'HTMLUListElement', 'HTMLSelectElement', 'HTMLOptionElement', 'HTMLTextAreaElement', 'HTMLImageElement', 'HTMLTableElement', 'HTMLTableRowElement', 'HTMLTableCellElement', 'HTMLFormElement', 'HTMLDetailsElement', 'HTMLTemplateElement', 'HTMLCanvasElement', 'HTMLIFrameElement', 'SVGElement', 'SVGSVGElement', 'SVGPathElement']); for (const e of document.getElementsByTagName('*')) { const c = e.constructor && e.constructor.name; if (c && window[c] && window[c].prototype) s.add(c); } return [...s]; })()`);
             let detached = 0;
-            for (const k of names) {
+            for (const k of DETACHED_NODE_CLASSES) {
                 const proto = await within(Runtime.evaluate({ expression: k + '.prototype', objectGroup: 'nodes' }), 'metrics: prototype');
                 const arr = await within(Runtime.queryObjects({ prototypeObjectId: proto.result.objectId, objectGroup: 'nodes' }), 'metrics: queryObjects');
                 const r = await within(Runtime.callFunctionOn({ objectId: arr.objects.objectId, returnByValue: true, functionDeclaration: 'function () { let n = 0; for (const e of this) { try { if (!e.isConnected) n++; } catch { /* the prototype object of each class is in the list and is not a node */ } } return n; }' }), 'metrics: count');
@@ -87,7 +104,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); // a settle for the page
                 detached += r.result.value;
                 await Runtime.releaseObjectGroup({ objectGroup: 'nodes' });
             }
-            if (!Number.isFinite(live + detached)) throw new Error('node count is not a number: ' + JSON.stringify({ live, detached, names }));
+            if (!Number.isFinite(live + detached)) throw new Error('node count is not a number: ' + JSON.stringify({ live, detached, classes: DETACHED_NODE_CLASSES }));
             return live + detached;
         };
         const metrics = async () => {
@@ -125,6 +142,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); // a settle for the page
             if (SELFTEST) await ev(`(() => { window.addEventListener('resize', () => {}); setInterval(() => {}, 60000); new ResizeObserver(() => {}).observe(document.body); return true; })()`);
         };
         for (let n = 0; n < 10; n++) await cycle(n);
+        console.log('detached-node classes', JSON.stringify(DETACHED_NODE_CLASSES));
         const base = await metrics();
         for (let n = 0; n < CYCLES; n++) await cycle(n);
         const end = await metrics();
