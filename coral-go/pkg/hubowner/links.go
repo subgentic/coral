@@ -122,7 +122,8 @@ func readLinks(dir string) ([]Link, error) {
 }
 
 // Install keeps a hub's secret (a person's act, like WriteFile). With no hub id it is WriteFile: an older hub's install, which replaces the single file as before. With a hub id it adds that hub's link or
-// replaces only that hub's, and a single-file secret under the same computer id goes (it was this hub's before it said its id: a rotation must not leave the old secret working).
+// replaces only that hub's. The single file is never touched by it: an older hub may know this computer by the same name, and nothing proves the file was this hub's (QA SHOULD 3), so it stays until the
+// person removes it (coral hub-owner-secret --remove).
 func Install(dir string, l Link, now time.Time) error {
 	if l.Hub == "" {
 		return WriteFile(dir, l.Remote, l.Secret)
@@ -145,13 +146,7 @@ func Install(dir string, l Link, now time.Time) error {
 	if len(kept) >= MaxLinks {
 		return fmt.Errorf("hubowner: this computer already holds secrets for %d hubs: remove one first (coral hub-owner-secret --remove)", MaxLinks)
 	}
-	if err := writeLinks(dir, append(kept, l)); err != nil {
-		return err
-	}
-	if id, _, ok, err := ReadFile(dir); err == nil && ok && id == l.Remote {
-		return os.Remove(filepath.Join(dir, FileName))
-	}
-	return nil
+	return writeLinks(dir, append(kept, l))
 }
 
 func writeLinks(dir string, ls []Link) error {
@@ -246,28 +241,29 @@ func (lv *LinkVerifiers) Check(links []Link, hub, value, method, decodedPath, ta
 		}
 		return nil, ReasonUnknownLink, nil
 	}
-	live := map[string]*Verifier{}
+	// every link held keeps its verifier and replay table, whichever hub this stamp is from (Security's MUST on da39815989: a check for hub A must not drop hub B's table); only a removed or
+	// rotated link's table goes
+	key := func(l Link) string { return l.Hub + "\x00" + l.Remote + "\x00" + l.Secret }
+	live := make(map[string]*Verifier, len(links))
+	for _, l := range links {
+		v := lv.m[key(l)]
+		if v == nil {
+			v = &Verifier{Secret: l.Secret, RemoteID: l.Remote, Start: lv.Start, Now: lv.Now}
+		}
+		live[key(l)] = v
+	}
+	lv.m = live
 	var errs []error
 	var ok *Link
 	for i := range cands {
 		l := cands[i]
-		key := l.Hub + "\x00" + l.Remote + "\x00" + l.Secret
-		v := lv.m[key]
-		if v == nil {
-			v = &Verifier{Secret: l.Secret, RemoteID: l.Remote, Start: lv.Start, Now: lv.Now}
-		}
-		live[key] = v
-		if ok != nil {
-			continue
-		}
-		err := v.Verify(value, method, decodedPath, target, body)
+		err := live[key(l)].Verify(value, method, decodedPath, target, body)
 		if err == nil {
 			ok = &l
-			continue
+			break
 		}
 		errs = append(errs, err)
 	}
-	lv.m = live // a removed or rotated link's table goes with it
 	if ok != nil {
 		return ok, "", nil
 	}
