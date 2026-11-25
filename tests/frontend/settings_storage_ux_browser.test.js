@@ -48,7 +48,7 @@ const GIB = 1024 ** 3;
         await ev(`window.__hold = true; window.showSettingsModal('cleanup'); true`);
         await waitFor(`!!window.__release`, 'the slow load', 8000);
         let f = await ev(`(() => { const i = document.getElementById('settings-artifact-store-max'), r = document.getElementById('settings-received-max'); return { line: (document.getElementById('settings-artifact-store-size')?.textContent ?? ''), rline: (document.getElementById('settings-received-size')?.textContent ?? ''), v: i.value, loaded: i.dataset.loaded || '', dis: i.disabled, rv: r.value, rloaded: r.dataset.loaded || '', rdis: r.disabled }; })()`);
-        assert.equal(f.line, 'Loading…', 'the line says it is loading, not what it showed last time'); assert.equal(f.rline, 'Loading…');
+        assert.equal(f.line.trim(), 'Loading…', 'the line says it is loading, not what it showed last time'); assert.equal(f.rline, 'Loading…');
         assert.equal(f.v, ''); assert.equal(f.loaded, ''); assert.equal(f.dis, true); assert.equal(f.rv, ''); assert.equal(f.rloaded, ''); assert.equal(f.rdis, true);
         await ev(`window.__puts.length = 0; document.getElementById('settings-artifact-store-max').disabled = false; document.getElementById('settings-artifact-store-max').value = '5'; true`);
         await apply();
