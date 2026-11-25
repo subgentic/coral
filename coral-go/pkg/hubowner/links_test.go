@@ -164,3 +164,38 @@ func TestLinkVerifiersPickTheHubsOwnSecretAndSayWhy(t *testing.T) {
 	_, reason, _ = lv.Check(nil, linkHubA, sign(a, time.Now()), "POST", route, route, nil)
 	assert.Equal(t, ReasonNoSecret, reason)
 }
+
+// Security's MUST on da39815989: a check for one hub keeps every other hub's replay table, so a captured stamp of hub B is still refused after a stamp of hub A was checked.
+func TestACheckForOneHubKeepsTheOtherHubsReplayTable(t *testing.T) {
+	a, b := strings.Repeat("1a", 32), strings.Repeat("2b", 32)
+	links := []Link{{Hub: linkHubA, Remote: "mac", Secret: a}, {Hub: linkHubB, Remote: "mac", Secret: b}}
+	route := "/api/board/team/artifacts/abc/review"
+	lv := &LinkVerifiers{Start: time.Now().Add(-time.Hour)}
+	sb, err := Sign(b, "mac", "POST", route, nil, time.Now())
+	require.NoError(t, err)
+	sa, err := Sign(a, "mac", "POST", route, nil, time.Now())
+	require.NoError(t, err)
+	_, reason, _ := lv.Check(links, linkHubB, sb, "POST", route, route, nil)
+	require.Empty(t, reason)
+	_, reason, _ = lv.Check(links, linkHubA, sa, "POST", route, route, nil)
+	require.Empty(t, reason)
+	_, reason, _ = lv.Check(links, linkHubB, sb, "POST", route, route, nil)
+	assert.Equal(t, ReasonReplay, reason, "hub B's stamp was accepted again after a check for hub A")
+	_, _, _ = lv.Check(links, linkHubA, sa, "POST", route, route, nil) // QA's probe (#21213 finding 2): another A check right before
+	_, reason, _ = lv.Check(links, "", sb, "POST", route, route, nil)
+	assert.Equal(t, ReasonReplay, reason, "and from an older hub's check against every link")
+}
+
+// QA SHOULD 3 on da39815989: an older hub (no id) and a newer one may know this computer by the same name; the newer hub's install must not take the older hub's secret (#21212 again). Nothing proves
+// the single file was the newer hub's, so it stays until the person removes it (coral hub-owner-secret --remove).
+func TestANewerHubsInstallKeepsAnOlderHubsSecretUnderTheSameComputerName(t *testing.T) {
+	dir := t.TempDir()
+	older := strings.Repeat("ab", 32)
+	require.NoError(t, WriteFile(dir, "mac", older))
+	require.NoError(t, Install(dir, Link{Hub: linkHubA, Remote: "mac", Secret: strings.Repeat("1a", 32)}, time.Now()))
+	ls, err := Links(dir)
+	require.NoError(t, err)
+	require.Len(t, ls, 2, "the older hub's secret was deleted by the newer hub's install")
+	assert.Equal(t, Link{Remote: "mac", Secret: older, At: ls[0].At}, ls[0])
+	assert.Equal(t, linkHubA, ls[1].Hub)
+}

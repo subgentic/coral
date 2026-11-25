@@ -579,7 +579,7 @@ func TestInstallOwnerSecretSendsTheHubAndFallsBackForAnOlderCoral(t *testing.T) 
 		last   string
 	}{
 		"a newer Coral":  {"#!/bin/sh\ncat >>\"$LOG\"\necho >>\"$LOG\"\nexit 0\n", 1, `"hub":"` + hub + `"`},
-		"an older Coral": {"#!/bin/sh\nin=$(cat)\necho \"$in\" >>\"$LOG\"\ncase \"$in\" in *'\"hub\"'*) exit 2;; esac\nexit 0\n", 2, `{"remote":"ssh-box","secret":"`},
+		"an older Coral": {"#!/bin/sh\nin=$(cat)\necho \"$in\" >>\"$LOG\"\ncase \"$in\" in *'\"hub\"'*) echo 'coral hub-owner-secret: stdin is not {remote, secret}' >&2; exit 2;; esac\nexit 0\n", 2, `{"remote":"ssh-box","secret":"`},
 	} {
 		dir := t.TempDir()
 		ssh := filepath.Join(dir, "ssh")
@@ -601,6 +601,25 @@ func TestInstallOwnerSecretSendsTheHubAndFallsBackForAnOlderCoral(t *testing.T) 
 		}
 		if last := lines[len(lines)-1]; !strings.Contains(last, c.last) || c.calls == 2 && strings.Contains(last, `"hub"`) {
 			t.Errorf("%s: last install %q", name, last)
+		}
+	}
+	// a newer Coral's own refusal (exit 2, a bad hub id) is not retried without the hub: only the older Coral's unknown-field words fall back (Security INFO 3)
+	{
+		dir := t.TempDir()
+		ssh := filepath.Join(dir, "ssh")
+		log := filepath.Join(dir, "log")
+		if err := os.WriteFile(ssh, []byte(strings.ReplaceAll("#!/bin/sh\ncat >>\"$LOG\"\necho >>\"$LOG\"\necho \"coral hub-owner-secret: the hub's id is not valid\" >&2\nexit 2\n", "$LOG", log)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		tg, _ := ParseTarget("rich@box.example.com")
+		err := (Runner{SSH: ssh}).InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", strings.Repeat("ab", 32), hub, "Studio hub")
+		var oe *OwnerSecretError
+		if !errors.As(err, &oe) || oe.ExitCode != 2 {
+			t.Fatalf("a newer Coral's refusal: %v", err)
+		}
+		b, _ := os.ReadFile(log)
+		if n := len(strings.Split(strings.TrimSpace(string(b)), "\n")); n != 1 {
+			t.Errorf("a newer Coral's refusal was retried without the hub: %d installs %q", n, b)
 		}
 	}
 	// any other failure is not retried: it is the far computer's answer

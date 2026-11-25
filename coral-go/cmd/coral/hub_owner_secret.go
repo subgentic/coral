@@ -100,7 +100,7 @@ func runHubOwnerSecretWith(args []string, stdin io.Reader, stdout, stderr io.Wri
 		dec := json.NewDecoder(strings.NewReader(string(data)))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&in); err != nil || dec.More() {
-			fmt.Fprintln(stderr, "coral hub-owner-secret: stdin is not {remote, secret}")
+			fmt.Fprintln(stderr, "coral hub-owner-secret: stdin is not {remote, secret, hub, name}")
 			return 2
 		}
 	}
