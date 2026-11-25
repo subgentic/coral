@@ -239,6 +239,16 @@ func (s *CloudStore) LinkRequestStatus(ctx context.Context, id, pollSecret strin
 	return r.State, nil
 }
 
+// LinkRequestCapGiven is the cap the person gave, for the Hub's poll once the request is allowed (#21221): the poll secret opens it, and it is empty before Allow, after the request ends, and for a wrong secret. Never the code.
+func (s *CloudStore) LinkRequestCapGiven(ctx context.Context, id, pollSecret string, now time.Time) string {
+	s.expireLinkRequests(ctx, now)
+	r, err := lrLoad(ctx, s.db, id)
+	if err != nil || !lrSame(r.PollSalt, pollSecret, r.PollHash) || r.State != "allowed" || !validMode(r.CapGiven) {
+		return ""
+	}
+	return r.CapGiven
+}
+
 // PendingLinkRequests are the requests waiting for the Operator, oldest first: what the Needs-you card shows.
 func (s *CloudStore) PendingLinkRequests(ctx context.Context, now time.Time) ([]LinkRequest, error) {
 	s.expireLinkRequests(ctx, now)

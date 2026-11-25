@@ -253,13 +253,16 @@ function formHtml() {
     const adding = _editing === '';
     const cur = { ...(adding ? {} : (_servers.find(s => s.id === _editing) || {})), ...(_draft || {}) };
     const title = adding ? 'Add computer' : `Edit ${escHtml(cur.label || cur.id || '')}`;
+    if (adding) return `<div class="servers-form" id="servers-form"><div id="servers-join-host"></div>
+        <details class="servers-advanced"${_formError || _urlError || _draft ? ' open' : ''}><summary>Advanced: add by URL and key</summary><div id="servers-form-host"></div></details></div>`; // the second-Hub join is the first choice (#21221); the URL and API key form stays for a computer added the old way
     return `<div class="servers-form" id="servers-form">
         <h4>${title}</h4>
-        ${adding ? '' : warningHtml(_servers.find(x => x.id === _editing))}
+        ${warningHtml(_servers.find(x => x.id === _editing))}
         <div id="servers-form-host"></div>
     </div>`;
 }
 
+let _join = null;         // the second-Hub join (second_hub_join.js), mounted with Add computer and loaded then
 let _formView = null;     // the add and edit form (settings_view in form mode), drawn into the page after each render of it
 
 /** The form of the page being drawn (settings_view in form mode): the id, the name, the URL, the write-only key and the private-address switch. */
@@ -282,7 +285,15 @@ function mountServerForm(host) {
     _formView.set('allow_private', !!cur.allow_private);
     if (_urlError) _formView.error('url', _urlError);
     if (_formError) _formView.say(_formError, true);
-    _formView.focus(_urlError ? 'url' : adding ? 'id' : 'label');
+    if (!adding || _formError || _urlError || _draft) _formView.focus(_urlError ? 'url' : adding ? 'id' : 'label');
+}
+
+/** The second-Hub join, drawn into the Add computer page's first slot. Its module keeps its own state; a redraw while it waits does nothing (render() returns early). */
+async function mountJoin(slot) {
+    const { mountSecondHubJoin } = await importOnce('./second_hub_join.js', 'the second-Hub join');
+    if (_editing !== '' || !slot.isConnected) return;
+    const view = mountSecondHubJoin(slot, { taken: _servers.map(x => x.id), onClose: done => { _join = null; _editing = null; _draft = null; _formError = ''; _urlError = ''; render(); if (done) load && load(); } });
+    _join = view;
 }
 
 function closeSsh() {
@@ -311,6 +322,8 @@ function render() {
     const m = _host;
     if (!m) return;
     if (_ssh && m.querySelector('#servers-ssh-host')) return; // the flow is open and owns its slot
+    if (_join && _editing !== '') { _join.unmount(); _join = null; } // the form closed another way (the URL and key form added the computer)
+    if (_join && m.querySelector('#servers-join-host')) return; // the join is open and owns its slot
     const allRemotes = _servers.filter(s => !(s.local || s.id === 'local'));
     syncServersBar(allRemotes, 'server', render); // the search box, from six servers up
     const remotes = allRemotes.filter(serverVisible);
@@ -361,6 +374,7 @@ function render() {
         if (el) el.focus();
     }
     if (_editing !== null) { const host = m.querySelector('#servers-form-host'); if (host) mountServerForm(host); }
+    if (_editing === '') { const jh = m.querySelector('#servers-join-host'); if (jh) mountJoin(jh); }
 }
 
 function setBusy(id, on) { if (on) _busy.add(id); else _busy.delete(id); }
@@ -464,6 +478,7 @@ async function submitServerForm(values) {
         if (!Object.keys(body).length) { _editing = null; render(); return; }
     }
     _draft = { id, label, url, allow_private: allowPrivate };
+    const advanced = _host && _host.querySelector('.servers-advanced'); if (advanced) advanced.open = true; // a refusal puts focus in its field: a closed Advanced would hide it
     _formView.set('api_key', ''); // drop the key from the DOM at once; it only lives in `body` for this request
     setBusy('*', true); _formError = ''; _urlError = '';
     let failure = '';
