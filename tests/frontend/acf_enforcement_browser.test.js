@@ -46,6 +46,7 @@ const BASE = require('./test_base').BASE;
         let t = await line();
         assert.match(t, /^Codex keeps only a sandbox and an approval mode: a sandbox that can change files in its folder, with no network, and it asks only when the model requests it/);
         assert.match(t, /web search on.*Deny entries and shell patterns are not enforced/);
+        assert.match(t, /Shell: Codex runs these without asking; the list does not stop other commands\. Pick Accept edits or Plan to be asked\.$/, 'a Shell list on Default says it is not an approval gate (#21358)');
         assert.equal(await ev(`!!document.querySelector('#fixture .acf-perms-enforced button')`), false, 'on-request has no network to turn off: no Learn more');
         assert.ok((await deny()).every(d => d.disabled), 'no new Deny entry for Codex');
         await chip('deny', 'shell');
