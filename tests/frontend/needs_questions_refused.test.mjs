@@ -31,7 +31,25 @@ test('the question list through the Hub reports a 403 from a remote as a refusal
     globalThis.fetch = window.fetch = async () => Response.json({ error: 'owner_only', code: 'owner_only' }, { status: 403 });
     await asks.refreshOperatorAsks(true);
     for (let i = 0; i < 2; i++) { N.incompleteNote(); await new Promise(r => setTimeout(r, 30)); }
-    assert.match(N.incompleteNote(), /Refused by srv9 \(owner_only\)\./, N.incompleteNote());
+    assert.match(N.incompleteNote(), /Refused by Box \(owner_only\)\./, N.incompleteNote()); // by its label (#21260)
     assert.doesNotMatch(N.incompleteNote(), /Set up Approve/, 'only operator_only is the missing setup');
     assert.doesNotMatch(N.incompleteNote(), /older Coral/);
+});
+test('#21260: on a hub the refused note names a computer by its label in Settings > Computers, not its server id', async () => {
+    state.hub = true; state.servers = [{ id: 'b-6xcc9', label: 'Build box', status: 'online' }, { id: 'odd', label: 'Odd\u202e box', status: 'online' }];
+    const settle = async () => { for (let i = 0; i < 2; i++) { N.incompleteNote(); await new Promise(r => setTimeout(r, 30)); } };
+    N.readOutcome('questions', 'srv9', true);
+    N.readOutcome('questions', 'b-6xcc9', false, Response.json({ code: 'operator_only' }, { status: 403 }));
+    await settle();
+    assert.match(N.incompleteNote(), /Refused by Build box \(operator_only\)\. Set up Approve through the hub for Build box: in Settings > Computers/, N.incompleteNote());
+    assert.doesNotMatch(N.incompleteNote(), /Refused by b-6xcc9/);
+    N.readOutcome('questions', 'b-6xcc9', true);
+    N.readOutcome('questions', 'odd', false, Response.json({ code: 'owner_only' }, { status: 403 }));
+    await settle();
+    assert.match(N.incompleteNote(), /Refused by Odd box \(owner_only\)\./, 'a label is cleaned like an id');
+    N.readOutcome('questions', 'odd', true);
+    N.readOutcome('questions', 'gone', false, Response.json({ code: 'owner_only' }, { status: 403 }));
+    await settle();
+    assert.match(N.incompleteNote(), /Refused by gone \(owner_only\)\./, 'a computer the hub no longer lists keeps its id');
+    N.readOutcome('questions', 'gone', true);
 });
