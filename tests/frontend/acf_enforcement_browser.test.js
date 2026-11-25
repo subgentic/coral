@@ -118,7 +118,10 @@ const BASE = require('./test_base').BASE;
         await setMode('default');
         assert.deepEqual(await lit(), [], 'back on Default: none again');
         await setType('claude');
-        assert.deepEqual(await lit(), ['file_read', 'file_write', 'shell', 'web_access'], 'Claude is unchanged');
+        assert.deepEqual(await lit(), [], 'Claude on Default: no chip lit either (#21397)');
+        assert.equal(await saved(), null);
+        await setMode('acceptEdits');
+        assert.deepEqual(await lit(), ['file_read', 'file_write', 'shell', 'web_access'], 'Claude on another Mode keeps the tools');
         await setType('codex'); await setMode('default');
         assert.deepEqual(await lit(), []);
         await chip('allow', 'file_read');
@@ -140,14 +143,14 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await lit(), ['file_read', 'file_write', 'shell', 'web_access'], 'a stored Codex agent keeps what it has');
         assert.deepEqual((await saved()).allow, ['file_read', 'file_write', 'shell', 'web_access']);
         console.log('The team dialog: a Codex member from a built-in template or a role has no chip lit and saves no capabilities (#21363, QA2)');
-        const member = (name, caps, defaults) => ev(`(async () => {
+        const member = (name, caps, defaults, type) => ev(`(async () => {
             const { _addTeamAgent } = await import((window.__coralStatic || '/static/') + 'team_dialogs.js');
             const { SHIPPED_CAPABILITIES } = await import((window.__coralStatic || '/static/') + 'agent_presets.js');
-            const row = _addTeamAgent(${JSON.stringify(name)}, 'p', ${caps ? "{ allow: [...SHIPPED_CAPABILITIES], deny: [] }" : 'null'}, 'codex', '', '', { capsAreDefaults: ${defaults} });
+            const row = _addTeamAgent(${JSON.stringify(name)}, 'p', ${caps ? "{ allow: [...SHIPPED_CAPABILITIES], deny: [] }" : 'null'}, ${JSON.stringify(type)}, '', '', { capsAreDefaults: ${defaults} });
             const id = row.dataset.acfId, f = document.getElementById(id);
             return { mode: f.querySelector('.acf-permission-mode').value, lit: [...f.querySelectorAll('[data-type="allow"].active')].map(b => b.dataset.cap), caps: window.getAgentConfig(id).capabilities }; })()`);
-        for (const [name, caps, defaults] of [['Orchestrator', true, true], ['Security Reviewer', false, false]]) {
-            const m = await member(name, caps, defaults);
+        for (const [name, caps, defaults, type] of [['Orchestrator', true, true, 'codex'], ['Security Reviewer', false, false, 'codex'], ['Orchestrator', true, true, 'claude'], ['Security Reviewer', false, false, 'claude'], ['Lead', true, true, '']]) {
+            const m = await member(name, caps, defaults, type);
             assert.equal(m.mode, 'default', name + ': Default');
             assert.deepEqual(m.lit, [], name + ': no chip lit');
             assert.equal(m.caps, null, name + ': nothing saved');

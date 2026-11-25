@@ -149,6 +149,8 @@ function _populateGeneratedTeamDraft(team) {
             agent.capabilities,
             agent.agent_type,
             agent.model,
+            undefined,
+            { capsAreDefaults: true }, // a drafted or sample team's tools are a starting point (#21397)
         );
     }
     showDraftedNote(team.agents.length);
