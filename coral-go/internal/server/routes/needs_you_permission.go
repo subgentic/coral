@@ -12,8 +12,8 @@ import (
 // refuses a digit whose label changed or is not one-time by THIS list (Security Reviewer's conditions on #21256). inbox_answer.js's ONE_TIME is the same list for display only: this one decides.
 
 // oneTimeForm is a permission choice that lasts for this one answer: Yes, Allow or Approve, optionally "once", "this once", "proceed", "continue" or Antigravity's "run command"; No, Deny or Reject,
-// optionally "cancel" or Codex's "and tell <CLI> what to do differently". The WHOLE label must be one of these (a trailing key hint and final punctuation dropped), so any added words fail.
-var oneTimeForm = regexp.MustCompile(`(?i)^(?:(?:yes|allow|approve)(?:,? (?:once|this once|proceed|continue|run command))?|(?:no|deny|reject)(?:,? (?:cancel|and tell \w+ what to do differently))?)$`)
+// optionally "cancel", "exit", "skip" or Codex's "and tell <CLI> what to do differently". The WHOLE label must be one of these (a trailing key hint and final punctuation dropped), so any added words fail.
+var oneTimeForm = regexp.MustCompile(`(?i)^(?:(?:yes|allow|approve)(?:,? (?:once|this once|proceed|continue|run command))?|(?:no|deny|reject)(?:,? (?:cancel|exit|skip|and tell \w+ what to do differently))?)$`)
 
 // keyHint is a key in brackets at the end of a label ("(y)", "(esc)"): only a key is a hint, so "(always)" or "(all projects)" stays in the label and the whole-label match fails.
 var keyHint = regexp.MustCompile(`(?i)\s*\((?:[a-z]|esc|enter|tab|shift\+tab|ctrl\+[a-z])\)$`)
@@ -32,16 +32,6 @@ func wholeLabel(label string) string {
 
 // oneTimeChoice reports whether a permission prompt's option lasts for this one answer only.
 func oneTimeChoice(label string) bool { return oneTimeForm.MatchString(wholeLabel(label)) }
-
-// asksPermission reports whether a menu is a permission prompt: one of its options is a Yes, Allow or Approve.
-func asksPermission(opts []NeedsYouOption) bool {
-	for _, o := range opts {
-		if yesWord.MatchString(strings.TrimSpace(o.Label)) {
-			return true
-		}
-	}
-	return false
-}
 
 // permissionOptions is what a Needs you item offers of a permission prompt's menu: its one-time options with their own numbers, or none unless that leaves at least one Yes and one No.
 func permissionOptions(opts []NeedsYouOption) []NeedsYouOption {

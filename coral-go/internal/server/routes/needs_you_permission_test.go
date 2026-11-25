@@ -46,7 +46,13 @@ func TestPermissionOptionsOfferOnlyTheOneTimeYesAndNo(t *testing.T) {
 	assert.Nil(t, permissionOptions([]NeedsYouOption{{N: 1, Label: "Yes"}, {N: 2, Label: "Always allow"}}), "no No: nothing offered")
 	assert.Nil(t, permissionOptions([]NeedsYouOption{{N: 1, Label: "Yes (always)"}, {N: 2, Label: "No"}}), "a bracket that is not a key stays in the label, and the whole label must be one-time")
 
-	for _, l := range []string{"Yes", "Yes, proceed (y)", "Allow once", "Approve.", "No, and tell Codex what to do differently (esc)", "Deny", "Reject, cancel"} {
+	// QA's SHOULD on #21256: a Yes/No dialog whose No exits or skips keeps its buttons; one whose Yes is lasting or unknown (trust a folder, update now) is the open-the-window notice.
+	exit := []NeedsYouOption{{N: 1, Label: "Yes, proceed"}, {N: 2, Label: "No, exit"}}
+	assert.Equal(t, exit, permissionOptions(exit))
+	assert.Nil(t, permissionOptions([]NeedsYouOption{{N: 1, Label: "Yes, I trust this folder"}, {N: 2, Label: "No, exit"}}))
+	assert.Nil(t, permissionOptions([]NeedsYouOption{{N: 1, Label: "Yes, update now"}, {N: 2, Label: "No, skip"}}))
+
+	for _, l := range []string{"Yes", "Yes, proceed (y)", "Allow once", "No, exit", "No, skip", "Approve.", "No, and tell Codex what to do differently (esc)", "Deny", "Reject, cancel"} {
 		assert.True(t, oneTimeChoice(l), l)
 	}
 	for _, l := range []string{"Yes, and don't ask again", "Yes, allow all edits during this session", "Always allow", "Yes, for this project", "Trust all and continue", "Yes forever"} {
@@ -226,7 +232,7 @@ func TestHubMergeKeepsOnlyAOneTimePermissionMenu(t *testing.T) {
 }
 
 // (b): a prompt the hooks never reported, seen only on the screen, is a Needs you item naming the agent once it has stood for its minutes, and a permission menu there offers no lasting grant either.
-func TestAPermissionPromptOnlyTheScreenSawIsANeedsYouItemWithNoLastingGrant(t *testing.T) {
+func TestAPermissionPromptOnlyTheScreenSawIsANeedsYouItemWithItsMenuAsRead(t *testing.T) {
 	_, h, terminal, ss := setupSessionsTestServer(t)
 	const sid = "00000000-0000-0000-0000-0000002125b6"
 	name := "codex-" + sid
@@ -244,9 +250,23 @@ func TestAPermissionPromptOnlyTheScreenSawIsANeedsYouItemWithNoLastingGrant(t *t
 	assert.Equal(t, name, items[0].From, "it names the agent")
 	assert.True(t, items[0].Dialog)
 	assert.Equal(t, DialogWords, items[0].Line)
-	for _, o := range items[0].Options {
-		assert.True(t, oneTimeChoice(o.Label), "no lasting grant is offered: %q", o.Label)
+	assert.False(t, items[0].Permission, "the hooks did not say it is a permission wait")
+	assert.Len(t, items[0].Options, 3, "a screen-only dialog keeps its menu as read (#19864); the one-time rule is for the hooked permission kind")
+}
+
+// QA's MUST on #21256: only a hooked permission item is cut to its one-time Yes and No; every other dialog keeps the menu #19864 shipped, a Yes/No about a folder or an update included.
+func TestOnlyAHookedPermissionItemGetsTheOneTimeRule(t *testing.T) {
+	menus := [][]NeedsYouOption{
+		{{N: 1, Label: "Yes, proceed"}, {N: 2, Label: "No, exit"}},
+		{{N: 1, Label: "Yes, I trust this folder"}, {N: 2, Label: "No, exit"}},
+		{{N: 1, Label: "Yes, update now"}, {N: 2, Label: "No, skip"}},
 	}
+	for _, m := range menus {
+		assert.Equal(t, m, needsYouMenu(NeedsYouItem{Dialog: true}, m), "a dialog keeps its menu: %v", m)
+	}
+	codex := []NeedsYouOption{{N: 1, Label: "Yes, proceed (y)"}, {N: 2, Label: "Yes, and don't ask again for commands that start with `git rebase` (p)"}, {N: 3, Label: "No, and tell Codex what to do differently (esc)"}}
+	assert.Equal(t, []NeedsYouOption{codex[0], codex[2]}, needsYouMenu(NeedsYouItem{Permission: true}, codex), "a real permission prompt loses its lasting grant")
+	assert.Nil(t, needsYouMenu(NeedsYouItem{}, menus[0]), "an item that is neither shows no menu")
 }
 
 // postAsDashboard is http.Post as the person's own dashboard sends it (a same-origin fetch): only the person answers a permission prompt (#21256), so a test that answers one as the dashboard says so.
