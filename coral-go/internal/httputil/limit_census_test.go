@@ -24,7 +24,8 @@ var tooManyRequestsSites = map[string]struct {
 }{
 	"internal/server/routes/open_in_browser.go":         {1, "local browser launch limit: WriteActionLimit marks every refusal"},
 	"internal/httputil/limit.go":                        {1, "WriteActionLimit itself: always sends X-Coral-Limit: action"},
-	"internal/auth/middleware.go":                       {1, "too many wrong API keys: marked by hand (X-Coral-Limit set just before), plain-text body"},
+	"internal/auth/middleware.go":                       {2, "too many wrong API keys or wrong request keys from one address: each marked by hand (X-Coral-Limit set just before), plain-text body (#21220)"},
+	"internal/server/routes/review_drafts_send.go":      {3, "the comments-to-agents send limit: prepareReviewSend returns it as a value (the first mention) and its two callers send every 429 with WriteActionLimit (marked X-Coral-Limit: action, Retry-After 60)"},
 	"internal/cloud/enroll.go":                          {2, "client side: reads Coral Hub's 429, never writes one"},
 	"internal/hubdropbox/upload.go":                     {1, "client side: reads the Hub's 429 for an upload (RateLimited), never writes one"},
 	"internal/dropbox/upload.go":                        {1, "client side: reads Dropbox's 429 (and too_many_requests) as RateLimited with its Retry-After, never writes one (#14655)"},
