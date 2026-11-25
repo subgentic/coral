@@ -41,7 +41,7 @@ const MEASURE = `(() => { const pane = document.getElementById('settings-pane-no
                 if (m.overlaps.length) problems.push(`${tag}: text under a Reset: ${m.overlaps}`);
                 if (m.blockShown && !m.blockRows) problems.push(`${tag}: What reaches Needs you is shown with no rows`);
                 if (m.helpH > m.lines * m.lh + 6) problems.push(`${tag}: the Desktop alerts hint is ${Math.round(m.helpH)} px for ${m.lines} lines of ${m.lh} px`);
-                if (!m.alerts.every(t => /tab open/i.test(t))) problems.push(`${tag}: the Alert rows do not say the tab must be open ${JSON.stringify(m.alerts)}`);
+                if (!m.alerts.every(t => /while this tab is open/i.test(t))) problems.push(`${tag}: the Alert rows do not say they work while this tab is open ${JSON.stringify(m.alerts)}`);
                 if (!m.hub) problems.push(`${tag}: no Phone notifications row`);
                 else {
                     if (m.hub.href !== '/account#push-panel' || m.hub.abs !== m.hub.origin + '/account#push-panel') problems.push(`${tag}: the link goes to ${m.hub.abs}`);
