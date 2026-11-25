@@ -9,6 +9,18 @@ const BASE = require('./test_base').BASE;
 const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { Input } = client;
+    // A person's hands, not the page's own methods (#21425: the comment box was visible and dead, and this suite clicked the hidden toggle in code and set .value, so it never saw it): the pointer goes to the middle of the element, and what is under it must BE the element.
+    const realClick = async selector => {
+        const at = await ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return { missing: true }; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, hit = document.elementFromPoint(x, y); return { x, y, ok: hit === e || e.contains(hit), covered: hit && (hit.id || hit.className || hit.tagName), rect: [r.left, r.top, r.width, r.height].map(Math.round).join(','), view: innerWidth + 'x' + innerHeight }; })()`);
+        assert.ok(!at.missing, `${selector} is on the page`);
+        assert.ok(at.ok, `${selector} can be pressed: under the pointer is ${at.covered}; box ${at.rect} in ${at.view}`);
+        await Input.dispatchMouseEvent({ type: 'mouseMoved', x: at.x, y: at.y });
+        await Input.dispatchMouseEvent({ type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+        await Input.dispatchMouseEvent({ type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+    };
+    const realButton = async (label, scope = '#artifact-viewer') => { await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + ' button')].find(b => b.textContent === ${JSON.stringify(label)}); if (!b) throw Error('Missing button: ' + ${JSON.stringify(label)}); b.dataset.realclick = '1'; return true; })()`); await realClick('[data-realclick]'); await ev(`document.querySelectorAll('[data-realclick]').forEach(b => delete b.dataset.realclick); true`); };
+    const typeInto = async (selector, text) => { await realClick(selector); await Input.insertText({ text }); assert.equal(await ev(`document.querySelector(${JSON.stringify(selector)}).value`), text, 'typed words land in the box'); };
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async name => { if (!process.env.CORAL_SCREENSHOT_DIR) return; fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const click = selector => ev(`document.querySelector(${JSON.stringify(selector)}).click(); true`);
@@ -59,16 +71,34 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
         await ev(`(async () => { const m = await import(${S} + 'artifact_viewer.js'); m.openArtifactViewer('${hex}', { filename: 'Release plan', board: ${JSON.stringify(board)} }); return true; })()`);
         await waitFor(`!!document.querySelector('.ac-composer textarea')`, 'document comments ready', 8000);
         if (hex === HEX && board === 'draft-test') await waitFor(`document.querySelector('#artifact-viewer').hasAttribute('data-document-review')`, 'Needs you review context');
-        await ev(`(() => { const toggle = document.querySelector('.ac-toggle'); if (toggle.getAttribute('aria-expanded') !== 'true') toggle.click(); return true; })()`);
+        const state = await ev(`(() => { const p = document.querySelector('#artifact-viewer .ac-panel'), r = p.getBoundingClientRect(); return { inert: p.inert, hidden: p.hidden, shown: r.width > 0 && r.height > 0, toggleShown: !!document.querySelector('#artifact-viewer .ac-toggle')?.getClientRects().length }; })()`);
+        assert.deepEqual({ inert: state.inert, hidden: state.hidden, shown: state.shown }, { inert: false, hidden: false, shown: true }, 'the comments column is usable from the first paint: nothing opens it');
         await ev(framesJs(4));
     };
     const save = async text => {
-        await ev(`(() => { const input = document.querySelector('.ac-composer textarea'); input.value = ${JSON.stringify(text)}; input.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-        await button('Save draft');
+        await typeInto('.ac-composer textarea', text);
+        await realButton('Save draft');
         await waitFor(`document.querySelector('.ac-composer textarea')?.value === ''`, 'saved private draft', 5000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // A new browser, and one that remembers the comments shut from a document that was not a review (coral-artifact-comments-open): the review's comment box works at once, at both sizes, by a person's clicks and typing (#21425).
+        for (const [width, height] of [[1600, 1000], [390, 844]]) for (const remembered of [null, 'closed']) {
+            await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile: width === 390 });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await ev(`localStorage.removeItem('coral-artifact-comments-open'); ${remembered ? `localStorage.setItem('coral-artifact-comments-open', '${remembered}');` : ''} true`);
+            await ev(fixture); await open(HEX);
+            const what = `${width}x${height}${remembered ? ', remembered shut' : ', fresh profile'}`;
+            await typeInto('.ac-composer textarea', `Typed by hand at ${width}`);
+            await realButton('Save draft');
+            await waitFor(`window.__drafts.length === 1 && window.__drafts[0].body === 'Typed by hand at ${width}'`, `Save draft by a click (${what})`, 5000);
+            assert.equal(await ev('window.__batches.length'), 0, 'Save never delivers');
+            await shot(`draft-review-first-paint-${width}${remembered ? '-remembered' : ''}`);
+            await waitFor(`!!document.querySelector('.ac-draft-bar:not([hidden])')`, `the saved draft shows its Send bar (${what})`, 5000);
+            await realButton('Send comments');
+            await waitFor(`window.__batches.length === 1 && window.__batches[0].length === 1`, `Send comments by a click (${what})`, 5000);
+            await click('.artifact-viewer-close');
+        }
         for (const width of [1280, 390]) for (const theme of ['dark', 'light']) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);

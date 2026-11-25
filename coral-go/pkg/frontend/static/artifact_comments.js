@@ -118,6 +118,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     const phone = window.matchMedia(PHONE_QUERY);
     const sheet = opts.sheet || (() => phone.matches && !dialog.hasAttribute('data-document-review')); // the panel is a bottom sheet over the document
     const isOpen = () => panel.classList.contains('ac-sheet-open');
+    const draftMode = () => dialog.hasAttribute('data-document-review') && !!st.reviewDrafts?.snapshot().data?.drafts_supported; // the Needs-you document review, which holds comments as drafts (the same pair the CSS keys on): the comments are the page's column at every width, never a sheet to open, and no remembered "closed" shuts it (#21425: the column showed, dead, with its only opener hidden)
     const focusInput = () => { const i = panel.querySelector('.ac-input'); i?.focus(); i?.scrollIntoView({ block: 'nearest' }); }; // the box that opened is where the person looks: a long thread no longer leaves it below the fold (#15119)
     const preferenceKey = () => opts.preferenceKey ? opts.preferenceKey() : OPEN_KEY;
     const remember = (open) => { const key = preferenceKey(); if (key) browserLocal.set(key, open ? 'open' : 'closed'); };
@@ -245,6 +246,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         panel.replaceChildren(); reviewBar.replaceChildren(); reviewBar.hidden = true;
         const show = (st.text || st.whole) && !st.gone && !!st.data;
         panel.hidden = !show; st.shownNow = show; syncToggle();
+        if (show && draftMode() && !isOpen()) setSheet(true);
         syncOn();
         paintToggle();
         if (!show) return;
@@ -461,9 +463,10 @@ export function attachComments(dialog, body, host, opts = {}) {
         footRoom();
         const open = panel.classList.contains('ac-sheet-open');
         panel.inert = !st.shownNow || !open;
-        body.inert = !!st.shownNow && sheet() && open && !st.video && phone.matches; // only a phone's sheet is modal: a docked pane's open sheet leaves the file above it to scroll (#14846)
+        body.inert = !!st.shownNow && sheet() && open && !st.video && phone.matches && !draftMode(); // only a phone's sheet is modal: a docked pane's open sheet leaves the file above it to scroll (#14846)
     }
     phone.addEventListener('change', () => { syncInert(); syncOn(); });
+    dialog.addEventListener('av-review-layout', () => { if (st.shownNow && draftMode() && !isOpen()) setSheet(true); }); // the review context (data-document-review) arrives after the comments: the column opens when it does
     if (opts.observe && typeof ResizeObserver === 'function') new ResizeObserver(() => { syncInert(); syncToggle(); paintToggle(); }).observe(opts.observe); // the pane's width decides whether the panel is a sheet
 
     // ── a card or a highlight is made current, and the other follows
@@ -572,13 +575,14 @@ export function attachComments(dialog, body, host, opts = {}) {
 
     // ── the phone's sheet
     let sheetOverlay = 0; // the sheet's entry in overlay_history.js while it is open on a phone (#5219)
-    function setSheet(open, { popped = false } = {}) {
+    function setSheet(open, { popped = false, force = false } = {}) {
+        if (!open && !force && draftMode()) open = true;
         if (open === panel.classList.contains('ac-sheet-open')) return;
         panel.classList.toggle('ac-sheet-open', open);
         syncInert();
         syncOn();
         paintToggle();
-        if (open && !sheetOverlay && isPhoneLayout()) sheetOverlay = pushOverlay(() => setSheet(false, { popped: true }));
+        if (open && !sheetOverlay && isPhoneLayout() && !draftMode()) sheetOverlay = pushOverlay(() => setSheet(false, { popped: true }));
         else if (!open && sheetOverlay) { const id = sheetOverlay; sheetOverlay = 0; if (!popped) popOverlay(id); }
     }
     function paintToggle() {
@@ -593,7 +597,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     toggle.addEventListener('click', () => userSet(!isOpen()));
     // Escape closes the docked pane's open sheet and puts focus back on its toggle (#5371); the composer's own Escape (cancel) stops the key before it gets here, and the viewer's dialog keeps Escape for itself.
     panel.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape' || e.defaultPrevented || !opts.sheet || !sheet() || !panel.classList.contains('ac-sheet-open')) return;
+        if (e.key !== 'Escape' || e.defaultPrevented || draftMode() || !opts.sheet || !sheet() || !panel.classList.contains('ac-sheet-open')) return;
         e.preventDefault(); e.stopPropagation(); setSheet(false); toggle.focus();
     });
 
@@ -618,7 +622,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */
         // The computer whose artifact it is: the caller's, else the one on show (the rule renderArtifact reads the content by); a bare /api/ route is the hub's own and 404s there (#6245).
-        open(hex, server, board, series = false) { st.reviewDrafts?.close(); st.reviewDrafts = null; liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composeLater = null; st.composing = null; st.wholeComposer = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); importOnce('./open_link.js').then(m => { st.wantThread = m.takeThread('coral://artifacts/' + hex); }).catch(() => {}); },
+        open(hex, server, board, series = false) { st.reviewDrafts?.close(); st.reviewDrafts = null; liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composeLater = null; st.composing = null; st.wholeComposer = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false, { force: true }); importOnce('./open_link.js').then(m => { st.wantThread = m.takeThread('coral://artifacts/' + hex); }).catch(() => {}); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
         /** The document drawn is not text the comments can point into (HTML in its frame, a picture, a PDF, a table, a video, a download): the panel is there for a comment on the whole document. */
         /** Mark up in the viewer (#12367): the marked copy of the picture on show starts a comment on the whole file, in the tray with the text box ready, and the panel (a phone's sheet) opens on it. Resolves false when this person cannot comment here. */
@@ -657,6 +661,6 @@ export function attachComments(dialog, body, host, opts = {}) {
             refresh();
         },
         docRendered(source, text) { st.source = source || ''; st.text = !!text; if (!st.text) { render(); return; } region(true); refresh(); },
-        close() { st.reviewDrafts?.close(); st.reviewDrafts = null; liveStop(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; st.composeLater = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
+        close() { st.reviewDrafts?.close(); st.reviewDrafts = null; liveStop(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); hover(null); setSheet(false, { force: true }); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; st.composeLater = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
     };
 }
