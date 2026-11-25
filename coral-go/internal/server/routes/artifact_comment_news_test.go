@@ -37,3 +37,28 @@ func TestOnlyTheOwnersReadOfTheCommentsClearsNewComments(t *testing.T) {
 	require.Equal(t, 200, code)
 	assert.Zero(t, unseen(), "the owner opened the thread")
 }
+
+// #21285: a read with the server's API key and no stamp lists the comments but marks nothing seen (marking is a person's act); the owner stamped at the Hub, as a person, does.
+func TestAKeyOnlyReadOfTheCommentsMarksNothingSeen(t *testing.T) {
+	rig := newCmtRig(t)
+	ctx := context.Background()
+	root := rig.ownerComment("please check the lock")
+	_, err := rig.ss.CreateArtifactComment(ctx, store.ArtifactComment{ArtifactID: cmtDoc, Board: "team-a", ParentID: &root, Body: "checked, it holds",
+		AuthorIssuer: "agent", AuthorSubject: "s1", AuthorName: "Dev", AuthorKind: "agent"})
+	require.NoError(t, err)
+	unseen := func() int {
+		got, err := rig.ss.UnseenAgentReplies(ctx)
+		require.NoError(t, err)
+		return len(got)
+	}
+	require.Equal(t, 1, unseen())
+
+	code, out := rig.do("GET", cp(cmtDoc), cmtAsKey, nil)
+	require.Equal(t, 200, code, "the key may still list the comments")
+	assert.NotEmpty(t, out["comments"], "and gets them")
+	assert.Equal(t, 1, unseen(), "but it marked nothing seen")
+
+	code, _ = rig.do("GET", cp(cmtDoc), map[string]string{testHubOwnerHeader: "1"}, nil)
+	require.Equal(t, 200, code)
+	assert.Zero(t, unseen(), "the owner's genuine stamp is a person: it marks them seen")
+}

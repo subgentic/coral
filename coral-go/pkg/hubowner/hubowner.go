@@ -49,7 +49,7 @@ const secretBytes = 32
 // RoutesVersion is the generation of the allowlist below: 1 is the first eight routes, 2 (#13694) adds every Operator click that writes an Activity row and the decisions that need a person, 3 (#13757) the Markdown editor's save and the model switch, 4 (#13802) Send to agent with the diff, 5 (#13834) the done-state of a "Goal looks done" row, 6 (#13910) the Operator's opened version of a file, 7 (#15380) the Hub's read of a computer's Needs you, 8 (#15697) pause and resume of an agent's notices, 9 (#15708) the person-only reads of audit group 4, 10 (#15713) the manager's private mark on an artifact, 11 (#15715) a team import from a folder on the computer, 12 (#15717) a team's daily-knowledge writes, 13 (#15720) the delete of ended agents' terminal logs, 14 (#15729) the acknowledgement of artifact retention, 15 (#15729) the delete of unlisted received files. A remote says in
 // its health answer which generation it accepts; a hub stamps a route only when the remote's generation is at least the route's (a stamp on a route an older remote does not list is refused 403, where an
 // unstamped call still goes through as a key caller). The remote still checks every stamp against its own list, so a wrong number gets a 403 and never more power.
-const RoutesVersion = 15
+const RoutesVersion = 16
 
 type route struct {
 	pattern string
@@ -167,7 +167,19 @@ var routes = []route{
 	{"POST /api/artifacts/retention/ack", 14},
 	// Generation 15 (#15729, exactly one route, the last write tier of audit group 4): the owner deletes received files no board lists, from the Hub. Body: up to 100 ids, each a 64-digit hex digest (64 KB cap); no path is read. A file goes only if the remote finds, under the digest's lock, that it is still a received file waiting for a message whose every receipt has expired, no board lists it, nothing durable links it, no agent uploaded the same bytes and the Operator did not keep it; anything else is skipped with the reason and left alone. A file an agent or a board still uses cannot be reached by naming it.
 	{"POST /api/artifacts/received/unlisted/delete", 15},
+	// Generation 16 (#21285, Security: four routes, reads only): the owner's saved messages and the skills (and the approval view of one), read at a remote computer from the Hub. They are private text and what the owner decides
+	// on, so a read with the Hub's key alone is warned about now (KeyReadNoticeHeader) and refused in a later release (#21252): the owner signed in at the Hub reads them with a stamp.
+	{"GET /api/saved", 16},
+	{"GET /api/saved/{id}/message", 16},
+	{"GET /api/skills", 16},
+	{"GET /api/skills/{id}", 16},
 }
+
+// KeyReadNoticeHeader is how a remote says that it served a private read to the Hub's API key with no owner stamp, which a later release refuses (#21285). Its value is one of KeyReadKinds.
+const KeyReadNoticeHeader = "X-Coral-Owner-Stamp-Needed"
+
+// KeyReadKinds are the reads the notice names; a Hub shows only a value from this list, never a remote's own words.
+var KeyReadKinds = []string{"saved", "skills"}
 
 // MustBeSigned reports whether a request is one whose words are the person's own and become automation on the remote when no stamp goes with it: the owner's message to an agent (#13456) and, since
 // #13694, every widened route (Security: a body over MaxBody is not a normal click, and a refusal never sends the Operator's act with a lesser identity). The hub refuses such a request that is too big
@@ -205,6 +217,9 @@ func AllowedAt(method, path string, version int) bool {
 
 // since is the generation that added the route a request is on (0: not on the list).
 func since(method, path string) int {
+	if method == "GET" && path == "/api/skills/search" {
+		return 0 // the $skill menu is never through the Hub (#12676): a fixed word the {id} entry would otherwise admit
+	}
 	segs := strings.Split(strings.Trim(path, "/"), "/")
 	for _, r := range routes {
 		m, p, _ := strings.Cut(r.pattern, " ")

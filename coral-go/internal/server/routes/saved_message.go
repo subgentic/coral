@@ -132,6 +132,7 @@ func (h *SystemHandler) SavedMessage(w http.ResponseWriter, r *http.Request) {
 	if refuseUnlessOperator(w, r, "read a saved message") {
 		return
 	}
+	noteKeyOnlyRead(w, r, "saved")
 	w.Header().Set("Cache-Control", "no-store") // the reply is message text (#5763)
 	id, ok := savedID(w, r)
 	if !ok {

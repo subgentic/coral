@@ -61,6 +61,7 @@ func (h *SkillsHandler) ListSkillsOperator(w http.ResponseWriter, r *http.Reques
 	if refuseUnlessOperator(w, r, "read the skills") {
 		return
 	}
+	noteKeyOnlyRead(w, r, "skills")
 	status := r.URL.Query().Get("status")
 	switch status {
 	case "", store.SkillPending, store.SkillApproved, store.SkillRejected:
@@ -97,6 +98,7 @@ func (h *SkillsHandler) GetSkillOperator(w http.ResponseWriter, r *http.Request)
 	if refuseUnlessOperator(w, r, "read a skill") {
 		return
 	}
+	noteKeyOnlyRead(w, r, "skills")
 	id := chi.URLParam(r, "id")
 	if !validSkillID(id) {
 		errNotFound(w, "no such skill")

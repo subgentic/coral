@@ -229,6 +229,7 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 			if err := Refusal(resp); err != nil {
 				return err
 			}
+			h.noteNoStamp(id, resp)
 			// The remote's own static build is not the build of the page this hub serves. The reverse proxy would append it to
 			// the hub's X-Coral-Build, and the dashboard's update banner would read "hub, remote" and never match (#3990).
 			resp.Header.Del("X-Coral-Build")
@@ -486,4 +487,36 @@ type targetTransport struct{ t Target }
 
 func (tt targetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return tt.t.RoundTrip(req)
+}
+
+// noStampLogged is when the Hub last warned about a remote's key-only private read, per remote and kind.
+var noStampLogged = struct {
+	sync.Mutex
+	at map[string]time.Time
+}{at: map[string]time.Time{}}
+
+// noteNoStamp turns a remote's "I served a private read to your key with no owner stamp" header into this Hub's own warning, once a day per remote and kind (#21285). The value is shown only when it is one of
+// the closed list: a remote's own words are never logged. The header is removed so it does not reach the page.
+func (h *Handler) noteNoStamp(id string, resp *http.Response) {
+	v := resp.Header.Get(hubowner.KeyReadNoticeHeader)
+	if v == "" {
+		return
+	}
+	resp.Header.Del(hubowner.KeyReadNoticeHeader)
+	known := false
+	for _, k := range hubowner.KeyReadKinds {
+		known = known || k == v
+	}
+	if !known {
+		return
+	}
+	noStampLogged.Lock()
+	due := time.Since(noStampLogged.at[id+"|"+v]) > 24*time.Hour
+	if due {
+		noStampLogged.at[id+"|"+v] = time.Now()
+	}
+	noStampLogged.Unlock()
+	if due {
+		slog.Warn("this Hub has no Approve set up for a computer: its "+v+" will need it in a later release (Settings > Computers, Approve through this hub)", "server", id)
+	}
 }
