@@ -23,6 +23,7 @@ import (
 //	POST /api/cloud/link-requests/{id}/allow   {cap?}      -> {code, cap}   the person at this computer only; the code is in no other read
 //	POST /api/cloud/link-requests/{id}/deny    {}          -> {ok}
 //	POST /api/cloud/link-requests/{id}/finish  {poll_secret, code} -> {enrollment}   takes no address: only the origin that was allowed
+//	                                           {poll_secret, code, link: "key"} -> {linked, cap}   a request key's own Hub, as a key link (#21220)
 
 const linkRequestSecretHeader = "X-Link-Request-Secret"
 
@@ -214,9 +215,11 @@ func (h *CloudHandler) LinkRequestFinish(w http.ResponseWriter, r *http.Request)
 	var body struct {
 		PollSecret string `json:"poll_secret"`
 		Code       string `json:"code"`
+		// Link "key" is a self-hosted Hub that reaches computers over HTTP and asks for a key link (#21220, design B); "" is the enroll, as before.
+		Link string `json:"link"`
 	}
-	if err := decodeJSONLimit(r, &body, 1024); err != nil {
-		errBadRequest(w, "send {\"poll_secret\": ..., \"code\": ...}")
+	if err := decodeJSONLimit(r, &body, 1024); err != nil || (body.Link != "" && body.Link != "key") {
+		errBadRequest(w, "send {\"poll_secret\": ..., \"code\": ..., \"link\": \"key\" for a key link}")
 		return
 	}
 	m := h.manager()
@@ -227,6 +230,24 @@ func (h *CloudHandler) LinkRequestFinish(w http.ResponseWriter, r *http.Request)
 	id := chi.URLParam(r, "id")
 	if finishFailuresOver(time.Now()) {
 		httputil.WriteActionLimit(w, int(finishFailureWindow.Seconds()), "rate_limited", "Too many wrong codes just now. Try again in a few minutes.")
+		return
+	}
+	if body.Link == "key" && key == "" {
+		errBadRequest(w, "Only a Hub's own request key can finish as a key link")
+		return
+	}
+	if body.Link == "key" { // a self-hosted Hub's own request key (#21220, design B): the request becomes the link that key answers to, at the cap the person gave; no enroll, no tunnel to the Hub, no secret sent
+		l, err := h.links.FinishLinkRequestAsKeyLink(r.Context(), id, body.PollSecret, body.Code, key, time.Now())
+		if err != nil {
+			if errors.Is(err, store.ErrLinkRequestCode) {
+				noteFinishFailure(time.Now())
+			}
+			h.linkRequestErr(w, err)
+			return
+		}
+		m.LinksChanged(r.Context())
+		slog.Info("cloud: link request finished as a key link", "request", id, "link", l.LinkID, "hub", l.HubOrigin, "cap", l.MaxMode)
+		writeJSON(w, http.StatusOK, map[string]any{"linked": true, "cap": l.MaxMode})
 		return
 	}
 	hub, linkCap, err := h.links.FinishLinkRequestBy(r.Context(), id, body.PollSecret, body.Code, key, time.Now())
@@ -250,4 +271,24 @@ func (h *CloudHandler) LinkRequestFinish(w http.ResponseWriter, r *http.Request)
 	default:
 		h.linkRequestErr(w, err)
 	}
+}
+
+// ServeKeyLink carries a request of a linked request key (#21220) through its link's in-process tunnel, at the link's cap. It reports false, writing nothing, when the key answers to no active link.
+func (h *CloudHandler) ServeKeyLink(w http.ResponseWriter, r *http.Request, keyID string) bool {
+	if h.links == nil {
+		return false
+	}
+	l, err := h.links.KeyLink(r.Context(), keyID)
+	if err != nil {
+		return false
+	}
+	m := h.manager()
+	if m == nil {
+		writeError(w, http.StatusServiceUnavailable, "key_link_not_open", "This computer's link for that Hub is not open yet. Try again in a moment.")
+		return true
+	}
+	if err := m.ServeKeyLink(w, r, l.LinkID); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "key_link_not_open", "This computer's link for that Hub is not open yet. Try again in a moment.")
+	}
+	return true
 }

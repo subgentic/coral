@@ -22,7 +22,13 @@ const (
 	MethodLoopback               // a localhost peer (no credentials checked)
 	MethodAPIKey                 // the API key, in a header or the query string
 	MethodSession                // a session cookie from the /auth login (or the QR link)
+	// MethodLinkKey is a self-hosted Hub's request key (X-Link-Request-Key, #20944, #21220), sent alone: let on to the identity layer, which checks the key, refuses it everywhere it does not reach and records
+	// a wrong one against the address (RecordLinkKeyFailure). It is never the API key, a session or the Operator.
+	MethodLinkKey
 )
+
+// LinkKeyHeader carries a self-hosted Hub's request key.
+const LinkKeyHeader = "X-Link-Request-Key"
 
 type methodKey struct{}
 
@@ -93,6 +99,18 @@ func Middleware(ks *KeyStore) func(http.Handler) http.Handler {
 				strings.HasPrefix(path, "/static/") ||
 				path == "/manifest.json" || path == "/favicon.ico" {
 				next.ServeHTTP(w, r)
+				return
+			}
+
+			// A self-hosted Hub's request key, sent with no API key and no session cookie (#21220: before, a Hub on another computer could not reach even its three join calls): on to the identity layer,
+			// which checks it. Wrong keys count against the address like wrong API keys, so a guesser is throttled here first.
+			if len(r.Header.Values(LinkKeyHeader)) > 0 && extractAPIKey(r) == "" && ks.extractSessionCookie(r) == "" {
+				if ks.RateLimited(clientIP(r)) {
+					w.Header().Set(httputil.ActionLimitHeader, "action")
+					http.Error(w, "Too many authentication attempts", http.StatusTooManyRequests)
+					return
+				}
+				next.ServeHTTP(w, withMethod(r, MethodLinkKey))
 				return
 			}
 
@@ -253,3 +271,10 @@ func SafeReturnTo(p string) string {
 // Host its DNS-rebinding check refuses. A Coral hub reads it (pkg/hubproxy.RefusedHeader, the same
 // name) to tell a rejected key and a refused host from an ordinary 401 or 403 (#3649).
 const RefusedHeader = "X-Coral-Refused"
+
+// RecordLinkKeyFailure counts a wrong or revoked request key against the address it came from, as a wrong API key is (#21220, Security's MUST 1): the identity layer calls it when it refuses one.
+func (ks *KeyStore) RecordLinkKeyFailure(r *http.Request) {
+	if ks != nil {
+		ks.RecordFailure(clientIP(r))
+	}
+}

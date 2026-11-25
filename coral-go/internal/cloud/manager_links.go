@@ -67,6 +67,7 @@ func modeOf(name string) tunnel.Mode {
 // LinksChanged makes the running connectors match the store: an active link added here gets a connector, one that is removing, revoked or gone loses its, and one whose cap changed is dialed again at the new cap
 // (a lowered cap first ends the streams the old one allowed, so nothing outlives it). It is called at start, after a link is added or removed and after a cap changes; it is safe to call at any time.
 func (m *Manager) LinksChanged(ctx context.Context) {
+	m.keyLinksChanged(ctx)
 	m.mu.Lock()
 	root := m.root
 	m.mu.Unlock()

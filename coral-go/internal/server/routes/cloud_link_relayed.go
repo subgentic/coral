@@ -208,6 +208,9 @@ func (h *CloudHandler) relayedKeyRevoke(w http.ResponseWriter, r *http.Request) 
 		h.linkKeyErr(w, err)
 		return
 	}
+	if m := h.manager(); m != nil {
+		m.LinksChanged(r.Context()) // a link that key answered to ends now, with its streams (#21220)
+	}
 	slog.Info("cloud: link key revoked through a Hub", "key", id, "link", c.m.Link)
 	h.recordLinkKey(r, "link_key_revoke", id, name)
 	h.noteRelayedLink(r, " key="+id)

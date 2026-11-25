@@ -196,6 +196,10 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 		return s.cloudHandler.VerifyCLI(r)
 	})
 	s.identity.SetLinkKeys(func(ctx context.Context, key string) (string, bool) { return s.cloudHandler.VerifyLinkKey(ctx, key) }) // a self-hosted Hub's request key: three calls only (#20944)
+	s.identity.SetLinkKeyFailures(s.keyStore.RecordLinkKeyFailure)                                                                 // a wrong request key is throttled like a wrong API key (#21220)
+	s.identity.SetKeyLinks(func(w http.ResponseWriter, r *http.Request, keyID string) bool {
+		return s.cloudHandler.ServeKeyLink(w, r, keyID)
+	}) // a linked request key, through its link (#21220)
 	s.identity.SetOtherUser(func(r *http.Request) bool { return s.cloudHandler != nil && s.cloudHandler.OtherUser(r) })
 	if s.cfg.StrictLocalAuth {
 		// Phase 2 (#3418): refuse what the report lists instead of logging it.
