@@ -113,6 +113,19 @@ const (
 	FailMemberUnnamed    = "member_unnamed"     // a team member with no name: skipped, never launched (#19942)
 )
 
+// The error classes (#21453): what an "internal" launch failure was, as one value from a closed list. Chosen from the error's type or fixed words, never sent as the error's text, a path or a name.
+const (
+	ClassSettingsUnreadable = "settings_unreadable" // Coral's settings could not be read
+	ClassCLIUntrustedMount  = "cli_untrusted_mount" // the CLI is behind a folder Coral will not run programs from
+	ClassCLIWrongBinary     = "cli_wrong_binary"    // the CLI found is not the program the agent type needs
+	ClassCLIPathInvalid     = "cli_path_invalid"    // the CLI path in Settings is not an executable file
+	ClassModelMismatch      = "model_mismatch"      // a model that belongs to another provider
+	ClassLaunchFiles        = "launch_files"        // the launch's prompt, settings or instruction files could not be written
+	ClassTerminalStart      = "terminal_start"      // the terminal (tmux or pty) could not be started
+	ClassEnvEmpty           = "env_empty"           // the agent's environment was empty
+	ClassOther              = "other"
+)
+
 type propKind int
 
 const (
@@ -142,7 +155,8 @@ var (
 	failureEnu  = enum(FailInvalidRequest, FailUnsupportedOption, FailLimitReached, FailWorkdirUnavailable,
 		FailBackendUnavailable, FailProviderMissing, FailProviderUnrunnable, FailSpawnFailed, FailWorktreeFailed, FailInternal, FailHomeFolderAsked,
 		FailDisclosureAsked, FailWorkdirMissing, FailTeamAccessOff, FailNameTaken, FailInvalidModel, FailOutsideTeam, FailAgentTypeInvalid, FailMemberUnnamed)
-	agentCount = intRange(0, 64)
+	errorClassEnu = enum(ClassSettingsUnreadable, ClassCLIUntrustedMount, ClassCLIWrongBinary, ClassCLIPathInvalid, ClassModelMismatch, ClassLaunchFiles, ClassTerminalStart, ClassEnvEmpty, ClassOther)
+	agentCount    = intRange(0, 64)
 )
 
 var slugRE = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
@@ -173,7 +187,7 @@ var eventSpecs = map[string]map[string]propSpec{
 
 	EventLaunchRequested: {"kind": kindEnu, "attempt_id": slugProp, "provider": providerEnu, "backend": backendEnu, "requested_agents": agentCount, "resume": boolProp},
 	EventLaunchResult: {"kind": kindEnu, "attempt_id": slugProp, "provider": providerEnu, "backend": backendEnu, "requested_agents": agentCount,
-		"resume": boolProp, "outcome": enum(OutcomeSuccess, OutcomeFailure, OutcomePartial), "failure_category": failureEnu,
+		"resume": boolProp, "outcome": enum(OutcomeSuccess, OutcomeFailure, OutcomePartial), "failure_category": failureEnu, "error_class": errorClassEnu,
 		"duration_ms": intRange(0, 600000), "started_agents": agentCount, "failed_agents": agentCount},
 	EventTaskCompleted: {"outcome": enum(OutcomeSuccess, OutcomeFailed)},
 
@@ -255,6 +269,15 @@ type Attempt struct {
 	requested int
 	resume    bool
 	start     time.Time
+	errClass  string
+}
+
+// ErrorClass sets the error class (one of the Class* values) the result carries when the launch fails; it returns the attempt so it chains into Finish. A nil attempt is fine.
+func (a *Attempt) ErrorClass(class string) *Attempt {
+	if a != nil {
+		a.errClass = class
+	}
+	return a
 }
 
 // StartLaunch records launch_requested and returns the attempt to finish. It is
@@ -283,6 +306,9 @@ func (a *Attempt) Finish(outcome, category string, started, failed int) {
 	p["outcome"] = outcome
 	if outcome != OutcomeSuccess && category != "" {
 		p["failure_category"] = category
+		if a.errClass != "" {
+			p["error_class"] = a.errClass
+		}
 	}
 	p["duration_ms"] = strconv.FormatInt(time.Since(a.start).Milliseconds(), 10)
 	p["started_agents"] = strconv.Itoa(started)

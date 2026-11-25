@@ -68,7 +68,7 @@ var AllEvents = []EventDoc{
 	{Name: EventFirstTaskSucceeded, When: "Once ever: the first message-board task completed successfully."},
 	{Name: EventTaskCompleted, When: "Every time a message-board task is marked complete.", Extra: "outcome — success or failed"},
 	{Name: EventLaunchRequested, When: "Every time you start launching an agent or a team.", Extra: "kind, attempt_id (random per launch), provider (claude, codex, gemini, other, mixed), backend (tmux, pty), requested_agents, resume"},
-	{Name: EventLaunchResult, When: "When that launch finishes.", Extra: "the launch_requested properties plus outcome (success, failure, partial), failure_category (a fixed list such as limit_reached or spawn_failed — never the error text), duration_ms, started_agents, failed_agents"},
+	{Name: EventLaunchResult, When: "When that launch finishes.", Extra: "the launch_requested properties plus outcome (success, failure, partial), failure_category (a fixed list such as limit_reached or spawn_failed — never the error text), error_class (on an internal failure: a fixed class such as launch_files or terminal_start), duration_ms, started_agents, failed_agents"},
 	{Name: EventDashboardReady, When: "Each time the dashboard page finishes loading and shows your agents.", Extra: "page_id — a random ID for that page load"},
 	{Name: EventDashboardActiveDay, When: "At most once per UTC day that you have the dashboard open."},
 	{Name: EventDashboardFailed, When: "When the dashboard cannot load its agent list or status at startup.", Extra: "code — a fixed code such as sessions_fetch_http or init_failed"},

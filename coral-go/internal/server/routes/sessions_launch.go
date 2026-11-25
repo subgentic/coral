@@ -314,7 +314,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 			writeModelRefused(w, refused)
 			return
 		}
-		attempt.Finish(tracking.OutcomeFailure, classifyLaunchError(err), 0, 1)
+		category := classifyLaunchError(err)
+		if category == tracking.FailInternal { // what an internal failure was, as a fixed class (#21453)
+			attempt.ErrorClass(launchErrorClass(err))
+		}
+		attempt.Finish(tracking.OutcomeFailure, category, 0, 1)
 		if refuse, ok := cliPathRefusal(viaHub(r.Context(), r), err); ok { // a setting to fix, not a server fault (#115)
 			refuse(w)
 			return
