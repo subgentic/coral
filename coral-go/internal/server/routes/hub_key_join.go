@@ -39,12 +39,17 @@ const keyJoinTTL = store.LinkRequestPendingTTL
 // maxKeyJoins is how many joins may wait at once.
 const maxKeyJoins = 8
 
+// maxJoinCodeTries is how many wrong codes one join may send before it ends here (coral-hub Security's SHOULD C on #21220). The computer keeps its own count and denies its request after
+// store.LinkRequestMaxTries wrong codes, whatever any Hub does.
+const maxJoinCodeTries = 5
+
 type keyJoin struct {
 	serverID, label, url string
 	allowPrivate         bool
 	key                  string // the request key: for the three calls and the record, nowhere else
 	requestID, secret    string // the computer's request and its poll secret
 	expires              time.Time
+	tries                int // wrong codes sent so far
 }
 
 type keyJoins struct {
@@ -82,6 +87,22 @@ func (j *keyJoins) put(kj *keyJoin) (string, bool) {
 	id := hex.EncodeToString(b)
 	j.m[id] = kj
 	return id, true
+}
+
+// wrongCode counts one wrong code for join id and reports whether it may still try; at maxJoinCodeTries the join ends.
+func (j *keyJoins) wrongCode(id string) bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	kj := j.m[id]
+	if kj == nil {
+		return false
+	}
+	kj.tries++
+	if kj.tries >= maxJoinCodeTries {
+		delete(j.m, id)
+		return false
+	}
+	return true
 }
 
 func (j *keyJoins) drop(id string) {
@@ -124,6 +145,28 @@ func keyNameFor(hub string) string {
 		n = "hub"
 	}
 	return n
+}
+
+// sshFailureText is what an SSH failure may show the person (coral-hub Security's SHOULD A on #21220): no key and no long hex (a key's secret, a host key), at most 200 characters.
+var sshSecretish = regexp.MustCompile(`lrk_[0-9A-Za-z_]*|[0-9a-fA-F]{16,}`)
+
+func sshFailureText(err error) string {
+	s := sshSecretish.ReplaceAllString(cleanSavedField(err.Error()), "[hidden]")
+	if len(s) > 200 {
+		s = s[:200] + "..."
+	}
+	return s
+}
+
+// orphanedKeyNote names a key this hub made over SSH for a join that then failed (coral-hub Security's SHOULD B on #21220): it is unused at that computer, and the person removes it there. Only
+// its id, which is not a secret.
+func orphanedKeyNote(key string) string {
+	rest := strings.TrimPrefix(key, "lrk_")
+	id, _, ok := strings.Cut(rest, "_")
+	if !ok || len(id) != 8 {
+		return ""
+	}
+	return " The request key lk-" + id + " this hub made on that computer is unused: remove it there with: coral cloud keys revoke lk-" + id
 }
 
 // thisHubOrigin is this hub's address as the person's browser reached it: the name the computer shows its person and holds the link under.
@@ -184,14 +227,17 @@ func remoteSaid(code int, out map[string]any) string {
 }
 
 // joinErr answers a join that could not reach the computer: the reason, never the key.
-func joinErr(w http.ResponseWriter, err error) {
+func joinErr(w http.ResponseWriter, err error) { joinErrNote(w, err, "") }
+
+// joinErrNote is joinErr with a note after the reason (an orphaned key's).
+func joinErrNote(w http.ResponseWriter, err error, note string) {
 	switch {
 	case errors.Is(err, proxy.ErrLinkKeyPlainHTTP):
-		errBadRequest(w, proxy.ErrLinkKeyPlainHTTP.Error())
+		errBadRequest(w, proxy.ErrLinkKeyPlainHTTP.Error()+note)
 	case errors.Is(err, proxy.ErrBlocked):
-		errBadRequest(w, "That address is on a private network: tick Allow a private address to join it")
+		errBadRequest(w, "That address is on a private network: tick Allow a private address to join it."+note)
 	default:
-		writeError(w, http.StatusBadGateway, "unreachable", "Could not reach the computer")
+		writeError(w, http.StatusBadGateway, "unreachable", "Could not reach the computer."+note)
 	}
 }
 
@@ -240,6 +286,7 @@ func (h *RemoteServersHandler) JoinStart(w http.ResponseWriter, r *http.Request)
 		hub = thisHubOrigin(r)
 	}
 	key := strings.TrimSpace(body.Key)
+	made := "" // a key this hub made over SSH: named as unused if the join fails after it
 	switch {
 	case key != "" && body.SSHTarget != "":
 		errBadRequest(w, "send a key or an ssh_target, not both")
@@ -253,10 +300,11 @@ func (h *RemoteServersHandler) JoinStart(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		if key, err = h.sshKey(r.Context(), body.SSHTarget, keyNameFor(hub)); err != nil {
-			slog.Warn("hub: could not make a request key over SSH", "server", body.ID, "error", err.Error())
-			writeError(w, http.StatusBadGateway, "ssh_key_failed", "Could not make a request key on that computer over SSH: "+cleanSavedField(err.Error()))
+			slog.Warn("hub: could not make a request key over SSH", "server", body.ID, "error", sshFailureText(err))
+			writeError(w, http.StatusBadGateway, "ssh_key_failed", "Could not make a request key on that computer over SSH: "+sshFailureText(err))
 			return
 		}
+		made = key
 	}
 	if !proxy.IsLinkKey(key) {
 		errBadRequest(w, "that is not a request key (it starts with lrk_): make one at the computer with coral cloud keys create")
@@ -267,20 +315,24 @@ func (h *RemoteServersHandler) JoinStart(w http.ResponseWriter, r *http.Request)
 		label = body.ID
 	}
 	t := proxy.HTTPTarget{URL: norm, APIKey: key, AllowPrivate: body.AllowPrivate}
+	orphan := ""
+	if made != "" {
+		orphan = orphanedKeyNote(made)
+	}
 	code, out, err := remoteCall(r.Context(), t, http.MethodPost, "/api/cloud/link-requests", map[string]string{"hub": hub, "cap": body.Cap}, nil)
 	if err != nil {
-		joinErr(w, err)
+		joinErrNote(w, err, orphan)
 		return
 	}
 	reqID, _ := out["request_id"].(string)
 	secret, _ := out["poll_secret"].(string)
 	if code != http.StatusOK || reqID == "" || secret == "" {
-		writeError(w, http.StatusBadGateway, "join_refused", remoteSaid(code, out))
+		writeError(w, http.StatusBadGateway, "join_refused", remoteSaid(code, out)+"."+orphan)
 		return
 	}
 	id, ok := h.joins.put(&keyJoin{serverID: body.ID, label: label, url: norm, allowPrivate: body.AllowPrivate, key: key, requestID: reqID, secret: secret, expires: time.Now().Add(keyJoinTTL)})
 	if !ok {
-		writeError(w, http.StatusTooManyRequests, "too_many_joins", "Too many joins are waiting: finish or wait for them first")
+		writeError(w, http.StatusTooManyRequests, "too_many_joins", "Too many joins are waiting: finish or wait for them first."+orphan)
 		return
 	}
 	slog.Info("hub: asked a computer to join", "server", body.ID, "join", id)
@@ -337,6 +389,10 @@ func (h *RemoteServersHandler) JoinCode(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if linked, _ := out["linked"].(bool); code != http.StatusOK || !linked {
+		if c, _ := out["code"].(string); code == http.StatusForbidden && c == "wrong_code" && !h.joins.wrongCode(jid) {
+			writeError(w, http.StatusGone, "too_many_codes", "That was the last wrong code this hub sends for this join: start the join again")
+			return
+		}
 		status := http.StatusBadGateway
 		if code == http.StatusForbidden || code == http.StatusConflict || code == http.StatusGone {
 			status = code // a wrong code, a request that is not waiting: the person can act on it

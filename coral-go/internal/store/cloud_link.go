@@ -197,6 +197,12 @@ func (s *CloudStore) LinkByOrigin(ctx context.Context, hubURL string) (*CloudLin
 }
 
 // LinkExists reports whether id is an active link on this computer: a paused, revoked or removing link is "no" (Security's point 8). A store error is "no": the caller refuses.
+// HostedLink is whether id is a hosted Hub's link (any source but a request key's, #21220). A row it cannot read is not one.
+func (s *CloudStore) HostedLink(ctx context.Context, id string) bool {
+	var src string
+	return id != "" && s.db.GetContext(ctx, &src, "SELECT source FROM cloud_link WHERE link_id = ?", id) == nil && src != LinkSourceKey
+}
+
 func (s *CloudStore) LinkExists(ctx context.Context, id string) bool {
 	var n int
 	return s.db.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link WHERE link_id = ? AND state = ?", id, LinkStateActive) == nil && n == 1

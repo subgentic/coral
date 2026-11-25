@@ -603,7 +603,7 @@ func (h *SessionsHandler) WSTerminal(w http.ResponseWriter, r *http.Request) {
 	defer h.backend.Unsubscribe(name, subID)
 	defer h.focus.closed(sessionID, subID) // this view's focus report goes with its socket; other views of the agent keep theirs
 
-	t := &terminalStream{h: h, ctx: ctx, conn: conn, name: name, agentType: agentType, sessionID: sessionID, viaHub: cloud.Tunneled(r), subID: subID,
+	t := &terminalStream{h: h, ctx: ctx, conn: conn, name: name, agentType: agentType, sessionID: sessionID, viaHub: cloud.Tunneled(r), keyLink: keyLinkCaller(r), subID: subID,
 		sizeCheck: make(chan int64, 1)}
 	t.sizer, _ = h.backend.(ptymanager.PaneSizer)
 	t.sendReplay()
@@ -665,6 +665,7 @@ type terminalStream struct {
 	conn                       *websocket.Conn
 	name, agentType, sessionID string
 	viaHub                     bool // the socket came through Coral Hub
+	keyLink                    bool // through a key link (#21220): it watches, it never types as the person
 	subID                      string
 	sizer                      ptymanager.PaneSizer
 	// sizeCheck carries a resize's seq to the writer, which answers it with the pane's size.
@@ -771,6 +772,14 @@ func (t *terminalStream) handleFrame(msg terminalFrame) {
 	// Input or a resize for a terminal that is gone is not dropped silently: the
 	// client is told, like the 409 terminal_gone of POST /send and /keys (#3218).
 	var sendErr error
+	if t.keyLink && (msg.Type == "composer_send" || msg.Type == "terminal_input") { // a key link is never the person (#21220): nothing it sends is typed
+		frame := map[string]any{"type": "terminal_input_failed", "code": keyLinkPersonActCode, "error": keyLinkPersonActText, "not_sent": true}
+		if msg.ID != nil {
+			frame["id"] = *msg.ID
+		}
+		wsWriteJSON(t.ctx, t.conn, frame)
+		return
+	}
 	switch msg.Type {
 	case "composer_send":
 		t.composerSend(msg)

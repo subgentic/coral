@@ -24,6 +24,9 @@ import (
 // Send sends a command to a live tmux session.
 // POST /api/sessions/live/{name}/send
 func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
+	if refuseKeyLinkPersonAct(w, r) { // a key link is never the person (#21220)
+		return
+	}
 	sentAt := time.Now() // a reply is measured from here, not from when the agent took the prompt (a message behind a running turn waits)
 	name := chi.URLParam(r, "name")
 	var body struct {
@@ -101,6 +104,9 @@ func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
 // Keys sends raw tmux key names to a session.
 // POST /api/sessions/live/{name}/keys
 func (h *SessionsHandler) Keys(w http.ResponseWriter, r *http.Request) {
+	if refuseKeyLinkPersonAct(w, r) { // a key link is never the person (#21220)
+		return
+	}
 	name := chi.URLParam(r, "name")
 	var body struct {
 		Keys      []string `json:"keys"`

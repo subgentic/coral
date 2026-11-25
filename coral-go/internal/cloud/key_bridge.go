@@ -41,8 +41,9 @@ func (b *keyBridge) mode() tunnel.Mode { return tunnel.Mode(b.cap.Load()) }
 
 // keyBridges are the running key links' tunnels, by link id.
 type keyBridges struct {
-	mu sync.Mutex
-	m  map[string]*keyBridge
+	syncMu sync.Mutex // one sync at a time
+	mu     sync.Mutex // m
+	m      map[string]*keyBridge
 }
 
 // memListener is a net.Listener whose connections are in-memory pipes: the bridge's tunnel never touches a socket.
@@ -146,16 +147,19 @@ func (o oneTarget) Resolve(_ context.Context, id string) (hubproxy.Target, error
 }
 
 // syncKeyBridges makes the running key-link tunnels match the active key links (called from LinksChanged): a new one is opened, a removed, revoked or paused one is closed (its streams end with it), and
-// one whose cap changed is opened again at the new cap, a lowered cap first closing the streams above it.
+// one whose cap changed is opened again at the new cap, a lowered cap first closing the streams above it. Closing happens under kb.mu; opening (up to 10 s each) does not, so one slow open never
+// holds up the other key links' requests (QA's INFO on #21220). A link being opened answers ErrNoKeyLink meanwhile. syncMu keeps two syncs from opening the same link twice.
 func (m *Manager) syncKeyBridges(root context.Context, links []store.CloudLink) {
+	m.kb.syncMu.Lock()
+	defer m.kb.syncMu.Unlock()
 	want := map[string]store.CloudLink{}
 	for _, l := range links {
 		if l.Source == store.LinkSourceKey && l.State == store.LinkStateActive {
 			want[l.LinkID] = l
 		}
 	}
+	var open []store.CloudLink
 	m.kb.mu.Lock()
-	defer m.kb.mu.Unlock()
 	if m.kb.m == nil {
 		m.kb.m = map[string]*keyBridge{}
 	}
@@ -178,12 +182,18 @@ func (m *Manager) syncKeyBridges(root context.Context, links []store.CloudLink) 
 			b.cancel()
 			delete(m.kb.m, id)
 		}
-		b, err := m.startKeyBridge(root, l, cp)
+		open = append(open, l)
+	}
+	m.kb.mu.Unlock()
+	for _, l := range open {
+		b, err := m.startKeyBridge(root, l, modeOf(l.MaxMode))
 		if err != nil {
-			m.o.Logger.Warn("cloud: could not open a key link's tunnel", "link", id, "error", err.Error())
+			m.o.Logger.Warn("cloud: could not open a key link's tunnel", "link", l.LinkID, "error", err.Error())
 			continue
 		}
-		m.kb.m[id] = b
+		m.kb.mu.Lock()
+		m.kb.m[l.LinkID] = b
+		m.kb.mu.Unlock()
 	}
 }
 

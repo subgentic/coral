@@ -106,6 +106,34 @@ func TestTwoSelfHostedHubsJoinOneComputerByKeyAndRevokingOneLeavesTheOther(t *te
 	require.Eventually(t, func() bool { return reach(hubA) != 200 }, 5*time.Second, 50*time.Millisecond, "hub A's reach ends with its key")
 	assert.Equal(t, 200, reach(hubB), "hub B's link is untouched")
 
+	// coral-hub Security's SHOULD C: the hub sends at most 5 wrong codes for one join, then ends it (the computer denies its own request at 5 too)
+	hubC := newE2EHub(t, env, "", true) // a hub holds one link to a computer: a third one
+	_, k3 := makeKeyForTest(t, w.h, "Hub C")
+	code, b := asPerson(t, hubC, "POST", "/api/servers/join", map[string]any{"id": "box2", "url": w.r.url(), "cap": "view", "allow_private": true, "key": k3})
+	require.Equal(t, 200, code, string(b))
+	var st map[string]string
+	require.NoError(t, json.Unmarshal(b, &st))
+	feed := call(w.h, "GET", "/api/cloud/link-requests", "", nil)
+	rid := regexp.MustCompile(`"id":"([^"]+)","hub":"` + regexp.QuoteMeta(hubC.ts.URL) + `"`).FindStringSubmatch(feed.Body.String())
+	require.Len(t, rid, 2, feed.Body.String())
+	al := call(w.h, "POST", "/api/cloud/link-requests/"+rid[1]+"/allow", `{}`, map[string]string{"Content-Type": "application/json"})
+	require.Equal(t, 200, al.Code, al.Body.String())
+	right := regexp.MustCompile(`"code":"(\d{8})"`).FindStringSubmatch(al.Body.String())[1]
+	wrong := "00000000"
+	if right == wrong {
+		wrong = "11111111"
+	}
+	for i := 1; i <= 5; i++ {
+		code, b = asPerson(t, hubC, "POST", "/api/servers/join/"+st["join"]+"/code", map[string]string{"code": wrong})
+		if i < 5 {
+			assert.Equal(t, 403, code, "wrong code %d: %s", i, b)
+		} else {
+			assert.Equal(t, 410, code, "the fifth wrong code ends the join: %s", b)
+		}
+	}
+	code, _ = asPerson(t, hubC, "POST", "/api/servers/join/"+st["join"]+"/code", map[string]string{"code": right})
+	assert.Equal(t, 404, code, "an ended join takes no code, not even the right one")
+
 	w.r.mu.Lock()
 	defer w.r.mu.Unlock()
 	for _, r := range w.r.reqs {
