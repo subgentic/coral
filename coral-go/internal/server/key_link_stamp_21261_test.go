@@ -154,3 +154,26 @@ func TestALinkRequestsHubIDIsCheckedAndOnlyAKeysIsKept(t *testing.T) {
 	rec := call(w.h, "POST", "/api/cloud/link-requests", `{"hub":"https://hub-bad.example.com","cap":"view","hub_id":"Not A Hub!"}`, kj)
 	assert.Equal(t, 400, rec.Code, rec.Body.String())
 }
+
+// #21318 (Security INFO 6): a stamp that is genuine (this link's own Hub, fresh, the right body) on a route that is NOT on the owner-stamp allowlist is refused, never taken as the person. The allowlist
+// check runs inside the verify, before the stamp can make the request the person's.
+func TestAGenuineStampOnAKeyLinkForARouteOffTheAllowlistIsRefused(t *testing.T) {
+	w := newKeyLinkWorld(t)
+	w.installHubs(t)
+	key1 := w.joinAs(t, "https://hub-one.example.com", kls1Hub1)
+	require.Eventually(t, func() bool { c, _ := w.send(t, "GET", "/api/health", key1, nil); return c == 200 }, 5*time.Second, 20*time.Millisecond)
+
+	const off = "/api/sessions/live/no-such-agent/keys" // within an Interact link's cap, so the stamp (not the cap) is what answers
+	require.False(t, hubowner.Allowed("POST", off), "the route this test uses must stay off the allowlist")
+	body := `{"keys":"x"}`
+	s, err := hubowner.Sign(kls1Sec1, "mac", "POST", off, []byte(body), time.Now())
+	require.NoError(t, err)
+	code, got := w.sendBody(t, "POST", off, key1, body, map[string]string{"Content-Type": "application/json", hubowner.Header: s})
+	assert.Equal(t, 403, code, got)
+	assert.Contains(t, got, "hub_owner_stamp_refused", "a genuine stamp off the allowlist is refused as a stamp, not run as the person")
+	assert.Contains(t, got, hubowner.ReasonMalformed)
+
+	// the same Hub's stamp on an allowlisted route is its person (the control: the refusal above is the route's)
+	_, ok := w.stampedAs(t, key1, kls1Sec1, "", time.Now())
+	assert.False(t, refusedAsAKeyLinkOrStamp(ok), ok)
+}
