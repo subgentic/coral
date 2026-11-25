@@ -1,5 +1,29 @@
 # Release Notes
 
+## v2.1.13 — Reminders in the New agent panel, a clearer Inbox in light and dark, a calmer permission window, and Codex plugin hook cards
+
+Task numbers in brackets. Built on v2.1.12. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Reminders while you create an agent** (#21169, #21184): the New agent panel has a Reminders step. A persona can carry reminders (the same shape as a team template role's, daily or weekly), and the step fills them in and labels where they came from.
+- **A read Inbox card keeps a distinct title** (#21161): a card's title stays the most prominent line after it has been read.
+- **Inbox text holds its contrast in light** (#21206, #21253): the unread rows' titles, Dismiss, snippets and table text all read at 4.5:1 or better on the blue unread tint.
+- **A calmer permission window** (#21215): when a permission ask cannot be answered with one choice, the window is a normal size on a solid panel, with Open agent and Close, instead of a tall, pale, empty shape.
+- **Codex plugin hook cards** (#21209, #21226): when Codex stops because a plugin's hook is new or changed, the Needs you card names that plugin (found by comparing its trusted hash), says it is not one of Coral's hooks, and offers Trust all or Review, from the phone too.
+
+### Test and gate fixes in this release
+
+- The plugin and marketplace names in the Codex hook card are checked as single safe names before they are used in a path, and the join is in the reviewed-join census (#21288).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption and the browser gate are green on the gated commit. No Windows run: no change in this release is Windows-only.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+
 ## v2.1.12 — Send back and Split for large changes, the Waste card on the Cost page, and clearer Hub key settings
 
 Task numbers in brackets. Built on v2.1.11. A prerelease until the Operator promotes it.
