@@ -51,6 +51,17 @@ assert.equal(e.patternsEnforced, false);
 e = pe.presetEnforcement('codex', AGENT_PRESETS.find(p => p.name === 'Lead Developer').capabilities, 'default');
 assert.match(e.text, /a sandbox that can change files in its folder and use the network, and it never asks/, 'Codex git_write is no sandbox-free choice (#6422): four chips are workspace-write, never');
 assert.doesNotMatch(e.text, /without a sandbox/, 'no sandbox is only an explicit choice');
+// A Shell list for Codex on Default or Auto is a sandbox choice, not an approval gate (#21358, Security's SHOULD on #21335): the line says so where Shell is allowed or patterns are listed; Accept edits and Plan ask, so they do not say it; Claude is unchanged.
+{
+    const SAYS = /Shell: Codex runs these without asking; the list does not stop other commands\. Pick Accept edits or Plan to be asked\./;
+    for (const mode of ['default', 'auto', '']) {
+        assert.match(pe.presetEnforcement('codex', { allow: ['shell'] }, mode).text, SAYS, `Codex ${mode || 'no mode'} with Shell`);
+        assert.match(pe.presetEnforcement('codex', { allow: ['shell:git *'] }, mode).text, SAYS, `Codex ${mode || 'no mode'} with a shell pattern`);
+    }
+    for (const mode of ['acceptEdits', 'plan', 'bypassPermissions']) assert.doesNotMatch(pe.presetEnforcement('codex', { allow: ['shell'] }, mode).text, SAYS, `Codex ${mode} asks or says its own thing`);
+    assert.doesNotMatch(pe.presetEnforcement('codex', { allow: ['web_access'] }, 'default').text, SAYS, 'no Shell list, no line');
+    assert.doesNotMatch(pe.presetEnforcement('claude', { allow: ['shell'] }, 'default').text, SAYS, 'Claude is unchanged');
+}
 for (const t of ['agy', 'gemini', 'antigravity']) {
     e = pe.presetEnforcement(t, AGENT_PRESETS.find(p => p.name === 'Security Reviewer').roleLimits, 'default');
     assert.match(e.text, /^Antigravity keeps only a mode: read-only planning/, t);

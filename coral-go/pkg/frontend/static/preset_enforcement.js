@@ -124,6 +124,7 @@ export function presetEnforcement(agentType, caps, permMode) {
         const networkOn = m ? m.sandbox === 'workspace-write' && m.approval === 'never' : ['auto', 'dontAsk'].includes(permMode);
         if (networkOn && m && !m.search) text += ' Leaving out Web Access does not turn the network off.';
         text += ' Deny entries and shell patterns are not enforced (a Deny entry only changes the mode).';
+        if (['', 'default', 'auto'].includes(permMode || '') && (allow.has('shell') || [...allow].some(a => a.startsWith('shell:')))) text += ' Shell: Codex runs these without asking; the list does not stop other commands. Pick Accept edits or Plan to be asked.'; // Default is Auto for Codex (#21335): the Shell list is a sandbox choice, not an approval gate (#21358)
         return { text, denyEnforced: false, patternsEnforced: false, ...(networkOn ? { more: NETWORK_OFF_FLAG } : {}) };
     }
     if (family === 'agy') {
