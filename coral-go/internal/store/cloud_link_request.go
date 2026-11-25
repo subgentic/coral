@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"math/big"
 	"strings"
 	"time"
@@ -333,6 +334,72 @@ func (s *CloudStore) FinishLinkRequest(ctx context.Context, id, pollSecret, code
 // FinishLinkRequestBy is FinishLinkRequest for a caller that is a request key (#20959, defence in depth beside the poll secret): a request made with one key is finished only by that key, and any other key, or
 // none (including ""), gets the same none as an unknown request. A request made by the person at this computer (not by a key) may be finished with key ""; a key's request is finished only by its key, the person included.
 func (s *CloudStore) FinishLinkRequestBy(ctx context.Context, id, pollSecret, code, key string, now time.Time) (hub, linkCap string, err error) {
+	return s.finishLinkRequest(ctx, id, pollSecret, code, key, now, nil)
+}
+
+// FinishLinkRequestAsKeyLink finishes a request a self-hosted Hub's request key made (#21220, design (B)): no enroll and no tunnel. In the one transaction that checks the request and marks it consumed, it
+// writes the link that key answers to (source "key", the cap given) and its 'added' event, under the same gates as AddLink (the link cap, one link per address). A request made otherwise is ErrLinkRequestNone;
+// a replayed, expired or used one writes nothing.
+func (s *CloudStore) FinishLinkRequestAsKeyLink(ctx context.Context, id, pollSecret, code, key string, now time.Time) (*CloudLink, error) {
+	if !strings.HasPrefix(key, "lk-") {
+		return nil, ErrLinkRequestNone
+	}
+	var linkID string
+	hub, _, err := s.finishLinkRequest(ctx, id, pollSecret, code, key, now, func(tx *sqlx.Tx, r *lrRow) error {
+		origin, err := CanonicalHubOrigin(r.Hub)
+		if err != nil {
+			return err
+		}
+		var n, same int
+		if err := tx.GetContext(ctx, &n, "SELECT COUNT(*) FROM cloud_link"); err != nil {
+			return err
+		}
+		if n >= MaxCloudLinks {
+			return ErrTooManyLinks
+		}
+		if n >= 1 && !secondLinkOpen {
+			return ErrSecondLinkNotYet
+		}
+		if err := tx.GetContext(ctx, &same, "SELECT COUNT(*) FROM cloud_link WHERE hub_origin = ?", origin); err != nil {
+			return err
+		}
+		if same > 0 {
+			return ErrLinkExists
+		}
+		if linkID, err = NewLinkID(); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, created_at, source, key_id) VALUES (?, ?, ?, ?, '', ?, ?, 'all', ?, ?, ?)`,
+			linkID, origin, key, origin, LinkStateActive, r.CapGiven, nowUTC(), LinkSourceKey, key); err != nil {
+			return err
+		}
+		return logLinkEvent(ctx, tx, linkID, origin, LinkEventAdded, "cap "+r.CapGiven+", by request key "+key)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.LinkByOrigin(ctx, hub)
+}
+
+// KeyLink is the active link a request key answers to (#21220), or ErrNoCloudLink: none, or one that is paused, revoked or being removed.
+func (s *CloudStore) KeyLink(ctx context.Context, keyID string) (*CloudLink, error) {
+	if keyID == "" {
+		return nil, ErrNoCloudLink
+	}
+	var l CloudLink
+	err := s.db.GetContext(ctx, &l, `SELECT link_id, hub_origin, server_id, label, state, max_mode, scope, owner_account, owner_user, owner_adopted_at, created_at, last_seen, last_error, source, key_id
+		FROM cloud_link WHERE key_id = ? AND source = ? AND state = ?`, keyID, LinkSourceKey, LinkStateActive)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNoCloudLink
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &l, nil
+}
+
+// finishLinkRequest is the one transaction of a finish: the checks, the consume and then, when it is given, more writes in the same transaction (a failure there writes nothing, the request included).
+func (s *CloudStore) finishLinkRequest(ctx context.Context, id, pollSecret, code, key string, now time.Time, then func(*sqlx.Tx, *lrRow) error) (hub, linkCap string, err error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return "", "", err
@@ -375,6 +442,11 @@ func (s *CloudStore) FinishLinkRequestBy(ctx context.Context, id, pollSecret, co
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE cloud_link_request SET state = 'consumed', ended_at = ? WHERE request_id = ?`, lrTime(now), id); err != nil {
 		return "", "", err
+	}
+	if then != nil {
+		if err := then(tx, r); err != nil {
+			return "", "", err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return "", "", err

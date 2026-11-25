@@ -208,5 +208,10 @@ func (s *CloudStore) RevokeLinkKey(ctx context.Context, id string, now time.Time
 		return ErrLinkKeyNone
 	}
 	_, err = s.db.ExecContext(ctx, `UPDATE cloud_link_request SET state = 'expired', ended_at = ? WHERE cred_id = ? AND state IN ('pending','allowed')`, lrTime(now), id)
+	if err != nil {
+		return err
+	}
+	// The link a self-hosted Hub reached this computer by with that key shows as revoked from now on (#21220, Security's MUST 4): never a working link, and removing it never brings the key back.
+	_, err = s.db.ExecContext(ctx, `UPDATE cloud_link SET state = ? WHERE key_id = ? AND source = ?`, LinkStateRevoked, id, LinkSourceKey)
 	return err
 }
