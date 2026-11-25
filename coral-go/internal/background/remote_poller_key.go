@@ -2,11 +2,10 @@ package background
 
 import (
 	"context"
-	"net"
-	"net/url"
 	"strings"
 
 	"github.com/subgentic/coral/internal/store"
+	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
 // RemoteKeyRegistry is the part of store.RemoteServerStore the poller's key lookup needs.
@@ -43,22 +42,5 @@ func RemoteKeyFor(reg RemoteKeyRegistry) func(ctx context.Context, remoteURL str
 	}
 }
 
-// keySafeURL is whether a key may be sent to this URL: https always, plain http only to this computer (localhost or a loopback address).
-func keySafeURL(raw string) bool {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return false
-	}
-	if u.Scheme == "https" {
-		return true
-	}
-	if u.Scheme != "http" {
-		return false
-	}
-	h := u.Hostname()
-	if strings.EqualFold(h, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(h)
-	return ip != nil && ip.IsLoopback()
-}
+// keySafeURL is whether a key may be sent to this URL: https always, plain http only to this computer (localhost or a loopback address). The hub's one rule (hubproxy.KeySafeURL).
+func keySafeURL(raw string) bool { return proxy.KeySafeURL(raw) }

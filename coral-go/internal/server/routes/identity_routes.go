@@ -366,6 +366,10 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/servers/{id}/test":         "test a remote server",
 	"POST /api/servers/{id}/reconnect":    "reconnect a remote server",
 	"POST /api/servers/{id}/owner-secret": "set up Approve through this hub for a computer added by URL",
+	// #21220: a second Hub joins a computer with that computer's request key (made over SSH, or typed in), at a level its person allows.
+	"POST /api/servers/join":             "join a computer as a second Hub",
+	"GET /api/servers/join/{join}":       "check a join of a computer",
+	"POST /api/servers/join/{join}/code": "finish joining a computer with its code",
 	// #11370: setting a server up over SSH runs commands on another computer with the hub user's SSH access.
 	"GET /api/servers/provision/options":            "read what the server setup dialog shows",
 	"GET /api/servers/provision":                    "list the server setups that are running or just finished",
@@ -545,6 +549,7 @@ var operatorOnlyRoutes = map[string]string{
 // lets them be absent otherwise.
 var hubModeRoutes = map[string]bool{
 	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true, "POST /api/servers/{id}/reconnect": true, "POST /api/servers/{id}/owner-secret": true,
+	"POST /api/servers/join": true, "GET /api/servers/join/{join}": true, "POST /api/servers/join/{join}/code": true,
 	"GET /api/servers/provision/options": true, "GET /api/servers/provision": true, "POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/forget-key": true, "POST /api/servers/provision/{plan}/run": true, "POST /api/servers/provision/{plan}/upload": true,
 	"GET /api/servers/provision/{plan}": true, "DELETE /api/servers/provision/{plan}": true,
 	"CONNECT /api/remote/{server}/*": true,

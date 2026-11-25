@@ -70,6 +70,8 @@ var columnMigrations = []struct {
 	{"remote_servers", "ssh_target", "TEXT NOT NULL DEFAULT ''"},
 	{"remote_servers", "remote_port", "INTEGER NOT NULL DEFAULT 0"},
 	{"remote_servers", "instance_id", "TEXT NOT NULL DEFAULT ''"},
+	// What a server's stored key is (#21220): "api", an API key, or "link", a request key the remote's person Allowed (AddLinkKey only). A link key is sent in its own header and only over https or loopback.
+	{"remote_servers", "key_kind", "TEXT NOT NULL DEFAULT 'api'"},
 	// A job's runs work in a worktree of its folder (0, as every job before this did) or in the folder itself (1): a folder that is not a git repository can be one (#10276).
 	{"scheduled_jobs", "no_worktree", "INTEGER NOT NULL DEFAULT 0"},
 	// 1: each run trusts exactly the worktree it made for itself, so the CLI's trust card does not stop an unattended run. Set only by the person on their own dashboard, cleared when the job's folder changes (#16421).

@@ -1033,6 +1033,11 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		r.Delete("/api/servers/{id}", rsHandler.Delete)
 		r.Post("/api/servers/{id}/test", rsHandler.Test)
 		r.Post("/api/servers/{id}/owner-secret", rsHandler.OwnerSecret)
+		// Join a computer with its request key, as a second Hub (#21220): start, the person's answer there, the code.
+		rsHandler.SetSSHLinkKeyMaker(routes.SSHCreateLinkKey)
+		r.Post("/api/servers/join", rsHandler.JoinStart)
+		r.Get("/api/servers/join/{join}", rsHandler.JoinStatus)
+		r.Post("/api/servers/join/{join}/code", rsHandler.JoinCode)
 		// Set a Coral server up on another computer over SSH (#11370): hub mode only, the Operator's.
 		prov := routes.NewProvisioner(rsHandler.Store())
 		prov.SetUploadDir(filepath.Join(s.cfg.CoralDir(), "provision-uploads")) // an uploaded package is held here until its run ends (#15691)
