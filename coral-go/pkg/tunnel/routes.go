@@ -479,14 +479,35 @@ var routeTable = cat(
 		"/api/workflows", "/api/workflows/runs/recent", "/api/workflows/by-name/{name}", "/api/workflows/{id}",
 		"/api/workflows/{id}/runs", "/api/workflows/runs/{id}",
 	)),
+	// The Operator's clicks that the Activity record keeps by their route (#21435): the connector stamps the owner marker on them so the row names the owner (not hub:unknown); the machine refuses
+	// nobody here (a grantee at Interact still acts, and is recorded as hub:unknown, never as the owner), as for every OwnerSees route.
+	owner(OwnerSees,
+		rules(http.MethodPost, TierInteract,
+			"/api/sessions/live/{name}/send",
+			"/api/sessions/live/{name}/answer-prompt",
+			"/api/workflows/runs/{id}/seen",
+			"/api/scheduled/runs/{id}/seen",
+			"/api/board/{project}/tasks/{id}/complete",
+			"/api/board/{project}/tasks/{id}/cancel",
+			"/api/board/{project}/tasks/{id}/nudge",
+			"/api/board/{project}/tasks/{id}/reminder",
+			"/api/board/{project}/tasks/{id}/publish",
+			"/api/board/{project}/goals/{id}/close",
+		),
+		rules(http.MethodPut, TierInteract, "/api/board/{project}/tasks/{id}/goal"),
+		rules(http.MethodPatch, TierInteract,
+			"/api/board/{project}/tasks/{id}",
+			"/api/board/{project}/tasks/{id}/amend",
+			"/api/board/{project}/goals/{id}",
+		),
+		rules(http.MethodDelete, TierInteract, "/api/board/{project}/tasks/{id}/reminder"),
+	),
 	rules(http.MethodPost, TierInteract,
 		// A panel interaction and a request to the agent put user text in front of an agent, like send.
 		"/api/agent/ui/{uiid}/events",
 		"/api/agent/ui-request",
-		"/api/sessions/live/{name}/send",
 		"/api/sessions/live/{name}/keys",
 		"/api/sessions/live/{name}/resize",
-		"/api/sessions/live/{name}/answer-prompt",
 		// Turning auto-accept off is always safe (#3182); turning it on is Launch, below.
 		"/api/sessions/live/{name}/auto-accept/disable",
 		"/api/auto-accept/disable-all",
@@ -499,8 +520,6 @@ var routeTable = cat(
 		"/api/sessions/live/{id}/unarchive",
 		"/api/workflows/runs/{id}/kill",
 		// A run opened (#9315): the unread dot and the Needs you row of a failed run go on the Hub too. Interact, like the workflow reads: a view-only viewer sees no workflow run to open.
-		"/api/workflows/runs/{id}/seen",
-		"/api/scheduled/runs/{id}/seen",
 		"/api/board/{project}/external-messages",
 		// A file Coral Hub relayed from another Coral (cross-team artifacts): only with its stamped header.
 		"/api/board/{project}/external-artifacts",
@@ -509,18 +528,12 @@ var routeTable = cat(
 		// Coral Hub's full list of cross-team links (#5572): only with its stamped header (X-Coral-Hub-Links: snapshot), only on a connection whose hub advertised cross_team_links/1.
 		"/api/cloud/cross-team-links",
 		"/api/board/{project}/reminder",
-		"/api/board/{project}/tasks/{id}/complete",
 		// Not .../review, .../approve or .../reject (#3725): a review verdict is given by the
 		// reviewer agent named in subscriber_id, and Coral Hub can't prove it is that agent
 		// (Security's #3725 review), so they stay off this table and are refused.
-		"/api/board/{project}/tasks/{id}/cancel",
-		"/api/board/{project}/tasks/{id}/nudge",
 		// A reply to a task (#5463): a board message linked to it, written as the stamped hub user like POST .../messages; the creator is mentioned, nothing else changes.
 		"/api/board/{project}/tasks/{id}/reply",
-		"/api/board/{project}/tasks/{id}/reminder",
-		"/api/board/{project}/tasks/{id}/publish",
 		// Goals (#7087): board text, written as the Operator by the Hub like a task or a message. A write here starts, wakes and messages nothing (a test pins it).
-		"/api/board/{project}/goals/{id}/close",
 	),
 	rules(http.MethodPut, TierInteract,
 		// Only the changed-files comparison base (validated to three values); PUT /api/settings itself stays never.
@@ -528,21 +541,16 @@ var routeTable = cat(
 		"/api/sessions/live/{name}/display-name",
 		"/api/sessions/live/{name}/icon",
 		"/api/sessions/live/{name}/name-color",
-		"/api/board/{project}/tasks/{id}/goal", // link a task to a goal of its board, or unlink it (#7087)
 	),
 	rules(http.MethodPatch, TierInteract,
 		"/api/sessions/live/{name}/notes/{id}",
 		"/api/sessions/live/{name}/tasks/{id}",
-		"/api/board/{project}/tasks/{id}",
-		"/api/board/{project}/tasks/{id}/amend",
-		"/api/board/{project}/goals/{id}", // a goal's text and state (#7087)
 	),
 	rules(http.MethodDelete, TierInteract,
 		"/api/sessions/live/{name}/notes/{id}",
 		"/api/sessions/live/{name}/tasks/{id}",
 		"/api/sessions/live/{name}/held/{id}", // a person's queued chat message, cancelled before it is typed (#6627): who may send may cancel
 		"/api/board/{project}/reminder",
-		"/api/board/{project}/tasks/{id}/reminder",
 	),
 	// Deleting a whole board (its messages, tasks and members) can't be undone: Launch, not
 	// Interact (#3433). It stays the Operator's (attributed, recorded, refused with the opt-out).

@@ -266,6 +266,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodGet && (strings.Contains(p, "/attachment/") || strings.HasSuffix(p, "/changes.diff") && strings.HasPrefix(p, "/api/board/")) {
 				continue
 			}
+			// The routes of a click the Activity record keeps by its route (#21435) are OwnerSees routes: stamped so the row names the owner, refusing nobody. The old list never had them.
+			if pat, _ := OwnerRoute(m, p); got && inActivityClickRoutes(m, pat) {
+				continue
+			}
 			// The class A reads of #20257 (a board's queue, groups, waits, peek..., the task runs, a resource by name) are the owner's alone through the hub: the old list never had them.
 			if pat, _ := OwnerRoute(m, p); got && inParityARows(m, pat) {
 				continue
@@ -359,7 +363,7 @@ func TestTheRealConnectorStampsEveryOwnerRouteOfTheTableAndNothingElse(t *testin
 		do(grantee, r.Method, p, forged)
 	}
 	do(owner, http.MethodGet, "/api/board/team/status", forged) // not an owner route
-	do(owner, http.MethodPost, "/api/board/team/tasks/12/complete", forged)
+	do(owner, http.MethodPost, "/api/board/team/tasks/12/reply", forged)
 	mu.Lock()
 	defer mu.Unlock()
 	require.Len(t, got, 2*len(routes)+2)
@@ -400,4 +404,28 @@ func inParityARows(method, pattern string) bool {
 		}
 	}
 	return false
+}
+
+// inActivityClickRoutes is whether (method, pattern) is one of the OwnerSees routes of #21435: the Operator's clicks the Activity record keeps by their route, which were recorded as hub:unknown because no owner
+// marker was stamped on them.
+func inActivityClickRoutes(method, pattern string) bool {
+	return activityClickRoutes[method+" "+pattern]
+}
+
+var activityClickRoutes = map[string]bool{
+	"POST /api/sessions/live/{name}/send":             true,
+	"POST /api/sessions/live/{name}/answer-prompt":    true,
+	"POST /api/workflows/runs/{id}/seen":              true,
+	"POST /api/scheduled/runs/{id}/seen":              true,
+	"POST /api/board/{project}/tasks/{id}/complete":   true,
+	"POST /api/board/{project}/tasks/{id}/cancel":     true,
+	"POST /api/board/{project}/tasks/{id}/nudge":      true,
+	"POST /api/board/{project}/tasks/{id}/reminder":   true,
+	"POST /api/board/{project}/tasks/{id}/publish":    true,
+	"POST /api/board/{project}/goals/{id}/close":      true,
+	"PUT /api/board/{project}/tasks/{id}/goal":        true,
+	"PATCH /api/board/{project}/tasks/{id}":           true,
+	"PATCH /api/board/{project}/tasks/{id}/amend":     true,
+	"PATCH /api/board/{project}/goals/{id}":           true,
+	"DELETE /api/board/{project}/tasks/{id}/reminder": true,
 }
