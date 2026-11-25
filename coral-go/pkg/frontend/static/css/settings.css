@@ -51,7 +51,8 @@
 
 /* A real link box keeps its phone target out of the neighbouring control. */
 @media (max-width: 767px), (pointer: coarse) {
-    #settings-modal { --sv-learn-display: inline-flex; --sv-learn-height: var(--control-touch-height, 44px); --sv-learn-target-display: none; --lg: calc((1lh - var(--sv-learn-height)) / 2); } /* the 44 px box overlaps the lines around it, so a wrapped hint has no gap before its link (#21268) */
+    #settings-modal { --sv-learn-display: inline-flex; --sv-learn-height: var(--control-touch-height, 44px); --sv-learn-target-display: none; }
+    #settings-pane-notifications { --lg: calc((1lh - var(--sv-learn-height)) / 2); } /* Notifications only: its 44 px Learn more box overlaps the lines around it, so a wrapped hint has no gap before its link (#21268); the other tabs keep the real box that stays clear of the control beside it (settings_learn_hit_area) */
 }
 /* Per-row persistence feedback stays beside the setting, including at larger text sizes. */
 .settings-save-status { display: block; font-size: var(--sv-help-size); color: var(--text-muted); }
