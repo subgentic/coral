@@ -65,7 +65,7 @@ func TestCronLineHoldsTheFiveMinuteFloor(t *testing.T) {
 		}
 	}
 	// a rare line is still measured: both firings of 29 Feb are a minute apart
-	if _, err := CronLine("0,1 0 29 2 *"); err == nil || !strings.Contains(err.Error(), "every 1 minute") {
+	if _, err := CronLine("0,1 0 29 2 *"); err == nil || !strings.Contains(err.Error(), "can be 1 minute apart") {
 		t.Errorf("a Feb 29 line two minutes apart passed: %v", err)
 	}
 }

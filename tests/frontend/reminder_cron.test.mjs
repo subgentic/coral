@@ -13,7 +13,7 @@ for (const [line, want] of [['0 9 * * 1-5', '0 9 * * 1-5'], ['  */5   *  * * *  
 for (const [line, why] of [['', /Write a cron line/], ['   ', /Write a cron line/], ['@reboot', /@words/], ['@daily', /@words/], ['0 0 9 * * 1-5', /exactly 5 fields/], ['0 9 * *', /exactly 5 fields/], ['0 9 * * MON', /no names/], ['0 9 * JAN *', /no names/], ['0 9 ? * *', /no names/],
     ['0 9 L * *', /no names/], ['0 9 * * 1#2', /no names/], ['60 9 * * *', /minute runs from 0 to 59/], ['0 24 * * *', /hour runs from 0 to 23/], ['0 9 32 * *', /day of the month runs from 1 to 31/], ['0 9 * 13 *', /month runs from 1 to 12/],
     ['0 9 * * 7', /weekday runs from 0 to 6/], ['*/0 * * * *', /step/], ['5-1 * * * *', /backwards/], ['CRON_TZ=UTC 0 9 * * *', /exactly 5 fields/], ['1,'.repeat(80) + '2 * * * *', /too long/],
-    ['* * * * *', /at most every 5 minutes/], ['*/1 * * * *', /every 1 minute at times/], ['*/2 * * * *', /every 2 minutes at times/], ['*/4 * * * *', /at most every 5 minutes/], ['0,3 * * * *', /every 3 minutes/], ['0-10 9 * * *', /at most every 5 minutes/], ['0,1 0 29 2 *', /every 1 minute/]]) {
+    ['* * * * *', /at most every 5 minutes/], ['*/1 * * * *', /can be 1 minute apart/], ['*/2 * * * *', /can be 2 minutes apart/], ['*/4 * * * *', /at most every 5 minutes/], ['0,3 * * * *', /can be 3 minutes apart/], ['0-10 9 * * *', /at most every 5 minutes/], ['0,1 0 29 2 *', /can be 1 minute apart/]]) {
     const c = checkCron(line); assert.equal(c.ok, false, `${line} passed`); assert.match(c.error, why, line); assert.ok(!/\n/.test(c.error), 'one line');
 }
 

@@ -56,7 +56,7 @@ export function checkCron(input) {
     }
     if (least && least < MIN_GAP_MINUTES * 60000) {
         const mins = Math.round(least / 60000);
-        return { ok: false, error: `That fires every ${mins} minute${mins === 1 ? '' : 's'} at times; a reminder can repeat at most every ${MIN_GAP_MINUTES} minutes.` };
+        return { ok: false, error: `Two firings can be ${mins} minute${mins === 1 ? '' : 's'} apart; a reminder can repeat at most every ${MIN_GAP_MINUTES} minutes.` };
     }
     return { ok: true, line: fields.join(' '), sets };
 }
