@@ -14,7 +14,6 @@ import (
 
 	"github.com/subgentic/coral/internal/hooks"
 	"github.com/subgentic/coral/internal/license"
-	"github.com/subgentic/coral/pkg/hubowner"
 )
 
 // coral auto-accept off --all [--url URL]
@@ -102,7 +101,7 @@ func subcommand(args []string) (int, bool) {
 		return runAcceptTerms(args[1:], os.Stdin, os.Stdout, os.Stderr, license.RecordHubOwnerAcceptance), true
 	}
 	if len(args) > 0 && args[0] == "hub-owner-secret" { // the self-hosted hub's owner stamp (#11378); not listed in the help on purpose
-		return runHubOwnerSecret(args[1:], os.Stdin, os.Stdout, os.Stderr, hubowner.WriteFile), true
+		return runHubOwnerSecret(args[1:], os.Stdin, os.Stdout, os.Stderr, installHubOwnerLink), true
 	}
 	if len(args) > 0 && args[0] == "machine" && machineLaunchEnabled() { // off unless CORAL_MACHINE_LAUNCH=1: without it `coral machine` is an unknown command (#9934 slice 1b)
 		return runMachine(args[1:], os.Stdin, os.Stdout, os.Stderr), true

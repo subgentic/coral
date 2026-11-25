@@ -153,7 +153,9 @@ func TestAStampThatIsNotGenuineIsRefusedNeverIgnored(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, w.Code, "%s: %s", name, w.Body.String())
 		assert.Contains(t, w.Body.String(), "hub_owner_stamp_refused", name)
 		assert.False(t, rig.seen.ran, "%s: the handler ran for a refused stamp", name)
-		assert.NotContains(t, w.Body.String(), "secret", name)
+		// the answer says why (#21213: a reason code, the hub's name, what to fix), never the secret itself
+		assert.NotContains(t, w.Body.String(), stampSecret, name)
+		assert.NotContains(t, w.Body.String(), stampSecret[:16], name)
 	}
 }
 
@@ -209,23 +211,23 @@ func TestTheSecretFileBeingInstalledReplacedOrRemovedIsLoggedEachTime(t *testing
 	at, ok := rig.o.HubOwnerStampAt()
 	require.True(t, ok)
 	assert.False(t, at.IsZero())
-	assert.Equal(t, 1, strings.Count(buf.String(), "installed or replaced"), "installing was not logged once:\n"+buf.String())
+	assert.Equal(t, 1, strings.Count(buf.String(), "installed, replaced or removed"), "installing was not logged once:\n"+buf.String())
 	assert.Contains(t, buf.String(), "level=WARN")
 	_, _ = rig.o.HubOwnerStampAt() // looking again says nothing more
-	assert.Equal(t, 1, strings.Count(buf.String(), "installed or replaced"))
+	assert.Equal(t, 1, strings.Count(buf.String(), "installed, replaced or removed"))
 
 	// a replacement (a later time) is logged again, and so is the first stamp check after it
 	require.NoError(t, hubowner.WriteFile(rig.dir, "ssh-box", strings.Repeat("ab", 32)))
 	later := time.Now().Add(2 * time.Second)
 	require.NoError(t, os.Chtimes(filepath.Join(rig.dir, hubowner.FileName), later, later))
 	rig.do("POST", stampRoute, "{}", func(r *http.Request) { r.Header.Set(hubowner.Header, "junk") }) // a stamp check looks at the file
-	assert.Equal(t, 2, strings.Count(buf.String(), "installed or replaced"), "a replacement was not logged:\n"+buf.String())
+	assert.Equal(t, 2, strings.Count(buf.String(), "installed, replaced or removed"), "a replacement was not logged:\n"+buf.String())
 
 	// removal
 	require.NoError(t, os.Remove(filepath.Join(rig.dir, hubowner.FileName)))
 	_, ok = rig.o.HubOwnerStampAt()
 	assert.False(t, ok)
-	assert.Contains(t, buf.String(), "gone or not usable")
+	assert.Contains(t, buf.String(), "no hub's secret is held or usable")
 	assert.NotContains(t, buf.String(), stampSecret, "the secret is in the log")
 	assert.NotContains(t, buf.String(), strings.Repeat("ab", 32))
 }
@@ -236,7 +238,7 @@ func TestAStampRefusalAsksForTheClocksToBeChecked(t *testing.T) {
 		r.Header.Set(hubowner.Header, stampFor(t, "POST", stampRoute, "{}", time.Now().Add(-time.Minute)))
 	})
 	require.Equal(t, http.StatusForbidden, w.Code)
-	assert.Contains(t, w.Body.String(), "Check that both computers' clocks are right")
+	assert.Contains(t, w.Body.String(), "Check that this computer's clock and the hub's clock are right")
 }
 
 // #13456: a message to an agent through a self-hosted Hub reaches the remote with the server's API key. A bare key is automation (a script holding it must not appear as the Operator), but the hub's signed-in owner

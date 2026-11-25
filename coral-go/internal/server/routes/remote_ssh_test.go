@@ -223,3 +223,44 @@ func TestOwnerSecretRouteIsAPersonsAndShowsTheLineOnce(t *testing.T) {
 	_, ok, _ = e.h.store.OwnerSecret(ctx, "build")
 	assert.False(t, ok, "a secret was made for an SSH computer")
 }
+
+// #21213: the setup line names this hub (a third part) when the computer says it keeps one secret per hub; to an older Coral, which would refuse a third part, it is the two-part line it always was.
+func TestOwnerSecretLineNamesTheHubOnlyForACoralThatKeepsOnePerHub(t *testing.T) {
+	hub := strings.Repeat("c", 32)
+	SetHubLinkID(hub)
+	t.Cleanup(func() { SetHubLinkID("") })
+	e := newRSEnv(t)
+	e.router.(*chi.Mux).Post("/api/servers/{id}/owner-secret", e.h.OwnerSecret)
+	ctx := context.Background()
+	health := func(links int) string {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body := map[string]any{"status": "ok", "version": "2.1.12"}
+			if links > 0 {
+				body["hub_owner_links"] = links
+			}
+			writeJSON(w, http.StatusOK, body)
+		}))
+		t.Cleanup(srv.Close)
+		return srv.URL
+	}
+	_, err := e.h.store.Add(ctx, "newer", "Newer", health(1), routeSecret, true)
+	require.NoError(t, err)
+	_, err = e.h.store.Add(ctx, "older", "Older", health(0), routeSecret, true)
+	require.NoError(t, err)
+	line := func(id string) []string {
+		req := httptest.NewRequest("POST", "/api/servers/"+id+"/owner-secret", nil)
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		w := httptest.NewRecorder()
+		e.router.ServeHTTP(w, req)
+		require.Equal(t, 200, w.Code, w.Body.String())
+		var out map[string]string
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+		return strings.Fields(out["setup_line"])
+	}
+	f := line("newer")
+	require.Len(t, f, 3)
+	assert.Equal(t, []string{"newer", hub}, []string{f[0], f[2]})
+	f = line("older")
+	require.Len(t, f, 2, "an older Coral refuses a third part")
+	assert.Equal(t, "older", f[0])
+}
