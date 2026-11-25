@@ -363,6 +363,7 @@ function _applyACFPresetFor(containerId, name) {
             agentType: persona.agentType || persona.agent_type || current.agentType,
             model: persona.model || current.model,
             capabilities: persona.capabilities,
+            capabilitiesAreDefaults: true, // a role's tools are a starting point, not a Codex Default choice (#21363)
         });
     } else {
         setAgentConfig(containerId, {
@@ -574,7 +575,7 @@ async function _initTeamForm() {
 
 /** The default team's members: generic roles that work for any goal (#9877, #17817). */
 function _addDefaultMembers(members = DEFAULT_TEAM_MEMBERS) {
-    for (const a of members) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags);
+    for (const a of members) _addTeamAgent(a.name, a.prompt, a.capabilities, a.agent_type, a.model, a.flags, { capsAreDefaults: true }); // shipped members: their tools are a starting point (#21363)
 }
 
 function _loadTeamTemplate(name) {
@@ -590,7 +591,7 @@ function _loadTeamTemplate(name) {
     for (const agent of tmpl.agents) {
         const agentName = agent.name || agent.role || '';
         const agentPrompt = agent.prompt || agent.description || '';
-        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags, { thinking: agent.thinking, reminders: agent.reminders });
+        const row = _addTeamAgent(agentName, agentPrompt, agent.capabilities, agent.agent_type, agent.model, agent.flags, { thinking: agent.thinking, reminders: agent.reminders, capsAreDefaults: !!tmpl.builtin });
         if (!tmpl.builtin) row.dataset.permissionExplicit = '1'; // existing saved templates retain their confirm-mode meaning
         const modeSel = agent.permission_mode && document.getElementById(row.dataset.acfId)?.querySelector('.acf-permission-mode');
         if (modeSel && [...modeSel.options].some(o => o.value === agent.permission_mode)) { modeSel.value = agent.permission_mode; modeSel.dataset.pickedByPerson = '1'; }
@@ -606,7 +607,7 @@ function _loadTeamTemplate(name) {
 
 // reveal: scroll the new row into view. Only for a member the person added; the default members and a template's are added while the dialog opens or fills, and scrolling to the last of them
 // left the Members step opened past its heading and the template picker (#4950). top: put the row first (Add Orchestrator).
-function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false, thinking = '', reminders = null } = {}) {
+function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultAgentType, defaultModel, defaultFlags, { reveal = false, top = false, thinking = '', reminders = null, capsAreDefaults = false } = {}) {
     launch.teamAgentCounter++;
     const idx = launch.teamAgentCounter;
     const acfId = `team-agent-acf-${idx}`;
@@ -642,6 +643,7 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
         agentType: defaultAgentType || document.getElementById('team-agent-type')?.value || '',
         model: defaultModel || '',
         capabilities: caps,
+        capabilitiesAreDefaults: capsAreDefaults || (!defaultCapabilities && !!caps), // a shipped template's or a role's tools, not a saved member's (#21363)
     };
     if (thinking) acfValue.thinking = thinking;
     acfValue.flags = defaultFlags || ''; // a member with no mode of its own starts at Default and follows the saved default Mode (#6397)
