@@ -235,7 +235,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
             wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
-            const gaps = loaded && !loading ? missingWords(missingComputers(), shownComputers()) : '';
+            const gaps = loaded ? missingWords(missingComputers(), shownComputers()) : '';
             if (gaps) { // the mock's "Partial multi-computer view" notice: the same icon, heading and sentence as the record check (#19924)
                 const n = DT.el('div', 'activity-check activity-check-partial'), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
                 tile.setAttribute('aria-hidden', 'true'); text.append(DT.el('b', 'activity-check-title', partialTitle), DT.el('span', 'activity-check-detail', gaps));

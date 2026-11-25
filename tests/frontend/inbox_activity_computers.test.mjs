@@ -120,6 +120,29 @@ await AC.refresh();
 assert.equal(AC.spec({}, {}).empty.line, 'Nothing yet.', 'only a fully answered empty read says Nothing yet');
 assert.equal(AC.spec({}, {}).node().querySelector('.activity-check-partial'), null);
 
+// #21417: a redraw during a refresh must keep the known gap, even when the
+// completed read has the same signature and therefore does not redraw again.
+reset(online(['srv1']), { local: { ids: [{ id: 11, at: at(1) }] }, srv1: { status: 502 } });
+await AC.refresh();
+assert.ok(AC.spec({}, {}).node().querySelector('.activity-check-partial'));
+let finishRefresh;
+const refreshGate = new Promise(resolve => { finishRefresh = resolve; });
+globalThis.fetch = async (...args) => { await refreshGate; return realFetch(...args); };
+try {
+    const refreshing = AC.refresh();
+    const during = AC.spec({}, {});
+    let rendered = during.node(); // another UI change redraws while the network read is pending
+    const signature = during.signature;
+    assert.equal(during.rows.length, 1, 'existing rows remain during refresh');
+    finishRefresh();
+    await refreshing;
+    const after = AC.spec({}, {});
+    assert.equal(after.signature, signature, 'the same result does not trigger a new render');
+    if (after.signature !== signature) rendered = after.node();
+    assert.ok(rendered.querySelector('.activity-check-partial'), 'the partial notice survives a refresh with an unchanged signature');
+    assert.match(rendered.textContent, /Activity from 1 computer \(SRV1\) could not be read\./);
+} finally { finishRefresh(); globalThis.fetch = realFetch; }
+
 // older actions: each computer has its own cursor (its own smallest id), never another's
 const many = (from, n, t0) => Array.from({ length: n }, (_, i) => ({ id: from - i, at: at(t0 + i) }));
 reset(online(['srv1']), { local: { ids: many(1000, 200, 0) }, srv1: { ids: [{ id: 5000, at: at(1) }] } });
