@@ -95,9 +95,22 @@ func codexVersionLess(a, b string) bool {
 	return len(pa) < len(pb)
 }
 
+// codexReadSmall reads a regular file of at most max bytes, never through a link: Codex's own config and a plugin's cached hook file, whose paths are the person's (CODEX_HOME or ~/.codex, and the plugin
+// names in that config, checked below), never a request's, an agent's or a repository's (#21209). Reviewed in file_open_lint_test.go.
+func codexReadSmall(path string, max int64) ([]byte, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !fi.Mode().IsRegular() || fi.Size() > max {
+		return nil, os.ErrInvalid
+	}
+	return os.ReadFile(path)
+}
+
 func codexPluginHookReview(home string) codexPluginHooks {
 	cfgPath := foldertrust.CodexConfigPath(home)
-	b, err := os.ReadFile(cfgPath)
+	b, err := codexReadSmall(cfgPath, 4<<20)
 	if err != nil {
 		return codexPluginHooks{}
 	}
@@ -117,7 +130,7 @@ func codexPluginHookReview(home string) codexPluginHooks {
 		if strings.HasPrefix(line, "[") {
 			flush()
 			name, market, enabled, cur = "", "", false, ""
-			if m := codexPluginTable.FindStringSubmatch(line); m != nil {
+			if m := codexPluginTable.FindStringSubmatch(line); m != nil && !strings.Contains(m[1], "..") && !strings.Contains(m[2], "..") && m[1] != "." && m[2] != "." {
 				name, market = m[1], m[2]
 			} else if m := codexStateTable.FindStringSubmatch(line); m != nil {
 				cur = m[1]
@@ -143,7 +156,7 @@ func codexPluginHookReview(home string) codexPluginHooks {
 		sort.Slice(files, func(i, j int) bool {
 			return codexVersionLess(filepath.Base(filepath.Dir(filepath.Dir(files[i]))), filepath.Base(filepath.Dir(filepath.Dir(files[j]))))
 		})
-		raw, err := os.ReadFile(files[len(files)-1]) // the newest version folder, by number (1.10 is after 1.9)
+		raw, err := codexReadSmall(files[len(files)-1], 1<<20) // the newest version folder, by number (1.10 is after 1.9)
 		var doc struct {
 			Hooks map[string][]map[string]any `json:"hooks"`
 		}
