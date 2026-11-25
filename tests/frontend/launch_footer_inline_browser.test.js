@@ -49,7 +49,9 @@ const { install: installNT, openNewTeam, T } = require('./helpers/new_team');
             await waitFor(`document.getElementById('team-recap').textContent.trim().length > 0`, `${label}: New team shows its line`, 8000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: fitted after it is drawn
             const tr = await box('#team-recap'), tf = await firstButton('launch-step-team');
-            if (!mobile) assert.ok(tr.t >= tf.top - 1 && tr.b <= tf.bottom + 1 && tr.r <= tf.left, `${label}: New team's line is on the footer row, left of the buttons: ${JSON.stringify({ tr, tf })}`);
+            // #21236: New team keeps Cancel at the row's far left and Back / Next at the right; the line runs BETWEEN them (it used to be 24 px wide under Cancel)
+            const groups = await ev(`(() => { const a = document.querySelector('#launch-step-team > .modal-actions'), ar = a.getBoundingClientRect(), mid = ar.left + ar.width / 2, bs = [...a.querySelectorAll(':scope > .btn')].filter(b => !b.hidden && b.getClientRects().length).map(b => b.getBoundingClientRect()); const left = bs.filter(r => r.left + r.width / 2 <= mid), right = bs.filter(r => r.left + r.width / 2 > mid); return { leftEdge: left.length ? Math.max(...left.map(r => r.right)) : 0, rightEdge: right.length ? Math.min(...right.map(r => r.left)) : Infinity }; })()`);
+            if (!mobile) assert.ok(tr.t >= tf.top - 1 && tr.b <= tf.bottom + 1 && tr.l >= groups.leftEdge && tr.r <= groups.rightEdge, `${label}: New team's line is on the footer row, between the buttons at its left and right: ${JSON.stringify({ tr, tf, groups })}`);
             else assert.ok(tr.b <= tf.btnTop + 1, `${label}: on a phone New team's line stays above the buttons: ${JSON.stringify({ tr, tf })}`);
             await ev(`window.hideLaunchModal(); true`);
         }

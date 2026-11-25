@@ -11,10 +11,13 @@ const STEPS = ['launch-step-agent', 'launch-step-team'];
 export function fitFooter(id) {
     const step = document.getElementById(id), actions = step?.querySelector(':scope > .modal-actions');
     if (!step || !actions) return;
-    if (!matchMedia(DESKTOP).matches) { step.style.removeProperty('--lf-right'); step.style.removeProperty('--lf-h'); return; }
+    if (!matchMedia(DESKTOP).matches) { step.style.removeProperty('--lf-right'); step.style.removeProperty('--lf-h'); step.style.removeProperty('--lf-left'); return; }
     const box = actions.getBoundingClientRect(), shown = [...actions.querySelectorAll(':scope > .btn')].filter(b => !b.hidden && b.getClientRects().length);
     if (!box.width || !shown.length) return;
-    step.style.setProperty('--lf-right', `${Math.round(box.right - Math.min(...shown.map(b => b.getBoundingClientRect().left)) + 16)}px`);
+    // New team keeps Cancel at the row's far left and Back / Launch team at the right (#21236): the line runs between the two groups, not under Cancel (counting Cancel made the line 24 px wide)
+    const mid = box.left + box.width / 2, rects = shown.map(b => b.getBoundingClientRect()), right = rects.filter(r => r.left + r.width / 2 > mid), left = rects.filter(r => r.left + r.width / 2 <= mid), stepLeft = step.getBoundingClientRect().left;
+    step.style.setProperty('--lf-right', `${Math.round(box.right - Math.min(...(right.length ? right : rects).map(r => r.left)) + 16)}px`);
+    if (right.length && left.length) step.style.setProperty('--lf-left', `${Math.round(Math.max(...left.map(r => r.right)) - stepLeft + 12)}px`); else step.style.removeProperty('--lf-left');
     step.style.setProperty('--lf-h', `${Math.round(box.height)}px`);
 }
 

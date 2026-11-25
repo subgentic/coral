@@ -9,6 +9,7 @@
     /* open: the detail is a panel above the footer row, the whole width, with its link under the text */
     #launch-step-agent .launch-recap-wrap:has(#launch-recap[data-open]) { right: 0; bottom: var(--lf-h, 72px); height: auto; max-height: 45dvh; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 24px; background: var(--bg-secondary); border-top: 1px solid var(--border); }
     #launch-step-agent .launch-recap-wrap #launch-recap[data-open] { max-height: 36dvh; padding: 0; border: 0; }
-    #launch-step-team > #team-recap { position: absolute; left: 0; right: var(--lf-right, 22rem); bottom: calc(var(--lf-h, 72px) / 2); transform: translateY(50%); z-index: 1; padding: 0 0 0 24px; border: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    #launch-step-team > #team-recap { position: absolute; left: var(--lf-left, 0); right: var(--lf-right, 22rem); bottom: calc(var(--lf-h, 72px) / 2); transform: translateY(50%); z-index: 1; padding: 0 0 0 var(--lf-pad, 24px); border: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    #launch-step-team[style*="--lf-left"] > #team-recap { --lf-pad: 0px; }
     #launch-step-team > #team-recap:empty { display: none; }
 }
