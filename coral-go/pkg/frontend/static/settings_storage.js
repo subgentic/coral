@@ -31,7 +31,9 @@ export async function loadArtifactStoreSize({ fresh = false } = {}) {
         for (const [i, o] of [[input, out], [rin, rout]]) {
             if (!i || !o) continue;
             i.value = ''; delete i.dataset.loaded; i.disabled = true;
-            o.textContent = 'Loading…'; delete o.dataset.state;
+            if (o === out) o.replaceChildren('Loading…', document.createElement('br'), '\u00a0'); // the answer takes two lines (the size, the diffs): the loading line holds both, so the rows under it do not move as it fills (#21400)
+            else o.textContent = 'Loading…';
+            delete o.dataset.state;
         }
         const ub = document.getElementById('settings-received-unlisted'); if (ub) ub.hidden = true;
     }
