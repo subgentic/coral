@@ -55,6 +55,9 @@ type NeedsYouItem struct {
 	// Words only (cleaned, secrets redacted, cut), at most needsYouOptionsMax: they are never a command, and what is pressed is answered by the agent's own answer-prompt, which re-reads the screen.
 	Dialog  bool             `json:"dialog,omitempty"`
 	Options []NeedsYouOption `json:"options,omitempty"`
+	// Permission: on an agent item, the agent's own hooks say it waits on a permission prompt (#21256). Its Options, when there are any, are the prompt's one-time Yes and No only (permissionOptions),
+	// read from the screen the dialog watch confirmed; a lasting grant is never offered, and a press is checked again on the Coral (needsYouPress).
+	Permission bool `json:"permission,omitempty"`
 	// Server: on an item a Hub read from one of its computers (#15380), the Hub's own id for that computer (never a name the computer chose); absent on this Coral's own items.
 	Server string `json:"server,omitempty"`
 }
@@ -123,8 +126,8 @@ func (h *SessionsHandler) NeedsYouAgents(r *http.Request) ([]NeedsYouItem, error
 	}
 	items := needsYouAgentItems(rows, time.Now())
 	for i := range items {
-		if items[i].Dialog {
-			items[i].Options = h.dialogs.options(strings.TrimPrefix(items[i].ID, "agent:"))
+		if items[i].Dialog || items[i].Permission {
+			items[i].Options = needsYouMenu(items[i], h.dialogs.options(strings.TrimPrefix(items[i].ID, "agent:")))
 		}
 	}
 	return items, nil
@@ -166,9 +169,22 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 		if at = needsYouTime(at); at == "" {
 			at = now.UTC().Format(time.RFC3339Nano)
 		}
-		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid, Dialog: !wait})
+		kind, _ := row["waiting_kind"].(string)
+		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid, Dialog: !wait, Permission: wait && kind == "permission"})
 	}
 	return out
+}
+
+// needsYouMenu is what an agent item offers of the menu on its agent's screen: a permission prompt (the hooks say so, or the menu has a Yes) offers its one-time Yes and No only (#21256); any other
+// dialog offers its menu as read (#19864).
+func needsYouMenu(item NeedsYouItem, opts []NeedsYouOption) []NeedsYouOption {
+	if item.Permission || asksPermission(opts) {
+		return permissionOptions(opts)
+	}
+	if item.Dialog {
+		return opts
+	}
+	return nil
 }
 
 // DialogWords is the line of an agent at a dialog, the dashboard's own words (at_dialog.js DIALOG_WORDS, #11430).

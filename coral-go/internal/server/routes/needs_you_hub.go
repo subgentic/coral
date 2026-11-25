@@ -132,6 +132,7 @@ type remoteNeedsIn struct {
 		NewComments  json.Number `json:"new_comments"`
 		StillWaiting bool        `json:"still_waiting"`
 		Dialog       bool        `json:"dialog"`
+		Permission   bool        `json:"permission"`
 		Options      []struct {
 			N     json.Number `json:"n"`
 			Label string      `json:"label"`
@@ -184,7 +185,8 @@ func rebuildRemoteNeeds(machine string, body []byte) (items []NeedsYouItem, coun
 			continue
 		}
 		var opts []NeedsYouOption
-		if it.Dialog && it.Kind == "agent" && len(it.Options) <= needsYouOptionsMax {
+		menu := it.Kind == "agent" && (it.Dialog || it.Permission)
+		if menu && len(it.Options) <= needsYouOptionsMax {
 			for _, o := range it.Options {
 				// An n outside 1-9 is dropped, never clamped to 9 (QA's SHOULD on #19872): a clamped number would name another option's key.
 				if n, err := o.N.Int64(); err == nil && n >= 1 && n <= 9 && strings.TrimSpace(o.Label) != "" {
@@ -194,9 +196,14 @@ func rebuildRemoteNeeds(machine string, body []byte) (items []NeedsYouItem, coun
 			if len(opts) != len(it.Options) {
 				opts = nil
 			}
+			if it.Permission || asksPermission(opts) { // a permission prompt: the Hub repeats the one-time rule (#21256); the computer's own press-time check is the one that counts
+				if kept := permissionOptions(opts); len(kept) != len(opts) {
+					opts = nil
+				}
+			}
 		}
 		items = append(items, NeedsYouItem{
-			Dialog: it.Dialog && it.Kind == "agent", Options: opts,
+			Dialog: it.Dialog && it.Kind == "agent", Permission: it.Permission && it.Kind == "agent", Options: opts,
 			Kind: it.Kind, From: needsYouTitle(it.From), Line: needsYouLine(it.Line), Team: needsYouTitle(it.Team),
 			ID: machine + "/" + id, At: needsYouTime(it.At), Server: machine,
 			GoalID: int64(nonNegInt(it.GoalID, 1<<53)), TaskID: int64(nonNegInt(it.TaskID, 1<<53)),

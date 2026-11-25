@@ -982,6 +982,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		AskID          string `json:"ask_id"`           // the ask the caller drew (a screen's ask_id): another ask now open is refused (#10400); empty: not checked
 		RateLimitModel string `json:"rate_limit_model"` // a row's answer to Codex's rate-limit notice names the model it drew: the screen must still be exactly that notice with that model, from the person's own dashboard (#14774); empty: the chat's own answer
 		TrustFolder    string `json:"trust_folder"`     // a row's Yes for the folder-trust menu names the folder it drew: the screen must still name it, and Coral may trust it (#14110); empty: the chat's own answer
+		From           string `json:"from"`             // "needs_you": pressed on a Needs you item (#21256): only the person, and only a one-time choice (needsYouPress)
 	}
 	if err := decodeJSON(r, &body); err != nil || !body.Submit && (body.N < 1 || body.N > 9 || strings.TrimSpace(body.Label) == "") {
 		errBadRequest(w, "n (1-9) and label are required")
@@ -1038,6 +1039,16 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	opt := screen.Options[body.N-1]
 	if normalizeLabel(opt.Label) != normalizeLabel(body.Label) {
 		errConflict(w, "The prompt changed. Answer it in the terminal.")
+		return
+	}
+	if body.From == "needs_you" { // checked on the label the screen shows NOW, after the re-read: a menu that changed under the button types nothing (#21256, Security)
+		if status, code, why := needsYouPress(r, opt.Label); status != 0 {
+			writeError(w, status, code, why)
+			return
+		}
+	}
+	if hubAutomationAtPermission(r, screen) { // the Hub's own automation, with no owner stamp, never answers a permission prompt (#21256, Security's condition 1)
+		writeError(w, http.StatusForbidden, "not_the_person", "Only the person can answer a permission prompt through Coral Hub.")
 		return
 	}
 	if body.TrustFolder != "" && isTrustYes(screen, opt) && (screen.TrustFolder != body.TrustFolder || !h.trustOffered(r, body.SessionID, screen)) { // a row's lasting Yes: only for the folder it showed, a folder Coral may trust, from the person's own dashboard (#14110)
