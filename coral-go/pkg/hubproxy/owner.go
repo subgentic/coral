@@ -24,6 +24,16 @@ func WithSignedInOwner(ctx context.Context) context.Context {
 
 func signedInOwner(ctx context.Context) bool { v, _ := ctx.Value(signedInOwnerKey{}).(bool); return v }
 
+type ownerLinkKey struct{}
+
+// WithOwnerLink gives the request the hub's link id (hubowner.HubID), sent beside an owner stamp in hubowner.LinkHeader so the remote checks it against this hub's own secret (#21213). Only the hub's own
+// routing sets it.
+func WithOwnerLink(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, ownerLinkKey{}, id)
+}
+
+func ownerLink(ctx context.Context) string { v, _ := ctx.Value(ownerLinkKey{}).(string); return v }
+
 type sessionSignedInKey struct{}
 
 // WithSessionSignedIn marks that the signed-in person of this request holds a real SIGN-IN SESSION at this hub (the identity layer's dashboard cookie), not only this computer's own same-origin browser with sign-in

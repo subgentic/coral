@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -16,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -72,6 +75,9 @@ func (h *BoardHandler) SetNeedsYouRemotes(r *NeedsYouRemotes) { h.needsYouRemote
 func proxyContext(req *http.Request) *http.Request {
 	if humanInputCaller(req) {
 		req = req.WithContext(proxy.WithSignedInOwner(req.Context()))
+		if id, _ := hubLinkID.Load().(string); id != "" {
+			req = req.WithContext(proxy.WithOwnerLink(req.Context(), id)) // which of a remote's hub secrets this hub's stamps are checked against (#21213)
+		}
 		if kind, _ := req.Context().Value(callerKindKey{}).(string); kind == callerDashCookie {
 			req = req.WithContext(proxy.WithSessionSignedIn(req.Context()))
 		}
@@ -316,4 +322,19 @@ func (nr *NeedsYouRemotes) Forget() {
 	nr.mu.Lock()
 	nr.cache = nil
 	nr.mu.Unlock()
+}
+
+// hubLinkID is this hub's link id (hubowner.HubID), sent beside each owner stamp; "" until SetHubLinkID.
+var hubLinkID atomic.Value
+
+// SetHubLinkID sets this hub's link id, read once at startup from its data folder.
+func SetHubLinkID(id string) { hubLinkID.Store(id) }
+
+// HubLinkID is this hub's link id, "" when none is set.
+func HubLinkID() string { id, _ := hubLinkID.Load().(string); return id }
+
+// hubDisplayName is how a computer this hub sets up names it in a refused stamp's sentence: this computer's host name, cleaned.
+func hubDisplayName() string {
+	h, _ := os.Hostname()
+	return hubowner.CleanHubName(h)
 }

@@ -32,6 +32,10 @@ func ownerHub(t *testing.T, res *fakeResolver) *httptest.Server {
 				req = req.WithContext(WithSessionSignedIn(req.Context())) // the identity layer's dashboard cookie (routes.MountRemoteProxy)
 			}
 		}
+		if id := req.Header.Get("X-Test-Link"); id != "" {
+			req = req.WithContext(WithOwnerLink(req.Context(), id)) // this hub's link id (routes.proxyContext, #21213)
+		}
+		req.Header.Del("X-Test-Link")
 		req.Header.Del("X-Test-Session")
 		req.Header.Del("X-Test-Person")
 		h.ServeHTTP(w, req)
@@ -273,4 +277,34 @@ func TestTheSignedInPersonsGoalDriverAndMoveAreSignedAndNothingElseIs(t *testing
 		assert.Equal(t, c.body, s2.body)
 		s2.mu.Unlock()
 	}
+}
+
+// #21213: beside its stamp the hub says which link it is, so a remote two hubs reach checks it against this hub's own secret. Only beside a stamp, and never what a browser sent.
+func TestTheHubsLinkGoesBesideItsStampOnlyAndNeverFromTheBrowser(t *testing.T) {
+	link := strings.Repeat("a", 32)
+	hub, s := hubFor(t, ownerTestSecret)
+	post(t, hub, reviewPath, `{"decision":"approve"}`, true, map[string]string{"X-Test-Link": link, hubowner.LinkHeader: strings.Repeat("b", 32)})
+	s.mu.Lock()
+	assert.NotEmpty(t, s.header.Get(hubowner.Header))
+	assert.Equal(t, []string{link}, s.header.Values(hubowner.LinkHeader), "the hub's own link, not the browser's")
+	s.mu.Unlock()
+
+	for name, c := range map[string]struct {
+		path   string
+		person bool
+	}{
+		"no stamp: not the person":            {reviewPath, false},
+		"no stamp: a route off the allowlist": {"/api/saved", true},
+	} {
+		post(t, hub, c.path, `{}`, c.person, map[string]string{"X-Test-Link": link, hubowner.LinkHeader: strings.Repeat("b", 32)})
+		s.mu.Lock()
+		assert.Empty(t, s.header.Values(hubowner.LinkHeader), name)
+		s.mu.Unlock()
+	}
+	// a hub with no link id sends the stamp alone, as before
+	post(t, hub, reviewPath, `{"decision":"approve"}`, true, nil)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assert.NotEmpty(t, s.header.Get(hubowner.Header))
+	assert.Empty(t, s.header.Values(hubowner.LinkHeader))
 }
