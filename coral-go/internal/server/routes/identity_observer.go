@@ -78,11 +78,13 @@ type IdentityObserver struct {
 	hasSession func(*http.Request) bool
 
 	// Strict local auth (#3418), set once before serving (SetStrict).
-	strict    bool
-	validKey  func(*http.Request) bool                                   // a valid API key in the request
-	verifyCLI func(*http.Request) (*http.Request, bool)                  // a valid command-line signature
-	otherUser func(*http.Request) bool                                   // a loopback caller running as another OS user
-	linkKey   func(ctx context.Context, key string) (id string, ok bool) // a self-hosted Hub's request key (#20944)
+	strict        bool
+	validKey      func(*http.Request) bool                                   // a valid API key in the request
+	verifyCLI     func(*http.Request) (*http.Request, bool)                  // a valid command-line signature
+	otherUser     func(*http.Request) bool                                   // a loopback caller running as another OS user
+	linkKey       func(ctx context.Context, key string) (id string, ok bool) // a self-hosted Hub's request key (#20944)
+	keyLinks      func(w http.ResponseWriter, r *http.Request, keyID string) bool
+	linkKeyFailed func(r *http.Request) // counts a wrong request key against its address (the API key's rate limit) // carries a linked key's request through its link (#21220); false when the key has no link
 
 	mu         sync.Mutex
 	callers    map[string]int64
@@ -121,6 +123,16 @@ func NewIdentityObserver(db *store.DB, bs *board.Store, hasSession func(*http.Re
 // nonce).
 func (o *IdentityObserver) SetVerifiers(validKey func(*http.Request) bool, verifyCLI func(*http.Request) (*http.Request, bool)) {
 	o.validKey, o.verifyCLI = validKey, verifyCLI
+}
+
+// SetLinkKeyFailures gives the observer the count of wrong request keys (the auth middleware's rate limit, #21220).
+func (o *IdentityObserver) SetLinkKeyFailures(f func(r *http.Request)) {
+	o.linkKeyFailed = f
+}
+
+// SetKeyLinks gives the observer the way a linked request key's requests are carried (#21220): through the key's link, at its cap. It reports false, writing nothing, for a key with no active link.
+func (o *IdentityObserver) SetKeyLinks(f func(w http.ResponseWriter, r *http.Request, keyID string) bool) {
+	o.keyLinks = f
 }
 
 // SetLinkKeys gives the observer the check of a request key (X-Link-Request-Key, #20944).

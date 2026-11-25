@@ -162,6 +162,8 @@ type Manager struct {
 	deviceVerifierState // the one device-key verifier (device_verifier.go)
 	o                   Options
 	hc                  *http.Client
+	kb                  keyBridges                      // the key links' in-process tunnels (#21220)
+	keyRoot             atomic.Pointer[context.Context] // RunKeyLinks's context: key links run with or without a hosted Hub
 
 	pair pairingState
 

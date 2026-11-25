@@ -572,6 +572,7 @@ func startCloudConnector(ctx context.Context, db *store.DB, cfg *config.Config, 
 		},
 	})
 	srv.SetCloud(mgr)
+	safeGo(ctx, "cloud_key_links", func() { mgr.RunKeyLinks(ctx) }) // a self-hosted Hub's key links (#21220), with or without a hosted Hub
 	// A one-time credential (--bootstrap-file, or on Linux the well-known
 	// /run/coral/bootstrap.d/credential) enrolls this server before the connector
 	// runs. It is checked locally first; it never blocks the server's own startup.

@@ -137,6 +137,9 @@ func (h *CloudHandler) LinkKeyRevoke(w http.ResponseWriter, r *http.Request) {
 		h.linkKeyErr(w, err)
 		return
 	}
+	if m := h.manager(); m != nil {
+		m.LinksChanged(r.Context()) // the link that key answered to is revoked now: its tunnel and every stream its key opened end at once (#21220, Security's MUST 3)
+	}
 	slog.Info("cloud: link key revoked", "key", id)
 	h.recordLinkKey(r, board.ActLinkKeyRevoke, id, name)
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
