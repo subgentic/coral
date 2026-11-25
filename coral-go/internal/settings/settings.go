@@ -307,6 +307,12 @@ func ChiefPermissionMode(m map[string]string) string {
 // GoalDoneHidden is the setting that lists the goals the Operator hid from Needs you with Not yet or Ignore (#11825).
 const GoalDoneHidden = "goal_done_hidden"
 
+// GoalDoneDrivenItems brings back the "Goal looks done" item for a goal that has a driver (#21442): off by default, a goal with a driver (an active member, or the team's Orchestrator) is never one.
+const GoalDoneDrivenItems = "goal_done_driven_items"
+
+// GoalDoneShown lists the goals that have been a "Goal looks done" item once (#21442): a goal is one at most once.
+const GoalDoneShown = "goal_done_shown"
+
 // GoalDoneRead is the setting that lists the "Goal looks done" items the Operator has opened (#11983): listed in Needs you, not counted, as a read file is.
 const GoalDoneRead = "goal_done_read"
 

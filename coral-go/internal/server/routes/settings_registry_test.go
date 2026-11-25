@@ -72,6 +72,8 @@ var settingRows = map[string]struct{ good, bad string }{
 	"goal_done_hidden":            {`"[\"team|1|2\"]"`, `true`},
 	"goal_done_read":              {`"[\"team|1|2\"]"`, `true`},
 	"goal_done_quiet_minutes":     {`30`, `-1`},
+	"goal_done_driven_items":      {`"true"`, `"nope"`},
+	"goal_done_shown":             {`"[\"team|1|2026-11-25T10:00:00Z\"]"`, `true`},
 	"chief_team":                  {`"chief"`, `true`},
 	"chief_session":               {`"11111111-2222-4333-8444-555555555555"`, `true`},
 	"chief_name":                  {`"Ada"`, `true`},

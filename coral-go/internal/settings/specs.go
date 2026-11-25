@@ -217,6 +217,8 @@ func init() {
 	register(whole(GoalDoneQuietMinutes, "15", 0, 1440, ReadClamp, ApplyLive, "Minutes a goal whose tasks are all done waits after its latest task is completed before it is a 'Goal looks done' item of Needs you: time for its driver to add the next tasks; 0 is none."))
 	register(Spec{Key: GoalDoneRead, Kind: KindText, Apply: ApplyLive, MaxLen: 16384, Doc: "The goals the Operator has opened in Needs you (listed, not counted): a JSON list of team|goal|tasks|updated_at entries, the all-done total and the goal's last change each was opened at."})
 	register(Spec{Key: GoalDoneHidden, Kind: KindText, Apply: ApplyLive, MaxLen: 8192, Doc: "The goals hidden from Needs you with Not yet or Ignore: a JSON list of team|goal|tasks (or team|goal|*) entries."})
+	boolOff(GoalDoneDrivenItems, ApplyLive, "Put a 'Goal looks done' item in Needs you for a goal that has a driver (an active member, or the team's Orchestrator) and for a goal that was one before. Off by default: such a goal's driver is told once and closes it or asks you with post --ask; the Goals page still shows every goal's state.")
+	register(Spec{Key: GoalDoneShown, Kind: KindText, Apply: ApplyLive, MaxLen: 16384, Doc: "The goals that have been a 'Goal looks done' item once (a goal is one at most once): a JSON list of team|goal|time entries, kept by Coral."})
 	boolOff("home_editions_hidden", ApplyClient, "Hide the editions card on Home.")
 
 	// Storage.
