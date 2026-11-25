@@ -71,6 +71,12 @@ type permissionHarness struct {
 
 func newPermissionHarness(t *testing.T, caller *string) *permissionHarness {
 	t.Helper()
+	return newHarness(t, caller, true)
+}
+
+// newHarness is the Codex agent at its exec menu; hooked says whether its hook reported the permission wait (false: only the screen shows the menu).
+func newHarness(t *testing.T, caller *string, hooked bool) *permissionHarness {
+	t.Helper()
 	_, h, terminal, ss := setupSessionsTestServer(t)
 	const sid = "00000000-0000-0000-0000-0000002125a6"
 	name := "codex-" + sid
@@ -79,8 +85,10 @@ func newPermissionHarness(t *testing.T, caller *string) *permissionHarness {
 	terminal.addSession(name, "/tmp/test")
 	terminal.outputs[name] = codexExecScreen(t)
 	detail := `{"call_ids":["exec-1"],"kind":"permission","tool_name":"Bash","wants":"Wants to run: git rebase origin/main"}`
-	_, err := h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: name, SessionID: ptr.NonEmpty(sid), EventType: "permission_request", ToolName: ptr.NonEmpty("Bash"), Summary: "Waiting for the user: permission (Bash)", DetailJSON: &detail})
-	require.NoError(t, err)
+	if hooked {
+		_, err := h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: name, SessionID: ptr.NonEmpty(sid), EventType: "permission_request", ToolName: ptr.NonEmpty("Bash"), Summary: "Waiting for the user: permission (Bash)", DetailJSON: &detail})
+		require.NoError(t, err)
+	}
 	promptTextDelay = 0
 	fastPromptChecks(t)
 	r := chi.NewRouter()
@@ -281,4 +289,27 @@ func postAsDashboard(target, contentType string, body io.Reader) (*http.Response
 		req.Header.Set("Origin", u.Scheme+"://"+u.Host)
 	}
 	return http.DefaultClient.Do(req)
+}
+
+// Orchestrator's MUST on #21256: "from: needs_you" is checked only for an item the hooks marked permission. A press on a screen-only dialog goes the #19864 way: the person may press any choice the menu
+// shows, a non-person (the Hub) is still refused at a screen with a Yes.
+func TestAPressOnAScreenOnlyDialogGoesThe19864Way(t *testing.T) {
+	caller := callerDashCookie
+	p := newHarness(t, &caller, false)
+	screen, ok := parsePromptScreenFor("codex", codexExecScreen(t))
+	require.True(t, ok)
+	lasting := screen.Options[1].Label
+
+	caller = callerHub
+	code, why := p.press(t, 2, lasting, "needs_you")
+	assert.Equal(t, http.StatusForbidden, code, "a Hub caller is still refused")
+	assert.Equal(t, "not_the_person", why)
+	assert.Empty(t, p.keys())
+
+	caller = callerDashCookie
+	code, why = p.press(t, 2, lasting, "needs_you")
+	assert.NotEqual(t, "lasting_choice", why, "no one-time check on a screen-only dialog")
+	assert.NotEqual(t, http.StatusForbidden, code)
+	assert.Equal(t, "answer_sent_prompt_open", why, "the person's press went through every check and the digit was typed; the mock screen never clears, so the answer reads as still open")
+	assert.NotEmpty(t, p.keys(), "the digit is typed")
 }
