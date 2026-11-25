@@ -112,10 +112,11 @@ module.exports = part => (async () => {
             await sc('artifact, full screen', async () => {
                 await ev(`(async () => { window.PP = await import(${S} + 'preview_pane.js'); return true; })()`);
                 await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = ${JSON.stringify(TEAM)}; return true; })`); // the artifact's comments are of a board (Send to agent needs one)
-                await ev(STUB({ filename: 'release-notes.md', content: '# Release notes\n\nThe build is green.\n', mediaType: 'text/markdown', comments: [{ id: 1, parent_id: null, anchor: { whole: true }, body: 'Please check.', author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: '2026-10-22T00:00:00Z' }] }));
+                await ev(STUB({ draftsSupported: false, filename: 'release-notes.md', content: '# Release notes\n\nThe build is green.\n', mediaType: 'text/markdown', comments: [{ id: 1, parent_id: null, anchor: { whole: true }, body: 'Please check.', author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: '2026-10-22T00:00:00Z' }] }));
                 await ev(`import(${S} + 'changed_files.js').then(m => m.openFilePreview('coral://artifacts/${HEX}')).then(() => true)`); await waitFor(`!!document.querySelector('#preview-toolbar .ac-toggle')`, 'artifact', 10000);
             }, { min: 5, expect: `document.getElementById('preview-pane').classList.contains('preview-phone-full') && /Release notes/.test(document.getElementById('preview-body').textContent)` });
             await sc('artifact: comments sheet', async () => { await tap('#preview-toolbar .ac-toggle'); }, { min: 8, expect: `document.querySelector('#preview-toolbar .ac-toggle').getAttribute('aria-expanded') === 'true' && /Please check/.test(document.querySelector('.ac-panel').textContent)` });
+            // This fixture explicitly uses published comments without private-review support.
             // Send to agent (#6475): the picker in the comment's card in the sheet: the agents' boxes and buttons are 44 px targets, and the ones that cannot be asked are aria-disabled
             await sc('artifact: send to agent', async () => {
                 await waitFor(`!!document.querySelector('.ac-panel .ac-ask-open')`, 'Send to agent', 10000);

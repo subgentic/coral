@@ -34,6 +34,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const item = i => ({ id: hex(i), name: 'plan-' + String(i).padStart(2, '0') + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (${N} - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex(i), produced_by: 'Plan Writer', session_id: 's' + i });
                 window.__items = Array.from({ length: ${N} }, (_, k) => item(k + 1));
                 window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': window.__items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin), m = u.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts(?:\\/([0-9a-f]{64})\\/(review|tags))?$/);
+                    if (u.pathname.endsWith('/review-drafts')) return json({ drafts_supported: false, drafts: [], count: 0, revision: 0, can_write: false, can_send: false });
                     if (!m) return original(url, opts);
                     if (!m[1]) return json({ project: '${team}', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
                     const it = window.__items.find(a => a.id === m[1]);

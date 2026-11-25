@@ -54,6 +54,7 @@ function STUB(fx) {
         const view = c => ({ ...c, deleted: false, mine: true, can: can(c) });
         window.fetch = (u, o) => {
             const url = String(u), method = (o && o.method) || 'GET';
+            if (url.includes('/api/artifacts/' + window.__HEX + '/review-drafts') && ${fx.draftsSupported === false}) return json({ drafts_supported: false, drafts: [], count: 0, revision: 0, can_write: false, can_send: false });
             // a board with agents for the Send to agent picker (#6475): one that can be asked, one busy, one asleep, one not running
             if (/\\/api\\/board\\/[^/]+\\/status/.test(url)) return json({ agents: [
                 { name: 'QA', role: 'QA Engineer', agent_type: 'claude', availability: 'available' }, { name: 'Backend', role: 'Backend Dev', agent_type: 'codex', availability: 'busy' },
@@ -68,7 +69,7 @@ function STUB(fx) {
             if (url.includes('/api/artifacts/' + window.__HEX)) return Promise.resolve(new Response(${JSON.stringify(fx.content)}, { status: 200, headers: { 'Content-Type': ${JSON.stringify(fx.mediaType)} } }));
             return real(u, o);
         };
-        return true; })(); ${draftReviewStub(HEX)}`;
+        return true; })(); ${fx.draftsSupported === false ? '' : draftReviewStub(HEX)}`;
 }
 
 module.exports = { fixture, STUB, HEX, THREADS, REPLIES };
