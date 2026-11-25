@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/foldertrust"
+	"github.com/subgentic/coral/internal/safefs"
 )
 
 // Codex's hook review ("Hooks need review", "1 hook is new or changed.") names no hook. Coral trusts only its own six (codex_trust_hooks), so the one it asks about is a plugin's, a
@@ -130,7 +131,7 @@ func codexPluginHookReview(home string) codexPluginHooks {
 		if strings.HasPrefix(line, "[") {
 			flush()
 			name, market, enabled, cur = "", "", false, ""
-			if m := codexPluginTable.FindStringSubmatch(line); m != nil && !strings.Contains(m[1], "..") && !strings.Contains(m[2], "..") && m[1] != "." && m[2] != "." {
+			if m := codexPluginTable.FindStringSubmatch(line); m != nil && !strings.Contains(m[1], "..") && !strings.Contains(m[2], "..") && m[1] != "." && m[2] != "." && safefs.CheckName(m[1]) == nil && safefs.CheckName(m[2]) == nil {
 				name, market = m[1], m[2]
 			} else if m := codexStateTable.FindStringSubmatch(line); m != nil {
 				cur = m[1]
