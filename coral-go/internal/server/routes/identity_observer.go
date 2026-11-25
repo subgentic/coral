@@ -88,8 +88,9 @@ type IdentityObserver struct {
 	otherUser     func(*http.Request) bool                                   // a loopback caller running as another OS user
 	linkKey       func(ctx context.Context, key string) (id string, ok bool) // a self-hosted Hub's request key (#20944)
 	keyLinks      func(w http.ResponseWriter, r *http.Request, keyID string) bool
-	hostedLink    func(ctx context.Context, linkID string) bool // whether a tunneled request's link is a hosted Hub's (not a request key's, #21220); nil: every tunneled request is callerHub
-	linkKeyFailed func(r *http.Request)                         // counts a wrong request key against its address (the API key's rate limit) // carries a linked key's request through its link (#21220); false when the key has no link
+	keyLinkHub    func(ctx context.Context, linkID string) string // the hub id a key link's Hub gave at its join ("" for none, #21261): the only secret its owner stamps may be made with
+	hostedLink    func(ctx context.Context, linkID string) bool   // whether a tunneled request's link is a hosted Hub's (not a request key's, #21220); nil: every tunneled request is callerHub
+	linkKeyFailed func(r *http.Request)                           // counts a wrong request key against its address (the API key's rate limit) // carries a linked key's request through its link (#21220); false when the key has no link
 
 	mu         sync.Mutex
 	callers    map[string]int64
@@ -145,6 +146,14 @@ func (o *IdentityObserver) SetKeyLinks(f func(w http.ResponseWriter, r *http.Req
 func (o *IdentityObserver) SetHostedLinks(f func(ctx context.Context, linkID string) bool) {
 	o.hostedLink = f
 }
+
+// SetKeyLinkHubs gives the observer the hub id each key link recorded (#21261). Left nil, a stamp on a key link is refused: the link names no hub.
+func (o *IdentityObserver) SetKeyLinkHubs(f func(ctx context.Context, linkID string) string) {
+	o.keyLinkHub = f
+}
+
+// KeyLinkHubsSet reports whether the key links' hub ids are wired: the server census pins that they are, as for the hosted-link check.
+func (o *IdentityObserver) KeyLinkHubsSet() bool { return o.keyLinkHub != nil }
 
 // HostedLinksSet reports whether the hosted-link check is wired. Left nil, every tunneled request stays callerHub, so a key link would be the person: the server census pins that it is set (#21276).
 func (o *IdentityObserver) HostedLinksSet() bool { return o.hostedLink != nil }

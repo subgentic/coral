@@ -70,3 +70,33 @@ func TestAKeyLinkThatCannotBeWrittenConsumesNothing(t *testing.T) {
 	_, err = cs.KeyLink(ctx, keyID)
 	assert.ErrorIs(t, err, ErrNoCloudLink)
 }
+
+// #21261: the hub id a self-hosted Hub says it is goes with its request and onto the key link that comes of it; only a request key's request keeps one, and only a valid hub id is taken.
+func TestAKeyLinkKeepsTheHubIDItsHubGave(t *testing.T) {
+	cs, ctx, now := reqRig(t)
+	keyID, _, err := cs.CreateLinkKey(ctx, "Hub C", now)
+	require.NoError(t, err)
+	_, _, err = cs.CreateLinkRequestFor(ctx, "https://hub-c.example.com", "interact", keyID, "Not A Hub!", now)
+	assert.Error(t, err, "not a hub id")
+	_, _, err = cs.CreateLinkRequestFor(ctx, "https://hub-c.example.com", "interact", "", "hub-aaaaaaaa", now)
+	assert.Error(t, err, "a request no key made keeps no hub id")
+	id, secret, err := cs.CreateLinkRequestFor(ctx, "https://hub-c.example.com", "interact", keyID, "hub-aaaaaaaa", now)
+	require.NoError(t, err)
+	code, _, err := cs.AllowLinkRequest(ctx, id, "view", now)
+	require.NoError(t, err)
+	l, err := cs.FinishLinkRequestAsKeyLink(ctx, id, secret, code, keyID, now)
+	require.NoError(t, err)
+	assert.Equal(t, "hub-aaaaaaaa", cs.KeyLinkHubID(ctx, l.LinkID))
+	assert.Equal(t, "", cs.KeyLinkHubID(ctx, "lnk-00000000"), "no such link")
+
+	// a request that said none, and a link that is not a key link, have none
+	keyID2, _, err := cs.CreateLinkKey(ctx, "Hub D", now)
+	require.NoError(t, err)
+	id2, secret2, err := cs.CreateLinkRequest(ctx, "https://hub-d.example.com", "interact", keyID2, now)
+	require.NoError(t, err)
+	code2, _, err := cs.AllowLinkRequest(ctx, id2, "view", now)
+	require.NoError(t, err)
+	l2, err := cs.FinishLinkRequestAsKeyLink(ctx, id2, secret2, code2, keyID2, now)
+	require.NoError(t, err)
+	assert.Equal(t, "", cs.KeyLinkHubID(ctx, l2.LinkID))
+}

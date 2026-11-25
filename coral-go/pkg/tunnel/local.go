@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/pkg/hubowner"
 	"github.com/subgentic/coral/pkg/redact"
 )
 
@@ -62,6 +63,9 @@ type LocalHandler struct {
 	// LinkID is the id of the cloud_link whose own token authenticated this tunnel (#20312). It is stamped on every forwarded request (LinkHeader); it comes from the store row that opened
 	// the tunnel, never from a stream or a header. The server refuses a tunneled request with no known link.
 	LinkID string
+	// AllowOwnerStamp keeps the owner stamp (hubowner.Header) a request carries instead of scrubbing it with every other header off the allowlist (#21261). Only the in-process key-link bridge sets it; a tunnel
+	// to a hosted Hub never does, so a stamp a Hub sent is dropped as before. The local server checks the stamp against the key link's own hub secret.
+	AllowOwnerStamp bool
 	// RedactTokens turns on token redaction in View replies (#3560): well-known credential
 	// formats and private keys are replaced by redact.Marker before a reply leaves this
 	// computer. Read on every request; nil means on.
@@ -279,6 +283,7 @@ func (l *LocalHandler) serveHTTP(ctx context.Context, s *Stream) {
 		return
 	}
 	req.Header = l.stamp(scrub(h.Headers, h.Method, dec))
+	l.keepOwnerStamp(req.Header, h.Headers)
 	stampRole(req.Header, h, h.Method, dec)
 	stampGuide(req.Header, h, h.Method, dec)
 	stampTeam(req.Header, h, h.Method, dec)
@@ -433,5 +438,17 @@ func rewriteLocation(h http.Header) {
 			return
 		}
 		h.Del("Location")
+	}
+}
+
+// keepOwnerStamp puts the request's owner stamp back after scrub on a LocalHandler that allows it (the key-link bridge only), whatever the spelling of its name. It is never read from a WebSocket upgrade.
+func (l *LocalHandler) keepOwnerStamp(out, in http.Header) {
+	if !l.AllowOwnerStamp {
+		return
+	}
+	for k, vs := range in {
+		if http.CanonicalHeaderKey(k) == hubowner.Header {
+			out[hubowner.Header] = append(out[hubowner.Header], vs...)
+		}
 	}
 }

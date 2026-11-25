@@ -19,6 +19,7 @@ import (
 
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -319,7 +320,11 @@ func (h *RemoteServersHandler) JoinStart(w http.ResponseWriter, r *http.Request)
 	if made != "" {
 		orphan = orphanedKeyNote(made)
 	}
-	code, out, err := remoteCall(r.Context(), t, http.MethodPost, "/api/cloud/link-requests", map[string]string{"hub": hub, "cap": body.Cap}, nil)
+	ask := map[string]string{"hub": hub, "cap": body.Cap}
+	if id := HubLinkID(); hubowner.ValidHubID(id) {
+		ask["hub_id"] = id // which hub this is, so the computer binds this key link's owner stamps to this hub's own secret only (#21261); an older computer ignores the field
+	}
+	code, out, err := remoteCall(r.Context(), t, http.MethodPost, "/api/cloud/link-requests", ask, nil)
 	if err != nil {
 		joinErrNote(w, err, orphan)
 		return

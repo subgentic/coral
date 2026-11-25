@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/pkg/hubowner"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // The signed owner stamp, remote side (#11378, gap A). A hub that reaches this Coral with its API key may add X-Coral-Hub-Owner to ONE of a few requests (hubowner.Routes: Approve / Request changes, Ignore and Undo of a question (#13462), and the
@@ -51,6 +52,15 @@ func (h *hubOwnerStamps) note() (time.Time, bool) {
 
 // check verifies one stamp against the hub links held here. It returns the link that made it, or the reason it was refused and the link it was checked against (nil when none or several).
 func (h *hubOwnerStamps) check(hub, value, method, decodedPath, target string, body []byte) (*hubowner.Link, string, *hubowner.Link) {
+	return h.checkLinks(hub, false, value, method, decodedPath, target, body)
+}
+
+// checkExact is check for a stamp that arrived on a key link (#21261): hub is the link's recorded hub id and no other secret can make it (hubowner.LinkVerifiers.CheckExact).
+func (h *hubOwnerStamps) checkExact(hub, value, method, decodedPath, target string, body []byte) (*hubowner.Link, string, *hubowner.Link) {
+	return h.checkLinks(hub, true, value, method, decodedPath, target, body)
+}
+
+func (h *hubOwnerStamps) checkLinks(hub string, exact bool, value, method, decodedPath, target string, body []byte) (*hubowner.Link, string, *hubowner.Link) {
 	h.note()
 	links, err := hubowner.Links(h.dir)
 	if err != nil {
@@ -61,6 +71,9 @@ func (h *hubOwnerStamps) check(hub, value, method, decodedPath, target string, b
 	defer h.mu.Unlock()
 	if h.lv == nil {
 		h.lv = &hubowner.LinkVerifiers{Start: h.start}
+	}
+	if exact {
+		return h.lv.CheckExact(links, hub, value, method, decodedPath, target, body)
 	}
 	return h.lv.Check(links, hub, value, method, decodedPath, target, body)
 }
@@ -110,11 +123,21 @@ func (o *IdentityObserver) checkOwnerStamp(w http.ResponseWriter, r *http.Reques
 		o.refuseDetail(w, http.StatusForbidden, "hub_owner_stamp_refused", reason, stampRefusal(reason, link))
 		return false, false
 	}
-	if caller != callerAPIKey || len(vals) != 1 || o.stamps == nil {
-		return refuse(hubowner.ReasonMalformed, "not an API-key request, more than one stamp, or stamps are off", nil)
+	keyLink := caller == callerKeyLink
+	if caller != callerAPIKey && !keyLink || len(vals) != 1 || o.stamps == nil {
+		return refuse(hubowner.ReasonMalformed, "not an API-key or key-link request, more than one stamp, or stamps are off", nil)
 	}
 	hub := ""
-	if len(hubs) > 1 || len(hubs) == 1 && !hubowner.ValidHubID(hubs[0]) {
+	if keyLink {
+		// A key link's Hub is the one that made the link, not the one the stamp says: the hub id the link recorded at its join, checked against the secret held under exactly that id (#21261). The header
+		// this request carries here is the connector's own link id (tunnel.LinkHeader, the same name), never a hub id.
+		if o.keyLinkHub != nil {
+			hub = o.keyLinkHub(r.Context(), r.Header.Get(tunnel.LinkHeader))
+		}
+		if hub == "" {
+			return refuse(hubowner.ReasonUnknownLink, "the key link recorded no hub id", nil)
+		}
+	} else if len(hubs) > 1 || len(hubs) == 1 && !hubowner.ValidHubID(hubs[0]) {
 		return refuse(hubowner.ReasonMalformed, "more than one hub link, or not a hub id", nil)
 	} else if len(hubs) == 1 {
 		hub = hubs[0]
@@ -129,7 +152,11 @@ func (o *IdentityObserver) checkOwnerStamp(w http.ResponseWriter, r *http.Reques
 		r.Body = io.NopCloser(bytes.NewReader(b))
 		r.ContentLength = int64(len(b))
 	}
-	if _, reason, link := o.stamps.check(hub, vals[0], r.Method, r.URL.Path, hubowner.Target(r.URL), body); reason != "" {
+	verify := o.stamps.check
+	if keyLink {
+		verify = o.stamps.checkExact
+	}
+	if _, reason, link := verify(hub, vals[0], r.Method, r.URL.Path, hubowner.Target(r.URL), body); reason != "" {
 		return refuse(reason, "the stamp did not verify", link)
 	}
 	return true, true

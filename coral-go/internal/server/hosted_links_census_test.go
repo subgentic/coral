@@ -19,4 +19,5 @@ func TestTheServerWiresTheHostedLinkCheck(t *testing.T) {
 	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
 	require.NotNil(t, srv.identity)
 	assert.True(t, srv.identity.HostedLinksSet(), "router.go wires SetHostedLinks: a key link's request is never the person")
+	assert.True(t, srv.identity.KeyLinkHubsSet(), "router.go wires SetKeyLinkHubs: a stamp on a key link is checked against the hub id the link recorded (#21261)")
 }

@@ -42,6 +42,9 @@ type Options struct {
 	// NewWithOptions) and, as a second layer, still holds the bound between 100 ms and
 	// the default. Production leaves it unset.
 	UploadStallTimeout time.Duration
+	// KeepOwnerStamp lets the owner stamp (hubowner.Header) a request already carries go on over the tunnel instead of being dropped with every other header off the allowlist (#21261). Only the in-process
+	// key-link bridge sets it: the stamp is the caller's own and is checked on the far end of that tunnel against the key link's own hub secret, never trusted here.
+	KeepOwnerStamp bool
 }
 
 // minUploadStallTimeout is the floor of UploadStallTimeout.

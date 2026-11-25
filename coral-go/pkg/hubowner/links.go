@@ -234,6 +234,19 @@ type LinkVerifiers struct {
 // Check verifies a stamp. hub is the LinkHeader value ("" when the hub sent none: an older hub, checked against every secret). It returns the link that made the stamp, or the reason it is refused and the
 // link it was checked against when there was exactly one.
 func (lv *LinkVerifiers) Check(links []Link, hub, value, method, decodedPath, target string, body []byte) (*Link, string, *Link) {
+	return lv.check(links, hub, false, value, method, decodedPath, target, body)
+}
+
+// CheckExact is Check for a request that arrived on one hub's own key link (#21261): hub is that link's recorded hub id and only the secret held under exactly that id can make the stamp. There is no
+// fallback to the single file of an older hub's install and no "every secret" for an empty id: another link's secret, or none, is refused (ReasonUnknownLink or ReasonNoSecret).
+func (lv *LinkVerifiers) CheckExact(links []Link, hub, value, method, decodedPath, target string, body []byte) (*Link, string, *Link) {
+	if !ValidHubID(hub) {
+		return nil, ReasonUnknownLink, nil
+	}
+	return lv.check(links, hub, true, value, method, decodedPath, target, body)
+}
+
+func (lv *LinkVerifiers) check(links []Link, hub string, exact bool, value, method, decodedPath, target string, body []byte) (*Link, string, *Link) {
 	if lv.m == nil {
 		lv.m = map[string]*Verifier{}
 	}
@@ -245,7 +258,7 @@ func (lv *LinkVerifiers) Check(links []Link, hub, value, method, decodedPath, ta
 				break
 			}
 		}
-		if cands == nil { // a hub that installed before it said its id has its secret in the single file
+		if cands == nil && !exact { // a hub that installed before it said its id has its secret in the single file
 			for _, l := range links {
 				if l.Hub == "" {
 					cands = append(cands, l)

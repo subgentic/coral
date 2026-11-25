@@ -67,10 +67,7 @@ func (o *IdentityObserver) serveLinkKey(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	if !joinCall {
-		if len(stampValues(r)) > 0 { // refused, never ignored: a stamp on a key link is bound to nothing yet (#21261)
-			o.refuseDetail(w, http.StatusForbidden, "hub_owner_stamp_refused", "key_link", "Approve through a Hub linked by a request key is not available yet: that comes with its own step (#21261). Approve it at this computer, or through a Hub linked another way.")
-			return
-		}
+		// An owner stamp is not checked here: it is carried through the link's tunnel and checked on the far end of it, against the secret held under the hub id this key's link recorded (#21261).
 		if o.keyLinks(w, r, id) {
 			return
 		}

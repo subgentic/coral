@@ -223,3 +223,31 @@ func TestASingleFileUnderALinksNameIsALeftoverAndAloneIsNot(t *testing.T) {
 	_, ok = Leftover(dir)
 	assert.False(t, ok, "removed: no longer flagged")
 }
+
+// #21261: CheckExact is for a stamp on a key link: only the secret held under exactly the link's recorded hub id, with no fallback to the single file of an older hub's install and none to "every secret".
+func TestCheckExactTakesOnlyTheSecretHeldUnderThatHubID(t *testing.T) {
+	a, b, old := strings.Repeat("1a", 32), strings.Repeat("2b", 32), strings.Repeat("3c", 32)
+	links := []Link{{Remote: "mac", Secret: old}, {Hub: linkHubA, Remote: "mac", Secret: a}, {Hub: linkHubB, Remote: "mac", Secret: b}}
+	route := "/api/board/team/artifacts/abc/review"
+	lv := &LinkVerifiers{Start: time.Now().Add(-time.Hour)}
+	sign := func(secret string) string {
+		s, err := Sign(secret, "mac", "POST", route, nil, time.Now())
+		require.NoError(t, err)
+		return s
+	}
+	l, reason, _ := lv.CheckExact(links, linkHubB, sign(b), "POST", route, route, nil)
+	require.Empty(t, reason)
+	assert.Equal(t, linkHubB, l.Hub)
+	_, reason, _ = lv.CheckExact(links, linkHubB, sign(a), "POST", route, route, nil)
+	assert.Equal(t, ReasonWrongSecret, reason, "another link's secret")
+	_, reason, _ = lv.CheckExact(links, linkHubB, sign(old), "POST", route, route, nil)
+	assert.Equal(t, ReasonWrongSecret, reason, "the single file's secret is no hub's")
+	_, reason, _ = lv.CheckExact(links[:2], "hub-cccccccc", sign(old), "POST", route, route, nil)
+	assert.Equal(t, ReasonUnknownLink, reason, "a hub id with no secret held: no fallback to the single file")
+	for _, id := range []string{"", "NOT-AN-ID", "x"} {
+		_, reason, _ = lv.CheckExact(links, id, sign(a), "POST", route, route, nil)
+		assert.Equal(t, ReasonUnknownLink, reason, "a link that recorded no valid hub id: %q", id)
+	}
+	_, reason, _ = lv.CheckExact(nil, linkHubA, sign(a), "POST", route, route, nil)
+	assert.Equal(t, ReasonNoSecret, reason)
+}
