@@ -83,7 +83,7 @@ function docsHint(holder, name, original = null) {
     const sentence = document.createElement('span'); sentence.textContent = HINTS[name] ?? 'Permissions and limits for this computer.';
     if (p.id) { sentence.id = p.id; p.removeAttribute('id'); }
     p.replaceChildren(sentence, ' ');
-    const answer = ['Coral Hub', 'Access'].includes(name) ? 'Coral Hub access limits' : name === 'Allow Hub auto-accept' ? 'Coral Hub can turn on auto-accept' : HINTS[name] ? name : 'Settings help for Coral Hub access';
+    const answer = ['Coral Hub', 'Access'].includes(name) ? 'Coral Hub access limits' : HINTS[name] ? name : 'Settings help for Coral Hub access';
     const a = settingsDocsLink({ docs: { topic: 'hub', answer } }, { label: name });
     p.append(a); if (!original) holder.append(p);
 }

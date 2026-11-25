@@ -201,7 +201,7 @@ func (h *CloudHandler) recordAutoAcceptChange(ctx context.Context, by, user stri
 	return c
 }
 
-// HubOwnerSetAutoAccept: POST /api/hub-auto-accept {"allow": bool} (#5840), Coral Hub's owner turning "Coral Hub can turn on auto-accept" on or off. The route table marks it owner-only for the
+// HubOwnerSetAutoAccept: POST /api/hub-auto-accept {"allow": bool} (#5840), Coral Hub's owner turning "Allow Hub auto-accept" on or off. The route table marks it owner-only for the
 // hub (tunnel.OwnerHubOnly, Launch tier): refuseNonOwner refuses anyone but the account this computer is linked to, and a request that did not come through Coral Hub, with 403 owner_only
 // before anything is read. The body is closed (exactly {"allow": true|false}, 64 bytes at most; the query is none, or exactly allow=true or allow=false saying the same as the body, #20882). It sets the same setting as the Settings switch (PUT /api/cloud/allow-auto-accept);
 // turning it off ends every auto-accept the hub had enabled, as that route does. The change is recorded on this computer (who, when: shown beside the switch), in the Operator-actions

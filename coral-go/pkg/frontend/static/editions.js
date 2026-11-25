@@ -164,7 +164,7 @@ function _connectHtml() {
                 <legend id="editions-ask-q">What may Coral Hub do on this computer?</legend>
                 ${ASK_MODES.map(([value, name, text]) => `<label class="editions-ask-opt"><input type="radio" name="editions-mode" value="${escapeAttr(value)}" data-cloud-mode aria-describedby="editions-ask-${escapeAttr(value)}"><span class="editions-ask-text"><span class="editions-ask-name">${escapeHtml(name)}</span><span class="editions-ask-desc" id="editions-ask-${escapeAttr(value)}">${escapeHtml(text)}</span></span></label>`).join('')}
                 <div data-cloud="auto-accept-row" hidden>
-                    ${switchRow({ label: 'Coral Hub can turn on auto-accept', labelClass: 'editions-auto-accept', attrs: ' data-cloud="allow-auto-accept"', desc: 'Agents it launches act without asking for permission each time.', descId: 'editions-ask-auto', descClass: 'editions-ask-desc', descTag: 'div' })}
+                    ${switchRow({ label: 'Allow Hub auto-accept', labelClass: 'editions-auto-accept', attrs: ' data-cloud="allow-auto-accept"', desc: 'Agents it launches act without asking for permission each time.', descId: 'editions-ask-auto', descClass: 'editions-ask-desc', descTag: 'div' })}
                 </div>
                 <div class="editions-ask-note">You can change this any time in Settings › Coral Hub and remote access.</div>
             </fieldset>

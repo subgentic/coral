@@ -8,8 +8,8 @@ assert.equal(switchRow({ label: 'Cross-team messaging', name: 'cross_team_messag
 assert.equal(switchRow({ label: 'Share files with other teams', name: 'cross_team_artifacts' }),
     '<label><input type="checkbox" name="cross_team_artifacts"> Share files with other teams</label>');
 // editions.js and mobile.js: label class and extra attributes.
-assert.equal(switchRow({ label: 'Coral Hub can turn on auto-accept', labelClass: 'editions-auto-accept', attrs: ' data-cloud="allow-auto-accept"' }),
-    '<label class="editions-auto-accept"><input type="checkbox" data-cloud="allow-auto-accept"> Coral Hub can turn on auto-accept</label>');
+assert.equal(switchRow({ label: 'Allow Hub auto-accept', labelClass: 'editions-auto-accept', attrs: ' data-cloud="allow-auto-accept"' }),
+    '<label class="editions-auto-accept"><input type="checkbox" data-cloud="allow-auto-accept"> Allow Hub auto-accept</label>');
 assert.equal(switchRow({ label: 'Show computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' }),
     '<label class="list-display-option" data-display-row="server" hidden><input type="checkbox" data-display-input="server" data-on-change="toggle-show-server"> Show computer</label>');
 // team_health_settings.js: a rule head names the switch by its title and describes it by the sentence after the label.

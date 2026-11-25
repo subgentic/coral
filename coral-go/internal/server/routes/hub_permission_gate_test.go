@@ -104,7 +104,7 @@ func team(board, agentType string, teamFlags, geminiFlags []string) map[string]a
 
 // #126 F4: through the Coral Hub, launch, launch-team and restart start an agent that skips
 // permission prompts (its flags, capability allow rules, allowed tools, custom hooks) only with the
-// Hub's provenance, the owner's local switch "Coral Hub can turn on auto-accept" and the Launch
+// Hub's provenance, the owner's local switch "Allow Hub auto-accept" and the Launch
 // mode, as tasks/run (TestTasksRunAutoAcceptThroughTheHub). Refused, nothing starts. The same
 // request from this computer, and a Hub request whose choices keep the prompts, are unchanged.
 func TestHubLaunchesThatSkipPermissionPrompts(t *testing.T) {
@@ -170,7 +170,7 @@ func TestHubLaunchesThatSkipPermissionPrompts(t *testing.T) {
 				Error string `json:"error"`
 			}
 			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &refusal))
-			assert.Contains(t, refusal.Error, "Coral Hub can turn on auto-accept", "the refusal says where to turn it on")
+			assert.Contains(t, refusal.Error, "Allow Hub auto-accept", "the refusal says where to turn it on")
 			assert.Contains(t, refusal.Error, "Settings > Coral Hub and remote access", "the refusal says where to turn it on")
 			assert.Equal(t, before, len(term.sentCommands()), "nothing started")
 			passed(call("local", tc.skips), "from this computer: unchanged")
@@ -189,8 +189,8 @@ func TestHubLaunchesThatSkipPermissionPrompts(t *testing.T) {
 // owner can follow it.
 func TestHubAutoAcceptOffSaysWhereToTurnItOn(t *testing.T) {
 	for file, labels := range map[string][]string{
-		"../../../pkg/frontend/templates/includes/modals.html": {"Coral Hub and remote access", "Coral Hub can turn on auto-accept"},
-		"../../../pkg/frontend/static/editions.js":             {"Coral Hub can turn on auto-accept"},
+		"../../../pkg/frontend/templates/includes/modals.html": {"Coral Hub and remote access", "Allow Hub auto-accept"},
+		"../../../pkg/frontend/static/editions.js":             {"Allow Hub auto-accept"},
 	} {
 		b, err := os.ReadFile(file)
 		require.NoError(t, err)

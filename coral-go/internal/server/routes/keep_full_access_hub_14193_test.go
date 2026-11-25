@@ -15,7 +15,7 @@ import (
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// Full access is the widest skip of permission prompts, so through Coral Hub it meets the computer's switch "Coral Hub can turn on auto-accept" like every other skip (#14193, Security): switch off and
+// Full access is the widest skip of permission prompts, so through Coral Hub it meets the computer's switch "Allow Hub auto-accept" like every other skip (#14193, Security): switch off and
 // an authentic owner is refused hub_auto_accept_disabled with nothing started or stored; switch on at Launch it works; below Launch hub_mode_too_low; a Hub user who is not the owner is refused;
 // a request from this computer is not gated. A choice the hub made ends when the switch goes off; one made locally stays.
 func TestFullAccessThroughTheHubMeetsTheOwnersSwitch(t *testing.T) {

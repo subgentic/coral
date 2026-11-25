@@ -220,7 +220,7 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('dialog.auto-accept-confirm button')].find(b => b.textContent === 'Cancel').click(); true`);
         console.log('   ✓ 1 hour preselected, no "No time limit"');
 
-        console.log('10. Settings: "Coral Hub can turn on auto-accept" shows only with Launch, on by default, saves locally');
+        console.log('10. Settings: "Allow Hub auto-accept" shows only with Launch, on by default, saves locally');
         step10 = true;
         await ev(`(() => {
             window.__aaAwaitTimings = [];

@@ -18,7 +18,7 @@ import (
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
-// #5840 (the Operator's decision): "Coral Hub can turn on auto-accept" is ON unless the owner turned it off; Coral Hub's owner may turn it on or off through POST /api/hub-auto-accept
+// #5840 (the Operator's decision): "Allow Hub auto-accept" is ON unless the owner turned it off; Coral Hub's owner may turn it on or off through POST /api/hub-auto-accept
 // {"allow": bool} (owner-only, Launch tier, the Hub only), and the change is recorded: who, when, in the Operator-actions log.
 
 func TestHubAutoAcceptDefaultsOnAndAnExplicitOffStaysOff(t *testing.T) {
@@ -26,7 +26,7 @@ func TestHubAutoAcceptDefaultsOnAndAnExplicitOffStaysOff(t *testing.T) {
 	assert.False(t, HubAutoAcceptAllowed(map[string]string{AllowHubAutoAcceptSetting: "false"}), "the owner turned it off: it stays off")
 	assert.True(t, HubAutoAcceptAllowed(map[string]string{AllowHubAutoAcceptSetting: "true"}), "turned on")
 	assert.Contains(t, hubAutoAcceptOff, "Settings > Coral Hub and remote access", "the refusal says where the switch is")
-	assert.Contains(t, hubAutoAcceptOff, `"Coral Hub can turn on auto-accept"`)
+	assert.Contains(t, hubAutoAcceptOff, `"Allow Hub auto-accept"`)
 }
 
 type hubAutoAcceptEnv struct {

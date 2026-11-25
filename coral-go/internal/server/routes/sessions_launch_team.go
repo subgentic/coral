@@ -569,7 +569,7 @@ func memberAsksToSkip(body launchTeamRequest, def launchTeamAgent, settings map[
 }
 
 // memberDefaultSkips reports whether a member that NAMES NO MODE would start in a mode that skips the prompts because of the new default (#14336, Security's MUST 2 on #14333): Auto for Claude and Codex,
-// Bypass for Hermes and opencode. A Coral Hub launch of such a member is held to the same switch as a single launch: with the owner's "Coral Hub can turn on auto-accept" off the member is refused with
+// Bypass for Hermes and opencode. A Coral Hub launch of such a member is held to the same switch as a single launch: with the owner's "Allow Hub auto-accept" off the member is refused with
 // hub_auto_accept_disabled, never started in Default and never in Auto. A member that names a mode (its own flags, the team's, or an explicit Default) is judged by what it names; the Operator's own
 // saved default is the owner's choice and is not counted, as before.
 func memberDefaultSkips(body launchTeamRequest, def launchTeamAgent, settings map[string]string, agentType string, flags []string) bool {

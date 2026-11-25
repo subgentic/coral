@@ -14,7 +14,7 @@ import (
 
 // hubAutoAcceptOff is the hub_auto_accept_disabled refusal: what is off, and where on this computer
 // the owner turns it on.
-const hubAutoAcceptOff = `Coral Hub auto-accept is turned off on this computer. To turn it on, open Settings > Coral Hub and remote access on this computer and turn on "Coral Hub can turn on auto-accept" (the account this computer is linked to can also turn it on from Coral Hub).`
+const hubAutoAcceptOff = `Coral Hub auto-accept is turned off on this computer. To turn it on, open Settings > Coral Hub and remote access on this computer and turn on "Allow Hub auto-accept" (the account this computer is linked to can also turn it on from Coral Hub).`
 
 // hubAsksToSkip reports whether a launch, team member or restart asks for an agent that acts
 // without asking: flags that skip permission prompts (agent.SkipsPermissionPrompts, an allowlist),
@@ -64,7 +64,7 @@ func hubSkipRefusal(ctx context.Context, r *http.Request, ss *store.SessionStore
 // owner allowed that on this computer, and reports whether it refused: the agent auto-accept rule
 // (#3182, #3377 SEC-JB-01), on every route that starts an agent with the request's choices (launch,
 // launch-team, restart, tasks/run). The request must carry the Hub's provenance, the local switch
-// "Coral Hub can turn on auto-accept" must be on (off unless the owner turned it on) and the Launch
+// "Allow Hub auto-accept" must be on (off unless the owner turned it on) and the Launch
 // mode must be set. It is refused, never stripped, so the person sees why. A local request is not
 // gated: the owner chooses at the dashboard, the command line or with the API key.
 func refuseHubSkip(w http.ResponseWriter, r *http.Request, ss *store.SessionStore, skips bool) bool {
