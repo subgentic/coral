@@ -25,8 +25,8 @@
 .shj-dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: var(--accent); }
 .shj-ok .shj-dot { background: var(--success-text); }
 .shj-bad .shj-dot { background: var(--error-text); }
-.shj-pills { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
-.shj-steps { margin: 0; padding-left: var(--space-xl); color: var(--text-secondary); display: grid; gap: var(--space-xs); }
+.shj-pills { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+.shj-steps { margin: 0; padding-left: var(--space-xl); color: var(--text-secondary); font-size: var(--fs-lg); display: grid; gap: var(--space-xs); }
 .shj-error { margin: 0; color: var(--error-text); }
 .shj-foot { display: flex; flex-wrap: wrap; gap: var(--space-sm); justify-content: flex-end; padding-top: var(--space-sm); border-top: 1px solid var(--border); }
 .shj-foot > :first-child:not(:only-child) { margin-right: auto; }

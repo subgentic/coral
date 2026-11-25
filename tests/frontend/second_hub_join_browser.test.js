@@ -11,7 +11,7 @@ const SERVERS = [{ id: 'local', label: 'studio-mac', local: true, status: 'onlin
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const ok = name => console.log(`   ✓ ${name}`);
-    const shot = async n => { if (process.env.SHOT_DIR) fs.writeFileSync(`${process.env.SHOT_DIR}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const shot = async n => { if (process.env.SHOT_DIR) { await ev(`document.querySelectorAll('.toast, #toast-container > *').forEach(t => t.remove()); true`); fs.writeFileSync(`${process.env.SHOT_DIR}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } };
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -52,9 +52,12 @@ const SERVERS = [{ id: 'local', label: 'studio-mac', local: true, status: 'onlin
 
                 // 3. SSH unreachable: the reason the Hub got, on the same panel, the fields kept
                 await ev(`window.__joinStatus = 502; document.querySelector('.shj-form input[type=text]').value = 'me@studio.example.com'; [...document.querySelectorAll('.shj-form input[type=url]')][0].value = 'https://studio.example.com'; document.querySelector('.shj-form button[type=submit]').click(); true`);
-                await waitFor(`/connection refused/.test((document.querySelector('.shj-error') || {}).textContent || '')`, `${at}the SSH failure said`);
-                assert.equal(await ev(`document.querySelector('.shj-form input[type=text]').value`), 'me@studio.example.com', at + 'the address is kept');
+                await waitFor(`/connection refused/.test((document.querySelector('.shj-status.shj-bad') || {}).textContent || '')`, `${at}the SSH failure said, in its own Not connected panel`);
+                assert.match(await ev(`document.querySelector('.shj-dialog').textContent`), /Not connected\./, at + 'the panel says Not connected');
                 await shot(`join_6_ssh_failed_${w}_${theme}`);
+                await ev(`[...document.querySelectorAll('.shj-dialog button')].find(b => b.textContent === 'Edit address').click(); true`);
+                await waitFor(`!!document.querySelector('.shj-form input[type=text]')`, `${at}Edit address returns to the form`);
+                assert.equal(await ev(`document.querySelector('.shj-form input[type=text]').value`), 'me@studio.example.com', at + 'the address is kept');
 
                 // 4. ask: the body names the computer, the address, the level and the SSH target
                 await ev(`window.__joinStatus = 200; window.__calls.length = 0; document.querySelector('.shj-levels input[value=interact]').click(); document.querySelector('.shj-form input[id$=label]').value = 'Studio'; document.querySelector('.shj-form button[type=submit]').click(); true`);
@@ -77,6 +80,7 @@ const SERVERS = [{ id: 'local', label: 'studio-mac', local: true, status: 'onlin
                 await ev(`document.querySelector('.shj-foot .btn-primary').click(); true`);
                 await waitFor(`/4 tries left/.test(document.body.innerText)`, `${at}the tries left`);
                 assert.match(await text('.shj-status.shj-bad'), /That code is not right/);
+                await shot(`join_8_wrong_code_${w}_${theme}`);
                 await ev(`window.__codeStatus = 201; document.querySelector('.shj-code').value = '4821 7390'; document.querySelector('.shj-foot .btn-primary').click(); true`);
                 await waitFor(`/is linked/.test(document.body.innerText)`, `${at}linked`);
                 assert.deepEqual(await ev(`window.__calls.filter(c => c.p.endsWith('/code')).map(c => c.body.code)`), ['48217390', '48217390'], at + 'the code is sent as digits');
@@ -104,6 +108,12 @@ const SERVERS = [{ id: 'local', label: 'studio-mac', local: true, status: 'onlin
                 await shot(`join_7_denied_${w}_${theme}`);
                 await ev(`[...document.querySelectorAll('.shj-foot .btn')].find(x => x.textContent === 'Ask again').click(); true`);
                 await waitFor(`!!document.querySelector('.shj-form')`, `${at}Ask again returns to the form`);
+                // an expired request says so in its own panel
+                await ev(`window.__state = { state: 'expired' }; document.querySelector('.shj-form input[type=password]').value = 'lrk_bbbbbbbb_' + '0'.repeat(32); document.querySelector('.shj-form button[type=submit]').click(); true`);
+                await waitFor(`/Not allowed in time/.test(document.body.innerText)`, `${at}expired`, 9000);
+                await shot(`join_9_expired_${w}_${theme}`);
+                await ev(`[...document.querySelectorAll('.shj-foot .btn')].find(x => x.textContent === 'Ask again').click(); true`);
+                await waitFor(`!!document.querySelector('.shj-form')`, `${at}Ask again after expired returns to the form`);
                 ok(`${at}${theme}: with a key; the key leaves the page; denied has its words and Ask again`);
 
                 // 8. Advanced closes the dialog and leaves the URL and key form on the page; Escape closes the dialog and the form
