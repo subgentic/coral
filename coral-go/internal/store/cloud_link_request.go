@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"github.com/subgentic/coral/pkg/hubowner"
 	"math/big"
 	"strings"
 	"time"
@@ -107,6 +108,15 @@ func (s *CloudStore) expireLinkRequests(ctx context.Context, now time.Time) {
 // a Hub already linked, a full computer, a muted Hub, too many waiting and too many an hour. cred names the credential (or "" for the person at this computer) the limits count per. It returns the request id and the
 // poll secret, shown once.
 func (s *CloudStore) CreateLinkRequest(ctx context.Context, hub, linkCap, cred string, now time.Time) (id, pollSecret string, err error) {
+	return s.CreateLinkRequestFor(ctx, hub, linkCap, cred, "", now)
+}
+
+// CreateLinkRequestFor is CreateLinkRequest for a self-hosted Hub that says which hub id it is (#21261): kept with the request and copied to the key link it makes. hubID is "" or a valid hub id; a
+// request not made by a request key keeps none.
+func (s *CloudStore) CreateLinkRequestFor(ctx context.Context, hub, linkCap, cred, hubID string, now time.Time) (id, pollSecret string, err error) {
+	if hubID != "" && (!hubowner.ValidHubID(hubID) || !strings.HasPrefix(cred, "lk-")) {
+		return "", "", errors.New("that is not a hub id")
+	}
 	origin, err := CanonicalHubOrigin(hub)
 	if err != nil {
 		return "", "", err
@@ -179,8 +189,8 @@ func (s *CloudStore) CreateLinkRequest(ctx context.Context, hub, linkCap, cred s
 		return "", "", err
 	}
 	id = "req-" + idHex
-	if _, err = tx.ExecContext(ctx, `INSERT INTO cloud_link_request (request_id, hub_origin, cap_asked, state, cred_id, poll_salt, poll_hash, created_at, expires_at)
-		VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`, id, origin, linkCap, cred, salt, lrHash(salt, pollSecret), lrTime(now), lrTime(now.Add(LinkRequestPendingTTL))); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO cloud_link_request (request_id, hub_origin, cap_asked, state, cred_id, poll_salt, poll_hash, created_at, expires_at, hub_id)
+		VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`, id, origin, linkCap, cred, salt, lrHash(salt, pollSecret), lrTime(now), lrTime(now.Add(LinkRequestPendingTTL)), hubID); err != nil {
 		return "", "", err
 	}
 	if err := tx.Commit(); err != nil {
@@ -192,6 +202,7 @@ func (s *CloudStore) CreateLinkRequest(ctx context.Context, hub, linkCap, cred s
 type lrRow struct {
 	LinkRequest
 	CredID   string `db:"cred_id"`
+	HubID    string `db:"hub_id"`
 	PollSalt string `db:"poll_salt"`
 	PollHash string `db:"poll_hash"`
 	CodeSalt string `db:"code_salt"`
@@ -204,7 +215,7 @@ type lrQuerier interface {
 
 func lrLoad(ctx context.Context, q lrQuerier, id string) (*lrRow, error) {
 	var r lrRow
-	err := q.GetContext(ctx, &r, `SELECT `+linkRequestCols+`, cred_id, poll_salt, poll_hash, code_salt, code_hash FROM cloud_link_request WHERE request_id = ?`, id)
+	err := q.GetContext(ctx, &r, `SELECT `+linkRequestCols+`, cred_id, hub_id, poll_salt, poll_hash, code_salt, code_hash FROM cloud_link_request WHERE request_id = ?`, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrLinkRequestNone
 	}
@@ -369,8 +380,8 @@ func (s *CloudStore) FinishLinkRequestAsKeyLink(ctx context.Context, id, pollSec
 		if linkID, err = NewLinkID(); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, created_at, source, key_id) VALUES (?, ?, ?, ?, '', ?, ?, 'all', ?, ?, ?)`,
-			linkID, origin, key, origin, LinkStateActive, r.CapGiven, nowUTC(), LinkSourceKey, key); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO cloud_link (link_id, hub_origin, server_id, label, token, state, max_mode, scope, created_at, source, key_id, hub_id) VALUES (?, ?, ?, ?, '', ?, ?, 'all', ?, ?, ?, ?)`,
+			linkID, origin, key, origin, LinkStateActive, r.CapGiven, nowUTC(), LinkSourceKey, key, r.HubID); err != nil {
 			return err
 		}
 		return logLinkEvent(ctx, tx, linkID, origin, LinkEventAdded, "cap "+r.CapGiven+", by request key "+key)
@@ -452,4 +463,14 @@ func (s *CloudStore) finishLinkRequest(ctx context.Context, id, pollSecret, code
 		return "", "", err
 	}
 	return r.Hub, r.CapGiven, nil
+}
+
+// KeyLinkHubID is the hub id a key link's Hub gave when it joined (#21261): "" for a link that is not a key link, one made before the id was kept, or one whose Hub gave none. Only a stamp made with the secret held under
+// exactly this id is that Hub's person (hubowner.LinkVerifiers.CheckExact).
+func (s *CloudStore) KeyLinkHubID(ctx context.Context, linkID string) string {
+	var id string
+	if err := s.db.GetContext(ctx, &id, `SELECT hub_id FROM cloud_link WHERE link_id = ? AND source = ? AND state = ?`, linkID, LinkSourceKey, LinkStateActive); err != nil {
+		return ""
+	}
+	return id
 }

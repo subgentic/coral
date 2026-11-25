@@ -104,14 +104,15 @@ func (m *Manager) startKeyBridge(root context.Context, l store.CloudLink, cp tun
 	go func() { defer safego.Recover("cloud/key_bridge:serve"); _ = srv.Serve(ln) }()
 	go func() { <-ctx.Done(); _ = srv.Close(); _ = ln.Close() }()
 	b.local = &tunnel.LocalHandler{
-		BaseURL:       m.o.LocalBaseURL,
-		AllowRequest:  tunnel.AllowRequest(b.mode), // this link's own cap, read on every request: the same table as a tunnel link's
-		MaxMode:       b.mode,
-		ViaValue:      ViaSecret(),
-		LinkID:        l.LinkID,
-		RedactTokens:  m.o.RedactTokens,
-		Redactor:      m.o.Redactor,
-		HubLimitsFunc: m.o.HubLimits,
+		BaseURL:         m.o.LocalBaseURL,
+		AllowRequest:    tunnel.AllowRequest(b.mode), // this link's own cap, read on every request: the same table as a tunnel link's
+		MaxMode:         b.mode,
+		ViaValue:        ViaSecret(),
+		LinkID:          l.LinkID,
+		AllowOwnerStamp: true, // the Hub's owner stamp rides the tunnel to the local server, which checks it against this link's own hub secret (#21261)
+		RedactTokens:    m.o.RedactTokens,
+		Redactor:        m.o.Redactor,
+		HubLimitsFunc:   m.o.HubLimits,
 	}
 	hc := &http.Client{Transport: &http.Transport{DialContext: ln.dial}}
 	cs, err := tunnel.Dial(ctx, "ws://127.0.0.1/key-link", "key-link", tunnel.ClientOptions{Handler: b.local, LocalMode: b.mode, AllowInsecure: true, HTTPClient: hc, CoralVersion: m.o.CoralVersion})
@@ -129,7 +130,7 @@ func (m *Manager) startKeyBridge(root context.Context, l store.CloudLink, cp tun
 	go func() { <-ctx.Done(); b.session.Close() }()
 	target := hubproxy.TunnelTarget{Session: b.session}
 	r := chi.NewRouter()
-	r.Handle("/api/remote/{server}/*", hubproxy.NewWithOptions(oneTarget{id: l.LinkID, t: target}, hubproxy.Options{AllowedOrigins: []string{keyBridgeOrigin}}))
+	r.Handle("/api/remote/{server}/*", hubproxy.NewWithOptions(oneTarget{id: l.LinkID, t: target}, hubproxy.Options{AllowedOrigins: []string{keyBridgeOrigin}, KeepOwnerStamp: true}))
 	b.proxy = r
 	return b, nil
 }

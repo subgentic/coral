@@ -200,7 +200,14 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 			// got only the denylist below, so a browser's X-API-Key, X-Coral-* and Sec-Fetch-* went
 			// downstream; the Authorization the target sets in RoundTrip is added after this.
 			enc := out.Header.Values("Accept-Encoding")
+			var keepStamp []string
+			if h.opts.KeepOwnerStamp {
+				keepStamp = stampHeaderValues(out.Header)
+			}
 			allowlistHeaders(out.Header, out.Method, dec)
+			for _, v := range keepStamp {
+				out.Header.Add(hubowner.Header, v)
+			}
 			if !isTunnel(t) {
 				dropHubUserHeader(out.Header) // only a tunnel carries a Hub user the connector vouches for
 				// A direct remote relays gzip unchanged (the connector decodes for a tunnel, which is
@@ -522,4 +529,15 @@ func (h *Handler) noteNoStamp(id string, resp *http.Response) {
 	if due {
 		slog.Warn("this Hub has no Approve set up for a computer: its "+v+" will need it in a later release (Settings > Computers, Approve through this hub)", "server", id)
 	}
+}
+
+// stampHeaderValues is every value of the owner stamp header in any spelling of its name.
+func stampHeaderValues(h http.Header) []string {
+	var out []string
+	for k, v := range h {
+		if http.CanonicalHeaderKey(k) == hubowner.Header {
+			out = append(out, v...)
+		}
+	}
+	return out
 }

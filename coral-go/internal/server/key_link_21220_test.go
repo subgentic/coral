@@ -124,7 +124,7 @@ func TestAKeyLinkReachesThisComputerAtItsCapAndEndsWithTheLinkOrTheKey(t *testin
 	assert.Equal(t, 403, code, "above the link's cap")
 	code, body := w.send(t, "GET", "/api/sessions/live", key, map[string]string{"X-Coral-Hub-Owner": "v1.1." + strings.Repeat("0", 32) + "." + strings.Repeat("0", 64)})
 	assert.Equal(t, 403, code)
-	assert.Contains(t, body, "#21261", "a stamp is refused with a plain reason, never ignored")
+	assert.Contains(t, body, "hub_owner_stamp_refused", "a stamp that does not verify against this link's own Hub is refused with a plain reason, never ignored")
 	code, _ = w.send(t, "GET", "/api/health", "lrk_00000000_"+strings.Repeat("0", 32), nil)
 	assert.Equal(t, 401, code, "a wrong key")
 

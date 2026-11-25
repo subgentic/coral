@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,7 @@ import (
 	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 )
 
 // A second Hub asks to join this Coral (#20936, design #20901 v4). Every route here is the person at this computer's: never tunneled (the tunnel table has none of them), never an agent's, never a Hub's. A request is a
@@ -88,15 +90,23 @@ func (h *CloudHandler) LinkRequestCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var body struct {
-		Hub string `json:"hub"`
-		Cap string `json:"cap"`
+		Hub   string `json:"hub"`
+		Cap   string `json:"cap"`
+		HubID string `json:"hub_id"` // a self-hosted Hub's own id (#21261): only kept for a request a request key made, and only a valid hub id
 	}
 	if err := decodeJSONLimit(r, &body, 4096); err != nil {
 		errBadRequest(w, "send {\"hub\": the Hub's address, \"cap\": \"view\", \"interact\" or \"launch\"}")
 		return
 	}
+	if body.HubID != "" && !hubowner.ValidHubID(body.HubID) {
+		errBadRequest(w, "hub_id is not a hub id")
+		return
+	}
+	if !strings.HasPrefix(cred, "lk-") {
+		body.HubID = "" // a person's own request, or a Hub's tunnel: no key link comes of it, so there is nothing to bind
+	}
 	now := time.Now()
-	id, secret, err := h.links.CreateLinkRequest(r.Context(), body.Hub, body.Cap, cred, now)
+	id, secret, err := h.links.CreateLinkRequestFor(r.Context(), body.Hub, body.Cap, cred, body.HubID, now)
 	if err != nil {
 		h.linkRequestErr(w, err)
 		return

@@ -15,11 +15,13 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
-	{"device_keys", "approved_by", "TEXT NOT NULL DEFAULT ''"},  // #20515 M3: the kid of the signer or passkey that made the key; '' is a key made at this computer
-	{"device_keys", "via_passkey", "TEXT NOT NULL DEFAULT ''"},  // #20515 M5: the passkey whose certificate made the device; it acts only on itself
-	{"device_keys", "raised_by", "TEXT NOT NULL DEFAULT ''"},    // #20515 M4: the kid of the signer that last raised the key (PairOwner for a raise at this computer), for the owner's notice
-	{"device_keys", "changed_at", "INTEGER NOT NULL DEFAULT 0"}, // #20515 M4: when the row was made or its mode last changed, for the owner's notice
-	{"cloud_link_key", "via_link", "TEXT NOT NULL DEFAULT ''"},  // #20966: the link a key was made through (a relayed make), '' for one made at this computer; a Hub ends only its own link's
+	{"device_keys", "approved_by", "TEXT NOT NULL DEFAULT ''"},   // #20515 M3: the kid of the signer or passkey that made the key; '' is a key made at this computer
+	{"device_keys", "via_passkey", "TEXT NOT NULL DEFAULT ''"},   // #20515 M5: the passkey whose certificate made the device; it acts only on itself
+	{"device_keys", "raised_by", "TEXT NOT NULL DEFAULT ''"},     // #20515 M4: the kid of the signer that last raised the key (PairOwner for a raise at this computer), for the owner's notice
+	{"device_keys", "changed_at", "INTEGER NOT NULL DEFAULT 0"},  // #20515 M4: when the row was made or its mode last changed, for the owner's notice
+	{"cloud_link_key", "via_link", "TEXT NOT NULL DEFAULT ''"},   // #20966: the link a key was made through (a relayed make), '' for one made at this computer; a Hub ends only its own link's
+	{"cloud_link_request", "hub_id", "TEXT NOT NULL DEFAULT ''"}, // #21261: the hub id a self-hosted Hub's join said it is (hubowner.HubID); '' for any other request. Copied to the key link it makes
+	{"cloud_link", "hub_id", "TEXT NOT NULL DEFAULT ''"},         // #21261: the hub id a key link's Hub gave at its join: only a stamp made with the secret held under exactly this id is that Hub's person; '' for a tunnel link and for a key link made before this
 	{"cloud_link", "source", "TEXT NOT NULL DEFAULT 'enrollment'"},
 	{"cloud_link", "key_id", "TEXT NOT NULL DEFAULT ''"},        // #21220: the request key a self-hosted Hub's link answers to (source 'key'); '' for a tunnel link // #20368: 'enrollment' is the link the one enrollment mirrors (its cap is the setting), 'added' a link added at this computer (its own cap); the enrollment's save, delete and mirror touch only the first kind
 	{"gdoc_comment_map", "seen", "INTEGER NOT NULL DEFAULT 1"},  // the last pull saw this Google comment (#20012): an upgrade from a build that made the table without it
