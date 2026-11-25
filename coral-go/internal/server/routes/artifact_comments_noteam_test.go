@@ -1,8 +1,10 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,4 +47,33 @@ func TestAnAgentCannotCommentOnOrReadTheReservedNoTeamBoard(t *testing.T) {
 	code, list := rig.do("GET", cp(cmtDoc), cmtAsAgent, nil)
 	require.Equal(t, 200, code, fmt.Sprint(list))
 	assert.Empty(t, list["comments"], "an agent does not see a thread of the reserved board: it is on no board")
+}
+
+// #21202: a send of the Operator's review asks the uploader of a no-team file into exactly the threads it carries, and the uploader reads those in full; every other thread of the reserved board stays hidden.
+func TestTheUploaderOfANoTeamFileReadsTheThreadsSentToItAndNothingElse(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.uploadedBySession("s1", "")
+	post := func(body string) int64 {
+		code, out := rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": body, "anchor": anchorOf("the lock"), "board": noTeamBoardID})
+		require.Equal(t, 201, code, fmt.Sprint(out))
+		return int64(out["id"].(float64))
+	}
+	sentID := post("Sent to the agent.")
+	post("The Operator's private note.")
+	now := time.Now()
+	_, _, err := rig.ss.CreateArtifactAsk(context.Background(), sentID, cmtDoc, noTeamBoardID, "s1", noTeamReviewTitle, now)
+	require.NoError(t, err)
+	require.NoError(t, rig.ss.CloseArtifactAsks(context.Background(), sentID, now))
+
+	code, list := rig.do("GET", cp(cmtDoc), cmtAsAgent, nil)
+	require.Equal(t, 200, code, fmt.Sprint(list))
+	cs, _ := list["comments"].([]any)
+	require.Len(t, cs, 1, "the thread sent to it, and no other")
+	assert.Equal(t, "Sent to the agent.", cs[0].(map[string]any)["body"])
+
+	// another agent's ask grants this one nothing
+	_, _, err = rig.ss.CreateArtifactAsk(context.Background(), sentID+1, cmtDoc, noTeamBoardID, "s2", noTeamReviewTitle, now)
+	require.NoError(t, err)
+	_, list = rig.do("GET", cp(cmtDoc), cmtAsAgent, nil)
+	assert.Len(t, list["comments"], 1)
 }
