@@ -81,6 +81,7 @@ const SERVERS = [
 
         // 3. a refused add shows its message next to the URL field, and that field is flagged and focused
         await ev(`document.querySelector('[data-action=add]').click(); true`);
+        await waitFor(`!!document.querySelector('.shj-advanced')`, 'the join dialog'); await ev(`document.querySelector('.shj-advanced').click(); true`); // the URL and key form is behind the dialog's Advanced link (#21221)
         await waitFor(`!!document.getElementById('servers-form')`, 'the add form');
         await fillForm({ id: 'new1', url: 'http://example.org:8420', key: 'k' }); await submitForm();
         await waitFor(`!!document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error') && !document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error').hidden`, 'the inline URL error');
@@ -105,6 +106,7 @@ const SERVERS = [
         await ev(`document.getElementById('server-row-lan').scrollIntoView({ block: 'center' }); true`); await sleep(200); // sleep-ok: layout settles after a font-size or scroll change; there is no completion event
         await shot('rows-phone-200');
         await ev(`document.querySelector('[data-action=add]').click(); true`);
+        await waitFor(`!!document.querySelector('.shj-advanced')`, 'the join dialog'); await ev(`document.querySelector('.shj-advanced').click(); true`); // the URL and key form is behind the dialog's Advanced link (#21221)
         await waitFor(`!!document.getElementById('servers-form')`, 'the add form on the phone');
         await ev(`window.__postAnswer = { status: 400, body: { error: ${JSON.stringify(REFUSED)} } }; true`); await fillForm({ id: 'new1', url: 'http://example.org:8420', key: 'k' }); await submitForm();
         await waitFor(`!!document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error') && !document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error').hidden`, 'the inline URL error on the phone');

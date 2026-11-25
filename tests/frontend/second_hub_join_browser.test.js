@@ -39,8 +39,8 @@ const SERVERS = [{ id: 'local', label: 'studio-mac', local: true, status: 'onlin
 
                 // 1. over SSH is first and chosen; the URL and key form is behind Advanced
                 assert.equal(await ev(`document.querySelector('.shj-ways input:checked').value`), 'ssh', at + 'Over SSH is the default');
-                assert.equal(await ev(`document.querySelector('.servers-advanced').open`), false, at + 'the URL and key form is behind Advanced');
-                assert.match(await text('.servers-advanced summary'), /Advanced: add by URL and key/);
+                assert.equal(await ev(`document.querySelector('.shj-dialog').open && getComputedStyle(document.querySelector('.shj-dialog')).position`), 'fixed', at + 'the join is a dialog, as the approved mock draws it');
+                assert.match(await text('.shj-advanced'), /Advanced: add by URL and key/);
                 assert.deepEqual(await ev(`[...document.querySelectorAll('.shj-levels input')].map(i => i.value + ':' + i.checked)`), ['view:false', 'interact:true', 'launch:false'], at + 'the three levels to ask for');
                 await sideways('the SSH form'); await shot(`join_1_ssh_${w}_${theme}`);
                 ok(`${at}${theme}: Over SSH first, three levels, the old form behind Advanced`);
@@ -84,7 +84,7 @@ const SERVERS = [{ id: 'local', label: 'studio-mac', local: true, status: 'onlin
                 assert.match(await text('.shj-lead'), /coral cloud links/);
                 await sideways('the linked step'); await shot(`join_5_linked_${w}_${theme}`);
                 await ev(`document.querySelector('.shj-foot .btn-primary').click(); true`);
-                await waitFor(`!document.querySelector('.shj-form, .shj-body') && !!document.querySelector('#server-row-studio')`, `${at}Done returns to the list with the new computer`);
+                await waitFor(`!document.querySelector('.shj-dialog') && !!document.querySelector('#server-row-studio')`, `${at}Done returns to the list with the new computer`);
                 ok(`${at}${theme}: lower level said, wrong code counted, linked with its level, Done returns to the list`);
                 await ev(`window.__added = null; window.__codeStatus = 403; window.__state = { state: 'pending' }; true`);
 
@@ -105,6 +105,11 @@ const SERVERS = [{ id: 'local', label: 'studio-mac', local: true, status: 'onlin
                 await ev(`[...document.querySelectorAll('.shj-foot .btn')].find(x => x.textContent === 'Ask again').click(); true`);
                 await waitFor(`!!document.querySelector('.shj-form')`, `${at}Ask again returns to the form`);
                 ok(`${at}${theme}: with a key; the key leaves the page; denied has its words and Ask again`);
+
+                // 8. Advanced closes the dialog and leaves the URL and key form on the page; Escape closes the dialog and the form
+                await ev(`document.querySelector('.shj-advanced').click(); true`);
+                await waitFor(`!document.querySelector('.shj-dialog') && !!document.getElementById('servers-id')`, `${at}Advanced leaves the old form`);
+                await ev(`[...document.querySelectorAll('#servers-form button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
             }
         }
         console.log('PASS second hub join');
