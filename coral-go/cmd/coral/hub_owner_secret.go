@@ -127,12 +127,17 @@ func listHubOwnerLinks(dir string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "no hub's owner stamp secret is installed")
 		return 0
 	}
+	left, isLeft := hubowner.Leftover(dir)
 	for _, l := range links {
 		hub := l.Hub
 		if hub == "" {
 			hub = "(an older hub, no id)"
 		}
-		fmt.Fprintf(stdout, "%s\thub %s\tthis computer at it: %s\tinstalled %s\n", l.Label(), hub, l.Remote, l.At)
+		fmt.Fprintf(stdout, "%s\thub %s\tthis computer at it: %s\tinstalled %s", l.Label(), hub, l.Remote, l.At)
+		if isLeft && l.Hub == "" && l.Remote == left.Remote {
+			fmt.Fprint(stdout, "\t"+hubowner.LeftoverNote(left))
+		}
+		fmt.Fprintln(stdout)
 	}
 	return 0
 }

@@ -199,3 +199,27 @@ func TestANewerHubsInstallKeepsAnOlderHubsSecretUnderTheSameComputerName(t *test
 	assert.Equal(t, Link{Remote: "mac", Secret: older, At: ls[0].At}, ls[0])
 	assert.Equal(t, linkHubA, ls[1].Hub)
 }
+
+// #21251: an older single-file secret under the same computer name as a hub's link is a leftover (an install with a hub id leaves the file alone); a single file alone, or under another name, is not.
+func TestASingleFileUnderALinksNameIsALeftoverAndAloneIsNot(t *testing.T) {
+	dir := t.TempDir()
+	_, ok := Leftover(dir)
+	assert.False(t, ok, "nothing installed")
+	require.NoError(t, WriteFile(dir, "mac", strings.Repeat("9f", 32)))
+	_, ok = Leftover(dir)
+	assert.False(t, ok, "a single file alone is not flagged")
+	require.NoError(t, Install(dir, Link{Hub: linkHubA, Remote: "other", Secret: strings.Repeat("1a", 32)}, time.Now()))
+	_, ok = Leftover(dir)
+	assert.False(t, ok, "a link under another computer name does not match")
+	require.NoError(t, Install(dir, Link{Hub: linkHubB, Remote: "mac", Secret: strings.Repeat("2b", 32)}, time.Now()))
+	l, ok := Leftover(dir)
+	require.True(t, ok, "a link and the single file under the same name")
+	assert.Equal(t, "mac", l.Remote)
+	assert.Contains(t, LeftoverNote(l), "--remove mac")
+	assert.NotContains(t, LeftoverNote(l), strings.Repeat("9f", 32))
+	n, err := Remove(dir, "mac")
+	require.NoError(t, err)
+	require.Equal(t, 1, n)
+	_, ok = Leftover(dir)
+	assert.False(t, ok, "removed: no longer flagged")
+}
