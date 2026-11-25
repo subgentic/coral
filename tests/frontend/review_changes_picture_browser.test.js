@@ -24,6 +24,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const item = { id: hex, name: 'Review file.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - 600000).toISOString(), task_id: 0, source: 'upload', available: true, session_id: 'writer-a', produced_by: 'Writer A', tags: ['for review'], uri: 'coral://artifacts/' + hex };
             window.__comments = []; window.__uploads = []; window.__decisions = [];
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), m = opts.method || 'GET';
+                if (new URL(String(url), location.href).pathname.endsWith('/review-drafts')) return json({drafts_supported:false,drafts:[],count:0,revision:0,can_write:false,can_send:false});
                 const page = u.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(u.href, location.href, {'${team}':[item]}) : null;
                 if (page && m === 'GET') return json(page);
                 if (m === 'GET' && u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? [item] : [], has_more: false });

@@ -1,3 +1,4 @@
+const { draftReviewStub, sendSavedDrafts } = require('./helpers/draft_review_stub');
 // #20991: sent comment pictures survive artifact name lookup, locally and through cloud routing.
 // Four pictures per comment are accepted; the fifth is refused with words and no upload.
 const assert = require('node:assert/strict');
@@ -48,19 +49,22 @@ const PNG='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEh
             await Page.addScriptToEvaluateOnNewDocument({source:`window.__qaCloud=${cloud};`});
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
             const blank=Page.loadEventFired();await Page.navigate({url:'about:blank'});await blank;
-            const loaded=Page.loadEventFired();await Page.navigate({url:BASE+'/'});await loaded;await install();
+            const loaded=Page.loadEventFired();await Page.navigate({url:BASE+'/'});await loaded;await install();await ev(draftReviewStub(HEX));
             if(surface==='preview') await ev(`(async()=>{const path=(window.__coralStatic||'/static/');const {state}=await import(path+'state.js');state.currentSession={type:'live',name:'Dev',session_id:'picker-agent',agent_type:'claude',server:'${cloud?'build-mac':'local'}'};const {showView}=await import(path+'utils.js');showView('live-session-view');const p=await import(path+'preview_pane.js');p.setPreviewSession('picker-agent');p.openArtifactTab('coral://artifacts/${HEX}',{filename:'plan.md',mediaType:'text/markdown',server:'${cloud?'build-mac':'local'}',phoneFull:true});return true;})()`);
             else await ev(`(async()=>{const v=await import((window.__coralStatic||'/static/')+'artifact_viewer.js');v.openArtifactViewer('${HEX}',{filename:'plan.md',mediaType:'text/markdown'${cloud?",server:'build-mac'":''}});return true;})()`);
             await waitFor(`!!document.querySelector('${root} .ac-panel')`,'document',10000);
             await waitFor(`!!document.querySelector('${toggleRoot} .ac-toggle:not([hidden])')`,'Comments action',10000);
             await ev(`(()=>{const t=document.querySelector('${toggleRoot} .ac-toggle');if(t.getAttribute('aria-expanded')!=='true')t.click();return true;})()`);
-            await waitFor(`!!document.querySelector('${root} .ac-whole')`,'whole-document action',10000);
-            await ev(`document.querySelector('${root} .ac-whole').click();true`);
+            await waitFor(`!!document.querySelector('${root} .ac-composer .ac-input, ${root} .ac-whole')`,'whole-document composer or preview launcher',10000);
+            await ev(`document.querySelector('${root} .ac-whole')?.click();true`);
             await waitFor(`!!document.querySelector('${root} .ac-composer .ac-add-image')`,'comment picker',10000);
             const tag=source+' '+width+' '+surface;
             const send=async()=>{
                 await ev(`(()=>{const t=document.querySelector('${root} .ac-composer .ac-input');t.value='coral://artifacts/'+('e'.repeat(63)+'1');t.dispatchEvent(new Event('input'));document.querySelector('${root} .ac-composer').requestSubmit();return true;})()`);
-                await waitFor(`document.querySelectorAll('${root} .ac-card').length===window.__comments.length && !document.querySelector('${root} .ac-composer')`,tag+' sent',8000);
+                await waitFor(`window.__drafts.length===1`,tag+' private save',8000);
+                if (await ev(`window.__comments.length !== window.__draftWrites.filter(w=>w.method==='POST').length - 1`)) throw new Error(tag+' Save draft published a comment');
+                await sendSavedDrafts(ev,waitFor,root);
+                await waitFor(`document.querySelectorAll('${root} .ac-card').length===window.__comments.length && (!document.querySelector('${root} .ac-composer .ac-input') || document.querySelector('${root} .ac-composer .ac-input').value==='')`,tag+' sent',8000);
             };
             await ev(`window.__pick();true`);
             await waitFor(`document.querySelectorAll('${root} .ac-thumb-ready').length===1`,tag+' first upload',5000);
@@ -69,7 +73,7 @@ const PNG='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEh
             await ev(`window.__meta.splice(0).forEach(f=>f());true`);
             await waitFor(`document.querySelector('${root} .ac-body a.mb-artifact-ref')?.textContent==='stored-picture.png'`,tag+' name response applied',5000);
             assert.equal(await ev(`document.querySelectorAll('${root} .ac-card .ac-pic-img').length`),1,tag+' name lookup preserves the sent picture without reload');
-            await ev(`document.querySelector('${root} .ac-whole').click();true`);
+            await ev(`document.querySelector('${root} .ac-whole')?.click();true`);
             for(let n=1;n<=4;n++){
                 await ev(`window.__pick();true`);
                 await waitFor(`document.querySelectorAll('${root} .ac-thumb-ready').length===${n}`,tag+' upload '+n,5000);

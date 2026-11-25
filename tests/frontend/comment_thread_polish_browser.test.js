@@ -1,3 +1,4 @@
+const { draftReviewStub, sendSavedDrafts } = require('./helpers/draft_review_stub');
 // Comment threads, polish (#15119, walk 3 N11-N15, N23): the reply box scrolls into view and says how to send (Enter adds a line, Ctrl/Cmd+Enter sends); Add comment shows for a selection over
 // two lines or two paragraphs; the status line under a comment says what it means (no "already asked"), and its read mark is about the NEWEST message; a comment's place reads "In the file, line N";
 // the comments pane keeps the choice made (a different file does not flip it) and the viewer does not change width when the pane opens. Stubbed comments API. 1280 and 390 px.
@@ -31,7 +32,7 @@ const MD = ['# Plan', '', 'First line of a paragraph that goes on', 'and a secon
             if (url.includes('/api/artifacts/${HEX}')) return Promise.resolve(new Response(${JSON.stringify(MD)}, { status: 200, headers: { 'Content-Type': 'text/markdown' } }));
             return real(u, o); };
         return true; })()`;
-    const open = async () => { await ev(STUB); await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'ask-team' })); true`); await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000); };
+    const open = async () => { await ev(STUB); if (!(await ev(`!!window.__draftWrites`))) await ev(draftReviewStub(HEX)); await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'ask-team' })); true`); await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
@@ -60,6 +61,8 @@ const MD = ['# Plan', '', 'First line of a paragraph that goes on', 'and a secon
             assert.ok(/^\d+ \/ \d+$/.test(hint) && !/sends/.test(hint), at + 'the count is only the count; the way to send is said once, in the line under the box (#16399): ' + hint);
             await ev(`(() => { const ta = document.querySelector('.ac-card .ac-input'); ta.focus(); ta.value = 'Thanks'; ta.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
             await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', modifiers: 2 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, modifiers: 2 });
+            await waitFor(`window.__drafts.length === 1 && window.__sent.length === 0`, 'reply saved privately', 5000);
+            await sendSavedDrafts(ev, waitFor);
             await waitFor(`window.__sent.length === 1 && window.__sent[0].body === 'Thanks'`, `${at}Ctrl+Enter sent the reply`, 6000);
             await ev(`window.__sent.length = 0; true`);
 

@@ -1,3 +1,4 @@
+const { draftReviewStub } = require('./helpers/draft_review_stub');
 // #15231 (walk 8 M3 and walk 11 M3, #15164 M11): the "Add comment" button that follows a selection is whole and inside the dialog (it was cut at the right edge), and it does not cover the selected text. 1024 x 700 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -14,7 +15,7 @@ const { coralReady } = require('./helpers/wait');
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-            await ev(STUB);
+            await ev(STUB); await ev(draftReviewStub(H3));
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(H3)}, { filename: 'release-plan.md' }); return true; })()`);
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-body') && document.querySelector('#artifact-viewer .artifact-viewer-body').textContent.length > 20`, at + 'the file shows', 12000);
             const sel = () => {

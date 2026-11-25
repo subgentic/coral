@@ -33,7 +33,7 @@ const CDP = require('chrome-remote-interface');
             await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer(window.__HEX, { filename: ${JSON.stringify(fx.filename)} })); true`);
             await waitFor(`document.querySelectorAll('.ac-card').length > 0 && !!(CSS.highlights.get('ac-comment') && CSS.highlights.get('ac-comment').size)`, 'the cards and the highlights', 30000);
             const openMs = Math.round(await cpu() - c0), openWall = Date.now() - t0;
-            const s = await ev(`({ cards: document.querySelectorAll('.ac-card').length, highlights: CSS.highlights.get('ac-comment').size, orphans: document.querySelectorAll('.ac-orphan').length })`);
+            const s = await ev(`({ cards: document.querySelectorAll('.ac-card, .ac-draft-card').length, highlights: CSS.highlights.get('ac-comment').size, orphans: document.querySelectorAll('.ac-orphan').length })`);
             check(`${kind}: ${fx.comments.length} comments open with a card and a highlight for each open thread (320 of 400), none orphaned`, s.cards === 320 && s.highlights === 320 && s.orphans === 0, JSON.stringify(s));
             check(`${kind}: the viewer opens with its comments in ${OPEN_MS} ms`, openMs <= OPEN_MS, openMs + ' ms of CPU (' + openWall + ' ms on the clock)');
             // a click on a card: the card is current, so is its highlight, and it took no long freeze
@@ -60,14 +60,14 @@ const CDP = require('chrome-remote-interface');
             // a posted comment: it is in the list, the document is not indexed again for it, and it took no long freeze
             const cp0 = await cpu();
             const p = await ev(`(async () => {
-                document.querySelector('.ac-whole').click(); const ta = document.querySelector('.ac-input'); ta.value = 'A comment on the whole document.'; ta.dispatchEvent(new Event('input'));
+                document.querySelector('.ac-whole')?.click(); const ta = document.querySelector('.ac-input'); ta.value = 'A comment on the whole document.'; ta.dispatchEvent(new Event('input'));
                 const t = performance.now(); document.querySelector('.ac-composer').requestSubmit();
-                await new Promise((res, rej) => { const end = t + 20000; const tick = () => { if ([...document.querySelectorAll('.ac-card .ac-body')].some(e => e.textContent === 'A comment on the whole document.')) return res(); if (performance.now() > end) return rej(new Error('the post did not show')); setTimeout(tick, 5); }; tick(); });
+                await new Promise((res, rej) => { const end = t + 20000; const tick = () => { if ([...document.querySelectorAll('.ac-draft-card p')].some(e => e.textContent === 'A comment on the whole document.')) return res(); if (performance.now() > end) return rej(new Error('the post did not show')); setTimeout(tick, 5); }; tick(); });
                 await ${framesJs(2, 10000)};
-                return { ms: Math.round(performance.now() - t), cards: document.querySelectorAll('.ac-card').length, openHl: CSS.highlights.get('ac-comment').size };
+                return { ms: Math.round(performance.now() - t), cards: document.querySelectorAll('.ac-card, .ac-draft-card').length, openHl: CSS.highlights.get('ac-comment').size };
             })()`);
             const postCpu = Math.round(await cpu() - cp0);
-            check(`${kind}: a posted comment shows in ${POST_MS} ms of CPU, the other highlights stay`, postCpu <= POST_MS && p.cards === 321 && p.openHl === 320, JSON.stringify({ ...p, postCpu }));
+            check(`${kind}: a posted comment shows in ${POST_MS} ms of CPU, the other highlights stay`, postCpu <= POST_MS && p.cards === 321 && p.openHl === 320 && (await ev(`window.__drafts.length === 1 && window.__cs.length === 500`)), JSON.stringify({ ...p, postCpu }));
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); true`);
         }
     } finally { await browser.close().catch(() => {}); /* the harness closes Chrome */ }

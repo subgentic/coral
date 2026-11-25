@@ -1,3 +1,4 @@
+const { draftReviewStub, sendSavedDrafts } = require('./helpers/draft_review_stub');
 // Mark up on a picture of a comment (#11654, Goal #184 slice 2, the wiring): each ready thumbnail has a Mark up button; it opens the markup editor (the real image_markup.js), Done uploads the marked PNG with
 // version_of=<the first picture's hex> and the thumbnail becomes the marked copy (still one picture; Send names the new hex); marking again still follows the FIRST hex; Cancel changes nothing; a failed upload keeps the
 // original and says why; the button is 44 px tall on a 390 px phone. Against the same stub of Backend Dev's comment-images route as comment_images_browser. Drives Chrome over CDP through agent_view_harness.js.
@@ -44,14 +45,13 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`try { localStorage.removeItem('coral-artifact-comments-open'); } catch {} true`);
-        await ev(STUB);
+        await ev(STUB); await ev(draftReviewStub(HEX));
         if (team) await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = ${JSON.stringify(team)}; return true; })`);
         await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md' }); return true; })()`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
         await waitFor(`!document.querySelector('.ac-toggle').hidden`, 'the Comments button', 5000);
         if (mobile || !(await ev(`document.querySelector('.ac-panel').getClientRects().length > 0`))) { await ev(`document.querySelector('.ac-toggle').click(); true`); await new Promise(r => setTimeout(r, 400)); } // sleep-ok: the sheet slides in
-        await waitFor(`!!document.querySelector('.ac-whole')`, 'the whole-document button', 5000);
-        await ev(`document.querySelector('.ac-whole').click(); true`);
+        await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the always-visible whole-document draft composer', 5000);
         await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 5000);
     };
     const thumbs = () => ev(`document.querySelectorAll('.ac-composer .ac-thumb').length`);
@@ -122,6 +122,8 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
 
             // Send names the latest hex, once
             await ev(`document.querySelector('.ac-composer .ac-send').click(); true`);
+            await waitFor(`window.__drafts.length === 1 && window.__posts.length === 0`, at + 'marked copy saved privately without publishing', 5000);
+            await sendSavedDrafts(ev, waitFor);
             await waitFor(`window.__posts.length === 1`, at + 'the comment is sent', 5000);
             assert.deepEqual(await ev(`window.__posts[0].images`), [H3], at + 'it names the marked copy only');
             await waitFor(`document.querySelectorAll('.ac-card .ac-pic-img').length === 1`, at + 'one picture in the thread', 5000);

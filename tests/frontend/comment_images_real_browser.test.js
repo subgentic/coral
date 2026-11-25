@@ -46,10 +46,10 @@ const DATA = process.env.CORAL_TEST_DATA_DIR || '';
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
             await waitFor(`!document.querySelector('.ac-toggle').hidden`, 'the Comments button', 5000);
             if (!(await ev(`document.querySelector('.ac-panel').getClientRects().length > 0`))) { await ev(`document.querySelector('.ac-toggle').click(); true`); }
-            await waitFor(`!!document.querySelector('.ac-whole') || !!document.querySelector('.ac-card')`, 'the panel', 8000);
+            await waitFor(`!!document.querySelector('.ac-composer .ac-input') || !!document.querySelector('.ac-card')`, 'the panel', 8000);
         };
         await open();
-        await ev(`document.querySelector('.ac-whole').click(); true`);
+        await ev(`document.querySelector('.ac-whole')?.click(); true`);
         await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 5000);
 
         // a picture through the page's own file input, to the real route: stored, then a comment that is a picture alone
@@ -57,6 +57,12 @@ const DATA = process.env.CORAL_TEST_DATA_DIR || '';
         await waitFor(`document.querySelectorAll('.ac-composer .ac-thumb-img').length === 1 && document.querySelectorAll('.ac-composer .ac-thumb-uploading').length === 0`, 'the stored thumbnail', 8000);
         check('the real route took the picture: no failed thumbnail', (await ev(`document.querySelectorAll('.ac-composer .ac-thumb-failed').length`)) === 0);
         await ev(`document.querySelector('.ac-composer').requestSubmit(); true`);
+        await waitFor(`document.querySelectorAll('.ac-draft-card .ac-pic-img').length === 1`, 'the picture in the private draft', 8000);
+        const privateReview = (await api('GET', `/api/artifacts/${HEX}/review-drafts`)).body;
+        check('Save draft keeps the picture private and writes no published comment', privateReview.count === 1 && privateReview.drafts[0].images.length === 1 && (await api('GET', `/api/artifacts/${HEX}/comments?state=all`)).body.comments.length === 0);
+        const draft = privateReview.drafts[0];
+        check('explicit published API still accepts the stored picture', (await api('POST', `/api/artifacts/${HEX}/comments`, { body:draft.body, anchor:draft.anchor, images:draft.images.map(i=>i.hex) })).status === 201);
+        await open();
         await waitFor(`document.querySelectorAll('.ac-card .ac-pic-img').length === 1`, 'the picture in the thread', 8000);
         await waitFor(`[...document.querySelectorAll('.ac-card .ac-pic-img')].every(i => i.complete && i.naturalWidth > 0)`, 'the picture drawn from the artifact URL of a team artifact', 8000);
         const d = (await api('GET', `/api/artifacts/${HEX}/comments?state=all`)).body;

@@ -316,12 +316,12 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         if (!shownAll.length && !opts.compact && !st.reviewDrafts?.snapshot().data?.count) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one, or Tab to the document and press Enter to choose a passage.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
-        if (st.reviewDrafts) panel.append(draftPanel({ review: st.reviewDrafts, run, refresh, server: st.server, composing: !!st.composing, bar: reviewBar }));
+        if (draftDocument) panel.append(draftPanel({ review: st.reviewDrafts, run, refresh, server: st.server, composing: !!st.composing, bar: reviewBar }));
         const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked && !askedNow(c.id).size); // one an agent already has is not offered again (#20240)
         if (st.bulkSent) { const b = st.bulkSent, who = b.agents.join(', '); const done = el('p', 'ac-send-done', `Sent ${plural(b.total, 'open comment')}${b.of > b.total ? ` of ${b.of}` : ''} to ${who}${b.queued ? ` (delivers when ${b.agents.length === 1 ? who : 'the agent'} is free)` : b.messages > 1 ? `, in ${b.messages} messages because of the size limit of one` : ', in one message'}. Each comment says where it stands.`); done.setAttribute('role', 'status'); panel.append(done); }
         if (!st.reviewDrafts?.snapshot().data?.drafts_supported && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, st.bulkSent ? 'remaining open comment' : 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
-        else if (st.reviewDrafts && d.canComment && !d.locked && !opts.compact) {
+        else if (draftDocument && opts.inlineWhole && d.canComment && !d.locked && !opts.compact) {
             st.wholeComposer ||= { anchor: { whole: true } };
             panel.append(composer(undefined, st.wholeComposer));
         } else if (d.canComment && !d.locked && !opts.compact) {

@@ -1,3 +1,4 @@
+const { draftReviewStub } = require('./helpers/draft_review_stub');
 // The keyboard stays in the comments after a send (#15174, Beta walk 7 H2: after Send in a review comment and after Reply, the focus dropped to the page body and the next Tab started from the top): a reply sent with
 // Ctrl+Enter leaves the keyboard on a control of the panel (the thread's Reply box), not on the page. Stubbed comments API. 1280 px.
 const { connect } = require('./agent_view_harness');
@@ -24,6 +25,7 @@ const HEX = 'c'.repeat(64);
                 }
                 if (url.includes('/api/artifacts/${HEX}')) return Promise.resolve(new Response('# Plan\\n\\nThe plan.\\n', { status: 200, headers: { 'Content-Type': 'text/markdown' } }));
                 return real(u, o); }; return true; })()`);
+        await ev(draftReviewStub(HEX));
         await ev(`import(${S} + 'safe_storage.js').then(({ browserLocal }) => { browserLocal.set('coral-artifact-comments-open', 'open'); browserLocal.set('coral-artifact-comments:text/markdown', 'open'); return true; })`);
         await ev(`import(${S} + 'artifact_viewer.js').then(v => v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'kb-team' })); true`);
         await waitFor(`!!document.querySelector('.ac-card[data-id="1"] .ac-replybox')`, 'the thread', 10000);
@@ -31,7 +33,7 @@ const HEX = 'c'.repeat(64);
         await waitFor(`!!document.querySelector('.ac-card .ac-input')`, 'the reply box', 4000);
         await ev(`(() => { const ta = document.querySelector('.ac-card .ac-input'); ta.focus(); ta.value = 'Thanks'; ta.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', modifiers: 2 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, modifiers: 2 });
-        await waitFor(`window.__cs.length === 2 && !document.querySelector('.ac-card .ac-input')`, 'the reply is sent and the box is gone', 8000);
+        await waitFor(`window.__drafts.length === 1 && window.__cs.length === 1 && !document.querySelector('.ac-card .ac-input')`, 'the reply is private, no published reply was added, and the reply box is gone', 8000);
         await ev(`new Promise(r => setTimeout(r, 500))`); // sleep-ok: the panel is drawn again
         const where = await ev(`(() => { const a = document.activeElement; return { body: !a || a === document.body, inPanel: !!a && !!a.closest('.ac-panel'), name: a ? (a.getAttribute('aria-label') || a.textContent || '').trim().slice(0, 40) : '' }; })()`);
         if (where.body || !where.inPanel) problems.push('after Ctrl+Enter send the keyboard is not in the comments: ' + JSON.stringify(where));

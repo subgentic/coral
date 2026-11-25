@@ -1,3 +1,4 @@
+const { draftReviewStub, sendSavedDrafts } = require('./helpers/draft_review_stub');
 // #20985: a hidden board picker must not stand in for the active comment picker.
 // Check the real box and chooser click in modal/docked comments, locally and through cloud routing.
 const assert = require('node:assert/strict');
@@ -44,7 +45,7 @@ const HEX='d'.repeat(64);
             await Page.addScriptToEvaluateOnNewDocument({source:`window.__qaCloud=${cloud};`});
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
             const blank=Page.loadEventFired();await Page.navigate({url:'about:blank'});await blank;
-            const loaded=Page.loadEventFired();await Page.navigate({url:BASE+'/'});await loaded;await install();
+            const loaded=Page.loadEventFired();await Page.navigate({url:BASE+'/'});await loaded;await install();await ev(draftReviewStub(HEX));
             // A board composer remains mounted when another page is open. Its
             // hidden Add image must not be mistaken for the active comment's.
             await ev(`import((window.__coralStatic||'/static/')+'board_composer.js').then(m=>{m.mountBoardPictures('picker-team');return true;})`);
@@ -53,8 +54,8 @@ const HEX='d'.repeat(64);
             await waitFor(`!!document.querySelector('${root} .ac-panel')`,'document',10000);
             await waitFor(`!!document.querySelector('${toggleRoot} .ac-toggle:not([hidden])')`,'Comments action',10000);
             await ev(`(()=>{const t=document.querySelector('${toggleRoot} .ac-toggle');if(t.getAttribute('aria-expanded')!=='true')t.click();return true;})()`);
-            await waitFor(`!!document.querySelector('${root} .ac-whole')`,'whole-document action',10000);
-            await ev(`document.querySelector('${root} .ac-whole').click();true`);
+            await waitFor(`!!document.querySelector('${root} .ac-composer .ac-input, ${root} .ac-whole')`,'whole-document composer or preview launcher',10000);
+            await ev(`document.querySelector('${root} .ac-whole')?.click();true`);
             await waitFor(`!!document.querySelector('${root} .ac-composer .ac-add-image')`,'comment picker',10000);
             const box=await ev(`(()=>{const btn=document.querySelector('${root} .ac-composer .ac-add-image');btn.scrollIntoView({block:'nearest',behavior:'instant'});const r=btn.getBoundingClientRect(),first=document.querySelector('.ac-add-image'),fr=first.getBoundingClientRect();const ancestors=[];for(let n=first;n;n=n.parentElement){const s=getComputedStyle(n);ancestors.push({tag:n.tagName,id:n.id,cls:n.className,display:s.display,hidden:n.hidden,rects:n.getClientRects().length});}return {x:r.x+r.width/2,y:r.y+r.height/2,w:r.width,h:r.height,rects:btn.getClientRects().length,globalFirstIsComposer:first===btn,globalRect:[fr.width,fr.height],ancestors};})()`);
             console.log('PICKER',source,width,surface,JSON.stringify(box));

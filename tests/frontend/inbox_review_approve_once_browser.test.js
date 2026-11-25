@@ -29,6 +29,7 @@ const YES = "(()=>{const m=document.getElementById('confirm-modal');if(m&&getCom
             const item = (n, tags, age) => ({ team: '${team}', id: hex(n), name: 'index.html', media_type: 'text/html', size: 3000, created_at: made(age), source: 'upload', available: true, tags, uri: 'coral://artifacts/' + hex(n), produced_by: 'Orchestrator', session_id: 's1' });
             window.__rv = { calls: [], items: [item(1, ['for review', 'changes requested', 'internal'], 2), item(2, ['for review', 'internal'], 1)] };
             window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.href), st = window.__rv;
+                if (new URL(String(url), location.href).pathname.endsWith('/review-drafts')) return json({drafts_supported:false,drafts:[],count:0,revision:0,can_write:false,can_send:false});
                 if (u.pathname === '/api/team-artifacts') return json(window.__reviewFixturePage(u, location.href, { '${team}': st.items }));
                 const m = u.pathname.match(/^\\/api\\/board\\/([^/]+)\\/artifacts(?:\\/([0-9a-f]{64})\\/(review|tags))?$/);
                 if (!m) return original(url, opts);

@@ -33,6 +33,7 @@ const { coralReady } = require('./helpers/wait');
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
                         const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'${team}': window.__reviewItems}) : null; if (reviewPage) return json(reviewPage); const u=window.__reviewFixtureURL(String(url), location.origin);
+                if (new URL(String(url), location.href).pathname.endsWith('/review-drafts')) return json({drafts_supported:false,drafts:[],count:0,revision:0,can_write:false,can_send:false});
                         if(u.pathname==='/api/board/${team}/artifacts'){
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag')));
                             return json({project:'${team}',artifacts:items,has_more:false});

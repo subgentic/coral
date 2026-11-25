@@ -43,7 +43,7 @@ const FX = { filename: 'pricing.md', content: CONTENT, size: CONTENT.length, med
             const tag = `${w}x${h}`;
             await load(w, h, mobile, 'dark');
             await open(HEX, 'pricing.md', 'text/markdown');
-            await waitFor(`!!document.querySelector('#preview-body .preview-pane-markdown') && document.querySelectorAll('#preview-main .ac-card').length > 0`, `${tag}: the document and its comments`, { timeout: 10000 });
+            await waitFor(`!!document.querySelector('#preview-body .preview-pane-markdown') && document.querySelectorAll('#preview-main .ac-card').length > 0`, `${tag}: the document and its comments`, 10000);
             const opened = await ev(`(() => { const p = document.querySelector('#preview-main .ac-panel'); return !!p && p.classList.contains('ac-sheet-open'); })()`);
             if (!opened) { await ev(`document.querySelector('#preview-toolbar .ac-toggle').click(); true`); await settle(500); }
             const reach = () => ev(`(() => { const w = document.querySelector('#preview-main .ac-whole'), main = document.getElementById('preview-main'); if (!w) return { none: true }; const r = w.getBoundingClientRect(), m = main.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;

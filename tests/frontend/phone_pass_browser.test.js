@@ -1,3 +1,4 @@
+const { draftReviewStub } = require('./helpers/draft_review_stub');
 // A phone pass over the views changed on Oct 19 (#5219, the operator uses Coral on a phone): at 320 and 390 px, both themes, with touch: the agent list with the Show branches and Show agent type options, the agent
 // page (the capped branch, the model and thinking chips, the composer), Team settings (every tab), the preview in the sheet and full screen, and the artifact viewer with its comments sheet and composer. In each: nothing wider
 // than the screen, every control 44 px, the viewer's title readable and its sheet header on one row, a comment composer not under the keyboard (the visual viewport shrinks; a fake one drives mobile.js), and the back
@@ -82,7 +83,7 @@ const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await require('./helpers/wait').coralReady(ev);
         await setTheme(ev, theme);
-        await ev(STUBFETCH);
+        await ev(STUBFETCH); await ev(draftReviewStub(HEX));
     };
     const TEAM = 'pass-team-' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
     const scene = () => ev(`(async () => {
@@ -144,7 +145,7 @@ const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-
             await audit(`${tag} the comments sheet`, '#artifact-viewer');
             const head = await ev(`(() => { const t = document.querySelector('#artifact-viewer .ac-title').getBoundingClientRect(), x = document.querySelector('#artifact-viewer .ac-sheet-close').getBoundingClientRect(), f = document.querySelector('#artifact-viewer .ac-showresolved').getBoundingClientRect(); return { sameRow: Math.abs((t.top + t.height / 2) - (x.top + x.height / 2)) < 12, filtersBelow: f.top >= t.bottom - 2 }; })()`);
             check(`${tag}: the sheet's close button is on the title's row and Show resolved has a row of its own`, head.sameRow && head.filtersBelow, JSON.stringify(head));
-            await ev(`document.querySelector('#artifact-viewer .ac-whole').click(); true`); await settle(400);
+            await ev(`document.querySelector('#artifact-viewer .ac-whole')?.click(); true`); await settle(400);
             await ev(`document.querySelector('#artifact-viewer .ac-composer .ac-input').focus(); true`);
             await audit(`${tag} the comment composer`, '#artifact-viewer');
             // the keyboard: the visual viewport shrinks to 55% of the screen; the sheet and its composer stay inside what is left

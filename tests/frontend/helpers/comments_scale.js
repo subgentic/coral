@@ -3,6 +3,8 @@
 //   fixture('markdown'): about 1 MB of Markdown, 2,600 paragraphs under a heading every 25; fixture('code'): a 5,000-line source file.
 // 400 threads, each on a quote found once in the file, spread evenly through it; 100 replies; every fifth thread resolved.
 
+const { draftReviewStub } = require('./draft_review_stub');
+
 const THREADS = 400, REPLIES = 100;
 
 function build(kind) {
@@ -66,7 +68,7 @@ function STUB(fx) {
             if (url.includes('/api/artifacts/' + window.__HEX)) return Promise.resolve(new Response(${JSON.stringify(fx.content)}, { status: 200, headers: { 'Content-Type': ${JSON.stringify(fx.mediaType)} } }));
             return real(u, o);
         };
-        return true; })()`;
+        return true; })(); ${draftReviewStub(HEX)}`;
 }
 
 module.exports = { fixture, STUB, HEX, THREADS, REPLIES };

@@ -27,6 +27,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
                     const prefix = server === 'local' ? '' : '/api/remote/review-box';
                     window.fetch = (input,opts={}) => {
                         const u = new URL(String(input),location.href), path = u.pathname, method = opts.method || 'GET';
+                if (new URL(String(input), location.href).pathname.endsWith('/review-drafts')) return json({drafts_supported:false,drafts:[],count:0,revision:0,can_write:false,can_send:false});
                         if (method === 'GET' && (path === prefix+'/api/board/alpha/artifacts' || path === prefix+'/api/team-artifacts')) { if (path.endsWith('/api/board/alpha/artifacts') || u.searchParams.has('digest')) window.__stateReads++; const rows = [row, ...((mode === 'held-switch' || mode.startsWith('older-send-lost-')) ? [{...row,id:'${OTHER}',uri:'coral://artifacts/${OTHER}',name:'Replacement.md'}] : [])].filter(r=>!u.searchParams.has('digest') || r.id===u.searchParams.get('digest')); return json({artifacts:rows,total:rows.length,tag_counts:{'for review':rows.length},has_more:false}); }
                         if (method === 'POST' && path.startsWith(prefix+'/api/') && (path.endsWith('/review') || path.endsWith('/comments') || path.endsWith('/send'))) {
                             const body = JSON.parse(opts.body); window.__writes.push({path,body});

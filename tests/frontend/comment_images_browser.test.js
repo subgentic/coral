@@ -1,3 +1,4 @@
+const { draftReviewStub, sendSavedDrafts } = require('./helpers/draft_review_stub');
 // Pictures in an artifact comment (#11651, goal #184 slice 1, the page): in the comment box a person picks, pastes or drops a picture; each shows as a thumbnail before Send (and goes up as it is added, so Send only names what is
 // stored), a text file or a fifth picture is refused with words, a failed one blocks Send until it is removed, Send waits for one still going up; after Send the pictures are inline in the thread, drawn from the artifact's raw URL,
 // in the order sent. Against a stub of Backend Dev's route (POST /api/artifacts/{id}/comment-images, raw body, answers {hex, name, content_type, size}; `images` on create and on the list). 1280 px and a 390 px phone, where
@@ -47,7 +48,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`try { localStorage.removeItem('coral-artifact-comments-open'); } catch {} true`);
-        await ev(STUB);
+        await ev(STUB); await ev(draftReviewStub(HEX));
         if (team) await ev(`import(${S} + 'state.js').then(m => { m.state.selectedTeam = ${JSON.stringify(team)}; return true; })`);
         await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md' }); return true; })()`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000).catch(async error => {
@@ -64,8 +65,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         assert.ok(await ev(`window.__documentReads.every(u=>!u.startsWith('/api/remote/'))`), 'both opens stay on the local computer');
         await waitFor(`!document.querySelector('.ac-toggle').hidden`, 'the Comments button', 5000);
         if (mobile || !(await ev(`document.querySelector('.ac-panel').getClientRects().length > 0`))) { await ev(`document.querySelector('.ac-toggle').click(); true`); await new Promise(r => setTimeout(r, 400)); } // sleep-ok: the sheet slides in
-        await waitFor(`!!document.querySelector('.ac-whole')`, 'the whole-document button', 5000);
-        await ev(`document.querySelector('.ac-whole').click(); true`);
+        await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the always-visible whole-document draft composer', 5000);
         await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 5000);
     };
     const thumbs = () => ev(`document.querySelectorAll('.ac-composer .ac-thumb').length`);
@@ -84,7 +84,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             // the picker: a button, and a file input that takes the three picture types (a phone offers its photos)
             assert.deepEqual(await ev(`(() => { const b = document.querySelector('.ac-composer .ac-add-image'), i = document.querySelector('.ac-composer .ac-picker input'); return { b: !!b && b.textContent, accept: i && i.accept, multiple: i && i.multiple, hidden: i && i.hidden }; })()`), { b: 'Add image', accept: 'image/png,image/jpeg,image/webp', multiple: true, hidden: true }, at + 'the picker');
             assert.equal(await ev(`document.querySelector('.ac-composer .ac-images').hidden`), true, at + 'no pictures: no tray');
-            assert.equal(await ev(`(() => { const h = document.querySelector('.ac-composer .ac-images-hint'); return h && h.getClientRects().length > 0 ? h.textContent : null; })()`), 'Pictures are shared with this team\'s agents as they are; nothing is hidden.', at + 'the quiet line about who sees a picture is beside Add image');
+            assert.equal(await ev(`(() => { const h = document.querySelector('.ac-composer .ac-images-hint'); return h && h.getClientRects().length > 0 ? h.textContent : null; })()`), 'Pictures are included when you send these draft comments.', at + 'the quiet line about who sees a picture is beside Add image');
 
             // pick one: a thumbnail before Send, uploaded as the raw file with its own type
             await pick([['one.png', 'image/png']]);
@@ -144,6 +144,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             const ready = await ev(`[...document.querySelectorAll('.ac-composer .ac-thumb-img')].length`);
             assert.equal(ready, 3, at + 'three pictures to send');
             await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'The lock is the problem, see these'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
+            await waitFor(`window.__drafts.length === 1`, at + 'saved privately', 5000);
+            assert.equal(await ev(`window.__posts.length`), 0, at + 'Save draft does not publish');
+            await sendSavedDrafts(ev, waitFor);
             await waitFor(`window.__posts.length === 1`, at + 'the post', 5000);
             const post = await ev(`window.__posts[0]`);
             assert.equal(post.body, 'The lock is the problem, see these');
@@ -158,7 +161,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             void names;
 
             // a picture alone is a comment (the Operator's marked-up screenshot); nothing at all is still refused in words
-            await ev(`document.querySelector('.ac-whole').click(); true`);
+            await ev(`document.querySelector('.ac-whole')?.click(); true`);
             await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, at + 'the composer again', 5000);
             await ev(`document.querySelector('.ac-composer').requestSubmit(); true`);
             assert.equal(await ev(`document.querySelector('.ac-composer .ac-error').textContent`), 'Write something first.', at + 'no words and no picture: refused in words');
@@ -166,6 +169,9 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await pick([['alone.png', 'image/png']]);
             await waitFor(`document.querySelectorAll('.ac-composer .ac-thumb-img').length === 1`, at + 'the picture', 5000); await settled();
             await ev(`document.querySelector('.ac-composer').requestSubmit(); true`);
+            await waitFor(`window.__drafts.length === 1`, at + 'saved privately', 5000);
+            assert.equal(await ev(`window.__posts.length`), 1, at + 'Save draft does not publish');
+            await sendSavedDrafts(ev, waitFor);
             await waitFor(`window.__posts.length === 2`, at + 'the picture-only post', 5000);
             const alone = await ev(`window.__posts[1]`);
             assert.equal(alone.body, '', at + 'the post has no words');

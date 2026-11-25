@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { sqliteExec } = require('./helpers/sqlite');
 const { connect } = require('./agent_view_harness');
 const { guardSettings } = require('./helpers/settings_guard');
 const { coralReady } = require('./helpers/wait');
@@ -55,22 +56,35 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
                 await waitFor(`(() => { const t = document.querySelector('.ac-toggle'); return !!t && !t.hidden; })()`, `${tag}: the Comments button`, 10000);
                 check(`${tag}: the Comments button is offered`, await ev(`!document.querySelector('.ac-toggle').hidden`));
                 await ev(`(() => { const p = document.querySelector('.ac-panel'); if (!p.classList.contains('ac-sheet-open')) document.querySelector('.ac-toggle').click(); return true; })()`);
-                await waitFor(`!!document.querySelector('.ac-panel .ac-whole')`, `${tag}: Comment on the whole document`, 6000);
+                await waitFor(`!!document.querySelector('${k.mediaType.startsWith('video/') ? '.ac-panel .ac-whole' : '.ac-panel .ac-composer .ac-input'}')`, `${tag}: whole-document composer or video playhead button`, 6000);
                 // a video's panel has a timeline and its one button is "Comment at playhead" (#13175); its comment is made at the playhead (time 0 for bytes that are not a playable video), so its card says Video: <time> where the others say The whole document
-                const want = k.mediaType.startsWith('video/') ? 'Comment at playhead' : 'Comment on the whole document';
-                check(`${tag}: the panel offers "${want}"`, await ev(`document.querySelector('.ac-panel .ac-whole').textContent.trim() === ${JSON.stringify(want)}`));
+                const want = k.mediaType.startsWith('video/') ? 'Comment at playhead' : 'Whole-document comment';
+                check(`${tag}: the panel offers "${want}"`, await ev(`document.querySelector('${k.mediaType.startsWith('video/') ? '.ac-panel .ac-whole' : '.ac-panel .ac-whole-label'}').textContent.trim() === ${JSON.stringify(want)}`));
                 check(`${tag}: no comment can be made by selecting text unless it is text`, await ev(`(() => { const b = document.querySelector('.ac-selbtn'); return !b || b.hidden; })()`));
                 check(`${tag}: the panel is beside the document, never inside it`, await ev(`(() => { const p = document.querySelector('.ac-panel'), body = document.querySelector('.artifact-viewer-body'); return !body.contains(p) && !p.closest('iframe') && p.closest('.artifact-viewer-main') !== null; })()`));
                 if (k.html) {
                     check(`${tag}: the HTML stays in its sandboxed frame (no allow-same-origin, script cannot reach the page)`, await ev(`(() => { const f = document.querySelector('.artifact-viewer-body iframe'); return !!f && f.hasAttribute('sandbox') && !/allow-same-origin/.test(f.getAttribute('sandbox')) && !window.__pwned; })()`));
                 }
                 // a whole-document comment, through the panel
-                await ev(`document.querySelector('.ac-panel .ac-whole').click(); true`);
+                await ev(`document.querySelector('.ac-panel .ac-whole')?.click(); true`);
                 await waitFor(`!!document.querySelector('.ac-panel .ac-input')`, `${tag}: the composer`, 4000);
                 await ev(`(() => { const ta = document.querySelector('.ac-panel .ac-input'); ta.value = ${JSON.stringify('Looks right: ' + tag)}; ta.dispatchEvent(new Event('input', { bubbles: true })); ta.closest('form').requestSubmit(); return true; })()`);
+                if (!k.mediaType.startsWith('video/')) {
+                    await waitFor(`document.querySelectorAll('.ac-panel .ac-draft-card').length === ${wi + 1}`, `${tag}: private whole-document card`, 6000);
+                    const privateReview = (await api('GET', `/api/artifacts/${k.hex}/review-drafts`)).body;
+                    const draft = privateReview.drafts.find(c=>c.body === 'Looks right: ' + tag);
+                    check(`${tag}: whole-document save is private and does not publish`, privateReview.count === wi + 1 && draft?.anchor?.whole === true && (await list(k.hex)).comments.length === wi);
+                    // Published threads are a separate fixture: the UI save above must NOT create one.
+                    // Seed them in this isolated DB to retain every rendering/Reply/Resolve check without
+                    // doubling the 16 UI writes past the real 20-writes/minute author cap.
+                    const sql = value => "'" + String(value).replace(/'/g, "''") + "'";
+                    sqliteExec(path.join(DATA, 'sessions.db'), `INSERT INTO artifact_comments (artifact_id,board,anchor_json,body,author_issuer,author_subject,author_name,author_kind,created_at,images_json) VALUES (${sql(k.hex)},'',${sql(JSON.stringify(draft.anchor))},${sql(draft.body)},'local','published-fixture','Published reviewer','owner',${sql(new Date().toISOString())},'[]');`);
+                    await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+                    await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${k.hex}', { filename: ${JSON.stringify(k.name)}, mediaType: ${JSON.stringify(k.mediaType)} })); true`);
+                }
                 await waitFor(`document.querySelectorAll('.ac-panel .ac-card').length === ${wi + 1}`, `${tag}: the new card`, 6000);
                 const d = await list(k.hex);
-                check(`${tag}: the server holds one whole-document comment with that text`, d && d.comments.length === wi + 1 && d.comments.every(c => c.anchor && c.anchor.whole === true) && d.comments.some(c => c.body === 'Looks right: ' + tag), JSON.stringify(d && d.comments && d.comments.map(c => c.anchor)));
+                check(`${tag}: the published whole-document fixture stays readable with that text`, d && d.comments.length === wi + 1 && d.comments.every(c => c.anchor && c.anchor.whole === true) && d.comments.some(c => c.body === 'Looks right: ' + tag), JSON.stringify(d && d.comments && d.comments.map(c => c.anchor)));
                 check(`${tag}: the card says where the comment is: ${k.mediaType.startsWith('video/') ? 'the video time' : 'the whole document'}`, await ev(`[...document.querySelectorAll('.ac-panel .ac-card .ac-quote')].every(q => ${k.mediaType.startsWith('video/') ? '/^Video: /' : '/The whole document/'}.test(q.textContent))`));
                 check(`${tag}: Resolve and Reply are there, and Lock for the owner`, await ev(`(() => { const t = document.querySelector('.ac-panel').textContent; return /Resolve/.test(t) && /Reply/.test(t) && !!document.querySelector('.ac-panel .ac-lock'); })()`));
                 // clean up: the artifact's comments go with it, and the viewer closes

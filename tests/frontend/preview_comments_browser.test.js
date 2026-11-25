@@ -1,3 +1,4 @@
+const { sendSavedDrafts } = require('./helpers/draft_review_stub');
 // Comments in the docked preview pane (#5311): the artifacts tab's Preview opens a tab in the pane, not the viewer dialog, and the operator could not comment there. The pane now carries the viewer's own
 // comments component for the tab that is on show: beside the document when the pane is 720 px wide or more (maximised), a bottom sheet over it below that (a narrow dock, a phone), with a Comments button
 // in the toolbar in both layouts; highlights for the comments, the Comment button by a selection, a posted comment; none for a file, an image or no tab; torn down when the tab goes. Real server, the comments routes
@@ -46,7 +47,7 @@ const IMG = 'f'.repeat(64);
     };
     const open = async (hex, name, type) => {
         await ev(`window.PP.openArtifactTab('coral://artifacts/' + ${JSON.stringify(hex)}, { name: ${JSON.stringify(name)}, mediaType: ${JSON.stringify(type)} }); true`);
-        await waitFor(`getComputedStyle(document.getElementById('preview-pane')).display !== 'none'`, 'the pane', { timeout: 8000 });
+        await waitFor(`getComputedStyle(document.getElementById('preview-pane')).display !== 'none'`, 'the pane', 8000);
     };
     const state = () => ev(`(() => { const main = document.getElementById('preview-main'), p = main.querySelector('.ac-panel'), t = document.querySelector('#preview-toolbar .ac-toggle'); const pr = p && p.getBoundingClientRect(); const hl = CSS.highlights && CSS.highlights.get('ac-comment');
         return { w: main.clientWidth, panelHidden: !p || p.hidden, panelPos: p && getComputedStyle(p).position, panelW: pr && Math.round(pr.width), panelInert: !!(p && p.inert), sheetOpen: !!(p && p.classList.contains('ac-sheet-open')), cards: main.querySelectorAll('.ac-card').length, toggle: t && !t.hidden ? t.textContent : null,
@@ -56,7 +57,7 @@ const IMG = 'f'.repeat(64);
             const tag = `${w}px ${theme}`;
             await load(w, h, mobile, theme);
             await open(HEX, 'pricing.md', 'text/markdown');
-            await waitFor(`!!document.querySelector('#preview-body .preview-pane-markdown') && document.querySelectorAll('#preview-main .ac-card').length > 0`, `${tag}: the document and its comments`, { timeout: 10000 });
+            await waitFor(`!!document.querySelector('#preview-body .preview-pane-markdown') && document.querySelectorAll('#preview-main .ac-card').length > 0`, `${tag}: the document and its comments`, 10000);
             let s = await state();
             const sheet = s.w < 720;
             check(`${tag}: the toolbar counts two open threads; a phone and a pane too narrow for the column (a sheet over the file) start on the document (#14846)`, s.toggle === 'Comments (2)' && s.sheetOpen === (!mobile && !sheet) && s.panelInert === !s.sheetOpen && (sheet ? s.panelPos === 'absolute' : s.panelPos !== 'absolute'), JSON.stringify(s).slice(0,300));
@@ -72,15 +73,17 @@ const IMG = 'f'.repeat(64);
             }
             // a selection in the document: the Comment button, the composer, a posted comment
             await ev(`(() => { const w = document.createTreeWalker(document.getElementById('preview-body'), NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { const i = n.nodeValue.indexOf('audit log'); if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 9); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return true; } } return false; })()`);
-            await waitFor(`(() => { const b = document.querySelector('#preview-pane .ac-selbtn'); return !!b && !b.hidden; })()`, `${tag}: the Comment button by the selection`, { timeout: 5000 });
+            await waitFor(`(() => { const b = document.querySelector('#preview-pane .ac-selbtn'); return !!b && !b.hidden; })()`, `${tag}: the Comment button by the selection`, 5000);
             await ev(`document.querySelector('#preview-pane .ac-selbtn').click(); true`); await settle(400);
-            await waitFor(`!!document.querySelector('#preview-main .ac-composer .ac-input')`, `${tag}: the composer`, { timeout: 5000 });
+            await waitFor(`!!document.querySelector('#preview-main .ac-composer .ac-input')`, `${tag}: the composer`, 5000);
             check(`${tag}: the composer quotes the selected text`, /audit log/.test(await ev(`document.querySelector('#preview-main .ac-composer .ac-quote').textContent`)));
             await ev(`(() => { const ta = document.querySelector('#preview-main .ac-composer .ac-input'); ta.value = 'Mention the audit log retention.'; ta.dispatchEvent(new Event('input')); document.querySelector('#preview-main .ac-composer').requestSubmit(); return true; })()`);
-            await waitFor(`window.__cs.some(c => c.body === 'Mention the audit log retention.')`, `${tag}: the comment is posted`, { timeout: 8000 });
+            await waitFor(`window.__drafts.some(c => c.body === 'Mention the audit log retention.') && !window.__cs.some(c => c.body === 'Mention the audit log retention.')`, 'selection saved privately without publishing', 8000);
+            await sendSavedDrafts(ev,waitFor,'#preview-main');
+            await waitFor(`window.__cs.some(c => c.body === 'Mention the audit log retention.')`, `${tag}: the comment is posted`, 8000);
             const posted = await ev(`window.__cs.find(c => c.body === 'Mention the audit log retention.').anchor`);
             check(`${tag}: it is posted with its quote and context`, posted && /audit log/.test(posted.quote) && posted.start_line > 0, JSON.stringify(posted));
-            await waitFor(`[...document.querySelectorAll('#preview-main .ac-card .ac-body')].some(e => e.textContent === 'Mention the audit log retention.')`, `${tag}: its card`, { timeout: 8000 });
+            await waitFor(`[...document.querySelectorAll('#preview-main .ac-card .ac-body')].some(e => e.textContent === 'Mention the audit log retention.')`, `${tag}: its card`, 8000);
             if (!mobile) {
                 // a wide screen, the pane maximised in its column: 720 px or more, so the panel is beside the document and its toolbar button stays available
                 await Emulation.setDeviceMetricsOverride({ width: 1920, height: 1000, deviceScaleFactor: 1, mobile: false }); await settle(400);
@@ -95,11 +98,11 @@ const IMG = 'f'.repeat(64);
             }
             // an image artifact has no comments; the pane's own tabs: switching and closing tear them down
             await open(IMG, 'logo.png', 'image/png');
-            await waitFor(`!!document.querySelector('#preview-body img, #preview-body .image-pane')`, `${tag}: the image`, { timeout: 8000 });
+            await waitFor(`!!document.querySelector('#preview-body img, #preview-body .image-pane')`, `${tag}: the image`, 8000);
             s = await state();
             check(`${tag}: an image artifact has no comments (no panel, no button, no highlights, the body is no region)`, s.panelHidden && !s.toggle && s.highlights === 0 && s.bodyRegion === null, JSON.stringify(s).slice(0, 240));
             await ev(`window.PP.openArtifactTab('coral://artifacts/${HEX}', { name: 'pricing.md', mediaType: 'text/markdown' }); true`);
-            await waitFor(`document.querySelectorAll('#preview-main .ac-card').length > 0 && ${JSON.stringify(true)}`, `${tag}: back on the document its comments are back`, { timeout: 8000 });
+            await waitFor(`document.querySelectorAll('#preview-main .ac-card').length > 0 && ${JSON.stringify(true)}`, `${tag}: back on the document its comments are back`, 8000);
             check(`${tag}: switching back brings the comments and the highlights back`, (await state()).highlights >= 2);
             await ev(`window.PP.closeAllTabs(); true`); await settle(300);
             s = await state();
