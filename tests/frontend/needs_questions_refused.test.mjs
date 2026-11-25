@@ -8,10 +8,12 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 installDom({ mode: 'local' });
 const N = await importUi('needs_incomplete'), asks = await importUi('operator_asks'), { state } = await importUi('state');
 
-test('a refused read of a remote names it and its code, and blames no older Coral', () => {
-    N.readOutcome('questions', 'srv1', false, true, '', 'operator_only');
+test('a refused read of a remote names it and its code, and blames no older Coral', async () => {
+    const settle = () => new Promise(r => setTimeout(r, 30));
+    N.readOutcome('questions', 'srv1', false, Response.json({ code: 'operator_only' }, { status: 403 }));
+    N.incompleteNote(); await settle();
     assert.equal(N.incompleteNote(), 'Not everything is shown: questions from srv1 could not be read. Refused by srv1 (operator_only). Set up Approve through the hub for srv1: in Settings > Computers, open it and press Approve through this hub (Set up approvals for a computer added over SSH).');
-    N.readOutcome('questions', 'srv1', false, true, '', 'not a code; <b>');
+    N.readOutcome('questions', 'srv1', false, Response.json({ code: 'not a code; <b>' }, { status: 403 })); await settle();
     assert.equal(N.incompleteNote(), 'Not everything is shown: questions from srv1 could not be read. Refused by srv1.', 'a code that is not a code is not shown');
     N.readOutcome('questions', 'srv1', true);
     assert.equal(N.incompleteNote(), '', 'a good read clears it');
@@ -28,6 +30,7 @@ test('the question list through the Hub reports a 403 from a remote as a refusal
     state.hub = true; state.servers = [{ id: 'srv9', label: 'Box', status: 'online' }];
     globalThis.fetch = window.fetch = async () => Response.json({ error: 'owner_only', code: 'owner_only' }, { status: 403 });
     await asks.refreshOperatorAsks(true);
+    N.incompleteNote(); await new Promise(r => setTimeout(r, 30));
     assert.match(N.incompleteNote(), /Refused by srv9 \(owner_only\)\./, N.incompleteNote());
     assert.doesNotMatch(N.incompleteNote(), /Set up Approve/, 'only operator_only is the missing setup');
     assert.doesNotMatch(N.incompleteNote(), /older Coral/);
