@@ -43,13 +43,17 @@ test('#21260: on a hub the refused note names a computer by its label in Setting
     await settle();
     assert.match(N.incompleteNote(), /Refused by Build box \(operator_only\)\. Set up Approve through the hub for Build box: in Settings > Computers/, N.incompleteNote());
     assert.doesNotMatch(N.incompleteNote(), /Refused by b-6xcc9/);
+    assert.match(N.incompleteNote(), /questions from Build box could not be read\./, 'the first half names it by the same label (#21277), not two ways');
+    assert.doesNotMatch(N.incompleteNote(), /b-6xcc9/, 'the id is nowhere in the note');
     N.readOutcome('questions', 'b-6xcc9', true);
     N.readOutcome('questions', 'odd', false, Response.json({ code: 'owner_only' }, { status: 403 }));
     await settle();
     assert.match(N.incompleteNote(), /Refused by Odd box \(owner_only\)\./, 'a label is cleaned like an id');
+    assert.match(N.incompleteNote(), /questions from Odd box could not be read/, 'and in the first half');
     N.readOutcome('questions', 'odd', true);
     N.readOutcome('questions', 'gone', false, Response.json({ code: 'owner_only' }, { status: 403 }));
     await settle();
     assert.match(N.incompleteNote(), /Refused by gone \(owner_only\)\./, 'a computer the hub no longer lists keeps its id');
+    assert.match(N.incompleteNote(), /questions from gone could not be read/, 'in both halves');
     N.readOutcome('questions', 'gone', true);
 });

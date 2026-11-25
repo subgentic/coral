@@ -13,7 +13,7 @@ export async function codeOf(response) {
 }
 
 /** A computer's name as Settings > Computers shows it on a hub (#21260): its label, or its id when the hub does not list it. */
-const labelOf = id => (state.servers || []).find(s => s.id === id)?.label || id;
+export const labelOf = id => (state.servers || []).find(s => s.id === id)?.label || id;
 
 /** The sentence for the refused gaps ({source, res}); clean makes a source safe to show; redraw is called when a code that was still being read arrives. */
 export function refusedNote(gaps, clean, redraw) {
