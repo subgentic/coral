@@ -79,24 +79,31 @@ func (h *SessionsHandler) rateLimitNoticeState(name, agentType, sessionID string
 			stamp = st
 		}
 	}
-	on, _ := h.startupScreens.read(promptReadKey(sessionID, name, agentType)+rateLimitReadSuffix, stamp, time.Now(), func() (bool, string) {
+	on, why := h.startupScreens.read(promptReadKey(sessionID, name, agentType)+rateLimitReadSuffix, stamp, time.Now(), func() (bool, string) {
 		ctx, cancel := context.WithTimeout(context.Background(), loginScreenTimeout)
 		defer cancel()
 		screen, err := h.agentScreen(ctx, name, agentType, sessionID, stamp)
-		if err != nil || !ptymanager.CodexRateLimitNoticeOnScreen(screen) {
+		if err != nil {
 			return false, ""
 		}
-		return true, ""
+		switch {
+		case ptymanager.CodexRateLimitNoticeOnScreen(screen):
+			return true, rateLimitNoticeSummary
+		case ptymanager.CodexHooksReviewOnScreen(screen): // a restart that changed a hook: the agent has events, so the no-event startup read never looks (#21427)
+			return true, hooksReviewSummary
+		}
+		return false, ""
 	})
 	if !on {
 		return ""
 	}
-	return rateLimitNoticeSummary
+	return why
 }
 
 const (
 	rateLimitReadSuffix    = "|ratelimit"
 	rateLimitNoticeSummary = "Approaching rate limits: Codex asks whether to switch to a cheaper model"
+	hooksReviewSummary     = "Hooks need review: Codex asks whether to trust a new or changed hook"
 )
 
 // forgetPromptReads drops the cached screen reads of a session's startup-style prompts: the prompt was answered, the next state reads what replaced it.
