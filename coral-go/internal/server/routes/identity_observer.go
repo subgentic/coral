@@ -146,6 +146,9 @@ func (o *IdentityObserver) SetHostedLinks(f func(ctx context.Context, linkID str
 	o.hostedLink = f
 }
 
+// HostedLinksSet reports whether the hosted-link check is wired. Left nil, every tunneled request stays callerHub, so a key link would be the person: the server census pins that it is set (#21276).
+func (o *IdentityObserver) HostedLinksSet() bool { return o.hostedLink != nil }
+
 // SetLinkKeys gives the observer the check of a request key (X-Link-Request-Key, #20944).
 func (o *IdentityObserver) SetLinkKeys(f func(ctx context.Context, key string) (string, bool)) {
 	o.linkKey = f
