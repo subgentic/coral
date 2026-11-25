@@ -150,7 +150,11 @@ func (h *CloudHandler) LinkRequestStatus(w http.ResponseWriter, r *http.Request)
 		h.linkRequestErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"state": st})
+	out := map[string]string{"state": st}
+	if c := h.links.LinkRequestCapGiven(r.Context(), chi.URLParam(r, "id"), r.Header.Get(linkRequestSecretHeader), time.Now()); c != "" {
+		out["cap"] = c // what the person allowed, once they have (#21221): the Hub says it before it takes the code
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // LinkRequestAllow: POST /api/cloud/link-requests/{id}/allow {cap?}. The person here allows, optionally a lower cap; the 8-digit code is in this response and nowhere else.

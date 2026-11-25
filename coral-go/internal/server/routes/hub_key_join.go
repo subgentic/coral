@@ -360,7 +360,11 @@ func (h *RemoteServersHandler) JoinStatus(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadGateway, "join_refused", remoteSaid(code, out))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"state": cleanSavedField(st)})
+	reply := map[string]string{"state": cleanSavedField(st)}
+	if c, _ := out["cap"].(string); joinCapOK(c) {
+		reply["cap"] = c // what the person allowed, shown before the code is typed (#21221)
+	}
+	writeJSON(w, http.StatusOK, reply)
 }
 
 // JoinCode handles POST /api/servers/join/{join}/code {code}: finishes the join as a key link at the computer, then registers it here with the key.
@@ -412,7 +416,17 @@ func (h *RemoteServersHandler) JoinCode(w http.ResponseWriter, r *http.Request) 
 	}
 	slog.Info("hub: joined a computer with a request key", "server", srv.ID)
 	srv, _ = h.store.Get(r.Context(), srv.ID)
-	writeJSON(w, http.StatusCreated, viewRemote(srv))
+	given, _ := out["cap"].(string)
+	if !joinCapOK(given) {
+		given = ""
+	}
+	writeJSON(w, http.StatusCreated, struct {
+		remoteServerView
+		Cap string `json:"cap,omitempty"` // the level the person gave on that computer (#21221)
+	}{viewRemote(srv), given})
 }
+
+// joinCapOK is whether c is one of the three levels a computer can give; anything else a computer sends is not passed on.
+func joinCapOK(c string) bool { return c == "view" || c == "interact" || c == "launch" }
 
 var eightDigits = regexp.MustCompile(`^\d{8}$`)

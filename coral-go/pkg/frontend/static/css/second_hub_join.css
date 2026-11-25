@@ -1,0 +1,30 @@
+/* Add computer, the second-Hub join (#21221, the approved mock). Loaded with the first Add computer, not at start. */
+.shj { display: grid; gap: var(--space-md); max-width: 40rem; }
+.shj h4 { margin: 0; font-size: var(--fs-lg); }
+.shj-head { display: grid; gap: var(--space-xs); }
+.shj-sub, .shj-help, .shj-lead { margin: 0; color: var(--text-secondary); font-size: var(--fs-md); line-height: var(--lh-body); }
+.shj-help { color: var(--text-muted); font-size: var(--fs-sm); }
+.shj-form, .shj-body { display: grid; gap: var(--space-md); }
+.shj-ways, .shj-levels { display: grid; gap: var(--space-sm); border: 0; margin: 0; padding: 0; min-width: 0; }
+.shj-levels legend { padding: 0; margin-bottom: var(--space-xs); color: var(--text-secondary); font-size: var(--fs-md); }
+.shj-choice { display: flex; gap: var(--space-sm); align-items: flex-start; padding: var(--space-sm) var(--space-md); min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); cursor: pointer; }
+.shj-choice:has(input:checked) { border-color: var(--accent); }
+.shj-choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shj-choice input { margin-top: 3px; flex: none; accent-color: var(--accent); }
+.shj-choice-text { display: grid; gap: 2px; min-width: 0; }
+.shj-field { display: grid; gap: var(--space-xs); }
+.shj-field label { color: var(--text-secondary); font-size: var(--fs-md); }
+.shj-field input { font: inherit; min-height: 44px; padding: var(--space-sm) var(--space-md); color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--control-border, var(--border)); border-radius: var(--radius-md); }
+.shj-optional { margin-left: var(--space-sm); color: var(--text-muted); font-size: var(--fs-sm); }
+.shj-code { font-size: var(--fs-xl); max-width: 14em; font-variant-numeric: tabular-nums; }
+.shj-status { display: flex; gap: var(--space-sm); align-items: flex-start; padding: var(--space-sm) var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-tertiary); }
+.shj-status p { margin: 0; }
+.shj-dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: var(--accent); }
+.shj-ok .shj-dot { background: var(--success-text); }
+.shj-bad .shj-dot { background: var(--error-text); }
+.shj-pills { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.shj-steps { margin: 0; padding-left: var(--space-xl); color: var(--text-secondary); display: grid; gap: var(--space-xs); }
+.shj-error { margin: 0; color: var(--error-text); }
+.shj-foot { display: flex; flex-wrap: wrap; gap: var(--space-sm); justify-content: flex-end; padding-top: var(--space-sm); border-top: 1px solid var(--border); }
+.shj-foot > :first-child:not(:only-child) { margin-right: auto; }
+@media (max-width: 639px) { .shj-foot { flex-direction: column-reverse; align-items: stretch; } .shj-foot > :first-child:not(:only-child) { margin-right: 0; } .shj-foot .btn { min-height: 44px; } }
