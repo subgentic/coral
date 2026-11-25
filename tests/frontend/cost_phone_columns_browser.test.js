@@ -108,12 +108,13 @@ const WIDE = {
         // scroll the cost-dashboard-view container (overflow-y: auto) past the header
         await ev(`document.getElementById('cost-dashboard-view').scrollBy(0, 400); true`);
         await waitFor(`document.getElementById('cost-dashboard-view').scrollTop > 100`, 'the scroll to settle', 3000);
-        const headerRect = await ev(`(() => { const v = document.getElementById('cost-dashboard-view'); const h = v.querySelector('.cost-header'); if (!h) return null; const vr = v.getBoundingClientRect(); const hr = h.getBoundingClientRect(); const s = getComputedStyle(h); return { offset: Math.round(hr.top - vr.top), pos: s.position }; })()`);
+        const headerRect = await ev(`(() => { const v = document.getElementById('cost-dashboard-view'); const h = v.querySelector('.cost-header-left'); if (!h) return null; const vr = v.getBoundingClientRect(); const hr = h.getBoundingClientRect(); const s = getComputedStyle(h), a = v.querySelector('.cost-header-actions').getBoundingClientRect(); return { offset: Math.round(hr.top - vr.top), pos: s.position, h: Math.round(hr.height), controlsBottom: Math.round(a.bottom - vr.top) }; })()`); // #21231: the bar stays (way back, title, question); the controls under it scroll away, they are not a 250 px sticky block over the cards
         await shot('cost-390-after-scroll-sticky');
         // legend gap: viz-legend-btn must be inline-flex with centered items
         const legendStyle = await ev(`(() => { const b = document.querySelector('.viz-legend-btn'); if (!b) return null; const s = getComputedStyle(b); return { display: s.display, alignItems: s.alignItems }; })()`);
         const errs = [];
-        if (!(headerRect && headerRect.offset <= 5 && headerRect.pos === 'sticky')) errs.push('the .cost-header is sticky at the top of its scroll container after scrolling: ' + JSON.stringify(headerRect));
+        if (!(headerRect && headerRect.offset <= 5 && headerRect.pos === 'sticky')) errs.push('the .cost-header-left (the bar) is sticky at the top of its scroll container after scrolling: ' + JSON.stringify(headerRect));
+        if (!(headerRect && headerRect.h <= 110 && headerRect.controlsBottom <= headerRect.h)) errs.push('only the bar stands over the cards after scrolling (at most 110 px), the range, team and export controls scrolled away (#21231): ' + JSON.stringify(headerRect));
         if (!legendStyle) errs.push('the legend button does not exist in the overview');
         else if (!(legendStyle.display === 'inline-flex' && legendStyle.alignItems === 'center')) errs.push('the legend button is not inline-flex and centred: ' + JSON.stringify(legendStyle));
         assert.equal(errs.length, 0, errs.join('; '));
