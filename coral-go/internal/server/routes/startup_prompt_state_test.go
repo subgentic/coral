@@ -107,9 +107,9 @@ func TestStartupPromptsHoldTheSession(t *testing.T) {
 		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "codex", AgentName: "running", WorkingDir: "/tmp/project"}))
 		_, err := h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: name, SessionID: &sid, EventType: "stop", Summary: "stop"})
 		require.NoError(t, err)
-		mock.outputs[name] = codexHookTrust(t, "tmux_open.txt")
+		mock.outputs[name] = "  Pick a model\n\n\u203a 1. Fast\n  2. Slow\n\n  Press enter to confirm or esc to go back\n" // not the hooks review: that one IS read on an agent with events since #21427 (a restart that changed a hook)
 		st := h.deriveSingleSessionState(ctx, sid, 0)
-		assert.NotEqual(t, "startup", st.WaitingKind, "a startup prompt is never taken from an agent whose events say what it does; its idle screen is read only for Codex's rate-limit notice (rate_limit_state_test.go)")
+		assert.NotEqual(t, "startup", st.WaitingKind, "a startup prompt is never taken from an agent whose events say what it does; its idle screen is read only for Codex's rate-limit notice and hooks review (rate_limit_state_test.go, codex_hook_review_dialog_21427_test.go)")
 	})
 }
 

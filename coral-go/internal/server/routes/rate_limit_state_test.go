@@ -24,7 +24,7 @@ func TestCodexRateLimitNoticeHoldsAnIdleAgentAndNeedsYou(t *testing.T) {
 	}{
 		{"idle codex agent on the notice", "codex", "stop", rateLimitScreen, true},
 		{"codex agent with a turn in flight is not read", "codex", "prompt_submit", rateLimitScreen, false},
-		{"another menu on an idle codex agent", "codex", "stop", codexHookTrust(t, "tmux_open.txt"), false},
+		{"another menu on an idle codex agent", "codex", "stop", "  Pick a model\n\n\u203a 1. Fast\n  2. Slow\n\n  Press enter to confirm or esc to go back\n", false},
 		{"the notice's title with a changed menu", "codex", "stop", "  Approaching rate limits\n  Switch to gpt-6-luna for lower credit usage?\n\n› 1. Switch to gpt-6-luna\n  2. Keep current model\n\n  Press enter to confirm or esc to go back\n", false},
 		{"another agent type is never read for it", "claude", "stop", rateLimitScreen, false},
 	}
