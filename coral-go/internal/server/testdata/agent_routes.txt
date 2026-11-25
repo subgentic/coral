@@ -439,6 +439,9 @@ b POST /api/scheduled/validate-cron
 b POST /api/servers
 b POST /api/servers/{id}/reconnect
 b POST /api/servers/{id}/test
+b POST /api/servers/join
+b GET /api/servers/join/{join}
+b POST /api/servers/join/{join}/code
 b POST /api/servers/provision/plan
 b POST /api/servers/provision/{plan}/connect
 b POST /api/servers/provision/{plan}/forget-key

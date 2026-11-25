@@ -56,9 +56,11 @@ func DialWebSocket(ctx context.Context, t Target, path, rawQuery string, protoco
 }
 
 func dialWS(ctx context.Context, t HTTPTarget, base *url.URL, raw, rawQuery string, protocols []string) (*websocket.Conn, error) {
+	hdr := http.Header{}
+	SetCredential(hdr, t.APIKey)
 	conn, resp, err := websocket.Dial(ctx, wsURL(base, raw, rawQuery), &websocket.DialOptions{
 		HTTPClient:   &http.Client{Transport: transport(t.AllowPrivate)},
-		HTTPHeader:   http.Header{"Authorization": []string{"Bearer " + t.APIKey}},
+		HTTPHeader:   hdr,
 		Subprotocols: protocols,
 	})
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/subgentic/coral/pkg/hubowner"
+	"github.com/subgentic/coral/pkg/hubproxy"
 	"github.com/subgentic/coral/pkg/secretbox"
 )
 
@@ -46,7 +47,7 @@ var (
 
 // ValidateRemoteID checks the slug rules.
 func ValidateRemoteID(id string) error {
-	if id == LocalServerID || id == "provision" || !remoteIDRe.MatchString(id) { // "provision" is the path of the setup routes under /api/servers
+	if id == LocalServerID || id == "provision" || id == "join" || !remoteIDRe.MatchString(id) { // "provision" and "join" are the paths of the setup and join routes under /api/servers
 
 		return ErrInvalidRemoteID
 	}
@@ -74,7 +75,21 @@ type RemoteServer struct {
 	InstanceID string `json:"-" db:"instance_id"`
 	// OwnerStamp is whether this hub holds a secret to sign owner stamps for this server with (#11378). Whether the remote has installed its half is the live health answer's: hub_owner_stamp.
 	OwnerStamp bool `json:"owner_stamp" db:"owner_stamp"`
+	// KeyKind is what the stored key is (#21220): "api", an API key (every server before this, and every one added with a key), or "link", a request key a person Allowed at that computer (AddLinkKey).
+	KeyKind string `json:"key_kind" db:"key_kind"`
 }
+
+// The kinds of a registered server's key.
+const (
+	RemoteKeyAPI  = "api"
+	RemoteKeyLink = "link"
+)
+
+// ErrLinkKeyRemote is an edit a server joined with a request key cannot take: its key is the one its person Allowed, and its address must stay https or this computer (#21220).
+var ErrLinkKeyRemote = errors.New("this computer was joined with a request key: its key cannot be changed here, and its address must be https (remove it and join it again)")
+
+// linkKeyFormRe is a request key as the remote's `coral cloud keys create` prints it.
+var linkKeyFormRe = regexp.MustCompile(`^lrk_[0-9a-f]{8}_[0-9a-f]{32}$`)
 
 // The transports of a registered server.
 const (
@@ -212,6 +227,40 @@ func (s *RemoteServerStore) AddSSH(ctx context.Context, id, label, sshTarget str
 	return s.Get(ctx, id)
 }
 
+// AddLinkKey registers a server this hub joined with a request key (#21220, design B): the remote's person Allowed the key's request and the hub finished it as a key link, so the key now reaches
+// that computer at the cap they gave. The key is sealed like an API key (and never leaves this store but into a request to url). url must be https, or plain http to this computer: the key is
+// never sent across a network in clear (Security's MUST 6).
+func (s *RemoteServerStore) AddLinkKey(ctx context.Context, id, label, url, key string, allowPrivate bool) (*RemoteServer, error) {
+	if err := ValidateRemoteID(id); err != nil {
+		return nil, err
+	}
+	if !linkKeyFormRe.MatchString(key) {
+		return nil, errors.New("not a request key")
+	}
+	if !hubproxy.KeySafeURL(url) {
+		return nil, hubproxy.ErrLinkKeyPlainHTTP
+	}
+	box, err := s.getBox(ctx, true, false)
+	if err != nil {
+		return nil, err
+	}
+	env, err := box.Seal(id, []byte(key))
+	if err != nil {
+		return nil, err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO remote_servers (id, label, url, api_key, allow_private, status, created_at, key_kind)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, label, strings.TrimRight(url, "/"), env, allowPrivate, RemoteStatusUnknown, nowUTC(), RemoteKeyLink)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "PRIMARY KEY") {
+			return nil, ErrRemoteExists
+		}
+		return nil, err
+	}
+	return s.Get(ctx, id)
+}
+
 // ErrRemoteInstanceExists is a remote machine that is already registered (by its instance id) under another id.
 var ErrRemoteInstanceExists = errors.New("this remote Coral is already registered")
 
@@ -240,8 +289,12 @@ type RemoteServerUpdate struct {
 
 // Update applies edits to a server.
 func (s *RemoteServerStore) Update(ctx context.Context, id string, u RemoteServerUpdate) (*RemoteServer, error) {
-	if _, err := s.Get(ctx, id); err != nil {
+	cur, err := s.Get(ctx, id)
+	if err != nil {
 		return nil, err
+	}
+	if cur.KeyKind == RemoteKeyLink && (u.APIKey != nil || (u.URL != nil && !hubproxy.KeySafeURL(*u.URL))) {
+		return nil, ErrLinkKeyRemote
 	}
 	if u.Label != nil {
 		if _, err := s.db.ExecContext(ctx, "UPDATE remote_servers SET label = ? WHERE id = ?", *u.Label, id); err != nil {
@@ -317,7 +370,7 @@ func (s *RemoteServerStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_renew_since, transport, ssh_target, remote_port, instance_id, (owner_secret != '') AS owner_stamp"
+const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_renew_since, transport, ssh_target, remote_port, instance_id, (owner_secret != '') AS owner_stamp, key_kind"
 
 // Get returns one server (without its key). Status is key_unreadable when the
 // stored key cannot be decrypted.

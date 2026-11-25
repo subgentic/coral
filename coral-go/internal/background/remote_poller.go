@@ -15,6 +15,7 @@ import (
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
+	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
 // RemoteBoardPoller polls remote Coral servers for unread board messages.
@@ -138,7 +139,7 @@ func (p *RemoteBoardPoller) RunOnce(ctx context.Context) error {
 		}
 		if p.keyFor != nil { // redirects are never followed (CheckRedirect), so the key goes to this URL and nowhere else
 			if key, ok := p.keyFor(ctx, sub.RemoteServer); ok {
-				req.Header.Set("Authorization", "Bearer "+key)
+				proxy.SetCredential(req.Header, key) // a request key in its own header (#21220), any other as Bearer
 			}
 		}
 		resp, err := p.client.Do(req)

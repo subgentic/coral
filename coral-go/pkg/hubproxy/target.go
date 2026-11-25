@@ -82,7 +82,7 @@ func (t HTTPTarget) RoundTrip(req *http.Request) (*http.Response, error) {
 	out.URL.Scheme = base.Scheme
 	out.URL.Host = base.Host
 	out.Host = base.Host
-	out.Header.Set("Authorization", "Bearer "+t.APIKey)
+	SetCredential(out.Header, t.APIKey) // a request key in its own header (#21220), any other as Bearer
 	return transport(t.AllowPrivate).RoundTrip(out)
 }
 
@@ -192,6 +192,9 @@ func ValidateTarget(t HTTPTarget) (*url.URL, error) {
 	u, err := url.Parse(t.URL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
 		return nil, fmt.Errorf("invalid remote url")
+	}
+	if err := checkLinkKeyURL(t.APIKey, t.URL); err != nil { // a request key never crosses the network in clear (#21220)
+		return nil, fmt.Errorf("%w: %w", ErrBlocked, err)
 	}
 	if !t.AllowPrivate {
 		if _, err := httputil.ResolveAndValidateURL(t.URL); err != nil {

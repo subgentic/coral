@@ -35,6 +35,10 @@ type RemoteServersHandler struct {
 
 	store         *store.RemoteServerStore
 	healthTimeout time.Duration
+
+	// A second Hub's join with a request key (#21220, hub_key_join.go): the joins waiting for their person, and how a key is made over SSH.
+	joins  keyJoins
+	sshKey SSHLinkKeyMaker
 }
 
 // NewRemoteServersHandler creates the handler. The store holds the encrypted keys.
@@ -230,6 +234,9 @@ func probeFailure(err error) string {
 // DNS rebinding between check and connect cannot reach a private address.
 // Redirects are never followed, so the key cannot be forwarded elsewhere.
 func CheckRemoteHealth(ctx context.Context, baseURL, apiKey string, allowPrivate bool, timeout time.Duration) RemoteHealth {
+	if proxy.IsLinkKey(apiKey) && !proxy.KeySafeURL(baseURL) { // a request key never crosses the network in clear (#21220, Security's MUST 6)
+		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: proxy.ErrLinkKeyPlainHTTP.Error()}
+	}
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
 	transport := &http.Transport{
 		Proxy: nil,
@@ -260,7 +267,7 @@ func CheckRemoteHealth(ctx context.Context, baseURL, apiKey string, allowPrivate
 	if err != nil {
 		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "invalid URL"}
 	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	proxy.SetCredential(req.Header, apiKey) // a request key in its own header (#21220), any other as Bearer
 	req.Header.Set("Accept", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {

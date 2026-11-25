@@ -147,7 +147,7 @@ func (s *StreamTarget) RoundTrip(req *http.Request) (*http.Response, error) {
 	out := req.Clone(req.Context())
 	host := s.hostPort() // the name the remote's own Host check accepts for itself: its loopback address and port (a made-up name is refused as DNS rebinding)
 	out.URL.Scheme, out.URL.Host, out.Host = "http", host, host
-	out.Header.Set("Authorization", "Bearer "+s.apiKey)
+	proxy.SetCredential(out.Header, s.apiKey) // a request key in its own header (#21220), any other as Bearer
 	return s.transport().RoundTrip(out)
 }
 
@@ -157,9 +157,11 @@ func (s *StreamTarget) DialWS(ctx context.Context, path, rawQuery string, protoc
 	if dec, err := url.PathUnescape(path); err == nil {
 		u.Path = dec
 	}
+	hdr := http.Header{}
+	proxy.SetCredential(hdr, s.apiKey)
 	c, resp, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{
 		HTTPClient:   &http.Client{Transport: s.transport()},
-		HTTPHeader:   http.Header{"Authorization": []string{"Bearer " + s.apiKey}},
+		HTTPHeader:   hdr,
 		Subprotocols: protocols,
 	})
 	if err != nil {
