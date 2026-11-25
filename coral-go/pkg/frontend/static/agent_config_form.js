@@ -142,7 +142,8 @@ function _syncEnforcement(container) {
     const caps = _getPermissions(`${uid}-perms`) || {};
     const e = { ...presetEnforcement(agentType, caps, permMode) };
     const roleCaps = container._acfCapsDefault; // limits a role or template carried and Codex on Default left unlit (#21363): say so, and how to keep them (#21373)
-    if (roleCaps && agentType === 'codex' && permMode === 'default' && (roleCaps.allow || []).some(c => c.startsWith('shell:') || !SHIPPED_CAPABILITIES.every(k => roleCaps.allow.includes(k)))) e.text = (e.text ? e.text + ' ' : '') + "A role's limits are not applied on Default: Codex runs Auto. Pick Plan, or turn the chips on, to keep them.";
+    const claudeAuto = agentType === 'claude' && permMode === 'auto' && !modeSelect?.dataset.pickedByPerson; // Claude's Default asks first, so its limits are not lost there; an unpicked Auto drops them like Codex Default (#21408)
+    if (roleCaps && (agentType === 'codex' ? permMode === 'default' : claudeAuto) && (roleCaps.allow || []).some(c => c.startsWith('shell:') || !SHIPPED_CAPABILITIES.every(k => roleCaps.allow.includes(k)))) e.text = (e.text ? e.text + ' ' : '') + (claudeAuto ? "A role's limits are not applied on Auto. Pick Accept edits or Plan, or turn the chips on, to keep them." : "A role's limits are not applied on Default: Codex runs Auto. Pick Plan, or turn the chips on, to keep them.");
     // The Operator's "Use Full access for this agent" (#14085): the checkbox is there only in a form that offers it (launch, restart) and only for the three CLIs that have it (the server refuses anyone else and says so)
     const useFull = container.querySelector('.acf-use-full-access');
     if (useFull) useFull.hidden = !['claude', 'codex', 'agy'].includes(agentType);
