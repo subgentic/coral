@@ -48,6 +48,7 @@ export function permissionDescription(type, value) {
     if ((t === 'agy' || t === 'antigravity' || t === 'gemini') && SKIPS_ALL_PROMPTS.includes(v)) return NO_CHECKS_DESCRIPTION;
     if (t === 'codex' && CODEX_NETWORK_MODES.includes(v)) return CODEX_AUTO_DESCRIPTION;
     if (t === 'codex' && v === 'default') return CODEX_DEFAULT_DESCRIPTION;
+    if (t === 'codex' && v === 'acceptEdits') return CODEX_ACCEPT_EDITS_DESCRIPTION;
     if (!t && v === 'auto') return GENERIC_AUTO_DESCRIPTION; // Settings' own select is for every CLI, and safety checks are Claude's only: it must not say 'with safety checks' (#10191)
     return PERMISSION_MODE_DESCRIPTIONS[v] || '';
 }
@@ -56,14 +57,15 @@ export function permissionDescription(type, value) {
 // Codex launches these as workspace-write that never asks, which has the network on (Security's #7503); so does Codex with nothing chosen (the saved default or Auto). Default is not one of them since #10362: it sends no flags
 export const CODEX_NETWORK_MODES = ['auto', 'dontAsk']; // not Default: an explicit Default sends no flags (#10362), so Codex runs its own default, which asks
 export const CODEX_AUTO_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.';
+const CODEX_ACCEPT_EDITS_DESCRIPTION = 'Workspace sandbox that asks before it acts (the network is Coral\'s, as in Auto).'; // #21335: the one Codex mode that still asks
 const CODEX_DEFAULT_DESCRIPTION = 'Workspace sandbox, with the network on so it can reach Coral.'; // Default is Auto for Codex (the Operator, #21335); before it sent no flags, so its sandbox had no network and its board calls stalled (#10362, #10381)
 
 // The modes in which an agent's launch of a worker is refused: agent.SkipsPermissionPrompts keeps only Default as asking (Plan too, for the CLIs other than Claude, #5894)
 const WORKERS_REFUSED = { plan: 'Claude agents cannot start workers in this mode.' };
 const WORKERS_REFUSED_ANY = 'Agents cannot start workers in this mode.';
 
-// A CLI offers only the modes it has (#10381): Codex has no Accept edits (its sandbox and approval pair for it is Codex's own default, which Default is) and no Don't ask (it is Auto's launch), so its list is Default, Plan, Auto and Bypass permissions.
-const MODES_A_CLI_LACKS = { codex: ['acceptEdits', 'dontAsk'], hermes: ['acceptEdits', 'plan', 'auto', 'dontAsk'] }; // Hermes has one switch: it asks before a dangerous command, or --yolo (Bypass) does not (agent.PermissionFlagsForAgent, #12169)
+// A CLI offers only the modes it has (#10381): Codex has Accept edits since #21335 (workspace-write that asks first: Default is Auto now, so the pick must stay offered and stored as itself) and no Don't ask (it is Auto's launch), so its list is Default, Plan, Auto and Bypass permissions.
+const MODES_A_CLI_LACKS = { codex: ['dontAsk'], hermes: ['acceptEdits', 'plan', 'auto', 'dontAsk'] }; // Hermes has one switch: it asks before a dangerous command, or --yolo (Bypass) does not (agent.PermissionFlagsForAgent, #12169)
 export function modeOffered(type, value) { return !(MODES_A_CLI_LACKS[String(type || '').toLowerCase()] || []).includes(value); }
 /** Hides the modes the CLI lacks; a pick that is one of them (the type was changed to this CLI) falls to Default. */
 function offerModesFor(selectEl, type) {
@@ -149,7 +151,7 @@ export function _permissionModeFromFlags(flagsStr) {
     if (flags.includes('--dangerously-bypass-approvals-and-sandbox')) return 'bypassPermissions';
     if (flags.includes('--full-auto') || flags.includes('--dangerously-skip-permissions') || flags.includes('--yolo')) return 'bypassPermissions';
     if (/--sandbox(?:\s+|=)read-only/.test(flags)) return 'plan';
-    if (/--sandbox(?:\s+|=)workspace-write/.test(flags)) return 'auto';
+    if (/--sandbox(?:\s+|=)workspace-write/.test(flags)) return /(?:-a|--ask-for-approval)(?:\s+|=)on-request/.test(flags) ? 'acceptEdits' : 'auto'; // on-request is the Codex pair that asks: Accept edits, not Auto (#21335)
     return '';
 }
 
