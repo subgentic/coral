@@ -4,7 +4,8 @@
 // observers still observing (counted by wrapping the constructors in the page), and, after a forced GC, event listeners, DOM nodes, documents and the heap. Each is compared with
 // its value after the warm-up. Measured when written (50 rounds): every count flat except the heap (+0.5 MB) and 8 listeners from a first use; the bounds below sit
 // above that noise and well under what one missed removeEventListener per round (+50) or one stray interval per round (+50) adds.
-// CYCLES=n runs more rounds; TEARDOWN_HANG_SELFTEST=1 makes round 3 wait on a promise that never settles (the suite must fail within TEARDOWN_STEP_ms naming the step); TEARDOWN_LEAK_SELFTEST=1 adds a deliberate leak (a listener on window, an interval, a ResizeObserver per round) the bounds must catch.
+// CYCLES=n runs more rounds; TEARDOWN_HANG_SELFTEST=1 makes round 3 wait on a promise that never settles (the suite must fail within TEARDOWN_STEP_ms naming the step); TEARDOWN_LEAK_SELFTEST=1 adds a deliberate leak (a listener on window, an interval, a ResizeObserver per round) the bounds must catch; TEARDOWN_NODE_MUTANT=attached|detached leaks one element with a text child (2 nodes) per round (left in the page, or held in a JS array, never attached) and the nodes bound must catch it.
+// nodes (#21381): what our code can leak, not Chrome's Nodes metric. That metric also counts removed nodes Chrome itself keeps for a while with no JS object, about 100 on a slow runner (a heap snapshot of a red run: 2500 DOM objects in the heap against 12 100 counted, nothing detached growing), so it stepped +102 on a cold first run with the DOM and the mutations identical to a green run. The count here is every node in the document (elements, text, comments, shadow roots) plus every node a script can still reach after a forced GC that is not in the document (a removed node something holds). Chrome's number is printed for information.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -23,7 +24,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); // a settle for the page
 
 (async () => {
     const { client, Page, Emulation, ev: rawEv, waitFor, PRELOAD, install } = await connect();
-    const { HeapProfiler, Performance } = client;
+    const { HeapProfiler, Performance, Runtime } = client;
     // A step that never answers names itself (#5310 on the 131 gate: about 1 run in 10 hung until the runner's 180 s): every page call is raced against STEP_MS, and says which step, in which round, and what
     // dialogs the page had opened (a native alert or confirm blocks every evaluation until it is answered).
     const STEP_MS = Number(process.env.TEARDOWN_STEP_MS || 20000);
@@ -72,12 +73,30 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); // a settle for the page
         const within = (p, what) => { let t; return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`stalled ${STEP_MS} ms in ${what}`)), STEP_MS); })]).finally(() => clearTimeout(t)); };
         // Settings' panes arm a watcher that waits until the pane is first laid out (whenPaneShown, settings_fill.js): a pane shown for 10 ms in a round may not be laid out before the next, so whether the two on Storage and cleanup (and the providers' two) are still waiting when the count is taken depended on timing (+2, about 1 run in 8: #18996). It is one standing watcher per key whatever the rounds, not a leak: every pane is shown long enough to be laid out before each count.
         const settlePanes = async () => { for (const p of [...PANES.filter(x => x !== 'cleanup'), 'cleanup']) { await ev(`window.showSettingsModal(${JSON.stringify(p)}); true`); await wait(p === 'cleanup' ? 400 : 60); } await ev(`window.hideSettingsModal(); true`); await wait(50); }; // Storage and cleanup is shown last and longest: its watchers are armed when its fill runs, a moment after it shows, and must see it laid out
+        // Every node in the document, shadow roots included, plus every Node object the page can still reach that is not in the document (queryObjects over each DOM class's prototype, after the GC the caller just ran).
+        const ourNodes = async () => {
+            const live = await ev(`(() => { let n = 0; const walk = root => { const w = document.createTreeWalker(root, NodeFilter.SHOW_ALL); for (let x = w.currentNode; x; x = w.nextNode()) { n++; if (x.shadowRoot) walk(x.shadowRoot); } }; walk(document); return n; })()`);
+            // the classes in the document now, and the ones a dialog or a viewer commonly builds: a class that is in neither and is held detached would not be seen, but the mutant in this suite (a div) is, and a leak is a pattern, not one odd class
+            const names = await ev(`(() => { const s = new Set(['Text', 'Comment', 'DocumentFragment', 'HTMLElement', 'HTMLDivElement', 'HTMLSpanElement', 'HTMLButtonElement', 'HTMLInputElement', 'HTMLAnchorElement', 'HTMLLabelElement', 'HTMLParagraphElement', 'HTMLLIElement', 'HTMLUListElement', 'HTMLSelectElement', 'HTMLOptionElement', 'HTMLTextAreaElement', 'HTMLImageElement', 'HTMLTableElement', 'HTMLTableRowElement', 'HTMLTableCellElement', 'HTMLFormElement', 'HTMLDetailsElement', 'HTMLTemplateElement', 'HTMLCanvasElement', 'HTMLIFrameElement', 'SVGElement', 'SVGSVGElement', 'SVGPathElement']); for (const e of document.getElementsByTagName('*')) { const c = e.constructor && e.constructor.name; if (c && window[c] && window[c].prototype) s.add(c); } return [...s]; })()`);
+            let detached = 0;
+            for (const k of names) {
+                const proto = await within(Runtime.evaluate({ expression: k + '.prototype', objectGroup: 'nodes' }), 'metrics: prototype');
+                const arr = await within(Runtime.queryObjects({ prototypeObjectId: proto.result.objectId, objectGroup: 'nodes' }), 'metrics: queryObjects');
+                const r = await within(Runtime.callFunctionOn({ objectId: arr.objects.objectId, returnByValue: true, functionDeclaration: 'function () { let n = 0; for (const e of this) { try { if (!e.isConnected) n++; } catch { /* the prototype object of each class is in the list and is not a node */ } } return n; }' }), 'metrics: count');
+                if (typeof (r.result && r.result.value) !== 'number') throw new Error('queryObjects count for ' + k + ' is not a number: ' + JSON.stringify(r).slice(0, 300));
+                detached += r.result.value;
+                await Runtime.releaseObjectGroup({ objectGroup: 'nodes' });
+            }
+            if (!Number.isFinite(live + detached)) throw new Error('node count is not a number: ' + JSON.stringify({ live, detached, names }));
+            return live + detached;
+        };
         const metrics = async () => {
             await settlePanes();
             await within(HeapProfiler.collectGarbage(), 'metrics: collectGarbage'); await within(HeapProfiler.collectGarbage(), 'metrics: collectGarbage');
             const m = Object.fromEntries((await within(Performance.getMetrics(), 'metrics: getMetrics')).metrics.map(x => [x.name, x.value]));
             const t = await ev(`(() => { const T = window.__t; return { intervals: T.intervals.size, timeouts: T.timeouts.size, ws: [...T.ws].filter(w => w.readyState < 2).length, obs: [...T.obs].filter(o => o.__live > 0).length }; })()`);
-            return { heapMB: m.JSHeapUsedSize / 1048576, nodes: m.Nodes, listeners: m.JSEventListeners, documents: m.Documents, ...t };
+            const nodes = await ourNodes();
+            return { heapMB: m.JSHeapUsedSize / 1048576, nodes, chromeNodes: m.Nodes, listeners: m.JSEventListeners, documents: m.Documents, ...t };
         };
         const cycle = async n => {
             round = n;
@@ -101,6 +120,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); // a settle for the page
                 return true; })()`);
             await ev(`(() => { T.state.liveSessions = []; window.__m.agents = {}; T.render.renderLiveSessions(T.state.liveSessions);
                 for (let i = 0; i < 6; i++) window.__m.add('td-' + i, String.fromCharCode(65 + i), 50, { sleeping: false }); T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
+            if (process.env.TEARDOWN_NODE_MUTANT === 'attached') await ev(`(() => { const d = document.createElement('div'); d.textContent = 'x'; document.body.appendChild(d); return true; })()`);
+            if (process.env.TEARDOWN_NODE_MUTANT === 'detached') await ev(`(() => { const d = document.createElement('div'); d.textContent = 'x'; (window.__held = window.__held || []).push(d); return true; })()`);
             if (SELFTEST) await ev(`(() => { window.addEventListener('resize', () => {}); setInterval(() => {}, 60000); new ResizeObserver(() => {}).observe(document.body); return true; })()`);
         };
         for (let n = 0; n < 10; n++) await cycle(n);
@@ -108,7 +129,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); // a settle for the page
         for (let n = 0; n < CYCLES; n++) await cycle(n);
         const end = await metrics();
         const grew = Object.fromEntries(Object.keys(BOUNDS).map(k => [k, +(end[k] - base[k]).toFixed(2)]));
-        console.log('after the warm-up', JSON.stringify(base), '\nafter', CYCLES, 'more rounds', JSON.stringify(end), '\ngrew', JSON.stringify(grew));
+        console.log('(nodes = the document plus what scripts hold, chromeNodes = Chrome\'s own count, information only)\nafter the warm-up', JSON.stringify(base), '\nafter', CYCLES, 'more rounds', JSON.stringify(end), '\ngrew', JSON.stringify(grew));
         const over = Object.keys(BOUNDS).filter(k => grew[k] > BOUNDS[k]);
         if (SELFTEST) { assert.ok(over.includes('listeners') && over.includes('intervals') && over.includes('obs'), `the deliberate leak is caught (over: ${over})`); console.log('teardown_stability selftest: ok'); }
         else assert.deepEqual(over, [], `grew past its bound: ${over.map(k => `${k} +${grew[k]} (bound ${BOUNDS[k]})`).join(', ')}`);
