@@ -408,13 +408,10 @@ func PermissionFlagsForAgent(agentType, mode string) []string {
 	}
 }
 
-// PermissionModeForCLI is the mode a launch of agentType may record: the one it is given when that CLI has it, else "default" (#10466, Security Reviewer Windows on #10381). A saved default of Accept
-// edits made a Codex launch record acceptEdits, a mode Codex does not have (its Accept edits flags are its Default ones): the recorded mode is what a restart, a wake and a resurrect restore and what the
-// chat says, so it must name something the CLI can be in. Only Codex's Accept edits is mapped: every other CLI records what it launched with, as before (Antigravity's Auto and Don't ask launch as they did).
+// PermissionModeForCLI is the mode a launch of agentType may record. It records every mode as given. It once mapped Codex's Accept edits to "default" (#10466), when Codex's Default and its Accept edits
+// ran the same flags; Default is Auto now (#21335), so that mapping would turn a person's Accept edits (workspace writes that ask) into Auto on every restart, wake and resurrect. Codex's Accept edits
+// launches --sandbox workspace-write -a on-request, and is recorded as such.
 func PermissionModeForCLI(agentType, mode string) string {
-	if agentType == at.Codex && mode == "acceptEdits" {
-		return "default"
-	}
 	return mode
 }
 
