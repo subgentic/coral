@@ -1,0 +1,7 @@
+/* The phone agent page's second row, with the ⋯ open (#21257, the Operator's shot): four equal buttons, each its icon over its word in one 44 px target. Loaded with the first ⋯ tap, not at start. */
+@media (max-width: 639px) {
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] :is(.terminal-header-actions > [data-word]:not([hidden]), .terminal-header-actions > button[data-on-click="live-view-switch"]:not([hidden], .live-view-switch), #popout-panel-toggle-btn) { display: flex !important; flex: 1 1 0; min-width: 0; width: auto; height: 44px; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px 4px; border: 0; box-shadow: none; background: none; color: var(--text-secondary); font-size: var(--fs-base); }
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] #popout-panel-toggle-btn[aria-pressed="true"] { color: var(--accent); }
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > [data-word]:not([hidden])::before { content: attr(data-word); order: 1; font-size: var(--fs-base); } /* the word is the button's own text: ::after is the touch target's expander (touch.css) */
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .live-view-switch-text { text-transform: capitalize; } /* the one word is the view it shows: Terminal, Chat */
+}

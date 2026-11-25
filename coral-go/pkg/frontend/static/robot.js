@@ -1,6 +1,8 @@
 /* The robot on the agent page (#15152): "Copy for an agent" in the header's action slot, with the open agent's name and where in the docs to read (sessions). Loaded when an agent opens; the button stays across agents and reads the open one when pressed. */
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('phone_agent_bar.css'); // the phone agent page's second row (#21257): with the robot, when an agent opens, not at start
 const { agentCopyIn } = await importOnce('./agent_copy_button.js');
 
 /** Each time an agent opens: the robot is on its page, and an open Branches tab follows the agent (it moved here from sessions.js so the start path carries one lazy call, #15152). */

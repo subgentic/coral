@@ -60,7 +60,7 @@ export function applyLiveViewMode(override) {
     document.getElementById('command-input')?.setAttribute('aria-label', mode === 'chat' ? 'Message' : 'Message to the agent, not typed into the terminal');
     autosizeCommandInput();
     // A phone's one switch shows the view it goes to: a terminal icon while in Chat, a chat icon while in Terminal (#11187)
-    const to = mode === "chat" ? "terminal" : "chat", word = to === "terminal" ? "Show terminal" : "Show chat";
+    const to = mode === "chat" ? "terminal" : "chat", word = "Show " + to;
     for (const id of ["live-view-switch", "live-view-switch-menu"]) {
         const sw = document.getElementById(id);
         if (!sw) continue;
@@ -68,7 +68,7 @@ export function applyLiveViewMode(override) {
         sw.setAttribute("title", word);
         if (id === "live-view-switch") sw.setAttribute("aria-label", word);
         const ic = sw.querySelector(".material-icons"); if (ic && ic.textContent !== to) ic.textContent = to;
-        const tx = sw.querySelector(".live-view-switch-text"); if (tx && tx.textContent !== word) tx.textContent = word;
+        const tx = sw.querySelector(".live-view-switch-text"); if (tx && tx.textContent !== to) tx.textContent = to;
     }
     for (const m of ["terminal", "chat"]) {
         const btn = document.getElementById(`live-view-btn-${m}`);
