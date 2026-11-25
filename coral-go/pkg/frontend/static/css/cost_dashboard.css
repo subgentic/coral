@@ -467,6 +467,7 @@
 /* An Analytics view on a phone is a drill-down (#11236 approved, #11239 slice C): the way back and the title are ONE 56 px bar (the arrow 44 px, the words stay its name for a screen reader; the title 16/600 on one line), the view's question and range line under it */
 @media (max-width: 600px) {
     #cost-dashboard-view[data-phone-item] .cost-header { display: contents; } /* #21231: the bar (way back, title, question) stays at the top; the range, team and export controls under it scroll away with the page instead of standing over the cards (the whole header was 248 px) */
+    #cost-dashboard-view[data-phone-item] .cost-header-actions { margin-block: 8px 20px; } /* the header's own gap and bottom margin, which display: contents drops */
     #cost-dashboard-view[data-phone-item] .cost-header-left { position: sticky; top: 0; z-index: 2; background: var(--bg-primary); padding-top: 4px; margin-top: -4px; }
     #cost-dashboard-view .cost-header-left { display: grid; grid-template-columns: var(--control-touch-height, 44px) minmax(0, 1fr); grid-template-rows: 48px auto auto; column-gap: 4px; align-items: center; padding: 0 8px; margin-inline: -12px; }
     #cost-dashboard-view .cost-title-block { display: contents; }
