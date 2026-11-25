@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/foldertrust"
+	"github.com/subgentic/coral/internal/secfile"
 )
 
 // Codex's hook review ("Hooks need review", "1 hook is new or changed.") names no hook. Coral trusts only its own six (codex_trust_hooks), so the one it asks about is a plugin's, a
@@ -95,17 +97,22 @@ func codexVersionLess(a, b string) bool {
 	return len(pa) < len(pb)
 }
 
-// codexReadSmall reads a regular file of at most max bytes, never through a link: Codex's own config and a plugin's cached hook file, whose paths are the person's (CODEX_HOME or ~/.codex, and the plugin
-// names in that config, checked below), never a request's, an agent's or a repository's (#21209). Reviewed in file_open_lint_test.go.
+// codexReadSmall reads a regular file of at most max bytes, opened once without following a link and read through a limit (no check-then-use): Codex's own config and a plugin's cached hook file, whose
+// paths are the person's (CODEX_HOME or ~/.codex, and the plugin names in that config, checked below), never a request's, an agent's or a repository's (#21209, #21242). Reviewed in file_open_lint_test.go.
 func codexReadSmall(path string, max int64) ([]byte, error) {
-	fi, err := os.Lstat(path)
+	f, err := secfile.OpenNoFollow(path, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
-	if !fi.Mode().IsRegular() || fi.Size() > max {
+	defer f.Close()
+	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
 		return nil, os.ErrInvalid
 	}
-	return os.ReadFile(path)
+	b, err := io.ReadAll(io.LimitReader(f, max+1))
+	if err != nil || int64(len(b)) > max {
+		return nil, os.ErrInvalid
+	}
+	return b, nil
 }
 
 func codexPluginHookReview(home string) codexPluginHooks {

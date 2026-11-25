@@ -129,3 +129,39 @@ func TestCodexPluginNamesCannotLeaveTheCacheFolder(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfg, append(b, []byte("\n[plugins.\"..@..\"]\nenabled = true\n")...), 0o644))
 	assert.Equal(t, []string{"posthog"}, codexPluginHookReview(home).Changed, "a '..' plugin is skipped; the real one is still named")
 }
+
+func TestCodexReadIsGuarded(t *testing.T) {
+	// a hook file that is a link to a real one names no plugin (the link is never followed)
+	home := codexFixture(t, map[string]string{"linked": posthogHookFile}, nil)
+	hook := filepath.Join(home, ".codex", "plugins", "cache", "m", "linked", "1.0", "hooks", "codex-hooks.json")
+	real := filepath.Join(home, "real-hooks.json")
+	require.NoError(t, os.WriteFile(real, []byte(posthogHookFile), 0o644))
+	require.NoError(t, os.Remove(hook))
+	require.NoError(t, os.Symlink(real, hook))
+	r := codexPluginHookReview(home)
+	assert.Empty(t, r.Changed, "a symlinked hook file is not read")
+	assert.Equal(t, []string{"linked"}, r.Unsure, "it is not hashed, so it is not claimed to have changed")
+
+	// a config over the cap names nothing
+	home = codexFixture(t, map[string]string{"posthog": posthogHookFile}, nil)
+	cfg := filepath.Join(home, ".codex", "config.toml")
+	b, err := os.ReadFile(cfg)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(cfg, append(b, []byte("\n# "+strings.Repeat("x", 4<<20)+"\n")...), 0o644))
+	assert.Equal(t, codexPluginHooks{}, codexPluginHookReview(home), "a config over 4 MiB is not read")
+
+	// codexReadSmall itself: a link, a directory and an over-cap file are refused; the cap itself is allowed
+	dir := t.TempDir()
+	f := filepath.Join(dir, "f")
+	require.NoError(t, os.WriteFile(f, []byte("12345"), 0o644))
+	got, err := codexReadSmall(f, 5)
+	assert.NoError(t, err)
+	assert.Equal(t, "12345", string(got), "exactly the cap is fine")
+	_, err = codexReadSmall(f, 4)
+	assert.Error(t, err, "one over the cap is refused")
+	require.NoError(t, os.Symlink(f, filepath.Join(dir, "l")))
+	_, err = codexReadSmall(filepath.Join(dir, "l"), 100)
+	assert.Error(t, err, "a link is refused")
+	_, err = codexReadSmall(dir, 100)
+	assert.Error(t, err, "a directory is refused")
+}
