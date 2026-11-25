@@ -45,7 +45,7 @@ func CronLine(line string) (string, error) {
 	least := cronLeastGap(sched)
 	if least != 0 && least < MinCronGapMinutes*time.Minute {
 		n := int(least / time.Minute)
-		return "", fmt.Errorf("that fires every %d minute%s at times; a reminder can repeat at most every %d minutes", n, map[bool]string{true: "", false: "s"}[n == 1], MinCronGapMinutes)
+		return "", fmt.Errorf("two firings can be %d minute%s apart; a reminder can repeat at most every %d minutes", n, map[bool]string{true: "", false: "s"}[n == 1], MinCronGapMinutes)
 	}
 	return norm, nil
 }
