@@ -71,6 +71,7 @@ export function decorateKindRow(tr) {
     const icon = tr.querySelector('.inbox-kind-icon');
     if (!icon || tr.classList.contains('dt-mailed')) return;
     tr.classList.add('inbox-kind-row');
+    tr.classList.toggle('inbox-row-new', tr.classList.contains('dt-unread')); // css names an unread row without a dt- class (#21271)
     const badge = icon.dataset.kind === 'permission' ? ['Permission', 'warn', '.dt-person'] : null; /* mock v3: only Permission is a chip; a Yes / No ask and a question show no chip (#20066, final walk #20101) */ // the kind chip beside the name, drawn from data-badge so the name's text stays the name (#19833)
     if (icon.dataset.kind === 'ask') tr.classList.add('inbox-ask-row'); // its buttons sit beside its text on a wide card (#20016)
     if (icon.dataset.kind === 'question') tr.classList.add('inbox-stack'); // the question card is the permission card's stack (#19962)
