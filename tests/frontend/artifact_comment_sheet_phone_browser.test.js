@@ -1,6 +1,6 @@
-// The comment sheet on a phone leaves the file readable (#17460, walk 69 L3: it covered all but about 3 lines). A real 60-line file on the isolated server, the viewer at 390x844 as touch, the Comments sheet
-// open: the part of the file above the sheet is at least a fifth of the screen (it was 41 px), and the sheet is no more than half of it. Then with the keyboard up (#17835, QA4's SHOULD: the sheet is half of a smaller
-// screen, 390x440 here, the visual viewport shrinking as the keyboard does): the comment box and its Comment button are on screen, the sheet is on screen (with the keyboard up it may use all of the viewer, by design: artifact-comments.css), and the long thread scrolls inside it with the box still reachable. Removed again.
+// Private document reviews use one scrolling phone workspace. Header and draft bar must
+// leave at least a fifth of the viewport; with the keyboard up, the box and Save draft
+// must both fit after scrolling the box into view. A real isolated server supplies six threads.
 const os = require('node:os');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -33,9 +33,9 @@ const { guardSettings } = require('./helpers/settings_guard');
         await ev(`document.querySelector('#artifact-viewer .ac-toggle').click(); true`);
         await waitFor(`(() => { const p = document.querySelector('#artifact-viewer .ac-panel'); return !!p && p.getBoundingClientRect().height > 100; })()`, 'the sheet is open', 8000);
         await ev(framesJs(30));
-        const m = await ev(`(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-main').getBoundingClientRect(), b = document.querySelector('#artifact-viewer .artifact-viewer-body').getBoundingClientRect(), vh = innerHeight; return { sheet: Math.round(p.height), sheetShare: +(p.height / vh).toFixed(2), fileAbove: Math.round(b.height), vh }; })()`);
-        check(m.fileAbove >= m.vh / 5, 'the scrollable review keeps the whole document available: ' + JSON.stringify(m));
-        check(m.sheetShare <= 1, 'the review workspace fits the screen below the header: ' + JSON.stringify(m));
+        const m = await ev(`(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-main').getBoundingClientRect(), bar = document.querySelector('#artifact-viewer .ac-draft-bar')?.getBoundingClientRect(), vh = innerHeight, bottom = Math.min(p.bottom, bar?.height ? bar.top : vh, vh); return { top: p.top, bottom, available: bottom - Math.max(0, p.top), vh }; })()`);
+        check(m.top >= 0 && m.bottom <= m.vh && m.available >= m.vh / 5, 'header and draft bar leave at least a fifth of the screen for the document workspace: ' + JSON.stringify(m));
+        check(await ev(`(() => { const box = document.querySelector('#artifact-viewer .ac-composer .ac-input'), hint = document.querySelector('#artifact-viewer .ac-draft-save-hint'); return !!hint?.id && (box.getAttribute('aria-describedby') || '').split(/\\s+/).includes(hint.id); })()`), 'the draft privacy sentence describes the comment box');
         // the keyboard up: the box is focused and the screen shrinks to what is left above the keyboard
         check(await ev(`!!document.querySelector('#artifact-viewer .ac-composer .ac-draft-save-hint')`), 'whole-document draft composer is already visible');
         await waitFor(`!!document.querySelector('#artifact-viewer .ac-composer .ac-input')`, 'the comment box', 8000);
@@ -43,12 +43,12 @@ const { guardSettings } = require('./helpers/settings_guard');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 440, deviceScaleFactor: 1, mobile: true });
         await waitFor(`document.body.classList.contains('keyboard-open')`, 'the page knows the keyboard is up', 8000);
         await ev(framesJs(30));
-        await ev(`document.querySelector('#artifact-viewer .ac-composer .ac-input').scrollIntoView({block:'center'}); true`);
+        await ev(`document.querySelector('#artifact-viewer .ac-composer .ac-input').scrollIntoView({block:'start'}); true`);
         const k = await ev(`(() => { const R = s => { const e = document.querySelector('#artifact-viewer ' + s); if (!e) return null; const r = e.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), shown: e.getClientRects().length > 0 }; }, p = document.querySelector('#artifact-viewer .artifact-viewer-main'), vh = innerHeight;
             return { vh, sheet: Math.round(p.getBoundingClientRect().height), box: R('.ac-composer .ac-input'), send: R('.ac-composer .ac-send'), scrolls: p.scrollHeight > p.clientHeight + 20, overflowY: getComputedStyle(p).overflowY }; })()`);
         const inView = r => !!r && r.shown && r.top >= 0 && r.bottom <= k.vh;
         check(k.sheet <= k.vh, 'keyboard up: the sheet fits the screen left: ' + JSON.stringify(k));
-        check(inView(k.box) && k.send.shown && k.send.bottom > k.send.top, 'keyboard up: the comment box is reachable and Save draft remains in the scrolling workspace: ' + JSON.stringify(k));
+        check(inView(k.box) && inView(k.send), 'keyboard up: the comment box is reachable and Save draft remains in the scrolling workspace: ' + JSON.stringify(k));
         check(k.scrolls && /auto|scroll/.test(k.overflowY), 'keyboard up: the document and long thread scroll inside the review workspace: ' + JSON.stringify(k));
         const sc = await ev(`(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-main'), cards = [...p.querySelectorAll('.ac-card, .ac-comment')], vh = innerHeight; p.scrollTop = 0; const top0 = p.scrollTop; p.scrollTop = p.scrollHeight; const last = cards[cards.length - 1], lr = last && last.getBoundingClientRect(), s = p.querySelector('.ac-composer .ac-send').getBoundingClientRect(); return { moved: p.scrollTop > top0, cards: cards.length, lastShown: !!lr && lr.bottom <= vh && lr.top >= 0, sendBottom: Math.round(s.bottom), vh }; })()`);
         check(sc.moved && sc.cards >= 6, 'keyboard up: scrolling the workspace moves the thread (' + sc.cards + ' comments): ' + JSON.stringify(sc));

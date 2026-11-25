@@ -37,7 +37,9 @@ export function createComposer({ st, render, run, ownHex }) {
         const row = el('div', 'ac-composer-row'); row.append(count, ...(tray && !editOf ? [tray.picker()] : []), cancel, send);
         const hint = editOf || st.reviewDrafts ? '' : st.hint?.() || '', hintEl = hint ? el('p', 'ac-note ac-hint', hint) : null; // always drawn with its line; shown while the file waits for review (the review bar toggles it with the file's state, #15128)
         if (hintEl) { hintEl.id = `ac-hint-${++hintSeq}`; const on = !!st.hintOn?.(); hintEl.hidden = !on; if (on) ta.setAttribute('aria-describedby', `${hintEl.id} ${how.id}`); } // a screen reader hears it where the person types
-        box.append(ta, ...(!editOf && st.reviewDrafts ? [el('p', 'ac-draft-save-hint', 'Saved as a draft. Only sent when you choose Send comments.')] : []), ...(hintEl ? [hintEl] : []), how, ...(tray ? editOf ? [tray.node] : [tray.node, tray.hint()] : []), err, row);
+        const draftHint = !editOf && st.reviewDrafts ? el('p', 'ac-draft-save-hint', 'Saved as a draft. Only sent when you choose Send comments.') : null;
+        if (draftHint) { draftHint.id = `ac-draft-hint-${++hintSeq}`; ta.setAttribute('aria-describedby', `${draftHint.id} ${how.id}`); }
+        box.append(ta, ...(draftHint ? [draftHint] : []), ...(hintEl ? [hintEl] : []), how, ...(tray ? editOf ? [tray.node] : [tray.node, tray.hint()] : []), err, row);
         if (tray) { tray.detach(); tray.attach(box, ta); tray.listen(() => { if (automatic) { st.composing = cm; delete box.dataset.idleWhole; } send.disabled = tray.busy() || tray.failed(); }); send.disabled = tray.busy() || tray.failed(); } // Send waits for a picture still going up, and for a failed one to be removed
         box.addEventListener('submit', (e) => {
             e.preventDefault();
