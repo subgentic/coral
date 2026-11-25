@@ -200,18 +200,16 @@ func (h *BoardHandler) goalDoneDriven(ctx context.Context, project string) goalD
 	return s
 }
 
-// hasDriver: the goal's driver is an active member of the board, or it has none and the team has an active Orchestrator (the one its driver's notice goes to).
+// hasDriver: the goal's driver is an active member of the board, or, when it has none or its driver is not active, the team has an active Orchestrator (the one its driver's notice falls back to, as the health nudge does).
 func (s goalDoneDrivenState) hasDriver(g board.Goal) bool {
-	who := g.Driver
-	if who == "" {
-		who = s.orch
-	}
-	if who == "" {
-		return false
-	}
-	for _, sub := range s.active {
-		if sub.IsActive != 0 && board.SameIdentity(sub.SubscriberID, who) {
-			return true
+	for _, who := range []string{g.Driver, s.orch} {
+		if who == "" {
+			continue
+		}
+		for _, sub := range s.active {
+			if sub.IsActive != 0 && board.SameIdentity(sub.SubscriberID, who) {
+				return true
+			}
 		}
 	}
 	return false
