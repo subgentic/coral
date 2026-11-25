@@ -44,6 +44,19 @@ assert.match(badge(0).title, /not an instruction/);
 assert.equal(badge(1).textContent, 'to gamma');
 assert.ok(badge(1).classList.contains('is-outbound'));
 assert.equal(badge(2), null, 'ordinary messages have no badge');
+// The tags name the team, the board id is in the tooltip, and the id stands in when the server sent no name (#21291).
+{
+    const { externalMessageBadge } = await import('../../coral-go/pkg/frontend/static/board_message_text.js');
+    const html = m => { const d = document.createElement('div'); d.innerHTML = externalMessageBadge(m); return d.firstElementChild; };
+    const named = html({ external: { direction: 'inbound', board: 'b-bq4h4qi42c', board_label: 'Coral Go Team', sender: 'Orchestrator' } });
+    assert.equal(named.textContent, 'from Coral Go Team', 'an inbound tag shows the sender team name');
+    assert.match(named.title, /Coral Go Team \(b-bq4h4qi42c\)/, 'the id is in the tooltip');
+    assert.equal(html({ external: { direction: 'inbound', board: 'b-bq4h4qi42c', sender: 'Orchestrator' } }).textContent, 'from b-bq4h4qi42c', 'no name: the id');
+    const sent = html({ external: { direction: 'outbound', target_board: 'b-zz9', target_board_label: 'Video Team' } });
+    assert.equal(sent.textContent, 'to Video Team', 'an outbound tag shows the receiving team name');
+    assert.match(sent.title, /Video Team \(b-zz9\)/);
+    assert.equal(html({ external: { direction: 'outbound', target_board: 'b-unknown1' } }).textContent, 'to b-unknown1', 'unknown target: the id');
+}
 mb.showMessageBoardProjects();
 
 // ── Team settings switch ──

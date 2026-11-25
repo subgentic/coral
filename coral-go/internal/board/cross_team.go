@@ -401,9 +401,11 @@ type MessageOrigin struct {
 	Sender     string `json:"sender"`
 	SenderRole string `json:"sender_role"`
 	// The receiving side of the message.
-	TargetServerID  string `json:"target_server_id"`
-	TargetBoard     string `json:"target_board"`
-	TargetMessageID int64  `json:"target_message_id,omitempty"` // set on the outbound mirror
+	TargetServerID string `json:"target_server_id"`
+	TargetBoard    string `json:"target_board"`
+	// TargetBoardLabel is the receiving board's name on this Coral (#21291), stored on the outbound mirror so the "to" tag names the team; TargetBoard stays the id. Left out when the board has no name of its own.
+	TargetBoardLabel string `json:"target_board_label,omitempty"`
+	TargetMessageID  int64  `json:"target_message_id,omitempty"` // set on the outbound mirror
 	// A message relayed by Coral Hub from another Coral (#3489): the sender's message id
 	// (the de-duplication key) and how many relayed replies led to it.
 	RelayMessageID string `json:"relay_message_id,omitempty"`
@@ -490,6 +492,14 @@ func SenderLabel(o MessageOrigin) string {
 	return fmt.Sprintf("%s (%s)", o.SenderRole, team)
 }
 
+// safeBoardLabel is the sender board's name as the envelope may carry it for a tag to show (#21291): the same rule SenderLabel applies, so a name that could pass for another's or break a line is left out and the id shows.
+func (o MessageOrigin) safeBoardLabel() string {
+	if l, ok := cleanTeamLabel(o.BoardLabel, o.chiefBoard && !o.remote()); ok && l != o.Board {
+		return l
+	}
+	return ""
+}
+
 // maxTeamLabelRunes is the longest team name the sender label carries; a longer one shows the board id.
 const maxTeamLabelRunes = 40
 
@@ -550,6 +560,7 @@ func (s *Store) PostCrossTeamMessage(ctx context.Context, p CrossTeamPost) (inbo
 			in.BoardLabel = l
 		}
 	}
+	in.BoardLabel = in.safeBoardLabel()
 	inJSON, err := json.Marshal(in)
 	if err != nil {
 		return nil, nil, err
@@ -596,6 +607,9 @@ func (s *Store) PostCrossTeamMessage(ctx context.Context, p CrossTeamPost) (inbo
 	out := p.Origin
 	out.Direction = "outbound"
 	out.TargetMessageID = inID
+	if l, ok := CleanTeamLabel(s.BoardLabel(ctx, out.TargetBoard)); ok && l != out.TargetBoard {
+		out.TargetBoardLabel = l
+	}
 	outJSON, err := json.Marshal(out)
 	if err != nil {
 		return nil, nil, err
@@ -628,6 +642,7 @@ func (s *Store) PostRelayedCrossTeamMessage(ctx context.Context, p CrossTeamPost
 	if !in.remote() || in.RelayMessageID == "" {
 		return nil, false, errors.New("a relayed message needs its source server and message id")
 	}
+	in.BoardLabel = in.safeBoardLabel()
 	inJSON, err := json.Marshal(in)
 	if err != nil {
 		return nil, false, err

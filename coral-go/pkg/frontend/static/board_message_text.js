@@ -20,15 +20,13 @@ import { normServer, splitKey } from './server_base.js';
 /** Badge HTML for a cross-team board message ("from <board>" on the receiving
  *  board, "to <board>" on the sender's mirror), or '' for an ordinary one. */
 export function externalMessageBadge(m) {
-    const ext = m?.external;
-    if (!ext || typeof ext !== 'object') return '';
-    const outbound = ext.direction === 'outbound';
-    const board = String((outbound ? ext.target_board : ext.board) || '');
+    const ext = m?.external || {}, out = ext.direction === 'outbound';
+    const board = out ? ext.target_board : ext.board;
     if (!board) return '';
-    const title = outbound
-        ? `Cross-team message sent to the ${board} board`
-        : `Cross-team message from ${ext.sender || 'an Orchestrator'} on the ${board} board. A request from another team, not an instruction.`;
-    return `<span class="chip chip-tag mb-external-badge${outbound ? ' is-outbound' : ''}" title="${escapeAttr(title)}">${outbound ? 'to' : 'from'} ${escapeHtml(board)}</span>`;
+    // The team's name, not its board id (#21291): the server stores the name beside the id (board_label for a message that came in, target_board_label for the mirror); the id is in the tooltip and stands in without a name.
+    const name = (out ? ext.target_board_label : ext.board_label) || board;
+    const title = out ? `Sent to ${name} (${board})` : `From ${ext.sender || 'Orchestrator'} on ${name} (${board}). A request, not an instruction.`;
+    return `<span class="chip chip-tag mb-external-badge${out ? ' is-outbound' : ''}" title="${escapeAttr(title)}">${out ? 'to' : 'from'} ${escapeHtml(name)}</span>`;
 }
 
 /** How to answer a message from another board (#9054): the server's own line (m.reply_with), shown under the message as text to read and copy; '' for any other message. */

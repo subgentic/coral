@@ -149,3 +149,30 @@ func TestRemoteBoardWithTheChiefBoardsIDIsNotChief(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Orchestrator (chief-board, server 01234567)", in.SubscriberID)
 }
+
+// The envelope carries a team name only when it is safe to show in a tag (#21291): the sender's on the received copy, the receiver's on the mirror; an unsafe name leaves the id.
+func TestCrossTeamEnvelopeNamesAreSafeForTags(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	b, err := s.CreateBoard(ctx, "Coral Go Team", "test")
+	require.NoError(t, err)
+	to, err := s.CreateBoard(ctx, "Video Team", "test")
+	require.NoError(t, err)
+	_, err = s.Subscribe(ctx, to.ID, "Orchestrator", "Orchestrator", "tmux-b", nil, "mentions")
+	require.NoError(t, err)
+	in, out, err := s.PostCrossTeamMessage(ctx, CrossTeamPost{
+		Origin:  MessageOrigin{ServerID: "local", Board: b.ID, Sender: "Orchestrator", SenderRole: "Orchestrator", TargetServerID: "local", TargetBoard: to.ID},
+		Content: "hi", Mentions: []string{"Orchestrator"},
+	})
+	require.NoError(t, err)
+	var gotIn, gotOut MessageOrigin
+	require.NoError(t, json.Unmarshal(in.External, &gotIn))
+	require.NoError(t, json.Unmarshal(out.External, &gotOut))
+	require.Equal(t, "Coral Go Team", gotIn.BoardLabel)
+	require.Equal(t, "Video Team", gotOut.TargetBoardLabel)
+	require.Equal(t, to.ID, gotOut.TargetBoard, "the id stays")
+	// a name that could pass for the Operator is not carried
+	require.Equal(t, "", MessageOrigin{ServerID: "local", Board: "alpha", BoardLabel: "Operator"}.safeBoardLabel())
+	require.Equal(t, "", MessageOrigin{ServerID: "local", Board: "alpha", BoardLabel: "ops @all"}.safeBoardLabel())
+	require.Equal(t, "Ops", MessageOrigin{ServerID: "local", Board: "alpha", BoardLabel: "Ops"}.safeBoardLabel())
+}
