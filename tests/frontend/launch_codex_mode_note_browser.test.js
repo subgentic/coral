@@ -1,5 +1,4 @@
-// #15735 (QA #15727, the Operator's Codex Bypass report): under New agent step 3's flags line, the reason the flags are not the pick's own: a role's Shell rule narrows Bypass, Default plus Shell gets its flags
-// from the capabilities, kept Full access, and Default with nothing says Codex's own settings decide. The real server answers (POST /api/launch/permission-args); only the role's capabilities are set on the form's config.
+// #15735 (QA #15727, the Operator's Codex Bypass report): under New agent step 3's flags line, the reason the flags are not the pick's own: a role's Shell rule narrows Bypass, Default (Auto since #21335) says Auto's own reason or what a role's capabilities narrow it to, and kept Full access. The real server answers (POST /api/launch/permission-args); only the role's capabilities are set on the form's config.
 const assert = require('node:assert/strict');
 const { coralReady } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
@@ -30,8 +29,10 @@ const { install: installNA, stubModels, stubCliChecks } = require('./helpers/new
             } catch (e) { problems.push(name + ': ' + e.message.slice(0, 300) + ' / got ' + JSON.stringify(await ev(`document.getElementById('launch-recap')?.textContent`))); }
         };
         await why('Bypass narrowed by a Shell rule', 'codex', 'bypassPermissions', false, { allow: ['shell'], deny: ['git_write'] }, 'narrow this mode to workspace writes, asks first');
-        await why('Default plus Shell, no limits', 'codex', 'default', false, { allow: ['shell'] }, 'capabilities set them: workspace writes, never asks');
-        await why('Default with nothing: Codex decides', 'codex', 'default', false, null, "Codex's own settings");
+        // Default is Auto for Codex since #21335 (the server's CodexModeNote/CodexAutoNote say so): Shell with no limits and nothing at all run Auto's own flags, so the reason is Auto's; a file_read-only role narrows it, said in words.
+        await why('Default plus Shell, no limits: Auto (#21335)', 'codex', 'default', false, { allow: ['shell'] }, "Auto (and Default, which is Auto for Codex) uses Codex's own auto-review");
+        await why('Default with nothing: Auto (#21335)', 'codex', 'default', false, null, "Auto (and Default, which is Auto for Codex) uses Codex's own auto-review");
+        await why('Default narrowed by file_read', 'codex', 'default', false, { allow: ['file_read'] }, "Default is Auto for Codex, and the agent's capabilities narrow it to read-only");
         await why('Full access kept', 'codex', 'plan', true, { allow: ['shell'], deny: ['git_write'] }, 'Full access is kept for this agent');
         await why('Bypass as chosen: no reason line', 'codex', 'bypassPermissions', false, null, '');
         await why('Another agent: no reason line', 'claude', 'plan', false, null, '');
