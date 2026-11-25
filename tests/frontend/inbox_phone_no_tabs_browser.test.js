@@ -67,7 +67,7 @@ const fs = require('node:fs');
                 check(`${label}: the drawer now marks Goals`, d.rows.filter(r => r.current).map(r => r.label).join() === 'Goals', JSON.stringify(d.rows.filter(r => r.current)));
             } else {
                 const items = await ev(`[...document.querySelectorAll('.view-list-item')].filter(b => b.getClientRects().length).map(b => b.dataset.key).slice(0, 4).join()`);
-                check(`${label}: the sidebar's folder list is as it was`, /needs,tasks,goals,saved/.test(items), items);
+                check(`${label}: the sidebar's folder list is in the Operator's order (#21325)`, /needs,activity,saved,goals/.test(items), items);
             }
         }
     } finally { await client.close(); }

@@ -1131,15 +1131,13 @@ const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission o
 const agentStatusNode = () => { const rows = allNeeds().filter(isAgentRow); if (!rows.length) return null; const n = { awake: 0, asleep: 0, archived: 0 }; for (const r of rows) { const k = AW.agentWaitState(refOf(r)).state; if (k in n) n[k]++; } return AW.statusNode(rows.length, n); }; // the tab's one line above the list (#19904)
 const needsCountWords = () => { if (needsTab === 'agent') return ''; const unread = countOf('needs'), listed = allNeeds().filter(inTab).length; return listed > unread ? `${unread} unread, ${listed} in the list` : ''; };
 const needsStatusLine = () => AW.statusLine(activeNeedsTeam ? teamNeedsCount(activeNeedsTeam).value : countOf('needs'), allNeeds().filter(inTab).length + (activeNeedsTeam ? 0 : welcomeRows().length)); // the line under the Waiting on you tab's filters (#19904); on a team page the team's own unread count
-/** The sidebar's groups, one list for this dashboard and the Hub-served one (#13256): Needs attention (Needs you, Tasks, Goals, Saved), Files (Artifacts), History (Activity), the same order and words. Under the Hub an entry shows only where the Hub serves it
+/** The sidebar's groups, one list for this dashboard and the Hub-served one (#13256): Your work (Needs you, Activity, Saved, Goals, Tasks, Artifacts: one group, #21325), the same order and words. Under the Hub an entry shows only where the Hub serves it
  *  (a native group in GROUPS: Artifacts not for a grantee; Activity is the owner-only record from linked computers) and a Hub-frame page keeps no number of its own (the page says it). */
 const folderSections = () => {
     const hub = nativeInbox(), shown = key => !hub || (GROUPS.some(g => g.key === key) && (key !== 'artifacts' || !IA.artifactsOwnerOnly())), framed = key => hub && !!GROUPS.find(g => g.key === key)?.frame;
     const item = (key, label, count, extra) => shown(key) ? [{ key, label, count: framed(key) ? undefined : count, ...extra }] : [];
     const sections = [
-        { title: 'Needs attention', items: [...item('needs', 'Needs you', countOf('needs'), { alert: !hub && countOf('needs') > 0, words: needsCountWords() }), ...item('tasks', 'Tasks', countOf('tasks')), ...item('goals', 'Goals', countOf('goals')), ...item('saved', 'Saved', countOf('saved'))] },
-        { title: 'Files', items: item('artifacts', 'Artifacts', countOf('artifacts')) },
-        { title: 'History', items: item('activity', 'Activity') },
+        { title: 'Your work', items: [...item('needs', 'Needs you', countOf('needs'), { alert: !hub && countOf('needs') > 0, words: needsCountWords() }), ...item('activity', 'Activity'), ...item('saved', 'Saved', countOf('saved')), ...item('goals', 'Goals', countOf('goals')), ...item('tasks', 'Tasks', countOf('tasks')), ...item('artifacts', 'Artifacts', countOf('artifacts'))] },
     ].filter(section => section.items.length);
     return [...sections, ...CH.chatSections(), ...boardSection()].map(section => ({ ...section, items: section.items.map(item => ({ ...item, tip: FOLDER_TIPS[item.key], icon: FOLDER_ICONS[item.key] || (item.key.startsWith(BOARD_ITEM) ? 'forum' : undefined) || (item.key.startsWith('chats-cli-') ? `cli:${item.key.slice(10)}` : undefined) })) }));
 };
