@@ -8,7 +8,7 @@ import (
 )
 
 // CodexLaunchPermissions (#14051) is the sandbox and approval policy a Codex launch with these stored settings runs with, from the same flag builder a launch uses: what a wake or a restart
-// would give the agent, to be compared with the mode it runs in now. "" and "" when the settings carry no permission at all (the CLI's own config decides).
+// would give the agent, to be compared with the mode it runs in now. Since #21335 a launch with nothing stored is Default, which is Auto: workspace-write and never.
 func TestCodexLaunchPermissionsAreWhatTheLaunchBuilderGives(t *testing.T) {
 	caps := func(raw string) *Capabilities {
 		c := &Capabilities{}
@@ -26,9 +26,9 @@ func TestCodexLaunchPermissionsAreWhatTheLaunchBuilderGives(t *testing.T) {
 		{"bypass flag, no capabilities", []string{"--dangerously-bypass-approvals-and-sandbox"}, nil, "", "danger-full-access", "never"},
 		{"bypass mode, no capabilities", nil, nil, "bypassPermissions", "danger-full-access", "never"},
 		{"the stored bypass is narrowed by capabilities (the three agents of #14028)", []string{"--dangerously-bypass-approvals-and-sandbox"}, narrow, "bypassPermissions", "workspace-write", "on-request"},
-		{"capabilities and the default mode", nil, narrow, "default", "workspace-write", "on-request"},
-		{"nothing stored", nil, nil, "", "", ""},
-		{"default mode, no flags", nil, nil, "default", "", ""},
+		{"capabilities and the default mode: Default is Auto, a narrow shell list no longer makes it ask (#21335, coral-hub's three agents)", nil, narrow, "default", "workspace-write", "never"},
+		{"nothing stored: Default is Auto (#21335)", nil, nil, "", "workspace-write", "never"},
+		{"default mode, no flags (#21335)", nil, nil, "default", "workspace-write", "never"},
 		{"auto mode", nil, nil, "auto", "workspace-write", "never"},
 		{"plan mode", nil, nil, "plan", "read-only", "on-request"},
 		{"sandbox and approval flags", []string{"--sandbox", "read-only", "-a", "on-request"}, nil, "", "read-only", "on-request"},

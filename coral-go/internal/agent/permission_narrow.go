@@ -187,16 +187,26 @@ func CodexModeNote(caps *Capabilities, mode string, keepFull bool) string {
 		capPair = codexPair{"workspace-write", "never"}
 	}
 	m, explicit := codexPairForMode(mode)
-	if !explicit {
+	if !explicit && !codexUnattendedMode(mode) {
 		return "Default has no flags of its own, so the agent's capabilities set them: " + codexPairWords(capPair) + "."
 	}
 	if perms.FullAuto {
 		return "" // against an explicit mode, Shell with no limits restricts nothing: the mode stands as chosen
 	}
-	if narrowCodexPair(m, capPair) == m {
+	if !explicit { // Default is Auto (#21335)
+		m = codexPair{"workspace-write", "never"}
+	}
+	narrowed := narrowCodexPair(m, capPair)
+	if codexUnattendedMode(mode) {
+		narrowed.approval = "never" // capabilities narrow what an Auto agent may touch, never into asking a person (#21335)
+	}
+	if narrowed == m {
 		return ""
 	}
-	return "The agent's capabilities narrow this mode to " + codexPairWords(narrowCodexPair(m, capPair)) + "."
+	if !explicit {
+		return "Default is Auto for Codex, and the agent's capabilities narrow it to " + codexPairWords(narrowed) + "."
+	}
+	return "The agent's capabilities narrow this mode to " + codexPairWords(narrowed) + "."
 }
 
 // CodexAutoNote is the reason beside the flags line for an Auto pick (#15780): on a Codex that has it, Auto is Codex's own auto-review (--approve-for-me), said in words with what can still narrow
@@ -208,7 +218,7 @@ func CodexAutoNote(args, flags []string, mode string, keepFull bool) string {
 	}
 	for _, a := range args {
 		if a == "--approve-for-me" {
-			return "Auto uses Codex's own auto-review (--approve-for-me): Codex's own reviewer judges each approval request, and it can approve actions outside the sandbox, such as writing outside the workspace, without asking you. A role's Shell rule that limits the agent still narrows it."
+			return "Auto (and Default, which is Auto for Codex) uses Codex's own auto-review (--approve-for-me): Codex's own reviewer judges each approval request, and it can approve actions outside the sandbox, such as writing outside the workspace, without asking you. A role's Shell rule that limits the agent still narrows it."
 		}
 	}
 	sandbox, approval := "", ""

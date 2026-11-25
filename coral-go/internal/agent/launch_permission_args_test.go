@@ -17,8 +17,8 @@ func TestLaunchPermissionArgsAreWhatTheLaunchBuildersAdd(t *testing.T) {
 		full        bool
 		want        string
 	}{
-		{"codex", "", false, ""},
-		{"codex", "default", false, ""},
+		{"codex", "", false, "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"}, // Default is Auto (#21335)
+		{"codex", "default", false, "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"},
 		{"codex", "plan", false, "--sandbox read-only -a on-request"},
 		{"codex", "auto", false, "-c sandbox_workspace_write.network_access=true --sandbox workspace-write -a never"},
 		{"codex", "bypassPermissions", false, "--dangerously-bypass-approvals-and-sandbox"},

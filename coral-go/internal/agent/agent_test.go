@@ -630,12 +630,12 @@ func TestCodex_ExplicitModeIsAppliedAndCapabilitiesOnlyNarrowIt(t *testing.T) {
 		{"plan, four chips", fourChips, "plan", "--sandbox read-only -a on-request", []string{"workspace-write", "-a never", "bypass"}},
 		{"acceptEdits, four chips", fourChips, "acceptEdits", "--sandbox workspace-write -a on-request", []string{"-a never", "bypass"}},
 		{"bypass, read-only chips", readOnly, "bypassPermissions", "--sandbox read-only -a on-request", []string{"bypass", "danger-full-access"}},
-		{"auto, read-only chips", readOnly, "auto", "--sandbox read-only -a on-request", []string{"-a never"}},
+		{"auto, read-only chips: narrowed, and never asking (#21335)", readOnly, "auto", "--sandbox read-only -a never", []string{"-a on-request"}},
 		{"plan, read-only chips", readOnly, "plan", "--sandbox read-only -a on-request", nil},
 		{"bypass, four chips: the explicit full-access choice stands", fourChips, "bypassPermissions", "--dangerously-bypass-approvals-and-sandbox", nil},
 		{"auto, four chips", fourChips, "auto", "--sandbox workspace-write -a never", []string{"bypass"}},
 		{"default mode: the chips decide", fourChips, "default", "--sandbox workspace-write -a never", []string{"bypass"}},
-		{"no mode: the chips decide", readOnly, "", "--sandbox read-only -a on-request", nil},
+		{"no mode: Default is Auto, the chips narrow its sandbox and it never asks (#21335)", readOnly, "", "--sandbox read-only -a never", []string{"-a on-request"}},
 	} {
 		cmd := buildLaunch(a, LaunchParams{Capabilities: tc.caps, PermissionMode: tc.mode})
 		if !strings.Contains(cmd, tc.want) {
@@ -652,7 +652,7 @@ func TestCodex_ExplicitModeIsAppliedAndCapabilitiesOnlyNarrowIt(t *testing.T) {
 func TestCodex_WithCapabilities_ReadOnly(t *testing.T) {
 	a := &CodexAgent{}
 	cmd := buildLaunch(a, LaunchParams{Capabilities: &Capabilities{Allow: []string{CapFileRead}}})
-	if !strings.Contains(cmd, "--sandbox read-only") || !strings.Contains(cmd, "-a on-request") {
+	if !strings.Contains(cmd, "--sandbox read-only") || !strings.Contains(cmd, "-a never") { // Default is Auto (#21335): the sandbox is narrowed, nothing asks
 		t.Errorf("expected read-only sandbox, got %q", cmd)
 	}
 }
@@ -662,7 +662,7 @@ func TestCodex_WithCapabilities_ReadWrite(t *testing.T) {
 	cmd := buildLaunch(a, LaunchParams{
 		Capabilities: &Capabilities{Allow: []string{CapFileRead, CapFileWrite}},
 	})
-	if !strings.Contains(cmd, "--sandbox workspace-write") || !strings.Contains(cmd, "-a on-request") {
+	if !strings.Contains(cmd, "--sandbox workspace-write") || !strings.Contains(cmd, "-a never") { // Default is Auto (#21335)
 		t.Errorf("expected workspace-write sandbox, got %q", cmd)
 	}
 }

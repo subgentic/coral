@@ -38,7 +38,8 @@ func TestLaunchPermissionArgsRouteAnswersFromTheLaunchBuilders(t *testing.T) {
 	_, out = ask(`{"agent_type":"codex","permission_mode":"plan","keep_full_access":true}`)
 	assert.Contains(t, out, `"--dangerously-bypass-approvals-and-sandbox"`)
 	_, out = ask(`{"agent_type":"codex","permission_mode":"default"}`)
-	assert.JSONEq(t, `{"args":[],"text":"","note":"No permission flags are added, so Codex's own settings (its config file) decide.","skips_prompts":false}`, out)
+	assert.Contains(t, out, `"args":["-c","sandbox_workspace_write.network_access=true"`, "Default is Auto for Codex (#21335): the flags are Auto's")
+	assert.Contains(t, out, `"skips_prompts":true`)
 	code, _ = ask(`not json`)
 	assert.Equal(t, http.StatusBadRequest, code)
 	// Security's #15726: the body and each flag are capped.
@@ -64,8 +65,8 @@ func TestLaunchPermissionArgsRouteSaysWhyTheFlagsDifferFromThePick(t *testing.T)
 		return got.Note
 	}
 	assert.Contains(t, note(`{"agent_type":"codex","permission_mode":"bypassPermissions","capabilities":{"allow":["shell"],"deny":["git_write"]}}`), "narrow this mode to workspace writes, asks first", "Bypass with a Shell rule")
-	assert.Contains(t, note(`{"agent_type":"codex","permission_mode":"default","capabilities":{"allow":["shell"]}}`), "capabilities set them: workspace writes, never asks", "Default with Shell, no limits")
-	assert.Contains(t, note(`{"agent_type":"codex","permission_mode":"default"}`), "Codex's own settings", "Default with no flags")
+	assert.Contains(t, note(`{"agent_type":"codex","permission_mode":"default","capabilities":{"allow":["file_read"]}}`), "Default is Auto for Codex, and the agent's capabilities narrow it to read-only", "Default narrowed to read-only (#21335)")
+	assert.Contains(t, note(`{"agent_type":"codex","permission_mode":"default"}`), "Auto", "Default with no flags is Auto (#21335)")
 	assert.Equal(t, "", note(`{"agent_type":"codex","permission_mode":"bypassPermissions"}`), "the pick's own flags run: no note")
 	assert.Equal(t, "", note(`{"agent_type":"claude","permission_mode":"default"}`), "no note for another agent")
 }
@@ -105,7 +106,10 @@ func TestLaunchPermissionArgsRouteShowsCodexAutoReview(t *testing.T) {
 	assert.Equal(t, netOn+"--sandbox workspace-write -a never", text)
 	assert.Contains(t, note, "older than 0.163.0")
 	text, note = ask("0.163.0", `{"agent_type":"codex","permission_mode":"auto","capabilities":{"allow":["shell"],"deny":["git_write"]}}`)
-	assert.Equal(t, "--sandbox workspace-write -a on-request", text, "a Shell rule narrows Auto")
+	assert.Equal(t, "--approve-for-me", text, "a Shell rule no longer makes Auto ask (#21335): it is still Auto")
+	assert.Contains(t, note, "auto-review")
+	text, note = ask("0.163.0", `{"agent_type":"codex","permission_mode":"auto","capabilities":{"allow":["file_read"]}}`)
+	assert.Equal(t, "--sandbox read-only -a never", text, "file read alone narrows Auto's sandbox and does not ask")
 	assert.Contains(t, note, "narrow this mode")
 	text, note = ask("0.163.0", `{"agent_type":"codex","permission_mode":"plan"}`)
 	assert.Equal(t, "--sandbox read-only -a on-request", text)

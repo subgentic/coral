@@ -441,9 +441,12 @@ func codexAutoPick(params LaunchParams, userFlags []string) bool {
 	if params.KeepFullAccess {
 		return false
 	}
+	defaultPick := false
 	switch params.PermissionMode {
 	case "auto", "dontAsk":
 		return true
+	case "", "default":
+		defaultPick = true // the Default pick is the Auto pick (#21335), unless stored flags say otherwise below
 	}
 	for i, f := range userFlags {
 		switch {
@@ -473,6 +476,9 @@ func codexAutoPick(params LaunchParams, userFlags []string) bool {
 			approval = value
 		}
 		i += n - 1
+	}
+	if sandbox == "" && approval == "" {
+		return defaultPick
 	}
 	return sandbox == "workspace-write" && approval == "never"
 }
@@ -618,11 +624,22 @@ func codexCapabilityFlags(parts []string, caps *Capabilities, mode string) (out 
 		return parts, false, false
 	}
 	pair := codexPairOf(perms)
+	unattended := codexUnattendedMode(mode)
 	if m, ok := codexPairForMode(mode); ok {
 		if perms.FullAuto {
 			pair = codexPair{codexSandboxNone, "never"} // Shell with no deny restricts nothing: against an explicit mode it is the widest set, so the mode stands as chosen
 		}
 		pair = narrowCodexPair(m, pair)
+	} else if unattended { // the Default pick is Auto (#21335)
+		if perms.FullAuto {
+			pair = codexPair{"workspace-write", "never"}
+		}
+		pair = narrowCodexPair(codexPair{"workspace-write", "never"}, pair)
+	}
+	if unattended && pair.approval != "never" {
+		// A capabilities list narrows what the agent may touch, never into asking a person: a Default or Auto agent stays unattended (#21335). The sandbox stays as narrow as the capabilities made it; only the
+		// approval prompt is gone, and where Codex has it its own review (--approve-for-me) judges what would have asked.
+		pair.approval = "never"
 	}
 	switch {
 	case pair.sandbox == codexSandboxNone && pair.approval == "never":
@@ -790,6 +807,15 @@ func codexApprovalFlagName(flag string) string {
 	return flag
 }
 
+// codexUnattendedMode says the mode keeps a Codex agent from asking a person: Default (or none) and Auto. Plan and Accept edits ask, Bypass has nothing to ask about.
+func codexUnattendedMode(mode string) bool {
+	switch mode {
+	case "", "default", "auto", "dontAsk":
+		return true
+	}
+	return false
+}
+
 func appendCodexFullAuto(parts []string) []string {
 	return append(parts, "--sandbox", "workspace-write", "-a", "never")
 }
@@ -797,7 +823,12 @@ func appendCodexFullAuto(parts []string) []string {
 func appendCodexPermissionMode(parts []string, bypassSandbox bool, mode string) ([]string, bool, bool) {
 	switch mode {
 	case "", "default":
-		return parts, bypassSandbox, false
+		// The Default pick is Coral's Auto pick for Codex (the Operator's decision, #21335): workspace writes, nothing asks a person (Codex's own review where it has it, codexAutoPick). Only an explicit Plan or Accept
+		// edits asks, and only an explicit Bypass or Full access leaves the sandbox.
+		if !bypassSandbox {
+			parts = appendCodexFullAuto(parts)
+		}
+		return parts, bypassSandbox, true
 	case "bypassPermissions":
 		if !bypassSandbox {
 			parts = append(parts, "--dangerously-bypass-approvals-and-sandbox")

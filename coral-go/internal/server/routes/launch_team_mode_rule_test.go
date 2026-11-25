@@ -33,7 +33,7 @@ func TestTheTeamModeReachesEveryMemberAndCapabilitiesOnlyNarrowIt(t *testing.T) 
 		at.Codex: {
 			"plan":   {"none": {[]string{"--sandbox read-only -a on-request"}, []string{"-a never", "bypass"}}, "four chips": {[]string{"--sandbox read-only -a on-request"}, []string{"-a never", "bypass"}}, "read-only": {[]string{"--sandbox read-only -a on-request"}, []string{"-a never", "bypass"}}},
 			"bypass": {"none": {[]string{"--dangerously-bypass-approvals-and-sandbox"}, nil}, "four chips": {[]string{"--dangerously-bypass-approvals-and-sandbox"}, nil}, "read-only": {[]string{"--sandbox read-only -a on-request"}, []string{"bypass"}}},
-			"":       {"none": {[]string{"--sandbox workspace-write -a never"}, []string{"bypass"}}, "four chips": {[]string{"--sandbox workspace-write -a never"}, []string{"bypass"}}, "read-only": {[]string{"--sandbox read-only -a on-request"}, nil}},
+			"":       {"none": {[]string{"--sandbox workspace-write -a never"}, []string{"bypass"}}, "four chips": {[]string{"--sandbox workspace-write -a never"}, []string{"bypass"}}, "read-only": {[]string{"--sandbox read-only -a never"}, nil}}, // a team with no mode is Auto (#21335): a read-only member keeps its sandbox and does not ask
 		},
 		at.Agy: {
 			"plan":   {"none": {[]string{"--mode plan"}, []string{"skip-permissions"}}, "four chips": {[]string{"--mode plan"}, []string{"skip-permissions"}}, "read-only": {[]string{"--mode plan"}, nil}},

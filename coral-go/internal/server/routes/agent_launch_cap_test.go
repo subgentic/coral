@@ -24,7 +24,7 @@ func TestTheRankOfEachTypesModesIsWhatItCanDoWithoutAsking(t *testing.T) {
 		want      int
 	}{
 		{"claude", "default", rankAsks}, {"claude", "plan", rankAsks}, {"claude", "acceptEdits", rankEdits}, {"claude", "auto", rankJudged}, {"claude", "dontAsk", rankJudged}, {"claude", "bypassPermissions", rankOpen},
-		{"codex", "plan", rankAsks}, {"codex", "default", rankEdits}, {"codex", "acceptEdits", rankEdits}, {"codex", "auto", rankJudged}, {"codex", "bypassPermissions", rankOpen},
+		{"codex", "plan", rankAsks}, {"codex", "default", rankJudged} /* #21335: Default is Auto for Codex */, {"codex", "acceptEdits", rankEdits}, {"codex", "auto", rankJudged}, {"codex", "bypassPermissions", rankOpen},
 		{"agy", "default", rankAsks}, {"agy", "acceptEdits", rankEdits}, {"agy", "auto", rankJudged} /* #14741: agy has its own --mode auto */, {"agy", "bypassPermissions", rankOpen},
 		{"gemini", "acceptEdits", rankEdits}, {"antigravity", "bypassPermissions", rankOpen},
 		{"hermes", "default", rankAsks}, {"hermes", "auto", rankAsks}, {"hermes", "bypassPermissions", rankOpen},
@@ -115,8 +115,11 @@ func TestAHermesOrCodexOrchestratorNeverRaisesAMemberAboveItsOwnTypesSetting(t *
 	grant, refusal := capAgentLaunchFor(authOf(modeRank("codex", "auto"), nil), agentLaunchAsk{AgentType: "claude", DefaultMode: "bypassPermissions"})
 	require.Nil(t, refusal)
 	assert.Equal(t, "auto", grant.Mode)
-	// Codex at its default (edits) starts Claude members at Accept edits
-	grant, refusal = capAgentLaunchFor(authOf(modeRank("codex", "default"), nil), agentLaunchAsk{AgentType: "claude", DefaultMode: "auto"})
+	// Codex at its default is Auto now (#21335), so it starts Claude members in Auto; one in Accept edits (edits) starts them at Accept edits
+	grant, refusal = capAgentLaunchFor(authOf(modeRank("codex", "default"), nil), agentLaunchAsk{AgentType: "claude", DefaultMode: "bypassPermissions"})
+	require.Nil(t, refusal)
+	assert.Equal(t, "auto", grant.Mode)
+	grant, refusal = capAgentLaunchFor(authOf(modeRank("codex", "acceptEdits"), nil), agentLaunchAsk{AgentType: "claude", DefaultMode: "auto"})
 	require.Nil(t, refusal)
 	assert.Equal(t, "acceptEdits", grant.Mode)
 	// a Hermes that asks (rank 0) starts Default members; a Hermes in Bypass (3) may start a Hermes member in Bypass
