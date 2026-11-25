@@ -1,6 +1,6 @@
 /* Moved out of modals.js as it was (#3844): no behaviour change. */
 import { importOnce } from './import_once.js';
-const { ALL_CAPABILITIES } = await importOnce('./agent_presets.js');
+const { ALL_CAPABILITIES, SHIPPED_CAPABILITIES } = await importOnce('./agent_presets.js');
 const { permissionDescription, PERMISSION_MODE_DESCRIPTIONS, CODEX_AUTO_DESCRIPTION, CODEX_NETWORK_MODES, _updatePermModeDescription, defaultPermissionMode, syncDefaultPermissionMode, trackPermissionPick, _hasPermFlag, _normalizePermFlagsForAgent, _permissionModeFromFlags, _stripPermFlags, _syncACFAutoPermissions } = await importOnce('./permission_flags.js');
 const { _acfServer, _fillModelDatalist, _getAgentModels, _getDefaultModels, _settingsFor } = await importOnce('./launch_models.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
@@ -139,7 +139,9 @@ function _syncEnforcement(container) {
     const permMode = modeSelect?.value
         || defaultPermissionMode(_settingsFor(_acfServer(container)), agentType);
     const caps = _getPermissions(`${uid}-perms`) || {};
-    const e = presetEnforcement(agentType, caps, permMode);
+    const e = { ...presetEnforcement(agentType, caps, permMode) };
+    const roleCaps = container._acfCapsDefault; // limits a role or template carried and Codex on Default left unlit (#21363): say so, and how to keep them (#21373)
+    if (roleCaps && agentType === 'codex' && permMode === 'default' && (roleCaps.allow || []).some(c => c.startsWith('shell:') || !SHIPPED_CAPABILITIES.every(k => roleCaps.allow.includes(k)))) e.text = (e.text ? e.text + ' ' : '') + "A role's limits are not applied on Default: Codex runs Auto. Pick Plan, or turn the chips on, to keep them.";
     // The Operator's "Use Full access for this agent" (#14085): the checkbox is there only in a form that offers it (launch, restart) and only for the three CLIs that have it (the server refuses anyone else and says so)
     const useFull = container.querySelector('.acf-use-full-access');
     if (useFull) useFull.hidden = !['claude', 'codex', 'agy'].includes(agentType);
