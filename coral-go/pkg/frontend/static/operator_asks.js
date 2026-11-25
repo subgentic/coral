@@ -4,7 +4,7 @@ import { responseUpdateError } from './server_base.js';
  * on one line, and opens whole in a dialog with a Reply box. The reply is the board post the dashboard already makes (POST /api/board/{board}/messages as the Operator, with the asker's @name, and reply_to
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
-import { readOutcome } from './needs_incomplete.js';
+import { readOutcome, refusalCode } from './needs_incomplete.js';
 import { isHiddenAsk, prepareAskReviews } from './ask_filter.js';
 import { importOnce } from './import_once.js';
 import { OPERATOR_ID } from './utils.js';
@@ -90,7 +90,7 @@ export function refreshOperatorAsks(force = false) {
     const readAsks = async server => {
         try {
             const r = await serverFetch(server === LOCAL_SERVER ? undefined : server, '/api/operator-asks');
-            if (!r.ok) { readOutcome('questions', server, false, r.status === 401 || r.status === 403, (await responseUpdateError(r, server))?.message || ''); return r.status === 401 || r.status === 403 ? [] : null; } // access taken away (401, 403): none drawn, and the note says so; anything else keeps the rows
+            if (!r.ok) { readOutcome('questions', server, false, r.status === 401 || r.status === 403, (await responseUpdateError(r, server))?.message || '', r.status === 401 || r.status === 403 ? await refusalCode(r) : ''); return r.status === 401 || r.status === 403 ? [] : null; } // access taken away (401, 403): none drawn, and the note says so; anything else keeps the rows
             const rows = await r.json();
             if (!Array.isArray(rows)) { readOutcome('questions', server, false); return null; }
             readOutcome('questions', server, true);

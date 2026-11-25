@@ -2,7 +2,7 @@ import { responseUpdateError } from './server_base.js';
 /* What agents asked to add to a team, and have not been decided (#11389): the list, read from GET /api/proposals, and the decisions. No page here, so the Inbox's badge can count them without loading the table:
  * like the review rows it reads only after the Inbox was first opened, then keeps itself current (at most one read in 20 seconds). The Operator's alone: a guest or a grantee is answered 403, and has no rows. */
 import { serverFetch, identityKey, splitKey } from './server_base.js';
-import { readOutcome } from './needs_incomplete.js';
+import { readOutcome, refusalCode } from './needs_incomplete.js';
 import { inboxSources } from './inbox_servers.js';
 import { isPaused } from './overload.js';
 import { browserLocal } from './safe_storage.js';
@@ -36,7 +36,7 @@ export function refreshProposals(force = false) {
             const settled = await Promise.all(sources.map(async server => {
                 try {
                     const r = await serverFetch(server, '/api/proposals?state=pending,approving,expired');
-                    if (!r.ok) { readOutcome('proposals', server, false, r.status === 401 || r.status === 403, (await responseUpdateError(r, server))?.message || ''); return r.status === 401 || r.status === 403 ? { server, rows: [], refused: true } : { server, keep: true }; } // access was taken away (401, 403): no rows, and the note says so (#13454, #13841); a missing route (404), a server error, a failure or a bad body keeps the rows
+                    if (!r.ok) { readOutcome('proposals', server, false, r.status === 401 || r.status === 403, (await responseUpdateError(r, server))?.message || '', r.status === 401 || r.status === 403 ? await refusalCode(r) : ''); return r.status === 401 || r.status === 403 ? { server, rows: [], refused: true } : { server, keep: true }; } // access was taken away (401, 403): no rows, and the note says so (#13454, #13841); a missing route (404), a server error, a failure or a bad body keeps the rows
                     const got = (await r.json()).proposals;
                     if (!Array.isArray(got)) { readOutcome('proposals', server, false); return { server, keep: true }; }
                     readOutcome('proposals', server, true);
