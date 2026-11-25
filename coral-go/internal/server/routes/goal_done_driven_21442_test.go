@@ -87,6 +87,18 @@ func TestADrivenGoalIsNeverALooksDoneItem(t *testing.T) {
 	assert.Equal(t, []string{fmt.Sprintf("goal_done:team:%d", orchDriven.ID)}, g.items(), "with nobody active to drive it, the goal is the Operator's")
 }
 
+func TestAGoalWhoseNamedDriverIsInactiveFallsBackToTheOrchestrator(t *testing.T) {
+	g := newGoalDoneRig(t)
+	gl := g.goal("Dev left", "Dev")
+	g.finishTask(gl)
+	_, err := g.bs.Unsubscribe(context.Background(), "team", "Dev")
+	require.NoError(t, err)
+	assert.Empty(t, g.items(), "its named driver is gone, the active Orchestrator has it: still no item")
+	_, err = g.bs.Unsubscribe(context.Background(), "team", "Lead")
+	require.NoError(t, err)
+	assert.Equal(t, []string{fmt.Sprintf("goal_done:team:%d", gl.ID)}, g.items(), "nobody active: the Operator's")
+}
+
 func TestAGoalWithNoDriverIsAnItemAtMostOnce(t *testing.T) {
 	g := newGoalDoneRig(t)
 	_, err := g.bs.Unsubscribe(context.Background(), "team", "Lead") // no Orchestrator: nobody drives
