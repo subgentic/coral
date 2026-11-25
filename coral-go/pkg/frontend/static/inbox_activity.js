@@ -23,6 +23,14 @@ await loadStyles('activity_ledger.css'); // the ledger's rows (#19816)
 await loadStyles('activity_kinds.css'); // the kind chips' rules (several at once, #16087): not at start
 
 const PAGE = 200;
+// The exact cursor is the server's (time, id) pair; older Coral replies only support an ID.
+const cursorFrom = (d, got) => Number.isSafeInteger(d.next_before) && typeof d.next_before_at === 'string' && d.next_before_at
+    ? { id: d.next_before, at: d.next_before_at } : { id: Math.min(...got.map(r => r.id)) };
+const addCursor = (q, cursor) => {
+    if (!cursor) return;
+    q.set('before', String(cursor.id));
+    if (cursor.at) q.set('before_at', cursor.at);
+};
 const PHONE_HINT = 'pho' + 'ne'; // the record's hint word, spelled in two parts: the icon-name lint reads that quoted word as an icon name
 let rows = [], check = null, loaded = false, loading = null, more = false, failed = false, denied = false;
 /** Each computer owns its cursor and its own check (#15380): a cursor is never sent to another computer. `moreBy` says which computers have older actions; `unread` names the ones that could not be read this time. */
@@ -92,13 +100,14 @@ export function refresh(done, { next = false } = {}) {
     }
     if (!sources) { // this computer alone
         const q = new URLSearchParams({ limit: String(PAGE) });
-        if (next && rows.length) q.set('before', String(Math.min(...rows.map(r => r.id))));
+        if (next) addCursor(q, cursors[LOCAL_SERVER]);
         loading = (async () => {
             try {
                 const d = await requestJson('GET', `/api/activity?${q}`);
                 const got = Array.isArray(d.actions) ? d.actions : [];
                 rows = next ? [...rows, ...got.filter(g => !rows.some(r => r.id === g.id))] : got;
-                if (!next) check = d.check || null;
+                if (!next) { check = d.check || null; cursors = {}; }
+                if (got.length) cursors[LOCAL_SERVER] = cursorFrom(d, got);
                 more = got.length === PAGE;
                 unread = [];
                 failed = false; denied = false;
@@ -111,13 +120,13 @@ export function refresh(done, { next = false } = {}) {
     loading = (async () => {
         const settled = await Promise.allSettled(targets.map(async server => {
             const q = new URLSearchParams({ limit: String(PAGE) });
-            if (next && cursors[server] != null) q.set('before', String(cursors[server]));
+            if (next) addCursor(q, cursors[server]);
             const r = await serverFetch(server === LOCAL_SERVER ? undefined : server, `/api/activity?${q}`);
             if (r.status === 403) return { server, denied: true };
             if (!r.ok) throw await responseUpdateError(r, server) || Object.assign(new Error(`HTTP ${r.status}`), { server });
             const d = await r.json();
             const got = (Array.isArray(d.actions) ? d.actions : []).filter(a => a && Number.isSafeInteger(a.id)).map(a => ({ ...a, server, team: identityKey(server, a.team) }));
-            return { server, got, check: d.check || null, more: got.length === PAGE };
+            return { server, got, check: d.check || null, more: got.length === PAGE, cursor: got.length ? cursorFrom(d, got) : null };
         }));
         const answered = settled.filter(x => x.status === 'fulfilled' && !x.value.denied).map(x => x.value);
         const deniedAll = settled.length > 0 && settled.every(x => x.status === 'fulfilled' && x.value.denied);
@@ -126,7 +135,7 @@ export function refresh(done, { next = false } = {}) {
         for (const a of answered) {
             for (const row of a.got) if (!seen.has(keyOf(row))) { seen.add(keyOf(row)); rows.push(row); }
             moreBy[a.server] = a.more;
-            if (a.got.length) cursors[a.server] = Math.min(...rows.filter(r => r.server === a.server).map(r => r.id));
+            if (a.cursor) cursors[a.server] = a.cursor;
             if (!next) checks[a.server] = a.check;
         }
         rows.sort((x, y) => atOf(y) - atOf(x));

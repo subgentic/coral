@@ -21,13 +21,16 @@ globalThis.fetch = async (url) => {
     const server = m ? m[1] : u.pathname === '/api/activity' ? 'local' : null;
     assert.ok(server, `an unexpected request: ${u.pathname}`);
     const p = plan[server] || {};
-    asked.push({ server, before: u.searchParams.get('before') });
+    asked.push({ server, before: u.searchParams.get('before'), before_at: u.searchParams.get('before_at') });
     if (p.status === 403) return json({ error: 'owner_only' }, 403);
     if (p.status && p.status !== 200) return json({ error: 'boom' }, p.status);
     const before = u.searchParams.get('before');
     const all = p.ids || [];
-    const got = all.filter(a => before == null || a.id < Number(before)).slice(0, Number(u.searchParams.get('limit')));
-    return json({ actions: got.map(a => ({ id: a.id, team: 'team', at: a.at, action: 'approved', item_kind: 'file', item_id: a.item_id || 'x', source: 'local' })), check: p.check || { intact: true, rows: all.length, note: '' } });
+    const beforeAt = u.searchParams.get('before_at');
+    const ordered = p.exact ? [...all].sort((a, b) => b.at.localeCompare(a.at) || b.id - a.id) : all;
+    const got = ordered.filter(a => before == null || (p.exact && beforeAt ? a.at < beforeAt || (a.at === beforeAt && a.id < Number(before)) : a.id < Number(before))).slice(0, Number(u.searchParams.get('limit')));
+    const last = got[got.length - 1];
+    return json({ actions: got.map(a => ({ id: a.id, team: 'team', at: a.at, action: 'approved', item_kind: 'file', item_id: a.item_id || 'x', source: 'local' })), check: p.check || { intact: true, rows: all.length, note: '' }, ...(p.exact && last ? { next_before: last.id, next_before_at: last.at } : {}) });
 };
 const { state } = await import(pathToFileURL(path.join(dir, 'state.js')).href);
 const AC = await import(pathToFileURL(path.join(dir, 'inbox_activity.js')).href);
@@ -151,6 +154,53 @@ assert.equal(AC.total(), 201);
 asked.length = 0;
 await AC.refresh(null, { next: true });
 assert.deepEqual(asked.map(a => `${a.server}:${a.before}`), ['local:801'], 'only the computer with more is asked, with its own cursor');
+
+// #21432: the exact cursor is the reply's pair, not the smallest id among merged rows.
+// IDs increase while timestamps decrease, so deriving before from a minimum cannot pass.
+const timed = (start, minute) => Array.from({ length: 450 }, (_, i) => ({ id: start + i, at: at(minute - i) }));
+reset(online(['srv1']), { local: { exact: true, ids: timed(1000, 1000) }, srv1: { exact: true, ids: timed(5000, 2000) } });
+await AC.refresh();
+assert.ok(asked.every(a => a.before === null && a.before_at === null), 'first pages have no cursor');
+for (const [idOffset, minuteOffset] of [[199, 199], [399, 399]]) {
+    asked.length = 0;
+    await AC.refresh(null, { next: true });
+    assert.deepEqual(asked, [
+        { server: 'local', before: String(1000 + idOffset), before_at: at(1000 - minuteOffset) },
+        { server: 'srv1', before: String(5000 + idOffset), before_at: at(2000 - minuteOffset) },
+    ], 'each computer gets its own exact pair on both older-page reads');
+}
+assert.equal(AC.total(), 900, 'all actions across three pages on each computer remain visible');
+
+// The single-computer path uses the same reply pair and advances it on every page.
+reset(undefined, { local: { exact: true, ids: timed(1000, 1000) } });
+await AC.refresh();
+for (const offset of [199, 399]) {
+    asked.length = 0;
+    await AC.refresh(null, { next: true });
+    assert.deepEqual(asked, [{ server: 'local', before: String(1000 + offset), before_at: at(1000 - offset) }]);
+}
+assert.equal(AC.total(), 450);
+
+// An older computer omits next_before_at: preserve ID-only paging alongside a modern one.
+reset(online(['srv1']), { local: { ids: many(1000, 450, 0) }, srv1: { exact: true, ids: timed(5000, 2000) } });
+await AC.refresh();
+for (const offset of [199, 399]) {
+    asked.length = 0;
+    await AC.refresh(null, { next: true });
+    assert.deepEqual(asked, [
+        { server: 'local', before: String(1000 - offset), before_at: null },
+        { server: 'srv1', before: String(5000 + offset), before_at: at(2000 - offset) },
+    ]);
+}
+assert.equal(AC.total(), 900);
+reset(undefined, { local: { ids: many(1000, 450, 0) } });
+await AC.refresh();
+for (const offset of [199, 399]) {
+    asked.length = 0;
+    await AC.refresh(null, { next: true });
+    assert.deepEqual(asked, [{ server: 'local', before: String(1000 - offset), before_at: null }]);
+}
+assert.equal(AC.total(), 450);
 
 // a computer that leaves the list takes its actions along, even for a page of older ones (#15404)
 reset(online(['srv1', 'srv2']), { local: { ids: [{ id: 1, at: at(1) }] }, srv1: { ids: [{ id: 1, at: at(2) }] }, srv2: { ids: [{ id: 1, at: at(3) }] } });
