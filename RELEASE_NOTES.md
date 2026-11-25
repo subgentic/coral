@@ -1,5 +1,50 @@
 # Release Notes
 
+## v2.1.14 — Draft comments on documents, a self-hosted Hub that joins with its own key, permission prompts answered from Needs you, and a two-row phone agent bar
+
+Task numbers in brackets. Built on v2.1.13. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Comment on a document as a draft, send once** (#21185, #21189, #21194, #21195, #21196, #21300): your comments on a document stay private drafts until you send them, all together in one message, or with your Approve or Request changes. The full viewer has an always-open whole-document comment box; the docked preview keeps its button. Google Doc comments on a team's file are held as drafts too.
+- **Drafts on a file with no team** (#21202, #21273): Send goes to the agent that uploaded the file, and the To: line names it.
+- **Answer a permission prompt from Needs you** (#21256): an agent waiting at a permission prompt shows its one-time Yes and No in Needs you and sends a push. Only the person can answer, and the choice is checked again when pressed.
+- **Phone agent bar** (#21257): one name row, then four equal buttons (Find, Copy, Sidebar, Terminal) with the word under each icon. The row wraps at large text instead of cutting words.
+- **Inbox ink** (#21271): unread senders are brighter; read senders stay quieter.
+- **Board chat** (#21291): cross-team to and from tags name the team, with the board id in the tooltip.
+- **Phone Settings > Notifications through a Hub** (#21268): Reset no longer covers a title, and no empty Needs you heading.
+- **New team, step 3** (#21236): the reason Launch team is off is readable.
+- **Needs you on a phone and through a Hub** (#21231): the Team filter lists a team once per computer; on Analytics only the bar stays at the top.
+- **Needs you notes name the computer by its label** (#21241, #21260, #21277), with the refusal code and the setup it needs.
+- **Settings > Network is shorter and steadier** (#21382, #21381, #21385, #21391): the Network Hub wording is shorter, the Hub join guide stays open, the switch is now "Allow Hub auto-accept", and the pane no longer shifts while it loads.
+
+#### Coral Hub
+
+- **A self-hosted Hub joins with its own request key** (#21220, #21276): over SSH it runs only `coral cloud keys create`, then asks to join with that key; the link it gets reaches this computer at its allowed level.
+- **One owner secret per Hub link** (#21213, #21251, #21261, #21318): approvals through a key-linked Hub are bound to that link's own secret, and refusals name the Hub.
+- **Private reads need the person** (#21285): Saved and Skills warn on a key-only read; reading comments with a key never marks them seen.
+- **The device-key link names this computer** (#21331): `GET /api/device-keys/link` also returns this computer's key id as `computer`.
+- **Reading drafts no longer writes** (#21365): opening a document's drafts does not record the owner identity; only saving does.
+
+### Test and gate fixes in this release
+
+- A Codex hook file read is size-limited and does not follow links (#21242).
+- key_bridge goroutines recover, and the join limit and drafts send are in the 429 census (#21320).
+- The reply box works on a Coral that does not support drafts, and the phone comment sheet grows with large text (#21370, #21377).
+- Settings panes wait to be shown with one listener per group, not a ResizeObserver (#21392).
+- teardown_stability now bounds the nodes our code can leak (document nodes plus script-reachable detached nodes), with Chrome's own node count logged for information; the bound stays 60 and deliberate leaks still fail (#21381, #21418).
+- A test pins that a goal-done row hidden at the computer stays hidden through a Hub (#21328).
+- The first browser run found 31 suites red where the doc-comments and phone changes met older tests. Fixed in #21336, #21337 and #21354, with no check dropped. Two real bugs were fixed on the way: the docked preview had lost its whole-document comment button, and on a 320 px phone with the keyboard open the comment box covered a filter.
+- Docs: the quickstart lists all six agent CLIs (#21299, #21307).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption and the browser gate are green on the gated commit. No Windows run: no change in this release is Windows-only.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+
 ## v2.1.13 — Reminders in the New agent panel, a clearer Inbox in light and dark, a calmer permission window, and Codex plugin hook cards
 
 Task numbers in brackets. Built on v2.1.12. A prerelease until the Operator promotes it.
