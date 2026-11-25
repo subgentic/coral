@@ -66,13 +66,14 @@ const overlap = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 1 && Math.mi
         await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`window.selectLiveSession('hub-agent-2', 'claude', 'hub-agent-2', 'm2'); true`);
         await waitFor(`document.getElementById('terminal-header-label')?.textContent.includes('Build agent') && document.querySelector('#live-session-view .terminal-header')?.getClientRects().length > 0`, 'the agent', 12000);
+        await waitFor(`document.querySelector('#live-session-view .terminal-header')?.hasAttribute('data-more')`, 'the four-button row is drawn (robot.js sets it when the agent page opens)', 8000); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the row settles over frames after the lazy sheet; there is no completion event
         const before = (await ev(rects)).header;
         assert.ok(await select(), 'something to select');
         await waitFor(`getComputedStyle(document.getElementById('selection-pause-badge')).display !== 'none'`, 'the paused chip', 4000);
         const p = await ev(rects);
         assert.ok(p.chip && p.chip.t >= p.header.b - 1, `390: the chip is under the header: ` + JSON.stringify({ chip: p.chip, header: p.header }));
         for (const [n, b] of p.parts) assert.ok(!overlap(b, p.chip), `390: the chip overlaps no header control or text (${n}): ` + JSON.stringify({ chip: p.chip, b }));
-        assert.equal(p.header.b - p.header.t, before.b - before.t, '390: the header keeps its height (still one row) with the chip showing');
+        assert.equal(p.header.b - p.header.t, before.b - before.t, '390: the header keeps its height (name row plus the four-button row) with the chip showing');
         console.log('   hub 390 paused: ok');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

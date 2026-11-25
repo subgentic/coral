@@ -45,10 +45,10 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`document.getElementById('agent-bar-more').click(); true`);
                 await waitFor(`document.getElementById('live-view-switch-menu').getClientRects().length > 0`, 'More reveals the view switch');
                 const a = await sw();
-                assert.ok(a.toggle === 'none' && a.label === 'Show terminal' && a.icon === 'terminal' && a.menu === 'Show terminal' && !a.term, `${fs}: in Chat the one button says Show terminal with a terminal icon, and the two-button toggle is gone: ` + JSON.stringify(a));
+                assert.ok(a.toggle === 'none' && a.label === 'Show terminal' && a.icon === 'terminal' && a.menu === 'terminal' && !a.term, `${fs}: in Chat the one button says Show terminal with a terminal icon, and the two-button toggle is gone: ` + JSON.stringify(a));
                 await ev(`document.getElementById('live-view-switch-menu').click(); true`);
                 const b = await sw();
-                assert.ok(b.term && b.label === 'Show chat' && b.icon === 'chat' && b.menu === 'Show chat', `${fs}: pressed, it shows the terminal and now says Show chat with a chat icon: ` + JSON.stringify(b));
+                assert.ok(b.term && b.label === 'Show chat' && b.icon === 'chat' && b.menu === 'chat', `${fs}: pressed, it shows the terminal and now says Show chat with a chat icon (the row's word is the view it shows: chat): ` + JSON.stringify(b));
                 await ev(`document.getElementById('live-view-switch-menu').click(); true`);
                 assert.equal((await sw()).label, 'Show terminal', `${fs}: pressed again, it is back to the chat and says Show terminal`);
                 await ev(`document.getElementById('agent-bar-more').click(); true`);
@@ -58,7 +58,7 @@ const { coralReady } = require('./helpers/wait');
                 assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, `${fs}: one centre line, the back, switch and ⋯ on one row: ` + JSON.stringify(m.shown));
             }
             if (fs === 16) {
-                assert.ok(m.header.b - m.header.t <= 60, `100%: the row is about 56 px: ` + JSON.stringify(m.header));
+                assert.ok(m.header.b - m.header.t <= 100, `100%: the name row and the four-button row under it are about 90 px (#21257, the Operator's shot): ` + JSON.stringify(m.header));
                 assert.ok(m.under && m.under.inView && !m.under.inHeader && !m.under.inDetails, `100%: the chat starts right under the row: ` + JSON.stringify(m.under));
                 assert.ok(m.detailsH <= 1, `100%: Details is closed under the row: ${m.detailsH}`);
             }
@@ -78,9 +78,9 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(m.detailsOpen && m.detailsH > 10, `${fs}: the Details are open (folder, model): ${m.detailsH}`);
             await shot(`phone-one-row-more-${fs}`);
             await ev(`document.getElementById('agent-bar-more').click(); true`);
-            await waitFor(`!document.getElementById('agent-phone-details').open && document.getElementById('chat-find-btn').getBoundingClientRect().width === 0`, `${fs}: ⋯ again puts them away`, 4000);
+            await waitFor(`!document.getElementById('agent-phone-details').open`, `${fs}: ⋯ again puts the Details away`, 4000);
             m = await rects();
-            assert.ok(m.more.length === 0 && !m.detailsOpen, `${fs}: ⋯ again puts them away`);
+            assert.ok(m.more.length === 2 && !m.detailsOpen, `${fs}: ⋯ again puts the Details away; the row of buttons stays (#21257)`);
             console.log(`   390@${fs}: ok`);
         }
         // a computer: the top bar stays, the header is its one row and Details has no row of its own (the operator, #11056): ⋯ opens the facts as a card over the chat, nothing under it moves, and the paused chip overlaps no header text

@@ -30,7 +30,7 @@ if (process.platform === 'win32') { console.log('phone_touch_targets_12978_brows
             const hit = (x, y) => { const e = document.elementFromPoint(x, y); return !!e && (e === b || b.contains(e)); };
             const side = x => {
                 if (x < 0 || x >= innerWidth || cy < 0 || cy >= innerHeight) return { sampled: false, reason: 'viewport' };
-                const neighbour = controls.find(c => { if(c === b || b.contains(c) || c.contains(b)) return false; const q=c.getBoundingClientRect();return x>=q.left&&x<q.right&&cy>=q.top&&cy<q.bottom; });
+                const neighbour = controls.find(c => { if(c === b || b.contains(c) || c.contains(b)) return false; const q=c.getBoundingClientRect();if (!(x>=q.left&&x<q.right&&cy>=q.top&&cy<q.bottom)) return false; const top = document.elementFromPoint(x, cy); return !!top && (top === c || c.contains(top)); }); // a control under the open panel (the header's row of buttons) is not a neighbour: nothing there can be tapped by mistake
                 if(neighbour) return { sampled: false, reason: 'neighbour: '+name(neighbour) };
                 return { sampled: true, hit: hit(x, cy), x, y: cy };
             };
