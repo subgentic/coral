@@ -117,13 +117,14 @@ function _renderEnforcedLine(line, e, container) {
 // (#4545, Security's #4550): Codex keeps only a sandbox and an approval mode and Antigravity only a mode, so
 // for them a new Deny entry can't be added (an existing one can be removed: it still changes the mode, shown
 // in the line) and shell patterns are marked as not enforced. Coral adds no permission layer of its own.
-// The chips a template, Getting started or a role fills in are a starting point, not a choice (#21363): for Codex on Default (which is Auto: no limits) none is lit, since a lit chip narrows the sandbox; on another Mode or provider they are as given. A chip or the Shell box touched by hand ends this.
+// The chips a template, Getting started or a role fills in are a starting point, not a choice (#21363, #21397): for Codex (Default is Auto: a lit chip narrows the sandbox) and Claude on Default none is lit; on another Mode or provider they are as given. A chip or the Shell box touched by hand ends this.
 function _syncDefaultCaps(container) {
     const d = container._acfCapsDefault, uid = container.dataset.acfUid;
     if (!d || !uid) return;
     const type = container.querySelector('.acf-agent-type')?.value || 'claude';
-    const mode = container.querySelector('.acf-permission-mode')?.value || 'default';
-    const shown = type === 'codex' && mode === 'default' ? null : d;
+    const modeEl = container.querySelector('.acf-permission-mode'), mode = modeEl?.value || 'default';
+    const onDefault = mode === 'default' || (mode === 'auto' && !modeEl?.dataset.pickedByPerson); // the Mode still showing the saved default (Auto for Claude, #5836), not one picked
+    const shown = ['codex', 'claude'].includes(type) && onDefault ? null : d; // Claude and Codex both (#21397): Default asks or runs Auto, nothing narrowed by a pre-ticked box
     _setPermissions(`${uid}-perms`, shown);
     const sum = container.querySelector('.acf-perms-summary');
     if (sum && sum.textContent.startsWith('(')) sum.textContent = `(${[shown?.allow?.length && `${shown.allow.length} allow`, shown?.deny?.length && `${shown.deny.length} deny`].filter(Boolean).join(', ') || 'default'})`; // the count follows the chips
@@ -760,6 +761,7 @@ export function setAgentConfig(containerId, values) {
     const flagsEl = container.querySelector('.acf-flags');
     if (flagsEl) flagsEl.value = _stripPermFlags(v.flags || '');
     const permModeEl = container.querySelector('.acf-permission-mode');
+    const modeWasPicked = !!permModeEl?.dataset.pickedByPerson;
     if (permModeEl) {
         // Extract permission mode from flags if present, otherwise use default from settings
         const flagMode = _permissionModeFromFlags(v.flags || '');
@@ -786,6 +788,7 @@ export function setAgentConfig(containerId, values) {
         }
     }
 
+    if (permModeEl && v.capabilitiesAreDefaults && !modeWasPicked) delete permModeEl.dataset.pickedByPerson; // a role's tools do not make the Mode a pick: it still follows the saved default (#21397)
     container._acfCapsDefault = v.capabilitiesAreDefaults && v.capabilities ? structuredClone(v.capabilities) : null; // from a template, Getting started or a role, not a saved choice (#21363)
     if (uid) _setPermissions(`${uid}-perms`, v.capabilities || null);
     _syncEnforcement(container);
