@@ -1,3 +1,4 @@
+const { draftReviewStub } = require('./helpers/draft_review_stub');
 // Mark up in the file viewer (#12367, the operator: "I don't see any way to markup the image in the window. But I can markup the image I attach to the comment."): a picture opened in the viewer has Mark up (a button beside
 // Comments on a computer, an item of the ⋯ menu on a phone); it opens the comment composer's drawing tool on the file's own image; Done starts a comment on the whole file with the marked copy in its tray and the text box ready
 // (the panel, a phone's sheet, opens on it); Cancel changes nothing; the file itself is never changed. A text file has no Mark up. Real drawing (mouse, touch) at 1280 and 390 px; the comments API stubbed.
@@ -56,7 +57,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`try { localStorage.removeItem('coral-artifact-comments-open'); } catch {} true`);
-            await ev(STUB);
+            await ev(STUB); await ev(draftReviewStub(HEX));
             await ev(`(async () => { const c = Object.assign(document.createElement('canvas'), { width: 240, height: 140 }), x = c.getContext('2d'); x.fillStyle = '#2d6a4f'; x.fillRect(0, 0, 240, 140); x.fillStyle = '#fff'; x.fillRect(40, 30, 160, 80); window.__pic = await new Promise(r => c.toBlob(r, 'image/png')); return true; })()`);
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'screenshot.png', mediaType: 'image/png' }); return true; })()`);
             await waitFor(`!!document.querySelector('#artifact-viewer .image-panes img')`, at + 'the picture', 8000);
@@ -74,7 +75,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             const open = async () => { await ev(`${markBtn}.click(); true`); await waitFor(`!!${dlg} && ${dlg}.open && !!document.querySelector('.markup-canvas')`, at + 'the editor opens on the picture', 8000); };
             // Cancel: nothing changes
             await open(); await ev(`[...document.querySelectorAll('.markup-foot button')].find(b => b.textContent === 'Cancel').click(); true`); await waitFor(`!${dlg}`, at + 'Cancel closes it', 5000);
-            assert.deepEqual([await ev(`window.__up.length`), await ev(`!!document.querySelector('.ac-input')`)], [0, false], at + 'Cancel uploads nothing and starts no comment');
+            assert.deepEqual([await ev(`window.__up.length`), await ev(`!!document.querySelector('.ac-composer[data-idle-whole]') && document.querySelector('.ac-input').value === '' && window.__draftWrites.length === 0`)], [0, true], at + 'Cancel uploads nothing and starts no comment');
             // Done with a stroke
             if (mobile) await ev(`document.querySelector('#artifact-viewer .artifact-viewer-more').click(); true`);
             await open();
@@ -88,10 +89,10 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await ev(framesJs(25)); await shot('viewer-markup-comment-' + w); // the sheet has slid in
             // Send: a comment on the whole file naming the picture
             await ev(`(() => { const t = document.querySelector('.ac-input'); t.value = 'See the arrow'; t.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('.ac-send').click(); return true; })()`);
-            await waitFor(`window.__posts.length === 1`, at + 'the comment is sent', 6000);
-            const posted = await ev(`window.__posts[0]`);
+            await waitFor(`window.__draftWrites.length === 1`, at + 'the comment is sent', 6000);
+            const posted = await ev(`window.__draftWrites[0].body`);
             assert.ok(posted.anchor && posted.anchor.whole === true && posted.images && posted.images.length === 1 && posted.body === 'See the arrow', at + 'a comment on the whole file with the picture: ' + JSON.stringify(posted));
-            assert.ok(await ev(`!window.__posts.some(p => !p.body) && window.__up.every(u => u.method === 'POST')`), at + 'only the comment and its picture were written: the file is not changed');
+            assert.ok(await ev(`window.__posts.length === 0 && !window.__draftWrites.some(p => !p.body.body) && window.__up.every(u => u.method === 'POST')`), at + 'only the comment and its picture were written: the file is not changed');
             // someone who can read the comments but not write them does not see Mark up at all (#12394): not a toast after the press
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click(); window.__viewOnly = true; true`);
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'screenshot.png', mediaType: 'image/png' }); return true; })()`);

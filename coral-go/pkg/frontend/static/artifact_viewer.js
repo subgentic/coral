@@ -275,10 +275,10 @@ function _build() {
     const phone = matchMedia('(max-width: 768px)'), dock = () => {
         const q = x => d.querySelector(x), foot = q('.artifact-viewer-foot'), actions = q('.artifact-viewer-actions'), chips = q('.artifact-viewer-chips');
         const approve = q('.artifact-review-approve'), changes = q('.artifact-review-changes'), toggle = q('.ac-toggle');
-        if (phone.matches) { foot.prepend(...[approve, changes].filter(Boolean)); if (toggle) q('.artifact-viewer-header').insertBefore(toggle, q('.artifact-viewer-morewrap')); }
+        if (phone.matches && !(d.hasAttribute('data-document-review') && d.classList.contains('av-draft-document'))) { foot.prepend(...[approve, changes].filter(Boolean)); if (toggle) q('.artifact-viewer-header').insertBefore(toggle, q('.artifact-viewer-morewrap')); }
         else { if (toggle) actions.prepend(toggle); actions.append(...[approve, changes].filter(Boolean)); }
     };
-    dock(); phone.addEventListener('change', dock);
+    dock(); phone.addEventListener('change', dock); d.addEventListener('av-review-layout', dock);
     // Back or Forward changes the page under the viewer (#3532 routes): close it with the page.
     window.addEventListener('popstate', () => { if (!_overlay) closeArtifactViewer(); }); // on a phone the viewer has its own history entry (overlay_history.js)
     document.body.appendChild(d);
@@ -351,7 +351,7 @@ async function offerMarkdownEdit(d, hex, opts, gen) {
 }
 async function startMarkdownEdit(d) {
     const granted = _editCapability; if (!granted || _editor || _editOpening || _editSend || _sendOpening) return;
-    const commentDraft = d.querySelector('.ac-composer');
+    const commentDraft = d.querySelector('.ac-composer:not([data-idle-whole])');
     if (commentDraft) { _comments.setSheet(true); commentDraft.querySelector('textarea')?.focus(); importOnce('./notifications.js').then(n => n.showToast('Send or cancel your comment before editing this document.', true)).catch(() => {}); return; }
     const gen = _gen, button = d.querySelector('.artifact-viewer-edit'); _editOpening = true; d.querySelector('.artifact-edit-send-action').disabled = true;
     d.querySelectorAll('.artifact-viewer-edit,.artifact-viewer-edit-item').forEach(b => { b.disabled = true; }); button.textContent = 'Opening editor…'; _editAbort?.abort(); _editAbort = new AbortController();
@@ -641,7 +641,7 @@ export async function openBundledDocument({ title, url, name, onOpened }) {
  function closeArtifactViewer(opts = {}) {
     _openIntent++;
     if (!_dialog || _dialog.hidden) return;
-    const active = _editor || _editSend;
+    const active = _editor || _editSend || _comments;
     if (active && !opts.confirmed) {
         const confirmed = { ...opts, confirmed: true };
         if (active.beforeLeave(() => closeArtifactViewer(confirmed))) {

@@ -14,6 +14,9 @@ const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a cora
 const { createAsk } = await importOnce('./artifact_comment_ask.js');
 await loadStyles('artifact_passage.css'); // the focus of the document and of a passage chosen by keyboard (#15173): not in the start CSS (page_weight)
 const { createComposer } = await importOnce('./artifact_comment_composer.js');
+const { createDraftReview } = await importOnce('./artifact_review_drafts.js');
+const { showConfirmModal } = await importOnce('./confirm_dialog.js');
+const { draftPanel } = await importOnce('./artifact_review_drafts_panel.js');
 const { createHighlights } = await importOnce('./artifact_comment_highlights.js');
 import { showToast } from './utils.js';
 import { scrollBehavior } from './motion.js';
@@ -102,6 +105,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     resizer.addEventListener('dblclick', () => setWidth(AC_DEFAULT_W));
     window.addEventListener('resize', () => { if (host.isConnected && host.style.getPropertyValue('--ac-w')) setWidth(currentWidth(), false); });
     setWidth(savedWidth, false);
+    const reviewBar = el('div', 'ac-draft-bar'); reviewBar.hidden = true; host.after(reviewBar);
     host.append(resizer, panel); if (!opts.toggleHost) (dialog.querySelector('.artifact-viewer-actions') || dialog.querySelector('.artifact-viewer-header'))?.prepend(toggle);
     dialog.append(selBtn);
     // A live region for what the panel does (a comment posted, resolved, the one stepped to): outside the panel, which is out of the accessibility tree while the phone's sheet is shut.
@@ -112,7 +116,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     // The document is a region a keyboard reaches; ] and [ step through the comments from it. (While an artifact is on show: the docked pane's body also draws files and images.)
     const region = (on) => { if (on) { body.tabIndex = 0; body.setAttribute('role', 'region'); body.setAttribute('aria-label', 'Document'); body.setAttribute('aria-keyshortcuts', '] ['); } else { for (const a of ['tabindex', 'role', 'aria-label', 'aria-keyshortcuts']) body.removeAttribute(a); } };
     const phone = window.matchMedia(PHONE_QUERY);
-    const sheet = opts.sheet || (() => phone.matches); // the panel is a bottom sheet over the document
+    const sheet = opts.sheet || (() => phone.matches && !dialog.hasAttribute('data-document-review')); // the panel is a bottom sheet over the document
     const isOpen = () => panel.classList.contains('ac-sheet-open');
     const focusInput = () => { const i = panel.querySelector('.ac-input'); i?.focus(); i?.scrollIntoView({ block: 'nearest' }); }; // the box that opened is where the person looks: a long thread no longer leaves it below the fold (#15119)
     const preferenceKey = () => opts.preferenceKey ? opts.preferenceKey() : OPEN_KEY;
@@ -157,6 +161,15 @@ export function attachComments(dialog, body, host, opts = {}) {
         try {
             const data = sourcePolicy(await api.listComments(hex, st.server, st.board, st.series));
             if (hex !== st.hex || gen !== ctxGen) return;
+            if (/^[a-f0-9]{64}$/.test(hex) && !st.video && !opts.readOnly?.()) {
+                if (!st.reviewDrafts) st.reviewDrafts = createDraftReview({ hex, server: st.server, board: st.board });
+                try {
+                    const drafts = await st.reviewDrafts.refresh();
+                    if (drafts && !drafts.can_write) { data.canComment = false; data.reason ||= 'Draft comments cannot be changed here. Your saved drafts stay private.'; }
+                }
+                catch (e) { data.canComment = false; data.reason ||= 'Private draft comments could not be loaded. Retry before adding a comment.'; }
+                if (hex !== st.hex || gen !== ctxGen) return;
+            }
             st.data = data; st.gone = false;
             if (!st.visibilitySet) {
                 st.visibilitySet = true;
@@ -183,7 +196,14 @@ export function attachComments(dialog, body, host, opts = {}) {
         const gen = ctxGen, hex = st.hex, server = st.server, board = st.board, series = st.series; liveBusyGen = gen;
         try {
             const data = sourcePolicy(await api.listComments(hex, server, board, series));
-            if (gen !== ctxGen || hex !== st.hex || server !== st.server || board !== st.board || series !== st.series || !st.data || sigOf(data) === sigOf(st.data) || panelSelection()) return; // selected text waits: the next tick draws what changed once it is let go
+            const priorDrafts = JSON.stringify(st.reviewDrafts?.snapshot().data);
+            if (st.reviewDrafts && !st.reviewDrafts.snapshot().busy) {
+                try { await st.reviewDrafts.refresh(); }
+                catch { data.canComment = false; data.reason ||= 'Private draft comments could not be loaded. Retry before adding a comment.'; }
+            }
+            if (st.reviewDrafts && !st.reviewDrafts.snapshot().data?.can_write) { data.canComment = false; data.reason ||= 'Draft comments cannot be changed here. Your saved drafts stay private.'; }
+            const draftsChanged = priorDrafts !== JSON.stringify(st.reviewDrafts?.snapshot().data);
+            if (gen !== ctxGen || hex !== st.hex || server !== st.server || board !== st.board || series !== st.series || !st.data || (!draftsChanged && sigOf(data) === sigOf(st.data)) || panelSelection()) return; // selected text waits: the next tick draws what changed once it is let go
             const added = data.comments.filter(c => !c.deleted).length - st.data.comments.filter(c => !c.deleted).length, top = panel.scrollTop;
             const ta = document.activeElement && document.activeElement.matches?.('.ac-input') && panel.contains(document.activeElement) ? document.activeElement : null, sel = ta ? [ta.selectionStart, ta.selectionEnd, ta.selectionDirection] : null; // the caret of a comment being written
             st.data = data; render(); paint(); panel.scrollTop = top;
@@ -216,9 +236,13 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (target) { if (!target.matches('button, textarea, a')) target.tabIndex = -1; target.focus({ preventScroll: true }); }
     }
     function render() {
+        const wasDraftDocument = dialog.classList.contains('av-draft-document');
+        const draftDocument = !!st.reviewDrafts?.snapshot().data?.drafts_supported;
+        dialog.classList.toggle('av-draft-document', draftDocument);
+        if (wasDraftDocument !== draftDocument) dialog.dispatchEvent(new Event('av-review-layout'));
         syncPassageStop();
         const kept = focusKey();
-        panel.replaceChildren();
+        panel.replaceChildren(); reviewBar.replaceChildren(); reviewBar.hidden = true;
         const show = (st.text || st.whole) && !st.gone && !!st.data;
         panel.hidden = !show; st.shownNow = show; syncToggle();
         syncOn();
@@ -290,13 +314,17 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length && !opts.compact) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one, or Tab to the document and press Enter to choose a passage.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
+        if (!shownAll.length && !opts.compact && !st.reviewDrafts?.snapshot().data?.count) wrap.append(el('p', 'empty-state empty-state-tight', !d.canComment ? 'No open comments.' : st.text ? 'No open comments. Select some text to add one, or Tab to the document and press Enter to choose a passage.' : opts.words?.empty || 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
+        if (st.reviewDrafts) panel.append(draftPanel({ review: st.reviewDrafts, run, refresh, server: st.server, composing: !!st.composing, bar: reviewBar }));
         const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked && !askedNow(c.id).size); // one an agent already has is not offered again (#20240)
         if (st.bulkSent) { const b = st.bulkSent, who = b.agents.join(', '); const done = el('p', 'ac-send-done', `Sent ${plural(b.total, 'open comment')}${b.of > b.total ? ` of ${b.of}` : ''} to ${who}${b.queued ? ` (delivers when ${b.agents.length === 1 ? who : 'the agent'} is free)` : b.messages > 1 ? `, in ${b.messages} messages because of the size limit of one` : ', in one message'}. Each comment says where it stands.`); done.setAttribute('role', 'status'); panel.append(done); }
-        if (sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, st.bulkSent ? 'remaining open comment' : 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
+        if (!st.reviewDrafts?.snapshot().data?.drafts_supported && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, st.bulkSent ? 'remaining open comment' : 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
-        else if (d.canComment && !d.locked && !opts.compact) {
+        else if (st.reviewDrafts && d.canComment && !d.locked && !opts.compact) {
+            st.wholeComposer ||= { anchor: { whole: true } };
+            panel.append(composer(undefined, st.wholeComposer));
+        } else if (d.canComment && !d.locked && !opts.compact) {
             const whole = btn('ac-whole', st.video ? 'Comment at playhead' : opts.words?.whole || 'Comment on the whole document'); whole.addEventListener('click', () => { const time = st.video?.current(); st.composing = { anchor: opts.wholeAnchor ? opts.wholeAnchor() : { whole: true }, ...time, ...(time ? { timeLabel: stampRange(time) } : {}) }; st.error = ''; render(); focusComposer(); });
             panel.append(whole);
         }
@@ -386,7 +414,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); focusComposer(); }));
         if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen(`Delete this comment?${(() => { const read = [...new Set((c.asks || []).filter(k => k.agent && (k.seen || k.readAt || k.replies)).map(k => k.agent))]; return read.length ? ` ${read.join(' and ')} already read it, and keeps what it read.` : ''; })()}`, () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub. Hidden while an ask is queued (sent but not yet read or replied: the status line says where it stands, and the button would just confuse; #17734).
-        if (top && canAsk(c) && !(c.asks || []).some(k => k.open && k.agent && !k.replies && !(k.readAt || k.seen))) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
+        if (!st.reviewDrafts?.snapshot().data?.drafts_supported && top && canAsk(c) && !(c.asks || []).some(k => k.open && k.agent && !k.replies && !(k.readAt || k.seen))) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
         if (top && st.ranges.has(c.id)) { const j = btn('ac-jump', 'Show in text', `Show the text of the comment by ${who} in the document`); j.addEventListener('click', () => jumpTo(c.id)); row.append(j); }
         return row;
@@ -399,7 +427,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (st.busy) return;
         st.busy = true;
         const hadKeys = panel.contains(document.activeElement); // the keyboard was in the comment box: it must not be dropped on the page when the box goes (#15174)
-        try { const sentTo = await fn(); st.error = ''; st.composing = null; await refresh(); if (hadKeys && (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected)) (panel.querySelector(`.ac-card[data-id="${st.active}"] .ac-replybox`) || panel.querySelector('.ac-card .ac-replybox') || toggle).focus(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : sentTo && sentTo.queuedFor ? `. Queued for ${sentTo.queuedFor}, delivers when it's free` : '')); if (typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); else if (sentTo && sentTo.queuedFor) showToast(`Queued for ${sentTo.queuedFor}, delivers when it's free`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
+        try { const sentTo = await fn(); st.error = ''; st.composing = null; st.wholeComposer = null; await refresh(); if (hadKeys && (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected)) (panel.querySelector(`.ac-card[data-id="${st.active}"] .ac-replybox`) || panel.querySelector('.ac-card .ac-replybox') || toggle).focus(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : sentTo && sentTo.queuedFor ? `. Queued for ${sentTo.queuedFor}, delivers when it's free` : '')); if (typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); else if (sentTo && sentTo.queuedFor) showToast(`Queued for ${sentTo.queuedFor}, delivers when it's free`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
         catch (e) { st.error = e.message || 'The change was refused.'; showToast(st.error, true); render(); }
         finally { st.busy = false; }
     }
@@ -491,7 +519,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const box = (dialog.querySelector('.artifact-viewer-content') || dialog).getBoundingClientRect(), wide = selBtn.offsetWidth || 120, tall = selBtn.offsetHeight || 36, lo = Math.max(8, box.left + 8), hi = Math.min(window.innerWidth - 8, box.right - 8) - wide;
         let x = Math.max(lo, Math.min(s.rect.right - 40, hi)), below = s.rect.bottom + 6, y = below + tall <= Math.min(window.innerHeight, box.bottom) - 8 ? below : Math.max(8, s.rect.top - tall - 6);
         const foot = window.matchMedia?.('(pointer: coarse)').matches && dialog.querySelector('.artifact-viewer-foot'); // a touch screen (walk 11 M3): not over the lines under the selection, but above the bar, on the right
-        if (foot) { const h = selBtn.offsetHeight || 44, w = selBtn.offsetWidth || 110, t = foot.getBoundingClientRect().top - h - 8; x = window.innerWidth - w - 12; y = s.rect.bottom + 6 > t - 4 ? Math.max(8, s.rect.top - h - 6) : t; }
+        if (foot) { const bottom = foot.getClientRects().length ? foot.getBoundingClientRect().top : reviewBar.getClientRects().length ? reviewBar.getBoundingClientRect().top : box.bottom; const h = selBtn.offsetHeight || 44, w = selBtn.offsetWidth || 110, t = bottom - h - 8; x = window.innerWidth - w - 12; y = s.rect.bottom + 6 > t - 4 ? Math.max(8, s.rect.top - h - 6) : t; }
         selBtn.style.left = x + 'px'; selBtn.style.top = y + 'px';
     }
     document.addEventListener('selectionchange', () => { if (!shown()) return; clearTimeout(selTimer); selTimer = setTimeout(syncSelButton, 120); });
@@ -572,6 +600,12 @@ export function attachComments(dialog, body, host, opts = {}) {
     return {
         /** The Comments button in either layout: the owner places it when toggleHost was given. */
         toggle,
+        beforeLeave(leave) {
+            const count = st.reviewDrafts?.snapshot().data?.count || 0;
+            if (!count) return false;
+            showConfirmModal('Leave document?', 'Your drafts stay saved. No comments have been sent. You can continue this review from the Inbox.', leave, undefined, { label: 'Leave and keep drafts', cancelLabel: 'Back to review', danger: false });
+            return true;
+        },
         /** Open a newly sent edit's existing artifact thread without discarding a composer. */
         async showThread(id) {
             const hex = st.hex, gen = ctxGen; await refresh();
@@ -584,7 +618,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */
         // The computer whose artifact it is: the caller's, else the one on show (the rule renderArtifact reads the content by); a bare /api/ route is the hub's own and 404s there (#6245).
-        open(hex, server, board, series = false) { liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composeLater = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); importOnce('./open_link.js').then(m => { st.wantThread = m.takeThread('coral://artifacts/' + hex); }).catch(() => {}); },
+        open(hex, server, board, series = false) { st.reviewDrafts?.close(); st.reviewDrafts = null; liveStart(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composeLater = null; st.composing = null; st.wholeComposer = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); importOnce('./open_link.js').then(m => { st.wantThread = m.takeThread('coral://artifacts/' + hex); }).catch(() => {}); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
         /** The document drawn is not text the comments can point into (HTML in its frame, a picture, a PDF, a table, a video, a download): the panel is there for a comment on the whole document. */
         /** Mark up in the viewer (#12367): the marked copy of the picture on show starts a comment on the whole file, in the tray with the text box ready, and the panel (a phone's sheet) opens on it. Resolves false when this person cannot comment here. */
@@ -623,6 +657,6 @@ export function attachComments(dialog, body, host, opts = {}) {
             refresh();
         },
         docRendered(source, text) { st.source = source || ''; st.text = !!text; if (!st.text) { render(); return; } region(true); refresh(); },
-        close() { liveStop(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; st.composeLater = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
+        close() { st.reviewDrafts?.close(); st.reviewDrafts = null; liveStop(); st.lifetime++; resetAsk(); st.video?.close(); st.video = null; st.videoTime = null; dialog.classList.remove('avc-video'); hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; st.composeLater = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
     };
 }

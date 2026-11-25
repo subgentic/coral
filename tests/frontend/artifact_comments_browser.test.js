@@ -1,3 +1,4 @@
+const { draftReviewStub } = require('./helpers/draft_review_stub');
 // Comments in the artifact viewer (#5182, phase 1), against a stubbed comments API that answers the way the server's one policy does (the routes are #5176's; the real server is run with them
 // in the stack's own suites). Desktop and a 390 px phone: the panel lists threads with their quote, author, time, lines and state; the highlights are drawn for quotes that are found and an
 // orphaned one says "text changed"; a selection shows a Comment button, the composer shows the quote and posts it with its context; reply, edit your own, resolve and reopen, delete your own (after a
@@ -58,7 +59,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
     const settled = sel => waitStable(ev, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return ''; const r = e.getBoundingClientRect(); return [r.top, r.bottom, r.left, r.right].map(Math.round).join(); })()`, `${sel} to stop moving`, 150);
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height) }; })()`);
     const open = async (extra, opts = {}) => {
-        await ev(STUB);
+        await ev(STUB); await ev(draftReviewStub(HEX));
         if (extra) await ev(extra);
         await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, ${JSON.stringify({filename:'plan.md',...opts})}); return true; })()`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
@@ -185,21 +186,23 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 await click('.ac-selbtn');
                 await waitFor(`!!document.querySelector('.ac-composer .ac-input')`, 'the composer', 3000);
                 const hint = await ev(`(document.querySelector('.ac-composer .ac-hint:not([hidden])') || {}).textContent || ''`);
-                check(`${at}: ${waiting ? 'a file waiting for review says only what is always true: writing here does not approve it' : 'after Approve there is no hint'}`, waiting ? hint === 'To approve, use Approve on the file: writing here does not approve it.' : hint === '', hint);
+                check(`${at}: ${waiting ? 'a file waiting for review says only what is always true: writing here does not approve it' : 'after Approve there is no hint'}`, hint === '' && !!(await ev(`document.querySelector('.ac-draft-save-hint')`)), hint);
                 const described = await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'), h = document.querySelector('.ac-composer .ac-hint'); return { by: t.getAttribute('aria-describedby'), id: h && h.id }; })()`);
-                check(`${at}: the box is described by the hint only while it shows (${waiting ? 'waiting' : 'not waiting'})`, waiting ? !!described.id && (described.by || '').split(' ').includes(described.id) : !/ac-hint-/.test(described.by || ''), // the send hint (Ctrl+Enter) always describes the box too (#15231)
+                check(`${at}: the box is described by the hint only while it shows (${waiting ? 'waiting' : 'not waiting'})`, !/ac-hint-/.test(described.by || ''), // the send hint (Ctrl+Enter) always describes the box too (#15231)
                         JSON.stringify(described));
             }
             await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'Is the lock per table or per database?'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
-            await waitFor(`[...document.querySelectorAll('.ac-card')].some(c => /per table or per database/.test(c.textContent))`, 'the new card', 5000);
-            let call = await ev(`window.__calls.filter(c => c.method === 'POST')[0]`);
+            await waitFor(`[...document.querySelectorAll('.ac-draft-card')].some(c => /per table or per database/.test(c.textContent))`, 'the new card', 5000);
+            let call = await ev(`window.__draftWrites.filter(c => c.method === 'POST')[0]`);
+            check(`${at}: draft save does not publish a comment`, await ev(`!window.__calls.some(c => c.method === 'POST')`));
+            await ev(`fetch('/api/artifacts/${HEX}/comments', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(window.__draftWrites[0].body)}).then(r=>r.json())`);
             check(`${at}: the post carries the body and the anchor with its context`, call.body.body === 'Is the lock per table or per database?' && call.body.anchor.quote === 'write lock on large databases' && /backfill takes a/.test(call.body.anchor.prefix) && /, so it must run/.test(call.body.anchor.suffix), JSON.stringify(call.body.anchor));
             // reply
             await click('.ac-card[data-id="1"] .ac-replybox');
             await shot(`comments-desktop-reply-${theme}`);
             await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'Thanks'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
-            await waitFor(`[...document.querySelectorAll('.ac-reply')].some(c => /Thanks/.test(c.textContent))`, 'the reply', 5000);
-            const rc = (await ev(`window.__calls.filter(c => c.method === 'POST').pop()`)).body;
+            await waitFor(`[...document.querySelectorAll('.ac-draft-card')].some(c => /Thanks/.test(c.textContent))`, 'the reply', 5000);
+            const rc = (await ev(`window.__draftWrites.filter(c => c.method === 'POST').pop()`)).body;
             check(`${at}: a reply is posted with its thread's id and no anchor of its own`, rc.parent_id === 1 && !('anchor' in rc), JSON.stringify(rc));
             // edit own
             await ev(`${topAct(1, 'Edit')}.click(); true`);
@@ -240,10 +243,10 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await ev(`import(${S} + 'state.js').then(m => { m.state.servers=[{id:'box',label:'Box'}];m.state.selectedTeam = '@box/team-x'; return true; })`);
         await open('', {server:'box',board:'team-x'});
         await waitFor(`document.querySelectorAll('.ac-card').length >= 3`, 'cards', 5000);
-        await click('.ac-whole');
+        check('whole-document draft composer is visible', await ev(`!!document.querySelector('.ac-composer .ac-draft-save-hint')`));
         await ev(`(() => { const t = document.querySelector('.ac-composer .ac-input'); t.value = 'On the team'; t.dispatchEvent(new Event('input')); document.querySelector('.ac-composer').requestSubmit(); return true; })()`);
-        await waitFor(`window.__calls.some(c => c.method === 'POST')`, 'the post', 5000);
-        check('opened from a team the list and the post carry its bare board name', (await ev(`window.__calls[0].url`)).includes('board=team-x') && (await ev(`window.__calls.find(c => c.method === 'POST').body.board`)) === 'team-x');
+        await waitFor(`window.__draftWrites.some(c => c.method === 'POST')`, 'the private draft', 5000);
+        check('opened from a team the list and the post carry its bare board name', (await ev(`window.__calls[0].url`)).includes('board=team-x') && (await ev(`window.__draftWrites.find(c => c.method === 'POST').body.board`)) === 'team-x');
 
         // text, never markup
         await load(1280, 800, false, 'dark');
@@ -256,7 +259,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await load(1280, 800, false, 'light');
         await open(`window.__role = 'hubview'; true`);
         await waitFor(`document.querySelectorAll('.ac-card').length >= 3`, 'cards', 5000);
-        const ro = await ev(`({ reason: (document.querySelector('.ac-readonly') || {}).textContent, composer: !!document.querySelector('.ac-composer'), acts: document.querySelectorAll('.ac-act').length, whole: !!document.querySelector('.ac-whole'), lock: !!document.querySelector('.ac-lock') })`);
+        const ro = await ev(`({ reason: (document.querySelector('.ac-readonly') || {}).textContent, composer: !!document.querySelector('.ac-composer'), acts: document.querySelectorAll('.ac-act').length, whole: !!document.querySelector('.ac-composer .ac-draft-save-hint'), lock: !!document.querySelector('.ac-lock') })`);
         await select('write lock on large databases'); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the selection button waits a beat after the selection changes
         check('a read-only viewer gets the reason, no action buttons, no composer, no whole-document button, no lock', /view only/.test(ro.reason) && !ro.composer && ro.acts === 0 && !ro.whole && !ro.lock, JSON.stringify(ro));
         check('and a selection shows no Comment button', await ev(`document.querySelector('.ac-selbtn').hidden`));
@@ -326,7 +329,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         const ul = await ev(`(() => { const b = document.querySelector('.ac-lock'); return { label: b.getAttribute('aria-label'), pressed: b.getAttribute('aria-pressed'), glyph: b.querySelector('.material-icons').textContent, title: b.title, note: !!document.querySelector('.ac-lock-note'), text: b.textContent.replace(b.querySelector('.material-icons').textContent, '').trim(), focused: document.activeElement === b }; })()`);
         check('unlocked: the same icon is an open lock, not pressed, named Lock comments, with the explanation as its tip and no note box (#13578)', ul.label === 'Lock comments' && ul.pressed === 'false' && ul.glyph === 'lock_open' && /Locking stops anyone adding comments to this file\. You can unlock it any time/.test(ul.title) && !ul.note && ul.text === '', JSON.stringify(ul));
         check('and focus stays on the lock after it flips', ul.focused, JSON.stringify(ul));
-        check('Unlock sends DELETE .../lock and the panel is writable again', /\/lock$/.test((await ev(`window.__calls.filter(c => c.method === 'DELETE').pop()`)).url) && !!(await ev(`!!document.querySelector('.ac-whole')`)));
+        check('Unlock sends DELETE .../lock and the panel is writable again', /\/lock$/.test((await ev(`window.__calls.filter(c => c.method === 'DELETE').pop()`)).url) && !!(await ev(`!!document.querySelector('.ac-composer .ac-draft-save-hint')`)));
 
         // no comments routes: the viewer is as it was
         await load(1280, 800, false, 'dark');
@@ -343,7 +346,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         check('no comments: closed, "Comments", the document has the whole width', zero.text === 'Comments' && zero.expanded === 'false' && !zero.panelShown && !zero.wide && zero.body >= zero.content - 4, JSON.stringify(zero));
         await click('.ac-toggle');
         await waitFor(`document.querySelector('.ac-panel').getClientRects().length > 0`, 'the panel opening with no comments', 3000);
-        check('no comments: opened by the button, "Comment on the whole document" is in the panel', await ev(`!!document.querySelector('.ac-panel .ac-whole')`));
+        check('no comments: opened by the button, "Comment on the whole document" is in the panel', await ev(`!!document.querySelector('.ac-panel .ac-draft-save-hint')`));
 
         // the phone
         for (const theme of ['dark', 'light']) {
@@ -378,7 +381,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             const au = await auditRegion(ev, ['.ac-panel']);
             check(`${at}: the sheet reads at 4.5:1`, au.fails.length === 0, JSON.stringify(au.fails.slice(0, 2)));
             await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-            await waitFor(`!!document.querySelector('.ac-composer') === false || document.getElementById('artifact-viewer').hidden`, 'Escape closing the composer or the viewer', 3000);
+            await waitFor(`!!document.querySelector('.ac-composer:not([data-idle-whole])') === false || document.getElementById('artifact-viewer').hidden`, 'Escape closing the composer or the viewer', 3000);
         }
     } catch (e) {
         console.error(e && e.stack || e);

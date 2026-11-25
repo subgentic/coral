@@ -18,6 +18,7 @@ const STUB = `(() => {
     const c = (id, art, ver, from, carried, quote, body, extra) => ({ id, artifact_id: art, parent_id: null, anchor: { quote }, body, author: who(extra && extra.by || 'Operator'), created_at: at(2), mine: true, can: { reply: true, edit: true, delete: true, resolve: true }, version: ver, ...(from ? { from_version: from, carried } : {}), ...(extra || {}) });
     window.fetch = (u, o) => {
         const url = String(u), method = (o && o.method) || 'GET';
+        if (url.includes('/review-drafts')) return json({ drafts_supported: false, drafts: [], count: 0, revision: 0, can_write: false, can_send: false });
         let m = /\\/api\\/artifacts\\/([0-9a-f]{64})\\/versions/.exec(url);
         if (m) return json(rows);
         m = /\\/api\\/artifacts\\/([0-9a-f]{64})\\/comments(\\/\\d+\\/\\w+)?(\\?.*)?$/.exec(url);

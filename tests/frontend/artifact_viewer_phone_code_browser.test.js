@@ -1,3 +1,4 @@
+const { draftReviewStub } = require('./helpers/draft_review_stub');
 // The file viewer on a phone with a code file (walk 11 M1 to M3, #15267): with Details showing, row one is the name and the ⋯ button, row two Details and Comments, then the chips (no button alone on a row);
 // a long name in a code line wraps instead of being cut at the right edge; Add comment on a touch screen sits above the bar, not over the lines under the selection. 390 px with touch, the routes stubbed (artifact_code_stub).
 // The stub is the versions stub with a JavaScript file in place of the Markdown one.
@@ -18,9 +19,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
         for (const [w, h, mobile] of [[390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-            await ev(STUB);
+            await ev(STUB); await ev(draftReviewStub(H3));
             await ev(`(() => { const orig = window.fetch.bind(window); window.fetch = (u, o) => { const url = String(u);
-                if (/\\/api\\/team-artifacts/.test(url)) return Promise.resolve(new Response(JSON.stringify(window.__reviewFixturePage(u, location.origin, { 'team-a': [{ id: '${H3}', name: 'release-plan.md', available:true,tags: ['for review'], produced_by: 'Writer A', media_type: 'text/markdown', size: 12000, created_at: new Date().toISOString() }] })), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                if (/\\/api\\/team-artifacts/.test(url)) return Promise.resolve(new Response(JSON.stringify(window.__reviewFixturePage(u, location.origin, { 'team-a': [{ id: '${H3}', name: 'release-plan.md', available:true,tags: ['for review'], version: 3, produced_by: 'Writer A', media_type: 'text/markdown', size: 12000, created_at: new Date().toISOString() }] })), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/board\\/team-a\\/artifacts\\?tag=(approved|reviewed)/.test(url)) return Promise.resolve(new Response(JSON.stringify({ artifacts: [], has_more: false }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 if (/\\/api\\/board\\/team-a\\/artifacts\\/[0-9a-f]{64}\\/review/.test(url) && o && o.method === 'POST') return Promise.resolve(new Response(JSON.stringify({ state: 'approved', changed: true, tags: ['approved'], review: { state: 'approved', at: new Date().toISOString() }, delivered: true, to: 'Writer A' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 return orig(u, o); }; return true; })()`);
@@ -38,18 +39,18 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`(() => { const b = document.querySelector('.artifact-viewer-details'); if (b) { b.hidden = false; b.setAttribute('aria-expanded', 'true'); } return true; })()`); // on a phone Details is an item of the ⋯ menu and its button shows only while Details is open (#15033), so open it: the row-two layout is for that state
             await settle(); await shot('viewer-phone-code-' + w);
             const g = await ev(`(() => { const d = document.querySelector('.artifact-viewer-content'), q = s => d.querySelector(s), r = e => e.getBoundingClientRect(), mid = e => Math.round(r(e).top + r(e).height / 2), pre = q('pre.artifact-viewer-text');
-                return { titleTop: mid(q('.artifact-viewer-title')), moreTop: mid(q('.artifact-viewer-more')), detailsTop: mid(q('.artifact-viewer-details')), commentsTop: mid(q('.ac-toggle')), chipTop: mid(q('.av-current')), titleW: Math.round(r(q('.artifact-viewer-title')).width), detailsW: Math.round(r(q('.artifact-viewer-details')).width), commentsW: Math.round(r(q('.ac-toggle')).width), preScroll: pre.scrollWidth, preClient: pre.clientWidth, wrap: getComputedStyle(pre).overflowWrap }; })()`);
+                return { titleTop: mid(q('.artifact-viewer-title')), moreTop: mid(q('.artifact-viewer-more')), detailsTop: mid(q('.artifact-review-close')), commentsTop: mid(q('.artifact-review-changes')), chipTop: mid(q('.artifact-review-breadcrumb')), titleW: Math.round(r(q('.artifact-viewer-title')).width), detailsW: Math.round(r(q('.artifact-review-close')).width), commentsW: Math.round(r(q('.artifact-review-changes')).width), preScroll: pre.scrollWidth, preClient: pre.clientWidth, wrap: getComputedStyle(pre).overflowWrap }; })()`);
             console.log('   ' + JSON.stringify(g));
             assert.ok(Math.abs(g.titleTop - g.moreTop) <= 8, 'row one is the name and the ⋯ button: ' + JSON.stringify(g));
-            assert.ok(Math.abs(g.detailsTop - g.commentsTop) <= 8 && g.detailsTop > g.titleTop + 10, 'Details and Comments share row two, not a button alone on a row: ' + JSON.stringify(g));
-            assert.ok(g.chipTop > g.detailsTop + 10, 'the version chips are under them: ' + JSON.stringify(g));
+            assert.ok(Math.abs(g.detailsTop - g.commentsTop) <= 8 && g.detailsTop > g.titleTop + 10, 'Close document and Request changes share a row in the approved review header: ' + JSON.stringify(g));
+            assert.ok(g.chipTop < g.titleTop && (await ev(`document.querySelector('.artifact-review-breadcrumb').textContent.includes('version 3')`)), 'the visible breadcrumb above the title names version 3: ' + JSON.stringify(g));
             assert.ok(g.titleW >= 250, 'the name has the width of the row beside the ⋯ button: ' + g.titleW);
             assert.ok(g.detailsW >= 44 && g.commentsW >= 44, 'both are touch targets: ' + JSON.stringify([g.detailsW, g.commentsW]));
             assert.ok(g.preScroll <= g.preClient + 1, `a code line wraps at the edge, a long name in it too (it was cut at the right edge): the text is ${g.preScroll} px in a ${g.preClient} px box`);
             // Add comment on a touch screen is not over the lines under the selection (walk 11 M3): it sits above the bar on the right
             await ev(`(() => { const code = document.querySelector('pre.artifact-viewer-text code'), r = document.createRange(), n = code.firstChild; r.setStart(n, 0); r.setEnd(n, 20); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange')); return true; })()`);
             await waitFor(`!document.querySelector('.ac-selbtn').hidden`, `${w}: Add comment shows for a selection`, 4000);
-            const b = await ev(`(() => { const s = document.querySelector('.ac-selbtn').getBoundingClientRect(), sel = getSelection().getRangeAt(0).getBoundingClientRect(), foot = document.querySelector('.artifact-viewer-foot').getBoundingClientRect(); return { top: Math.round(s.top), bottom: Math.round(s.bottom), left: Math.round(s.left), selBottom: Math.round(sel.bottom), footTop: Math.round(foot.top), h: Math.round(s.height) }; })()`);
+            const b = await ev(`(() => { const s = document.querySelector('.ac-selbtn').getBoundingClientRect(), sel = getSelection().getRangeAt(0).getBoundingClientRect(), foot = document.querySelector('.artifact-viewer-content').getBoundingClientRect(); return { top: Math.round(s.top), bottom: Math.round(s.bottom), left: Math.round(s.left), selBottom: Math.round(sel.bottom), footTop: Math.round(foot.bottom), h: Math.round(s.height) }; })()`);
             await shot('viewer-phone-add-comment-' + w);
             assert.ok(b.bottom <= b.footTop, 'Add comment is above the bar: ' + JSON.stringify(b));
             assert.ok(b.top > b.selBottom + 40, 'Add comment is not on the lines under the selection (it was 6 px under them): ' + JSON.stringify(b));

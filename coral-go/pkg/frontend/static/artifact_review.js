@@ -5,6 +5,10 @@ import { boardFetch, identityKey, decisionNeedsPerson, isCloud, commentWritesOn,
 import { showToast, announceNotice } from './notifications.js';
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
+import { browserSession } from './safe_storage.js';
+import { storeKey } from './local_store.js';
+const reviewDrafts = await importOnce('./artifact_review_drafts_api.js');
+const { showConfirmModal } = await importOnce('./confirm_dialog.js');
 const { createComment, sendComment } = await importOnce('./artifact_comments_api.js'); // lazy, as the viewer's other modules: a failure is retried
 const { resultWords } = await importOnce('./artifact_comment_send.js');
 const { createFieldPictures, mountFieldPictures, savedWords } = await importOnce('./field_pictures.js');
@@ -36,9 +40,46 @@ const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' 
 const NOTE_MAX = 500; // characters of the comment that goes with Approve (#11888)
 const CHANGE_WORDS_MAX = 500; // runes of the words sent with Request changes
 async function decide(team, row, decision, reason, note, quiet = false, words = '', olderVersion = false, pictures = {}) {
-    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, ...pictures, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}), ...(olderVersion ? { older_version: true } : {}) }) });
+    let payload = { decision, ...pictures, ...(reason ? { reason } : {}), ...(note ? { note } : {}), ...(quiet ? { quiet: true } : {}), ...(words ? { text: words } : {}), ...(olderVersion ? { older_version: true } : {}) };
+    const hex = rowHex(row), context = splitKey(team);
+    const key = storeKey('coral-review-decision:' + JSON.stringify([team, hex]));
+    if (!quiet && ['approve', 'changes'].includes(decision) && hex) {
+        if (browserSession.get(storeKey('coral-review-send:' + JSON.stringify([context.server || '', context.name || '', hex])))) throw new Error('A comment send is awaiting confirmation. Retry Send comments before making a review decision.');
+        let saved = null;
+        try { saved = JSON.parse(browserSession.get(key) || 'null'); } catch { /* no pending decision */ }
+        if (saved?.send_drafts?.request_id) {
+            if (JSON.stringify({ ...saved, send_drafts: undefined }) !== JSON.stringify({ ...payload, send_drafts: undefined })) throw new Error('An earlier decision is not confirmed. Retry that same decision and words before changing it.');
+            payload = saved;
+        } else {
+            let drafts;
+            try { drafts = await reviewDrafts.readDrafts(hex, context.server, context.name); }
+            catch (e) { if (e.code !== 'drafts_not_supported') throw e; }
+            if (drafts?.drafts_supported && drafts.count > 0) {
+                if (!drafts.can_send) throw new Error('These draft comments cannot be sent here. Your decision and drafts are unchanged.');
+                const verb = decision === 'approve' ? 'Approve' : 'Request changes';
+                const confirmed = await new Promise(resolve => showConfirmModal(`${verb} with draft comments?`, `Send all ${drafts.count} draft comments with this decision as one review message. Going back keeps your drafts.`, () => resolve(true), () => resolve(false), { label: `${verb} and send comments`, cancelLabel: 'Back to review', danger: false }));
+                if (!confirmed) throw new Error('Decision cancelled. Your draft comments stay saved.');
+                payload.send_drafts = { request_id: crypto.randomUUID(), revision: drafts.revision };
+                browserSession.set(key, JSON.stringify(payload));
+            }
+        }
+    }
+    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) { const error = new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`); error.status = r.status; error.code = body.code; throw error; }
+    if (!r.ok) {
+        if (reviewDrafts.reviewRefused(body.code)) browserSession.remove(key);
+        const error = new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`); error.status = r.status; error.code = body.code; throw error;
+    }
+    if (payload.send_drafts) {
+        // A replay is the stored send answer, rather than the first decision's wrapper.
+        if (body.replayed === true && body.request_id === payload.send_drafts.request_id && ['sent', 'queued'].includes(body.status)) body.batch = { ...body };
+        if (!body.batch || !['sent', 'queued'].includes(body.batch.status)) throw new Error('The decision delivery was not confirmed. Retry the same decision to check it.');
+        browserSession.remove(key);
+        // The combined route already published the decision text. Never take the
+        // legacy request-changes fallback and create a second comment/message.
+        body.text_kept = true;
+        if (body.batch.status === 'queued') { body.delivered = false; body.queued = body.to || body.batch.results?.map(result => result.agent).filter(Boolean).join(', ') || 'the agent'; }
+    }
     return body;
 }
 
@@ -268,8 +309,16 @@ export function attachReview(d, { reload }) {
     let deciding = false;
     const syncHold = () => { approve.disabled = approveNote.disabled = deciding || !!d.dataset.contentPending; }; // the new version's content has not rendered: the old text must not sit under 'Approve v2' (#15636)
     d.addEventListener('av-content', () => { syncHold(); syncSend(); }); // the form's own Approve (approveWith, #15545) waits for the new content too
+    const breadcrumb = document.createElement('nav'); breadcrumb.className = 'artifact-review-breadcrumb'; breadcrumb.hidden = true;
+    d.querySelector('.artifact-viewer-header')?.before(breadcrumb);
+    const closeDocument = document.createElement('button'); closeDocument.type = 'button'; closeDocument.className = 'btn artifact-review-close'; closeDocument.textContent = 'Close document'; closeDocument.hidden = true;
+    closeDocument.addEventListener('click', () => d.querySelector('.artifact-viewer-close')?.click());
+    d.querySelector('.artifact-viewer-actions')?.prepend(closeDocument);
     const show = (s) => {
         cur = s; armed = false; draftWarned = false;
+        breadcrumb.hidden = closeDocument.hidden = !s;
+        breadcrumb.textContent = s ? `Inbox › Needs you › ${shown(s.row.name || 'Document')}${s.row.version ? ` · version ${s.row.version}` : ''}` : '';
+        d.toggleAttribute('data-document-review', !!s); d.dispatchEvent(new Event('av-review-layout'));
         form.querySelector('label').textContent = s && s.row.produced_by ? `What should change? ${shown(s.row.produced_by)}, who uploaded this file, will get it.` : 'What should change?'; // the box says who gets the request (walk 17 M13)
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
@@ -318,6 +367,7 @@ export function attachReview(d, { reload }) {
         if (!armed && d.dataset.coversFiles && Number(d.dataset.unopenedFiles) > 0) { armed = true; armedAt = Date.now(); paintApprove(); return; } // covers several files and some were never opened: say so, and ask again
         if (armed && Date.now() - armedAt < 600) return; // a double click is one press: it cannot answer the question it has not shown yet (Security's INFO on #15254)
         const unsent = [...d.querySelectorAll('.ac-composer .ac-input')].find(t => t.value.trim()); // a comment typed and not sent: Approve says so once, and a second press approves without it (#16399)
+        if (unsent && d.querySelector('.ac-review-drafts')) { showToast('Save or cancel the comment you are writing before approving this review.', true); unsent.focus(); return; }
         if (unsent && !draftWarned) { draftWarned = true; showToast('Your comment is not sent yet. Send it first, or press Approve again to approve without it.', true); unsent.focus(); return; }
         draftWarned = false; armed = false;
         deciding = true; syncHold();

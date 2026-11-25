@@ -38,7 +38,9 @@ const (
 	// #18825: the Technical Writer's Getting started guide (v7, approved by the Operator; guide/getting-started.md, 1,244,326 bytes with its nine screenshots inline, up from 395,954) is the first Inbox item of a new install and ships inside the binary: the tree is 7,813,278 bytes; plus 64 KiB, as the test prints. The Operator's standing OK for approved work (not the start-CSS cap).
 	// #20203 approved Inbox v4: lazy footer/message layout and command headers; tree plus 64 KiB under the standing policy. Startup CSS cap is unchanged.
 	// #20468 launch Where step (launch_where.js/css, the new worktree and setup check; standing OK for approved work, start CSS cap untouched): tree 7,963,655, plus 64 KiB.
-	staticBudget = 8_182_784
+	// #21185: private draft review UI brings the tree to about 8.118 MB; plus
+	// 64 KiB rounded up under standing policy. Startup caps are unchanged.
+	staticBudget = 8_184_832
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.

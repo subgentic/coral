@@ -1,3 +1,4 @@
+const { draftReviewStub } = require('./helpers/draft_review_stub');
 // A comment sent to an agent says where the agent has it (#14129, the Operator: "I'd like this to tell me when the agent has read the message"): Sent to A -> Read by A, <time> (the server saw the agent's own read call
 // return the comment: asks[].read_at) -> A replied. Never "unread": a view with no read_at (a guest's, or an older server's) says only Sent. The line moves on by itself while the panel is open (the panel's own poll).
 // 1280 and 390 px. The comments are stubbed at the page's fetch, with the asks the server's view carries. Isolated dev server.
@@ -39,6 +40,7 @@ const COMMENTS = [
                     if (url.includes('/api/artifacts/${HEX}/comments') && m === 'GET') return json({ comments: window.__cs.map(c => ({ ...c, deleted: false, mine: true, can: { reply: true, edit: false, delete: false, resolve: true } })), locked: false, you: { kind: 'owner', can_comment: true, can_lock: true }, limits: {} });
                     if (url.includes('/api/artifacts/${HEX}')) return Promise.resolve(new Response(${JSON.stringify(MD)}, { status: 200, headers: { 'Content-Type': 'text/markdown' } }));
                     return real(u, o); }; return true; })()`);
+            await ev(draftReviewStub(HEX));
             await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', board: 'ask-team' }); return true; })()`);
             await waitFor(`!!document.querySelector('.ac-toggle')`, `${at}the comments toggle`, 8000);
             await ev(`(() => { const t = document.querySelector('.ac-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`);
@@ -65,10 +67,15 @@ const COMMENTS = [
             check(l9 && l9.text === 'Writer J replied (5 times). The agent has reached its reply limit here', `${at}an agent out of replies is said so, in the thread (#15034): ` + JSON.stringify(l9));
             // the Operator's reply that reached no agent says why under the thread (#15034), from the answer to its creation
             await ev(`(() => { const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase(); if (url.includes('/api/artifacts/${HEX}/comments') && m === 'POST') { const c = { id: 30, parent_id: 4, anchor: null, body: 'hello', author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: new Date().toISOString(), deleted: false, mine: true, not_delivered: 'the board is paused', asks: [] }; return Promise.resolve(new Response(JSON.stringify(c), { status: 201, headers: { 'Content-Type': 'application/json' } })); } return real(u, o); }; return true; })()`);
+            const legacyReply = await ev(`fetch('/api/artifacts/${HEX}/comments', {method:'POST',body:JSON.stringify({body:'hello',parent_id:4})}).then(r=>r.json())`);
+            check(legacyReply.not_delivered === 'the board is paused', `${at}the published-comment API retains its non-delivery reason`);
+            await ev(`(() => { const real = window.fetch; window.fetch = (u,o={}) => String(u).includes('/review-drafts') && o.method === 'POST' ? Promise.resolve(new Response(JSON.stringify({code:'board_paused',message:'The board is paused. Your reply was not saved.'}),{status:409,headers:{'Content-Type':'application/json'}})) : real(u,o); return true; })()`);
             await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="4"] .ac-replybox').click(); true`);
             await waitFor(`!!document.querySelector('#artifact-viewer .ac-card[data-id="4"] textarea.ac-input')`, `${at}the reply box opens`, 4000);
             await ev(`(() => { const ta = document.querySelector('#artifact-viewer .ac-card[data-id="4"] textarea.ac-input'); ta.value = 'hello'; ta.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#artifact-viewer .ac-card[data-id="4"] .ac-send').click(); return true; })()`);
-            await waitFor(`(document.querySelector('#artifact-viewer .ac-card[data-id="4"] .ac-ask-status')?.textContent || '').trim() === 'Not delivered: the board is paused'`, `${at}the thread says why the reply went to no agent`, 8000);
+            await waitFor(`(document.querySelector('#artifact-viewer .ac-card[data-id="4"] .ac-error')?.textContent || '').includes('The board is paused')`, `${at}the draft reply says why it was refused`, 8000);
+            check(await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="4"] textarea').value === 'hello' && window.__drafts.length === 0`), `${at}refused draft reply keeps its words and is never delivered`);
+            await ev(`document.querySelector('#artifact-viewer .ac-card[data-id="4"] .ac-cancel').click(); true`);
             check(l1.names.includes('Writer A') && l2.names.includes('Writer B') && l3.names.includes('Writer C'), `${at}each agent's name is its own element (the link to its chat, or its label when it is not running): ` + JSON.stringify([l1.names, l2.names, l3.names]));
             // the line moves on by itself while the panel is open: the agent reads the comment, the next poll draws it
             await ev(`window.__cs[0].asks[0].read_at = new Date().toISOString(); true`);

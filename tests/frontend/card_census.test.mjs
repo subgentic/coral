@@ -18,6 +18,7 @@ export const CARDS = {
     'launch-computer-card': 'regular', // a computer to launch on, in the Hub's Which computer? step (#15014)
     'chief-check-card': 'regular',    // Chief's sources, checks and trigger summaries
     'goal-card': 'regular',           // the New goal screen's Guide and examples (#12724)
+    'ac-draft-card': 'dense',         // a private document review comment (#21185)
     'ac-card': 'dense',               // a comment thread
     'tool-card': 'dense',             // a tool call in the chat
     'machine-health-card': 'dense',   // a machine's health row in About

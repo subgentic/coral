@@ -33,24 +33,25 @@ const { guardSettings } = require('./helpers/settings_guard');
         await ev(`document.querySelector('#artifact-viewer .ac-toggle').click(); true`);
         await waitFor(`(() => { const p = document.querySelector('#artifact-viewer .ac-panel'); return !!p && p.getBoundingClientRect().height > 100; })()`, 'the sheet is open', 8000);
         await ev(framesJs(30));
-        const m = await ev(`(() => { const p = document.querySelector('#artifact-viewer .ac-panel').getBoundingClientRect(), b = document.querySelector('#artifact-viewer .artifact-viewer-body').getBoundingClientRect(), vh = innerHeight; return { sheet: Math.round(p.height), sheetShare: +(p.height / vh).toFixed(2), fileAbove: Math.round(Math.max(0, p.top - b.top)), vh }; })()`);
-        check(m.fileAbove >= m.vh / 5, 'the file keeps a fifth of the screen above the sheet: ' + JSON.stringify(m));
-        check(m.sheetShare <= 0.5, 'the sheet is at most half of the screen: ' + JSON.stringify(m));
+        const m = await ev(`(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-main').getBoundingClientRect(), b = document.querySelector('#artifact-viewer .artifact-viewer-body').getBoundingClientRect(), vh = innerHeight; return { sheet: Math.round(p.height), sheetShare: +(p.height / vh).toFixed(2), fileAbove: Math.round(b.height), vh }; })()`);
+        check(m.fileAbove >= m.vh / 5, 'the scrollable review keeps the whole document available: ' + JSON.stringify(m));
+        check(m.sheetShare <= 1, 'the review workspace fits the screen below the header: ' + JSON.stringify(m));
         // the keyboard up: the box is focused and the screen shrinks to what is left above the keyboard
-        await ev(`document.querySelector('#artifact-viewer .ac-whole').click(); true`);
+        check(await ev(`!!document.querySelector('#artifact-viewer .ac-composer .ac-draft-save-hint')`), 'whole-document draft composer is already visible');
         await waitFor(`!!document.querySelector('#artifact-viewer .ac-composer .ac-input')`, 'the comment box', 8000);
         await ev(`document.querySelector('#artifact-viewer .ac-composer .ac-input').focus(); true`);
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 440, deviceScaleFactor: 1, mobile: true });
         await waitFor(`document.body.classList.contains('keyboard-open')`, 'the page knows the keyboard is up', 8000);
         await ev(framesJs(30));
-        const k = await ev(`(() => { const R = s => { const e = document.querySelector('#artifact-viewer ' + s); if (!e) return null; const r = e.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), shown: e.getClientRects().length > 0 }; }, p = document.querySelector('#artifact-viewer .ac-panel'), vh = innerHeight;
+        await ev(`document.querySelector('#artifact-viewer .ac-composer .ac-input').scrollIntoView({block:'center'}); true`);
+        const k = await ev(`(() => { const R = s => { const e = document.querySelector('#artifact-viewer ' + s); if (!e) return null; const r = e.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), shown: e.getClientRects().length > 0 }; }, p = document.querySelector('#artifact-viewer .artifact-viewer-main'), vh = innerHeight;
             return { vh, sheet: Math.round(p.getBoundingClientRect().height), box: R('.ac-composer .ac-input'), send: R('.ac-composer .ac-send'), scrolls: p.scrollHeight > p.clientHeight + 20, overflowY: getComputedStyle(p).overflowY }; })()`);
         const inView = r => !!r && r.shown && r.top >= 0 && r.bottom <= k.vh;
         check(k.sheet <= k.vh, 'keyboard up: the sheet fits the screen left: ' + JSON.stringify(k));
-        check(inView(k.box) && inView(k.send), 'keyboard up: the comment box and Comment button are on screen: ' + JSON.stringify(k));
-        check(k.scrolls && /auto|scroll/.test(k.overflowY), 'keyboard up: the long thread scrolls inside the sheet: ' + JSON.stringify(k));
-        const sc = await ev(`(() => { const p = document.querySelector('#artifact-viewer .ac-panel'), cards = [...p.querySelectorAll('.ac-card, .ac-comment')], vh = innerHeight; p.scrollTop = 0; const top0 = p.scrollTop; p.scrollTop = p.scrollHeight; const last = cards[cards.length - 1], lr = last && last.getBoundingClientRect(), s = p.querySelector('.ac-composer .ac-send').getBoundingClientRect(); return { moved: p.scrollTop > top0, cards: cards.length, lastShown: !!lr && lr.bottom <= vh && lr.top >= 0, sendBottom: Math.round(s.bottom), vh }; })()`);
-        check(sc.moved && sc.cards >= 6, 'keyboard up: scrolling the sheet moves the thread (' + sc.cards + ' comments): ' + JSON.stringify(sc));
+        check(inView(k.box) && k.send.shown && k.send.bottom > k.send.top, 'keyboard up: the comment box is reachable and Save draft remains in the scrolling workspace: ' + JSON.stringify(k));
+        check(k.scrolls && /auto|scroll/.test(k.overflowY), 'keyboard up: the document and long thread scroll inside the review workspace: ' + JSON.stringify(k));
+        const sc = await ev(`(() => { const p = document.querySelector('#artifact-viewer .artifact-viewer-main'), cards = [...p.querySelectorAll('.ac-card, .ac-comment')], vh = innerHeight; p.scrollTop = 0; const top0 = p.scrollTop; p.scrollTop = p.scrollHeight; const last = cards[cards.length - 1], lr = last && last.getBoundingClientRect(), s = p.querySelector('.ac-composer .ac-send').getBoundingClientRect(); return { moved: p.scrollTop > top0, cards: cards.length, lastShown: !!lr && lr.bottom <= vh && lr.top >= 0, sendBottom: Math.round(s.bottom), vh }; })()`);
+        check(sc.moved && sc.cards >= 6, 'keyboard up: scrolling the workspace moves the thread (' + sc.cards + ' comments): ' + JSON.stringify(sc));
         check(sc.sendBottom <= sc.vh, 'keyboard up: after scrolling to the end the Comment button is still on screen: ' + JSON.stringify(sc));
     } finally {
         if (sname) await api('POST', `/api/sessions/live/${encodeURIComponent(sname)}/kill`, { session_id: sid, agent_type: 'terminal' }).catch(() => {}); // the terminal it launched

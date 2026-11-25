@@ -47,7 +47,12 @@ const DATA = process.env.CORAL_TEST_DATA_DIR || '';
         await ev(`document.querySelector('.ac-selbtn').click(); true`);
         await waitFor(`!!document.querySelector('.ac-panel .ac-input')`, 'the composer', 4000);
         await ev(`(() => { const ta = document.querySelector('.ac-panel .ac-input'); ta.value = 'Try 5,000 rows per batch.'; ta.dispatchEvent(new Event('input', { bubbles: true })); ta.closest('form').requestSubmit(); return true; })()`);
-        await waitFor(`document.querySelectorAll('.ac-panel .ac-card').length === 1`, 'the new card', 6000);
+        await waitFor(`document.querySelectorAll('.ac-panel .ac-draft-card').length === 1`, 'the private draft card', 6000);
+        const privateReview = (await api('GET', `/api/artifacts/${HEX}/review-drafts`)).body;
+        check('the UI saved a private draft with body and selected quote', privateReview.count === 1 && privateReview.drafts[0].body === 'Try 5,000 rows per batch.' && privateReview.drafts[0].anchor.quote === 'backfill in batches of 500 rows');
+        check('saving does not publish the comment', (await list()).comments.length === 0);
+        // Published-comment routes keep their API contract; seed one explicitly for their checks below.
+        await api('POST', `/api/artifacts/${HEX}/comments`, {body: privateReview.drafts[0].body, anchor: privateReview.drafts[0].anchor});
         let d = await list();
         check('the comment is on the server: its body, its quote with the context around it, its author the owner of this computer', d.comments.length === 1 && d.comments[0].body === 'Try 5,000 rows per batch.' && d.comments[0].anchor.quote === 'backfill in batches of 500 rows' && /behind a flag and\s*$/.test(d.comments[0].anchor.prefix) && /^\s*\./.test(d.comments[0].anchor.suffix) && d.comments[0].author.kind === 'owner' && d.comments[0].author.issuer === 'local', JSON.stringify(d.comments[0] && { a: d.comments[0].anchor, au: d.comments[0].author }));
         check('and it says so: mine, with every action the owner has on it', d.comments[0].mine === true && d.comments[0].can.edit && d.comments[0].can.delete && d.comments[0].can.resolve && d.comments[0].can.reply && d.you.can_lock === true);

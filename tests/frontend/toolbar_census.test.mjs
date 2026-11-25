@@ -12,6 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const css = path.resolve(here, '../../coral-go/pkg/frontend/static/css');
 
 export const TOOLBARS = {
+    'ac-draft-bar': 'the full-width document review action row (#21185), using the shared toolbar spacing',
     'toolbar': 'the one toolbar row (layout.css) every instance below carries',
     'list-bar-search-row': 'the list bar every list tab and the Inbox draw',
     'team-tb-chips': 'the chips of the filters that are on, in the list bar row',
