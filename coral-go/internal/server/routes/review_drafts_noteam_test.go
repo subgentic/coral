@@ -103,3 +103,28 @@ func TestDraftsOnANoTeamFileWithNoOneUploaderAreNotSent(t *testing.T) {
 }
 
 const id64tail = "cdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+
+// #21273: the review bar's "To:" names the uploading agent: its display name, cleaned like other agent names; the constant stays when it has none.
+func TestANoTeamTargetCarriesTheUploadersName(t *testing.T) {
+	bh, _, _, id, _ := noTeamNoticeRig(t)
+	_, sh, _, _ := setupSessionsTestServer(t)
+	sh.SetBoardHandler(bh)
+	ctx := context.Background()
+
+	targets, _, why := sh.reviewTargets(ctx, id, noTeamBoardID, nil)
+	require.Empty(t, why)
+	require.Len(t, targets, 1)
+	assert.Equal(t, noTeamReviewTitle, targets[0].title, "no name known: the constant")
+
+	require.NoError(t, sh.ss.SetDisplayName(ctx, noTeamSession, "Report \u202eWriter\n"))
+	targets, _, why = sh.reviewTargets(ctx, id, noTeamBoardID, nil)
+	require.Empty(t, why)
+	require.Len(t, targets, 1)
+	assert.Equal(t, "Report Writer", targets[0].title, "the uploader's name, cleaned")
+	assert.True(t, targets[0].noTeam)
+
+	require.NoError(t, sh.ss.SetDisplayName(ctx, noTeamSession, " \u202e\n"))
+	targets, _, _ = sh.reviewTargets(ctx, id, noTeamBoardID, nil)
+	require.Len(t, targets, 1)
+	assert.Equal(t, noTeamReviewTitle, targets[0].title, "a name that cleans to nothing: the constant")
+}
