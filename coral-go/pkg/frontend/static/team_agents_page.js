@@ -7,7 +7,7 @@ import { loadStyles } from './lazy_styles.js';
 import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
 import { modelName } from './model_labels.js'; // the Model column's words (#16671); the start bundle holds it, so no await in this lazy module (#18160)
-import { boardFetch, inTeam, keyLabel, isCloud, splitKey, sessionServer } from './server_base.js';
+import { boardFetch, inTeam, keyLabel, isCloud, splitKey, sessionServer, serverUrl } from './server_base.js';
 import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
@@ -104,16 +104,23 @@ async function load() {
 }
 
 /** Send the reminder: the message now, as an @mention board message to the agent; with a repeat, also the repeating reminder (POST /reminder). Resolves to { ok, error }. */
-async function sendReminder(agent, { message, seconds }) {
+async function sendReminder(agent, { message, seconds, cron, timezone }) {
     const name = agent.name, team = model.team;
     try {
+        let cronSet = false;
+        if (cron) { // Custom (cron) (#21330): set first, through the person's own reminder route (which holds the line to the server's rules; the Hub does not serve it, so the dialog does not offer Custom there): a refused line sends nothing, so a second try does not repeat the message
+            const { server, name: board } = splitKey(team);
+            const rr = await fetch(serverUrl('/api/reminders', server), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: message, kind: 'cron', at: cron, timezone, board, to: name }) });
+            if (!rr.ok) { const b = await rr.json().catch(() => ({})); return { ok: false, error: `The reminder was not set: ${b && b.error ? b.error : `HTTP ${rr.status}`}` }; }
+            cronSet = true;
+        }
         if (!subscribed.has(team)) {
             const r = await boardFetch(team, '/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, job_title: 'Operator' }) });
             if (r.ok) subscribed.add(team);
         }
         const r = await boardFetch(team, '/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, as: 'Operator', content: `@${name} ${message}` }) });
         if (!r.ok) { const b = await r.json().catch(() => ({})); return { ok: false, error: `Could not remind ${name}: ${b && b.error ? b.error : `HTTP ${r.status}`}` }; }
-        let every = '';
+        let every = cronSet ? `on the cron line ${cron}` : '';
         if (seconds > 0) {
             const rr = await boardFetch(team, '/reminder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: agent.subscriber_id || name, message, interval_seconds: seconds }) });
             if (!rr.ok) { const b = await rr.json().catch(() => ({})); return { ok: false, error: `${name} was reminded, but the repeat was not set: ${b && b.error ? b.error : `HTTP ${rr.status}`}` }; }
@@ -127,7 +134,7 @@ async function sendReminder(agent, { message, seconds }) {
     }
 }
 
-const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSend: (v) => sendReminder(agent, v) });
+const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, custom: !isCloud(), onSend: (v) => sendReminder(agent, v) });
 
 /** The agent's chat: its live session, local or a Hub computer's; null when it has none (an ended agent, a terminal). */
 const openChat = (session) => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server, { focusChat: true }); };

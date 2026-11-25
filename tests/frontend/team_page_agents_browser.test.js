@@ -110,6 +110,41 @@ const TEAM = `qa-agents-${Date.now() % 100000}`;
                 const rem = sent.find(x => /^\/api\/board\/[^/]+\/reminder$/.test(x.p)); assert.ok(rem, 'the repeating reminder is set'); assert.ok(/3600/.test(rem.b), `with an hour's interval (${rem.b})`);
                 assert.equal(await status(), 'Reminded Orchestrator and every hour.', 'the status says and every hour');
             });
+            await S.run(`${label}: Repeat > Custom (cron) shows a cron line with its words and next run, says in one line why a line will not do and turns Remind off, and a good line sets the reminder (POST /api/reminders) before the message goes (#21330)`, async () => {
+                await backToTable(); await openPage('Backend Dev'); await clickRemind('Backend Dev'); await settle(500);
+                const cron = `${inDlg('Backend Dev', 'input', '/^Cron line$/i')}`;
+                assert.equal(await ev(`(() => { const e = ${cron}; return !!e; })()`), false, 'the cron line is not shown until Custom is chosen');
+                await ev(`(() => { const s = ${inDlg('Backend Dev', 'select', '/^Repeat$/i')}; const o = [...s.options].find(o => /^Custom \\(cron\\)$/.test(o.textContent.trim())); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+                await settle(200);
+                const type = v => ev(`(() => { const e = ${cron}; e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                const seen = () => ev(`(() => { const d = ${dlg('Backend Dev')}; const t = sel => { const e = d.querySelector(sel); return e && !e.hidden ? window.__na.text(e).trim() : ''; }; const go = [...d.querySelectorAll('button')].find(b => /^Remind$/.test(window.__na.name(b))); return { words: t('.remind-cron-words'), error: t('.remind-cron-error'), off: go.disabled, invalid: d.querySelector('#remind-cron').getAttribute('aria-invalid') }; })()`);
+                assert.ok(await ev(`!!${cron}`), 'choosing Custom (cron) shows the Cron line field'); assert.equal((await seen()).off, true, 'Remind is off while the line is empty');
+                await type('0 9 * * 1-5'); let v = await seen();
+                assert.match(v.words, /^Weekdays at .+ · next /, `the words and the next run (${v.words})`); assert.equal(v.error, ''); assert.equal(v.off, false, 'Remind is on for a good line');
+                for (const [line, why] of [['* * * * *', /at most every 5 minutes/], ['@reboot', /@words/], ['0 0 9 * * 1', /exactly 5 fields/], ['0 9 * * MON', /no names/]]) {
+                    await type(line); v = await seen();
+                    assert.match(v.error, why, `${line}: ${v.error}`); assert.equal(v.off, true, `${line}: Remind is off`); assert.equal(v.invalid, 'true', `${line}: the field is marked invalid`); assert.equal(v.words, '', `${line}: no words for a refused line`);
+                }
+                await type('0 9 * * 1-5');
+                await ev(`(() => { window.__writes.length = 0; const R = window.fetch.bind(window); window.fetch = (u, o = {}) => (String((o && o.method) || 'GET').toUpperCase() === 'POST' && new URL(String(u), location.origin).pathname === '/api/reminders') ? (window.__writes.push({ m: 'POST', p: '/api/reminders', b: String(o.body || '') }), Promise.resolve(new Response(JSON.stringify({ id: 1, schedule_kind: 'cron', at: '0 9 * * 1-5' }), { status: 201, headers: { 'Content-Type': 'application/json' } }))) : R(u, o); return true; })()`);
+                await ev(`${inDlg('Backend Dev', 'button', '/^Remind$/i')}.click(); true`); await settle(900);
+                const sent = await ev(`window.__writes`);
+                const rem = sent.find(x => x.p === '/api/reminders'); assert.ok(rem, `the reminder is set (${JSON.stringify(sent.map(x => x.m + ' ' + x.p))})`);
+                const body = JSON.parse(rem.b); assert.equal(body.kind, 'cron'); assert.equal(body.at, '0 9 * * 1-5'); assert.ok(body.timezone && body.timezone !== 'Local', `this computer's zone (${body.timezone})`); assert.equal(body.to, 'Backend Dev'); assert.match(body.text, /Check your tasks and the board/);
+                assert.ok(sent.findIndex(x => x.p === '/api/reminders') < sent.findIndex(x => /\/messages$/.test(x.p)), 'the reminder is set before the message is sent');
+                assert.equal(await status(), 'Reminded Backend Dev and on the cron line 0 9 * * 1-5.');
+                assert.equal(await ev(`!!${dlg('Backend Dev')}`), false, 'the dialog closed');
+            });
+            await S.run(`${label}: a Custom (cron) line the server refuses is said in the dialog, which stays open, and the message is not sent (#21330)`, async () => {
+                await backToTable(); await openPage('Backend Dev'); await clickRemind('Backend Dev'); await settle(500);
+                await ev(`(() => { const s = ${inDlg('Backend Dev', 'select', '/^Repeat$/i')}; const o = [...s.options].find(o => /^Custom \\(cron\\)$/.test(o.textContent.trim())); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); const e = ${inDlg('Backend Dev', 'input', '/^Cron line$/i')}; e.value = '*/5 * * * *'; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await ev(`(() => { window.__writes.length = 0; const R = window.fetch.bind(window); window.fetch = (u, o = {}) => (String((o && o.method) || 'GET').toUpperCase() === 'POST' && new URL(String(u), location.origin).pathname === '/api/reminders') ? Promise.resolve(new Response(JSON.stringify({ error: 'an agent reminder can repeat at most every 15 minutes' }), { status: 400, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
+                await ev(`${inDlg('Backend Dev', 'button', '/^Remind$/i')}.click(); true`); await settle(700);
+                assert.ok(await ev(`!!${dlg('Backend Dev')}`), 'the dialog stays open');
+                assert.match(await ev(`window.__na.text(${dlg('Backend Dev')}.querySelector('.reminder-server-error')).trim()`), /The reminder was not set: an agent reminder can repeat at most every 15 minutes/);
+                assert.ok(!(await ev(`window.__writes`)).some(x => /\/messages$/.test(x.p)), 'no message was sent for a reminder that was refused');
+                await ev(`${inDlg('Backend Dev', 'button', '/^Cancel$/i')}.click(); true`); await settle(300); await backToTable();
+            });
             await S.run(`${label}: Cancel in the Remind dialog sends nothing`, async () => {
                 await backToTable(); await openPage('Backend Dev'); await ev(`window.__writes.length = 0; true`); await clickRemind('Backend Dev'); await settle(500);
                 await ev(`${inDlg('Backend Dev', 'button', '/^Cancel$/i')}.click(); true`); await settle(400);

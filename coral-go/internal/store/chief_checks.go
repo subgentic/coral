@@ -94,6 +94,9 @@ func ChiefCron(c ChiefCheck) (string, error) {
 			return "", errors.New("interval must be 5, 15, 30 or 60 minutes")
 		}
 	}
+	if c.ScheduleKind == "cron" { // a reminder's Custom (cron) line (#21330), kept in At and passed through after CronLine's strict check
+		return CronLine(c.At)
+	}
 	if c.ScheduleKind != "daily" && c.ScheduleKind != "weekdays" && c.ScheduleKind != "weekly" {
 		return "", errors.New("invalid schedule")
 	}

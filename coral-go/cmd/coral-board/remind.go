@@ -270,6 +270,8 @@ func reminderLine(m map[string]any) string {
 		when = fmt.Sprintf("every %v min", m["every_minutes"])
 	case "daily", "weekdays", "weekly":
 		when = kind + " " + fmt.Sprint(m["at"]) + " " + fmt.Sprint(m["timezone"])
+	case "cron":
+		when = "cron " + clitext.Clean(fmt.Sprint(m["at"])) + " " + fmt.Sprint(m["timezone"])
 	}
 	state := fmt.Sprint(m["state"])
 	if on, _ := m["enabled"].(bool); !on && state == "none" {

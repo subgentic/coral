@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
@@ -41,6 +42,12 @@ func nextFire(c store.ChiefCheck, now time.Time) time.Time {
 		}
 		m := time.Duration(c.EveryMinutes) * time.Minute
 		return now.Truncate(m).Add(m)
+	case "cron":
+		next, err := background.NextFireTime(c.At, c.Timezone, now)
+		if err != nil || next.IsZero() {
+			return time.Time{}
+		}
+		return next
 	case "daily", "weekdays", "weekly":
 		at, wd := c.At, -1
 		if c.ScheduleKind == "weekly" {

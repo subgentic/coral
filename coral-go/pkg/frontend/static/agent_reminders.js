@@ -45,7 +45,9 @@ export async function mountAgentReminders(host, team, agent) {
         if (!rows.length) cards.append(el('p', 'chief-check-hint', 'No reminders yet. Add one to start.'));
         for (const r of rows) {
             const card = el('section', 'chief-check-card'); card.append(el('h4', '', r.name));
-            card.append(el('p', 'chief-check-hint', `${whenWords(r)}${r.paused ? ' · Off' : ''} · ${who}`));
+            const when = el('p', 'chief-check-hint', `${whenWords(r)}${r.paused ? ' · Off' : ''} · ${who}`);
+            if (r.schedule_kind === 'cron') when.title = `Cron line: ${r.at}`; // the line behind the words (#21330)
+            card.append(when);
             const acts = el('div', 'chief-check-actions');
             const remove = button('Delete', async () => {
                 if (remove.dataset.confirm !== 'yes') { remove.dataset.confirm = 'yes'; remove.textContent = 'Confirm delete'; return; }

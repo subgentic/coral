@@ -24,7 +24,7 @@ const maxTemplateRemindersPerRole = 5
 // templateReminder is one reminder of a template's role.
 type templateReminder struct {
 	Text         string `json:"text"`
-	Kind         string `json:"kind"` // every, daily or weekdays
+	Kind         string `json:"kind"` // every, daily, weekdays, weekly or cron (the line is in at)
 	At           string `json:"at"`   // "09:00", for daily and weekdays
 	EveryMinutes int    `json:"every_minutes"`
 	Timezone     string `json:"timezone"`
@@ -80,14 +80,22 @@ func (h *ChiefChecksHandler) AddTemplateReminders(ctx context.Context, board, se
 				why("a reminder can repeat at most every 15 minutes")
 				continue
 			}
-		case "daily", "weekdays", "weekly":
+		case "daily", "weekdays", "weekly", "cron":
 			check.ScheduleKind, check.At = r.Kind, r.At
 		default:
-			why("a template's reminder repeats: every, daily, weekdays or weekly")
+			why("a template's reminder repeats: every, daily, weekdays, weekly or cron")
 			continue
 		}
-		if _, err := store.ChiefCron(check); err != nil {
+		line, err := store.ChiefCron(check)
+		if err != nil {
 			why(err.Error())
+			continue
+		}
+		if r.Kind == "cron" {
+			check.At = line
+		}
+		if r.Kind == "cron" && store.CronLeastGap(line) < minSelfReminderMinutes*time.Minute {
+			why("a reminder can repeat at most every 15 minutes")
 			continue
 		}
 		if active >= maxAgentReminders {
