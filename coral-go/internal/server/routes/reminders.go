@@ -101,8 +101,8 @@ func (h *ChiefChecksHandler) mayCancel(ctx context.Context, c reminderCaller, ch
 type reminderBody struct {
 	Text         string `json:"text"`
 	Name         string `json:"name"`
-	Kind         string `json:"kind"`          // once, every, daily, weekdays or weekly
-	At           string `json:"at"`            // once: YYYY-MM-DDTHH:mm in timezone; daily and weekdays: HH:mm; weekly: "Mon 09:00", the day and the time
+	Kind         string `json:"kind"`          // once, every, daily, weekdays, weekly or cron
+	At           string `json:"at"`            // once: YYYY-MM-DDTHH:mm in timezone; daily and weekdays: HH:mm; weekly: "Mon 09:00", the day and the time; cron: a five-field line like "0 9 * * 1-5" (never more often than every 5 minutes), in timezone
 	EveryMinutes int    `json:"every_minutes"` // every: 5, 15, 30 or 60
 	Timezone     string `json:"timezone"`      // an IANA zone name
 	To           string `json:"to"`            // a member's name; empty: the caller (an agent)
@@ -288,15 +288,19 @@ func (h *ChiefChecksHandler) remindersAdd(w http.ResponseWriter, r *http.Request
 		check.ScheduleKind, check.At = "once", b.At
 	case "every":
 		check.ScheduleKind, check.EveryMinutes = "interval", b.EveryMinutes
-	case "daily", "weekdays", "weekly":
+	case "daily", "weekdays", "weekly", "cron":
 		check.ScheduleKind, check.At = b.Kind, b.At
 	default:
-		errBadRequest(w, "kind must be once, every, daily, weekdays or weekly")
+		errBadRequest(w, "kind must be once, every, daily, weekdays, weekly or cron")
 		return
 	}
-	if _, err := store.ChiefCron(check); err != nil {
+	line, err := store.ChiefCron(check)
+	if err != nil {
 		errBadRequest(w, err.Error())
 		return
+	}
+	if check.ScheduleKind == "cron" {
+		check.At = line // kept as the scheduler has it: one space between the fields
 	}
 	if check.ScheduleKind == "once" {
 		loc, _ := time.LoadLocation(check.Timezone)
@@ -311,6 +315,10 @@ func (h *ChiefChecksHandler) remindersAdd(w http.ResponseWriter, r *http.Request
 		}
 	}
 	if origin != "operator" && check.ScheduleKind == "interval" && check.EveryMinutes < minSelfReminderMinutes {
+		errBadRequest(w, "an agent's reminder can repeat at most every 15 minutes")
+		return
+	}
+	if origin != "operator" && check.ScheduleKind == "cron" && store.CronLeastGap(line) < minSelfReminderMinutes*time.Minute {
 		errBadRequest(w, "an agent's reminder can repeat at most every 15 minutes")
 		return
 	}

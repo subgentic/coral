@@ -2,7 +2,9 @@
 export const INTERVALS = [[5, '5 minutes'], [15, '15 minutes'], [30, '30 minutes'], [60, 'Hour']];
 export const NOTIFY_MODES = [['only_if_found', 'Only if something is found'], ['every_time', 'Every time'], ['daily_brief', 'In the daily brief']];
 const WEEKDAY_WORDS = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+import { cronWords } from './job_words.js';
 export function scheduleWords(c) {
+    if (c.schedule_kind === 'cron') return `${cronWords(c.at)} · ${c.timezone}`; // a Custom (cron) line in words (#21330); the line itself is the tooltip, set where the words are drawn
     if (c.schedule_kind === 'interval') return `Every ${c.every_minutes === 60 ? 'hour' : `${c.every_minutes} minutes`}`;
     if (c.schedule_kind === 'weekly') { const [d, t] = String(c.at || '').split(' '); return `Every ${WEEKDAY_WORDS[d] || d} at ${t} · ${c.timezone}`; } // "Mon 09:00" (#21085)
     return `${c.schedule_kind === 'weekdays' ? 'Weekdays' : 'Daily'} at ${c.at} · ${c.timezone}`;

@@ -7,6 +7,7 @@ import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
 const { INTERVALS, scheduleWords } = await importOnce('./chief_checks_model.js');
 const { KINDS, DAYS } = await importOnce('./agent_reminders.js');
+const { cronWords } = await importOnce('./job_words.js');
 await loadStyles('launch_reminders.css').catch(() => {});
 
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -21,6 +22,7 @@ export function draftWords(d) {
     const dayName = c => (DAYS.find(([v]) => v === c) || [c, c])[1];
     if (d.kind === 'once') return `Once, ${String(d.at || '').replace('T', ' ')}`;
     if (d.kind === 'every') { const n = Number(d.every_minutes) || 15; return n === 60 ? 'Every hour' : n % 60 === 0 ? `Every ${n / 60} hours` : `Every ${n} minutes`; }
+    if (d.kind === 'cron') return cronWords(d.at); // a template's Custom (cron) line, in words; the line is the tooltip (#21330)
     if (d.kind === 'weekly') { const [day, time] = String(d.at || '').split(' '); return `Weekly, ${dayName(day)} at ${time || ''}`; }
     return `${d.kind === 'weekdays' ? 'Weekdays' : 'Daily'} at ${d.at || ''}`; // the time zone is said once, in the tab's line (the approved mock)
 }
@@ -63,7 +65,8 @@ export function mountLaunchReminders(host, { who = () => 'this agent', onChange 
     }
     function card(it) {
         const c = el('section', 'chief-check-card launch-rem-card'); c.setAttribute('aria-label', `Reminder: ${it.text}`);
-        const top = el('div', 'launch-rem-top'); top.append(el('strong', '', draftWords(it)), it.source ? el('span', 'chip chip-tag launch-rem-chip launch-rem-chip-src', 'From the template') : el('span', 'launch-rem-by', 'Added by you'));
+        const words = el('strong', '', draftWords(it)); if (it.kind === 'cron') words.title = `Cron line: ${it.at}`; // the line behind the words (#21330)
+        const top = el('div', 'launch-rem-top'); top.append(words, it.source ? el('span', 'chip chip-tag launch-rem-chip launch-rem-chip-src', 'From the template') : el('span', 'launch-rem-by', 'Added by you'));
         const acts = el('div', 'chief-check-actions');
         const remove = button('Remove', () => {
             if (remove.dataset.confirm !== 'yes') { remove.dataset.confirm = 'yes'; remove.textContent = 'Confirm remove'; return; }
