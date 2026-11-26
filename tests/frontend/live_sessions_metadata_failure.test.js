@@ -46,7 +46,7 @@ const html = '<!doctype html><html><body><section data-section="live-sessions"><
             };
             window.s=(await import((window.__coralStatic||'/static/')+'state.js')).state;
             s.liveSessions=[];
-            await import((window.__coralStatic||'/static/')+'status_groups.js'); // the list draws once this module is in
+            await (await import((window.__coralStatic||'/static/')+'import_once.js')).importOnce('./status_groups.js'); // the list draws once this module is in, as importOnce registers it (a plain import leaves the first draw waiting for a redraw: a race, #21546)
             window.api=await import((window.__coralStatic||'/static/')+'api.js');
             window.load=()=>api.loadLiveSessions(reason=>failures.push(reason));
             window.inspect=()=>({
