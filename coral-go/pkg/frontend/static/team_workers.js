@@ -73,7 +73,7 @@ function draw() {
     root.replaceChildren();
     if (S.failed || !S.loaded) { root.hidden = true; return; } // a team this computer cannot read (a Hub's, an older Coral): no section
     root.hidden = false;
-    const panel = el('section', 'pane workers-panel'); panel.setAttribute('aria-labelledby', 'workers-title');
+    const panel = el('section', 'workers-card'); panel.setAttribute('aria-labelledby', 'workers-title');
     const head = el('div', 'workers-head');
     const title = el('h3', 'workers-title', 'Workers the orchestrator can launch'); title.id = 'workers-title';
     const count = el('span', 'workers-count', String(S.workers.length)); count.setAttribute('aria-label', `${S.workers.length} workers`);

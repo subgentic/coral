@@ -201,13 +201,7 @@ func (h *SessionsHandler) LaunchWorker(w http.ResponseWriter, r *http.Request) {
 		taskText = workerTaskText(task.ID, task.Title, body)
 	}
 	display := h.freeWorkerName(r.Context(), project, worker.Name, in.TaskID)
-	prompt := worker.Instructions
-	if taskText != "" {
-		if prompt != "" {
-			prompt += "\n\n"
-		}
-		prompt += taskText
-	}
+	prompt := workerLaunchPrompt(worker, taskText)
 	req := map[string]any{
 		"agent_type": worker.AgentType, "display_name": display, "board_id": project, "board_name": project, "prompt": prompt,
 	}
@@ -245,6 +239,18 @@ func (h *SessionsHandler) LaunchWorker(w http.ResponseWriter, r *http.Request) {
 	_ = h.bs.RecordWorkerLaunch(r.Context(), project, display, worker.Name, in.TaskID) // keyed by the agent's name on the team, which is how its row and page are found
 	result["worker"], result["display_name"] = worker.Name, display
 	writeJSON(w, http.StatusOK, result)
+}
+
+// workerLaunchPrompt is the first message of a launched worker: the worker's instructions, a blank line, then the task's text. The instructions come first and are the same for every worker of the kind, so the provider can reuse that opening between launches.
+func workerLaunchPrompt(worker *board.Worker, taskText string) string {
+	prompt := worker.Instructions
+	if taskText != "" {
+		if prompt != "" {
+			prompt += "\n\n"
+		}
+		prompt += taskText
+	}
+	return prompt
 }
 
 // workerTaskText is a task as the first message of the worker started for it.

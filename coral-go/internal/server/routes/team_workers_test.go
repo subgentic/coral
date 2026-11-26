@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
@@ -54,6 +56,14 @@ func TestWorkerSetupRules(t *testing.T) {
 	ok := board.Worker{Name: "  Quick   fix ", AgentType: "codex", PermissionMode: "custom:abc"}
 	require.Empty(t, board.CleanWorker(&ok))
 	require.Equal(t, "Quick fix", ok.Name)
+}
+
+func TestWorkerLaunchPromptPutsTheInstructionsFirst(t *testing.T) {
+	task := workerTaskText(412, "Sign-in lands on a 404", "Look at c0ffee.")
+	got := workerLaunchPrompt(&board.Worker{Instructions: "Read only."}, task)
+	require.True(t, strings.HasPrefix(got, "Read only.\n\nYour task is #412: Sign-in lands on a 404"), got)
+	require.Equal(t, task, workerLaunchPrompt(&board.Worker{}, task), "no instructions: the task text alone")
+	require.Equal(t, "Read only.", workerLaunchPrompt(&board.Worker{Instructions: "Read only."}, ""))
 }
 
 func TestWorkerTaskTextIsBoundedAndNamesTheTask(t *testing.T) {
@@ -129,4 +139,67 @@ func TestLaunchWorkerRefusals(t *testing.T) {
 	rec := callWorkerLaunch(h, agentCtx, "crew", "Worker", `{}`, Actor{Kind: ActorToken, Name: "Orchestrator", Session: "claude-x"})
 	require.Equal(t, http.StatusForbidden, rec.Code)
 	require.Contains(t, rec.Body.String(), "worker_other_team")
+}
+
+// The prompt the launch really hands the new agent starts with the worker's instructions, a blank line, then "Your task is #N" (the cacheable part first).
+func TestLaunchWorkerGivesTheAgentInstructionsThenTheTask(t *testing.T) {
+	h, dir := workerLaunchFixture(t)
+	ctx := context.Background()
+	_, err := h.bs.SaveWorker(ctx, "crew", "", board.Worker{Name: "Reviewer", AgentType: "claude", Instructions: "Read only.", WorkingDir: dir}, false)
+	require.NoError(t, err)
+	task, err := h.bs.CreateTask(ctx, "crew", "Review the login fix", "Look at c0ffee.", "high", "Orchestrator")
+	require.NoError(t, err)
+	rec := callWorkerLaunch(h, ctx, "crew", "Reviewer", fmt.Sprintf(`{"task_id":%d}`, task.ID), Actor{Kind: ActorOperator, Name: "Operator"})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	sid, _ := out["session_id"].(string)
+	require.NotEmpty(t, sid)
+	var sent string
+	require.Eventually(t, func() bool { // the first message is the file the launch command reads
+		files, _ := filepath.Glob(filepath.Join(os.TempDir(), "coral_prompt_"+sid+"_*.txt"))
+		if len(files) == 0 {
+			return false
+		}
+		raw, err := os.ReadFile(files[0])
+		sent = string(raw)
+		return err == nil && sent != ""
+	}, 5*time.Second, 20*time.Millisecond, "the launch wrote the agent's first message")
+	require.Contains(t, sent, "Read only.")
+	first, second := strings.Index(sent, "Read only."), strings.Index(sent, fmt.Sprintf("Your task is #%d: Review the login fix", task.ID))
+	require.GreaterOrEqual(t, second, 0, "and then the task: %s", sent)
+	require.Less(t, first, second, "instructions before the task")
+}
+
+// The Operator changing the list posts it to the Orchestrator; a team with none posts nothing.
+func TestAWorkerChangePostsTheListToTheOrchestrator(t *testing.T) {
+	bs, err := boardtest.Open(filepath.Join(t.TempDir(), "board.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { bs.Close() })
+	ctx := context.Background()
+	h := NewBoardHandler(bs)
+
+	h.tellOrchestratorWorkersChanged(ctx, "crew")
+	msgs, err := bs.ListMessages(ctx, "crew", 100, 0, 0)
+	require.NoError(t, err)
+	require.Empty(t, msgs, "no Orchestrator on the team: nobody to tell")
+
+	_, err = bs.Subscribe(ctx, "crew", "Orchestrator", "Orchestrator", "", nil, "")
+	require.NoError(t, err)
+	_, err = bs.SaveWorker(ctx, "crew", "", board.Worker{Name: "Reviewer", Purpose: "reads code", AgentType: "codex"}, false)
+	require.NoError(t, err)
+	h.tellOrchestratorWorkersChanged(ctx, "crew")
+	msgs, err = bs.ListMessages(ctx, "crew", 100, 0, 0)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	require.Contains(t, msgs[0].Content, "@Orchestrator")
+	require.Contains(t, msgs[0].Content, "changed the team's approved workers")
+	require.Contains(t, msgs[0].Content, `coral-board worker launch "Reviewer" --task N`)
+
+	require.NoError(t, bs.DeleteWorker(ctx, "crew", "Reviewer"))
+	h.tellOrchestratorWorkersChanged(ctx, "crew")
+	msgs, _ = bs.ListMessages(ctx, "crew", 100, 0, 0)
+	require.Len(t, msgs, 2)
+	require.Contains(t, msgs[0].Content+msgs[1].Content, "no approved workers now")
 }

@@ -120,7 +120,7 @@ func (s *Store) ListWorkers(ctx context.Context, boardID string) ([]Worker, erro
 		CreatedAt string `db:"created_at"`
 		UpdatedAt string `db:"updated_at"`
 	}
-	if err := s.reader().SelectContext(ctx, &rows, `SELECT setup, created_at, updated_at FROM team_workers WHERE board_id = ? ORDER BY created_at, name_key`, boardID); err != nil {
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT setup, created_at, updated_at FROM team_workers WHERE board_id = ? ORDER BY created_at, rowid`, boardID); err != nil {
 		return nil, err
 	}
 	out := make([]Worker, 0, len(rows))

@@ -12,6 +12,7 @@ const css = path.resolve(here, '../../coral-go/pkg/frontend/static/css');
 
 // the card looks, and the padding kind each takes ('none': the card holds rows that carry their own padding)
 export const CARDS = {
+    'workers-card': 'regular',        // the team page's approved workers (#21467)
     'coral-live-card': 'regular', // local Live controls and persistent attention (#21030)
     'computer-card': 'regular',       // why a computer cannot be read, with the next step (#20207)
     'inbox-saved-card': 'none',       // the Saved folder's files and messages (#19833)
