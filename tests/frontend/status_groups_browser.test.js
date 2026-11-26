@@ -17,7 +17,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         // One that needs you, four working, three idle (one of them a team's), six that finished today; the orchestrator is on a team of its own
         const scene = () => ev(`(async () => {
-            T.state.liveSessions = []; window.__m.agents = {};
+            window.__rows = {}; T.state.liveSessions = []; window.__m.agents = {};
             const add = (name, seconds, extra, opts) => { window.__m.add(name, name.slice(0, 1).toUpperCase(), 1, { sleeping: false, ...opts }); Object.assign(T.state.liveSessions.find(s => s.name === name), { staleness_seconds: seconds, ...extra }); };
             add('ask-407', 360, { waiting_for_input: true });
             add('Orchestrator', 0, { working: true }, { board_project: 'shop' });
@@ -28,6 +28,10 @@ const { connect } = require('./agent_view_harness');
             add('idle-402', 3600, {});
             add('idle-qa', 3700, {});
             for (let i = 0; i < 6; i++) add('done-' + i, 7200 + i, { archived: true }, { archived: true });
+            // The scene is also what the mocked server answers, so a live-list read that lands late (CI is slower than the page's first read) returns these same rows and does not replace the scene with bare ones (#21725).
+            window.__rows = Object.fromEntries(T.state.liveSessions.map(s => [s.name, { ...s }]));
+            const base = window.__m.entry.__base || window.__m.entry, answer = a => (window.__rows[a.name] ? { ...window.__rows[a.name] } : base.call(window.__m, a)); answer.__base = base; window.__m.entry = answer;
+            window.__patch = (name, fields) => { for (const r of [window.__rows[name], T.state.liveSessions.find(s => s.name === name)]) if (r) Object.assign(r, fields); };
             T.render.renderLiveSessions(T.state.liveSessions); return T.state.liveSessions.length; })()`);
         const list = phone => phone ? '#mobile-agent-list' : '.sidebar';
         const load = async view => {
@@ -58,6 +62,8 @@ const { connect } = require('./agent_view_harness');
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         assert.equal(await scene(), 14);
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'the status groups', 6000);
+        await ev(`import((window.__coralStatic || '/static/') + 'api.js').then(m => m.loadLiveSessions()).then(() => true)`); // a live-list read that lands after the scene (CI's slower first read): the mocked server answers with the scene, so the list does not change (#21725)
+        await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'the groups after the read', 6000);
         let p = await picture(false);
         assert.deepEqual(p.out.filter(x => x.head).map(x => [x.head, x.name, x.n]), [['needs', 'Needs you', 1], ['working', 'Working', 4], ['idle', 'Idle', 3], ['done', 'Done today', 6]], 'the four groups, in order, with their counts');
         assert.deepEqual(p.out.filter(x => x.head).map(x => x.open), ['true', 'true', 'true', 'false'], 'Done today is folded');
@@ -84,7 +90,7 @@ const { connect } = require('./agent_view_harness');
         await scene(); await waitFor(`!!document.querySelector('.sidebar .status-switch')`, 'the switch in the Team view', 6000);
         assert.deepEqual((await picture(false)).switchOn, ['Team'], 'Team is kept after a reload');
         console.log('computer: the team folds its workers under the orchestrator');
-        await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) T.state.liveSessions.find(s => s.name === n).board_project = 'shop'; for (const s of T.state.liveSessions) if (s.archived) s.board_project = 'shop'; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
+        await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) window.__patch(n, { board_project: 'shop' }); for (const s of T.state.liveSessions) if (s.archived) window.__patch(s.name, { board_project: 'shop' }); T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
         const line = () => ev(`(() => { const row = document.querySelector('.sidebar .session-board-card .session-group-item'); const b = row && row.querySelector('.status-caret-toggle'); const sum = document.querySelector('.sidebar .status-workers-sum'); const dn = document.querySelector('.sidebar .status-workers-done'); return b ? { n: row.querySelector('.status-workers-n').textContent.trim(), open: b.getAttribute('aria-expanded'), sum: sum ? sum.textContent.replace(/\\s+/g, ' ').trim() : null, done: dn ? dn.textContent.replace(/\\s+/g, ' ').trim() : null, rows: document.querySelectorAll('.sidebar .session-board-card .session-group-item').length } : null; })()`);
         const folded = await line();
         assert.equal(folded.n, '5 workers', '"5 workers" is at the right of the orchestrator row');
@@ -107,7 +113,7 @@ const { connect } = require('./agent_view_harness');
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'Status again', 6000);
 
         console.log('computer: a question moves an agent to Needs you, an update moves it up');
-        await ev(`(() => { const by = n => T.state.liveSessions.find(s => s.name === n); Object.assign(by('work-411'), { waiting_for_input: true, staleness_seconds: 5 }); Object.assign(by('idle-qa'), { working: true, staleness_seconds: 0 }); T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
+        await ev(`(() => { window.__patch('work-411', { waiting_for_input: true, staleness_seconds: 5 }); window.__patch('idle-qa', { working: true, staleness_seconds: 0 }); T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
         p = await picture(false);
         const names = g => p.out.filter(x => x.row && x.group === g).map(x => x.row);
         assert.deepEqual(names('needs'), ['work-411', 'ask-407'], 'a new question is at the top of Needs you');
@@ -127,7 +133,7 @@ const { connect } = require('./agent_view_harness');
         await waitFor(`document.querySelectorAll('#mobile-agent-list .session-group-item[data-group="__status__"]').length === 14`, 'every agent', 4000);
         await shot('status-phone-390-all');
         console.log('phone 390: the Team view says the same, folded');
-        await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) T.state.liveSessions.find(s => s.name === n).board_project = 'shop'; return true; })()`);
+        await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) window.__patch(n, { board_project: 'shop' }); return true; })()`);
         await click('.status-switch-phone .btn[data-mode="team"]');
         await waitFor(`!!document.querySelector('#mobile-agent-list .status-workers-sum')`, 'the folded line on the phone', 6000);
         assert.equal(await ev(`document.querySelector('#mobile-agent-list .status-workers-sum').textContent.replace(/\\s+/g, ' ').trim()`), '3 working · 1 needs you · 1 ready');
