@@ -109,7 +109,7 @@ const (
 	rateLimitReadSuffix      = "|ratelimit"
 	rateLimitNoticeSummary   = "Approaching rate limits: Codex asks whether to switch to a cheaper model"
 	hooksReviewSummary       = "Hooks need review: Codex asks whether to trust a new or changed hook"
-	fullAccessConfirmSummary = "Enable full access?: Codex asks you to confirm Full Access (no sandbox, no approvals). 1. Yes, continue anyway (full access for this session) 2. Cancel. Answer it in the agent's terminal"
+	fullAccessConfirmSummary = "Enable full access?: Codex asks you to confirm Full Access (no sandbox, no approvals). 1. Yes, continue anyway (full access for this session) 2. Cancel. Answer it in the agent's terminal, or send 1 or 2 from here"
 )
 
 // forgetPromptReads drops the cached screen reads of a session's startup-style prompts: the prompt was answered, the next state reads what replaced it.

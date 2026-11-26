@@ -91,6 +91,7 @@ func TestAnAgentAtCodexsFullAccessConfirmationIsHeldAndNeedsYou(t *testing.T) {
 			assert.Equal(t, fullAccessConfirmSummary, st.WaitingSummary)
 			assert.Contains(t, st.WaitingSummary, "1. Yes, continue anyway", "its real options are named")
 			assert.Contains(t, st.WaitingSummary, "2. Cancel")
+			assert.Contains(t, st.WaitingSummary, "send 1 or 2 from here", "the dashboard's own 1 or 2 is accepted too (#21689)")
 			set("  \u203a \n")
 			st = h.deriveSingleSessionState(ctx, sid, 0)
 			assert.False(t, st.NeedsInput, "the confirmation went: cleared")
