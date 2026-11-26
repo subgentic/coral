@@ -198,21 +198,15 @@ export async function saveTerminalRow(id) {
 
 // ── Agents left in Coral's old tmux server (under pty) ───────────────────
 
-/** The page's two lines about the backend, from one read of the status: the agents left in the old tmux server, and the one-time "agents now stop when you quit" line (#6064). */
-export async function checkTerminalNotices() {
-    if (isCloud()) return;
+/** The page's lines about the backend, from one read of the status: the agents left in the old tmux server, and (all) the one-time "agents now stop when you quit" line (#6064). A remote browser is refused this read (403 other_user), so it does not ask (#21543). */
+async function notices(all) {
     let st;
-    try { st = await fetchStatus(); } catch { return; }
+    try { if (!await (await importOnce('./operator_here.js')).operatorHere()) return; st = await fetchStatus(); } catch { return; }
     showLeftoverTmux(st);
-    showDefaultNotice(st);
+    if (all) showDefaultNotice(st);
 }
-
-export async function checkLeftoverTmux() {
-    if (isCloud()) return;
-    let st;
-    try { st = await fetchStatus(); } catch { return; }
-    showLeftoverTmux(st);
-}
+export const checkTerminalNotices = () => notices(true);
+export const checkLeftoverTmux = () => notices(false);
 
 function showLeftoverTmux(st) {
     const banner = $('leftover-tmux-banner');
