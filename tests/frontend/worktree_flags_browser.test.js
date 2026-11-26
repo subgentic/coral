@@ -54,7 +54,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(dlg.title, 'Archive "#402: Remove the old billing flag"?', `${at}: the title`);
             assert.equal(dlg.message, 'It leaves the sidebar. You can start it again from Archived.');
             assert.equal(dlg.tick, true, `${at}: the box is on, as the mock draws it`);
-            assert.equal(dlg.tickWords, 'Also remove its worktree The folder task-402 is deleted. The branch is kept.');
+            assert.equal(dlg.tickWords, 'Also remove its worktree The folder task-402 is deleted, with any files git ignores (such as .env or build output). The branch is kept.');
             assert.deepEqual(dlg.buttons, ['Cancel', 'Archive']);
             await ev(framesJs(3)); await shot(`dialog-${width}-${theme}`, '#confirm-modal .modal-content');
             // Archive with the box on: the server is asked to remove it, and what became of it is told
@@ -90,7 +90,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`/worktree was kept/.test(document.getElementById('group-table-view').textContent)`, `${at}: the Activity row`, 10000);
             const text = await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ')`);
             assert.ok(text.includes('#398 was archived, but its worktree was kept') && text.includes(KEPT), `${at}: the row says which worker and why: ${text.slice(0, 300)}`);
-            assert.equal(await ev(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'Open the folder')`), true, `${at}: the row's button says Open the folder`);
+            assert.equal(await ev(`[...document.querySelectorAll('#group-table-view button')].some(b => b.textContent.trim() === 'Open worker')`), true, `${at}: the row's button says Open worker (it opens the worker's page, not a folder)`);
             assert.equal(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), true, `${at}: no sideways scroll`);
             await ev(framesJs(3)); await shot(`activity-${width}-${theme}`, '#group-table-view .al-row');
         }

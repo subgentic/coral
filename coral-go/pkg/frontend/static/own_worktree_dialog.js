@@ -16,7 +16,7 @@ export function askArchive(label, worktreeName, onAnswer, onCancel) {
     title.textContent = 'Also remove its worktree';
     code.textContent = worktreeName;
     help.className = 'text-muted-sm';
-    help.append('The folder ', code, ' is deleted. The branch is kept.');
+    help.append('The folder ', code, ' is deleted, with any files git ignores (such as .env or build output). The branch is kept.');
     words.append(title, help); // the tick box's words and, under them, what it does (the mock)
     box.replaceChildren(tick, words);
 }

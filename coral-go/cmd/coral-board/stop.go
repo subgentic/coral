@@ -18,7 +18,7 @@ const stopUsageText = `Usage: coral-board stop <member> [--remove-worktree] [--b
   Stop an agent: its session ends and it is archived. It stays with the team (name, role, tasks and history), leaves the Agents list, and no longer gets nudges or tasks; coral-board wake <member> starts it
   again, coral-board sleep <member> turns it into a sleeping agent. A working agent is cut off with its session. To end only the current turn use coral-board interrupt <member>.
   --remove-worktree also removes the worktree the worker was started in with its own flag (task-N); it does nothing for a worker started without one. It is refused, with the reason, when the worktree has
-  changes that are not committed (and one row says so in Activity). The branch is always kept.
+  changes that are not committed (and one row says so in Activity). The branch is always kept. Files git ignores (such as .env or build output) are deleted with the folder.
   An agent already archived gets a plain sentence. The Orchestrator itself and the team's last Orchestrator are refused, and so is an agent that waits for a person's answer or sits at a dialog.
 
   Only the board's Orchestrator, and only while BOTH the main orchestrator switch AND the separate "stop" setting are on in the board's orchestrator grant: any other caller, either switch off, is refused
