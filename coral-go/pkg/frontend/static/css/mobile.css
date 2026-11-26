@@ -932,7 +932,6 @@
 
     /* The open tab says its name beside its icon (#7063): the row of icons alone left a person guessing which panel is open */
     .agentic-state.mobile-panel-overlay .agentic-tab.active:not(:focus-visible)::after { content: attr(aria-label) / ''; margin-left: 6px; font-size: var(--fs-md); white-space: nowrap; }
-    .agentic-state.mobile-panel-overlay #agentic-tab-more.active:not(:focus-visible)::after { content: none; } /* More with a tab open behind it: no words beside its icon, they ran the row 111 px past the panel (#10052); its accessible name stays */
     .agentic-state.mobile-panel-overlay #agentic-tab-saved.active:not(:focus-visible)::after { content: none; } /* Saved: no words beside its icon, they ran to the edge (#9647); its accessible name stays */
 
     .agentic-state.mobile-panel-overlay .agentic-tab.active {

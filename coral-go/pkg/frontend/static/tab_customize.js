@@ -87,7 +87,7 @@ export function applyTabPrefs() {
     const want = orderedIds(ctx, ids);
     // Moving a focused button would drop its focus, so only reorder when the order differs.
     if (want.join() !== ids.join()) {
-        const anchor = document.getElementById('agentic-more') || document.getElementById('agentic-tab-customize'); // before More, the last of the row (#21684)
+        const anchor = document.getElementById('agentic-tab-customize');
         for (const id of want) bar.insertBefore(document.getElementById(`agentic-tab-${id}`), anchor);
     }
     const first = want.find(id => !hidden.has(id));
