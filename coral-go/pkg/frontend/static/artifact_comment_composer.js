@@ -35,7 +35,7 @@ export function createComposer({ st, render, run, ownHex }) {
         const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.wholeComposer = null; st.error = ''; render(); });
         const draft = !editOf && review;
         const send = btn(`${draft ? '' : 'btn-primary '}ac-send`, editOf ? 'Save' : review ? 'Save draft' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
-        const saveSend = draft ? btn('btn-primary ac-send ac-save-send', 'Save and send') : null;
+        const saveSend = draft ? btn('btn-primary ac-send ac-save-send', 'Send') : null;
         if (saveSend) saveSend.type = 'submit';
         const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;
         const actionWord = !editOf && review ? 'save this draft' : 'send';
@@ -44,9 +44,15 @@ export function createComposer({ st, render, run, ownHex }) {
         const actions = saveSend ? el('span', 'ac-draft-actions') : null;
         if (actions) actions.append(cancel, send, saveSend);
         row.append(count, ...(tray && !editOf ? [tray.picker()] : []), ...(actions ? [actions] : [cancel, send]));
+        if (draft) for (const [button, glyph] of [[row.querySelector('.ac-add-image'), 'image'], [cancel, 'close'], [send, 'save'], [saveSend, 'send']]) {
+            if (!button) continue;
+            const label = button.textContent, icon = el('span', 'material-icons ac-action-icon');
+            icon.dataset.glyph = glyph; icon.setAttribute('aria-hidden', 'true'); button.setAttribute('aria-label', label); if (!button.title && matchMedia('(max-width: 600px)').matches) button.setAttribute('title', label);
+            button.replaceChildren(icon, el('span', 'ac-action-label', label));
+        }
         const hint = editOf || review ? '' : st.hint?.() || '', hintEl = hint ? el('p', 'ac-note ac-hint', hint) : null; // always drawn with its line; shown while the file waits for review (the review bar toggles it with the file's state, #15128)
         if (hintEl) { hintEl.id = `ac-hint-${++hintSeq}`; const on = !!st.hintOn?.(); hintEl.hidden = !on; if (on) ta.setAttribute('aria-describedby', `${hintEl.id} ${how.id}`); } // a screen reader hears it where the person types
-        const draftHint = draft ? el('p', 'ac-draft-save-hint', 'Saved as a draft. Only sent when you choose Send comments or Save and send.') : null;
+        const draftHint = draft ? el('p', 'ac-draft-save-hint', 'Saved as a draft. Send with Send comments or Send.') : null;
         if (draftHint) { draftHint.id = `ac-draft-hint-${++hintSeq}`; ta.setAttribute('aria-describedby', `${draftHint.id} ${how.id}`); }
         box.append(ta, ...(draftHint ? [draftHint] : []), ...(hintEl ? [hintEl] : []), how, ...(tray ? editOf ? [tray.node] : [tray.node, tray.hint()] : []), err, row);
         const syncButtons = () => { const blocked = !!tray && (tray.busy() || tray.failed()); send.disabled = blocked; if (saveSend) saveSend.disabled = blocked || !review.snapshot().data?.can_send; };
