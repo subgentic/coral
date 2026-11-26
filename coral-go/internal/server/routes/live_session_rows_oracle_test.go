@@ -554,6 +554,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"skipped_send":          skippedSendField(tmuxName, boardUnread),
 			"board_is_orchestrator": boardSubscriberFlag(boardSub),
 			"board_subscriber_id":   boardSubscriberID(boardSub),
+			"board_task":            nil, // #21685: the oracle fixtures assign no tasks; the key is always present
 			"log_path":              agent.LogPath,
 			"sleeping":              liveSleeping[sid],
 			"archived":              liveArchived[sid],
@@ -660,6 +661,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"board_unread":          0,
 			"board_is_orchestrator": boardSubscriberFlag(boardSub),
 			"board_subscriber_id":   boardSubscriberID(boardSub),
+			"board_task":            nil, // #21685: the oracle fixtures assign no tasks; the key is always present
 			"log_path":              "",
 			"sleeping":              true,
 			"archived":              ls.IsArchived == 1,
