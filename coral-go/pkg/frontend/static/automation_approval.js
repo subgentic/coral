@@ -4,6 +4,7 @@ import { buttonsOf, buttonsOffered, claimButton, forgetAsk, refreshOperatorAsks 
 import { loadStyles } from './lazy_styles.js';
 import { showToast } from './utils.js';
 import { markHidden } from './visible_marks.js';
+import { modelName, typeName } from './model_labels.js';
 
 /** The Approve and Deny buttons of an automation question, or null when it has any other buttons. */
 export function automationButtons(a) {
@@ -35,12 +36,31 @@ function schedule(v) {
     return `${who} at ${at} (${zone})`;
 }
 
+const ALIAS = /^(opus|sonnet|haiku|fable)$/i;
+/** The agent type and model as the rest of the app names them: "Claude", "Sonnet 5.5" (an alias with no version reads "Sonnet"). */
+const agentWords = t => typeName(t || 'claude');
+const modelWords = (t, m) => { const n = modelName(t || 'claude', m); return ALIAS.test(n) ? n.charAt(0).toUpperCase() + n.slice(1).toLowerCase() : n; };
+const FIELDS = { model: 'Model', agent_type: 'Agent', timeout_s: 'Time limit', command: 'Command', prompt: 'Prompt', name: 'Name', type: 'Kind', continue_on_failure: 'If it fails' };
+/** One line of "what changed" in words: the schedule as the Runs row says it, step fields by their names, a model as its name. */
+function changeWords(line) {
+    const sign = line[0], rest = line.slice(2);
+    let m = /^Schedule: (.*)$/.exec(rest);
+    if (m) { const i = m[1].lastIndexOf(' '); return `${sign} Schedule: ${schedule({ cron: m[1].slice(0, i), timezone: m[1].slice(i + 1) }).replace(/^Only when.*/, 'none (only when someone runs it)')}`; }
+    m = /^(Step \d+) \u00b7 (\w+): (.*)$/.exec(rest);
+    if (m) {
+        const [, where, key, val] = m;
+        const shown = key === 'model' ? (val ? modelWords('claude', val) : 'default') : key === 'agent_type' ? agentWords(val) : key === 'timeout_s' ? (val ? `${val} seconds` : 'none') : key === 'continue_on_failure' ? (val === 'true' ? 'keeps going' : 'stops the run') : val;
+        return `${sign} ${where} \u00b7 ${FIELDS[key] || key}: ${shown}`;
+    }
+    return line;
+}
+
 function stepBlock(v, s) {
     const box = el('div', 'autoc-step'); const head = el('div', 'autoc-step-head');
     head.append(el('strong', '', `Step ${s.index}`), el('span', 'chip chip-tag', s.type === 'agent' ? 'Agent' : 'Shell'), el('span', 'autoc-step-note', s.continue_on_failure ? 'keeps going if it fails' : 'stops the run if it fails'));
     const body = el('div', 'autoc-step-body'); const dl = el('dl', 'autoc-dl');
     if (s.type === 'agent') {
-        fact(dl, 'Agent type', s.agent_type || 'default'); if (s.model) fact(dl, 'Model', s.model);
+        fact(dl, 'Agent type', agentWords(s.agent_type)); if (s.model) fact(dl, 'Model', modelWords(s.agent_type, s.model));
         fact(dl, 'Mode', 'Default: the permissions of an agent the Orchestrator launches; it cannot be given more');
     }
     fact(dl, 'Working folder', v.repo_path); if (s.timeout_s) fact(dl, 'Time limit', `${s.timeout_s} seconds`);
@@ -49,7 +69,7 @@ function stepBlock(v, s) {
     const pre = el('pre', 'autoc-text', text); pre.tabIndex = 0; pre.setAttribute('aria-label', `${s.type === 'agent' ? 'The prompt' : 'The command'} of step ${s.index}, in full`);
     body.append(pre);
     if (text.length > 400 || text.split('\n').length > 8) body.append(el('div', 'autoc-hint', 'Scrolls inside the box. Nothing is cut off.'));
-    if (s.file) { const n = el('div', 'autoc-note autoc-note-ok'); n.append(el('b', '', '✓ '), el('code', '', s.file), document.createTextNode(' is part of this approval; if it changes, the run stops and you are asked again.')); body.append(n); }
+    if (s.file) { const n = el('div', 'autoc-note autoc-note-ok'); const w = el('div', 'autoc-note-text'); w.append(el('code', '', s.file), el('span', '', 'is part of this approval; if it changes, the run stops and you are asked again. It covers this file only, not what the file runs.')); n.append(el('b', '', '✓ '), w); body.append(n); }
     else if (s.editable_files) { const n = el('div', 'autoc-note autoc-note-warn'); n.append(el('b', '', '! '), document.createTextNode('Runs files your team can change after you approve.')); body.append(n); }
     box.append(head, body); return box;
 }
@@ -57,7 +77,7 @@ function stepBlock(v, s) {
 function changedBlock(v) {
     const box = el('div', 'autoc-changed'); box.append(el('h4', '', 'What changed since you approved'));
     const diff = el('div', 'autoc-diff'); diff.setAttribute('role', 'list');
-    for (const line of v.changes || []) diff.append(Object.assign(el('div', line.startsWith('+') ? 'a' : 'd', line), { role: 'listitem' }));
+    for (const line of v.changes || []) diff.append(Object.assign(el('div', line.startsWith('+') ? 'a' : 'd', changeWords(line)), { role: 'listitem' }));
     if (diff.childElementCount) box.append(diff);
     const p = el('p', 'autoc-hint'); p.append(document.createTextNode('It was approved as '), el('code', '', short(v.approved_hash)), document.createTextNode('. This version is '), el('code', '', short(v.hash)), document.createTextNode('. It has been off since the change, and nothing ran from this version.')); box.append(p);
     return box;

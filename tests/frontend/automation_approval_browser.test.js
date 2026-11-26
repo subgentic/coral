@@ -64,8 +64,8 @@ const view = (extra = {}) => ({ name: 'nightly-deps', description: '', team: 'te
                 assert.equal(row.steps.length, 3, at + 'three steps');
                 assert.ok(row.steps[0].head.includes('Step 1') && row.steps[0].head.includes('Shell') && row.steps[0].head.includes('stops the run if it fails'), at + 'step 1 head: ' + row.steps[0].head);
                 assert.equal(row.steps[0].text, './scripts/check_deps.sh --since yesterday --out reports/deps.json', at + 'step 1 command whole');
-                assert.ok(row.steps[0].ok && !row.steps[0].warn && row.steps[0].note.includes('./scripts/check_deps.sh is part of this approval; if it changes, the run stops and you are asked again.'), at + 'step 1 has the green line: ' + row.steps[0].note);
-                assert.ok(row.steps[1].head.includes('Agent') && row.steps[1].body.includes('claude') && row.steps[1].body.includes('sonnet'), at + 'step 2 agent type and model');
+                assert.ok(row.steps[0].ok && !row.steps[0].warn && row.steps[0].note.includes('./scripts/check_deps.sh') && row.steps[0].note.includes('is part of this approval; if it changes, the run stops and you are asked again. It covers this file only, not what the file runs.'), at + 'step 1 has the green line: ' + row.steps[0].note);
+                assert.ok(row.steps[1].head.includes('Agent') && row.steps[1].body.includes('Agent typeClaude') && row.steps[1].body.includes('ModelSonnet') && !row.steps[1].body.includes('sonnet'), at + 'step 2 agent type and model');
                 assert.equal(row.steps[1].text, PROMPT, at + 'step 2 prompt whole, to the last character');
                 assert.ok(!row.steps[1].ok && !row.steps[1].warn, at + 'an agent step has neither note');
                 assert.ok(row.steps[2].head.includes('keeps going if it fails'), at + 'step 3 head');
@@ -76,6 +76,10 @@ const view = (extra = {}) => ({ name: 'nightly-deps', description: '', team: 'te
                 assert.equal(row.pwned, false, at + 'nothing the Orchestrator wrote ran'); assert.equal(row.imgs, 0, at + 'its markup is text');
                 const box = await ev(`(() => { const pre = document.querySelectorAll('.autoc-text')[1]; const cs = getComputedStyle(pre); return { scrolls: cs.overflowY === 'auto' && pre.scrollHeight > pre.clientHeight, hint: !!document.querySelectorAll('.autoc-step')[1].querySelector('.autoc-hint'), fits: document.documentElement.scrollWidth <= window.innerWidth + 1 }; })()`);
                 assert.ok(box.scrolls, at + 'a long prompt scrolls inside its box'); assert.ok(box.hint, at + 'and says so'); assert.ok(box.fits, at + 'no horizontal scroll');
+                // the footer and the green path (QA2 round 1): nothing runs off the card's edge; the path is one piece; at 390 Approve and Deny are wide
+                const foot = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'), right = n => n.getBoundingClientRect().right, edge = r.getBoundingClientRect().right + 1, h = r.querySelector('[data-automation-hint]'), ap = r.querySelector('[data-automation-action=approve]'), dn = r.querySelector('[data-automation-action=deny]'), code = r.querySelector('.autoc-note-ok code'), cs = getComputedStyle(code); return { hintIn: right(h) <= edge && h.scrollWidth <= h.clientWidth + 1, btnsIn: right(ap) <= edge && right(dn) <= edge, apW: ap.getBoundingClientRect().width, dnW: dn.getBoundingClientRect().width, dbg: (() => { const p = ap.parentElement, c = getComputedStyle(p), a = getComputedStyle(ap); return [p.className, c.display, c.flexWrap, c.width, a.flexBasis, a.flexGrow, a.width, p.getBoundingClientRect().width].join('|'); })(), pathOne: code.getClientRects().length === 1 && cs.whiteSpace === 'nowrap' && code.getBoundingClientRect().height < 30 }; })()`);
+                assert.ok(foot.hintIn, at + 'the note under the buttons is inside the card'); assert.ok(foot.btnsIn, at + 'the buttons are inside the card'); assert.ok(foot.pathOne, at + 'the script path stays whole on one line');
+                if (w === 390) assert.ok(foot.apW >= 120 && foot.dnW >= 120, at + `Approve and Deny are wide buttons at 390: ${foot.apW} ${foot.dnW} ${foot.dbg}`);
                 await shot(`asking-${w}-${theme}`, w, mobile);
                 if (theme === 'dark' || w === 390) {
                     // Approve: one click, one claim of the Approve button, the row goes
@@ -92,6 +96,7 @@ const view = (extra = {}) => ({ name: 'nightly-deps', description: '', team: 'te
                     assert.equal(ch.chip, 'Off until you approve again', at + 'the changed chip'); assert.ok(ch.title.includes('Changed since you approved: nightly-deps'), at + 'the changed title');
                     assert.ok(ch.changed.includes('What changed since you approved') && ch.changed.includes(HASH.slice(0, 8)) && ch.changed.includes(NEWER.slice(0, 8)) && ch.changed.includes('nothing ran from this version'), at + 'what changed: ' + ch.changed);
                     assert.equal(ch.adds, 2); assert.equal(ch.dels, 2); assert.equal(ch.approve, 'Approve again');
+                    assert.ok(ch.changed.includes('Schedule: Every weekday at 07:30 (Chicago time)') && ch.changed.includes('Schedule: Every day at 07:30 (Chicago time)') && ch.changed.includes('Step 2 \u00b7 Model: Sonnet') && ch.changed.includes('Step 2 \u00b7 Model: Opus') && !/\* \*|model:/.test(ch.changed), at + 'what changed is in words, no cron: ' + ch.changed);
                     assert.ok(ch.hint.includes('Deny keeps it off. You can approve it later from Automations.'), at + 'the changed hint');
                     await shot(`changed-${w}-${theme}`, w, mobile);
                     // an automation that changed behind the question: the server refuses and the page drops the row

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -418,18 +419,18 @@ func automationWords(project string, wf *store.Workflow, job *store.ScheduledJob
 			fail = "keeps going if it fails"
 		}
 		if st.Type == "agent" {
-			fmt.Fprintf(&b, "Step %d: %s (agent, %s). Agent step: it runs with an agent's own permissions, as an agent the Orchestrator launches would.\n", i+1, st.Name, fail)
+			fmt.Fprintf(&b, "Step %d: %s (agent, %s). Agent step: it runs with an agent's own permissions, as an agent the Orchestrator launches would, and signs in as usual.\n", i+1, st.Name, fail)
 			fmt.Fprintf(&b, "Prompt:\n%s\n", st.Prompt)
 			continue
 		}
 		fmt.Fprintf(&b, "Step %d: %s (shell, %s), in %s:\n%s\n", i+1, st.Name, fail, wf.RepoPath, st.Command)
 		if f := files[i]; f != "" {
-			fmt.Fprintf(&b, "  %s is part of this approval; if it changes, the run stops and you are asked again.\n", f)
+			fmt.Fprintf(&b, "  %s is part of this approval; if it changes, the run stops and you are asked again. It covers this file only, not what the file runs.\n", f)
 		} else if editable[i] {
 			b.WriteString("  This step runs files your team can change after you approve.\n")
 		}
 	}
-	b.WriteString("A shell step runs as you, on this computer: it can read every file you can read. It gets none of Coral's tokens or keys in its environment.\n")
+	b.WriteString("A shell step runs as you, on this computer: it can read every file you can read. It gets none of Coral's tokens or keys in its environment. (An agent step signs in as usual.)\n")
 	b.WriteString("Nothing runs until you approve. Approving enables exactly this version; any later edit turns it off and asks you again. Deny removes the proposal. Only you can approve it, on this computer: a Hub link cannot.")
 	return b.String()
 }
@@ -696,6 +697,8 @@ func (h *BoardHandler) deleteTeamAutomation(ctx context.Context, wf *store.Workf
 	return nil
 }
 
+var automationRunMu sync.Mutex
+
 // RunAutomationRoute answers POST /api/board/{project}/automations/{name}/run: one test run of an automation whose CURRENT hash the Operator approved. A proposal, an automation that changed and one that is off
 // cannot be run by an agent (the runner's gate refuses them too, whoever asks). At most one run at a time and a few an hour.
 func (h *BoardHandler) RunAutomationRoute(w http.ResponseWriter, r *http.Request) {
@@ -716,17 +719,25 @@ func (h *BoardHandler) RunAutomationRoute(w http.ResponseWriter, r *http.Request
 		errConflict(w, "only an automation the Operator has approved, in its current version, can be run: this one is not approved, or it is off")
 		return
 	}
+	automationRunMu.Lock() // the active-run check and the start are one step: two calls at once start one run
+	defer automationRunMu.Unlock()
 	if active, _ := h.auto.ws.GetActiveRunsForWorkflow(r.Context(), wf.ID); len(active) > 0 {
 		errConflict(w, "a run of this automation is already going")
 		return
 	}
-	if n, err := h.auto.ws.TeamTestRunsSince(r.Context(), project, time.Now().Add(-time.Hour)); err != nil || n >= automationTestRunsHour {
-		writeError(w, http.StatusTooManyRequests, "automation_limit", fmt.Sprintf("a team may test-run at most %d automations an hour", automationTestRunsHour))
+	slot, err := h.auto.ws.ClaimTeamTestRun(r.Context(), project, wf.ID, wf.Name, wf.ApprovedHash, who, automationTestRunsHour) // the hourly count and the record are one transaction
+	if err != nil {
+		if errors.Is(err, store.ErrTeamTestRunLimit) {
+			writeError(w, http.StatusTooManyRequests, "automation_limit", fmt.Sprintf("a team may test-run at most %d automations an hour", automationTestRunsHour))
+			return
+		}
+		errInternalServer(w, "the run could not start")
 		return
 	}
 	trig := "test run by the Orchestrator"
 	run, err := h.auto.runner.TriggerWorkflow(r.Context(), wf, "api", &trig)
 	if err != nil {
+		h.auto.ws.ReleaseTeamTestRun(r.Context(), slot) // it did not start: the slot is not used
 		var rae *background.ApprovalRequiredError
 		if errors.As(err, &rae) {
 			errConflict(w, rae.Error())
@@ -740,7 +751,6 @@ func (h *BoardHandler) RunAutomationRoute(w http.ResponseWriter, r *http.Request
 		errInternalServer(w, "the run could not start")
 		return
 	}
-	_ = h.auto.ws.RecordTeamWorkflowEvent(r.Context(), project, wf.ID, wf.Name, store.TeamWorkflowEventTestRun, wf.ApprovedHash, who)
 	writeJSON(w, http.StatusOK, map[string]any{"run_id": run.ID, "status": run.Status, "automation": wf.Name})
 }
 

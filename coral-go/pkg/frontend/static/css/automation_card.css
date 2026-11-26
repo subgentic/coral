@@ -25,8 +25,12 @@
 .autoc-diff .a { background: color-mix(in srgb, var(--success) 16%, transparent); }
 .autoc-diff .d { background: color-mix(in srgb, var(--error) 16%, transparent); }
 .autoc-rule { margin: 10px 0 0; color: var(--text-secondary); font-size: var(--fs-sm); }
-.autoc-actions-hint { flex-basis: 100%; color: var(--text-secondary); font-size: var(--fs-sm); margin-top: 6px; }
+.autoc-actions-hint { flex-basis: 100%; color: var(--text-secondary); font-size: var(--fs-sm); margin-top: 6px; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.autoc-note-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.autoc-note-text code { display: block; max-width: 100%; white-space: nowrap; overflow-x: auto; overflow-wrap: normal; }
 @media (max-width: 600px) {
+    .inbox-yesno-actions:has([data-automation-hint]) { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+    .inbox-yesno-actions > [data-automation-action] { flex: 1 1 40% !important; min-height: 40px; }
     .autoc-dl { grid-template-columns: 1fr; gap: 0; }
     .autoc-dl dd { margin-bottom: 6px; }
 }

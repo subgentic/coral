@@ -311,6 +311,8 @@ func TestATeamsAgentStepRunsUnderTheCapOfAnAgentLaunch(t *testing.T) {
 		"hooks":        `[{"name":"a","type":"shell","command":"true","hooks":{"Stop":[]}}]`,
 		"interactive":  `[{"name":"a","type":"agent","prompt":"p","interactive":true,"agent":{"agent_type":"claude"}}]`,
 		"connections":  `[{"name":"a","type":"shell","command":"true","connections":["x"]}]`,
+		"pi":           `[{"name":"a","type":"agent","prompt":"p","agent":{"agent_type":"pi"}}]`,
+		"codex":        `[{"name":"a","type":"agent","prompt":"p","agent":{"agent_type":"codex","model":"x"}}]`,
 	} {
 		if TeamStepsProblem(wf(steps)) == "" {
 			t.Errorf("%s: an agent step may not widen the cap", name)

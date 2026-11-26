@@ -377,6 +377,34 @@ func teamWorkflowTx(ctx context.Context, tx *sqlx.Tx, id int64) (*Workflow, erro
 	return &w, nil
 }
 
+// ErrTeamTestRunLimit says the team has used its test runs for the hour.
+var ErrTeamTestRunLimit = errors.New("the team has used its test runs for this hour")
+
+// ClaimTeamTestRun takes one of the team's hourly test-run slots: it counts the runs of the last hour and records this one in the same transaction, so two calls at once cannot both take the last slot.
+// A run that then fails to start gives its slot back with ReleaseTeamTestRun.
+func (s *WorkflowStore) ClaimTeamTestRun(ctx context.Context, team string, wfID int64, name, hash, who string, limit int) (int64, error) {
+	var id int64
+	err := s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
+		var n int
+		if err := tx.GetContext(ctx, &n, `SELECT COUNT(*) FROM team_workflow_events WHERE team = ? AND kind = ? AND at >= ?`, team, TeamWorkflowEventTestRun, time.Now().Add(-time.Hour).Unix()); err != nil {
+			return err
+		}
+		if n >= limit {
+			return ErrTeamTestRunLimit
+		}
+		if err := recordTeamEvent(ctx, tx, team, wfID, name, TeamWorkflowEventTestRun, hash, who, time.Now()); err != nil {
+			return err
+		}
+		return tx.GetContext(ctx, &id, `SELECT MAX(id) FROM team_workflow_events WHERE team = ? AND kind = ?`, team, TeamWorkflowEventTestRun)
+	})
+	return id, err
+}
+
+// ReleaseTeamTestRun gives back a slot ClaimTeamTestRun took, for a run that did not start.
+func (s *WorkflowStore) ReleaseTeamTestRun(ctx context.Context, id int64) {
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM team_workflow_events WHERE id = ? AND kind = ?`, id, TeamWorkflowEventTestRun)
+}
+
 // TeamTestRunsSince counts the test runs the team's Orchestrator started since t.
 func (s *WorkflowStore) TeamTestRunsSince(ctx context.Context, team string, t time.Time) (int, error) {
 	var n int

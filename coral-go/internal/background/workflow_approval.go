@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/subgentic/coral/internal/safefs"
@@ -268,6 +269,9 @@ func TeamStepsProblem(wf *store.Workflow) string {
 		}
 		if len(a.Flags) > 0 || len(a.Tools) > 0 || len(a.Capabilities) > 0 && string(a.Capabilities) != "null" {
 			return where + ": an agent step of a team's automation sets its agent type and model only: no flags, tools or capabilities"
+		}
+		if a.AgentType != "" && a.AgentType != "claude" {
+			return where + ": an agent step of a team's automation runs on claude only (agent type " + strconv.Quote(a.AgentType) + " is refused)"
 		}
 		return ""
 	}
