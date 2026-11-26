@@ -1,0 +1,17 @@
+/* Group by's boxes and the task split (#21685): not at start, loaded by status_groups.js with the module that draws them. */
+.session-list .session-group-item[data-in] .session-time { display: inline; } /* a task-split row shows its time, like a status row (the start sheet's rule is for data-group=__status__) */
+/* Group by's three boxes (#21685): a fieldset in the Display panel, a label over one box to a line (the mock); 44px lines on touch. The bar's inputs are tall by default (agentic.css), so these are set back. */
+.list-bar-groupby { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; flex: 0 0 100%; }
+.list-bar-groupby > legend { padding: 0; margin-bottom: var(--space-xs); color: var(--text-secondary); font-size: var(--fs-base); }
+.agent-list-bar .list-bar-groupby .list-bar-check { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-md); min-height: 30px; color: var(--text); font-size: var(--fs-base); cursor: pointer; }
+.agent-list-bar .list-bar-groupby .list-bar-check input { flex: none; inline-size: 1rem; block-size: 1rem; min-height: 0; margin: 0; }
+@media (pointer: coarse) { .agent-list-bar .list-bar-groupby .list-bar-check { min-height: 44px; } }
+/* Task rows: the sub-heading under a team or computer, and each row's #number title line (the mock: accent number, muted title, one line). */
+.status-sub { list-style: none; margin: var(--space-xs) 0 0; padding-inline-start: var(--space-md); }
+.status-sub .status-head-toggle { font-size: var(--fs-sm); color: var(--text-secondary); min-height: 30px; padding-block: 0; }
+.session-group-item[data-in] .session-preview, .session-group-item[data-in] .session-status-line { display: none; } /* the mock's row is the name and the task line */
+.session-group-item[data-in] { padding-inline-start: var(--space-xl); }
+.session-task-line { display: block; padding-left: 18px; color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-task-line b { color: var(--accent); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; margin-inline-end: var(--space-xs); }
+.status-queued { color: var(--text-muted); font-size: var(--fs-sm); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 var(--space-xs); margin-inline-start: var(--space-sm); flex: none; }
+.status-more-in { padding-inline-start: var(--space-xl); margin-top: 0; }

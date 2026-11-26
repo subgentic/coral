@@ -9,6 +9,8 @@ import { escapeHtml, escapeAttr } from './utils.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { sessionStateInfo } from './session_state.js';
 import { DISPLAY_PANEL_OPEN } from './display_panel.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('group_by.css'); // the Group by boxes and the task split: not in the start sheet (#21685)
 
 const KEYS = { server: 'coral-group-computer', team: 'coral-group-team', task: 'coral-group-task' }; // 'true' / 'false' per box; none set = the old choices (below), else all off
 const LEGACY = { server: ['coral-group-by-server', 'true'], team: ['coral-agent-grouping', 'team'] }; // what a browser chose before the three boxes
