@@ -19,6 +19,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/gitutil"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -501,7 +502,7 @@ func (h *BoardHandler) closeAutomationAsks(ctx context.Context, project, name, n
 func automationErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrTeamWorkflowLimit), errors.Is(err, store.ErrTeamProposalRate):
-		writeError(w, http.StatusTooManyRequests, "automation_limit", err.Error())
+		httputil.WriteActionLimit(w, 0, "automation_limit", err.Error()) // a limit on one action: marked, so the dashboard does not pause its pollers
 	case errors.Is(err, store.ErrTeamWorkflowMissing):
 		errNotFound(w, "no such automation on this team")
 	case err != nil && strings.Contains(err.Error(), "UNIQUE"):
@@ -728,7 +729,7 @@ func (h *BoardHandler) RunAutomationRoute(w http.ResponseWriter, r *http.Request
 	slot, err := h.auto.ws.ClaimTeamTestRun(r.Context(), project, wf.ID, wf.Name, wf.ApprovedHash, who, automationTestRunsHour) // the hourly count and the record are one transaction
 	if err != nil {
 		if errors.Is(err, store.ErrTeamTestRunLimit) {
-			writeError(w, http.StatusTooManyRequests, "automation_limit", fmt.Sprintf("a team may test-run at most %d automations an hour", automationTestRunsHour))
+			httputil.WriteActionLimit(w, 0, "automation_limit", fmt.Sprintf("a team may test-run at most %d automations an hour", automationTestRunsHour))
 			return
 		}
 		errInternalServer(w, "the run could not start")

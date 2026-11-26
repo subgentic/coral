@@ -12,6 +12,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -65,6 +66,8 @@ func (o *IdentityObserver) automationTokenGate(w http.ResponseWriter, r *http.Re
 		code := http.StatusTooManyRequests
 		if err != nil {
 			code = http.StatusServiceUnavailable
+		} else {
+			w.Header().Set(httputil.ActionLimitHeader, "action") // a limit on one action, not an overloaded server: the dashboard keeps polling
 		}
 		o.refuse(w, code, "automation_write_limit", "An automation may post "+strconv.Itoa(store.AutomationWritesPerRun)+" times a run and "+strconv.Itoa(store.AutomationWritesPerHour)+" times an hour")
 		return r, false

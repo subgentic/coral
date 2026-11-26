@@ -212,6 +212,7 @@ func TestAnAutomationMayPostTwentyTimesARun(t *testing.T) {
 	}
 	rec := rg.do("POST", postRoute, `{"content":"one more alert"}`, autoHdr(tok))
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Equal(t, "action", rec.Header().Get("X-Coral-Limit"), "a limit on one action is marked: the dashboard does not pause its pollers for it")
 	assert.Contains(t, rec.Body.String(), "automation_write_limit")
 	assert.Len(t, rg.messages(t), store.AutomationWritesPerRun)
 	_, _ = io.Discard.Write(nil)
