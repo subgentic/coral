@@ -65,6 +65,7 @@ const HEX='d'.repeat(64), OTHER='e'.repeat(64);
 
  const open=async width=>{
   await Emulation.setDeviceMetricsOverride({width,height:width===390?844:800,deviceScaleFactor:1,mobile:width===390});
+  await Emulation.setTouchEmulationEnabled({enabled:width===390});
   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);await ev(fixture);
   await ev(`window.__png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS9sAAAAASUVORK5CYII='; true`);
   await ev(`import(${S}+'artifact_viewer.js').then(m=>m.openArtifactViewer('${HEX}',{filename:'Release plan',board:'draft-test'}))`);
@@ -75,14 +76,26 @@ const HEX='d'.repeat(64), OTHER='e'.repeat(64);
   await Emulation.setTimezoneOverride({timezoneId:'UTC'});
   // Capture both requested widths before asserting the new action, so the old head supplies both before shots.
   for(const width of [1280,390]){await open(width);await type('Name the rollback owner.');await shot('composer-'+width);}
-  assert.equal(await ev(`document.querySelector('.ac-save-send')?.textContent`),'Save and send','the composer offers one-click Save and send');
+  assert.equal(await ev(`document.querySelector('.ac-save-send')?.getAttribute('aria-label')`),'Send','the composer offers one-click Save and send');
   for(const width of [1280,390]){
    await open(width);
    assert.ok(await ev(`(()=>{const a=document.querySelector('.ac-composer .ac-send').getBoundingClientRect(),b=document.querySelector('.ac-save-send').getBoundingClientRect();return Math.abs(a.y-b.y)<1 && b.right<=innerWidth;})()`),'Save draft and Save and send stay adjacent and fit');
-   const labels=await ev(`[...document.querySelectorAll('.ac-composer-row button')].map(b=>b.textContent)`);
-   assert.deepEqual(labels,['Add image','Cancel','Save draft','Save and send']);
+   const labels=await ev(`[...document.querySelectorAll('.ac-composer-row button')].map(b=>b.getAttribute('aria-label') || b.textContent)`);
+   assert.deepEqual(labels,['Add image','Cancel','Save draft','Send']);
    assert.ok(await ev(`!document.querySelector('.ac-composer .ac-send').classList.contains('btn-primary') && document.querySelector('.ac-save-send').classList.contains('btn-primary')`));
-   assert.match(await ev(`document.querySelector('.ac-draft-save-hint').textContent`),/Send comments.*Save and send/);
+   assert.match(await ev(`document.querySelector('.ac-draft-save-hint').textContent`),/Send comments.*Send/);
+   if(width===390){
+    await ev(`document.querySelector('.ac-composer textarea').focus();true`);
+    await Emulation.setDeviceMetricsOverride({width:390,height:440,deviceScaleFactor:1,mobile:true});
+    await waitFor(`document.body.classList.contains('keyboard-open')`,'keyboard-open phone layout');
+    await ev(`document.querySelector('.ac-composer textarea').scrollIntoView({block:'start'});true`);await ev(framesJs(3));
+    await shot('keyboard-390');
+    const keyboard=await ev(`({height:innerHeight,buttons:[...document.querySelectorAll('.ac-composer .ac-send')].map(b=>{const r=b.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {label:b.getAttribute('aria-label'),top:r.top,bottom:r.bottom,reachable:hit===b||b.contains(hit)};})})`);
+    assert.ok(keyboard.buttons.every(b=>b.top>=0&&b.bottom<=keyboard.height&&b.reachable),'both draft and send actions fit above the phone keyboard: '+JSON.stringify(keyboard));
+    await ev(`document.querySelector('.ac-composer textarea').blur();true`);
+    await Emulation.setDeviceMetricsOverride({width:390,height:844,deviceScaleFactor:1,mobile:true});
+    await waitFor(`!document.body.classList.contains('keyboard-open')`,'keyboard closed');
+   }
    await type('Earlier private draft');await click('.ac-composer .ac-send');
    await waitFor(`window.__drafts.length===1 && document.querySelector('.ac-composer textarea')?.value===''`,'private draft saved');
    assert.equal(await ev('window.__batches.length'),0);
@@ -111,6 +124,7 @@ const HEX='d'.repeat(64), OTHER='e'.repeat(64);
    await Input.dispatchKeyEvent({type:'keyDown',key:'Enter',code:'Enter',modifiers:4});await Input.dispatchKeyEvent({type:'keyUp',key:'Enter',code:'Enter',modifiers:4});
    await waitFor('window.__drafts.length===1','Cmd Return saves a private draft');
    assert.equal(await ev('window.__batches.length'),3);
+
   }
   console.log('PASS Save and send: whole and passage comments, full batch with pictures, failed send retains draft, retry without duplication, Cmd Return stays private at 1280/390');
  }finally{await client.close();}

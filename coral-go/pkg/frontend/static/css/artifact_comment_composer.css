@@ -1,2 +1,12 @@
 /* Keep Save draft beside Save and send when the picture picker wraps on a phone. */
 .ac-draft-actions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+
+.ac-action-icon { display: none; }
+.ac-action-icon::before { content: attr(data-glyph); }
+@media (max-width: 600px) {
+    .ac-draft-actions { flex-wrap: nowrap; }
+    .ac-composer .ac-add-image::before { content: none; }
+    .ac-composer .ac-action-label { display: none; }
+    .ac-composer .ac-action-icon { display: inline-block; font-size: var(--icon-size); }
+    .ac-composer button:has(.ac-action-icon) { min-width: 44px; padding: 6px 10px; }
+}
