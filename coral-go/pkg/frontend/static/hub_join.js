@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { serverLabel } from './server_status.js';
 import { pollEvery } from './overload.js';
 import { loadStyles } from './lazy_styles.js';
+import { importOnce } from './import_once.js';
 const local = () => !isCloud() && !state.hub;
 const el = (tag, text, cls) => { const n = document.createElement(tag); if (text != null) n.textContent = text; if (cls) n.className = cls; return n; };
 const button = (text, run, primary = false) => { const n = el('button', text, `btn${primary ? ' btn-primary' : ''}`); n.type = 'button'; n.addEventListener('click', run); return n; };
@@ -110,6 +111,7 @@ export function joinCount(query = '') { return local() ? requests.filter(r => ma
 export async function loadJoinRequests(changed) {
     if (!local() || reading || Date.now() - last < 20000) return;
     refresh = changed; reading = true; last = Date.now();
+    if (!await (await importOnce('./operator_here.js')).operatorHere()) { reading = false; return; } // a remote browser is refused join requests (403 other_user): do not ask (#21543)
     try { const data = await request('link-requests'); const old = requests; requests = (data.requests || []).slice(0, 50).filter(r => typeof r.hub === 'string' && r.hub.length <= 80 && ['view', 'interact', 'launch'].includes(r.cap_asked)); for (const r of old) if (!requests.some(n => n.id === r.id) && !retained.has(r.id) && Date.parse(r.expires_at) <= Date.now()) retained.set(r.id, { request: r, expired: true }); }
     catch (e) { requests = []; if (e.status === 401 || e.status === 403) retained.clear(); }
     try { if ([...retained.values()].some(v => v.code)) { const data = await request('links'); for (const v of retained.values()) if (v.code && data.links?.some(l => l.hub_origin === v.request.hub)) { v.code = ''; v.connected = true; } } } catch { /* A failed status read never claims a connection succeeded. */ }

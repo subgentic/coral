@@ -75,7 +75,6 @@ import './chat_find.js';
 import './update_check.js';
 import './server_base.js';
 import { initServersUi } from './servers.js';
-import { initHubIndicator } from './hub_indicator.js';
 import './servers_tab.js';
 import './inbox_tab.js';
 import './group_collapse.js';
@@ -135,7 +134,7 @@ async function startDashboard() {
     // Single-agent popout mode (/agent/{uuid}): chrome-free workspace only.
     // Marked before any renderer runs so CSS and storage scoping apply.
     const popout = applyPopoutBodyClass();
-    if (!popout) initHubIndicator(); // the Coral Hub connection in the header (#3544)
+    if (!popout) importOnce('./hub_indicator.js').then(m => m.initHubIndicator()).catch(() => {}); // the Coral Hub connection in the header (#3544); lazy, so the first paint carries none of it
 
     loadInitialData(popout);
 

@@ -121,10 +121,10 @@ export function renderIndicator(st, now = new Date()) {
 export async function refresh() {
     if (_stopped) return;
     try {
-        const resp = await fetch(STATUS_URL, { credentials: 'same-origin' });
-        if (resp.status === 403 || resp.status === 404) { stopHubIndicator(); return; } // not this computer's dashboard
-        if (!resp.ok) return; // a blip: keep what is shown
-        renderIndicator(await resp.json());
+        if (!await (await importOnce('./operator_here.js')).operatorHere()) return stopHubIndicator(); // a remote browser is refused this read (403 other_user): do not ask (#21543)
+        const resp = await fetch(STATUS_URL);
+        if (resp.status === 403 || resp.status === 404) return stopHubIndicator(); // not this computer's dashboard
+        if (resp.ok) renderIndicator(await resp.json()); // else a blip: keep what is shown
     } catch { /* offline: keep what is shown */ }
 }
 
