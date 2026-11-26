@@ -23,14 +23,22 @@ function fact(dl, label, value, extra) {
     dl.append(el('dt', '', label)); const dd = el('dd', '', value); if (extra) dd.append(extra); dl.append(dd);
 }
 
-/** The card's words for when the schedule runs: the cron text and its time zone, or "only when someone runs it". */
-function schedule(v) { return v.cron ? `${v.cron} (${v.timezone || 'UTC'})` : 'Only when someone runs it (no schedule)'; }
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** The card's words for when the schedule runs: "Every weekday at 07:30 (Chicago time)" for the plain shapes, the cron text and its zone for any other, "Only when someone runs it" for none. */
+function schedule(v) {
+    if (!v.cron) return 'Only when someone runs it (no schedule)';
+    const tz = v.timezone || 'UTC', zone = tz === 'UTC' ? 'UTC' : `${tz.split('/').pop().replace(/_/g, ' ')} time`;
+    const m = /^(\d{1,2}) (\d{1,2}) \* \* (\*|1-5|0,6|[0-7])$/.exec(v.cron);
+    if (!m || +m[1] > 59 || +m[2] > 23) return `${v.cron} (${tz})`;
+    const at = `${String(m[2]).padStart(2, '0')}:${String(m[1]).padStart(2, '0')}`;
+    const who = m[3] === '*' ? 'Every day' : m[3] === '1-5' ? 'Every weekday' : m[3] === '0,6' ? 'Every weekend day' : `Every ${DAYS[+m[3] % 7]}`;
+    return `${who} at ${at} (${zone})`;
+}
 
 function stepBlock(v, s) {
     const box = el('div', 'autoc-step'); const head = el('div', 'autoc-step-head');
     head.append(el('strong', '', `Step ${s.index}`), el('span', 'autoc-chip', s.type === 'agent' ? 'Agent' : 'Shell'), el('span', 'autoc-step-note', s.continue_on_failure ? 'keeps going if it fails' : 'stops the run if it fails'));
     const body = el('div', 'autoc-step-body'); const dl = el('dl', 'autoc-dl');
-    if (s.name) fact(dl, 'Name', s.name);
     if (s.type === 'agent') {
         fact(dl, 'Agent type', s.agent_type || 'default'); if (s.model) fact(dl, 'Model', s.model);
         fact(dl, 'Mode', 'Default: the permissions of an agent the Orchestrator launches; it cannot be given more');
@@ -62,7 +70,7 @@ export function automationCard(v) {
     const dl = el('dl', 'autoc-dl autoc-facts');
     fact(dl, 'Workflow', v.name); fact(dl, 'Team', v.team); fact(dl, 'Repo folder', v.repo_path); fact(dl, 'Runs', schedule(v));
     fact(dl, 'Proposed by', `Orchestrator of ${v.team}`);
-    const hash = el('code', 'autoc-hash', v.hash); const dd = hash; fact(dl, 'Hash', '', dd); dl.lastChild.append(el('span', 'autoc-hint-inline', ' covers every step below, the schedule and the folder'));
+    const hash = el('code', 'autoc-hash', v.hash.slice(0, 16)); hash.title = v.hash; fact(dl, 'Hash', '', hash); dl.lastChild.append(el('span', 'autoc-hint-inline', ' covers every step below, the schedule and the folder'));
     if (v.description) fact(dl, 'About', v.description);
     card.append(dl, el('h4', 'autoc-steps-title', `${v.steps.length} step${v.steps.length === 1 ? '' : 's'}, in order`));
     for (const s of v.steps) card.append(stepBlock(v, s));
@@ -102,23 +110,28 @@ export function addAutomationButtons(a, box) {
     drawCard(a, box, name, hash, again).catch(() => {});
 }
 
+const seen = new Map(); // board/name/hash -> the automation as the server described it: a redraw of the row paints the card at once, with no "Loading" in between
+
 async function drawCard(a, box, name, hash, again) {
     await loadStyles('automation_card.css');
     // the row is drawn after this module is asked for: find its cell once it is in the page
     for (let i = 0; i < 20 && !box.closest('tr'); i++) await new Promise(r => setTimeout(r, 25));
     const row = box.closest('tr'); if (!row) return;
-    const cell = row.querySelector('.inbox-agent-first'); if (!cell) return;
-    cell.querySelector('[data-automation-card]')?.remove(); cell.querySelector('.inbox-ask-name')?.classList.add('autoc-title');
+    const cell = row.querySelector('.inbox-agent-first'), msg = cell && cell.querySelector('.inbox-ask-name'); if (!msg) return;
+    // the question's own words are replaced by the card: its title, then the details in the message box
+    msg.classList.remove('inbox-preview'); msg.classList.add('autoc-msg'); cell.querySelector('.inbox-preview-toggle')?.remove();
+    msg.replaceChildren(el('strong', 'autoc-title', `${again ? 'Changed since you approved' : 'Approve an automation'}: ${name}`));
     const kind = cell.querySelector('.inbox-kind-ask'); if (kind) kind.textContent = 'Automation approval';
-    const title = cell.querySelector('.inbox-ask-name'); if (title) title.textContent = `${again ? 'Changed since you approved' : 'Approve an automation'}: ${name}`;
     const chip = el('span', again ? 'autoc-chip autoc-chip-off' : 'autoc-chip autoc-chip-warn', again ? 'Off until you approve again' : 'Starts off'); chip.setAttribute('data-automation-state', '');
     cell.querySelector('.inbox-meta')?.append(chip);
-    const holder = el('div', 'autoc'); holder.setAttribute('data-automation-card', ''); holder.textContent = 'Loading the automation…'; cell.append(holder);
+    const key = `${a.board}/${name}/${hash}`;
+    if (seen.has(key)) { msg.append(automationCard(seen.get(key))); return; }
+    const holder = el('div', 'autoc'); holder.setAttribute('data-automation-card', ''); holder.textContent = 'Loading the automation\u2026'; msg.append(holder);
     try {
         const r = await fetch(`/api/board/${encodeURIComponent(a.board)}/automations/${encodeURIComponent(name)}`, { cache: 'no-store' });
         const v = r.ok ? (await r.json()).automation : null;
         if (!v) { holder.textContent = 'The automation could not be loaded. Approving still works from the words of the question.'; return; }
         if (v.hash !== hash) { holder.textContent = 'This automation changed after the question was filed; look at the new question.'; return; }
-        holder.replaceWith(automationCard(v));
+        seen.set(key, v); holder.replaceWith(automationCard(v));
     } catch { holder.textContent = 'The automation could not be loaded. Try again.'; }
 }

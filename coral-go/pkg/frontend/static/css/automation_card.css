@@ -32,3 +32,5 @@
     .autoc-dl { grid-template-columns: 1fr; gap: 0; }
     .autoc-dl dd { margin-bottom: 6px; }
 }
+.autoc-msg { display: block; max-height: none; overflow: visible; white-space: normal; }
+.autoc-title { display: block; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
