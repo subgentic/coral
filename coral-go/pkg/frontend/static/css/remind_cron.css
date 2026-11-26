@@ -1,0 +1,3 @@
+/* The Remind dialog's Custom (cron) line (#21330): loads with the dialog, not at start (start_bytes_delta). */
+.remind-cron { display: flex; flex-direction: column; gap: 4px; margin-top: var(--space-md, 8px); }
+.modal-content input.remind-cron-input:not([type="checkbox"]):not([type="radio"]) { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); letter-spacing: var(--ls-cron); } /* outweighs the dialogs' input rule (0,3,1) */

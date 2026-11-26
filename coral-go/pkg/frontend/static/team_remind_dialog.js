@@ -3,6 +3,8 @@
  * so it is normalised the same way as it is sent. A refusal is said in the dialog and the dialog stays open. */
 import { importOnce } from './import_once.js';
 import { el as mk } from './dom_el.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('remind_cron.css'); // the Custom line's few rules are in the lazy sheet, not the start CSS
 const { oneLine } = await importOnce('./reminder_dialog.js');
 const { checkCron, nextRun } = await importOnce('./reminder_cron.js'); // the Custom (cron) line's check, the server's rules (#21330)
 const { cronWords, atWords, localZone } = await importOnce('./job_words.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried

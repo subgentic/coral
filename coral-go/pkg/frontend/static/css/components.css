@@ -3692,8 +3692,6 @@ dialog.reminder-dialog:not([open]) { display: none; }
 dialog.reminder-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .reminder-intro { margin: 0 0 var(--space-md, 8px); }
 .reminder-form [aria-invalid="true"] { border-color: var(--error); }
-.remind-cron { display: flex; flex-direction: column; gap: 4px; margin-top: var(--space-md, 8px); }
-.modal-content input.remind-cron-input:not([type="checkbox"]):not([type="radio"]) { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); letter-spacing: 0.04em; } /* outweighs the dialogs' input rule (0,3,1) */
 .reminder-hint { margin: 4px 0 var(--space-md, 8px); color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); }
 @media (pointer: coarse), (max-width: 767px) { .reminder-form input, .reminder-form .btn { min-height: var(--control-touch-height, 44px); } }
 
