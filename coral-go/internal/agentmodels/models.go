@@ -232,6 +232,7 @@ func ParseOpencodeModels(b []byte) ([]Model, error) {
 func ParsePiModels(b []byte) ([]Model, error) {
 	var models []Model
 	header := false
+	columns := 0
 	for _, line := range strings.Split(string(b), "\n") {
 		f := strings.Fields(line)
 		if len(f) == 0 {
@@ -241,12 +242,14 @@ func ParsePiModels(b []byte) ([]Model, error) {
 			if len(f) < 2 || f[0] != "provider" || f[1] != "model" {
 				return nil, ErrNoModels
 			}
-			header = true
+			header, columns = true, len(f)
 			continue
 		}
-		if len(f) >= 2 {
-			models = append(models, Model{Value: f[0] + "/" + f[1], DisplayName: f[1], Group: f[0]})
+		// A row has every column and a value that can be --model's argument. A warning pi prints after the table (stderr is read too, #21604) has neither the columns nor, as a rule, a valid id.
+		if len(f) != columns || !ValidModelValue(f[0]) || !ValidModelValue(f[1]) || !ValidModelValue(f[0]+"/"+f[1]) {
+			continue
 		}
+		models = append(models, Model{Value: f[0] + "/" + f[1], DisplayName: f[1], Group: f[0]})
 	}
 	return result(models)
 }

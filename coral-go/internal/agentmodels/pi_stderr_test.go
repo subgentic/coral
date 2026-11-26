@@ -29,3 +29,15 @@ func TestPiModelsAreReadFromStderr(t *testing.T) {
 		})
 	}
 }
+
+// #21618: a warning pi prints after the table is not a model.
+func TestParsePiModelsSkipsATrailingWarning(t *testing.T) {
+	clean, err := ParsePiModels(fixture(t, "pi-0.73.1-list-models.txt"))
+	require.NoError(t, err)
+	got, err := ParsePiModels(fixture(t, "pi-0.73.1-list-models-trailing-warning.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, clean, got)
+	for _, m := range got {
+		assert.True(t, ValidModelValue(m.Value), m.Value)
+	}
+}
