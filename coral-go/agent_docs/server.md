@@ -32,12 +32,12 @@ curl -fsSLO https://github.com/subgentic/coral/releases/latest/download/coral-li
 curl -fsSLO https://github.com/subgentic/coral/releases/latest/download/SHA256SUMS.txt
 grep " coral-linux-amd64.tar.gz$" SHA256SUMS.txt | sha256sum -c -
 
-mkdir -p /tmp/coral-unpack
-tar -xzf coral-linux-amd64.tar.gz -C /tmp/coral-unpack --no-same-owner
+d="$(mktemp -d)"
+tar -xzf coral-linux-amd64.tar.gz -C "$d" --no-same-owner
 for prog in coral launch-coral coral-board coral-agent coral-hook-agentic-state coral-hook-message-check coral-hook-session-start coral-hook-task-sync coral-update; do
-  sudo install -m 0755 -o root -g root "/tmp/coral-unpack/$prog" "/usr/local/bin/$prog"
+  sudo install -m 0755 -o root -g root "$d/$prog" "/usr/local/bin/$prog"
 done
-rm -rf /tmp/coral-unpack
+rm -rf "$d"
 ```
 
 ### Install an agent CLI where the service user finds it
@@ -72,11 +72,9 @@ There is **no `coral` CLI subcommand** (such as `coral cli-check`) to probe agen
 
 ## 3. Accept the Terms of Service
 
-> **[PLACEHOLDER — awaiting Operator decision on Goal #316 / #277915]:** The headless Terms of Service acceptance path on a server without an interactive terminal is pending the Operator's decision (whether a person sets an explicit flag/environment variable naming the Terms version, or runs an interactive acceptance step on a terminal first).
+> **[PLACEHOLDER — awaiting `#21530` (`--accept-terms` / `CORAL_ACCEPT_TERMS=1`)]:** The headless Terms of Service launch flag `--accept-terms` (and `CORAL_ACCEPT_TERMS=1`) is being added in `#21530`. The human installing Coral sets `--accept-terms` (or `CORAL_ACCEPT_TERMS=1`) after reading the Terms; an installing or deploying agent must **never** set `--accept-terms` or `CORAL_ACCEPT_TERMS=1` on a person's behalf, and must **never** fake a pseudo-terminal (`pty`) or write a helper script to accept the Terms.
 >
-> **Do not** have an agent fake a pseudo-terminal (`pty`) or write a helper script to accept the Terms on a person's behalf.
->
-> Until the headless path is decided:
+> Until `#21530` lands:
 > - **Interactive terminal once as the service user:** Run `sudo -u coral -i coral --no-browser` in an interactive SSH session (`ssh -t`), read the Terms of Service, type `accept`, and press `Ctrl+C` once the server prints the dashboard URL (this writes `/home/coral/.coral/.eula-accepted`).
 > - **Coral Hub bootstrap credential:** When a machine starts with a one-time Coral Hub bootstrap credential (`--bootstrap-file` or `/run/coral/bootstrap.d/credential`), Coral records the Terms acceptance confirmed by Coral Hub on enrollment ([hub.md](hub.md#enrolling-with-a-one-time-credential-cloud-hub)).
 
@@ -86,31 +84,34 @@ There is **no `coral` CLI subcommand** (such as `coral cli-check`) to probe agen
 >
 > **Password length rules in code (`internal/auth/password.go`):** Coral accepts any non-empty password from **1 byte up to 4,096 bytes** (after NFKC normalization; stored as an argon2id hash in `<data dir>/password`, mode `0600`). The code does **not** enforce a minimum length above 1 byte (the dashboard's strength meter only advises), so you must enforce a strong password policy yourself.
 
-Never pass a password on the command line or in an environment variable (`ps` and `/proc/<pid>/environ` expose both). Use one of the two headless paths:
+Never pass a password on the command line, in a `bash -c '...'` argument, or in an environment variable (`ps`, `/proc/<pid>/environ` and shell history expose them). Read the password silently with `read -rs PW` (or disable shell history with `set +o history` / a leading space when `HISTCONTROL=ignorespace` is set) and pipe it over stdin, then `unset PW`:
 
 ### Option A: Before first start, with `CORAL_INITIAL_PASSWORD_FILE`
 
-Write the password to a regular file owned by `coral` with mode `0600` and pass its path in `CORAL_INITIAL_PASSWORD_FILE`. At startup, if no password is set yet, Coral reads the first line, hashes and stores the password in `<data dir>/password`, and **deletes the file immediately**:
+Write the password over stdin to a regular file owned by `coral` with mode `0600` and pass its path in `CORAL_INITIAL_PASSWORD_FILE`. At startup, if no password is set yet, Coral reads the first line, hashes and stores the password in `<data dir>/password`, and **deletes the file immediately**:
 
 ```bash
-sudo -u coral -i bash -c '
-  umask 077
-  printf "%s\n" "replace-with-a-long-random-password" > /home/coral/.coral-initial-password
-'
+read -rs -p "Initial Coral password: " PW && echo
+printf '%s\n' "$PW" | sudo -u coral -i bash -c 'umask 077 && cat > /home/coral/.coral-initial-password'
+unset PW
 ```
 
 ### Option B: While Coral is running, with `coral set-password --stdin`
 
-Once the Coral service is running on `127.0.0.1:8420`, set the first password over stdin as the `coral` user (it signs the request with `/home/coral/.coral/cli-token`):
+Once the Coral service is running on `127.0.0.1:8420`, prompt silently and pipe the first password over stdin as the `coral` user (it signs the request with `/home/coral/.coral/cli-token` without putting the password in `ps` or shell history):
 
 ```bash
-printf '%s\n' 'replace-with-a-long-random-password' | sudo -u coral -i coral set-password --stdin
+read -rs -p "Initial Coral password: " PW && echo
+printf '%s\n' "$PW" | sudo -u coral -i coral set-password --stdin
+unset PW
 ```
 
 To rotate or clear the password later (works while Coral is running or stopped, and signs out every browser session):
 
 ```bash
-printf '%s\n' 'new-long-random-password' | sudo -u coral -i coral reset-password --stdin
+read -rs -p "New Coral password: " PW && echo
+printf '%s\n' "$PW" | sudo -u coral -i coral reset-password --stdin
+unset PW
 ```
 
 See [Browser password](auth.md#browser-password).
@@ -140,10 +141,15 @@ Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/coral
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+> **Note — the systemd unit is not an agent sandbox:** `ProtectSystem=full` and `ProtectHome=read-only` (with `ReadWritePaths=/home/coral`) keep the service from writing to `/usr`, `/boot`, `/etc` or other users' home directories, but every agent Coral launches runs with the full read/write permissions of `User=coral` inside `/home/coral` (including `/home/coral/.coral` and any provider credentials in `/home/coral`). If your agents need to edit repositories outside `/home/coral` (for example `/srv/projects`), add that path to `ReadWritePaths=`.
 
 If you installed the Coral binaries into `/usr/local/bin`, change `ExecStart` to `/usr/local/bin/coral --host 127.0.0.1 --port 8420 --no-browser`.
 
@@ -212,6 +218,9 @@ If you put nginx in front of `127.0.0.1:8420`, follow every rule below ([auth.md
 Example `/etc/nginx/sites-available/coral.conf`:
 
 ```nginx
+# Before enabling this proxy: set a dashboard password (Step 4), keep strict local auth on
+# (never pass --strict-local-auth=false), and turn on require_auth_on_loopback (Section 8)
+# — a password alone does not protect a header-less proxy when strict local auth is off.
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
