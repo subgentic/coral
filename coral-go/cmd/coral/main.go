@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
@@ -73,6 +74,7 @@ type serverFlags struct {
 	noAutoLoopback     *bool
 	port               *int
 	noBrowser          *bool
+	hubOnly            *bool
 	backendFlag        *string
 	remoteAccess       *bool
 	hubMode            *bool
@@ -102,6 +104,7 @@ func defineServerFlags() *serverFlags {
 	sf.host = flag.String("host", "", "Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Coral Hub and remote access, or --remote); otherwise Coral listens on 127.0.0.1")
 	sf.noAutoLoopback = flag.Bool("no-auto-loopback", config.Truthy(os.Getenv("CORAL_NO_AUTO_LOOPBACK")), "When --host names only network addresses, don't also listen on 127.0.0.1 (also CORAL_NO_AUTO_LOOPBACK=1)")
 	sf.port = flag.Int("port", 0, "Port to bind to")
+	sf.hubOnly = flag.Bool("hub-only", config.Truthy(os.Getenv(auth.HubOnlyEnv)), "Listen on this computer only, ask for a credential here too, and refuse every proxied request: reach this Coral only through Coral Hub. Saved until: coral hub-only off. Also CORAL_HUB_ONLY=1")
 	sf.noBrowser = flag.Bool("no-browser", false, "Don't open the browser on startup")
 	// "" = not given: Settings > Defaults, else the built-in terminal, pty (#3634, #6064).
 	sf.backendFlag = flag.String("backend", "", "Terminal backend: pty or tmux (default: Settings > Defaults, else pty: agents stop when you quit Coral)")
@@ -282,6 +285,11 @@ func configureServer(cfg *config.Config, sf *serverFlags) {
 		os.Exit(2)
 	}
 
+	if err := applyHubOnly(cfg, sf); err != nil {
+		fmt.Fprintf(os.Stderr, "coral: %v\n", err)
+		os.Exit(2)
+	}
+
 	// Check EULA acceptance (terminal prompt on first launch). A machine started with a Coral Hub credential (--bootstrap-file, or the well-known file) has nobody at a
 	// terminal: its terms are the Hub's confirmation of this version when the credential is redeemed, and it exits non-zero if that does not happen (#9936).
 	if config.EULARequired() && !license.EULAAcceptedLocally() {
@@ -310,6 +318,9 @@ func announceDashboard(cfg *config.Config, rs *startup.RunningServer, sf *server
 		fmt.Printf("  Other devices: https://<this computer>:%d (TLS)\n", cfg.Port)
 	}
 	fmt.Printf("  Press Ctrl+C to stop\n\n")
+	if auth.HubOnly() && !rs.Server.HubLinked() { // nothing can reach a hub-only Coral until it is linked: one next step, and Coral keeps running (#21558)
+		fmt.Printf("  Hub-only: not linked to a Hub yet. Next step, run: coral cloud connect\n\n")
+	}
 
 	// Open the browser with a sign-in link unless --no-browser, or print the link when
 	// there's no display (#3387). Always http://localhost: it works on this computer with

@@ -35,5 +35,7 @@ export function renderRemoteAccessStatus(status, loadError = false) {
     } else {
         el.removeAttribute('data-proxy');
     }
+    // Hub-only (#21558): read-only here, and through Coral Hub; changed on this computer with `coral hub-only`.
+    if (status?.hub_only === true) el.textContent = `${el.textContent} Hub-only is on: this Coral is reached through Coral Hub only. To change it, run on this computer: coral hub-only off`.trim();
     el.dataset.state = restart ? 'restart-required' : 'current';
 }

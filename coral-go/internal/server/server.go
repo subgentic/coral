@@ -229,6 +229,10 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 		}
 	}
 
+	if auth.HubOnly() { // hub-only: a credential on this computer too, whatever was stored or set in the environment (#21558)
+		auth.SetRequireAuthOnLoopback(true)
+	}
+
 	s := &Server{
 		cfg:        cfg,
 		db:         db,
@@ -267,6 +271,9 @@ const closeWait = 5 * time.Second
 // Close stops the server's own background work and closes its board database (#3914). The
 // sessions database belongs to the caller, which closes it after this. Call it after the HTTP
 // server has stopped; it is safe to call more than once.
+// HubLinked reports whether this Coral is enrolled with a Hub (hub-only's first-start hint asks).
+func (s *Server) HubLinked() bool { return s.cloudHandler != nil && s.cloudHandler.Linked() }
+
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
 		if !s.stopReleaseTimers(closeWait) {

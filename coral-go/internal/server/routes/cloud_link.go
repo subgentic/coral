@@ -24,6 +24,8 @@ import (
 type cloudStatus struct {
 	cloud.Status
 	AllowHubAutoAccept bool `json:"allow_hub_auto_accept"`
+	// HubOnly: this Coral runs hub-only (#21558): reached through Coral Hub only; changed from this computer with coral hub-only.
+	HubOnly bool `json:"hub_only,omitempty"`
 	// DeviceWebMode is the mode a browser paired from the connect link starts at: this computer's own setting (#19669; beta default launch).
 	DeviceWebMode string `json:"device_web_mode"`
 	// ComputerFingerprint is this computer's key as the pairing browser shows it, while a connect waits for approval (#19969): the person compares the two. A hash of a public key; absent when not enrolling.
@@ -63,6 +65,19 @@ type cloudStatus struct {
 	SecretKey *store.SecretKeyState `json:"secret_key,omitempty"`
 }
 
+// Linked reports whether this Coral is enrolled with a Hub (connecting, connected or retrying): what a hub-only server needs before anyone can reach it (#21558).
+func (h *CloudHandler) Linked() bool {
+	m := h.manager()
+	if m == nil {
+		return false
+	}
+	switch m.Status().State {
+	case cloud.StateConnecting, cloud.StateConnected, cloud.StateRetrying:
+		return true
+	}
+	return false
+}
+
 func (h *CloudHandler) status() cloudStatus {
 	st := cloud.Status{State: cloud.StateOff}
 	if m := h.manager(); m != nil {
@@ -83,6 +98,7 @@ func (h *CloudHandler) status() cloudStatus {
 	}
 	out := cloudStatus{Status: st, DeviceWebMode: h.ss.DeviceWebMode(context.Background()), AllowHubAutoAccept: allow, MaxModeSaved: modeSaved, RedactTokens: redact, HubRelaunchUpdates: relaunch, HubRelaunchNeedsHere: relaunchNeedsLocalApproval, HubRelaunchAvailable: updateRelaunchFeature, HubCrossTeamSettings: crossTeam, AllowHubAutoAcceptChanged: changed, Bootstrap: boot, OfferAtLaunch: h.OfferAtLaunch}
 	out.HubRelaunchUpdatesAtLaunch = h.HubUpdateAtLaunch
+	out.HubOnly = auth.HubOnly()
 	if m := h.manager(); m != nil && st.State == cloud.StateEnrolling {
 		out.ComputerFingerprint = m.DisplayFingerprint()
 	}

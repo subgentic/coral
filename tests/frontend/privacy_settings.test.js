@@ -29,6 +29,8 @@ const BASE = require('./test_base').BASE;
     assert.deepEqual(await proxy({remote_access_enabled:false,remote_access_effective:false,proxy_warning:{message:'Coral is being reached through a proxy; set a password',red:true,detail:'Why it is red.'}}), {text:'Coral is being reached through a proxy; set a password. Why it is red.',proxy:'red'});
     assert.equal((await proxy({remote_access_enabled:false,remote_access_effective:false,proxy_warning:{message:'Coral is being reached through a proxy; set a password',red:false}})).proxy, 'warn');
     assert.equal((await proxy({remote_access_enabled:false,remote_access_effective:false})).proxy, '');
+    // #21558: hub-only is shown, read-only.
+    assert.match((await proxy({remote_access_enabled:false,remote_access_effective:false,hub_only:true})).text, /Hub-only is on: this Coral is reached through Coral Hub only\. To change it, run on this computer: coral hub-only off/);
     assert.equal((await note({remote_access_enabled:true,remote_access_effective:true})).unencrypted, 'true');
     await ev(`(async()=>{document.getElementById('settings-telemetry-enabled').checked=true;document.getElementById('settings-remote-access-enabled').checked=true;await Promise.resolve(window.applySettings())})()`);
     const payload = await ev(`window.__settingsPut[0]`);
