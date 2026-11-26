@@ -100,8 +100,8 @@ const CASES = [
             window.__fetched = []; window.__puts = []; window.__inflight = 0; window.__putMode = 'ok';
             const real = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href).pathname, m = (o.method || 'GET').toUpperCase(); let pr;
-                // Background polls (auto-wake, the Hub status) land inside a case window on a slow runner (#19003): not a settings call.
-                if (p !== '/api/system/auto-wake' && p !== '/api/cloud/status') window.__fetched.push(m + ' ' + p);
+                // Background polls (auto-wake, the Hub status, the owner check's one auth-status read, #21650) land inside a case window on a slow runner (#19003): not a settings call.
+                if (p !== '/api/system/auto-wake' && p !== '/api/cloud/status' && p !== '/api/system/auth-status') window.__fetched.push(m + ' ' + p);
                 if (p === '/api/settings' && m === 'PUT') { window.__puts.push(o.body); pr = window.__putMode === 'ok' ? json({ ok: true }) : window.__putMode === '400' ? json({ error: 'cli_path_claude must be an executable file' }, 400) : window.__putMode === '500' ? json({}, 500) : Promise.reject(new TypeError('Failed to fetch')); }
                 else if (p === '/api/system/privacy') pr = json({ remote_access_enabled: false, remote_access_effective: false, debug_input_log: { enabled: false, forced: false, path: '' }, bind_host: '127.0.0.1' });
                 else if (p === '/api/themes') pr = json({ themes: [{ name: 'Mine' }] });
