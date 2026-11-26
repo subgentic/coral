@@ -128,8 +128,9 @@ if [ "$run_ok" = 1 ]; then
   live=$(curl -s -o /dev/null -w '%{http_code}' -m 10 -H "Authorization: Bearer $KEY" "http://127.0.0.1:$PORT/api/sessions/live")
   noauth=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "http://127.0.0.1:$PORT/api/sessions/live")
   # The availability list (#15071): every feature tests/release/availability.txt names answers what a release must report. Asked the way the dashboard asks
-  # (the routes are dashboard routes: they refuse a Bearer header): sign in with the login link the server printed (a cookie), then a same-origin request.
-  tok=$(grep -o 'login_token=[0-9a-f]*' "$work/server.log" | head -1 | cut -d= -f2)
+  # (the routes are dashboard routes: they refuse a Bearer header): sign in with a fresh login link (a cookie), then a same-origin request. The server no longer prints its sign-in link when stdout is not a terminal (#21549), so ask for one the supported way:
+  # 'coral open --print' against this smoke's own data folder and port. It opens no browser.
+  tok=$("${CENV[@]}" "$pkg/coral" open --print --url "http://127.0.0.1:$PORT" --home "$dd" 2>/dev/null | grep -o 'login_token=[0-9a-f]*' | head -1 | cut -d= -f2)
   jar="$work/avail.jar"
   curl -s -m 10 -c "$jar" -o /dev/null "http://127.0.0.1:$PORT/?login_token=$tok"
   dbx=$(python3 - "$here/availability.txt" "http://127.0.0.1:$PORT" "$jar" <<'PY'
