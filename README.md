@@ -251,7 +251,7 @@ We welcome contributions — from bug reports and documentation fixes to new age
 
 ### Build from source
 
-Requires **Git**, **Make**, **Go 1.26.10+**, and a C compiler (Xcode Command Line Tools on macOS, `build-essential` on Linux). Standard builds (`make build`) and all official release packages store plain SQLite databases (`SQLite format 3` header; all release builds use pure-Go SQLite with `CGO_ENABLED=0`, no SQLCipher or OpenSSL). Database encryption (`SQLCipher`) is an experimental, opt-in source-build feature (`CGO_ENABLED=1 go build -tags sqlcipher,fts5`) and is not included in release downloads:
+Requires **Git**, **Make**, **Go 1.26.10+**, and a C compiler (Xcode Command Line Tools on macOS, `build-essential` on Linux). Standard builds (`make build`) and all official release packages store plain SQLite databases (`SQLite format 3` header; the server and its command-line tools use pure-Go SQLite with `CGO_ENABLED=0`, no SQLCipher or OpenSSL). Database encryption (`SQLCipher`) is an experimental, opt-in source-build feature (`CGO_ENABLED=1 go build -tags sqlcipher,fts5`) and is not included in release downloads:
 
 ```bash
 git clone https://github.com/subgentic/coral.git
