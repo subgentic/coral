@@ -16,7 +16,7 @@ const { settle, coralReady } = require('./helpers/wait');
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers
         await ev(`window.selectLiveSession('dock-bot', 'claude', 'dock-bot-id', 'local'); true`);
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);
-        await waitFor(`document.getElementById('agentic-tab-files').getBoundingClientRect().width > 0 && !document.getElementById('agentic-tab-more').hidden`, 'the panel', 8000);
+        await waitFor(`document.getElementById('agentic-tab-files').getBoundingClientRect().width > 0`, 'the panel', 8000);
         await ev(`document.getElementById('agentic-tab-files').click(); document.documentElement.style.fontSize = '17px'; document.getElementById('files-bar-count').textContent = '128'; document.getElementById('agentic-tab-board').style.display = ''; true`); // a busy team agent at a slightly larger text size: the Files count, and the Board tab in the row
         for (const w of [280, 300, 320]) {
             await ev(`document.getElementById('agentic-state').style.width = '${w}px'; window.dispatchEvent(new Event('resize')); true`); await settle(ev, 500); // sleep-ok: the row is measured again

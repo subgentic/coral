@@ -1,6 +1,6 @@
-// The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): at 1280 px and up each tab shows its word beside its icon when all the words fit the row on one line (a panel dragged
-// narrow, or text at 200%, falls back to icons alone: no word clipped, no wrapped row), the Tasks count stays a badge, and the five rarely used tabs (Browse, Notes, Activity, Agent UI, Branches) are behind one More menu that
-// opens them with the keyboard and carries the open one's word. Below 1280 the tabs are icons alone with their names as title and aria-label. Drives the real dashboard over CDP; an isolated dev server.
+// The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): when all the words fit the row on one line each tab shows its word beside its icon (a panel dragged narrow, or text at 200%, falls back to
+// icons alone: no word clipped, no wrapped row), the Tasks count stays a badge, and when even the icons do not fit the LAST tabs go under More at the END of the row (#21684; dock_tabs_stable_browser holds that they never move
+// on a pick or a count). More opens with the keyboard and lights when the open tab is behind it. Drives the real dashboard over CDP; an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { settle, coralReady } = require('./helpers/wait');
@@ -22,20 +22,21 @@ const { settle, coralReady } = require('./helpers/wait');
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('dock-bot', 'claude', 'dock-bot-id', 'local'); true`);
         await ev(`(() => { const p = document.getElementById('agentic-state'); if (p.classList.contains('collapsed') || document.getElementById('agentic-tab-files').getBoundingClientRect().width === 0) window.toggleAgenticPanel(true); return true; })()`);
-        await waitFor(`document.getElementById('agentic-tab-files').getBoundingClientRect().width > 0 && !document.getElementById('agentic-tab-more').hidden`, 'the panel and its More', 8000);
+        await waitFor(`document.getElementById('agentic-tab-files').getBoundingClientRect().width > 0`, 'the panel', 8000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
 
-        console.log('1280: words when they all fit');
+        console.log('1280: every tab named, one line, nothing clipped, More last');
         await load(1280, false);
-        await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show at the default panel width', 4000);
+        await settle(ev, 500); // sleep-ok: the row is measured over a few frames
         let r = await row();
-        const named = r.shown.filter(([t]) => t !== 'customize'); // the Customize button at the row's end is an icon alone, as it was
-        assert.deepEqual(named.map(([t, w]) => [t, w]), [['files', 'Files'], ['artifacts', 'Artifacts'], ['tasks', 'Tasks'], ['more', 'More']], 'each shown tab says its word: ' + JSON.stringify(r.shown));
+        const named = r.shown.filter(([t]) => t !== 'customize' && t !== 'more'); // the Customize button at the row's end is an icon alone, as it was
+        assert.ok(named.length >= 3 && named[0][0] === 'files', 'the tabs are in the row in order: ' + JSON.stringify(r.shown));
         assert.deepEqual([r.tops.length, r.clipped], [1, false], 'one line, nothing clipped: ' + JSON.stringify(r));
-        assert.ok(!r.shown.some(([t]) => ['browse', 'activity', 'notes', 'agent-ui', 'branches'].includes(t)), 'only the four labelled tabs are in the row, the rest are behind More (#15855): ' + JSON.stringify(r.shown));
-        assert.equal(r.more[0], 'More tabs'); ok('Files, Artifacts, Tasks and More with their words, on one line (Board when the page has it)');
+        assert.ok(await ev(`[...document.querySelectorAll('${ROW} .agentic-tab')].filter(b => getComputedStyle(b).display !== 'none' && !b.classList.contains('tab-more')).every(b => b.title && b.getAttribute('aria-label'))`), 'every tab has its title and aria-label');
+        assert.ok(r.more === null || r.shown.map(x => x[0]).slice(-2)[0] === 'more', 'More is the last tab of the row, before Customize: ' + JSON.stringify(r.shown));
+        ok('the tabs in order on one line, More last');
         await shot('dock-tabs-1280');
 
         // UI/UX's #7621 small points: the customizer icon is named, only the selected tab looks selected (a hovered one is not blue with an underline), and the files line is sentence case
@@ -48,40 +49,45 @@ const { settle, coralReady } = require('./helpers/wait');
         assert.ok(look.saved[1] !== look.files[1] && !/^rgba\(0, 0, 0, 0\)$/.test(look.files[1]) && /^rgba\(\d+, \d+, \d+, (0|0\.0\d*)\)$|^rgba\(0, 0, 0, 0\)$/.test(look.saved[1]), 'a hovered tab is not drawn as the selected one (no accent underline; the tab family draws both in the primary text colour): ' + JSON.stringify(look));
         assert.equal(await ev(`getComputedStyle(document.getElementById('changed-files-title')).textTransform`), 'none', 'the files line is not in capitals');
         ok('Customize tabs, one selected tab, sentence case');
-        console.log('More opens the rare tabs');
+        console.log('More opens the tabs behind it');
+        await ev(`(() => { const s = document.getElementById('agentic-state'); s.style.setProperty('width', '300px', 'important'); s.style.setProperty('max-width', '300px', 'important'); return true; })()`);
+        await waitFor(`!document.getElementById('agentic-tab-more').hidden`, 'More appears when the icons do not fit the row', 5000);
+        await settle(ev, 300); // sleep-ok: the row is measured over a few frames
+        const rowBefore = (await row()).shown.map(x => x[0]).join();
         await ev(`document.getElementById('agentic-tab-more').focus(); true`);
         await key('ArrowDown');
         await waitFor(`!document.getElementById('agentic-more-menu').hidden && document.activeElement.getAttribute('role') === 'menuitem'`, 'the menu opens on ArrowDown with the focus in it', 4000);
-        const items = await ev(`[...document.querySelectorAll('#agentic-more-menu [role=menuitem]')].map(i => i.dataset.tab + ':' + i.textContent.trim())`);
-        assert.deepEqual(items, ['browse:folder_openBrowse', 'activity:timelineActivity', 'notes:edit_noteNotes', 'agent-ui:widgetsAgent UI', 'branches:account_treeBranches'], JSON.stringify(items));
+        const items = await ev(`[...document.querySelectorAll('#agentic-more-menu [role=menuitem]')].map(i => i.dataset.tab)`);
+        assert.ok(items.length >= 2, 'the menu holds the last tabs: ' + JSON.stringify(items));
+        assert.equal(await ev(`document.activeElement.dataset.tab`), items[0], 'the menu opens on its first item');
         await shot('dock-tabs-more-open');
-        for (let i = 0; i < 3; i++) await key('ArrowDown'); await key('Enter'); // the menu opens on Browse: three steps down is Agent UI
-        await waitFor(`document.getElementById('agentic-panel-agent-ui').classList.contains('active')`, 'Enter opens Agent UI', 4000);
+        await key('ArrowDown'); await key('Enter'); // the menu opens on its first item: one step down is the second
+        await waitFor(`document.getElementById('agentic-panel-' + ${JSON.stringify(items[1])}).classList.contains('active')`, `Enter opens ${items[1]}`, 4000);
         r = await row();
-        assert.deepEqual(r.more, ['More tabs', false, 'false'], 'More stays More, with the others behind it (#15733): ' + JSON.stringify(r.more));
+        assert.deepEqual(r.more, ['More tabs', true, 'false'], 'More stays More, and lights: the open tab is behind it: ' + JSON.stringify(r.more));
         assert.equal(await ev(`document.querySelector('#agentic-tab-more .agentic-tab-word').textContent`), 'More', 'and says More');
-        assert.deepEqual(r.shown.map(x => x[0]).filter(t => t === 'agent-ui'), ['agent-ui'], 'the open Agent UI is a tab of the row: ' + JSON.stringify(r.shown));
+        assert.equal(r.shown.map(x => x[0]).join(), rowBefore, 'the row did not change: ' + JSON.stringify(r.shown));
         assert.equal(await ev(`document.getElementById('agentic-menu') === null && document.getElementById('agentic-more-menu').hidden`), true, 'the menu closed');
         await ev(`document.getElementById('agentic-tab-more').focus(); true`); await key('ArrowDown'); await key('Escape');
         assert.equal(await ev(`document.activeElement.id`), 'agentic-tab-more', 'Escape closes the menu with the focus back on More');
         await ev(`document.getElementById('agentic-tab-files').click(); true`);
-        r = await row(); assert.deepEqual([r.more[0], r.more[1]], ['More tabs', false], 'another tab: More says More again');
-        ok('the keyboard opens, picks and closes; the open rare tab swaps into the row and More stays');
+        r = await row(); assert.deepEqual([r.more[0], r.more[1]], ['More tabs', false], 'a tab of the row: More is not lit');
+        ok('the keyboard opens, picks and closes; the open tab stays behind More and lights it');
+        await ev(`(() => { const s = document.getElementById('agentic-state'); s.style.removeProperty('width'); s.style.removeProperty('max-width'); return true; })()`);
 
-        console.log('a fifth tab (one picked from More) and a wide count crowd the row: icons alone, nothing clipped');
-        // The four labelled tabs fit the panel's narrowest width (280 px), so the words give way only when a tab from More joins the row as the open one (#15733) or counts widen the tabs (below).
+        console.log('a wide count crowds the row: icons alone, nothing clipped');
         // #9999 (the beta tester: eight icon-only tabs, a newcomer guessed which was Artifacts): the words are off, but the open tab says its own word when that fits; the others stay icons.
         let sawWord = false;
-        await ev(`document.getElementById('agentic-tab-branches').click(); true`);
-        for (const n of [4, 6, 8, 10, 11, 12, 13, 14, 16, 18]) { // a Files count of n digits widens its tab step by step, Branches (the longest word) open as the fifth tab
+        await ev(`document.getElementById('agentic-tab-files').click(); true`);
+        for (const n of [4, 6, 8, 10, 11, 12, 13, 14, 16, 18]) { // a Files count of n digits widens its tab step by step, Files open
             await ev(`document.getElementById('files-bar-count').textContent = '8'.repeat(${n}); window.dispatchEvent(new Event('resize')); true`); await settle(ev, 400); // sleep-ok: the row is measured again
             r = await row();
             if (r.words) continue; // every word fits
             const said = r.shown.filter(([, x]) => x !== null);
-            assert.ok(r.tops.length === 1 && !r.clipped && said.length <= 1 && (said.length === 0 || said[0][0] === 'branches'), `a ${n}-digit count: icons, and at most the open tab with its word, one line, nothing clipped: ` + JSON.stringify(r));
+            assert.ok(r.tops.length === 1 && !r.clipped && said.length <= 1 && (said.length === 0 || said[0][0] === 'files'), `a ${n}-digit count: icons, and at most the open tab with its word, one line, nothing clipped: ` + JSON.stringify(r));
             if (!sawWord) await shot('dock-tabs-open-word'); sawWord = true; // (that the open Files tab says its word when only it fits is dock_files_word_browser's)
         }
-        assert.ok(sawWord, 'the words give way to icons when a fifth tab and a wide count crowd the row');
+        assert.ok(sawWord, 'the words give way to icons when a wide count crowds the row');
         await settle(ev, 200); r = await row(); // sleep-ok: the row is measured for the name check
         assert.ok(await ev(`[...document.querySelectorAll('${ROW} .agentic-tab')].filter(b => getComputedStyle(b).display !== 'none' && !b.classList.contains('tab-more')).every(b => b.getAttribute('aria-label') && b.title)`), 'each keeps its name as aria-label and title');
         await shot('dock-tabs-narrow'); ok('words fall back to icons with the names kept');
@@ -94,14 +100,14 @@ const { settle, coralReady } = require('./helpers/wait');
         assert.ok(r.shown.every(([, w]) => w === null) || (r.tops.length === 1 && !r.clipped), 'words only if they fit: ' + JSON.stringify(r));
         await ev(`document.documentElement.style.fontSize = ''; true`);
 
-        console.log('below 1280 and on the phone: the same four, with their words when they fit (#15855), and More');
+        console.log('below 1280 and on the phone: one line, nothing clipped, More last when the icons do not fit');
         await load(1100, false);
         await waitFor(`(() => { const rw = document.querySelector('${ROW}'); return rw.scrollWidth <= rw.clientWidth; })()`, 'the row has settled: the words on, or taken off, with nothing clipped', 4000);
-        r = await row(); assert.ok(r.words && r.tops.length === 1 && !r.clipped && r.shown.filter(([t]) => ['files', 'artifacts', 'tasks'].includes(t)).every(([, w]) => w !== null), 'the words show at 1100: ' + JSON.stringify(r));
+        r = await row(); assert.ok(r.tops.length === 1 && !r.clipped, 'one line, nothing clipped at 1100: ' + JSON.stringify(r));
         await load(390, true);
         // the phone's strip scrolls (#17242), so settled means the words are on or off, not that the row fits
         await waitFor(`(() => { const rw = document.querySelector('${ROW}'); return rw.dataset.words !== undefined || rw.scrollWidth <= rw.clientWidth; })()`, 'the row has settled: the words on, or taken off, with nothing clipped', 4000);
-        r = await row(); assert.ok(r.more && r.tops.length === 1 && (r.words ? r.shown.filter(([t]) => ['files', 'artifacts', 'tasks'].includes(t)).every(([, w]) => w !== null) : r.shown.filter(([, w]) => w !== null).length <= 1), 'the phone: all the words, or icons with the open tab word, never a clipped one, and More: ' + JSON.stringify(r));
+        r = await row(); assert.ok(r.more && r.tops.length === 1, 'the phone: one line, More for the last tabs: ' + JSON.stringify(r));
         await ev(`document.getElementById('agentic-tab-more').click(); true`);
         await waitFor(`!document.getElementById('agentic-more-menu').hidden`, 'More opens on the phone', 4000);
         const target = await ev(`Math.round(document.querySelector('#agentic-more-menu [role=menuitem]').getBoundingClientRect().height)`);
@@ -111,12 +117,13 @@ const { settle, coralReady } = require('./helpers/wait');
         const before = await ev(`(() => { const r = document.querySelector('${ROW}'); return r.scrollWidth - r.clientWidth; })()`);
         await ev(`document.querySelector('#agentic-more-menu [role=menuitem]').click(); true`); await settle(ev, 400); // sleep-ok: the tab switch redraws the strip
         const fit = await ev(`(() => { const r = document.querySelector('${ROW}'), rb = r.getBoundingClientRect(); const tabs = [...r.querySelectorAll('.agentic-tab')].filter(b => getComputedStyle(b).display !== 'none' && b.getClientRects().length); const out = tabs.filter(b => { const b2 = b.getBoundingClientRect(); return b2.right > rb.right + 1 || b2.left < rb.left - 1; }).map(b => (b.getAttribute('aria-label') || b.title || b.id)); return { n: tabs.length, out, scroll: r.scrollWidth - r.clientWidth, before: window.__before, more: (document.getElementById('agentic-tab-more') || {}).textContent }; })()`);
-        assert.equal(await ev(`(() => { const b = document.querySelector('${ROW} .agentic-tab.active'); if (!b) return 'none'; b.scrollIntoView({ inline: 'nearest', block: 'nearest' }); const r = document.querySelector('${ROW}').getBoundingClientRect(), t = b.getBoundingClientRect(); return t.width > 0 && t.left >= r.left - 1 && t.right <= r.right + 1 ? 'in view' : 'cut: ' + JSON.stringify([t.left, t.right, r.left, r.right]); })()`), 'in view', 'the picked tab swapped into the row is a whole tab on the strip (#15733; the strip scrolls on a phone)');
+        assert.equal(await ev(`document.getElementById('agentic-tab-more').classList.contains('active')`), true, 'the tab picked from More stays behind it and More is lit (#21684)');
         assert.equal(await ev(`document.getElementById('agentic-tab-more').getClientRects().length > 0 && document.querySelector('#agentic-tab-more .agentic-tab-word').textContent`), 'More', 'More is still there after the pick');
         await shot('dock-tabs-open-word-390');
         // a tab's new count widens the tabs and leaves the strip's size alone (it does not wrap while its words show, #9420): the tabs are watched, so the words come off and nothing is wrapped or clipped (#9435)
         await ev(`document.getElementById('agentic-tab-files').click(); true`); // the picked tab stays open across the reload and is a tab of the row now (#15733): Files is the one the words were measured with
         await load(1280, false);
+        await ev(`for (const b of document.querySelectorAll('${ROW} .agentic-tab[data-tab]')) if (!['files', 'artifacts', 'tasks'].includes(b.dataset.tab)) b.classList.add('tab-hidden'); true`); // a page with three tabs: their words fit (the customizer's own hiding)
         await waitFor(`document.querySelector('${ROW}').hasAttribute('data-words')`, 'the words show again at 1280', 4000);
         // A layout-only badge uses the real count's classes, without the Files list replacing its text on refresh (#12683).
         await ev(`(() => { const badge = document.getElementById('files-bar-count').cloneNode(false); badge.removeAttribute('id'); badge.textContent = '8'.repeat(32); document.getElementById('agentic-tab-files').append(badge); return true; })()`);
@@ -131,6 +138,8 @@ const { settle, coralReady } = require('./helpers/wait');
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             console.log(`${w}: the focus after a pick from More`);
             await load(w, mobile);
+            await ev(`(() => { const s = document.getElementById('agentic-state'); s.style.setProperty('width', '300px', 'important'); s.style.setProperty('max-width', '300px', 'important'); return true; })()`); // a narrow row: the last tabs, Branches among them, are behind More
+            await waitFor(`!!document.querySelector('#agentic-more-menu [data-tab=branches]')`, `${w}: Branches is behind More`, 5000);
             await ev(`document.getElementById('agentic-tab-files').click(); true`); await waitFor(`document.getElementById('agentic-panel-files').classList.contains('active') && !document.querySelector('#agentic-more-menu [data-tab=branches]') === false`, 'Files is open and Branches is behind More again', 4000); // the open tab stays across a reload and is in the row now (#15733), so Branches is picked from More only when another tab is open
             await ev(`document.getElementById('agentic-tab-more').focus(); true`);
             await key('ArrowDown');
