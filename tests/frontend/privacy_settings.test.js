@@ -27,8 +27,8 @@ const BASE = require('./test_base').BASE;
     assert.deepEqual(await note({remote_access_enabled:false,remote_access_effective:false}), {text:'',unencrypted:''});
     // #21527: a proxy seen while remote access is off is a warning, red without a password.
     const proxy = st => ev(`import((window.__coralStatic||'/static/')+'settings_remote_status.js').then(m=>{m.renderRemoteAccessStatus(${JSON.stringify(st)});const el=document.getElementById('settings-remote-access-status');return {text:el.textContent,proxy:el.dataset.proxy||''};})`);
-    assert.deepEqual(await proxy({remote_access_enabled:false,remote_access_effective:false,proxy_warning:{message:'Coral is being reached through a proxy; set a password',red:true,detail:'Why it is red.'}}), {text:'Coral is being reached through a proxy; set a password. Why it is red.',proxy:'red'});
-    assert.equal((await proxy({remote_access_enabled:false,remote_access_effective:false,proxy_warning:{message:'Coral is being reached through a proxy; set a password',red:false}})).proxy, 'warn');
+    assert.deepEqual(await proxy({remote_access_enabled:false,remote_access_effective:false,proxy_warning:{message:'A proxy was seen in front of Coral since Coral started; set a password',red:true,detail:'Why it is red.'}}), {text:'Coral is being reached through a proxy; set a password. Why it is red.',proxy:'red'});
+    assert.equal((await proxy({remote_access_enabled:false,remote_access_effective:false,proxy_warning:{message:'A proxy was seen in front of Coral since Coral started; set a password',red:false}})).proxy, 'warn');
     assert.equal((await proxy({remote_access_enabled:false,remote_access_effective:false})).proxy, '');
     // #21558: hub-only is shown, read-only.
     assert.match((await proxy({remote_access_enabled:false,remote_access_effective:false,hub_only:true})).text, /Hub-only is on: this Coral is reached through Coral Hub only\. To change it, run on this computer: coral hub-only off/);
