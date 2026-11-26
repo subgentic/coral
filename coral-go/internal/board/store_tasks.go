@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/naming"
 )
 
@@ -746,16 +748,40 @@ func (s *Store) noteClaimedTaskFiles(ctx context.Context, project string, taskID
 	}
 }
 
-// errSlotHeld is the refusal of a claim by an agent that has a task in progress.
+// errSlotHeld is the refusal of a claim by an agent that has a task in progress. SlotHeldError is the same refusal naming the open task (#21699); errors.Is(err, errSlotHeld) is true for both.
 var errSlotHeld = fmt.Errorf("complete your current task before claiming a new one")
 
-// refuseWhileSlotHeld is errSlotHeld when the subscriber has an active task.
+// SlotHeldError names the task that holds the claimer's one slot: a member has one task in progress, and a second claim is refused rather than moving the first (a move would hide, from its owner and the board, that work was dropped).
+type SlotHeldError struct {
+	TaskID int64
+	Title  string
+}
+
+func (e *SlotHeldError) Error() string {
+	return fmt.Sprintf("%s: #%d %q is still in progress (finish it with task complete or submit-review; if it waits on someone use task wait-on; the Orchestrator can park or release it)", errSlotHeld.Error(), e.TaskID, e.Title)
+}
+
+func (e *SlotHeldError) Is(target error) bool { return target == errSlotHeld }
+
+// slotHeldError is the refusal naming the subscriber's open task, or the bare refusal when it cannot be read.
+func (s *Store) slotHeldError(ctx context.Context, q sqlx.QueryerContext, project, subscriberID string) error {
+	var held struct {
+		ID    int64  `db:"id"`
+		Title string `db:"title"`
+	}
+	if err := sqlx.GetContext(ctx, q, &held, `SELECT id, title FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL+` ORDER BY id LIMIT 1`, project, subscriberID); err != nil {
+		return errSlotHeld
+	}
+	return &SlotHeldError{TaskID: held.ID, Title: clitext.Clean(held.Title)}
+}
+
+// refuseWhileSlotHeld is errSlotHeld, naming the task, when the subscriber has an active task.
 func (s *Store) refuseWhileSlotHeld(ctx context.Context, project, subscriberID string) error {
 	var activeCount int
 	if err := s.db.GetContext(ctx, &activeCount,
 		`SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL,
 		project, subscriberID); err == nil && activeCount > 0 {
-		return errSlotHeld
+		return s.slotHeldError(ctx, s.db, project, subscriberID)
 	}
 	return nil
 }
@@ -818,9 +844,10 @@ func (s *Store) claimOne(ctx context.Context, project, subscriberID string, task
 	if n == 0 {
 		var hasActive int
 		tx.GetContext(ctx, &hasActive, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND assigned_to = ? AND `+holdsSlotSQL, project, subscriberID)
+		held := s.slotHeldError(ctx, tx, project, subscriberID)
 		tx.Rollback()
 		if hasActive > 0 {
-			return false, errSlotHeld
+			return false, held
 		}
 		return false, nil
 	}

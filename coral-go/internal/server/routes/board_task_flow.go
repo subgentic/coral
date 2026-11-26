@@ -40,7 +40,8 @@ func (h *BoardHandler) ClaimTask(w http.ResponseWriter, r *http.Request) {
 	}
 	task, err := h.bs.ClaimTask(r.Context(), project, body.SubscriberID, body.TaskID)
 	if err != nil {
-		if err.Error() == "complete your current task before claiming a new one" {
+		var held *board.SlotHeldError
+		if err.Error() == "complete your current task before claiming a new one" || errors.As(err, &held) {
 			errConflict(w, err.Error())
 		} else if errors.Is(err, board.ErrReviewsOnly) { // #8957: an agent set to review only is refused a build task
 			writeError(w, http.StatusConflict, "reviews_only", err.Error())
