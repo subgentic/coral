@@ -3,6 +3,7 @@ package live
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -19,7 +20,9 @@ func TestFileStoreRoundTripsPrivatelyAndRefusesAFileItCannotRead(t *testing.T) {
 	require.NoError(t, fs.Save(in))
 	st, err := os.Stat(p)
 	require.NoError(t, err)
-	require.Equal(t, os.FileMode(0o600), st.Mode().Perm())
+	if runtime.GOOS != "windows" { // Windows has no Unix permission bits: Stat reports 0o666 (the data folder's ACL keeps the file private)
+		require.Equal(t, os.FileMode(0o600), st.Mode().Perm())
+	}
 	got, err := fs.Load()
 	require.NoError(t, err)
 	require.Equal(t, in, got)
