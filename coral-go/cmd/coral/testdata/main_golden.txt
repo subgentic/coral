@@ -15,6 +15,7 @@ Commands:
   setup-code       print the one-time code that setting the password from another computer asks for
   cloud            Coral Hub: connect this Coral, show its status, or disconnect
   auto-accept      turn auto-accept off for every agent at once
+  cli-check        does Coral see each agent CLI? (found or not, its path and version; exit 1 if the type you name is missing)
   artifacts        prune stored artifacts (diffs and objects) to free disk
   db               compact the database, or rebuild its search index (stop Coral first)
   version          print the version (also --version, -v)
@@ -135,6 +136,7 @@ Commands:
   setup-code       print the one-time code that setting the password from another computer asks for
   cloud            Coral Hub: connect this Coral, show its status, or disconnect
   auto-accept      turn auto-accept off for every agent at once
+  cli-check        does Coral see each agent CLI? (found or not, its path and version; exit 1 if the type you name is missing)
   artifacts        prune stored artifacts (diffs and objects) to free disk
   db               compact the database, or rebuild its search index (stop Coral first)
   version          print the version (also --version, -v)

@@ -56,6 +56,9 @@ func commands() []command {
 		{"auto-accept", "turn auto-accept off for every agent at once", func() []string {
 			return []string{"coral auto-accept off --all [--url " + u + "]"}
 		}},
+		{"cli-check", "does Coral see each agent CLI? (found or not, its path and version; exit 1 if the type you name is missing)", func() []string {
+			return []string{"coral cli-check [type] [--url " + u + "] [--home DIR]"}
+		}},
 		{"artifacts", "prune stored artifacts (diffs and objects) to free disk", func() []string {
 			return []string{
 				"coral artifacts prune --older-than 14d [--kind diffs|objects|diff-objects|all] [--dry-run] [--yes] [--url ...] [--home DIR]",

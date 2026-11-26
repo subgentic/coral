@@ -44,11 +44,12 @@ type fakeCoral struct {
 	connectFail       int
 	connectRetryAfter string
 	connects          int
-	onStatus          func() // test hook, called on every status read
-	connectReply      string // if set, what /api/cloud/connect answers (default: enrolling)
-	deviceReply       string // if set, what the /api/cloud/device* routes answer
-	linkReply         string // if set, what the /api/cloud/links* routes answer
-	keyReply          string // if set, what the /api/cloud/link-keys* routes answer
+	onStatus          func()            // test hook, called on every status read
+	connectReply      string            // if set, what /api/cloud/connect answers (default: enrolling)
+	deviceReply       string            // if set, what the /api/cloud/device* routes answer
+	linkReply         string            // if set, what the /api/cloud/links* routes answer
+	keyReply          string            // if set, what the /api/cloud/link-keys* routes answer
+	cliReply          map[string]string // agent type -> what /api/system/cli-check?type= answers (an unlisted type: found: false)
 }
 
 type fakeRedeem struct {
@@ -99,6 +100,12 @@ func (f *fakeCoral) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	f.calls = append(f.calls, r.Method+" "+r.URL.Path+" "+strings.TrimSpace(string(b)))
 	switch r.URL.Path {
+	case "/api/system/cli-check":
+		reply, ok := f.cliReply[r.URL.Query().Get("type")]
+		if !ok {
+			reply = `{"found":false}`
+		}
+		_, _ = io.WriteString(w, reply)
 	case "/api/cloud/redeem":
 		if string(body["check"]) == "true" {
 			f.checks++
