@@ -207,7 +207,7 @@ func TestAProposalStartsOffAndFilesOneQuestionWithTheWholeTextAndTheHash(t *test
 		assert.Contains(t, text, want)
 	}
 	assert.NotContains(t, text, "@Operator for nothing", "a mention inside a step is defused")
-	assert.Contains(t, text, "@​Operator for nothing")
+	assert.Contains(t, text, "@\u200bOperator for nothing")
 	// the second step's "editable" line sits on the make step only
 	assert.Equal(t, 1, strings.Count(text, "This step runs files your team can change after you approve."))
 }
@@ -261,8 +261,8 @@ func TestAProposalThatCannotBeShownWholeOrFloodsTheOperatorIsRefused(t *testing.
 	cases := map[string]string{
 		"too many steps":              mk(named(11), ok),
 		"a command over the cap":      mk("["+sh("echo "+strings.Repeat("x", 4001))+"]", ok),
-		"a right-to-left override":    mk("["+sh("echo ‮ hi")+"]", ok),
-		"a zero-width character":      mk("["+sh("echo a​b")+"]", ok),
+		"a right-to-left override":    mk("["+sh("echo \u202e hi")+"]", ok),
+		"a zero-width character":      mk("["+sh("echo a\u200bb")+"]", ok),
 		"a control character":         mk("["+sh("echo a\x07b")+"]", ok),
 		"every five minutes":          mk("["+sh("true")+"]", `{"cron":"*/5 * * * *"}`),
 		"every minute":                mk("["+sh("true")+"]", `{"cron":"* * * * *"}`),

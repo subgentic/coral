@@ -37,7 +37,7 @@ function schedule(v) {
 
 function stepBlock(v, s) {
     const box = el('div', 'autoc-step'); const head = el('div', 'autoc-step-head');
-    head.append(el('strong', '', `Step ${s.index}`), el('span', 'autoc-chip', s.type === 'agent' ? 'Agent' : 'Shell'), el('span', 'autoc-step-note', s.continue_on_failure ? 'keeps going if it fails' : 'stops the run if it fails'));
+    head.append(el('strong', '', `Step ${s.index}`), el('span', 'chip chip-tag', s.type === 'agent' ? 'Agent' : 'Shell'), el('span', 'autoc-step-note', s.continue_on_failure ? 'keeps going if it fails' : 'stops the run if it fails'));
     const body = el('div', 'autoc-step-body'); const dl = el('dl', 'autoc-dl');
     if (s.type === 'agent') {
         fact(dl, 'Agent type', s.agent_type || 'default'); if (s.model) fact(dl, 'Model', s.model);
@@ -54,7 +54,7 @@ function stepBlock(v, s) {
     box.append(head, body); return box;
 }
 
-function changes(v) {
+function changedBlock(v) {
     const box = el('div', 'autoc-changed'); box.append(el('h4', '', 'What changed since you approved'));
     const diff = el('div', 'autoc-diff'); diff.setAttribute('role', 'list');
     for (const line of v.changes || []) diff.append(Object.assign(el('div', line.startsWith('+') ? 'a' : 'd', line), { role: 'listitem' }));
@@ -66,7 +66,7 @@ function changes(v) {
 /** The whole card for an automation the server describes: facts, then every step. */
 export function automationCard(v) {
     const card = el('div', 'autoc'); card.setAttribute('data-automation-card', '');
-    if (v.state === 'changed') card.append(changes(v));
+    if (v.state === 'changed') card.append(changedBlock(v));
     const dl = el('dl', 'autoc-dl autoc-facts');
     fact(dl, 'Workflow', v.name); fact(dl, 'Team', v.team); fact(dl, 'Repo folder', v.repo_path); fact(dl, 'Runs', schedule(v));
     fact(dl, 'Proposed by', `Orchestrator of ${v.team}`);
@@ -122,7 +122,7 @@ async function drawCard(a, box, name, hash, again) {
     msg.classList.remove('inbox-preview'); msg.classList.add('autoc-msg'); cell.querySelector('.inbox-preview-toggle')?.remove();
     msg.replaceChildren(el('strong', 'autoc-title', `${again ? 'Changed since you approved' : 'Approve an automation'}: ${name}`));
     const kind = cell.querySelector('.inbox-kind-ask'); if (kind) kind.textContent = 'Automation approval';
-    const chip = el('span', again ? 'autoc-chip autoc-chip-off' : 'autoc-chip autoc-chip-warn', again ? 'Off until you approve again' : 'Starts off'); chip.setAttribute('data-automation-state', '');
+    const chip = el('span', again ? 'chip autoc-chip-off' : 'chip autoc-chip-warn', again ? 'Off until you approve again' : 'Starts off'); chip.setAttribute('data-automation-state', '');
     cell.querySelector('.inbox-meta')?.append(chip);
     const key = `${a.board}/${name}/${hash}`;
     if (seen.has(key)) { msg.append(automationCard(seen.get(key))); return; }

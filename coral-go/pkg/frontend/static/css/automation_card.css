@@ -6,23 +6,21 @@
 .autoc-hash { font-family: var(--font-mono); font-size: var(--fs-sm); background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 6px; }
 .autoc-hint-inline, .autoc-hint { color: var(--text-secondary); font-size: var(--fs-sm); }
 .autoc-hint { margin: 3px 0 0; }
-.autoc-steps-title { margin: 0 0 4px; font-size: var(--fs-base); font-weight: var(--fw-strong); }
+.autoc-steps-title { margin: 0 0 4px; font-size: var(--fs-base); }
 .autoc-step { border: 1px solid var(--border); background: var(--bg-secondary); border-radius: var(--radius-md); margin: 8px 0; overflow: hidden; }
 .autoc-step-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 7px 10px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: var(--fs-base); }
 .autoc-step-note { margin-left: auto; color: var(--text-secondary); font-size: var(--fs-sm); }
 .autoc-step-body { padding: 9px 10px; }
 .autoc-step .autoc-dl { font-size: var(--fs-sm); gap: 3px 14px; margin-bottom: 8px; }
-.autoc-text { margin: 0; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9.5em; overflow: auto; }
-.autoc-chip { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: var(--fs-sm); background: var(--bg-tertiary); color: var(--text-secondary); vertical-align: 1px; margin-left: 6px; }
-.autoc-step-head .autoc-chip { margin-left: 0; }
-.autoc-chip-warn { background: color-mix(in srgb, var(--warning) 20%, transparent); color: var(--warning-text); font-weight: var(--fw-strong); }
-.autoc-chip-off { background: color-mix(in srgb, var(--error) 18%, transparent); color: var(--error-text); font-weight: var(--fw-strong); }
+.autoc-text { margin: 0; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; font-family: var(--font-mono); font-size: var(--fs-sm); line-height: var(--lh-ui); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9.5em; overflow: auto; }
+.autoc-chip-warn { margin-left: 6px; background: color-mix(in srgb, var(--warning) 20%, transparent); color: var(--warning-text); }
+.autoc-chip-off { margin-left: 6px; background: color-mix(in srgb, var(--error) 18%, transparent); color: var(--error-text); }
 .autoc-note { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; font-size: var(--fs-sm); border-radius: var(--radius-sm); padding: 6px 9px; }
 .autoc-note-ok { color: var(--success-text); background: color-mix(in srgb, var(--success) 16%, transparent); }
 .autoc-note-warn { color: var(--warning-text); background: color-mix(in srgb, var(--warning) 20%, transparent); }
 .autoc-changed { margin: 0 0 12px; }
 .autoc-changed h4 { margin: 0 0 6px; font-size: var(--fs-base); }
-.autoc-diff { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 0; font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.5; }
+.autoc-diff { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 0; font-family: var(--font-mono); font-size: var(--fs-sm); line-height: var(--lh-ui); }
 .autoc-diff div { padding: 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .autoc-diff .a { background: color-mix(in srgb, var(--success) 16%, transparent); }
 .autoc-diff .d { background: color-mix(in srgb, var(--error) 16%, transparent); }
@@ -33,4 +31,4 @@
     .autoc-dl dd { margin-bottom: 6px; }
 }
 .autoc-msg { display: block; max-height: none; overflow: visible; white-space: normal; }
-.autoc-title { display: block; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.autoc-title { display: block; font-size: var(--fs-lg); }

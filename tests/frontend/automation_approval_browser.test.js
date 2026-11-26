@@ -23,7 +23,7 @@ const view = (extra = {}) => ({ name: 'nightly-deps', description: '', team: 'te
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = async (name, w, mobile) => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true });
-        await Emulation.setDeviceMetricsOverride({ width: w, height: 2600, deviceScaleFactor: 1, mobile }); await new Promise(r => setTimeout(r, 400)); // the card whole: a tall page
+        await Emulation.setDeviceMetricsOverride({ width: w, height: 2600, deviceScaleFactor: 1, mobile }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: a screenshot only: the resized page needs a beat to lay out
         fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
         await Emulation.setDeviceMetricsOverride({ width: w, height: w === 390 ? 844 : 900, deviceScaleFactor: 1, mobile }); };
     try {
@@ -50,7 +50,7 @@ const view = (extra = {}) => ({ name: 'nightly-deps', description: '', team: 'te
                     return true; })()`);
                 await ev(`window.switchNavTab('hub-inbox'); true`);
                 await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && !!document.querySelector('[data-automation-action=approve]') && !!document.querySelector('[data-automation-card] .autoc-step')`, at + 'one row with the card, Approve and Deny', 12000);
-                await new Promise(r => setTimeout(r, 400)); // the list redraws once after the card is in: read the settled row
+                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the list redraws once after the card is in; no state names it, so the settled row is read after a beat
                 await waitFor(`!!document.querySelector('[data-automation-card] .autoc-facts')`, at + 'the card after the redraw', 8000);
                 const row = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); const card = r.querySelector('[data-automation-card]');
                     const steps = [...card.querySelectorAll('.autoc-step')].map(s => ({ head: s.querySelector('.autoc-step-head').textContent, text: s.querySelector('.autoc-text').textContent, ok: !!s.querySelector('.autoc-note-ok'), warn: !!s.querySelector('.autoc-note-warn'), note: (s.querySelector('.autoc-note') || {}).textContent || '', body: s.querySelector('.autoc-step-body').textContent }));
