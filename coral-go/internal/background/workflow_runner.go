@@ -97,6 +97,8 @@ type WorkflowRunner struct {
 	killed map[int64]bool
 	// runTokens: the automation token of each run in progress whose workflow has a board (#21502); it is in a shell step's environment and ends with the run.
 	runTokens map[int64]string
+	// approvalNeeded files the Operator's question again when a run finds a team's workflow is not what was approved (#21505).
+	approvalNeeded func(ctx context.Context, wf *store.Workflow)
 	// running counts runs in progress; at maxRuns a new trigger is refused (#3424, MED-02).
 	running int
 	maxRuns int
@@ -143,6 +145,11 @@ func NewWorkflowRunner(wfStore *store.WorkflowStore, launcher *AgentLauncher, ru
 // Returns the created run. Callers can track progress via GetWorkflowRun.
 // A run beyond maxRuns in progress is refused with ConcurrencyLimitError (#3424, MED-02).
 func (wr *WorkflowRunner) TriggerWorkflow(ctx context.Context, workflow *store.Workflow, triggerType string, triggerContext *string) (*store.WorkflowRun, error) {
+	// a workflow a team's Orchestrator proposed runs only as the Operator approved it (#21505); the gate decides by the database and hands back the workflow as it is stored now
+	workflow, err := wr.requireApproval(ctx, workflow)
+	if err != nil {
+		return nil, err
+	}
 	wr.mu.Lock()
 	if wr.stopped {
 		wr.mu.Unlock()

@@ -29,6 +29,15 @@ type Workflow struct {
 	// Board is the team this automation posts to as "Automation: NAME" (#21502); "" means its steps have no board identity. Only a person sets it.
 	// It is not a column of workflows: a Coral of an older version scans that table with SELECT * and refuses a column it does not know, so the team is in the side table workflow_boards (read by fillBoards).
 	Board string `db:"-" json:"board"`
+	// Team, ProposedBy, ApprovedHash, ApprovedFiles, ApprovedSnapshot and ApprovedAt: a workflow a team's Orchestrator proposed (#21505), read from the side table team_workflows. Team is that team ("" for every other
+	// workflow); nothing of it runs unless ApprovedHash is the hash of what it is now (background.ApprovalOf). ApprovedFiles is the repo files that hash covers, each with its bytes' SHA-256, as JSON;
+	// ApprovedSnapshot is what was approved, kept to say what changed since.
+	Team             string `db:"-" json:"team,omitempty"`
+	ProposedBy       string `db:"-" json:"proposed_by,omitempty"`
+	ApprovedHash     string `db:"-" json:"approved_hash,omitempty"`
+	ApprovedFiles    string `db:"-" json:"-"`
+	ApprovedSnapshot string `db:"-" json:"-"`
+	ApprovedAt       string `db:"-" json:"approved_at,omitempty"`
 
 	// Computed fields (not stored in DB directly, populated by JSON unmarshal)
 	Steps        []json.RawMessage `db:"-" json:"steps,omitempty"`
@@ -306,11 +315,13 @@ func (s *WorkflowStore) setBoard(ctx context.Context, id int64, board string) er
 	return err
 }
 
-// fillBoards sets Board on each workflow from workflow_boards. A read that fails leaves Board empty: an automation without its team has no board identity, the safe side.
+// fillBoards sets Board on each workflow from workflow_boards, and the team's proposal state from team_workflows. A read of the first that fails leaves Board empty: an automation without its team has no board
+// identity, the safe side. A read of the second that fails leaves Team empty and the workflow looks like an Operator's: every caller that decides by Team reloads through GetWorkflow, which reports the error.
 func (s *WorkflowStore) fillBoards(ctx context.Context, ws ...*Workflow) {
 	if len(ws) == 0 {
 		return
 	}
+	s.fillTeams(ctx, ws)
 	var rows []struct {
 		ID    int64  `db:"workflow_id"`
 		Board string `db:"board"`

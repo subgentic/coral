@@ -1191,6 +1191,31 @@ CREATE TABLE IF NOT EXISTS workflow_boards (
     workflow_id INTEGER PRIMARY KEY REFERENCES workflows(id) ON DELETE CASCADE,
     board       TEXT NOT NULL
 );
+-- The workflows a team's Orchestrator proposed (#21505): who proposed it and what the Operator approved. A table of its own, not columns of workflows: an older Coral reads workflows with SELECT * and
+-- refuses a column it does not know.
+CREATE TABLE IF NOT EXISTS team_workflows (
+    workflow_id       INTEGER PRIMARY KEY REFERENCES workflows(id) ON DELETE CASCADE,
+    team              TEXT NOT NULL,
+    proposed_by       TEXT NOT NULL DEFAULT '',
+    approved_hash     TEXT NOT NULL DEFAULT '',
+    approved_files    TEXT NOT NULL DEFAULT '',
+    approved_snapshot TEXT NOT NULL DEFAULT '',
+    approved_at       TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_team_workflows_team ON team_workflows(team);
+
+-- What a team's Orchestrator and the Operator did to the team's proposed workflows (#21505): the hash, never the text. It is the limit on proposals per hour and the record of each propose, approve, deny and disable.
+CREATE TABLE IF NOT EXISTS team_workflow_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    team        TEXT NOT NULL,
+    workflow_id INTEGER NOT NULL DEFAULT 0,
+    name        TEXT NOT NULL DEFAULT '',
+    kind        TEXT NOT NULL,
+    hash        TEXT NOT NULL DEFAULT '',
+    who         TEXT NOT NULL DEFAULT '',
+    at          INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_team_workflow_events ON team_workflow_events(team, kind, at);
 
 -- Browser sign-ins (#3949): a sign-in link, the API-key form or the password. Only the
 -- SHA-256 of the cookie value is kept; times are unix seconds; expires_at is absolute.
