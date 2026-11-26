@@ -19,3 +19,12 @@
 }
 .team-tabs-next { display: none; }
 @media (max-width: 767px) { :root .team-needs-list .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 1 1 100%; } } /* the team page's phone toolbar is the Inbox's: the search has its own line, then Kind, the filters, Select and More */
+
+/* #21597: Linked teams is a panel below its tab, with the existing page gutters. */
+#team-panel-linked { padding: var(--team-page-padding, 16px 24px 0); }
+#team-panel-linked .team-page-links { margin: 0; }
+@media (max-width: 760px) {
+    #team-panel-linked { padding: 12px 16px 0; }
+    .team-tabs-row > .team-tabs { flex-wrap: wrap; overflow: visible; mask-image: none; }
+    .team-tabs-row .team-tabs-next, .team-tabs-row .team-strip-edge { display: none; }
+}

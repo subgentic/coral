@@ -33,7 +33,7 @@
  const HEX_RE = /^[0-9a-f]{64}$/i;
 // The team page's tabs, in order (#7453). /team/<name> with no tab is the first.
 export const SKILL_FOLDERS = ['imported', 'agent-created', 'coral-skills']; // the Skills sidebar's folders besides All (#12997)
-export const TEAM_TABS = ['goals', 'needs', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages', 'branches']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Needs you, Agents, Tasks, Artifacts, Knowledge, Board, and Branches last (Board stays seventh, after Knowledge, with Needs you in the strip); team settings are a popout (#8853), not a tab
+export const TEAM_TABS = ['goals', 'needs', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages', 'branches', 'linked']; // the strip's order, left to right and by the arrow keys (the operator's, #8791): Goals, Needs you, Agents, Tasks, Artifacts, Knowledge, Board, Branches and Linked teams last (Board stays seventh, after Knowledge, with Needs you in the strip); team settings are a popout (#8853), not a tab
 const TEAM_ITEM_TABS = ['goals', 'tasks', 'messages']; // the tabs with an item: /team/<name>/goals/<id>, /team/<name>/tasks/<id> (pages), /team/<name>/messages/<id> (the Board tab scrolled to that message, #7921)
 // An agent's own tabs (live_session.html #agentic-tab-<id>); the team-scoped ones belong to /team.
 export const AGENT_SUBTABS = ['board', 'tasks', 'notes', 'files', 'browse', 'artifacts', 'activity', 'info', 'agent-ui', 'branches'];
@@ -47,8 +47,6 @@ const INBOX = 'in' + 'box'; // the path word, spelled in two parts: the icon-nam
 const INBOX_CHATS_RE = /^(?:all|active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11})$/;
 const INBOX_FOLDER_RE = /^(?:needs|saved|activity|artifacts|chats|chats-(?:active|starred|notes|archived|cli-[a-z0-9]{1,20}|tag-[1-9]\d{0,11}))$/;
 // The team page's tabs by the word their path uses: the Board tab was Messages (#7784), and /team/<t>/messages still opens it, as /board (#8652).
-const TAB_PATH = { messages: 'board' };
-const TAB_FROM_PATH = { board: 'messages', messages: 'messages' };
 
 // The query keys the Chats tab owns (search_filters.js), kept on /chats only.
  const CHATS_QUERY_KEYS = ['page', 'type', 'q', 'fts_mode', 'tag_ids', 'tag_logic', 'source_types',
@@ -128,7 +126,7 @@ export function parse(pathname, search = '') {
             if (n === null) return null;
             if (top === 'board') return rest.length === 1 ? { view: 'board', server: t.server, id: n } : null;
             if (rest.length === 1) return { view: 'team', server: t.server, id: n, sub: null };
-            const tab = Object.hasOwn(TAB_FROM_PATH, rest[1]) ? TAB_FROM_PATH[rest[1]] : rest[1]; // the path's word, as the page names the tab
+            const tab = rest[1] === 'board' ? 'messages' : rest[1]; // the path's word, as the page names the tab
             if (!TEAM_TABS.includes(tab)) return null;
             if (rest.length === 2) { const query = tab === 'tasks' ? tasksQuery(search) : ''; return query ? { view: 'team', server: t.server, id: n, sub: tab, query } : { view: 'team', server: t.server, id: n, sub: tab }; }
             return rest.length === 3 && TEAM_ITEM_TABS.includes(tab) && INT_RE.test(rest[2]) ? { view: 'team', server: t.server, id: n, sub: tab, item: Number(rest[2]) } : null;
@@ -262,7 +260,7 @@ export function build(r) {
         case 'inbox-boards':
             return r.sub === 'boards' ? `/inbox/boards${r.id ? '/' + seg(r.id) : ''}` : '/';
         case 'team':
-            return `/team/${srvSeg(r.server)}${seg(r.id)}${TEAM_TABS.includes(r.sub) ? '/' + (TAB_PATH[r.sub] || r.sub) + (r.item && TEAM_ITEM_TABS.includes(r.sub) ? '/' + r.item : '') : ''}${r.sub === 'tasks' && !r.item && r.query ? '?' + r.query : ''}`;
+            return `/team/${srvSeg(r.server)}${seg(r.id)}${TEAM_TABS.includes(r.sub) ? '/' + (r.sub === 'messages' ? 'board' : r.sub) + (r.item && TEAM_ITEM_TABS.includes(r.sub) ? '/' + r.item : '') : ''}${r.sub === 'tasks' && !r.item && r.query ? '?' + r.query : ''}`;
         case 'board':
             return `/board/${srvSeg(r.server)}${seg(r.id)}`;
         case 'inbox-folder':

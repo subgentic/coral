@@ -40,22 +40,12 @@ const TEAM = `qa-hint-${Date.now() % 100000}`;
                 assert.ok(s.scrolls && s.shown && s.name === 'Show more tabs', 'at 820 px an overflowing strip has the "Show more tabs" button: ' + JSON.stringify(s));
                 continue;
             }
-            assert.equal(s.scrolls, true, 'a phone strip scrolls: ' + JSON.stringify(s));
-            assert.ok(s.shown && s.name === 'Show more tabs' && s.w >= 44 && s.h >= 44 && s.atEnd, 'a 44 px "Show more tabs" button sits beside the strip\'s end (right of it, over no tab: #18867) while tabs wait past the edge: ' + JSON.stringify(s));
-            await ev(`document.getElementById('team-tabs-next').click(); true`);
-            // > 0, not > 100: with narrower fonts (Ubuntu CI) the tabs overflow by little, and the button hides at the end, which widens the strip and lowers its largest scroll (#18963)
-            await waitFor(`document.getElementById('team-tabs').scrollLeft > 0`, 'the strip scrolled to the next tabs', 5000).catch(async e => { throw new Error(e.message + ': ' + JSON.stringify(await state())); });
-            for (let i = 0; i < 4 && (await state()).shown; i++) { await ev(`document.getElementById('team-tabs-next').click(); true`); await settle(500); }
-            // Geometry can reach the end before the scroll event updates data-more (Windows #19074).
-            // Wait for the observable result; a cue that stays shown still fails, with its raw state.
-            await waitFor(`(() => {
-                const tabs = document.getElementById('team-tabs'), next = document.getElementById('team-tabs-next');
-                const last = document.getElementById('team-tab-branches').getBoundingClientRect().right <= tabs.getBoundingClientRect().right + 1;
-                return last && (!next || !next.getClientRects().length || getComputedStyle(next).display === 'none' || getComputedStyle(next).visibility === 'hidden');
-            })()`, 'the last tab is visible and the scroll cue is hidden', 5000).catch(async e => { throw new Error(e.message + ': ' + JSON.stringify(await state())); });
-            s = await state();
-            assert.ok(s.last && !s.shown, 'at the last tab (Branches) the button is gone: ' + JSON.stringify(s));
+            assert.equal(s.scrolls, false, 'phone tabs wrap without horizontal scrolling: ' + JSON.stringify(s));
+            assert.equal(s.shown, false, 'no scroll cue when all phone tabs wrap');
+            const tabs = await ev(`(() => { const strip = document.getElementById('team-tabs').getBoundingClientRect(); return [...document.querySelectorAll('#team-tabs [role=tab]')].map(t => { const r = t.getBoundingClientRect(); return { name: t.textContent.trim(), whole: r.left >= strip.left - 1 && r.right <= strip.right + 1, h: r.height }; }); })()`);
+            assert.equal(tabs.length, 9, 'all nine tabs, including Linked teams');
+            assert.ok(tabs.every(t => t.whole && t.h >= 44), 'wrapped tabs remain whole 44 px targets: ' + JSON.stringify(tabs));
         }
     } finally { await removeBoards(ev, [TEAM]).catch(() => {}); await client.close(); }
-    console.log('PASS the phone team tab strip says it scrolls');
+    console.log('PASS phone tabs wrap; overflowing tablet tabs retain a scroll cue');
 })().catch(e => { console.error(e.message); process.exit(1); });
