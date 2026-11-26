@@ -139,7 +139,8 @@ setInterval(() => {}, 1 << 30);
         assert.match(await ev(`document.getElementById('editions-title').textContent`), /Connect to Coral Hub/);
         await clickVisible('[data-editions="skip"]');
         await waitFor(`!document.querySelector('[data-editions="skip"]') || document.querySelector('[data-editions="skip"]').getClientRects().length === 0`, `${tag}: the offer closing`, { timeout: 8000 });
-        const choice = await ev(`fetch('/api/settings').then(r => r.json()).then(j => ({ choice: String((j.settings || j).welcome_choice), pending: String((j.settings || j).welcome_pending) }))`);
+        // the offer closes at once and the answer is saved by a request still in flight (editions.js _dismiss): read it until the server has it (a slow phone run read it first, #21667)
+        const choice = await ev(`(async () => { const read = () => fetch('/api/settings').then(r => r.json()).then(j => ({ choice: String((j.settings || j).welcome_choice), pending: String((j.settings || j).welcome_pending) })); let c = await read(); for (let i = 0; i < 100 && c.choice !== 'skipped'; i++) { await new Promise(r => setTimeout(r, 100)); c = await read(); } return c; })()`);
         assert.equal(choice.choice, 'skipped', `${tag}: "Skip for now" is remembered (${JSON.stringify(choice)})`);
         console.log(`   ✓ ${tag}: the Coral Hub offer is skipped and the answer saved`);
         // a new install runs nothing on its own (#6384): whatever the examples are, no scheduled job is switched on
