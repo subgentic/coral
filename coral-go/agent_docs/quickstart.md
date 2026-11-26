@@ -103,7 +103,10 @@ Coral dashboard: http://localhost:8420
 Press Ctrl+C to stop
 ```
 
-On first launch, review the Terms of Service and accept them if you agree. Keep the
+On first launch, review the Terms of Service and accept them if you agree. With no
+terminal (a server), read them with `coral terms`, then start Coral with `--accept-terms`
+(or `CORAL_ACCEPT_TERMS=1`): the person installing Coral accepts the Terms, and an agent
+must not pass the flag for them. Keep the
 terminal open while the server runs. Agents run in the built-in terminal; tmux is not needed.
 
 Useful flags: `--home <dir>` (data directory, default `~/.coral`), `--port` (default

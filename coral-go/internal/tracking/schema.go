@@ -51,6 +51,7 @@ const (
 	EULASourceDialog = "dialog" // accepted in Coral's terms dialog
 	EULASourceLegacy = "legacy" // the Windows installer's acceptance, recorded as this version's
 	EULASourceHub    = "hub"    // the Coral Hub confirmed this version when the machine enrolled
+	EULASourceFlag   = "flag"   // the person starting Coral passed --accept-terms (or set CORAL_ACCEPT_TERMS), for a start with no terminal (#21530)
 
 	SignInApp      = "app"      // the Coral app's own window, through the sign-in link it opens
 	SignInLink     = "link"     // the sign-in link Coral prints or opens (a login token)
@@ -198,7 +199,7 @@ var eventSpecs = map[string]map[string]propSpec{
 	EventFirstPromptSubmitted:   {"source": enum(MessageViaComposerHTTP, MessageViaComposerWS, MessageViaTerminal, MessageViaLaunchPrompt)}, // every way a person's first message goes (#7455; was http_send only)
 	EventPromptSubmitRequested:  {"source": enum("dashboard_composer")},
 
-	EventEULAAccepted:      {"source": enum(EULASourceDialog, EULASourceLegacy, EULASourceHub)},
+	EventEULAAccepted:      {"source": enum(EULASourceDialog, EULASourceLegacy, EULASourceHub, EULASourceFlag)},
 	EventDashboardSignedIn: {"via": enum(SignInApp, SignInLink, SignInKey, SignInPassword)},
 	EventFirstMessageSent:  {"via": enum(MessageViaComposerHTTP, MessageViaComposerWS, MessageViaTerminal, MessageViaLaunchPrompt)},
 	EventFirstAgentReply:   {"provider": enum("claude", "codex", "gemini", "pi", "other"), "seconds_to_reply": intRange(0, replySeconds), "outcome": enum(ReplyOK, ReplyError)},

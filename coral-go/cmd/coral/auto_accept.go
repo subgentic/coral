@@ -97,6 +97,10 @@ func subcommand(args []string) (int, bool) {
 	if len(args) > 0 && args[0] == "reset-password" {
 		return runResetPassword(args[1:], os.Stdin, os.Stdout, os.Stderr), true
 	}
+	if len(args) == 1 && args[0] == "terms" { // prints the Terms of Service text, for a person deciding on --accept-terms; not listed in the help on purpose (#21530)
+		fmt.Print(license.EULAText)
+		return 0, true
+	}
 	if len(args) > 0 && args[0] == "accept-terms" { // the self-hosted hub's setup over SSH (#11370); not listed in the help on purpose
 		return runAcceptTerms(args[1:], os.Stdin, os.Stdout, os.Stderr, license.RecordHubOwnerAcceptance), true
 	}

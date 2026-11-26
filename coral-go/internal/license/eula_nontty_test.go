@@ -143,3 +143,47 @@ func TestTheNoTerminalGiveUpIsToldApartFromADecline(t *testing.T) {
 	}
 	t.Cleanup(func() { noTerminal.Store(false) })
 }
+
+// #21530: --accept-terms records the current terms with source "flag", the funnel reads that word, and a start with no terminal names the flag.
+func TestRecordFlagAcceptanceWritesTheCurrentTermsWithSourceFlag(t *testing.T) {
+	marker := markerAt(t)
+	if IsEULAAccepted() {
+		t.Fatal("no marker yet: not accepted")
+	}
+	require(t, RecordFlagAcceptance())
+	data, err := os.ReadFile(marker)
+	require(t, err)
+	for _, want := range []string{"version=" + EULAVersion, "source=flag"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("marker %q lacks %q", data, want)
+		}
+	}
+	if !IsEULAAccepted() {
+		t.Error("the flag's acceptance counts for this version")
+	}
+	if src, ok := AcceptedSource(); !ok || src != "flag" {
+		t.Errorf("AcceptedSource = %q, %v; want flag", src, ok)
+	}
+}
+
+func TestNoTerminalStartNamesTheAcceptTermsFlag(t *testing.T) {
+	pr, pw, err := os.Pipe()
+	require(t, err)
+	defer pw.Close()
+	defer pr.Close()
+	oldIn, oldOut := os.Stdin, os.Stdout
+	rOut, wOut, err := os.Pipe()
+	require(t, err)
+	os.Stdin, os.Stdout = pr, wOut
+	accepted := TerminalEULADialog("terms")
+	os.Stdin, os.Stdout = oldIn, oldOut
+	wOut.Close()
+	buf := make([]byte, 4096)
+	n, _ := rOut.Read(buf)
+	if accepted {
+		t.Fatal("no terminal: not accepted")
+	}
+	if !strings.Contains(string(buf[:n]), "--accept-terms") || !strings.Contains(string(buf[:n]), "CORAL_ACCEPT_TERMS") {
+		t.Errorf("the message does not name the flag: %q", buf[:n])
+	}
+}

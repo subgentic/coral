@@ -73,6 +73,7 @@ type serverFlags struct {
 	noAutoLoopback     *bool
 	port               *int
 	noBrowser          *bool
+	acceptTerms        *bool
 	backendFlag        *string
 	remoteAccess       *bool
 	hubMode            *bool
@@ -102,6 +103,7 @@ func defineServerFlags() *serverFlags {
 	sf.host = flag.String("host", "", "Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Coral Hub and remote access, or --remote); otherwise Coral listens on 127.0.0.1")
 	sf.noAutoLoopback = flag.Bool("no-auto-loopback", config.Truthy(os.Getenv("CORAL_NO_AUTO_LOOPBACK")), "When --host names only network addresses, don't also listen on 127.0.0.1 (also CORAL_NO_AUTO_LOOPBACK=1)")
 	sf.port = flag.Int("port", 0, "Port to bind to")
+	sf.acceptTerms = flag.Bool("accept-terms", config.Truthy(os.Getenv("CORAL_ACCEPT_TERMS")), "The person installing Coral accepts the Terms of Service (read them with: coral terms); an agent must not set this for you. For a start with no terminal. Also CORAL_ACCEPT_TERMS=1")
 	sf.noBrowser = flag.Bool("no-browser", false, "Don't open the browser on startup")
 	// "" = not given: Settings > Defaults, else the built-in terminal, pty (#3634, #6064).
 	sf.backendFlag = flag.String("backend", "", "Terminal backend: pty or tmux (default: Settings > Defaults, else pty: agents stop when you quit Coral)")
@@ -285,7 +287,13 @@ func configureServer(cfg *config.Config, sf *serverFlags) {
 	// Check EULA acceptance (terminal prompt on first launch). A machine started with a Coral Hub credential (--bootstrap-file, or the well-known file) has nobody at a
 	// terminal: its terms are the Hub's confirmation of this version when the credential is redeemed, and it exits non-zero if that does not happen (#9936).
 	if config.EULARequired() && !license.EULAAcceptedLocally() {
-		if bootstrapOffered(cfg) {
+		if *sf.acceptTerms {
+			if err := license.RecordFlagAcceptance(); err != nil {
+				fmt.Fprintf(os.Stderr, "coral: could not record the acceptance of the Terms: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Terms of Service version %s accepted with --accept-terms. Read them with: coral terms\n", license.EULAVersion)
+		} else if bootstrapOffered(cfg) {
 			cfg.TermsViaHub = true
 			log.Println("[EULA] not accepted here; a Coral Hub credential is offered: the Hub's confirmation of this terms version when it enrolls this server is the acceptance, and Coral exits if it does not come")
 		} else if !license.CheckAndPromptEULA(tracking.ObserveEULADialog(tracking.EULASurfaceConsole, license.TerminalEULADialog)) {

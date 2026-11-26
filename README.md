@@ -203,6 +203,8 @@ export PATH="$HOME/.local/bin:$PATH"
 coral --no-browser
 ```
 
+On first launch Coral asks you to accept the Terms of Service in the terminal. On a server with no terminal, read them with `coral terms`, then start Coral with `--accept-terms` (or `CORAL_ACCEPT_TERMS=1`). The person installing Coral accepts the Terms; an agent must not pass this flag on someone's behalf.
+
 For a headless Linux server or VPS (service user, `systemd` unit, server sizing, headless password, Tailscale, and nginx TLS proxy), see **[Run Coral on a server](https://subgentic.github.io/coral/server/)** ([`coral-go/agent_docs/server.md`](coral-go/agent_docs/server.md), `coral-agent docs server`). Each release publishes [`SHA256SUMS.txt`](https://github.com/subgentic/coral/releases/latest/download/SHA256SUMS.txt) so you can verify any download with `sha256sum -c`.
 
 #### Windows (`x64`)
