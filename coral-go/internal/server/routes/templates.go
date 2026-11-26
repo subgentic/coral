@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -448,13 +449,14 @@ func (h *TemplatesHandler) getTemplate(w http.ResponseWriter, r *http.Request, k
 	}
 	data, err := h.githubFetch(fmt.Sprintf("cli-tool/components/%s/%s/%s", kind, category, filename))
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]interface{}{"error": err.Error()})
+		slog.Warn("template fetch failed", "kind", kind, "category", category, "name", filename, "error", err) // the cause is logged, not sent: it can carry a URL or a token's error text
+		writeError(w, http.StatusBadGateway, "template_fetch_failed", "the template could not be fetched from GitHub")
 		return
 	}
 
 	dataMap, ok := data.(map[string]interface{})
 	if !ok {
-		writeJSON(w, http.StatusBadGateway, map[string]interface{}{"error": "unexpected response format"})
+		writeError(w, http.StatusBadGateway, "template_bad_response", "unexpected response format")
 		return
 	}
 
