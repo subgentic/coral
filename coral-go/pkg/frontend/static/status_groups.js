@@ -10,7 +10,8 @@ import { isPhoneLayout } from './phone_layout.js';
 import { sessionStateInfo } from './session_state.js';
 import { DISPLAY_PANEL_OPEN } from './display_panel.js';
 
-const KEY = 'coral-agent-grouping'; // 'status' (the default) or 'team'
+const KEYS = { server: 'coral-group-computer', team: 'coral-group-team', task: 'coral-group-task' }; // 'true' / 'false' per box; none set = the old choices (below), else all off
+const LEGACY = { server: ['coral-group-by-server', 'true'], team: ['coral-agent-grouping', 'team'] }; // what a browser chose before the three boxes
 const FOLD = 'coral-status-folded'; // JSON: the groups the person opened or folded by hand
 const MORE = 'coral-status-more'; // the phone's one line is open
 const DAY = 86400;
@@ -22,36 +23,40 @@ const GROUPS = [['needs', 'Needs you'], ['working', 'Working'], ['idle', 'Idle']
 const read = (k, d) => { try { return browserLocal.get(k) ?? d; } catch { return d; } };
 const write = (k, v) => { try { browserLocal.set(k, v); } catch { /* per-viewer only */ } };
 
-/** Group by (#21683): one more row of the agent list's Display panel, the same label-plus-select as State, Board and Sort, above the count: Status (the default) or Team. It replaces the
- *  Team | Status switch that sat in the list. Added to the sidebar's bar and the phone's (agent_list_bar.js builds them) at every draw and when the panel opens, so no start byte carries it. */
+/** Group by (#21685, the Operator's approved mock v4): three check boxes in the agent list's Display panel, above the count: Computer, Team, Task. Ticked ones nest in that order (computer, then team,
+ *  then task); none ticked is the Status view. Added to the sidebar's bar and the phone's (agent_list_bar.js builds them) at every draw and when the panel opens, so no start byte carries it.
+ *  They replace the Status | Team select (#21683) and the Display panel's "Group by computer" switch. */
+const BOXES = [['server', 'Computer'], ['team', 'Team'], ['task', 'Task']];
 function mountGroupBy() {
     for (const id of ['agent-list-bar', 'mobile-agent-list-bar']) {
         const menu = document.querySelector(`#${id} .list-bar-menu`);
         if (!menu) continue;
-        let sel = menu.querySelector('select[data-group-by]');
-        if (!sel) {
-            const wrap = document.createElement('label'), name = document.createElement('span');
-            wrap.className = 'list-bar-field'; name.className = 'list-bar-field-label'; name.textContent = 'Group by';
-            sel = document.createElement('select'); sel.className = 'field list-bar-select'; sel.id = `${id}-group-by`; sel.setAttribute('data-group-by', '');
-            sel.append(new Option('Status', 'status'), new Option('Team', 'team'));
-            sel.addEventListener('change', () => {
-                write(KEY, sel.value === 'team' ? 'team' : 'status');
-                for (const other of document.querySelectorAll('select[data-group-by]')) other.value = grouping(); // the sidebar's bar and the phone's show the one choice
-                redrawLiveList();
-            });
-            wrap.append(name, sel);
-            menu.insertBefore(wrap, menu.querySelector('.list-bar-count'));
+        let box = menu.querySelector('fieldset[data-group-by]');
+        if (!box) {
+            box = document.createElement('fieldset'); box.className = 'list-bar-groupby'; box.setAttribute('data-group-by', '');
+            const legend = document.createElement('legend'); legend.className = 'list-bar-field-label'; legend.textContent = 'Group by'; box.append(legend);
+            for (const [k, label] of BOXES) {
+                const row = document.createElement('label'), input = document.createElement('input');
+                row.className = 'list-bar-check'; input.type = 'checkbox'; input.id = `${id}-group-${k}`; input.dataset.box = k;
+                input.addEventListener('change', () => { write(KEYS[k], String(input.checked)); syncBoxes(); redrawLiveList(); });
+                row.append(input, document.createTextNode(label)); box.append(row);
+            }
+            menu.insertBefore(box, menu.querySelector('.list-bar-count'));
         }
-        if (sel.value !== grouping()) sel.value = grouping();
     }
+    syncBoxes();
 }
+const syncBoxes = () => { const g = groupBy(); for (const input of document.querySelectorAll('fieldset[data-group-by] input[data-box]')) if (input.checked !== g[input.dataset.box]) input.checked = g[input.dataset.box]; }; // the sidebar's bar and the phone's show the one choice
 document.addEventListener(DISPLAY_PANEL_OPEN, mountGroupBy);
 
-/** Which grouping the list uses: status unless the person chose Team. */
-export const grouping = () => (read(KEY, 'status') === 'team' ? 'team' : 'status');
+/** Which boxes are ticked: { server (the Computer box), team, task }. All off unless chosen; a browser that chose Team or Group by computer before the boxes keeps that choice. */
+export function groupBy() {
+    const on = k => { const v = read(KEYS[k], null); if (v !== null) return v === 'true'; const old = LEGACY[k]; return !!old && read(old[0], null) === old[1]; };
+    return { server: on('server'), team: on('team'), task: on('task') };
+}
 
 const foldedMap = () => { try { return JSON.parse(read(FOLD, '{}')) || {}; } catch { return {}; } };
-const isFolded = key => (key in foldedMap() ? !!foldedMap()[key] : key === 'done' || key.startsWith('w:') || key.startsWith('d:')); // Done today and a team's workers are folded until opened
+const isFolded = key => (key in foldedMap() ? !!foldedMap()[key] : key === 'done' || key.startsWith('w:') || key.startsWith('d:') || key.startsWith('m:')); // Done today, a team's workers and a phone's short lists are folded until opened
 
 /** The group an agent is in (an archived one is Done). */
 export function groupOf(s) {
@@ -116,21 +121,60 @@ registerActions({
     'status-more': () => { write(MORE, read(MORE, 'false') === 'true' ? 'false' : 'true'); redrawLiveList(); },
 });
 
-/** What the list draws in the Status view: { html, archived } (archived: the ones left for the Archived section), or null in the Team view (render.js draws that). */
+/** The Task box (#21685): an agent is On a task when the board's task data names it the assignee of an open task (the live row's board_task: in progress, else the oldest queued, which says "queued"). */
+const hasTask = s => !!(s.board_task && s.board_task.id);
+const SPLIT = [['on', 'On a task'], ['no', 'No task']];
+
+/** A row's task line, and the "queued" tag beside its name: the shared row, with the mock's "#21685 Sidebar: Group by Task" line under the name. */
+function withTaskLine(html, s) {
+    if (!hasTask(s)) return html;
+    const t = s.board_task, queued = t.status === 'pending';
+    return html.replace('<span class="session-name-spacer"></span>', `${queued ? '<span class="status-queued">queued</span>' : ''}<span class="session-name-spacer"></span>`)
+        .replace(/(\s*<\/div>\s*<div class="session-tooltip">)/, `<span class="session-task-line"><b>#${Number(t.id)}</b>${escapeHtml(String(t.title || ''))}</span>$1`); // inside the row's info column, after its last line
+}
+/** A subgroup's heading (On a task, No task): a caret, the name and the count, folded by hand like the Status groups. */
+const subHead = (key, label, n, folded) => `<li class="status-sub" data-status="${escapeAttr(key)}"><button type="button" class="btn btn-quiet status-head-toggle" data-on-click="status-fold" data-group="${escapeAttr(key)}" aria-expanded="${escapeAttr(String(!folded))}"><span class="status-caret" aria-hidden="true"></span><span class="status-name">${escapeHtml(label)}</span><span class="session-group-count">${Number(n)}</span></button></li>`;
+/** The Task box inside one scope (a team, a computer, the whole list): On a task, then No task, each with its rows. rows(list) draws agents as that scope always does.
+ *  On a phone each keeps a short list: two rows of On a task and one line that counts the rest ("1 more on a task", "3 without a task"), which opens the rest. */
+function taskSplit(list, scope, rows) {
+    const by = { on: list.filter(hasTask), no: list.filter(s => !hasTask(s)) };
+    if (!by.on.length && !by.no.length) return '';
+    const phone = isPhoneLayout(), open = !phone || !isFolded('m:' + scope);
+    let html = '';
+    for (const [k, label] of SPLIT) {
+        if (!by[k].length) continue;
+        const key = `t:${scope}:${k}`, folded = !phone && isFolded(key), shown = open ? by[k] : k === 'on' ? by[k].slice(0, PHONE_WORKING) : [];
+        html += subHead(key, label, by[k].length, folded) + (folded ? '' : rows(shown).replace(/<li /g, '<li data-in="1" '));
+        if (!open) { const rest = by[k].length - shown.length; if (rest) html += `<li class="status-more status-more-in"><button type="button" class="btn btn-quiet status-more-toggle" data-on-click="status-fold" data-group="${escapeAttr('m:' + scope)}" aria-expanded="false"><span class="status-caret" aria-hidden="true"></span>${Number(rest)} ${k === 'on' ? 'more on a task' : 'without a task'}</button></li>`; }
+    }
+    if (phone && open && list.length > PHONE_WORKING) html += `<li class="status-more status-more-in"><button type="button" class="btn btn-quiet status-more-toggle" data-on-click="status-fold" data-group="${escapeAttr('m:' + scope)}" aria-expanded="true"><span class="status-caret open" aria-hidden="true"></span>Show fewer</button></li>`;
+    return html;
+}
+
+/** What the list draws when Team is not ticked: { h, a } (a: the archived ones left for the Archived section), or null when it is (render.js draws the teams, and teamList below splits each by task).
+ *  wrap(agents, draw) puts a header per computer around draw's view when Computer is ticked (render.js). The view is the Status groups, or On a task / No task with the Task box. */
 let arch = []; // the archived agents of the last draw (a team's "done today" row reads them)
-export function lay(regular, limits, archived, renderRow) {
+export function lay(regular, limits, archived, renderRow, wrap) {
     arch = archived;
     mountGroupBy();
-    if (grouping() !== 'status') return null;
+    const g = groupBy();
+    if (g.team) return null;
     const sleeping = limits?.sleeping || [];
     if (limits) limits.sleeping = []; // drawn here, with the rest: render.js has none left to draw under the Team groups
-    return { h: renderStatusGroups([...regular, ...sleeping, ...archived.filter(doneToday)], renderRow), a: archived.filter(s => !doneToday(s)) };
+    const all = [...regular, ...sleeping, ...archived.filter(doneToday)];
+    const rows = list => list.map(s => withTaskLine(rowHtml(s, renderRow), s)).join('');
+    const view = own => (g.task ? taskSplit([...own].sort((a, b) => age(a) - age(b)), '*', rows) : renderStatusGroups(own, renderRow));
+    return { h: wrap(all, view), a: archived.filter(s => !doneToday(s)) };
 }
+
+/** Draw()'s rows with each agent's task line: the markup is split per row (each starts at its <li) and the ones with a task get theirs. */
+const withTaskRows = (html, list) => { const by = new Map(list.map(s => [escapeAttr(s.session_id || ''), s])); return html.split(/(?=<li )/).map(c => { const m = c.match(/data-session-id="([^"]*)"/), s = m && by.get(m[1]); return s ? withTaskLine(c, s) : c; }).join(''); };
 
 /** The Team view's orchestrator card (the mock's "under the orchestrator"): the orchestrator's row with a caret and "5 workers" at its right; folded, the line under it says "3 working · 1 needs you · 1 ready";
  * open, the workers follow and end with "6 done today", which opens the team's archived workers. saved: the team's agents in their saved order; draw: draws some of them as the card always did; row: draws one agent's row (an archived agent has no place in draw's lists).
  * A small team (under WORKERS_MIN workers) is drawn whole. */
 export function teamList(saved, board, draw, row) {
+    if (groupBy().task) return taskSplit(saved.filter(s => !s.sleeping), board, list => withTaskRows(draw(list), list)) + draw(saved.filter(s => s.sleeping)); // the Task box: each team's agents split On a task / No task (sleeping ones keep the list's own "N sleeping" row)
     const isOrch = s => /orchestrator/i.test(s.display_name || s.board_job_title || '');
     const all = [...saved.filter(isOrch), ...saved.filter(s => !isOrch(s))]; // the saved order, the orchestrator pinned to the top
     const [orch, ...rest] = all, workers = rest.filter(s => !s.sleeping), asleep = rest.filter(s => s.sleeping); // sleeping ones keep the list's own "N sleeping" row

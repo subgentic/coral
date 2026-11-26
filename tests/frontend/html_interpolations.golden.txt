@@ -266,7 +266,6 @@
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
 1	mobile.js	['summary', 'model'].map(k => switchRow({ label: `Show ${k}`, labelClass: 'list-display-option', labelAttrs: `
-1	mobile.js	switchRow({ label: 'Group by computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="gro
 1	mobile.js	switchRow({ label: 'Show computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server"
 1	model_chip.js	checked
 2	model_chip.js	how

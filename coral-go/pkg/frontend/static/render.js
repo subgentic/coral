@@ -47,7 +47,7 @@ import { UPDOWN, W, dirOf, menu, withAgent, withBoard } from './action_helpers.j
 export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, RESET_LOG_NOTE, attachDirect, killSessionDirect, restartDirect, restartSameDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep, sleepTerminalGone, setAgentAutoSleep, setKeepFullAccess } from './agent_actions.js';
 export { copyFolderPath, hideAlertModal, hidePromptModal, showAlertModal, showPromptModal } from './prompt_modals.js';
 export { killBoard, killGroup, saveTeamFromSidebar, shareAgentTeam, toggleTeamSleep } from './team_actions.js';
-export { expandSleepingGroup, toggleGroupByServer, toggleGroupByTeam, toggleShowServer, toggleRowLine } from './list_display_settings.js';
+export { expandSleepingGroup, toggleGroupByTeam, toggleShowServer, toggleRowLine } from './list_display_settings.js';
 export { renderHistoryChat, renderHistoryNodes, renderHistorySessions } from './history_list.js';
 export { updateSessionBranch, updateSessionFolder, updateSessionModel, updateSessionStatus, updateSessionSummary, updateWaitingIndicator } from './session_header_updates.js';
 export { distillTeamKnowledge, showTeamTokenUsage, updateHistoryTokenUsage, updateTokenUsage } from './token_usage_ui.js';
@@ -351,16 +351,18 @@ function _renderLiveSessions(sessions) {
     const regularAgents = limits?.regular || sessions;
     let html = limits?.summary || '';
     if (!SG) return; // the list by status (#21466) draws once its module is in (asked for above)
-    const st = SG.lay(regularAgents, limits, archived, _renderSessionItem);
-    html += st ? st.h : '';
-    if (!st && isGroupedByServer()) {
+    const wrap = (agents, draw) => { // the Computer box (#21685): a header per computer, the list's view inside it
+        if (!isGroupedByServer()) return draw(agents);
+        let h = '';
         for (const e of serversShown()) {
-            const own = regularAgents.filter(x => sessionServer(x) === e.id);
-            const collapsed = _isServerCollapsed(e.id);
-            html += serverGroupHeaderHtml(e, own.length, collapsed, _openServerDetails.has(e.id));
-            if (!collapsed) html += _renderGroups(own, groupByTeam, e.id === LOCAL_SERVER);
+            const own = agents.filter(x => sessionServer(x) === e.id), collapsed = _isServerCollapsed(e.id);
+            h += serverGroupHeaderHtml(e, own.length, collapsed, _openServerDetails.has(e.id));
+            if (!collapsed) h += draw(own, e.id);
         }
-    } else if (!st) html += _renderGroups(regularAgents, groupByTeam);
+        return h;
+    };
+    const st = SG.lay(regularAgents, limits, archived, _renderSessionItem, wrap);
+    html += st ? st.h : wrap(regularAgents, (own, id) => _renderGroups(own, groupByTeam, id === undefined || id === LOCAL_SERVER));
 
     html += limits?.waiting || '';
     if (limits?.sleeping.length) html += _renderGroups(limits.sleeping, groupByTeam);

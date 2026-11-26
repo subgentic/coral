@@ -1,7 +1,7 @@
 /* The agent list's display switches: server names, grouping, sleeping groups (moved out of render.js, #4996; no behaviour change). */
 import { state } from './state.js';
 import { redrawLiveList } from './list_hooks.js';
-import { isServerShownOnRows, isGroupedByServer, isRowLineShown, setRowLineShown } from './session_rows.js';
+import { isServerShownOnRows, isRowLineShown, setRowLineShown } from './session_rows.js';
 import { browserLocal } from './safe_storage.js';
 
 export async function toggleShowServer() {
@@ -21,11 +21,6 @@ export async function toggleShowServer() {
         state.settings = { ...state.settings, show_session_server: previous };
         redrawLiveList();
     }
-}
-
-export function toggleGroupByServer() {
-    try { browserLocal.set('coral-group-by-server', String(!isGroupedByServer())); } catch { /* per-viewer only */ }
-    redrawLiveList();
 }
 
 export function toggleRowLine(part) {

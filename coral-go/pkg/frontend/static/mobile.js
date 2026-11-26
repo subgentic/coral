@@ -139,7 +139,6 @@ function _listHeader(agentList) {
                 <div class="list-display-options">
                     ${['summary', 'model'].map(k => switchRow({ label: `Show ${k}`, labelClass: 'list-display-option', labelAttrs: ` data-display-row="${escapeAttr(k)}"`, attrs: ` data-display-input="${escapeAttr(k)}" data-on-change="toggle-row-line"` })).join('')}
                     ${switchRow({ label: 'Show computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' })}
-                    ${switchRow({ label: 'Group by computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group" hidden', attrs: ' data-display-input="group" data-on-change="toggle-group-by-server"' })}
                 </div>
             </div>
         `;
