@@ -37,11 +37,21 @@ func TestTheGoalsReadSaysWhichRowsAreHeld(t *testing.T) {
 	free := g.goal("Nobody drives it", "")
 	g.finishTask(free)
 	assert.False(t, g.held(free), "a goal nobody drives is listed the first time")
-	assert.False(t, g.held(free), "and again while it is the same all-done state")
-	g.finishTask(free) // another task done: a new all-done state of a goal that was shown
-	assert.True(t, g.held(free), "a goal shown once is not listed again")
+	g.finishTask(free) // another task done: a new all-done state. A read of the goals recorded nothing (#21470), so it is still the first time
+	assert.False(t, g.held(free), "a read of the goals does not write the once")
+	g.listed(free) // the Inbox drew the row
+	g.finishTask(free)
+	assert.True(t, g.held(free), "a goal the Inbox listed once is not listed again for a new all-done state")
 
 	g.settings["goal_done_driven_items"] = "true"
 	assert.False(t, g.held(driven), "the setting brings the rows back")
 	assert.False(t, g.held(free))
+}
+
+// listed is the Inbox page's "I drew this row" (POST .../done-state {"state":"listed"}).
+func (g *goalDoneRig) listed(gl *board.Goal) {
+	g.t.Helper()
+	got, err := g.bs.GetGoal(context.Background(), "team", gl.ID)
+	require.NoError(g.t, err)
+	g.h.recordListed(context.Background(), got)
 }

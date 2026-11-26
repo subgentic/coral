@@ -24,6 +24,7 @@ const (
 	doneStateShow    = "show"    // Undo of the two above: every hiding entry of the goal goes
 	doneStateRead    = "read"    // opened: stays listed, stops counting (the entry at this total and last change)
 	doneStateUnread  = "unread"  // Mark unread: every read entry of the goal goes
+	doneStateListed  = "listed"  // the Inbox page drew the goal's row: the "shown once" entry of #21442 is written now (#21470), by no other read of the goals
 )
 
 // SetGoalDoneState: POST /api/board/{project}/goals/{goalID}/done-state {"state": "not_yet" | "dismiss" | "show" | "read" | "unread"} (the Operator's alone). The Inbox kept these two lists by a PUT of the whole
@@ -42,13 +43,13 @@ func (h *BoardHandler) SetGoalDoneState(w http.ResponseWriter, r *http.Request) 
 		State string `json:"state"`
 	}
 	if err := decodeJSONStrict(r, &body); err != nil {
-		errBadRequest(w, `send {"state": "not_yet" | "dismiss" | "show" | "read" | "unread"}`)
+		errBadRequest(w, `send {"state": "not_yet" | "dismiss" | "show" | "read" | "unread" | "listed"}`)
 		return
 	}
 	switch body.State {
-	case doneStateNotYet, doneStateDismiss, doneStateShow, doneStateRead, doneStateUnread:
+	case doneStateNotYet, doneStateDismiss, doneStateShow, doneStateRead, doneStateUnread, doneStateListed:
 	default:
-		errBadRequest(w, `state is one of not_yet, dismiss, show, read, unread`)
+		errBadRequest(w, `state is one of not_yet, dismiss, show, read, unread, listed`)
 		return
 	}
 	if h.bs == nil || h.goalDoneEdit == nil {
@@ -68,6 +69,11 @@ func (h *BoardHandler) SetGoalDoneState(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	prefix := team + "|" + goal + "|"
+	if body.State == doneStateListed {
+		h.recordListed(r.Context(), g)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "state": body.State})
+		return
+	}
 	key, max := setreg.GoalDoneHidden, goalDoneHiddenMax
 	var edit func([]string) []string
 	switch body.State {
@@ -117,4 +123,15 @@ func withoutPrefix(l []string, prefix string) []string {
 		}
 	}
 	return out
+}
+
+// recordListed writes the "shown once" entry of a goal the Inbox page drew: only for a goal that is an item (looks done, not hidden) and that nothing holds back, as Needs you's read does.
+func (h *BoardHandler) recordListed(ctx context.Context, g *board.Goal) {
+	hidden := h.goalDoneHiddenSet(ctx)
+	if g.State != board.GoalActive || g.Rollup.Total == 0 || g.Rollup.Done != g.Rollup.Total || g.MovedOpen > 0 || hidden[goalDoneKey(g.BoardID, g.ID, g.Rollup.Total)] || hidden[goalDoneShownPrefix(g.BoardID, g.ID)+"*"] {
+		return
+	}
+	if d := h.goalDoneDriven(ctx, g.BoardID); !d.skips(*g) {
+		d.record(ctx, h, *g)
+	}
 }
