@@ -78,5 +78,29 @@ assert.deepStrictEqual(posts, [{ confirm: true }]);
 assert.strictEqual(part('rekey-row').hidden, true, 'gone once replaced');
 assert.match(part('status').textContent, /secret key was replaced/);
 assert.deepStrictEqual(domErrors.map(error => error.message), [], 'DOM listeners must not throw during the confirmation flow');
-console.log('cloud_rekey: ok');
+// #21557: Settings uses the same owner-only refusal, even after its commands
+// were placed in a closed Advanced fold by the off state.
+const settingsRoot = document.createElement('div');
+settingsRoot.id = 'settings-cloud';
+settingsRoot.innerHTML = `<div data-cloud="status"></div>
+ <button data-cloud="connect"></button><div data-cloud="mode-row"></div>
+ <div class="cloud-advanced"><summary>Advanced</summary><div data-cloud="command-row" hidden><code data-cloud="command"></code><button data-cloud="copy">Copy</button></div></div>`;
+document.body.append(settingsRoot);
+m.initCloudConnect();
+const settingsPanel = settingsRoot._cloudPanel;
+globalThis.fetch = async () => ({ ok: false, status: 403, json: async () => ({ code: 'local_dashboard_required', error: 'old server text' }) });
+await settingsPanel.load();
+const sq = role => settingsRoot.querySelector(`[data-cloud="${role}"]`);
+assert.match(sq('status').textContent, /On a server without a screen, run this on it \(for example over SSH, as the user Coral runs as\):/);
+assert.strictEqual(sq('command').textContent, 'coral cloud connect');
+assert.strictEqual(sq('command-row').hidden, false);
+assert.strictEqual(settingsRoot.querySelector('.cloud-advanced'), null, 'the command is outside the closed fold');
+assert.strictEqual(sq('connect').hidden, true);
+assert.strictEqual(sq('mode-row').hidden, true);
+settingsPanel.render({ state: 'idle', configured: true });
+assert.strictEqual(sq('command-row').hidden, true, 'the SSH command leaves with the refusal');
+assert.doesNotMatch(sq('status').textContent, /server without a screen/);
+settingsPanel.stop();
+panel.stop();
+console.log('cloud_rekey and headless refusal: ok');
 process.exit(0);

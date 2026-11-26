@@ -337,7 +337,18 @@ async function run() {
             await ev(`(async () => (await import((window.__coralStatic||'/static/')+'editions.js')).showHubSetup())()`);
             await until(`/computer running Coral/.test((document.querySelector('#editions-modal [data-cloud="status"]') || {}).textContent || '')`, 'the elsewhere message');
             s = await screen();
-            check(`${label}: from another computer: open Coral there, no command (#16717)`, !!s && s.status === 'Connecting happens on the computer running Coral. Open Coral on that computer and choose Connect.' && !s.connect && !s.code && !s.command, JSON.stringify(s));
+            check(`${label}: remote browser offers the headless SSH command (#21557)`, !!s && s.status.includes('On a server without a screen, run this on it (for example over SSH, as the user Coral runs as):') && !s.connect && !s.code && s.command === 'coral cloud connect', JSON.stringify(s));
+            { const { setTheme } = require('./helpers/contrast'); const fs = require('node:fs');
+              for (const theme of ['dark', 'light']) {
+                await setTheme(ev, theme);
+                if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/headless-${label}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+              }
+              await setTheme(ev, 'dark'); }
+            // The same refusal renderer is used by Settings; copy only the fixed command.
+            await ev(`window.__copied = ''; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copied = text; } } });`);
+            await click('#editions-modal [data-cloud="copy"]');
+            await until(`window.__copied === 'coral cloud connect'`, 'headless command copied');
+            check(`${label}: copies only the command`, await ev(`window.__copied === 'coral cloud connect'`));
             await click('#editions-modal [data-editions="skip"]');
             // A server with local_dashboard_required also gets the client-side elsewhere text (#16717).
             const own = { error: 'Connecting happens on the computer running Coral. Open Coral on that computer and choose Connect.', code: 'local_dashboard_required' };
@@ -345,7 +356,7 @@ async function run() {
             await ev(`(async () => (await import((window.__coralStatic||'/static/')+'editions.js')).showHubSetup())()`);
             await until(`/computer running Coral/.test((document.querySelector('#editions-modal [data-cloud="status"]') || {}).textContent || '')`, 'the server message');
             s = await screen();
-            check(`${label}: from another computer (#3285 server): the elsewhere text, no command`, !!s && s.status === own.error && !s.command, JSON.stringify(s));
+            check(`${label}: server owner-only refusal offers the same command`, !!s && s.status.includes('On a server without a screen') && s.command === 'coral cloud connect' && !s.connect && !s.code, JSON.stringify(s));
             await click('#editions-modal [data-editions="skip"]');
 
             // ── Settings > Coral Hub and remote access reopens it; closing keeps the stored answer ──

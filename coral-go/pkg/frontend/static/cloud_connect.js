@@ -27,8 +27,9 @@ const HUB_OPERATOR_URL = '/api/system/hub-operator';
     launch: 'Also start, stop, sleep, wake and restart agents (one agent or a whole team), browse folders to choose where, pause boards, delete board messages and boards, and turn on auto-accept. Launching runs code on this computer as you.',
 };
 // Said when this page is not the dashboard on the computer running Coral (the cloud routes
-// answer 403): connecting has to happen there. No CLI command on the main screen (#16717).
+// answer 403): connecting has to happen there, including over SSH on a headless server (#21557).
  const ELSEWHERE_TEXT = 'Connecting happens on the computer running Coral. Open Coral on that computer and choose Connect.';
+ const HEADLESS_TEXT = 'On a server without a screen, run this on it (for example over SSH, as the user Coral runs as):';
  const CONNECT_COMMAND = 'coral cloud connect';
 // The command a server with no hub is started with, shown only in the Advanced fold in Settings (#16717).
  const START_COMMAND = 'coral --cloud-url https://app.coralhub.dev';
@@ -497,11 +498,17 @@ class CloudPanel {
         }
     }
 
-    // Not the dashboard on the computer running Coral: say to open Coral there, no CLI command on screen (#16717).
+    // Owner-only refusal: keep the local browser path and offer the existing SSH flow (#21557).
     elsewhere(body) {
-        this.say(ELSEWHERE_TEXT);
-        for (const role of ['code', 'connect', 'cancel', 'disconnect', 'mode-row', 'command-row']) { const el = this.part(role); if (el) el.hidden = true; }
-        this.command = null;
+        this.say(`${ELSEWHERE_TEXT} ${HEADLESS_TEXT}`);
+        for (const role of ['code', 'connect', 'cancel', 'disconnect', 'mode-row', 'ask-row', 'auto-accept-row']) { const el = this.part(role); if (el) el.hidden = true; }
+        const row = this.part('command-row');
+        // Settings may previously have tucked this row into a closed Advanced fold.
+        const fold = row?.parentElement;
+        if (fold?.matches('.cloud-advanced')) { fold.before(row); fold.remove(); }
+        if (row) row.hidden = false;
+        put(this.part('command'), CONNECT_COMMAND);
+        this.command = CONNECT_COMMAND;
         this.onState({ state: 'elsewhere' });
     }
 
