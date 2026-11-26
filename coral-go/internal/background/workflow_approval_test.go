@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -331,9 +333,9 @@ func TestOnlyTheOperatorsApprovalEnablesAndOnlyOfTheHashItWasShown(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cur := func(w *store.Workflow, j *store.ScheduledJob) (string, error) {
+	cur := func(w *store.Workflow, j *store.ScheduledJob) (string, string, error) {
 		x, err := ApprovalOf(w, j)
-		return x.Hash, err
+		return x.Hash, ApprovalSnapshot(w, j), err
 	}
 	shown, _ := ApprovalOf(created, nil)
 	// the card was filed, then the Orchestrator changed the proposal: the old click enables nothing
@@ -419,4 +421,16 @@ func TestATeamsProposalsAreCappedPerTeamAndPerHour(t *testing.T) {
 	if list, _ := ws.ListTeamWorkflows(ctx, "web-shop"); len(list) > store.MaxTeamWorkflows {
 		t.Errorf("%d workflows held, cap %d", len(list), store.MaxTeamWorkflows)
 	}
+}
+
+// The gate asks the database whether a workflow is a team's, not the value it is handed: a value read without its team (a query that did not join the side table) cannot make a proposal run.
+func TestTheGateDecidesByTheDatabaseNotByTheValueItIsHanded(t *testing.T) {
+	ctx := context.Background()
+	ws, runner, wf, _ := approvedRig(t, []StepDef{{Name: "a", Type: "shell", Command: "true"}})
+	created, _, err := ws.CreateTeamWorkflow(ctx, wf, nil, "h", time.Now())
+	require.NoError(t, err)
+	bare := &store.Workflow{ID: created.ID, Name: created.Name, StepsJSON: created.StepsJSON, RepoPath: created.RepoPath, Enabled: 1} // no Team
+	var rae *ApprovalRequiredError
+	_, err = runner.TriggerWorkflow(ctx, bare, "api", nil)
+	require.True(t, errors.As(err, &rae), "a proposal handed over without its team still needs the approval: %v", err)
 }
