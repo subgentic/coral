@@ -54,9 +54,6 @@
   "settings_save_before_open_browser.test.js": [
     "showSettingsModal"
   ],
-  "status_groups_browser.test.js": [
-    "loadLiveSessions"
-  ],
   "task_links_browser.test.js": [
     "showCostDashboard"
   ],

@@ -62,7 +62,7 @@ const { connect } = require('./agent_view_harness');
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         assert.equal(await scene(), 14);
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'the status groups', 6000);
-        await ev(`import((window.__coralStatic || '/static/') + 'api.js').then(m => m.loadLiveSessions()).then(() => true)`); // a live-list read that lands after the scene (CI's slower first read): the mocked server answers with the scene, so the list does not change (#21725)
+        await ev(`window._coralLoadLiveSessions().then(() => true)`); // a live-list read that lands after the scene (CI's slower first read): the mocked server answers with the scene, so the list does not change (#21725)
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'the groups after the read', 6000);
         let p = await picture(false);
         assert.deepEqual(p.out.filter(x => x.head).map(x => [x.head, x.name, x.n]), [['needs', 'Needs you', 1], ['working', 'Working', 4], ['idle', 'Idle', 3], ['done', 'Done today', 6]], 'the four groups, in order, with their counts');
