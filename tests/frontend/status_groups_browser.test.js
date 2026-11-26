@@ -1,4 +1,4 @@
-// #21466 (the Operator's approved concept mocks v3, idea 4): the agent list grouped by status, the default, with a Team | Status switch whose choice is remembered.
+// #21466 (the Operator's approved concept mocks v3, idea 4): the agent list grouped by status, the default, with a Group by row (a select, like State and Sort, in the Display panel) whose choice is remembered (#21683).
 //   1. a fresh profile opens on Status: Needs you, Working, Idle, then Done today, folded; each heading has its count, no row has a status dot, and a group's rows run newest update first;
 //   2. Done today opens from its heading with a real click; the choice is kept after a reload;
 //   3. the Team button brings back the teams (the orchestrator card), is remembered across a reload, and Status brings the groups back;
@@ -43,9 +43,13 @@ const { connect } = require('./agent_view_harness');
                 else if (li.classList.contains('session-group-item')) out.push({ row: (li.dataset.name || li.getAttribute('aria-label') || '').split(',')[0], group, dot: !!li.querySelector('.session-dot') && getComputedStyle(li.querySelector('.session-dot')).display !== 'none', time: li.querySelector('.session-time')?.textContent });
                 else if (li.classList.contains('status-more')) out.push({ more: li.textContent.replace(/\\s+/g, ' ').trim() });
             }
-            return { out, switchOn: [...root.querySelectorAll('.status-switch [aria-pressed="true"]')].map(b => b.textContent.trim()), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+            return { out, switchOn: [...document.querySelectorAll('[data-group-by]')].filter(e => e.offsetParent).map(e => e.options[e.selectedIndex].textContent.trim()).slice(0, 1), oldSwitch: document.querySelectorAll('.status-switch, .status-switch-phone').length, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
         })()`);
         const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}-${process.env.LOOK_THEME || 'dark'}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }; // LOOK_THEME=light|dark picks the theme
+        const pick = async (value, hostId) => { // the Group by select of the Display panel, changed as a person does (the panel is kept open)
+            await waitFor(`!!document.querySelector('#${hostId} select[data-group-by]')`, 'the Group by row', 6000);
+            await ev(`(() => { const e = document.querySelector('#${hostId} select[data-group-by]'); e.value = ${JSON.stringify(value)}; e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        };
         const click = async sel => { // a real press on the element (after checking that it is what is under that point)
             const box = JSON.parse(await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return 'null'; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); const x = r.x + r.width / 2, y = r.y + r.height / 2; const hit = document.elementFromPoint(x, y); return JSON.stringify({ x, y, ok: hit === e || e.contains(hit) }); })()`));
             assert.ok(box && box.ok, `${sel} is under its own point`);
@@ -54,17 +58,22 @@ const { connect } = require('./agent_view_harness');
 
         console.log('computer: a fresh profile opens on Status');
         await load({ width: 1440, height: 900, mobile: false });
-        await ev(`try { localStorage.removeItem('coral-agent-grouping'); } catch (e) {} true`);
+        await ev(`try { localStorage.removeItem('coral-agent-grouping'); localStorage.setItem('coral_display_panel_open', '1'); } catch (e) {} true`);
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         assert.equal(await scene(), 14);
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'the status groups', 6000);
         let p = await picture(false);
+        await ev(`document.querySelector('.sidebar-header')?.scrollIntoView(); true`); await shot('groupby-desktop-1440');
         assert.deepEqual(p.out.filter(x => x.head).map(x => [x.head, x.name, x.n]), [['needs', 'Needs you', 1], ['working', 'Working', 4], ['idle', 'Idle', 3], ['done', 'Done today', 6]], 'the four groups, in order, with their counts');
         assert.deepEqual(p.out.filter(x => x.head).map(x => x.open), ['true', 'true', 'true', 'false'], 'Done today is folded');
         assert.deepEqual(p.out.filter(x => x.row).map(x => x.row), ['ask-407', 'Orchestrator', 'work-409', 'work-410', 'work-411', 'idle-designer', 'idle-402', 'idle-qa'], 'newest update first inside each group');
         assert.ok(p.out.filter(x => x.row).every(x => !x.dot), 'a row has no status dot: its heading is the status');
         assert.equal(p.out.find(x => x.row === 'work-410').time, '2 min');
         assert.deepEqual(p.switchOn, ['Status']);
+        assert.equal(p.oldSwitch, 0, 'no segmented switch is drawn any more');
+        const row = JSON.parse(await ev(`(() => { const e = document.querySelector('#agent-list-bar select[data-group-by]'), w = e.closest('label'), st = document.querySelector('#agent-list-bar .list-bar-menu select:not([data-group-by])'), cnt = document.querySelector('#agent-list-bar .list-bar-count'); return JSON.stringify({ label: w.querySelector('.list-bar-field-label').textContent, opts: [...e.options].map(o => o.textContent), cls: e.className === st.className, wrapCls: w.className, x: Math.round(e.getBoundingClientRect().x) === Math.round(st.getBoundingClientRect().x), h: Math.round(e.getBoundingClientRect().height) === Math.round(st.getBoundingClientRect().height), above: !!(w.compareDocumentPosition(cnt) & Node.DOCUMENT_POSITION_FOLLOWING) }); })()`));
+        assert.deepEqual([row.label, row.opts], ['Group by', ['Status', 'Team']]);
+        assert.ok(row.cls && row.x && row.h && row.above, 'the same kind of row as State and Sort: control, column, height, above the count ' + JSON.stringify(row));
         await shot('status-desktop-1440');
 
         console.log('computer: Done today opens from its heading, and the choice stays after a reload');
@@ -77,11 +86,11 @@ const { connect } = require('./agent_view_harness');
         assert.equal(p.out.find(x => x.head === 'done').open, 'true', 'Done today stays open after a reload');
 
         console.log('computer: Team brings back the teams, and it is remembered');
-        await click('.sidebar .status-switch .btn[data-mode="team"]');
+        await pick('team', 'agent-list-bar');
         await waitFor(`!document.querySelector('.sidebar .status-head') && !!document.querySelector('.sidebar .session-board-card')`, 'the teams', 6000);
         assert.deepEqual((await picture(false)).switchOn, ['Team']);
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await scene(); await waitFor(`!!document.querySelector('.sidebar .status-switch')`, 'the switch in the Team view', 6000);
+        await scene(); await waitFor(`!!document.querySelector('#agent-list-bar select[data-group-by]')`, 'the Group by row in the Team view', 6000);
         assert.deepEqual((await picture(false)).switchOn, ['Team'], 'Team is kept after a reload');
         console.log('computer: the team folds its workers under the orchestrator');
         await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) T.state.liveSessions.find(s => s.name === n).board_project = 'shop'; for (const s of T.state.liveSessions) if (s.archived) s.board_project = 'shop'; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
@@ -103,7 +112,7 @@ const { connect } = require('./agent_view_harness');
         await waitFor(`document.querySelectorAll('.sidebar .session-board-card .session-group-item').length === 12`, 'the six archived workers', 4000); 
         await click('.sidebar .status-workers-done button'); await click('.sidebar .session-board-card .status-caret-toggle');
         await waitFor(`!!document.querySelector('.sidebar .status-workers-sum')`, 'folded again', 4000);
-        await click('.sidebar .status-switch .btn[data-mode="status"]');
+        await pick('status', 'agent-list-bar');
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'Status again', 6000);
 
         console.log('computer: a question moves an agent to Needs you, an update moves it up');
@@ -118,6 +127,7 @@ const { connect } = require('./agent_view_harness');
         await ev(`try { localStorage.removeItem('coral-status-more'); localStorage.removeItem('coral-status-folded'); } catch (e) {} true`);
         await load({ width: 390, height: 844, mobile: true });
         await scene(); await waitFor(`!!document.querySelector('#mobile-agent-list .status-head')`, 'the phone groups', 6000);
+        await shot('groupby-phone-390');
         p = await picture(true);
         assert.deepEqual(p.out.filter(x => x.row).map(x => x.row), ['ask-407', 'Orchestrator', 'work-409'], 'the agent that needs you and two that are working');
         assert.equal(p.out.find(x => x.more).more, '2 more working · 3 idle · 6 done today');
@@ -128,7 +138,7 @@ const { connect } = require('./agent_view_harness');
         await shot('status-phone-390-all');
         console.log('phone 390: the Team view says the same, folded');
         await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) T.state.liveSessions.find(s => s.name === n).board_project = 'shop'; return true; })()`);
-        await click('.status-switch-phone .btn[data-mode="team"]');
+        await pick('team', 'mobile-agent-list-bar');
         await waitFor(`!!document.querySelector('#mobile-agent-list .status-workers-sum')`, 'the folded line on the phone', 6000);
         assert.equal(await ev(`document.querySelector('#mobile-agent-list .status-workers-sum').textContent.replace(/\\s+/g, ' ').trim()`), '3 working · 1 needs you · 1 ready');
         await shot('team-phone-390');

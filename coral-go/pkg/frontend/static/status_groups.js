@@ -8,6 +8,7 @@ import { redrawLiveList } from './list_hooks.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { sessionStateInfo } from './session_state.js';
+import { DISPLAY_PANEL_OPEN } from './display_panel.js';
 
 const KEY = 'coral-agent-grouping'; // 'status' (the default) or 'team'
 const FOLD = 'coral-status-folded'; // JSON: the groups the person opened or folded by hand
@@ -20,6 +21,31 @@ const GROUPS = [['needs', 'Needs you'], ['working', 'Working'], ['idle', 'Idle']
 
 const read = (k, d) => { try { return browserLocal.get(k) ?? d; } catch { return d; } };
 const write = (k, v) => { try { browserLocal.set(k, v); } catch { /* per-viewer only */ } };
+
+/** Group by (#21683): one more row of the agent list's Display panel, the same label-plus-select as State, Board and Sort, above the count: Status (the default) or Team. It replaces the
+ *  Team | Status switch that sat in the list. Added to the sidebar's bar and the phone's (agent_list_bar.js builds them) at every draw and when the panel opens, so no start byte carries it. */
+function mountGroupBy() {
+    for (const id of ['agent-list-bar', 'mobile-agent-list-bar']) {
+        const menu = document.querySelector(`#${id} .list-bar-menu`);
+        if (!menu) continue;
+        let sel = menu.querySelector('select[data-group-by]');
+        if (!sel) {
+            const wrap = document.createElement('label'), name = document.createElement('span');
+            wrap.className = 'list-bar-field'; name.className = 'list-bar-field-label'; name.textContent = 'Group by';
+            sel = document.createElement('select'); sel.className = 'field list-bar-select'; sel.id = `${id}-group-by`; sel.setAttribute('data-group-by', '');
+            sel.append(new Option('Status', 'status'), new Option('Team', 'team'));
+            sel.addEventListener('change', () => {
+                write(KEY, sel.value === 'team' ? 'team' : 'status');
+                for (const other of document.querySelectorAll('select[data-group-by]')) other.value = grouping(); // the sidebar's bar and the phone's show the one choice
+                redrawLiveList();
+            });
+            wrap.append(name, sel);
+            menu.insertBefore(wrap, menu.querySelector('.list-bar-count'));
+        }
+        if (sel.value !== grouping()) sel.value = grouping();
+    }
+}
+document.addEventListener(DISPLAY_PANEL_OPEN, mountGroupBy);
 
 /** Which grouping the list uses: status unless the person chose Team. */
 export const grouping = () => (read(KEY, 'status') === 'team' ? 'team' : 'status');
@@ -39,20 +65,6 @@ export function groupOf(s) {
 export const doneToday = s => !!s.archived && age(s) < DAY;
 const age = s => (s.staleness_seconds === null || s.staleness_seconds === undefined ? Infinity : s.staleness_seconds);
 const longAgo = sec => (sec === Infinity ? '' : sec < 60 ? 'now' : sec < 3600 ? `${Math.floor(sec / 60)} min` : sec < DAY ? `${Math.floor(sec / 3600)} h` : `${Math.floor(sec / DAY)} d`);
-
-/** The switch: Group by Team | Status. On a computer it is the list's first row; on a phone it sits in the page's own bar, beside the title Agents, as the mock has it (a row there would push the agents down). */
-function switchHtml(mode) {
-    const b = (v, label) => `<button type="button" class="btn" data-on-click="status-grouping" data-mode="${escapeAttr(v)}" aria-pressed="${escapeAttr(String(mode === v))}">${escapeHtml(label)}</button>`;
-    const buttons = b('team', 'Team') + b('status', 'Status');
-    const bar = isPhoneLayout() ? [...document.querySelectorAll('.phone-bar')].find(e => e.querySelector(':scope > .phone-bar-search-row')) : null; // the Agents page's own bar (the one with the search row)
-    if (bar) {
-        let seg = bar.querySelector('.status-switch-phone');
-        if (!seg) { seg = document.createElement('span'); seg.className = 'btn-seg status-switch-phone'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Group agents by'); seg.innerHTML = buttons; (bar.querySelector('.phone-bar-title') || bar.firstChild).after(seg); }
-        for (const x of seg.children) x.setAttribute('aria-pressed', String(x.dataset.mode === mode));
-        return '';
-    }
-    return `<li class="status-switch"><span class="status-switch-label">Group by</span><span class="btn-seg" role="group" aria-label="Group agents by">${buttons}</span></li>`;
-}
 
 /** A row of the list: the shared agent row, its time said as the mock does ("6 min"), with no drag (the order is the time) and no dot (the heading is the status). */
 function rowHtml(s, renderRow) {
@@ -75,7 +87,7 @@ export function renderStatusGroups(sessions, renderRow) {
         by[g].push(s);
     }
     for (const g of Object.values(by)) g.sort((a, b) => age(a) - age(b)); // the newest update first: an agent that comes back with output moves up
-    let html = switchHtml('status');
+    let html = '';
     if (isPhoneLayout()) {
         const open = read(MORE, 'false') === 'true';
         const shownWorking = open ? by.working : by.working.slice(0, PHONE_WORKING);
@@ -100,7 +112,6 @@ export function renderStatusGroups(sessions, renderRow) {
 }
 
 registerActions({
-    'status-grouping': el => { write(KEY, el.dataset.mode === 'team' ? 'team' : 'status'); redrawLiveList(); },
     'status-fold': (el, event) => { event.stopPropagation(); const k = String(el.dataset.group || ''); if (!k) return; const m = foldedMap(); m[k] = !isFolded(k); write(FOLD, JSON.stringify(m)); redrawLiveList(); },
     'status-more': () => { write(MORE, read(MORE, 'false') === 'true' ? 'false' : 'true'); redrawLiveList(); },
 });
@@ -109,14 +120,12 @@ registerActions({
 let arch = []; // the archived agents of the last draw (a team's "done today" row reads them)
 export function lay(regular, limits, archived, renderRow) {
     arch = archived;
+    mountGroupBy();
     if (grouping() !== 'status') return null;
     const sleeping = limits?.sleeping || [];
     if (limits) limits.sleeping = []; // drawn here, with the rest: render.js has none left to draw under the Team groups
     return { h: renderStatusGroups([...regular, ...sleeping, ...archived.filter(doneToday)], renderRow), a: archived.filter(s => !doneToday(s)) };
 }
-
-/** The Team view's own switch: the same two buttons, drawn above the teams. */
-export const sw = () => switchHtml('team');
 
 /** The Team view's orchestrator card (the mock's "under the orchestrator"): the orchestrator's row with a caret and "5 workers" at its right; folded, the line under it says "3 working · 1 needs you · 1 ready";
  * open, the workers follow and end with "6 done today", which opens the team's archived workers. saved: the team's agents in their saved order; draw: draws some of them as the card always did; row: draws one agent's row (an archived agent has no place in draw's lists).

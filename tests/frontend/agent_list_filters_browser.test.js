@@ -74,7 +74,8 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         await waitFor(`!!document.querySelector('#agent-list-bar #al-sort') && document.querySelector('#agent-list-bar .list-bar-count').textContent === '30 agents'`, 'the bar, drawn as the panel opens, with its count', { timeout: 8000 });
         assert.equal(await ev(`document.querySelector('#agent-list-bar #al-sort').value`), 'default');
         assert.equal(await ev(`(() => { const p = document.querySelector('.sidebar-header [data-display-panel]'); return getComputedStyle(p).position === 'static' && p.getBoundingClientRect().width > 150; })()`), true, 'a row of the header, not a popover');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#agent-list-bar .list-bar-field-label')].filter(e => e.getClientRects().length).map(e => e.textContent)`), ['State', 'Board', 'Sort'], 'State and Board (Machine only on a hub), then Sort');
+        await waitFor(`!!document.querySelector('#agent-list-bar select[data-group-by]')`, 'the Group by row (#21683)', { timeout: 8000 });
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#agent-list-bar .list-bar-field-label')].filter(e => e.getClientRects().length).map(e => e.textContent)`), ['State', 'Board', 'Sort', 'Group by'], 'State and Board (Machine only on a hub), then Sort, then Group by');
         assert.equal((await ids()).length, 30, 'every agent is in the list (sleeping ones open)');
         const labels = await ev(`[...document.querySelectorAll('#agent-list-bar #al-state option')].map(o => o.textContent)`);
         assert.deepEqual(labels, ['Any state', 'Needs input', 'Working', 'Idle', 'Asleep']);
