@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -40,6 +41,10 @@ func runAutomationCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 		return 2
 	}
 	base := endpointFromEnv(os.Getenv("CORAL_URL"), os.Getenv("CORAL_HOST"), os.Getenv("CORAL_PORT"))
+	if !loopbackBase(base) {
+		fmt.Fprintln(stderr, "Error: the automation token is sent to this computer only (CORAL_URL must be a loopback address)")
+		return 2
+	}
 	data, _ := json.Marshal(map[string]string{"content": text})
 	req, err := http.NewRequest(http.MethodPost, base+"/api/board/"+url.PathEscape(board)+"/automation/post", bytes.NewReader(data))
 	if err != nil {
@@ -93,4 +98,18 @@ func automationPostText(args []string, stdin io.Reader) (string, error) {
 		return "", fmt.Errorf("the text is over %d KiB: put the long text in an artifact", maxAutomationStdin>>10)
 	}
 	return string(raw), nil
+}
+
+// loopbackBase reports whether base names this computer: the token goes nowhere else, whatever a step sets CORAL_URL to (Security, #21502 INFO 7).
+func loopbackBase(base string) bool {
+	u, err := url.Parse(base)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return false
+	}
+	h := u.Hostname()
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && (ip.IsLoopback() || ip.IsUnspecified()) // 0.0.0.0 is how a server bound to every address names itself: it connects here
 }
