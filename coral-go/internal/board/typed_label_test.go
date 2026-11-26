@@ -49,6 +49,10 @@ func TestTypedTextKeepsAPercentageAndNothingElseWithAPercent(t *testing.T) {
 		"rate %PATH% here":                                        "rate PATH here",
 		"%USERPROFILE%":                                           "USERPROFILE",
 		"50 % off":                                                "50 off",
+		"1%A1%":                                                   "1 A1%",
+		"5%X2%":                                                   "5 X2%",
+		"1%1%":                                                    "1 1%",
+		"1%_x%":                                                   "1 _x",
 	} {
 		assert.Equal(t, want, TypedText(in), "%q", in)
 		assert.Equal(t, want, TypedLabel(in), "%q (a label keeps the same rule)", in)
