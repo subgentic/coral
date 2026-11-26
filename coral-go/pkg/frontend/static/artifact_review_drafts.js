@@ -12,7 +12,13 @@ export function createDraftReview({ hex, server, board, changed }) {
     const update = () => { if (active) changed?.({ data, busy, pending }); };
     async function refresh() {
         const current = ++generation;
-        const result = await api.readDrafts(hex, server, board);
+        let result;
+        try { result = await api.readDrafts(hex, server, board); }
+        catch (error) {
+            // A computer or Hub without the drafts route answers 404, and a person who may not keep drafts (a guide, a grantee) 403: that is no drafts, not no commenting (#21489); the comments route decides canComment. Every other failure still throws.
+            if (error?.status !== 404 && error?.status !== 403) throw error;
+            result = { drafts: [], count: 0, revision: 0, drafts_supported: false, can_write: false, can_send: false, reason: '', targets: [] };
+        }
         if (!active || current !== generation) return null;
         data = result; update(); return data;
     }
