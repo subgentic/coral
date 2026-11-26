@@ -46,3 +46,23 @@ func TestBacklogIsQuietNotCountedAndPromotedByAClaim(t *testing.T) {
 	_, err = s.SetBacklog(ctx, "team", ids[0])
 	require.Error(t, err, "a task in progress is not for later")
 }
+
+// #21746 (Security INFO 5 on #21701): backlog is a park with the reason "backlog" and no end, which a bare claim by number promotes. An agent's own park must not be able to say that word.
+func TestAPlainParkCannotUseTheBacklogReason(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	_, err := s.Subscribe(ctx, "team", "Worker", "Developer", "claude-w", nil, "all")
+	require.NoError(t, err)
+	task, err := s.CreateTask(ctx, "team", "t", "", "medium", "lead", "Worker")
+	require.NoError(t, err)
+	for _, reason := range []string{"backlog", "Backlog", "  BACKLOG "} {
+		_, err = s.ParkTask(ctx, "team", task.ID, reason, time.Time{})
+		require.ErrorIs(t, err, ErrReservedParkReason, reason)
+	}
+	got, err := s.GetTask(ctx, "team", task.ID)
+	require.NoError(t, err)
+	assert.False(t, got.InBacklog(), "refused: the task is not in the backlog")
+	assert.Nil(t, got.ParkedReason, "refused: nothing was parked")
+	_, err = s.ParkTask(ctx, "team", task.ID, "waiting on the Operator", time.Time{})
+	require.NoError(t, err, "a real reason still parks")
+}
