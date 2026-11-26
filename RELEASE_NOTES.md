@@ -1,5 +1,45 @@
 # Release Notes
 
+## v2.1.16 — Fewer "Goal looks done" items, Codex and Claude start on safe defaults, Activity through a Hub, and a Custom (cron) reminder repeat
+
+Task numbers in brackets. Built on v2.1.15. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **Fewer "Goal looks done" items** (#21442, #21461): a goal that has a driver no longer puts a "Goal looks done" item in Needs you, the Inbox list, the count or a phone push; its driver closes it. If the named driver is not active, the team's active Orchestrator counts as the driver. A goal with no driver shows it at most once. A setting brings the items back.
+- **Inbox sidebar** (#21325): one group, Your work: Needs you, Activity, Saved, Goals, Tasks, Artifacts.
+- **A Custom (cron) repeat for reminders** (#21330): the Remind dialog takes a cron line and shows what it means in plain words, with a clear message when the line has a gap.
+- **Settings > Storage** (#21400): the pane no longer moves while the size lines fill.
+- **The review dialog keeps its Send bar** (#21484): a click on Send just after Save draft is no longer lost to a redraw.
+- **Commenting on a whole document through a Hub** (#21489): when the drafts read answers "not found" or "not allowed", the whole-document comment button stays, for a Hub viewer or someone who is not the owner.
+
+#### Codex and Claude permissions
+
+- **Codex on Default is Auto** (#21335, #21355, #21358, #21363, #21373, #21376, #21405): a launch with no mode or Default runs workspace writes that never ask. Accept edits stays Accept edits (workspace-write, asks on request), and a restart no longer saves it as Auto. No permission chips are pre-selected from a template, Getting started or a role, and the dialog says when a role's limits are not applied. The Shell list says it is not an approval gate on Default or Auto.
+- **Claude on Default starts with no permissions ticked** (#21397): in templates, Getting started, New agent and New team. On an unpicked Auto, the dialog says a role's limits are not applied (#21408).
+
+#### Activity and Coral Hub
+
+- **Activity through a Hub** (#21435): the owner's clicks through a Hub are recorded as the owner's, not as "unknown", and a personal computer answers only the owner's rows. coral-hub's Activity view needs this release.
+- **Activity is steadier** (#21399, #21409, #21417, #21432): a read failure shows even when no actions arrive, the loading state stays until the read answers, known gaps stay visible during a refresh, and paging sends each cursor with its time.
+
+### Test and gate fixes in this release
+
+- A failed launch with an internal error now sends one fixed error class in its usage event, never the error text, a path or a name (#21453).
+- `coral-board task submit-review` records a worktree's head, and none from the shared checkout or for a commit that is not on origin (#21445).
+- The review-dialog drafts test waits for the dialog to settle before it clicks (#21480).
+- The teardown leak test covers a named list of DOM classes (#21438).
+- The owner-routes golden lists the 15 routes #21435 made owner-sees, and the goal-done suites follow the new rule with no check dropped (#21457, #21461). The Custom (cron) rules load with the Remind dialog, so the start CSS is smaller (#21458).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption and the browser gate are green on the gated commit. No Windows run: no change in this release is Windows-only.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+- A goal with no driver that was first seen on the Goals page counts as shown, so the Inbox may skip it (#21470).
+
 ## v2.1.15 — Commenting works again in the Inbox review dialog, and a Codex hooks review shows in Needs you
 
 Task numbers in brackets. Built on v2.1.14, with only these two fixes. A prerelease until the Operator promotes it.
