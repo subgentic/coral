@@ -9,6 +9,7 @@ Usage:
 
 Commands:
   open             sign in to the dashboard: opens it in your browser (--print: just print the one-time link)
+  cli-check        check the agent CLIs seen by the running Coral
   api-key          print this Coral's API key (a script sends it as: Authorization: Bearer <key>)
   set-password     set the dashboard's first password, on a running Coral
   reset-password   set a new password, or none (--clear); every browser is signed out
@@ -132,6 +133,7 @@ Usage:
 
 Commands:
   open             sign in to the dashboard: opens it in your browser (--print: just print the one-time link)
+  cli-check        check the agent CLIs seen by the running Coral
   api-key          print this Coral's API key (a script sends it as: Authorization: Bearer <key>)
   set-password     set the dashboard's first password, on a running Coral
   reset-password   set a new password, or none (--clear); every browser is signed out

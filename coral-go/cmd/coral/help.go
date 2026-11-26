@@ -26,6 +26,9 @@ func commands() []command {
 		{"open", "sign in to the dashboard: opens it in your browser (--print: just print the one-time link)", func() []string {
 			return []string{"coral open [--print] [--path /page] [--url " + u + "] [--home DIR]"}
 		}},
+		{"cli-check", "check the agent CLIs seen by the running Coral", func() []string {
+			return []string{"coral cli-check [type] [--url " + u + "] [--home DIR]"}
+		}},
 		{"api-key", "print this Coral's API key (a script sends it as: Authorization: Bearer <key>)", func() []string {
 			return []string{"coral api-key [--home DIR]"}
 		}},
