@@ -140,7 +140,7 @@ func TestPrivacyStatusWarnsWhenAProxyWasSeen(t *testing.T) {
 	handler.SetPasswordSet(func() bool { return false })
 	w, _ := privacyGetJSON(t, server.URL+"/api/system/privacy")["proxy_warning"].(map[string]any)
 	require.NotNil(t, w)
-	assert.Equal(t, "Coral is being reached through a proxy; set a password", w["message"])
+	assert.Equal(t, "A proxy was seen in front of Coral since Coral started; set a password", w["message"])
 	assert.Equal(t, true, w["red"], "no password and require_auth_on_loopback off: red")
 
 	handler.SetPasswordSet(func() bool { return true })

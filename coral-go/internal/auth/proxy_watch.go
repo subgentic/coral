@@ -10,7 +10,7 @@ import (
 )
 
 // ProxyMessage is the warning Settings and the startup log give once a request shows Coral is reached through a proxy while remote access is off (#21527).
-const ProxyMessage = "Coral is being reached through a proxy; set a password"
+const ProxyMessage = "A proxy was seen in front of Coral since Coral started; set a password"
 
 var (
 	proxySeen    atomic.Bool
