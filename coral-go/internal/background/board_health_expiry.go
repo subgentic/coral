@@ -13,6 +13,9 @@ import (
 // whose owner is in a turn. Each one is added to the check once, as it happens, and the set of task ids is returned so the stalled line skips them.
 func (m *BoardHealthMonitor) expireClaims(ctx context.Context, in rosterInputs, r *teamhealth.Roster) map[int64]bool {
 	expired := map[int64]bool{}
+	if m.paused != nil && m.paused(in.project) {
+		return expired // a paused board makes no automatic state change: its stale claims wait for the resume (#21742)
+	}
 	hours := m.store.GetHealthSettings(ctx, in.project).ClaimExpireHours
 	if hours <= 0 {
 		return expired

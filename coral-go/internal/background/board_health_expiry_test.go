@@ -76,3 +76,23 @@ func TestClaimExpiryExemptions(t *testing.T) {
 	h.m.scan(ctx)
 	assert.Equal(t, "in_progress", statusOf(t, h, late), "setting off")
 }
+
+// #21742 (Security INFO on #21700): a paused board makes no automatic change, so no claim is requeued while it is paused; it is when the board resumes.
+func TestNoClaimIsRequeuedWhileTheBoardIsPaused(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	_, err := h.s.Subscribe(ctx, "team", "Sleeper", "Developer", "claude-sleeper", nil, "all")
+	require.NoError(t, err)
+	id := expiryTask(t, h, "Sleeper")
+	h.now = h.now.Add(80 * time.Hour)
+	paused := true
+	h.m.SetPausedFn(func(string) bool { return paused })
+	out := h.checkTo("Orchestrator")
+	assert.Equal(t, "in_progress", statusOf(t, h, id), "paused: the claim stays")
+	assert.NotContains(t, out, "went back to pending")
+	paused = false
+	h.now = h.now.Add(30 * time.Minute)
+	h.m.scan(ctx)
+	assert.Equal(t, "pending", statusOf(t, h, id), "resumed: the stale claim goes back")
+}
