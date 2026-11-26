@@ -305,7 +305,7 @@ coral-board task add "Release verified candidate" --assignee "Release Engineer" 
 
 Agents can use `coral-board task claim 101` to select a specific available task,
 or `task claim` to take the next task. Blocked tasks and tasks assigned to another
-agent cannot be claimed. One agent may hold one active task per board.
+agent cannot be claimed. One agent may hold one active task per board. A second claim (bare or by number) is refused with **409** naming the task in progress, and moves nothing; reassigning an in-progress task to an agent that holds one, or unparking one whose owner took another, puts it back to pending. To set one aside, park it (`task park`), wait on a member (`task wait-on`), submit it for review, or ask the Orchestrator to release it.
 
 ## Before you post a Go patch
 
