@@ -159,6 +159,24 @@ func (s *CloudStore) VerifyLinkKey(ctx context.Context, key string, now time.Tim
 	return r.view(), true
 }
 
+// LinkKeyWasRevoked reports whether key is a request key that was made here and has been revoked: its secret still matches the stored one. A Hub that does not know its key was revoked keeps sending it (#21645); that is no guess at a secret, so
+// the identity layer does not count it against the address (a wrong or unknown key is counted). Malformed, unknown, live and wrong-secret keys are false.
+func (s *CloudStore) LinkKeyWasRevoked(ctx context.Context, key string) bool {
+	rest, ok := strings.CutPrefix(key, "lrk_")
+	if !ok {
+		return false
+	}
+	idPart, secret, ok := strings.Cut(rest, "_")
+	if !ok || len(idPart) != 8 || len(secret) != 32 {
+		return false
+	}
+	var r linkKeyRow
+	if err := s.db.GetContext(ctx, &r, `SELECT key_id, name, key_salt, key_hash, created_at, last_used_at FROM cloud_link_key WHERE key_id = ? AND revoked_at <> ''`, "lk-"+idPart); err != nil {
+		return false
+	}
+	return lrSame(r.Salt, secret, r.Hash)
+}
+
 // ListLinkKeys are the live keys, oldest first. Never a key or a hash.
 func (s *CloudStore) ListLinkKeys(ctx context.Context) ([]LinkKey, error) {
 	var rows []linkKeyRow

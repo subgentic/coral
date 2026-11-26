@@ -105,6 +105,9 @@ func TestTwoSelfHostedHubsJoinOneComputerByKeyAndRevokingOneLeavesTheOther(t *te
 	require.Equal(t, 200, call(w.h, "DELETE", "/api/cloud/link-keys/"+keyA, "", map[string]string{"Content-Type": "application/json"}).Code)
 	require.Eventually(t, func() bool { return reach(hubA) != 200 }, 5*time.Second, 50*time.Millisecond, "hub A's reach ends with its key")
 	assert.Equal(t, 200, reach(hubB), "hub B's link is untouched")
+	for i := 0; i < 15; i++ { // #21645: a Hub that does not know its key was revoked keeps asking; that must not use up the address's wrong-key budget, or the next Hub's join gets a 429
+		reach(hubA)
+	}
 
 	// coral-hub Security's SHOULD C: the hub sends at most 5 wrong codes for one join, then ends it (the computer denies its own request at 5 too)
 	hubC := newE2EHub(t, env, "", true) // a hub holds one link to a computer: a third one
