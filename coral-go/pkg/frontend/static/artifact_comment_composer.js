@@ -2,6 +2,8 @@
 import { importOnce } from './import_once.js';
 import { el } from './dom_el.js';
 import { showToast } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('artifact_comment_composer.css');
 let hintSeq = 0;
 const api = await importOnce('./artifact_comments_api.js');
 const { createFieldPictures, savedWords } = await importOnce('./field_pictures.js');
@@ -31,28 +33,45 @@ export function createComposer({ st, render, run, ownHex }) {
         const target = editOf ? (cm.pictureTarget || (cm.pictureTarget = { hex: ownHex(editOf), server: st.server, board: st.board })) : null;
         const tray = editOf ? (cm.tray || (cm.tray = createFieldPictures({ server: target.server, field: 'body', initial: editOf.images || [], hintWhenAdded: true, includeDraft: false, uploadPicture: (blob, versionOf) => api.uploadCommentImage(target.hex, target.server, blob, versionOf, target.board) }))) : (cm.tray || (cm.tray = imgs.createImageTray({ ...(review ? { hintText: 'Pictures are included when you send these draft comments.' } : {}), upload: (blob, versionOf) => api.uploadCommentImage(cm.hex || st.hex, st.server, blob, versionOf, st.board) }))); // a new comment or reply can carry pictures; an edit keeps the ones it has
         const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.wholeComposer = null; st.error = ''; render(); });
-        const send = btn('btn-primary ac-send', editOf ? 'Save' : review ? 'Save draft' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
+        const draft = !editOf && review;
+        const send = btn(`${draft ? '' : 'btn-primary '}ac-send`, editOf ? 'Save' : review ? 'Save draft' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
+        const saveSend = draft ? btn('btn-primary ac-send ac-save-send', 'Save and send') : null;
+        if (saveSend) saveSend.type = 'submit';
         const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;
         const actionWord = !editOf && review ? 'save this draft' : 'send';
         const how = el('p', 'ac-counter ac-sendhint', matchMedia('(pointer: coarse)').matches ? `Return starts a new line. Tap the button to ${actionWord}.` : `Enter starts a new line. Press ${sends} to ${actionWord}.`); how.id = `ac-sendhint-${Math.random().toString(36).slice(2, 8)}`; ta.setAttribute('aria-describedby', how.id); ta.dataset.sendhint = how.id; // Enter is a new line, so the way to send is said (#15231, walk 8 M3)
-        const row = el('div', 'ac-composer-row'); row.append(count, ...(tray && !editOf ? [tray.picker()] : []), cancel, send);
+        const row = el('div', 'ac-composer-row');
+        const actions = saveSend ? el('span', 'ac-draft-actions') : null;
+        if (actions) actions.append(cancel, send, saveSend);
+        row.append(count, ...(tray && !editOf ? [tray.picker()] : []), ...(actions ? [actions] : [cancel, send]));
         const hint = editOf || review ? '' : st.hint?.() || '', hintEl = hint ? el('p', 'ac-note ac-hint', hint) : null; // always drawn with its line; shown while the file waits for review (the review bar toggles it with the file's state, #15128)
         if (hintEl) { hintEl.id = `ac-hint-${++hintSeq}`; const on = !!st.hintOn?.(); hintEl.hidden = !on; if (on) ta.setAttribute('aria-describedby', `${hintEl.id} ${how.id}`); } // a screen reader hears it where the person types
-        const draftHint = !editOf && review ? el('p', 'ac-draft-save-hint', 'Saved as a draft. Only sent when you choose Send comments.') : null;
+        const draftHint = draft ? el('p', 'ac-draft-save-hint', 'Saved as a draft. Only sent when you choose Send comments or Save and send.') : null;
         if (draftHint) { draftHint.id = `ac-draft-hint-${++hintSeq}`; ta.setAttribute('aria-describedby', `${draftHint.id} ${how.id}`); }
         box.append(ta, ...(draftHint ? [draftHint] : []), ...(hintEl ? [hintEl] : []), how, ...(tray ? editOf ? [tray.node] : [tray.node, tray.hint()] : []), err, row);
-        if (tray) { tray.detach(); tray.attach(box, ta); tray.listen(() => { if (automatic) { st.composing = cm; delete box.dataset.idleWhole; } send.disabled = tray.busy() || tray.failed(); }); send.disabled = tray.busy() || tray.failed(); } // Send waits for a picture still going up, and for a failed one to be removed
+        const syncButtons = () => { const blocked = !!tray && (tray.busy() || tray.failed()); send.disabled = blocked; if (saveSend) saveSend.disabled = blocked || !review.snapshot().data?.can_send; };
+        if (tray) { tray.detach(); tray.attach(box, ta); tray.listen(() => { if (automatic) { st.composing = cm; delete box.dataset.idleWhole; } syncButtons(); }); } // Both actions wait for pictures still going up or failed.
+        syncButtons();
         box.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = ta.value.trim(), pictures = tray ? tray.hexes() : [];
             if (!text && !pictures.length) { st.error = 'Write something first.'; err.textContent = st.error; err.hidden = false; return; }
             if (tray && (tray.busy() || tray.failed())) return;
-            send.disabled = true;
+            const alsoSend = !!saveSend && e.submitter === saveSend;
+            send.disabled = true; if (saveSend) saveSend.disabled = true;
             if (editOf) run(async () => { const kept = await api.editComment(target.hex, target.server, editOf.id, text, tray.payload()); tray.destroy(); if (kept.picturesNotSaved) showToast(savedWords({ pictures_not_saved: true }, 'Comment saved'), true); }, 'Comment saved');
             else if (review) run(async () => {
                 await review.create({ body: text, ...(cm.parentId != null ? { parent_id: cm.parentId } : { anchor: cm.anchor }), images: pictures });
                 if (tray) tray.destroy();
-            }, 'Draft saved. Not sent to an agent.');
+                if (alsoSend) {
+                    // The draft is durable before delivery: on a send failure, show
+                    // the saved card and existing send error, never a duplicate editor.
+                    st.composing = null; st.wholeComposer = null;
+                    const targets = review.snapshot().data?.targets?.join(', ') || '';
+                    const outcome = await review.send();
+                    return outcome.status === 'queued' ? { queuedFor: targets || 'the agent' } : targets;
+                }
+            }, alsoSend ? 'Review comments sent' : 'Draft saved. Not sent to an agent.');
             else run(async () => { const c = await api.createComment(cm.hex || st.hex, st.server, { body: text, anchor: cm.anchor, parentId: cm.parentId, board: st.board, images: pictures, atS: cm.atS, endS: cm.endS }); if (tray) tray.destroy(); st.active = c.id; st.scrollCard = true; if (c.notDelivered && !c.sentTo) { st.undelivered.set(cm.parentId != null ? cm.parentId : c.id, c.notDelivered); showToast(`Not delivered: ${c.notDelivered}`, true); } else st.undelivered.delete(cm.parentId != null ? cm.parentId : c.id); if (c.sentTo && st.board === '~no-team') (st.noTeamSent || (st.noTeamSent = new Set())).add(cm.parentId != null ? cm.parentId : c.id); return c.sentTo || (c.queuedFor ? { queuedFor: c.queuedFor } : ''); }, cm.parentId != null ? 'Reply posted' : 'Comment posted');
         });
         ta.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) box.requestSubmit(); });
