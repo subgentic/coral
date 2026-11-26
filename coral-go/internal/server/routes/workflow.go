@@ -384,6 +384,7 @@ func (h *WorkflowHandler) DeleteWorkflow(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	background.RemoveRunDirs(h.cfg.CoralDir(), runIDs)
+	background.RemoveWorkflowState(h.cfg.CoralDir(), workflowID) // its state folder goes with it
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

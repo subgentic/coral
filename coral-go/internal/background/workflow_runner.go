@@ -226,6 +226,33 @@ func (wr *WorkflowRunner) pruneRuns(ctx context.Context, workflowID int64) {
 	RemoveRunDirs(wr.dataDir, ids)
 }
 
+// WorkflowStateDir is the folder a workflow keeps between its runs (a step reads it as CORAL_WORKFLOW_STATE_DIR): <dataDir>/workflows/state/<workflow id>. The id is never reused, so a deleted workflow's folder is never another's.
+func WorkflowStateDir(dataDir string, workflowID int64) string {
+	if dataDir == "" || workflowID <= 0 {
+		return ""
+	}
+	return filepath.Join(dataDir, "workflows", "state", strconv.FormatInt(workflowID, 10))
+}
+
+// ensureWorkflowStateDir makes the workflow's state folder (private to the user) and returns it, "" when it cannot be made or is not a plain folder: a step then has no CORAL_WORKFLOW_STATE_DIR rather than one that leads elsewhere.
+func ensureWorkflowStateDir(dataDir string, workflowID int64) string {
+	dir := WorkflowStateDir(dataDir, workflowID)
+	if dir == "" || os.MkdirAll(dir, 0o700) != nil {
+		return ""
+	}
+	if fi, err := os.Lstat(dir); err != nil || !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
+		return ""
+	}
+	return dir
+}
+
+// RemoveWorkflowState deletes a workflow's state folder, when the workflow is deleted.
+func RemoveWorkflowState(dataDir string, workflowID int64) {
+	if dir := WorkflowStateDir(dataDir, workflowID); dir != "" {
+		_ = os.RemoveAll(dir)
+	}
+}
+
 // RemoveRunDirs deletes <dataDir>/workflows/runs/<id> for each run id.
 func RemoveRunDirs(dataDir string, ids []int64) {
 	if dataDir == "" {
@@ -331,6 +358,7 @@ func (wr *WorkflowRunner) executeRun(runID int64, workflow *store.Workflow) {
 		return
 	}
 	defer rf.Close()
+	ensureWorkflowStateDir(wr.dataDir, workflow.ID) // before the first step: every step of every run sees the same folder
 	// Before the first step (#5469): when an agent step needs a CLI that is signed out, the whole run fails at once, no step starts, and nothing tries to sign in.
 	if nsi := wr.signInPreflightIn(ctx, steps, defaultAgent, workflow.RepoPath); nsi != nil {
 		for i := range results {
