@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -35,6 +36,9 @@ func (e *ErrParkCap) Error() string {
 // ErrNotParkable is a task that is finished (completed or cancelled): there is nothing to park.
 var ErrNotParkable = errors.New("only an open task can be parked")
 
+// ErrReservedParkReason is a park whose reason is the backlog's word (#21746): backlog is made only by SetBacklog (task add --later), because a task parked with that reason would be claimable by number.
+var ErrReservedParkReason = errors.New("the reason \"" + BacklogReason + "\" is the backlog's: use a real reason, or put the task in the backlog with task add --later")
+
 // Parked reports whether the task is parked at now.
 func (t *Task) Parked(now time.Time) bool {
 	if t == nil || t.ParkedReason == nil {
@@ -56,6 +60,9 @@ func (s *Store) ParkTask(ctx context.Context, project string, id int64, reason s
 
 // ParkTaskForce is ParkTask with the limit overridable (--force). forcedPast is the number of parks the agent already held when a forced park went past the limit (0: it did not), for the board line that tells the Operator.
 func (s *Store) ParkTaskForce(ctx context.Context, project string, id int64, reason string, until time.Time, force bool) (*Task, int, error) {
+	if strings.EqualFold(strings.TrimSpace(reason), BacklogReason) {
+		return nil, 0, ErrReservedParkReason
+	}
 	limit := s.GetHealthSettings(ctx, project).ParkLimit
 	var end any
 	if !until.IsZero() {

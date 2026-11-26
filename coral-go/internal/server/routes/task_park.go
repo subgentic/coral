@@ -155,7 +155,7 @@ func (h *BoardHandler) ParkTask(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, sql.ErrNoRows):
 		errNotFound(w, "Task not found")
 		return
-	case errors.Is(err, board.ErrNotParkable):
+	case errors.Is(err, board.ErrNotParkable), errors.Is(err, board.ErrReservedParkReason):
 		errBadRequest(w, err.Error())
 		return
 	case errors.As(err, new(*board.ErrParkCap)):
