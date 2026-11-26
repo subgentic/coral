@@ -1,8 +1,6 @@
 // The page's first full update is its first sight of the artifact revisions, not a return after a gap: it announces nothing (a cold Inbox read every list twice when the socket answered late); the next one does (#21126).
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-const feed = await import(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../coral-go/pkg/frontend/static/artifacts_feed.js'));
+const feed = await import(new URL('../../coral-go/pkg/frontend/static/artifacts_feed.js', import.meta.url).href); // a file:// URL: a Windows path (D:\...) is not a valid import specifier (#21646)
 const log = [];
 feed.onArtifactsRev((...a) => log.push(a));
 feed.publishArtifactsRev({ t: 5 }, true);
