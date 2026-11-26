@@ -238,7 +238,7 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	}
 	trace.end("state_transcript_enrichment", "rows", len(sessions), "large_list", largeList)
 
-	sessions = append(sessions, h.sleepingRows(allLive, liveSIDs, d.boardSubs)...)
+	sessions = append(sessions, h.sleepingRows(allLive, liveSIDs, d.boardSubs, d)...)
 	h.addBoardLabels(r.Context(), sessions)
 	h.addSessionGoals(r.Context(), sessions)
 	h.addWaitsOnThis(r, sessions)
@@ -337,6 +337,7 @@ type listData struct {
 	tokenUsage                                   map[string]*store.TokenUsage
 	latestTurnCtx                                map[string]int
 	boardSubs                                    map[string]*board.Subscriber
+	currentTasks                                 map[string]board.CurrentTask // the task each assignee is on, by board and assignee (#21685)
 	unread                                       map[string]int
 }
 
@@ -397,7 +398,8 @@ func (h *SessionsHandler) readListData(ctx context.Context, trace *phaseTrace, a
 	if h.bs != nil {
 		reads = append(reads,
 			func() { d.boardSubs, subsErr = h.bs.GetAllSubscriptions(ctx) },
-			func() { d.unread, unreadErr = h.bs.GetUnreadCountsForSessions(ctx, sessionNames) })
+			func() { d.unread, unreadErr = h.bs.GetUnreadCountsForSessions(ctx, sessionNames) },
+			func() { d.currentTasks, _ = h.bs.CurrentTasks(ctx) }) // unreadable: no row says it is on a task
 	}
 	runBounded(listReadConcurrency, reads)
 	trace.endPool("db_reads", h.db, "reads", len(reads))
@@ -427,6 +429,7 @@ func (h *SessionsHandler) readListData(ctx context.Context, trace *phaseTrace, a
 	d.goalAt = orEmpty(d.goalAt)
 	d.boardSubs = orEmpty(d.boardSubs)
 	d.unread = orEmpty(d.unread)
+	d.currentTasks = orEmpty(d.currentTasks)
 	return &d, nil
 }
 
@@ -592,6 +595,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"at_dialog":             h.dismissedDialogField(sid, d.waitIgnored[sid]), // {since, after_min, notify} while the same prompt has been on the agent's screen for two passes (#11437), null otherwise
 		"board_is_orchestrator": boardSubscriberFlag(boardSub),
 		"board_subscriber_id":   boardSubscriberID(boardSub),
+		"board_task":            d.currentTaskOf(boardSub),
 		"log_path":              agent.LogPath,
 		"sleeping":              lv.sleeping[sid],
 		"archived":              lv.archived[sid],
@@ -663,7 +667,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 }
 
 // sleepingRows are placeholder rows for sleeping sessions without an active terminal (not already in liveSIDs).
-func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map[string]bool, boardSubs map[string]*board.Subscriber) []map[string]any {
+func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map[string]bool, boardSubs map[string]*board.Subscriber, d *listData) []map[string]any {
 	var sessions []map[string]any
 	var asleepIDs []string // the events of the ones that may have asked something when they went away (#10368)
 	for _, ls := range allLive {
@@ -739,6 +743,7 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"board_unread":          0,
 			"board_is_orchestrator": boardSubscriberFlag(boardSub),
 			"board_subscriber_id":   boardSubscriberID(boardSub),
+			"board_task":            d.currentTaskOf(boardSub),
 			"log_path":              "",
 			"sleeping":              true,
 			"archived":              ls.IsArchived == 1,
@@ -859,4 +864,21 @@ func marshalsToNull(v any) bool {
 		return rv.IsNil()
 	}
 	return false
+}
+
+// currentTaskOf is {id, title, status} of the task the agent is on (in progress, else the oldest queued), or nil: always present, so a task that was finished clears the key on the dashboard (#21685). The task's assignee
+// is the agent's job title (the name a task is assigned by), or its subscriber name.
+func (d *listData) currentTaskOf(sub *board.Subscriber) any {
+	if sub == nil {
+		return nil
+	}
+	for _, who := range []string{sub.JobTitle, sub.SessionName, sub.SubscriberID} {
+		if who == "" {
+			continue
+		}
+		if t, ok := d.currentTasks[board.CurrentTaskKey(sub.Project, who)]; ok {
+			return map[string]any{"id": t.ID, "title": t.Title, "status": t.Status}
+		}
+	}
+	return nil
 }
