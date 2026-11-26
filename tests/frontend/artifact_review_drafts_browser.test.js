@@ -19,7 +19,16 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
         await Input.dispatchMouseEvent({ type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 });
         await Input.dispatchMouseEvent({ type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 });
     };
-    const realButton = async (label, scope = '#artifact-viewer') => { await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + ' button')].find(b => b.textContent === ${JSON.stringify(label)}); if (!b) throw Error('Missing button: ' + ${JSON.stringify(label)}); b.dataset.realclick = '1'; return true; })()`); await realClick('[data-realclick]'); await ev(`document.querySelectorAll('[data-realclick]').forEach(b => delete b.dataset.realclick); true`); };
+    // The page's own redraw of a bar (the live tick draws a just-saved draft's Send bar once more) can replace the button between the mark and the click, as it can under a person's pointer: wait until the viewer has been still for 250 ms, then mark and click at once; a button still replaced is found again (twice at most), the click itself stays a real pointer click and its assertions stay.
+    const stillFor = ms => ev(`new Promise(res => { const root = document.querySelector('#artifact-viewer') || document.body; let t = setTimeout(done, ${ms}); setTimeout(done, 3000); const mo = new MutationObserver(() => { clearTimeout(t); t = setTimeout(done, ${ms}); }); mo.observe(root, { subtree: true, childList: true, attributes: true, characterData: true }); function done() { mo.disconnect(); res(true); } })`);
+    const realButton = async (label, scope = '#artifact-viewer') => {
+        for (let attempt = 0; ; attempt++) {
+            await stillFor(250);
+            await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + ' button')].find(b => b.textContent === ${JSON.stringify(label)}); if (!b) throw Error('Missing button: ' + ${JSON.stringify(label)}); b.dataset.realclick = '1'; return true; })()`);
+            try { await realClick('[data-realclick]'); break; } catch (e) { if (attempt >= 1 || !/is on the page/.test(String(e.message))) throw e; }
+            finally { await ev(`document.querySelectorAll('[data-realclick]').forEach(b => delete b.dataset.realclick); true`); }
+        }
+    };
     const typeInto = async (selector, text) => { await realClick(selector); await Input.insertText({ text }); assert.equal(await ev(`document.querySelector(${JSON.stringify(selector)}).value`), text, 'typed words land in the box'); };
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async name => { if (!process.env.CORAL_SCREENSHOT_DIR) return; fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
