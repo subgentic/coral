@@ -85,8 +85,6 @@ var columnMigrations = []struct {
 	{"token_usage", "thinking", "TEXT"},
 	{"token_usage_hourly", "thinking", "TEXT"},
 	// Why a run failed, as a fixed word, and the agent CLI it concerns (#5469): "not_signed_in" and "claude". NULL on every other run.
-	// The team an automation posts to as itself (#21502): "" means none, so its steps get no board identity. Set by a person only.
-	{"workflows", "board", "TEXT NOT NULL DEFAULT ''"},
 	{"workflow_runs", "error_code", "TEXT"},
 	{"workflow_runs", "agent_type", "TEXT"},
 	{"scheduled_runs", "error_code", "TEXT"},

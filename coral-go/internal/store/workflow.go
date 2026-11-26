@@ -27,7 +27,8 @@ type Workflow struct {
 	CreatedAt        string `db:"created_at" json:"created_at"`
 	UpdatedAt        string `db:"updated_at" json:"updated_at"`
 	// Board is the team this automation posts to as "Automation: NAME" (#21502); "" means its steps have no board identity. Only a person sets it.
-	Board string `db:"board" json:"board"`
+	// It is not a column of workflows: a Coral of an older version scans that table with SELECT * and refuses a column it does not know, so the team is in the side table workflow_boards (read by fillBoards).
+	Board string `db:"-" json:"board"`
 
 	// Computed fields (not stored in DB directly, populated by JSON unmarshal)
 	Steps        []json.RawMessage `db:"-" json:"steps,omitempty"`
@@ -194,14 +195,17 @@ func (s *WorkflowStore) CreateWorkflow(ctx context.Context, w *Workflow) (*Workf
 	result, err := s.db.ExecContext(ctx,
 		`INSERT INTO workflows
 		 (name, description, steps_json, default_agent_json, repo_path,
-		  base_branch, max_duration_s, cleanup_worktree, enabled, board, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		  base_branch, max_duration_s, cleanup_worktree, enabled, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.Name, w.Description, w.StepsJSON, w.DefaultAgentJSON, w.RepoPath,
-		w.BaseBranch, w.MaxDurationS, w.CleanupWorktree, w.Enabled, w.Board, now, now)
+		w.BaseBranch, w.MaxDurationS, w.CleanupWorktree, w.Enabled, now, now)
 	if err != nil {
 		return nil, err
 	}
 	w.ID, _ = result.LastInsertId()
+	if err := s.setBoard(ctx, w.ID, w.Board); err != nil {
+		return nil, err
+	}
 	w.HydrateSteps()
 	return w, nil
 }
@@ -217,6 +221,7 @@ func (s *WorkflowStore) GetWorkflow(ctx context.Context, id int64) (*Workflow, e
 		return nil, err
 	}
 	w.HydrateSteps()
+	s.fillBoards(ctx, &w)
 	return &w, nil
 }
 
@@ -231,6 +236,7 @@ func (s *WorkflowStore) GetWorkflowByName(ctx context.Context, name string) (*Wo
 		return nil, err
 	}
 	w.HydrateSteps()
+	s.fillBoards(ctx, &w)
 	return &w, nil
 }
 
@@ -282,7 +288,43 @@ func (s *WorkflowStore) ListWorkflows(ctx context.Context) ([]Workflow, error) {
 		}
 	}
 
+	ptrs := make([]*Workflow, len(workflows))
+	for i := range workflows {
+		ptrs[i] = &workflows[i]
+	}
+	s.fillBoards(ctx, ptrs...)
 	return workflows, nil
+}
+
+// setBoard stores the team an automation posts to: "" removes it.
+func (s *WorkflowStore) setBoard(ctx context.Context, id int64, board string) error {
+	if board == "" {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM workflow_boards WHERE workflow_id = ?`, id)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO workflow_boards (workflow_id, board) VALUES (?, ?) ON CONFLICT(workflow_id) DO UPDATE SET board = excluded.board`, id, board)
+	return err
+}
+
+// fillBoards sets Board on each workflow from workflow_boards. A read that fails leaves Board empty: an automation without its team has no board identity, the safe side.
+func (s *WorkflowStore) fillBoards(ctx context.Context, ws ...*Workflow) {
+	if len(ws) == 0 {
+		return
+	}
+	var rows []struct {
+		ID    int64  `db:"workflow_id"`
+		Board string `db:"board"`
+	}
+	if err := s.db.SelectContext(ctx, &rows, `SELECT workflow_id, board FROM workflow_boards`); err != nil {
+		return
+	}
+	by := make(map[int64]string, len(rows))
+	for _, r := range rows {
+		by[r.ID] = r.Board
+	}
+	for _, w := range ws {
+		w.Board = by[w.ID]
+	}
 }
 
 // UpdateWorkflow updates allowed fields on a workflow.
@@ -290,12 +332,18 @@ func (s *WorkflowStore) UpdateWorkflow(ctx context.Context, id int64, fields map
 	err := dynamicUpdate(ctx, s.db, "workflows", id, fields, map[string]bool{
 		"name": true, "description": true, "steps_json": true,
 		"default_agent_json": true, "repo_path": true, "base_branch": true,
-		"max_duration_s": true, "cleanup_worktree": true, "enabled": true, "board": true,
+		"max_duration_s": true, "cleanup_worktree": true, "enabled": true,
 	}, map[string]bool{
 		"cleanup_worktree": true, "enabled": true,
 	}, true)
 	if err != nil {
 		return nil, err
+	}
+	if b, ok := fields["board"]; ok {
+		board, _ := b.(string)
+		if err := s.setBoard(ctx, id, board); err != nil {
+			return nil, err
+		}
 	}
 	return s.GetWorkflow(ctx, id)
 }
