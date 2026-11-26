@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/pkg/tunnel"
 	"io"
 	"io/fs"
 	"log"
@@ -318,7 +319,7 @@ func (ks *KeyStore) fromTrustedProxy(r *http.Request) bool {
 // trusted proxy is counted by its own address and the header is never read, so a client cannot choose its bucket; a value that is not an address is ignored.
 func (ks *KeyStore) throttleAddr(r *http.Request) string {
 	peer := clientIP(r)
-	if ks == nil || !ks.fromTrustedProxy(r) {
+	if ks == nil || !ks.fromTrustedProxy(r) || r.Header.Get(tunnel.ViaHeader) != "" { // a request the Coral Hub connector carried is counted by its peer: no header of a Hub's user picks a bucket
 		return peer
 	}
 	vals := r.Header.Values("X-Forwarded-For")
@@ -334,6 +335,40 @@ func (ks *KeyStore) throttleAddr(r *http.Request) string {
 		return a.String()
 	}
 	return peer
+}
+
+// peerThrottleKey is the second key a wrong password or key is counted under when a trusted proxy named another client (throttleAddr): the proxy's own address, with a higher ceiling (peerCeiling). It is
+// "" when the client is the peer itself, so a direct request is counted once.
+func (ks *KeyStore) peerThrottleKey(r *http.Request) string {
+	peer := clientIP(r)
+	if ks.throttleAddr(r) == rateKeyOf(peer) {
+		return ""
+	}
+	return peerPrefix + peer
+}
+
+// rateLimitedFor says whether r's client, or the proxy it came through, has used up its wrong keys; recordFailureFor counts a wrong key under both.
+func (ks *KeyStore) rateLimitedFor(r *http.Request) bool {
+	if ks.RateLimited(ks.throttleAddr(r)) {
+		return true
+	}
+	p := ks.peerThrottleKey(r)
+	return p != "" && ks.RateLimited(p)
+}
+
+func (ks *KeyStore) recordFailureFor(r *http.Request) {
+	ks.RecordFailure(ks.throttleAddr(r))
+	if p := ks.peerThrottleKey(r); p != "" {
+		ks.RecordFailure(p)
+	}
+}
+
+// rateKeyOf is a peer address as throttleAddr prints a forwarded one (a parsed address, so the two compare).
+func rateKeyOf(ip string) string {
+	if a, err := netip.ParseAddr(strings.SplitN(ip, "%", 2)[0]); err == nil {
+		return a.String()
+	}
+	return ip
 }
 
 // ForwardedHost is the host the browser reached Coral on, as a trusted reverse proxy
@@ -425,7 +460,15 @@ func (ks *KeyStore) CheckRateLimit(ip string) bool {
 		return true
 	}
 	entry.count++
-	return entry.count <= rateLimitMax
+	return entry.count <= limitFor(ip)
+}
+
+// limitFor is the wrong keys a minute an address may have: a peer key (the proxy's own address) has peerCeiling times as many as one client.
+func limitFor(key string) int {
+	if strings.HasPrefix(key, peerPrefix) {
+		return rateLimitMax * peerCeiling
+	}
+	return rateLimitMax
 }
 
 // RateLimited reports whether ip has already used up its failed-attempt budget
@@ -438,7 +481,7 @@ func (ks *KeyStore) RateLimited(ip string) bool {
 	if !ok || time.Since(e.windowAt) > rateLimitWindow {
 		return false
 	}
-	return e.count >= rateLimitMax
+	return e.count >= limitFor(ip)
 }
 
 // RecordFailure counts one failed authentication attempt from ip.

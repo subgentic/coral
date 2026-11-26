@@ -1,12 +1,15 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // Behind a reverse proxy on this computer every browser's peer is 127.0.0.1. The wrong-password and wrong-key counts are kept per client the proxy names in X-Forwarded-For (its last value), so a
@@ -98,4 +101,72 @@ func TestTwoForwardedClientsHaveTheirOwnWrongKeyCount(t *testing.T) {
 		call("10.0.0.5", "198.51.100."+string(rune('1'+i)), "wrong-key")
 	}
 	assert.Equal(t, http.StatusTooManyRequests, call("10.0.0.5", "198.51.100.200", ks.Key()))
+}
+
+// A proxy that does not overwrite X-Forwarded-For lets a stranger name a new client on every try. Each wrong try is also counted under the proxy's own address, with a ceiling a real set of browsers does
+// not reach and a rotating guesser does: 200 wrong passwords with 200 forged values are throttled, and so are 200 wrong keys.
+func TestAGuesserRotatingTheForwardedAddressIsStillThrottled(t *testing.T) {
+	g := newPwRig(t)
+	g.setPassword("open sesame")
+	var throttled int
+	for i := 0; i < 200; i++ {
+		r := g.req("POST", "/auth/password", `{"password":"nope"}`, "127.0.0.1", nil)
+		r.Header.Set("X-Forwarded-For", fmt.Sprintf("203.0.%d.%d", i/200, i%200+1))
+		if w, _ := g.do(g.ar.SignInWithPassword, r); w.Code == http.StatusTooManyRequests {
+			throttled++
+		}
+	}
+	assert.Greater(t, throttled, 100, "most of the 200 forged tries were made to wait: %d", throttled)
+	right := g.req("POST", "/auth/password", `{"password":"open sesame"}`, "127.0.0.1", nil)
+	right.Header.Set("X-Forwarded-For", "198.51.100.4")
+	w, _ := g.do(g.ar.SignInWithPassword, right)
+	assert.Equal(t, http.StatusTooManyRequests, w.Code, "while a guesser rotates the header, the proxy as a whole waits")
+}
+
+func TestARealSetOfBrowsersBehindAProxyIsNotThrottledTogether(t *testing.T) {
+	g := newPwRig(t)
+	g.setPassword("open sesame")
+	for c := 0; c < 8; c++ { // eight people each mistype twice: far under the proxy's ceiling
+		for k := 0; k < 2; k++ {
+			r := g.req("POST", "/auth/password", `{"password":"nope"}`, "127.0.0.1", nil)
+			r.Header.Set("X-Forwarded-For", fmt.Sprintf("198.51.100.%d", c+1))
+			g.do(g.ar.SignInWithPassword, r)
+		}
+	}
+	right := g.req("POST", "/auth/password", `{"password":"open sesame"}`, "127.0.0.1", nil)
+	right.Header.Set("X-Forwarded-For", "198.51.100.200")
+	w, _ := g.do(g.ar.SignInWithPassword, right)
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
+func TestWrongKeysWithRotatingForwardedAddressesHitTheProxyCeiling(t *testing.T) {
+	ks := newTestKeyStore(t)
+	h := Middleware(ks)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
+	call := func(client, key string) int {
+		r := httptest.NewRequest("GET", "/api/x", nil)
+		r.RemoteAddr = "127.0.0.1:5000"
+		r.Host = "localhost:8420"
+		r.Header.Set("Authorization", "Bearer "+key)
+		r.Header.Set("X-Forwarded-For", client)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code
+	}
+	limited := 0
+	for i := 0; i < 200; i++ {
+		if call(fmt.Sprintf("203.0.%d.%d", i/200, i%200+1), "wrong-key") == http.StatusTooManyRequests {
+			limited++
+		}
+	}
+	assert.Greater(t, limited, 90, "the 200 forged tries hit the proxy's ceiling (%d of them refused)", limited)
+	assert.Equal(t, http.StatusTooManyRequests, call("198.51.100.4", ks.Key()))
+}
+
+// A request the Coral Hub connector carried counts under its peer whatever header it has.
+func TestTheHubTunnelsRequestsIgnoreForwardedHeaders(t *testing.T) {
+	ks := newTestKeyStore(t)
+	r := fwd("127.0.0.1", "203.0.113.9")
+	r.Header.Set(tunnel.ViaHeader, "stamp")
+	assert.Equal(t, "127.0.0.1", ks.throttleAddr(r))
+	assert.Equal(t, "", ks.peerThrottleKey(r))
 }

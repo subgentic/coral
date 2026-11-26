@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"strings"
 	"sync"
 	"time"
 )
@@ -44,6 +45,14 @@ func newPasswordThrottle() *passwordThrottle {
 	}
 }
 
+// peerPrefix marks the count kept under the address a request came from when a trusted proxy names another client for it (KeyStore.throttleAddr). A proxy that does not overwrite X-Forwarded-For lets a
+// stranger pick its own client address on every try, so each try is also counted under the proxy's own peer, with peerCeiling times the free tries of one client: a real set of browsers never reaches it, a
+// guesser rotating the header does.
+const (
+	peerPrefix  = "peer:"
+	peerCeiling = 10
+)
+
 // delay is how long ip must still wait before its next attempt (0: it may try now).
 func (t *passwordThrottle) delay(ip string) time.Duration {
 	ip = rateKey(ip)
@@ -58,11 +67,15 @@ func (t *passwordThrottle) delay(ip string) time.Duration {
 		delete(t.perIP, ip)
 		return 0
 	}
-	if f.n < freeFails {
+	free := freeFails
+	if strings.HasPrefix(ip, peerPrefix) {
+		free *= peerCeiling
+	}
+	if f.n < free {
 		return 0
 	}
 	wait := maxDelay
-	if shift := f.n - freeFails; shift < 20 {
+	if shift := f.n - free; shift < 20 {
 		if d := time.Duration(1<<shift) * time.Second; d < maxDelay {
 			wait = d
 		}
