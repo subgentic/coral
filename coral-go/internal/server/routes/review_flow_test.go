@@ -254,7 +254,7 @@ func TestReviewFlowOrchestratorChangesReviewers(t *testing.T) {
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	got, _ = h.bs.GetTask(ctx, "chg", next.ID)
 	qa := got.Workflow.ReviewRounds[0].Reviewers[1].ReviewTaskID
-	code, out = postCode(t, base(next.ID, "review"), map[string]any{"subscriber_id": "lead", "reviewers": []string{"Security Reviewer"}})
+	code, out = postCode(t, base(next.ID, "review"), map[string]any{"subscriber_id": "lead", "reviewers": []string{"Security Reviewer"}, "replace": true})
 	require.Equal(t, http.StatusOK, code, "%v", out)
 	got, _ = h.bs.GetTask(ctx, "chg", next.ID)
 	require.Len(t, got.Workflow.ReviewRounds, 1, "the same round")

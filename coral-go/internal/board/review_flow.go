@@ -397,6 +397,27 @@ func (s *Store) DelegateReview(ctx context.Context, project string, id int64, ac
 	return task, created, err
 }
 
+// OpenRoundReviewers names the reviewers of the task's open review round, in the order they were named (nil when no round is open). `task review --to X` adds X to them instead of replacing them (#21747): a
+// second `--to` for the other reviewer used to take the first off the round, whose review task was then skipped, and the task completed on the one approval that was left.
+func (s *Store) OpenRoundReviewers(ctx context.Context, project string, id int64) ([]string, error) {
+	if _, err := s.GetTask(ctx, project, id); err != nil {
+		return nil, err
+	}
+	w, err := loadWorkflow(ctx, s.db, id)
+	if err != nil {
+		return nil, err
+	}
+	n := len(w.ReviewRounds)
+	if n == 0 || w.ReviewRounds[n-1].Result != "" {
+		return nil, nil
+	}
+	var names []string
+	for _, r := range w.ReviewRounds[n-1].Reviewers {
+		names = append(names, r.Reviewer)
+	}
+	return names, nil
+}
+
 // reopenClosedReviewTask opens reviewer's review task again when it is closed (completed by hand, skipped, cancelled) and the reviewer has given no verdict. It returns the task, or nil when it was open already.
 func (s *Store) reopenClosedReviewTask(ctx context.Context, project string, id, reviewTaskID int64, reviewer string, round int, title, author string) (*Task, error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE board_tasks SET status='pending', assigned_to=?, claimed_at=NULL, completed_by=NULL, completion_message=NULL, completed_at=NULL, body=?, edited_at=?
