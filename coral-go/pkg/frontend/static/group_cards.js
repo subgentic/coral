@@ -96,7 +96,7 @@ function _renderTeamCard(boardName, boardSessions) {
             <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
 
         const draw = a => _renderAgentListWithSubgroups(a, boardWorkDir, true, boardName); // the module is loaded: render.js draws no list before it is
-        html += loadedModule('./status_groups.js').teamList(_sortByOrder(boardSessions), boardName, draw) + `</ul></li>`;
+        html += loadedModule('./status_groups.js').teamList(_sortByOrder(boardSessions), boardName, draw, s => _renderSessionItem(s, boardName, true, false, boardWorkDir)) + `</ul></li>`;
     return html;
 }
 
