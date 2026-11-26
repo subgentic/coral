@@ -1,7 +1,9 @@
-# Third-party notices for encrypted database builds
+# Third-party notices for encrypted database builds (opt-in source build only)
 
-Coral encrypted binaries include or link the following components. Preserve
-this notice with packaged binaries and application bundles.
+> **Official release packages do not encrypt their databases:** Release downloads (macOS `.dmg` / Homebrew cask, Windows `.msi` / `.zip`, and Linux `.tar.gz` / `install.sh`) are standard builds that store plain, unencrypted SQLite databases (`sessions.db` and `messageboard.db`, with the standard `SQLite format 3` header) and do not include or link SQLCipher or OpenSSL. This notice applies **only** to opt-in source builds compiled with `CGO_ENABLED=1` and `-tags sqlcipher,fts5` (and the non-publishing CI `encryption-verify.yml` verification bundles).
+
+Coral encrypted source builds (`-tags sqlcipher,fts5`) include or link the following components. Preserve
+this notice with any packaged encrypted binaries and application bundles.
 
 ## 0xCarbon/go-sqlite3 v1.15.1
 

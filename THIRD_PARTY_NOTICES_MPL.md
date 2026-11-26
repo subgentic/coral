@@ -16,5 +16,7 @@ The Source Code Form of each module is also available from the Go module proxy,
 for example `go mod download github.com/hashicorp/yamux@v0.1.2`.
 
 Every other Go module linked into Coral is under a permissive license (MIT,
-BSD, Apache-2.0, ISC or similar). The encrypted-database components are listed in
+BSD, Apache-2.0, ISC or similar). Official release builds store plain SQLite
+databases and do not include SQLCipher or OpenSSL; the components for the
+opt-in encrypted-database source build (`-tags sqlcipher,fts5`) are listed in
 `THIRD_PARTY_NOTICES_SQLCIPHER.md`.
