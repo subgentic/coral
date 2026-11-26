@@ -41,7 +41,7 @@ curl -fsSL https://github.com/subgentic/coral/releases/latest/download/install.s
 
 ## Who Coral Is For
 
-Developers who run several coding agents at once, often from more than one vendor, and want them to keep working while they are away. One agent in one terminal is easy. Four, six or ten across a multi-hour project is where a permission prompt sits unseen in a background tab and a question gets buried in scrollback.
+Developers who run several coding agents at once, often from more than one vendor, and want them to keep working while they are away. One agent in one terminal is easy. Multiple concurrent agents across a multi-hour project (from 2–3 on a 2 GB server up to 6–10+ on a larger machine; see [Server sizing](https://subgentic.github.io/coral/server/#server-sizing)) is where a permission prompt sits unseen in a background tab and a question gets buried in scrollback.
 
 - **Know which agent needs you, from anywhere.** One **Inbox** (`Needs you`) lists every permission prompt, question and file to review. Answer from your laptop or your phone and the agent carries on. Optional desktop, Slack or Discord alerts tell you when an agent is stuck.
 - **"Done" means checked.** Tasks wait on each other. A finished task can be held for review (`review_pending`), so a second agent, which can be from another vendor, checks the work before the next step starts. Each agent's changed files are one click away.
@@ -203,7 +203,7 @@ export PATH="$HOME/.local/bin:$PATH"
 coral --no-browser
 ```
 
-For a headless Linux server or VPS (service user, `systemd` unit, headless password, and remote access), see **[Run Coral on a server](coral-go/agent_docs/server.md)** (`coral-agent docs server`).
+For a headless Linux server or VPS (service user, `systemd` unit, server sizing, headless password, Tailscale, and nginx TLS proxy), see **[Run Coral on a server](https://subgentic.github.io/coral/server/)** ([`coral-go/agent_docs/server.md`](coral-go/agent_docs/server.md), `coral-agent docs server`). Each release publishes [`SHA256SUMS.txt`](https://github.com/subgentic/coral/releases/latest/download/SHA256SUMS.txt) so you can verify any download with `sha256sum -c`.
 
 #### Windows (`x64`)
 
@@ -219,7 +219,7 @@ curl.exe -fSLo Coral-x64.msi https://github.com/subgentic/coral/releases/latest/
 2. Click **New agent** to start one coding agent in a project folder, or **New team** to launch an Orchestrator and specialist workers on a shared board (using a built-in template or a plain-English description).
 3. Send your goal or task in **Chat**, then watch **Inbox › Needs you** — whenever an agent asks a question, needs a permission, or uploads a file for review, it lands there.
 
-See the full **[Getting Started Guide](https://subgentic.github.io/coral/getting-started/)** for remote servers, Docker, and Tailscale setup.
+See the **[Getting Started Guide](https://subgentic.github.io/coral/getting-started/)** and **[Run Coral on a server](https://subgentic.github.io/coral/server/)** for remote servers, server sizing, Tailscale, and nginx reverse-proxy setup.
 
 ---
 

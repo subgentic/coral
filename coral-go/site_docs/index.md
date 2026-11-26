@@ -21,6 +21,7 @@ These guides cover the current **Go application**, including the macOS, Linux an
 | What you want to do | Guide |
 | --- | --- |
 | Set up the app and launch an agent | [Getting started](getting-started.md) |
+| Install Coral headless on a Linux server or VPS (service user, systemd, sizing, Tailscale, nginx) | [Run Coral on a server](server.md) |
 | Delegate work and follow a team's tasks | [Teams and tasks](teams-and-tasks.md) |
 | Browse files and preview agent output | [Files and artifacts](files-and-artifacts.md) |
 | Choose a model and thinking level, read cost by thinking level, turn on the team health monitor, filter the agent list | [Using the dashboard](using-the-dashboard.md) |

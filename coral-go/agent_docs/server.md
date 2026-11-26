@@ -4,6 +4,23 @@
 
 This page covers a headless Linux server (such as an Ubuntu VPS) where no desktop or browser runs on the machine itself. Everything runs as a dedicated service user, listens on loopback (`127.0.0.1:8420`), and is reached through **Coral Hub**, an **SSH or Tailscale tunnel**, or a **same-computer TLS reverse proxy** with a dashboard password set first.
 
+> **Security threat model — on a server, every agent runs as the Coral user and can act as the Operator:**
+> Coral and every agent it launches run as the same Unix user (`coral`). Because Coral does not sandbox agents at the OS level, any agent (including a prompt-injected agent or a package it installs) can read `/home/coral/.coral` directly — including `cli-token`, `api_key`, the `password` hash, `sessions.db`, `messageboard.db`, and every board and transcript — and can use `cli-token` or `api_key` to sign API requests as the **Operator**.
+>
+> - **Run one trusted team or project per server** (or isolate untrusted workloads on separate VMs), and **keep unrelated secrets, SSH keys and production credentials off the server**.
+> - **Use provider API keys with strict spend limits**, and **keep auto-accept off for untrusted work** (review prompts when an agent reads untrusted repositories, issues or web content).
+> - **Prefer a private network, Coral Hub or an SSH/Tailscale tunnel** over a public web port, and apply the `systemd` hardening in [Section 5](#5-run-coral-under-systemd) (`NoNewPrivileges=true`, `PrivateTmp=true`, `ProtectSystem=full`, `ProtectHome=read-only`, `ReadWritePaths=/home/coral`).
+
+## Server sizing
+
+Coral itself idles at roughly **115 MB** of RAM, while each active Claude Code session is a Node.js process that uses roughly **200–500 MB** of RAM (and is kept alive across restarts when you use `tmux`, or until idle sleep parks it):
+
+| Server RAM | Concurrent active agents | Notes |
+|---|---|---|
+| **2 GB** | **2–3 agents** | Good for a solo pair (for example `Orchestrator` + `Builder` + `Checker`), especially with automatic idle sleep enabled. |
+| **4 GB** | **~6 agents** | Comfortable for a mid-size team or a 3-role template plus review and build tools. |
+| **8 GB+** | **10+ agents** | Recommended for a full 7-role Coding Team running tests and builds in parallel worktrees. |
+
 ## 1. Create a service user (do not run as root)
 
 Coral does not sandbox agents: an agent can run any command and read or write any file that Coral's OS user can ([auth.md](auth.md#what-it-does-not-defend)). Never run Coral as `root`. If you started Coral as `root` once, do not reuse that `/root/.coral` folder — start fresh under a dedicated account without `sudo`:
@@ -53,16 +70,31 @@ Coral drives the coding agent CLIs installed on the server (`claude`, `codex`, `
 
 ### Confirm that Coral sees the agent CLI
 
-There is **no `coral` CLI subcommand** (such as `coral cli-check`) to probe agent CLIs from the shell. Confirm in either of two ways:
+Run this as the service user, once Coral is running:
 
-1. **In the dashboard:** Open **New agent** (or **Settings > Providers**); Coral checks each provider and shows whether its CLI was found and its version.
-2. **Over the API on the server** (as the `coral` service user, once Coral is running):
+```bash
+sudo -u coral -i coral cli-check
+sudo -u coral -i coral cli-check claude
+# If Coral uses a different data folder or address:
+sudo -u coral -i coral cli-check codex --home /var/lib/coral --url http://127.0.0.1:8452
+```
 
-   ```bash
-   sudo -u coral -i bash -c 'curl -s -H "Authorization: Bearer $(coral api-key)" "http://127.0.0.1:8420/api/system/cli-check?type=claude"'
-   ```
+Without a type, the command prints every agent CLI type with `found` or `not found`,
+its resolved path and version (`-` when unavailable). This is what the running
+Coral sees, including saved provider paths, rather than your SSH shell's `PATH`.
+A named type exits **1** when missing; the all-types report exits **0** even if
+some are missing. Unknown types or bad arguments exit **2**; request failures
+exit nonzero. Run `coral help cli-check` for usage.
 
-   When found, it returns `{"agent_type":"claude","found":true,"path":"/usr/local/bin/claude","probe":"ok","status":"available","version":"..."}` (add `&signin=1` to check whether `claude` or `codex` is signed in: `"signed_in":true|false`). See [CLI Check](settings-system.md#cli-check).
+The command signs local requests using the private `cli-token` in Coral's data
+folder, like `coral-board settings`; it needs no API key pasted into a shell.
+It only contacts this computer's Coral. `--home` defaults to `CORAL_DATA_DIR` or
+`~/.coral`; without `--url` (or `CORAL_URL` / `CORAL_PORT`), it finds the running
+server recorded in that folder, then falls back to the default port.
+
+In the dashboard, **New agent** or **Settings > Providers** shows the same CLI
+check. This checks installation, not provider sign-in; see
+[CLI Check](settings-system.md#cli-check) for the API and sign-in checks (`GET /api/system/cli-check?type=claude&signin=1`).
 
 ### Sign in to the agent CLI as the service user
 
@@ -184,24 +216,34 @@ curl -s http://127.0.0.1:8420/api/health
 
 Keep Coral itself listening on `--host 127.0.0.1` (do **not** expose Coral's plain-HTTP port to the internet). From strongest to weakest, choose one of:
 
-### Option 1 (Recommended): Coral Hub or a private tunnel (SSH / Tailscale)
+### Option 1 (Recommended): Coral Hub (`coral cloud connect`, with Hub-only mode coming in `#21558`) or a private tunnel (SSH / Tailscale)
 
-Neither opens a public web port on your server:
+None of these opens a public web port on your server:
 
-- **Coral Hub:** The server connects outbound over TLS to Coral Hub; nothing listens on the public network. On the server, run:
+- **Coral Hub (recommended):** The server connects outbound over TLS to Coral Hub (or your self-hosted Hub); nothing listens on the public network. (The dashboard's **Connect to Coral Hub** button requires a browser on the server itself and is refused through a remote proxy, so on a headless server run the CLI over SSH as the service user:)
 
   ```bash
   sudo -u coral -i coral cloud connect
+  # Prints an https://app.coralhub.dev/enroll?code=... link and a code — open and approve it in any browser, then verify:
+  sudo -u coral -i coral cloud status
   ```
 
-  Open the printed `https://app.coralhub.dev/enroll?code=...` link in your browser, approve the server, and choose its maximum access mode (**View**, **Interact** or **Launch**). See [Connecting a server to Coral Hub](hub.md#connecting-a-server-to-coral-hub).
+  When approving in your browser, choose the server's maximum access mode (**View**, **Interact** or **Launch**). See [Connecting a server to Coral Hub](hub.md#connecting-a-server-to-coral-hub).
+  > **[PLACEHOLDER — awaiting `#21558` (`--hub-only` / `CORAL_HUB_ONLY=1`)]:** Once `#21558` lands, pass `--hub-only` (or `Environment=CORAL_HUB_ONLY=1`) in `coral.service` to lock the server to Hub-only mode (loopback only, `require_auth_on_loopback` forced on, and any request with a forwarding header or non-local `Host` refused with `403 hub_only` while local CLIs and the Hub tunnel continue to work).
 - **SSH local port forward:** Forward port `8420` over SSH from your laptop and open `http://localhost:8420`:
 
   ```bash
   ssh -L 8420:127.0.0.1:8420 user@your-server
   ```
 
-- **Tailscale:** Either forward over Tailscale SSH / `tailscale serve`, or bind to loopback and the server's tailnet IP (`--remote --host 127.0.0.1,100.x.y.z`) with a dashboard password set. See [Listening on a tailnet address](quickstart.md#listening-on-a-tailnet-address).
+- **Tailscale:** You have two ways to reach Coral over a tailnet:
+  1. **Tailscale Serve (recommended — keeps Coral on `127.0.0.1` with remote access off):** Set a dashboard password (Step 4) and turn on `require_auth_on_loopback` (Section 8), then let Tailscale terminate HTTPS on your tailnet and proxy to `127.0.0.1:8420`:
+
+     ```bash
+     sudo tailscale serve --bg 8420
+     ```
+
+  2. **Bind directly to the server's tailnet IP (`100.x.y.z`):** Set a dashboard password first, then pass `--remote --host 127.0.0.1,100.x.y.z` (keeping `127.0.0.1` in the list so agents on the server still reach Coral over loopback). See [Listening on a tailnet address](quickstart.md#listening-on-a-tailnet-address).
 
 ### Option 2: A same-computer TLS reverse proxy (nginx)
 
@@ -212,10 +254,10 @@ If you put nginx in front of `127.0.0.1:8420`, follow every rule below ([auth.md
 1. **Set a long dashboard password BEFORE starting or exposing the proxy** (Step 4 above), **keep strict local auth on** (the default; never pass `--strict-local-auth=false` or `CORAL_STRICT_LOCAL_AUTH=0`), **and turn on `require_auth_on_loopback` in Settings** (Section 8 below). Every request through nginx arrives at Coral from `127.0.0.1`. When nginx sends `X-Forwarded-*` headers, Coral treats the request as remote and requires a password session or API key. Warning: if `--strict-local-auth=false` is ever used and a misconfigured proxy sends no forwarding headers and keeps `Host: 127.0.0.1`, Coral admits every request as an unauthenticated local user **even when a dashboard password is set** — only keeping strict local auth on (with forwarding headers) or turning on `require_auth_on_loopback` protects a header-less loopback proxy.
 2. **Pass the public `Host` header (`proxy_set_header Host $host;`).** Coral's WebSocket origin check (`wsAcceptOptions`) compares the browser's `Origin` header against the request's `Host` header directly (it does not read `X-Forwarded-Host`). If nginx leaves `Host` as `127.0.0.1:8420`, `/ws/coral` and `/ws/terminal/...` are refused. (If your public HTTPS port is not `443`, use `$http_host` instead of `$host`.)
 3. **Overwrite — never append — `X-Forwarded-Host` (`proxy_set_header X-Forwarded-Host $host;`).** Browser state-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) check `Origin` against `Host` or the **last** `X-Forwarded-Host` value.
-4. **Send `X-Forwarded-Proto $scheme` and `X-Forwarded-For $remote_addr`.** Coral marks the session cookie `Secure` (and `__Host-` when applicable) only when it sees `X-Forwarded-Proto: https` from a trusted loopback proxy.
+4. **Send `X-Forwarded-Proto $scheme` and `X-Forwarded-For $remote_addr`, and set HSTS at the proxy.** Coral marks the session cookie `Secure` (and `__Host-` when applicable) only when it sees `X-Forwarded-Proto: https` from a trusted loopback proxy. Because Coral itself never sends `Strict-Transport-Security` ([auth.md](auth.md#tls)), add `add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;` in your TLS `server` block. Obtain a real TLS certificate first (for example `sudo certbot certonly --nginx -d coral.example.com`) and remove any temporary or placeholder snakeoil certificate/key before enabling the site.
 5. **Use HTTP/1.1 with `Upgrade` and `Connection` headers for WebSockets.** Coral's upstream listener on `127.0.0.1:8420` speaks HTTP/1.1; an HTTP/2 WebSocket upgrade to the upstream fails. Disable proxy buffering and set a long read timeout so live feeds (`/ws/coral`) and terminal streams (`/ws/terminal/...`) do not drop.
 
-Example `/etc/nginx/sites-available/coral.conf`:
+Example `/etc/nginx/sites-available/coral.conf` (enable only after `certbot` has issued the certificate for your domain and any pre-certbot placeholder cert/key has been removed):
 
 ```nginx
 # Before enabling this proxy: set a dashboard password (Step 4), keep strict local auth on
@@ -233,6 +275,9 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/coral.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/coral.example.com/privkey.pem;
+
+    # Coral does not send HSTS itself; set it at the TLS reverse proxy:
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
 
     location / {
         proxy_pass http://127.0.0.1:8420;
@@ -387,10 +432,12 @@ Coral rotates its own logs inside `<data dir>` (`/home/coral/.coral`) automatica
 
 ### Backing up and restoring the data directory
 
-All persistent state lives in `/home/coral/.coral` (primarily the two SQLite WAL databases `sessions.db` and `messageboard.db`, plus `api_key`, `password`, `artifacts/`, `uploads/` and `agent_knowledge/`):
+All persistent state lives in `/home/coral/.coral` (primarily the two SQLite WAL databases `sessions.db` and `messageboard.db`, plus `api_key`, `password`, `cli-token`, `artifacts/`, `uploads/` and `agent_knowledge/`):
 
-- **Cold backup (simplest):** Stop the service briefly (`sudo systemctl stop coral`), archive `/home/coral/.coral` with permissions preserved (`sudo tar -C /home/coral -czpf coral-backup.tar.gz .coral`), and start Coral again (`sudo systemctl start coral`).Keep the backup archive `0600` — it contains `api_key`, `password` (hash) and unredacted terminal logs.
-- **Online SQLite snapshot:** If you back up while Coral is running, use `sqlite3 /home/coral/.coral/sessions.db ".backup '/path/to/sessions-backup.db'"` and `sqlite3 /home/coral/.coral/messageboard.db ".backup '/path/to/messageboard-backup.db'"` (under `umask 077`) rather than copying raw `.db` files without their `-wal` journals.
+> **Encrypt backups and store them off the host:** Every backup of `/home/coral/.coral` holds `api_key`, the `password` hash, `cli-token` (if taken while running), `.remote_secret_key`, and unredacted terminal logs and transcripts. Encrypt backup archives before storing them (for example with `gpg` or `age`), keep mode `0600`, and copy them **off the server** so neither an agent running as `coral` nor a compromised host can read or overwrite your backups.
+
+- **Cold backup (simplest):** Stop the service briefly (`sudo systemctl stop coral`), archive `/home/coral/.coral` with permissions preserved (`umask 077 && sudo tar -C /home/coral -czpf coral-backup.tar.gz .coral`), encrypt the archive and move it off the host, and start Coral again (`sudo systemctl start coral`).
+- **Online SQLite snapshot:** If you back up while Coral is running, use `sqlite3 /home/coral/.coral/sessions.db ".backup '/path/to/sessions-backup.db'"` and `sqlite3 /home/coral/.coral/messageboard.db ".backup '/path/to/messageboard-backup.db'"` (under `umask 077`) rather than copying raw `.db` files without their `-wal` journals, then encrypt and move the snapshots off the server.
 - **Compacting or repairing `sessions.db`:** With Coral stopped, `sudo -u coral -i coral db compact` writes a `0600` backup (`sessions.before-compact-<time>.db`) and `VACUUM`s `sessions.db`; `sudo -u coral -i coral db rebuild-search` rebuilds the FTS5 search index.
 - **Restoring to a new server or path (`--adopt-data-dir`):** Coral stamps a data-directory ID in both the folder and the database so it can warn if a database was copied from another instance. After restoring a backup onto a new server or path (with `coral.service` stopped), adopt the restored folder once as the `coral` user before starting the service:
 

@@ -23,7 +23,7 @@ Coral runs the agent CLIs you already use, each in its own terminal session, and
 | **Windows** (x64) | [`Coral-x64.msi`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi) (installer) or [`Coral-x64-portable.zip`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64-portable.zip). Not code-signed: SmartScreen warns that the publisher is unknown, so check the file as the [README](https://github.com/subgentic/coral#verify-your-download) describes before you run it. The default port is 8450, not 8420. | Not used: Windows uses the native PTY backend (ConPTY; there is no tmux on Windows). |
 | **Linux** (x86-64 or ARM64) | [`coral-linux-amd64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-amd64.tar.gz) (x86-64) or [`coral-linux-arm64.tar.gz`](https://github.com/subgentic/coral/releases/latest/download/coral-linux-arm64.tar.gz) (ARM64), statically linked CLI/server tools, no desktop app | Not bundled. Optional: install tmux yourself if you choose the tmux backend. |
 
-These file names always point to the newest release. Each release also keeps versioned names (`Coral.v<version>.dmg`, `Coral-<version>-x64.msi`, `Coral-<version>-x64-portable.zip`, `coral-linux-<arch>-<version>.tar.gz`): the same files.
+These file names always point to the newest release. Each release also keeps versioned names (`Coral.v<version>.dmg`, `Coral-<version>-x64.msi`, `Coral-<version>-x64-portable.zip`, `coral-linux-<arch>-<version>.tar.gz`): the same files. Each release publishes `SHA256SUMS.txt` (and `SHA256SUMS.txt.sigstore.json`) so you can verify any download with `sha256sum -c`.
 
 The macOS 13 minimum is checked in the shipped binaries. It has not been tested on a macOS 13 machine.
 
@@ -53,27 +53,35 @@ Add that line to your shell's startup file (`~/.zshrc` for zsh, `~/.bashrc` for 
 
 Both downloads are listed under [Platforms](#platforms).
 
-**Linux.** In the folder containing your download, extract the tools and add them to your `PATH` (ARM64: replace `amd64` with `arm64`):
+**Linux.** Run the one-line installer (downloads the release tarball for `x86_64` or `aarch64`, verifies it against `SHA256SUMS.txt`, and installs the binaries into `~/.local/bin`):
 
 ```bash
+curl -fsSL https://github.com/subgentic/coral/releases/latest/download/install.sh | bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Or extract the downloaded tarball and add it to your `PATH` (ARM64: replace `amd64` with `arm64`):
+
+```bash
+grep " coral-linux-amd64.tar.gz$" SHA256SUMS.txt | sha256sum -c -
 mkdir -p "$HOME/.local/share/coral"
 tar -xzf coral-linux-amd64.tar.gz -C "$HOME/.local/share/coral"
 export PATH="$HOME/.local/share/coral:$PATH"
 ```
 
-Add that `PATH` line to your shell's startup file for later terminals. There is no installer or service unit.
+Add that `PATH` line to your shell's startup file for later terminals. For a headless Linux server or VPS (dedicated `coral` service user, `systemd` unit, server sizing, headless password setup, Tailscale, and nginx TLS proxy), follow [Run Coral on a server](server.md).
 
-**Homebrew (macOS).** `brew install --cask cdknorow/coral/coral` installs the same signed app from the release; the release workflow updates the tap with each release's checksum. Then run `install-cli.sh` as above for the command-line tools.
+**Homebrew (macOS).** `brew install --cask cdknorow/coral/coral` installs the same signed app from the release; the release workflow updates the tap with each release's checksum from `SHA256SUMS.txt`. Then run `install-cli.sh` as above for the command-line tools.
 
 **If you once installed the old Python package** (`pip install agent-coral`), remove it. It installs commands with the same names and uses the same `~/.coral` directory and port, and can shadow this program. Check with `which -a coral` and remove it with `pip uninstall agent-coral`. Coral logs a warning at startup when it detects this.
 
 ## Updates
 
-Coral on a Mac, on Windows and on Linux keeps itself up to date. In the background it looks for the newest promoted release on GitHub, downloads it and checks it (the Sigstore signature, the checksum and the Apple Developer ID team of the new app). It never installs on its own: when an update is ready the dashboard and the tray offer a button (Update and relaunch on a Mac and on Linux, Install update on Windows), and only then does Coral install it and start again. On a Mac it swaps in the new app, and puts the old one back if the new one does not stay up. On Windows it runs the new MSI as an upgrade, and Windows asks you to allow it.
+Coral on a Mac, on Windows and on Linux keeps itself up to date. In the background it looks for the newest promoted release on GitHub, downloads it and checks it (the Sigstore signature, the checksum in `SHA256SUMS.txt` and the Apple Developer ID team of the new app). It never installs on its own: when an update is ready the dashboard and the tray offer a button (Update and relaunch on a Mac and on Linux, Install update on Windows), and only then does Coral install it and start again. On a Mac it swaps in the new app, and puts the old one back if the new one does not stay up. On Windows it runs the new MSI as an upgrade, and Windows asks you to allow it.
 
 - **Turn it off:** the automatic-updates switch in Settings, or start Coral with `CORAL_AUTO_UPDATE=off`.
 - **Homebrew installs** are never updated by Coral: run `brew upgrade --cask coral`.
-- **Windows:** only a Coral installed from the MSI updates this way; a portable copy never does (download the new zip). The Windows package is not code-signed yet: Coral accepts it on its checksum and the Sigstore signature alone. A rollback package is kept only when the version you had was itself a promoted release.
+- **Windows:** only a Coral installed from the MSI updates this way; a portable copy never does (download the new zip). The Windows package is not code-signed yet: Coral accepts it on its `SHA256SUMS.txt` checksum and the Sigstore signature alone. A rollback package is kept only when the version you had was itself a promoted release.
 - **Linux:** a tarball install in a folder only Coral's own programs are in, and that you can write, updates by swapping the folder, and keeps the old one for the rollback. An install a package manager owns, a shared folder or one you cannot write is left alone: download the new release as for a first install. Development, beta and Coral For Dropbox builds do not check at all.
 
 ## Start Coral
@@ -186,6 +194,7 @@ Coral shows a toast in the page when an agent needs input. You can also turn on 
 
 ## Next steps
 
+- [Run Coral on a server](server.md)
 - [Using the dashboard](using-the-dashboard.md)
 - [Remote access](remote-access.md)
 - [Privacy](privacy.md)
