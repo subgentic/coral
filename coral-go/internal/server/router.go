@@ -390,6 +390,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	sessHandler.SetTemplateReminders(s.chiefChecks.AddTemplateReminders)
 	workflowHandler := routes.NewWorkflowHandler(s.db, s.cfg)
 	s.workflowHandler = workflowHandler
+	workflowHandler.SetBoardStore(s.boardStore)
 	themeHandler := routes.NewThemesHandler(s.cfg)
 	themeHandler.SetDB(s.db)
 	themeHandler.SeedBundledThemes()

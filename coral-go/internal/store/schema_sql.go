@@ -1168,6 +1168,33 @@ CREATE TABLE IF NOT EXISTS check_token_writes (
 );
 CREATE INDEX IF NOT EXISTS idx_check_token_writes ON check_token_writes(project, check_name, at);
 
+-- Per-run tokens of an automation (a workflow whose board is set, #21502): the run may post to that board as "Automation: NAME" and nothing else,
+-- for one run (expires_at is absolute, unix seconds). Only the SHA-256 is kept.
+CREATE TABLE IF NOT EXISTS automation_tokens (
+    token_hash    TEXT PRIMARY KEY,
+    run_id        INTEGER NOT NULL,
+    workflow_id   INTEGER NOT NULL,
+    workflow_name TEXT NOT NULL,
+    project       TEXT NOT NULL,
+    writes        INTEGER NOT NULL DEFAULT 0,
+    created_at    INTEGER NOT NULL,
+    expires_at    INTEGER NOT NULL,
+    revoked_at    INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_automation_tokens_workflow ON automation_tokens(workflow_id);
+CREATE TABLE IF NOT EXISTS automation_writes (
+    workflow_id INTEGER NOT NULL,
+    at          INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_automation_writes ON automation_writes(workflow_id, at);
+
+-- The team an automation posts to as itself (#21502): none means its steps have no board identity. Set by a person only. It is a table of its own, not a column of workflows, because a Coral of an
+-- older version reads workflows with SELECT * and refuses a column it does not know (a downgrade must keep Automations working).
+CREATE TABLE IF NOT EXISTS workflow_boards (
+    workflow_id INTEGER PRIMARY KEY REFERENCES workflows(id) ON DELETE CASCADE,
+    board       TEXT NOT NULL
+);
+
 -- Browser sign-ins (#3949): a sign-in link, the API-key form or the password. Only the
 -- SHA-256 of the cookie value is kept; times are unix seconds; expires_at is absolute.
 CREATE TABLE IF NOT EXISTS browser_sessions (

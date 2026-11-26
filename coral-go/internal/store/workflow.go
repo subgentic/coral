@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/ptr"
 )
@@ -26,6 +27,9 @@ type Workflow struct {
 	Enabled          int    `db:"enabled" json:"enabled"`
 	CreatedAt        string `db:"created_at" json:"created_at"`
 	UpdatedAt        string `db:"updated_at" json:"updated_at"`
+	// Board is the team this automation posts to as "Automation: NAME" (#21502); "" means its steps have no board identity. Only a person sets it.
+	// It is not a column of workflows: a Coral of an older version scans that table with SELECT * and refuses a column it does not know, so the team is in the side table workflow_boards (read by fillBoards).
+	Board string `db:"-" json:"board"`
 
 	// Computed fields (not stored in DB directly, populated by JSON unmarshal)
 	Steps        []json.RawMessage `db:"-" json:"steps,omitempty"`
@@ -109,6 +113,12 @@ func (r *WorkflowRun) HydrateStepResults() {
 type WorkflowStore struct {
 	db *DB
 }
+
+// tolerant returns the handle for reads that scan a table into a struct. It
+// ignores a column the struct has no field for, so an older Coral still lists
+// workflows in a data dir a newer Coral gave one more column (#21512: v2.1.16
+// failed with "missing destination name board").
+func (s *WorkflowStore) tolerant() *sqlx.DB { return s.db.DB.Unsafe() }
 
 // NewWorkflowStore creates a new WorkflowStore.
 func NewWorkflowStore(db *DB) *WorkflowStore {
@@ -200,6 +210,9 @@ func (s *WorkflowStore) CreateWorkflow(ctx context.Context, w *Workflow) (*Workf
 		return nil, err
 	}
 	w.ID, _ = result.LastInsertId()
+	if err := s.setBoard(ctx, w.ID, w.Board); err != nil {
+		return nil, err
+	}
 	w.HydrateSteps()
 	return w, nil
 }
@@ -207,7 +220,7 @@ func (s *WorkflowStore) CreateWorkflow(ctx context.Context, w *Workflow) (*Workf
 // GetWorkflow returns a workflow by ID.
 func (s *WorkflowStore) GetWorkflow(ctx context.Context, id int64) (*Workflow, error) {
 	var w Workflow
-	err := s.db.GetContext(ctx, &w, "SELECT * FROM workflows WHERE id = ?", id)
+	err := s.tolerant().GetContext(ctx, &w, "SELECT * FROM workflows WHERE id = ?", id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -215,13 +228,14 @@ func (s *WorkflowStore) GetWorkflow(ctx context.Context, id int64) (*Workflow, e
 		return nil, err
 	}
 	w.HydrateSteps()
+	s.fillBoards(ctx, &w)
 	return &w, nil
 }
 
 // GetWorkflowByName returns a workflow by its unique name.
 func (s *WorkflowStore) GetWorkflowByName(ctx context.Context, name string) (*Workflow, error) {
 	var w Workflow
-	err := s.db.GetContext(ctx, &w, "SELECT * FROM workflows WHERE name = ?", name)
+	err := s.tolerant().GetContext(ctx, &w, "SELECT * FROM workflows WHERE name = ?", name)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -229,6 +243,7 @@ func (s *WorkflowStore) GetWorkflowByName(ctx context.Context, name string) (*Wo
 		return nil, err
 	}
 	w.HydrateSteps()
+	s.fillBoards(ctx, &w)
 	return &w, nil
 }
 
@@ -245,7 +260,7 @@ type workflowWithLastRun struct {
 // ListWorkflows returns all workflows with last_run summary in a single query.
 func (s *WorkflowStore) ListWorkflows(ctx context.Context) ([]Workflow, error) {
 	var rows []workflowWithLastRun
-	err := s.db.SelectContext(ctx, &rows,
+	err := s.tolerant().SelectContext(ctx, &rows,
 		`SELECT w.*,
 		        lr.id AS lr_id, lr.status AS lr_status,
 		        lr.trigger_type AS lr_trigger_type,
@@ -280,7 +295,43 @@ func (s *WorkflowStore) ListWorkflows(ctx context.Context) ([]Workflow, error) {
 		}
 	}
 
+	ptrs := make([]*Workflow, len(workflows))
+	for i := range workflows {
+		ptrs[i] = &workflows[i]
+	}
+	s.fillBoards(ctx, ptrs...)
 	return workflows, nil
+}
+
+// setBoard stores the team an automation posts to: "" removes it.
+func (s *WorkflowStore) setBoard(ctx context.Context, id int64, board string) error {
+	if board == "" {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM workflow_boards WHERE workflow_id = ?`, id)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO workflow_boards (workflow_id, board) VALUES (?, ?) ON CONFLICT(workflow_id) DO UPDATE SET board = excluded.board`, id, board)
+	return err
+}
+
+// fillBoards sets Board on each workflow from workflow_boards. A read that fails leaves Board empty: an automation without its team has no board identity, the safe side.
+func (s *WorkflowStore) fillBoards(ctx context.Context, ws ...*Workflow) {
+	if len(ws) == 0 {
+		return
+	}
+	var rows []struct {
+		ID    int64  `db:"workflow_id"`
+		Board string `db:"board"`
+	}
+	if err := s.db.SelectContext(ctx, &rows, `SELECT workflow_id, board FROM workflow_boards`); err != nil {
+		return
+	}
+	by := make(map[int64]string, len(rows))
+	for _, r := range rows {
+		by[r.ID] = r.Board
+	}
+	for _, w := range ws {
+		w.Board = by[w.ID]
+	}
 }
 
 // UpdateWorkflow updates allowed fields on a workflow.
@@ -294,6 +345,12 @@ func (s *WorkflowStore) UpdateWorkflow(ctx context.Context, id int64, fields map
 	}, true)
 	if err != nil {
 		return nil, err
+	}
+	if b, ok := fields["board"]; ok {
+		board, _ := b.(string)
+		if err := s.setBoard(ctx, id, board); err != nil {
+			return nil, err
+		}
 	}
 	return s.GetWorkflow(ctx, id)
 }
@@ -333,7 +390,7 @@ func (s *WorkflowStore) CreateWorkflowRun(ctx context.Context, workflowID int64,
 // GetWorkflowRun returns a run by ID with workflow name.
 func (s *WorkflowStore) GetWorkflowRun(ctx context.Context, runID int64) (*WorkflowRun, error) {
 	var run WorkflowRun
-	err := s.db.GetContext(ctx, &run,
+	err := s.tolerant().GetContext(ctx, &run,
 		`SELECT r.*, w.name as workflow_name
 		 FROM workflow_runs r
 		 JOIN workflows w ON w.id = r.workflow_id
@@ -379,7 +436,7 @@ func (s *WorkflowStore) ListRunsForWorkflow(ctx context.Context, workflowID int6
 	}
 	query += " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
-	err := s.db.SelectContext(ctx, &runs, query, args...)
+	err := s.tolerant().SelectContext(ctx, &runs, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +468,7 @@ func (s *WorkflowStore) ListRecentRuns(ctx context.Context, limit, offset int, s
 	}
 	query += " ORDER BY r.created_at DESC, r.id DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
-	err := s.db.SelectContext(ctx, &runs, query, args...)
+	err := s.tolerant().SelectContext(ctx, &runs, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -425,22 +482,29 @@ func (s *WorkflowStore) WorkflowRunIDs(ctx context.Context, workflowID int64) ([
 	return ids, err
 }
 
-// PruneWorkflowRuns deletes a workflow's runs older than its newest keep runs,
-// except ones still pending or running, and returns the deleted ids so their
-// run directories can be removed too.
+// QuietRunsKept is how many quiet runs (RunQuiet) a workflow, and a scheduled job, keeps besides its other runs: they are counted apart, so a check that runs every few minutes and finds nothing never pushes a run
+// that did something out of the history (#21502).
+const QuietRunsKept = 10
+
+// ScheduledRunsKept is how many runs of a scheduled job are kept, not counting its quiet runs (QuietRunsKept): the same as the workflow runs, which are kept 50 apiece.
+const ScheduledRunsKept = 50
+
+// PruneWorkflowRuns deletes a workflow's runs older than its newest keep runs, except ones still pending or running, and returns the deleted ids so their run directories can be removed too. Quiet runs are
+// counted apart: the newest QuietRunsKept of them stay, and they do not count toward keep.
 func (s *WorkflowStore) PruneWorkflowRuns(ctx context.Context, workflowID int64, keep int) ([]int64, error) {
-	const where = `workflow_id = ? AND status NOT IN ('pending', 'running')
-		   AND id NOT IN (SELECT id FROM workflow_runs WHERE workflow_id = ? ORDER BY id DESC LIMIT ?)`
+	const where = `workflow_id = ? AND status NOT IN ('pending', 'running') AND (
+		   (status = 'quiet' AND id NOT IN (SELECT id FROM workflow_runs WHERE workflow_id = ? AND status = 'quiet' ORDER BY id DESC LIMIT ?))
+		OR (status != 'quiet' AND id NOT IN (SELECT id FROM workflow_runs WHERE workflow_id = ? AND status != 'quiet' ORDER BY id DESC LIMIT ?)))`
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	var ids []int64
-	if err := tx.SelectContext(ctx, &ids, "SELECT id FROM workflow_runs WHERE "+where+" ORDER BY id", workflowID, workflowID, keep); err != nil || len(ids) == 0 {
+	if err := tx.SelectContext(ctx, &ids, "SELECT id FROM workflow_runs WHERE "+where+" ORDER BY id", workflowID, workflowID, QuietRunsKept, workflowID, keep); err != nil || len(ids) == 0 {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, "DELETE FROM workflow_runs WHERE "+where, workflowID, workflowID, keep); err != nil {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM workflow_runs WHERE "+where, workflowID, workflowID, QuietRunsKept, workflowID, keep); err != nil {
 		return nil, err
 	}
 	return ids, tx.Commit()
@@ -449,7 +513,7 @@ func (s *WorkflowStore) PruneWorkflowRuns(ctx context.Context, workflowID int64,
 // GetActiveRunsForWorkflow returns pending/running runs for a workflow.
 func (s *WorkflowStore) GetActiveRunsForWorkflow(ctx context.Context, workflowID int64) ([]WorkflowRun, error) {
 	var runs []WorkflowRun
-	err := s.db.SelectContext(ctx, &runs,
+	err := s.tolerant().SelectContext(ctx, &runs,
 		`SELECT * FROM workflow_runs
 		 WHERE workflow_id = ? AND status IN ('pending', 'running')
 		 ORDER BY created_at DESC, id DESC`, workflowID)
@@ -489,6 +553,16 @@ func (s *WorkflowStore) SetRunStatus(ctx context.Context, runID int64, status st
 	}
 }
 
+// RunQuiet is the status of a run a shell step ended on purpose with the quiet exit code: it checked, found nothing to do, and the steps after it did not run. It is no failure, and a person is not asked to open it (it is marked seen as it ends).
+const RunQuiet = "quiet"
+
+// SetRunQuiet ends a run as quiet: finished now, and already seen, so a check that runs every few minutes does not leave a new unread run each time.
+func (s *WorkflowStore) SetRunQuiet(ctx context.Context, runID int64) error {
+	now := nowUTC()
+	_, err := s.db.ExecContext(ctx, `UPDATE workflow_runs SET status = ?, finished_at = COALESCE(finished_at, ?), seen_at = COALESCE(seen_at, ?) WHERE id = ? AND status IN ('pending', 'running')`, RunQuiet, now, now, runID)
+	return err
+}
+
 // Error codes of a run refused before it started because its agent CLI is signed out or did not answer the sign-in check (#5469).
 const (
 	ErrorCodeNotSignedIn        = "not_signed_in"
@@ -520,7 +594,7 @@ func (s *WorkflowStore) UpdateStepResults(ctx context.Context, runID int64, curr
 // GetWorkflowRunDirect returns a run by ID without joining workflow name (for internal use).
 func (s *WorkflowStore) GetWorkflowRunDirect(ctx context.Context, runID int64) (*WorkflowRun, error) {
 	var run WorkflowRun
-	err := s.db.GetContext(ctx, &run, "SELECT * FROM workflow_runs WHERE id = ?", runID)
+	err := s.tolerant().GetContext(ctx, &run, "SELECT * FROM workflow_runs WHERE id = ?", runID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

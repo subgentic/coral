@@ -24,6 +24,9 @@ func (s *Store) Join(ctx context.Context, project, subscriberID, jobTitle, sessi
 }
 
 func (s *Store) subscribe(ctx context.Context, project, subscriberID, jobTitle, sessionName string, originServer *string, receiveMode string, peekFlag int, keepPeek bool) (*Subscriber, error) {
+	if ReservedMemberName(subscriberID) || ReservedMemberName(jobTitle) { // every way a member is made ends here: the name an automation posts under is nobody's to take (#21502)
+		return nil, ErrReservedMemberName
+	}
 	if receiveMode == "" {
 		if isOrchestrator(subscriberID, jobTitle, peekFlag) {
 			receiveMode = "all"

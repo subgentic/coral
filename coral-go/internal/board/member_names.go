@@ -71,3 +71,25 @@ func nearerMember(matched, following string, display []string) string {
 	}
 	return ""
 }
+
+// AutomationSenderPrefix starts the sender of every post an automation makes ("Automation: prod-alerts", #21502). Only the server writes it, from a run's token; no member, agent, worker or
+// session may have a name that starts with it, so a post under that name is always an automation's.
+const AutomationSenderPrefix = "Automation: "
+
+// OriginAutomation is the origin a post an automation made is stored with.
+const OriginAutomation = "automation"
+
+// ReservedMemberName reports whether name would pass for an automation's: it starts, ignoring case, spaces and a full-width colon, with "Automation:". It is refused in every path that names a member or an agent.
+func ReservedMemberName(name string) bool {
+	n := strings.ToLower(strings.Join(strings.Fields(name), ""))
+	n = strings.ReplaceAll(n, "\uff1a", ":")
+	return strings.HasPrefix(n, "automation:")
+}
+
+// ErrReservedMemberName is the refusal of a name ReservedMemberName names.
+var ErrReservedMemberName = errors.New(`a name that starts with "Automation:" is reserved for the posts of an automation`)
+
+// AutomationSender is the sender of an automation's post, from the workflow's name.
+func AutomationSender(workflowName string) string {
+	return AutomationSenderPrefix + strings.Join(strings.Fields(workflowName), " ")
+}

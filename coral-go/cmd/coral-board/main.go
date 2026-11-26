@@ -38,6 +38,9 @@ func resolveLocalServer() {
 }
 
 func main() {
+	if inAutomationStep() { // a step of an automation: post as it, and nothing else; it never signs as the Operator (#21502)
+		os.Exit(runAutomationCommand(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+	}
 	hooks.InstallIdentity("coral-board") // the agent session's token, sent with every request (#3387)
 	// A person running it in their own terminal (no agent session) signs with the
 	// command-line token instead, as the local Operator (strict local auth, #3418).

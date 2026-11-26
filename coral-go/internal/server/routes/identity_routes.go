@@ -105,6 +105,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/analytics/tasks":                          "read how many tasks each agent, team, model and provider completed (it names every agent and their work, #17206)",
 	"POST /api/worktrees/remove":                        "remove a kept worktree",
 	"POST /api/workflows":                               "create a workflow",
+	"POST /api/board/{project}/automation/post":         "post as an automation (only a workflow step with its run's token does, through the token gate)",
 	"PUT /api/workflows/{workflowID}":                   "change a workflow",
 	"DELETE /api/workflows/{workflowID}":                "delete a workflow",
 	"POST /api/workflows/{workflowID}/trigger":          "run a workflow",

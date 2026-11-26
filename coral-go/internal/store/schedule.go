@@ -206,6 +206,19 @@ func (s *ScheduleStore) CreateScheduledRunTrigger(ctx context.Context, jobID int
 	return result.LastInsertId()
 }
 
+// PruneScheduledRuns deletes a job's finished runs beyond its newest keep, and its quiet runs beyond the newest QuietRunsKept (counted apart, so quiet runs never push the others out); a run that is pending or
+// running is never deleted. It returns how many were deleted.
+func (s *ScheduleStore) PruneScheduledRuns(ctx context.Context, jobID int64, keep int) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM scheduled_runs WHERE job_id = ? AND status NOT IN ('pending', 'running') AND (
+		   (status = 'quiet' AND id NOT IN (SELECT id FROM scheduled_runs WHERE job_id = ? AND status = 'quiet' ORDER BY id DESC LIMIT ?))
+		OR (status != 'quiet' AND id NOT IN (SELECT id FROM scheduled_runs WHERE job_id = ? AND status != 'quiet' ORDER BY id DESC LIMIT ?)))`,
+		jobID, jobID, QuietRunsKept, jobID, keep)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // UpdateScheduledRun updates allowed fields on a run.
 func (s *ScheduleStore) UpdateScheduledRun(ctx context.Context, runID int64, fields map[string]interface{}) error {
 	quietRunText(fields)

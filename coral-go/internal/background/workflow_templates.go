@@ -33,6 +33,13 @@ func (wr *WorkflowRunner) buildStepEnv(workflow *store.Workflow, runID int64, ru
 		"CORAL_WORKFLOW_REPO_PATH=" + workflow.RepoPath,
 	}
 
+	// The workflow's own folder, which keeps what a run leaves for the next (a "last alert seen" file): made before the first step, removed with the workflow.
+	if dir := WorkflowStateDir(wr.dataDir, workflow.ID); dir != "" {
+		if fi, err := os.Lstat(dir); err == nil && fi.IsDir() && fi.Mode()&os.ModeSymlink == 0 {
+			env = append(env, "CORAL_WORKFLOW_STATE_DIR="+dir)
+		}
+	}
+
 	// Ensure Coral tools (coral-board, hooks, etc.) and agent CLIs are in PATH
 	if toolsDir := agent.CoralToolsDir(); toolsDir != "" {
 		env = append(env, "PATH="+agent.PathWithDir(toolsDir, os.Getenv("PATH")))

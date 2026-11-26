@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/agentmodels"
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/tracking"
@@ -124,6 +125,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		}
 		body.BoardName = key
 		boardCreated = created
+	}
+	if board.ReservedMemberName(body.DisplayName) { // the name an automation posts under is nobody's to launch with, on any board or none (#21502)
+		attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+		writeError(w, http.StatusBadRequest, "reserved_name", board.ErrReservedMemberName.Error())
+		return
 	}
 	if body.BoardName != "" && body.DisplayName != "" && (body.BoardServer == "" || body.BoardServer == "local") && !boardCreated && body.AgentType != at.Terminal {
 		if h.refuseMemberName(w, r.Context(), body.BoardName, naming.SubscriberID(body.DisplayName, body.AgentType), "") { // names are unique in a team, archived agents included (#19673)

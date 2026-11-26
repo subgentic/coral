@@ -24,6 +24,7 @@ import (
 
 // hubStampNotNeeded: Activity routes that are deliberately not stamped, with why.
 var hubStampNotNeeded = map[string]string{
+	"POST /api/board/{project}/automation/post":       "an automation run's own token reaches it, loopback only, from a shell step on this computer; it is never sent through the Hub (#21502)",
 	"POST /api/board/{project}/goal-images":           "a picture is bigger than the stamp's 64 KB body cap and would never be stamped; it stays local-only until a bounded design exists (Security, #13694)",
 	"POST /api/board/{project}/field-images":          "a picture is bigger than the stamp's 64 KB body cap and would never be stamped; it stays local-only until a bounded design exists (Security, #13694)",
 	"POST /api/field-images":                          "a picture is bigger than the stamp's 64 KB body cap and would never be stamped; it stays local-only until a bounded design exists (Security, #13694)",

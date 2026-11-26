@@ -331,6 +331,9 @@ func (s *JobScheduler) startRun(ctx context.Context, job store.ScheduledJob, now
 		s.runningMu.Unlock()
 		return 0, err
 	}
+	if _, perr := s.store.PruneScheduledRuns(ctx, job.ID, store.ScheduledRunsKept); perr != nil { // the job's history is bounded, as a workflow's is; best effort
+		s.logger.Warn("could not prune a job's old runs", "job", job.Name, "error", perr)
+	}
 
 	// Pre-register placeholder so concurrent evaluateJob calls see it
 	s.running[runID] = func() {}

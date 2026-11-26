@@ -58,7 +58,7 @@ func (wr *WorkflowRunner) runStep(ctx context.Context, runID int64, workflow *st
 	var stepErr error
 	switch step.Type {
 	case "shell":
-		stepErr = wr.executeShellStep(ctx, runID, step, sf, workflow.RepoPath, env, &results[i])
+		stepErr = wr.executeShellStep(ctx, runID, step, sf, workflow.RepoPath, append(env, wr.automationEnv(runID, workflow)...), &results[i])
 	case "agent":
 		stepErr = wr.executeAgentStep(ctx, runID, step, sf, workflow.RepoPath, env, defaultAgent, &results[i])
 	default:
@@ -70,14 +70,31 @@ func (wr *WorkflowRunner) runStep(ctx context.Context, runID int64, workflow *st
 
 	// Coral-level hooks (StepComplete/StepFailed), for every step type.
 	if stepHooks := parseStepHooks(step.Hooks); stepHooks != nil {
-		statusEnv := append(env, "CORAL_STEP_STATUS="+stepStatusStr(stepErr))
+		hookErr := stepErr
+		if errors.Is(stepErr, errQuietRun) {
+			hookErr = nil // a quiet end is a step that finished
+		}
+		statusEnv := append(env, "CORAL_STEP_STATUS="+stepStatusStr(hookErr))
 		event := "StepComplete"
-		if stepErr != nil {
+		if hookErr != nil {
 			event = "StepFailed"
 		}
 		wr.fireHooks(ctx, stepHooks, event, hookDir(workflow.RepoPath, stepDir), statusEnv)
 	}
 
+	if errors.Is(stepErr, errQuietRun) {
+		// A shell step ended the run on purpose (exit 78): this step is done, the rest do not run, and the run is quiet, not failed.
+		results[i].Status = "completed"
+		results[i].Note = fmt.Sprintf("ended the run quietly (exit %d): nothing to do, the steps after it did not run", QuietExitCode)
+		for j := i + 1; j < len(results); j++ {
+			results[j].Status = "skipped"
+		}
+		wr.persistResults(context.Background(), runID, i, results)
+		if !wr.isRunKilled(runID) {
+			wr.store.SetRunQuiet(context.Background(), runID)
+		}
+		return false
+	}
 	if stepErr == nil {
 		results[i].Status = "completed"
 		wr.persistResults(ctx, runID, i, results)
@@ -202,6 +219,9 @@ func (wr *WorkflowRunner) executeShellStep(ctx context.Context, runID int64, ste
 		}
 	}
 
+	if exitCode == QuietExitCode && stepCtx.Err() == nil && !wr.isRunKilled(runID) { // only a process that exited with it by itself: a timeout or a kill never reads as quiet
+		return errQuietRun
+	}
 	if exitCode != 0 {
 		return fmt.Errorf("exit code %d", exitCode)
 	}

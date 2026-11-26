@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
@@ -43,6 +44,11 @@ func TestDeleteWorkflowRemovesItsRunDirectories(t *testing.T) {
 		return run.ID
 	}
 	gone, keep := mk("gone"), mk("keep")
+	stateDir := func(id int64) string { return background.WorkflowStateDir(cfg.CoralDir(), id) } // the folder a workflow keeps between runs (#21502)
+	for _, id := range []int64{gone.ID, keep.ID} {
+		require.NoError(t, os.MkdirAll(stateDir(id), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(stateDir(id), "last_seen"), []byte("x"), 0o600))
+	}
 	goneRuns := []int64{mkRun(gone.ID), mkRun(gone.ID)}
 	keepRun := mkRun(keep.ID)
 
@@ -56,6 +62,8 @@ func TestDeleteWorkflowRemovesItsRunDirectories(t *testing.T) {
 		assert.NoDirExists(t, runDir(id))
 	}
 	assert.DirExists(t, runDir(keepRun))
+	assert.NoDirExists(t, stateDir(gone.ID), "the state folder goes with its workflow")
+	assert.DirExists(t, stateDir(keep.ID), "another workflow's state stays")
 	ids, err := h.ws.WorkflowRunIDs(ctx, gone.ID)
 	require.NoError(t, err)
 	assert.Empty(t, ids, "the run records went with the workflow")

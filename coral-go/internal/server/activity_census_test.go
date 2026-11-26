@@ -34,6 +34,7 @@ var activityByHandler = map[string]string{
 	"POST /api/board/{project}/field-images":                              "a picture for a task, chat or instruction field being written: the record's own row is the click (#20731)",
 	"POST /api/field-images":                                              "a picture for a task, chat or instruction field being written: the record's own row is the click (#20731)",
 	"POST /api/board/{project}/goals/{goalID}/close":                      "close a goal (goal_close)",
+	"POST /api/board/{project}/automation/post":                           "an automation step's post, with its run's token: a message of the board, not an Inbox action (#21502)",
 	"POST /api/board/{project}/messages":                                  "a message or a typed answer by the Operator: PostMessage writes message or answer",
 	"POST /api/board/{project}/operator-artifacts/message":                "the message that tells the agent about the shared file: the same click as the upload, which has the row (file_share)",
 	"POST /api/board/{project}/proposals/{id}/approve":                    "a proposal's approve",

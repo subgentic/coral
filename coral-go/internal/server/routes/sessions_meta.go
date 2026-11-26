@@ -30,6 +30,10 @@ func (h *SessionsHandler) SetDisplayName(w http.ResponseWriter, r *http.Request)
 		errBadRequest(w, "session_id and display_name required")
 		return
 	}
+	if board.ReservedMemberName(body.DisplayName) {
+		writeError(w, http.StatusBadRequest, "reserved_name", board.ErrReservedMemberName.Error())
+		return
+	}
 
 	if err := h.ss.SetDisplayName(r.Context(), body.SessionID, body.DisplayName); err != nil {
 		errInternalServer(w, err.Error())
