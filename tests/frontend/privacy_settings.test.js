@@ -20,10 +20,15 @@ const BASE = require('./test_base').BASE;
     await ev(`import((window.__coralStatic||'/static/')+'modals.js').then(m=>m.loadSettings())`);
     assert.deepEqual(await ev(`({telemetry:document.getElementById('settings-telemetry-enabled').checked,remote:document.getElementById('settings-remote-access-enabled').checked,status:document.getElementById('settings-remote-access-status').textContent})`), { telemetry:false, remote:false, status:'Saved: off. Running: on. Restart to apply. Not encrypted: the API key, login and terminal traffic cross the network as plain HTTP. Use Coral Hub, a TLS proxy, or --tls-cert and --tls-key.' });
     // #3355: remote access says whether it is encrypted; local-only says nothing about it.
-    const note = st => ev(`import((window.__coralStatic||'/static/')+'settings_core.js').then(m=>{m.renderRemoteAccessStatus(${JSON.stringify(st)});const el=document.getElementById('settings-remote-access-status');return {text:el.textContent,unencrypted:el.dataset.unencrypted||''};})`);
+    const note = st => ev(`import((window.__coralStatic||'/static/')+'settings_remote_status.js').then(m=>{m.renderRemoteAccessStatus(${JSON.stringify(st)});const el=document.getElementById('settings-remote-access-status');return {text:el.textContent,unencrypted:el.dataset.unencrypted||''};})`);
     assert.deepEqual(await note({remote_access_enabled:true,remote_access_effective:true,remote_access_tls:true}), {text:'Encrypted (HTTPS).',unencrypted:''});
     assert.match((await note({remote_access_enabled:true,remote_access_effective:false})).text, /Restart to apply.*Not encrypted: the API key/);
     assert.deepEqual(await note({remote_access_enabled:false,remote_access_effective:false}), {text:'',unencrypted:''});
+    // #21527: a proxy seen while remote access is off is a warning, red without a password.
+    const proxy = st => ev(`import((window.__coralStatic||'/static/')+'settings_remote_status.js').then(m=>{m.renderRemoteAccessStatus(${JSON.stringify(st)});const el=document.getElementById('settings-remote-access-status');return {text:el.textContent,proxy:el.dataset.proxy||''};})`);
+    assert.deepEqual(await proxy({remote_access_enabled:false,remote_access_effective:false,proxy_warning:{message:'Coral is being reached through a proxy; set a password',red:true,detail:'Why it is red.'}}), {text:'Coral is being reached through a proxy; set a password. Why it is red.',proxy:'red'});
+    assert.equal((await proxy({remote_access_enabled:false,remote_access_effective:false,proxy_warning:{message:'Coral is being reached through a proxy; set a password',red:false}})).proxy, 'warn');
+    assert.equal((await proxy({remote_access_enabled:false,remote_access_effective:false})).proxy, '');
     assert.equal((await note({remote_access_enabled:true,remote_access_effective:true})).unencrypted, 'true');
     await ev(`(async()=>{document.getElementById('settings-telemetry-enabled').checked=true;document.getElementById('settings-remote-access-enabled').checked=true;await Promise.resolve(window.applySettings())})()`);
     const payload = await ev(`window.__settingsPut[0]`);

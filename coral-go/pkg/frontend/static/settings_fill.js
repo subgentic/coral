@@ -7,7 +7,7 @@ import { getEngineNames } from './renderers.js';
 import { desktopNotifySupported, desktopNotifyEnabled, desktopNotifyBlocked, enableDesktopNotify, disableDesktopNotify, alertPrefs, setAlertPref } from './desktop_notify.js';
 import { isCloud } from './server_base.js';
 import { isPhoneLayout } from './phone_layout.js';
-import { settingBool, renderRemoteAccessStatus, renderDebugInputLogStatus, renderToolsFolderStatus, defaultThemeChoice, previewTheme } from './settings_core.js';
+import { settingBool, renderDebugInputLogStatus, renderToolsFolderStatus, defaultThemeChoice, previewTheme } from './settings_core.js';
 import { browserLocal } from './safe_storage.js';
 const { _fillModelDatalist, _getAgentModels } = await importOnce('./launch_models.js');
 const { _updatePermModeDescription } = await importOnce('./permission_flags.js');
@@ -15,6 +15,7 @@ const { _setApiKey, _wireApiKeyControls, loadDatabaseEncryptionStatus } = await 
 const { loadArtifactStoreSize, loadMessageSearchIndex, loadTerminalLogs, loadExamples, loadChatImport, wireStorageActions, loadLocalBackup } = await importOnce('./settings_storage.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { loadCodexTrustHooks } = await importOnce('./settings_codex_hooks.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 const { settingsAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
+const { renderRemoteAccessStatus } = await importOnce('./settings_remote_status.js'); // lazy like this file: a lazy module is loaded through importOnce (import_hygiene)
 
 // The CLI path fields, as the server has them now. The dialog opens at once from the settings this page loaded, which a
 // CLI path saved from another tab or client has outdated: a moment later the fields the person has not touched show the
