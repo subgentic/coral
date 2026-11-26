@@ -14,6 +14,7 @@ const BASE = require('./test_base').BASE;
   const guard = await require('./helpers/settings_guard').guardSettings(); // the settings this suite changes are put back in its finally (#4849)
   try {
     await Page.enable();
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.navigate({ url: BASE });
     await Page.loadEventFired();
 
@@ -35,7 +36,7 @@ const BASE = require('./test_base').BASE;
         }
       ];
       // Import render module
-      return import((window.__coralStatic||'/static/')+'render.js').then(m => {
+      return import((window.__coralStatic||'/static/')+'status_groups.js').then(() => import((window.__coralStatic||'/static/')+'render.js')).then(m => { // the list draws once status_groups.js is in
         document.body.classList.remove('popout-mode');
         localStorage.setItem('coral-group-by-team', 'true');
         document.getElementById('live-sessions-list')?.remove();

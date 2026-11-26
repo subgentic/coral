@@ -26,6 +26,7 @@ const html = '<!doctype html><html><body><section data-section="live-sessions"><
             return r.result.value;
         };
         await client.Page.enable();
+        await client.Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await client.Page.navigate({url:`http://127.0.0.1:${server.address().port}`});await client.Page.loadEventFired();
         await ev(`(async()=>{
             localStorage.clear();localStorage.setItem('coral-group-by-team','true');
@@ -45,6 +46,7 @@ const html = '<!doctype html><html><body><section data-section="live-sessions"><
             };
             window.s=(await import((window.__coralStatic||'/static/')+'state.js')).state;
             s.liveSessions=[];
+            await import((window.__coralStatic||'/static/')+'status_groups.js'); // the list draws once this module is in
             window.api=await import((window.__coralStatic||'/static/')+'api.js');
             window.load=()=>api.loadLiveSessions(reason=>failures.push(reason));
             window.inspect=()=>({

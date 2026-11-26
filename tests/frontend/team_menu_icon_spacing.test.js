@@ -11,6 +11,7 @@ const BASE = require('./test_base').BASE;
     return result.result.value;
   };
   try {
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.enable(); await Page.navigate({ url: BASE }); for (let i = 0; i < 50; i++) { if (await ev(`!!document.getElementById('live-sessions-list')`)) break; await new Promise(r => setTimeout(r, 100)); }
     await ev(`import((window.__coralStatic||'/static/')+'render.js').then(m => window.renderLiveSessions = m.renderLiveSessions)`);
     const metrics = await ev(`(() => {

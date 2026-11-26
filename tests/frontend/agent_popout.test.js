@@ -172,6 +172,7 @@ async function openTab(url, { contextId, stub, width = 1280, height = 800, mobil
         return r.result.value;
     };
     const waitFor = async (expr, ms = 8000, step = 100) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await ev(expr)) return true; } catch {} await sleep(step); } return false; };
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     const goto = async (u) => { await Page.navigate({ url: u }); await Page.loadEventFired(); };
     // Condition waits (#3118): two frames after a synchronous change; or the popout's whole visible state holding
     // still for 300 ms after it boots (identity, pill, title and overlays settle from several async loads).

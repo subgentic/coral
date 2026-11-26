@@ -65,6 +65,7 @@ async function run() {
     }
 
     // Navigate to Coral UI and wait for bundle to load
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.navigate({ url: BASE + '/' });
     await Page.loadEventFired();
     await until('!!window.__coralReady', 'the app readiness hook');

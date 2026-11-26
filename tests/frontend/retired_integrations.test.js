@@ -13,6 +13,7 @@ const BASE = require('./test_base').BASE;
   };
   try {
     await Page.enable();
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.navigate({ url: BASE });
     await Page.loadEventFired();
     const checks = await ev(`(async () => { return (await window.__coral.buildAllLazy(), // the Settings dialog is built on first open (#4500): built, so a retired setting's absence means something

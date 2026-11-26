@@ -11,6 +11,7 @@ const BASE = require('./test_base').BASE;
     return result.result.value;
   };
   try {
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
     await ev(`(() => {
       const ids=['settings-theme','settings-renderer-select','settings-agent-type','settings-permission-mode','settings-working-dir','settings-fit-pane-width','settings-notify-needs-input','settings-check-updates','settings-show-scrollbars','settings-proxy-enabled','settings-proxy-enabled-codex','settings-file-search-mode','settings-file-search-limit','settings-git-diff-mode','settings-git-poll-interval','settings-telemetry-enabled','settings-remote-access-enabled'];

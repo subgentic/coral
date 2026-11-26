@@ -31,6 +31,7 @@ const BASE = require('./test_base').BASE;
   })()`);
   const checked = () => ev(`document.getElementById('settings-board-auto-attach').checked`);
   try {
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
 
     for (const mod of ['modals.js', 'settings_core.js']) {

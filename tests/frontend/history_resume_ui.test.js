@@ -27,6 +27,7 @@ const BASE = require('./test_base').BASE;
                 return p;
             };
         })();` });
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         await ev(`import((window.__coralStatic || '/static/') + 'history_filters.js').then(m => m.ensureHistoryList()).then(() => true)`); // a local Coral reads its chat list when an entry is wanted, not at start (#8195)

@@ -25,6 +25,6 @@
 .status-caret-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0 var(--space-xs); min-width: 0; }
 .status-workers-n { margin-inline-start: auto; color: var(--text-muted); font-size: var(--fs-base); white-space: nowrap; }
 .status-workers-sum, .status-workers-done { list-style: none; }
-.status-workers-sum { display: flex; align-items: center; gap: var(--space-xs); padding-inline-start: calc(var(--space-2xl) + var(--space-xl)); min-height: 26px; color: var(--text-muted); font-size: var(--fs-base); } /* the mock's line under the orchestrator, shown while the workers are folded */
+.board-card-agents .status-workers-sum { display: flex; align-items: center; gap: var(--space-xs); padding-inline-start: calc(var(--space-2xl) * 2); min-height: 26px; color: var(--text-muted); font-size: var(--fs-base); } /* the mock's line under the orchestrator, shown while the workers are folded */
 .status-workers-done { padding-inline-start: var(--space-md); }
 .status-workers-done .status-head-toggle { color: var(--text-muted); font-weight: var(--fw-regular); }

@@ -90,6 +90,8 @@ const { connect } = require('./agent_view_harness');
         assert.equal(folded.n, '5 workers', '"5 workers" is at the right of the orchestrator row');
         assert.equal(folded.sum, '3 working · 1 needs you · 1 ready', 'the line under it, while folded');
         assert.equal(folded.open, 'false'); assert.equal(folded.done, null); assert.equal(folded.rows, 1, 'only the orchestrator row shows while the workers are folded');
+        const at = JSON.parse(await ev(`JSON.stringify((() => { const sum = document.querySelector('.sidebar .status-workers-sum'); const row = document.querySelector('.sidebar .session-board-card .session-group-item'); const text = document.createRange(); text.selectNodeContents(sum); return { text: Math.round(text.getBoundingClientRect().left), dot: Math.round(row.querySelector('.session-dot').getBoundingClientRect().left) }; })())`));
+        assert.ok(Math.abs(at.text - at.dot) <= 2, `the line under the orchestrator starts under its dot, as the mock has it: ${JSON.stringify(at)}`);
         await shot('team-folded-desktop-1440');
         await click('.sidebar .session-board-card .status-caret-toggle');
         await waitFor(`document.querySelectorAll('.sidebar .session-board-card .session-group-item').length === 6`, 'the workers open', 4000);

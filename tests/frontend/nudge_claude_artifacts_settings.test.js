@@ -32,6 +32,7 @@ const BASE = require('./test_base').BASE;
   const checked = () => ev(`document.getElementById('settings-nudge-claude-artifacts').checked`);
   const guard = await require('./helpers/settings_guard').guardSettings(); // the settings this suite changes are put back in its finally (#4849)
   try {
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
     // The real server first (before the page's fetch is replaced): only a boolean is taken.
     const put = body => ev(`fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(body))}}).then(r=>r.status)`);

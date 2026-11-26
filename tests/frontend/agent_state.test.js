@@ -117,6 +117,7 @@ async function run() {
     const diff = (obj) => ev(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [${JSON.stringify(obj)}] }); true`);
     const boot = async (w, h, mobile, grouped) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await until(`typeof window._coralSetLiveSessions === 'function'`, 'the app hooks', 10000);
         // Sleeping agents sit behind an "N sleeping" row; this suite inspects their rows, so expand every group.

@@ -30,6 +30,7 @@ const BASE = require('./test_base').BASE;
   const shown = () => ev(`({ on: document.getElementById('settings-auto-sleep').checked, minutes: document.getElementById('settings-auto-sleep-minutes').value })`);
   const guard = await require('./helpers/settings_guard').guardSettings();
   try {
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
     const put = body => ev(`fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(body))}}).then(r=>r.status)`);
     assert.equal(await put({ auto_sleep: 'yes' }), 400, 'the server refuses a non-boolean');
