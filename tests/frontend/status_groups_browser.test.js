@@ -8,6 +8,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { settle } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect({ grouping: 'status' });
@@ -100,7 +101,7 @@ const { connect } = require('./agent_view_harness');
         assert.deepEqual((await picture(false)).switchOn, ['team'], 'Team is kept after a reload');
         console.log('computer: the team folds its workers under the orchestrator');
         await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) window.__patch(n, { board_project: 'shop' }); for (const s of T.state.liveSessions) if (s.archived) window.__patch(s.name, { board_project: 'shop' }); T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
-        const line = () => ev(`(() => { const row = document.querySelector('.sidebar .session-board-card .session-group-item'); const b = row && row.querySelector('.status-caret-toggle'); const sum = document.querySelector('.sidebar .status-workers-sum'); const dn = document.querySelector('.sidebar .status-workers-done'); return b ? { n: row.querySelector('.status-workers-n').textContent.trim(), open: b.getAttribute('aria-expanded'), sum: sum ? sum.textContent.replace(/\\s+/g, ' ').trim() : null, done: dn ? dn.textContent.replace(/\\s+/g, ' ').trim() : null, rows: document.querySelectorAll('.sidebar .session-board-card .session-group-item').length } : null; })()`);
+        const line = () => ev(`(() => { const row = document.querySelector('.sidebar .session-board-card .session-group-item'); const b = row && row.querySelector('.status-workers-toggle'); const sum = document.querySelector('.sidebar .status-workers-sum'); const dn = document.querySelector('.sidebar .status-workers-done'); return b ? { n: row.querySelector('.status-workers-n').textContent.trim(), open: b.getAttribute('aria-expanded'), sum: sum ? sum.textContent.replace(/\\s+/g, ' ').trim() : null, done: dn ? dn.textContent.replace(/\\s+/g, ' ').trim() : null, rows: document.querySelectorAll('.sidebar .session-board-card .session-group-item').length } : null; })()`);
         const folded = await line();
         assert.equal(folded.n, '5 workers', '"5 workers" is at the right of the orchestrator row');
         assert.equal(folded.sum, '3 working · 1 needs you · 1 ready', 'the line under it, while folded');
@@ -108,7 +109,26 @@ const { connect } = require('./agent_view_harness');
         const at = JSON.parse(await ev(`JSON.stringify((() => { const sum = document.querySelector('.sidebar .status-workers-sum'); const row = document.querySelector('.sidebar .session-board-card .session-group-item'); const text = document.createRange(); text.selectNodeContents(sum); return { text: Math.round(text.getBoundingClientRect().left), dot: Math.round(row.querySelector('.session-dot').getBoundingClientRect().left) }; })())`));
         assert.ok(Math.abs(at.text - at.dot) <= 2, `the line under the orchestrator starts under its dot, as the mock has it: ${JSON.stringify(at)}`);
         await shot('team-folded-desktop-1440');
-        await click('.sidebar .session-board-card .status-caret-toggle');
+        // #21686: one button at the RIGHT of the orchestrator row, between its words and its menu: "5 workers" and a chevron (down while folded, up open); the name opens the agent, only the button folds
+        const btn = () => ev(`(() => { const row = document.querySelector('.sidebar .session-board-card .session-group-item'), b = row.querySelector('.status-workers-toggle'), name = row.querySelector('.session-label'), kebab = row.querySelector('.kebab-btn, .session-kebab, [aria-haspopup="menu"]'), r = e => e && e.getBoundingClientRect();
+            return { oldCaret: !!row.querySelector('.status-caret'), label: b.getAttribute('aria-label'), expanded: b.getAttribute('aria-expanded'), text: b.textContent.replace(/\\s+/g, ' ').trim(), icon: b.querySelector('.material-icons').textContent + (getComputedStyle(b.querySelector('.material-icons')).transform === 'none' ? '' : ' up'), right: r(b).left > r(name).right, beforeMenu: !kebab || r(b).right <= r(kebab).left + 1, inRow: row.contains(b), h: Math.round(r(b).height) }; })()`);
+        let bt = await btn();
+        assert.deepEqual([bt.oldCaret, bt.inRow, bt.right, bt.beforeMenu], [false, true, true, true], 'no triangle at the left; the fold button is at the right of the name and before the menu: ' + JSON.stringify(bt));
+        assert.deepEqual([bt.label, bt.expanded, bt.text, bt.icon], ['Show 5 workers', 'false', '5 workersexpand_more', 'expand_more'], 'folded: Show 5 workers, a down chevron: ' + JSON.stringify(bt));
+        await click('.sidebar .session-board-card .session-group-item .session-label');
+        await settle(ev, 300); // sleep-ok: a name click opens the agent through a few async steps
+        assert.equal((await btn()).expanded, 'false', 'a click on the name does not fold or unfold the workers');
+        assert.equal(await ev(`document.querySelector('.sidebar .session-board-card .session-group-item').getAttribute('aria-current')`), 'true', 'the name opens the Orchestrator');
+        const press = async k => { const code = k === ' ' ? 'Space' : 'Enter'; for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: k, code, windowsVirtualKeyCode: k === ' ' ? 32 : 13, ...(type === 'keyDown' ? { text: k === ' ' ? ' ' : '\r' } : {}) }); };
+        await ev(`document.querySelector('.sidebar .session-board-card .status-workers-toggle').focus(); true`);
+        await press('Enter');
+        await waitFor(`document.querySelectorAll('.sidebar .session-board-card .session-group-item').length === 6`, 'Enter opens the workers', 4000);
+        bt = await btn(); assert.deepEqual([bt.label, bt.expanded, bt.icon], ['Hide 5 workers', 'true', 'expand_more up'], 'open: Hide 5 workers, an up chevron: ' + JSON.stringify(bt));
+        await ev(`document.querySelector('.sidebar .session-board-card .status-workers-toggle').focus(); true`);
+        await press(' ');
+        await waitFor(`!!document.querySelector('.sidebar .status-workers-sum')`, 'Space folds them again', 4000);
+        assert.equal((await btn()).expanded, 'false');
+        await click('.sidebar .session-board-card .status-workers-toggle');
         await waitFor(`document.querySelectorAll('.sidebar .session-board-card .session-group-item').length === 6`, 'the workers open', 4000);
         const open = await line();
         assert.equal(open.open, 'true'); assert.equal(open.sum, null, 'the summary line is only for the folded team');
@@ -116,7 +136,7 @@ const { connect } = require('./agent_view_harness');
         await shot('team-open-desktop-1440');
         await click('.sidebar .status-workers-done button');
         await waitFor(`document.querySelectorAll('.sidebar .session-board-card .session-group-item').length === 12`, 'the six archived workers', 4000); 
-        await click('.sidebar .status-workers-done button'); await click('.sidebar .session-board-card .status-caret-toggle');
+        await click('.sidebar .status-workers-done button'); await click('.sidebar .session-board-card .status-workers-toggle');
         await waitFor(`!!document.querySelector('.sidebar .status-workers-sum')`, 'folded again', 4000);
         await pick('status', 'agent-list-bar');
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'Status again', 6000);
@@ -147,6 +167,8 @@ const { connect } = require('./agent_view_harness');
         await pick('team', 'mobile-agent-list-bar');
         await waitFor(`!!document.querySelector('#mobile-agent-list .status-workers-sum')`, 'the folded line on the phone', 6000);
         assert.equal(await ev(`document.querySelector('#mobile-agent-list .status-workers-sum').textContent.replace(/\\s+/g, ' ').trim()`), '3 working · 1 needs you · 1 ready');
+        const ph = await ev(`(() => { const b = document.querySelector('#mobile-agent-list .status-workers-toggle'), r = b.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width), label: b.getAttribute('aria-label'), caret: !!document.querySelector('#mobile-agent-list .status-caret') }; })()`);
+        assert.ok(ph.h >= 44 && ph.w >= 44 && ph.label === 'Show 5 workers' && !ph.caret, 'on the phone the fold button is a 44 px target on the right, no left triangle: ' + JSON.stringify(ph));
         await shot('team-phone-390');
         console.log('ok');
     } finally { await client.close(); }
