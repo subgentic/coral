@@ -126,7 +126,10 @@ func cmdPost() {
 		}
 		opt := foldOpt(os.Args[i], postFlags) // --TO is --to
 		if opt == "--to" && i+1 < len(os.Args) {
-			toNames = os.Args[i+1]
+			if toNames != "" {
+				toNames += "," // --to given again adds its names: it does not drop the earlier ones (#21703)
+			}
+			toNames += os.Args[i+1]
 			i++ // skip the value
 		} else if opt == "--file" && i+1 < len(os.Args) {
 			filePath = os.Args[i+1]
