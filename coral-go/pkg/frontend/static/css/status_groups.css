@@ -15,7 +15,7 @@
 /* A row here has no dot (its heading is its status) and no drag handle (the order is the time). */
 .session-list .session-group-item[data-group="__status__"] .session-dot, .session-list .session-group-item[data-group="__status__"] .drag-grip { display: none; }
 /* The mock shows the time at the right of every row ("6 min", "now"); the computer's row hides it elsewhere, so a row here shows it. */
-.session-list .session-group-item[data-group="__status__"] .session-time, .session-list .session-group-item[data-in] .session-time { display: inline; }
+.session-list .session-group-item[data-group="__status__"] .session-time { display: inline; }
 .session-list .session-group-item[data-need][data-state]:not([data-state="usage_limit"]) .session-name-row .chip-caps { display: none; }
 .status-caret-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0 var(--space-xs); min-width: 0; }
 .status-workers-n { margin-inline-start: auto; color: var(--text-muted); font-size: var(--fs-base); white-space: nowrap; }
@@ -23,18 +23,3 @@
 .board-card-agents .status-workers-sum { display: flex; align-items: center; gap: var(--space-xs); padding-inline-start: calc(var(--space-2xl) * 2); min-height: 26px; color: var(--text-muted); font-size: var(--fs-base); } /* the mock's line under the orchestrator, shown while the workers are folded */
 .status-workers-done { padding-inline-start: var(--space-md); }
 .status-workers-done .status-head-toggle { color: var(--text-muted); font-weight: var(--fw-regular); }
-/* Group by's three boxes (#21685): a fieldset in the Display panel, a label over one box to a line (the mock); 44px lines on touch. The bar's inputs are tall by default (agentic.css), so these are set back. */
-.list-bar-groupby { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; flex: 0 0 100%; }
-.list-bar-groupby > legend { padding: 0; margin-bottom: var(--space-xs); color: var(--text-secondary); font-size: var(--fs-base); }
-.agent-list-bar .list-bar-groupby .list-bar-check { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-md); min-height: 30px; color: var(--text); font-size: var(--fs-base); cursor: pointer; }
-.agent-list-bar .list-bar-groupby .list-bar-check input { flex: none; inline-size: 1rem; block-size: 1rem; min-height: 0; margin: 0; }
-@media (pointer: coarse) { .agent-list-bar .list-bar-groupby .list-bar-check { min-height: 44px; } }
-/* Task rows: the sub-heading under a team or computer, and each row's #number title line (the mock: accent number, muted title, one line). */
-.status-sub { list-style: none; margin: var(--space-xs) 0 0; padding-inline-start: var(--space-md); }
-.status-sub .status-head-toggle { font-size: var(--fs-sm); color: var(--text-secondary); min-height: 30px; padding-block: 0; }
-.session-group-item[data-in] .session-preview, .session-group-item[data-in] .session-status-line { display: none; } /* the mock's row is the name and the task line */
-.session-group-item[data-in] { padding-inline-start: var(--space-xl); }
-.session-task-line { display: block; padding-left: 18px; color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.session-task-line b { color: var(--accent); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; margin-inline-end: var(--space-xs); }
-.status-queued { color: var(--text-muted); font-size: var(--fs-sm); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 var(--space-xs); margin-inline-start: var(--space-sm); flex: none; }
-.status-more-in { padding-inline-start: var(--space-xl); margin-top: 0; }
