@@ -287,7 +287,6 @@ export function attachReview(d, { reload }) {
     const fileKey = x => JSON.stringify([x.team, x.server || '', x.hex]);
     let legacyDecision = null, legacyComment = null;
     let draftWarned = false; // Approve found an unsent comment and said so (#16399)
-    let armed = false, armedAt = 0; // Approve on a series of several files, some never opened, asks once more (#15254)
     let cur = null, gen = 0, sending = false, done = false, inProgress = false, progressTimer = null;
     const progress = $('.artifact-review-pending');
     const clearProgress = () => { clearTimeout(progressTimer); progressTimer = null; inProgress = false; progress.hidden = true; };
@@ -299,13 +298,11 @@ export function attachReview(d, { reload }) {
     error.before(pictureHost);
     const decisionPictures = field => { const p = tray.payload?.() || {}; return p.images ? { ...p, images: { [field]: p.images.text } } : p; };
     const paintApprove = () => {
-        const n = d.dataset.shownVersion, newer = d.dataset.newerVersion, covers = d.dataset.coversFiles, unopened = d.dataset.unopenedFiles;
-        if (armed && covers && Number(unopened) > 0) { approve.textContent = `${unopened} of ${covers} files not opened: approve all?`; approve.title = 'Press again to approve every file in this review, or open the others first.'; return; }
-        armed = false;
-        approve.textContent = cur && cur.newer ? 'Approve this older version' : `${newer && n ? `Approve v${n}` : 'Approve'}${cur && cur.state === 'changes' ? ' anyway' : ''}${newer ? ` (v${newer} is newer)` : ''}${covers && !newer ? ` (covers ${covers} files)` : ''}`;
-        approve.title = covers ? `One decision covers the ${covers} files in this review: open each from the version list first.` : '';
+        const n = d.dataset.shownVersion, newer = d.dataset.newerVersion;
+        approve.textContent = cur && cur.newer ? 'Approve this older version' : `${newer && n ? `Approve v${n}` : 'Approve'}${cur && cur.state === 'changes' ? ' anyway' : ''}${newer ? ` (v${newer} is newer)` : ''}`;
+        approve.title = '';
     };
-    d.addEventListener('av-version', () => { armed = false; if (cur) { paintApprove(); paintBanner(); } }); // another version shown: the question is asked again
+    d.addEventListener('av-version', () => { if (cur) { paintApprove(); paintBanner(); } }); // another version shown: update its approval wording
     let deciding = false;
     const syncHold = () => { approve.disabled = approveNote.disabled = deciding || !!d.dataset.contentPending; }; // the new version's content has not rendered: the old text must not sit under 'Approve v2' (#15636)
     d.addEventListener('av-content', () => { syncHold(); syncSend(); }); // the form's own Approve (approveWith, #15545) waits for the new content too
@@ -315,7 +312,7 @@ export function attachReview(d, { reload }) {
     closeDocument.addEventListener('click', () => d.querySelector('.artifact-viewer-close')?.click());
     d.querySelector('.artifact-viewer-actions')?.prepend(closeDocument);
     const show = (s) => {
-        cur = s; armed = false; draftWarned = false;
+        cur = s; draftWarned = false;
         breadcrumb.hidden = closeDocument.hidden = !s;
         breadcrumb.textContent = s ? `Inbox › Needs you › ${shown(s.row.name || 'Document')}${s.row.version ? ` · version ${s.row.version}` : ''}` : '';
         d.toggleAttribute('data-document-review', !!s); d.dispatchEvent(new Event('av-review-layout'));
@@ -364,12 +361,10 @@ export function attachReview(d, { reload }) {
     });
     approve.addEventListener('click', async () => {
         if (!cur) return;
-        if (!armed && d.dataset.coversFiles && Number(d.dataset.unopenedFiles) > 0) { armed = true; armedAt = Date.now(); paintApprove(); return; } // covers several files and some were never opened: say so, and ask again
-        if (armed && Date.now() - armedAt < 600) return; // a double click is one press: it cannot answer the question it has not shown yet (Security's INFO on #15254)
         const unsent = [...d.querySelectorAll('.ac-composer .ac-input')].find(t => t.value.trim()); // a comment typed and not sent: Approve says so once, and a second press approves without it (#16399)
         if (unsent && d.querySelector('.ac-review-drafts')) { showToast('Save or cancel the comment you are writing before approving this review.', true); unsent.focus(); return; }
         if (unsent && !draftWarned) { draftWarned = true; showToast('Your comment is not sent yet. Send it first, or press Approve again to approve without it.', true); unsent.focus(); return; }
-        draftWarned = false; armed = false;
+        draftWarned = false;
         deciding = true; syncHold();
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }
         catch (e) { showToast(e.message, true); } finally { deciding = false; syncHold(); }
