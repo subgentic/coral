@@ -345,6 +345,22 @@ A workflow keeps its newest 50 runs, and a scheduled job its newest 50 finished 
 
 ---
 
+## Drafting an automation as an Orchestrator
+
+A team's Orchestrator does not use `/api/workflows` or `/api/scheduled` (the Operator's, refused to every agent). It uses `coral-board automation`:
+
+| Command | What it does |
+|---|---|
+| `coral-board automation propose --file <json>` | A new automation, stored OFF. The Operator's Needs you gets one question with every step in full, the schedule, the repo folder and a hash, and Approve and Deny. |
+| `coral-board automation change <name> --file <json>` | A new definition. The automation and its scheduled job go OFF in that write and the Operator is asked again. |
+| `coral-board automation list` / `show <name>` | State (`pending`, `approved`, `changed`, `off`), hash, and the whole text. |
+| `coral-board automation disable <name>` / `delete <name>` | Off, or removed. There is no command or route that turns one on. |
+| `coral-board automation run <name>` | One test run, only of a version the Operator approved. |
+
+Routes: `GET|POST /api/board/{project}/automations`, `GET|PUT|DELETE /api/board/{project}/automations/{name}`, `POST .../{name}/disable`, `POST .../{name}/run`. The caller must be the verified Orchestrator of that team, on this computer (never through Coral Hub). A body that sets `enabled`, `board` or `team` is refused.
+
+What the approval covers: every step (kind, command, prompt, agent type, model, timeout, continue_on_failure), the schedule, the repo folder, and the bytes of each repo file a step runs as `./path` or `path/to/file`. A run checks the hash first, and again before each such step. If the files or the definition differ from what was approved, the run does not start, the automation and its job turn off, and the Operator is asked again. A shell step gets an allow-listed environment (no Coral token, no `CORAL_` credential, no Hub or API key). An agent step sets its agent type and model only, so it runs under the permissions of an agent the Orchestrator launches. Limits: 10 steps, 6 proposals an hour, 10 automations a team holds, a schedule no more often than every 15 minutes, 6 test runs an hour.
+
 ## Update a workflow
 
 ```

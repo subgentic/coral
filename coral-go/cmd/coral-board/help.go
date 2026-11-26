@@ -12,7 +12,7 @@ import (
 var commands = map[string]bool{
 	"join": true, "post": true, "read": true, "check": true, "projects": true,
 	"subscribers": true, "status": true, "working-mode": true, "leave": true,
-	"delete": true, "export": true, "peek": true, "waiting": true, "task": true, "workflow": true,
+	"delete": true, "export": true, "peek": true, "waiting": true, "task": true, "workflow": true, "automation": true,
 	"wait": true, "send": true, "targets": true, "health": true, "link": true, "unlink": true, "links": true,
 	"queue": true, "resource": true, "heavy": true, "goal": true, "ask": true, "reviewer": true, "seats": true, "settings": true, "wake": true, "sleep": true, "stop": true, "interrupt": true, "restart": true, "remind": true, "search": true,
 }

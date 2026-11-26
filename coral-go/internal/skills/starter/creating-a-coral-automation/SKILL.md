@@ -13,7 +13,10 @@ An automation in Coral is one of two things:
 - A **workflow**: up to 20 steps run in order. A `shell` step runs a command; an `agent` step runs an agent with a prompt. Each step can use the output of the one before.
 - A **scheduled job**: runs on a cron schedule. It launches a one-shot agent with a prompt (a `prompt` job), or triggers a saved workflow (a `workflow` job).
 
-**Creating, changing and running them is the Operator's.** An agent cannot create or trigger one: the routes refuse an agent's session. You design it, and the Operator creates it in the **Automations** tab (the Workflows and Jobs folders). The Workflows folder also has a **Build with Agent** button.
+**The Operator owns them.** The routes the Automations tab uses refuse every agent's session, so no agent creates, changes or triggers one there. Two ways to get one made:
+
+- **You are a team's Orchestrator:** draft it yourself with `coral-board automation propose --file <json>`. It is stored OFF and appears in the Operator's Needs you with every step in full, its schedule and a hash. It runs only after the Operator's own Approve, and only exactly that version: any change you make turns it off and asks again. You can `list`, `show`, `change`, `disable`, `delete` and `run` (one test run, only of a version the Operator approved). You can never turn one on, and you do not set `board` or `enabled`.
+- **Anyone else:** design it and hand it to the Operator, who creates it in the **Automations** tab (the Workflows and Jobs folders). The Workflows folder also has a **Build with Agent** button.
 
 ## Steps
 
@@ -76,3 +79,25 @@ coral-agent artifact upload nightly-check.md --tag "for review" --question "Crea
 ```
 
 Then post the link to the Operator. Once they have created it, they can run it once by hand from the Automations tab and read the run's output before the schedule starts.
+
+## Drafting as an Orchestrator
+
+The file for `coral-board automation propose --file`:
+
+```json
+{
+  "name": "nightly-deps",
+  "description": "Check dependencies for known advisories",
+  "steps": [
+    { "name": "scan", "type": "shell", "command": "./scripts/check_deps.sh --out reports/deps.json" },
+    { "name": "summarize", "type": "agent", "prompt": "Read reports/deps.json and post one short summary to the team board.", "agent": { "agent_type": "claude", "model": "sonnet" } }
+  ],
+  "schedule": { "cron": "30 7 * * 1-5", "timezone": "America/Chicago" }
+}
+```
+
+- It runs in the team's own repo folder: leave `repo_path` out. At most 10 steps, a command up to 4000 bytes, a prompt up to 8000, a schedule no more often than every 15 minutes, 6 proposals an hour, 10 held at a time.
+- A shell step whose command is one plain call of a repo file (`./scripts/x.sh --flag`) has that file's bytes approved with it: if the file changes, the run stops and the Operator is asked again. Any other command (`make`, `npm test`, a pipeline) runs files the team can change after the approval, and the card says so.
+- A shell step gets no Coral token or key in its environment; it is still the Operator's shell for every file they can read.
+- An agent step sets its agent type and model only: no flags, tools, capabilities or hooks.
+- Say in your post to the Operator what it costs and touches. The card shows every step whole; do not rely on it for the why.
