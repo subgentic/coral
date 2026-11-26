@@ -205,8 +205,8 @@ async function connect(opts = {}) {
         }
         const render = await import((window.__coralStatic||'/static/')+'render.js');
         window.T = { state, liveChat, ws, render };
-        // The list draws once its status_groups.js module is in (#21466): ask for it now (a draw does), and wait until it has run (its sheet link is the sign), so a suite's first synchronous renderLiveSessions draws.
-        if (!document.querySelector('link[href$="status_groups.css"]')) { try { render.renderLiveSessions([{ session_id: 'warm-id', name: 'warm', agent_type: 'claude', sleeping: false, status: 'idle' }]); } catch (e) {} for (let i = 0; i < 300 && !document.querySelector('link[href$="status_groups.css"]'); i++) await new Promise(r => setTimeout(r, 10)); }
+        // The list draws once its status_groups.js module is in (#21466): register it through importOnce (the page's own way) before the suite's first synchronous renderLiveSessions; its sheet is a start link now, so the link says nothing about the module.
+        await (await import((window.__coralStatic||'/static/')+'import_once.js')).importOnce('./status_groups.js');
         window.__qaState = state;
         // Count re-selects from every caller (Wake, the feed, the test itself).
         { window.__selCalls = 0; document.addEventListener('coral:agent-selected', () => { window.__selCalls++; }); } // the page's callers reach selectLiveSession through the sessions.js module (openLive), not window, so the event it dispatches is the count (#17243)
