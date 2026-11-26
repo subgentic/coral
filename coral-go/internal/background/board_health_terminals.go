@@ -17,11 +17,16 @@ func isTerminalMember(sub board.Subscriber, bySession map[string]AgentInfo) bool
 	return strings.HasPrefix(sub.SessionName, "terminal-")
 }
 
-// withoutTerminals is the members that are agents. bySession may be nil.
+// isNotAnAgentHere says a subscriber is not an agent of this computer's team (#21705): a member of another server (a Hub user: origin_server is set) or a seat with no session at all (a test persona left behind). Neither is ever idle, waiting or asleep here, so counting them made "23 agents sleep, wake one" a misleading line.
+func isNotAnAgentHere(sub board.Subscriber) bool {
+	return (sub.OriginServer != nil && strings.TrimSpace(*sub.OriginServer) != "") || strings.TrimSpace(sub.SessionName) == ""
+}
+
+// withoutTerminals is the members that are agents of this computer: not a person's terminal, not a remote member, not a seat with no session. bySession may be nil.
 func withoutTerminals(subs []board.Subscriber, bySession map[string]AgentInfo) []board.Subscriber {
 	kept := subs[:0:0]
 	for _, s := range subs {
-		if !isTerminalMember(s, bySession) {
+		if !isTerminalMember(s, bySession) && !isNotAnAgentHere(s) {
 			kept = append(kept, s)
 		}
 	}
