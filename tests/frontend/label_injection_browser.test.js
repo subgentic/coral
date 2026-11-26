@@ -95,7 +95,7 @@ const HOOK = `(() => {
         (r.status >= 200 && r.status < 300 ? planted : refused).push(`${field} (${r.status}${r.status >= 300 ? ' ' + JSON.stringify(r.data).slice(0, 160) : ''})`);
         return r;
     };
-    let standIn = null, before = null;
+    let standIn = null, before = null; const preloads = []; // the scripts this suite adds to the shared tab: taken off again so the next suite (live_sessions_metadata_failure) meets a clean one
     const BOARD = 'pwn-' + Date.now().toString(36);
     const fs = require('fs'), path = require('path'), os = require('os'), cp = require('./helpers/child_process.js');
     // A working folder an agent could have made: a file, a folder and a branch named with markup (a name may hold < > " ' and =, not a slash or a
@@ -145,8 +145,8 @@ const HOOK = `(() => {
 
         // The Operator-only writes go through the dashboard itself (the page's own fetch: its cookie and origin), as the Operator makes them.
         await Page.enable();
-        await Page.addScriptToEvaluateOnNewDocument({ source: HOOK });
-        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
+        preloads.push((await Page.addScriptToEvaluateOnNewDocument({ source: HOOK })).identifier);
+        preloads.push((await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE })).identifier); // the Team view: the list is grouped by status unless chosen (#21466)
         { const loaded0 = Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await loaded0; await coralReady().catch(() => {}); }
         const plantPage = async (field, method, path, body) => {
             const r = await ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, text: (await r.text()).slice(0, 4000) }))`); // enough to hold the new row's id
@@ -266,6 +266,7 @@ const HOOK = `(() => {
         for (const u of made) await ev(`fetch(${JSON.stringify(u)}, { method: 'DELETE' }).then(r => r.status)`).catch(() => {});
         try { if (/\/pwn-repo-/.test(repo)) fs.rmSync(repo, { recursive: true, force: true }); } catch { /* best effort */ }
         await removeBoards(ev, [BOARD]);
+        for (const identifier of preloads) await Page.removeScriptToEvaluateOnNewDocument({ identifier }).catch(() => {});
         await client.close();
     }
     process.exit(results.every(Boolean) ? 0 : 1);
