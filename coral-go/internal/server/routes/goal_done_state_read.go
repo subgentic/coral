@@ -19,7 +19,6 @@ func (h *BoardHandler) attachGoalDoneState(r *http.Request, goals ...*board.Goal
 	}
 	hidden, read := h.goalDoneHiddenSet(r.Context()), h.goalDoneReadSet(r.Context())
 	drivens := map[string]goalDoneDrivenState{} // read once per board (#21461)
-	quiet, now := h.goalDoneQuietFor(r.Context()), h.goalDoneClock()()
 	for _, g := range goals {
 		if g == nil {
 			continue
@@ -39,10 +38,8 @@ func (h *BoardHandler) attachGoalDoneState(r *http.Request, goals ...*board.Goal
 				d = h.goalDoneDriven(r.Context(), g.BoardID)
 				drivens[g.BoardID] = d
 			}
-			if d.skips(*g) {
+			if d.skips(*g) { // read only: the "shown once" entry is written where the row is listed (the done-state route's "listed", Needs you's read), never by a read of the goals (#21470)
 				st.Held = true
-			} else if st.Hidden == "" && !st.Read && goalDoneQuietOver(*g, now, quiet) {
-				d.record(r.Context(), h, *g) // shown now: the once of #21442, the same entry /api/needs-you writes
 			}
 		}
 		if st.Hidden != "" || st.Read || st.Held {
