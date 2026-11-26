@@ -146,6 +146,7 @@ const HOOK = `(() => {
         // The Operator-only writes go through the dashboard itself (the page's own fetch: its cookie and origin), as the Operator makes them.
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: HOOK });
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         { const loaded0 = Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await loaded0; await coralReady().catch(() => {}); }
         const plantPage = async (field, method, path, body) => {
             const r = await ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, text: (await r.text()).slice(0, 4000) }))`); // enough to hold the new row's id
