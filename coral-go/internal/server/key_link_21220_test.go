@@ -23,6 +23,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/secrets"
+	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/redact"
 )
@@ -37,6 +38,7 @@ type keyLinkWorld struct {
 
 func newKeyLinkWorld(t *testing.T) *keyLinkWorld {
 	t.Helper()
+	routes.ResetFinishFailuresForTest() // the wrong-code count is process-wide: each world starts from none, so -count=N and test order do not matter (#21655)
 	r := newE2ERemote(t, "k", nil)
 	cs := store.NewCloudStore(r.db, store.NewRemoteServerStore(r.db, r.dir))
 	local := httptest.NewServer(r.srv.Router()) // the bridge's own calls are this computer's loopback, as in production (the remote's front door marks every caller as another computer)

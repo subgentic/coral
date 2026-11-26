@@ -174,6 +174,13 @@ func finishFailuresOver(now time.Time) bool {
 	return len(keep) >= finishFailureLimit
 }
 
+// ResetFinishFailuresForTest forgets the wrong-code finishes: the count is process-wide, so a test that repeats (-count=N) or runs after another that failed codes starts from none (#21655). Tests only.
+func ResetFinishFailuresForTest() {
+	finishFailures.Lock()
+	finishFailures.at = nil
+	finishFailures.Unlock()
+}
+
 func noteFinishFailure(now time.Time) {
 	finishFailures.Lock()
 	finishFailures.at = append(finishFailures.at, now)
