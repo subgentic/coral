@@ -2082,9 +2082,6 @@ div.overflow-menu-note { margin: 0; padding: 6px 12px 2px; } /* a row menu's fir
 }
 
 /* New Agent's persona controls (#6407): Save Persona is the one button; Export and Import are a disclosure away, and the form's own Agent Type select is hidden once the radio group names the agent. */
-.persona-files { flex-basis: 100%; }
-.persona-files > summary { cursor: pointer; width: fit-content; padding: 4px 0; font-size: var(--fs-sm); color: var(--text-secondary); }
-.persona-files-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0; }
 #launch-agent-acf.has-agent-pick .acf-top-row > label:has(> .acf-agent-type) { display: none; }
 
 .acf-top-row {
@@ -3752,7 +3749,6 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-persona-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px; }
 .launch-persona-row .agent-preset-selector { flex: 1 1 14rem; min-width: 0; }
 .launch-persona-row .agent-preset-select { width: 100%; max-width: none; }
-.launch-persona-row .persona-files > summary::-webkit-details-marker { display: none; }
 .launch-persona-top .settings-hint { margin: 0 0 14px; }
 .launch-persona-top input[type="text"] { width: 100%; max-width: none; box-sizing: border-box; }
 .launch-stage-sub b { color: var(--text-primary); }
@@ -3836,13 +3832,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 #launch-agent-pick .launch-agent-opt { margin: 0; flex: 0 0 auto; }
 .launch-agent-pick { width: max-content; max-width: 100%; }
 .launch-persona-row .agent-preset-selector { border: 0; padding: 0; margin: 0; }
-.launch-persona-row .persona-files { position: relative; flex-basis: auto; }
-.launch-persona-row .persona-files > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; width: auto; padding: 8px 14px; min-height: 40px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); box-sizing: border-box; }
 .launch-persona-lead { margin: 0 0 10px; font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); }
-.launch-persona-row .persona-files-row { flex-direction: column; align-items: stretch; flex-wrap: nowrap; white-space: nowrap; } /* the More menu: its three actions one under the other */
-.persona-files-sub { display: flex; gap: 4px; padding-top: 6px; margin-top: 2px; border-top: 1px solid var(--border); } /* Export and Import: a quieter pair on one line under Save as persona (#10286) */
-.launch-persona-row .persona-files:not([open]) > .persona-files-row { display: none; } /* closed, its three buttons took no room but were still laid out (the census saw them 38 px wide) */
-.launch-persona-row .persona-files[open] .persona-files-row { position: absolute; right: 0; width: max-content; max-width: calc(100vw - 32px); z-index: 3; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; }
 
 .launch-wizard .launch-cli-slot { margin: 0 0 6px; }
 
@@ -3865,9 +3855,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 #launch-agent-pick .launch-agent-opt[data-mark]::before, .acf-provider-label .seg-btn[data-mark]::before, .agent-type-mark[data-mark]::before { content: attr(data-mark); } /* OpenCode and Hermes: the letter is on the chip (agent_marks.js, #12169) */
 .agent-type-mark::before { margin-right: 0; color: inherit; }
 .acf-provider-label .seg-btn[data-value="terminal"]::before { content: "T"; }
-.launch-persona-row .persona-files > summary::after { content: ""; margin-left: 8px; border: 4px solid transparent; border-top-color: currentColor; border-bottom-width: 0; } /* the menu's caret */
-.launch-persona-row .persona-files[open] > summary::after { transform: rotate(180deg); }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .launch-persona-row .persona-files > summary { min-height: var(--control-touch-height, 44px); } }
 
 /* Large text: a group too narrow for its words in em (a phone at 200%) is one column, so no name breaks inside a word. */
 .launch-agent-provider, .acf-provider-label { container-type: inline-size; }

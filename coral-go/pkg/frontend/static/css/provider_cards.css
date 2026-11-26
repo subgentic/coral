@@ -65,3 +65,17 @@
 @media (max-height: 520px) { #launch-agent-remove, #launch-agent-move-up, #launch-agent-move-down { flex: 0 0 auto; } }
 /* one control height in the New agent dialog (#15889): 36 px, 44 px on a phone or touch; Thinking, Install and Choose a path used to be 44 on a computer */
 @media (pointer: coarse), (max-width: 767px) { .provider-card-body select.seg-source { min-height: var(--control-touch-height, 44px); } }
+/* The New agent dialog's persona menu (Save as persona, Export, Import; #6407, #10286): lazy with the dialog, not in the start sheet. */
+.persona-files { flex-basis: 100%; }
+.persona-files > summary { cursor: pointer; width: fit-content; padding: 4px 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.persona-files-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0; }
+.launch-persona-row .persona-files > summary::-webkit-details-marker { display: none; }
+.launch-persona-row .persona-files { position: relative; flex-basis: auto; }
+.launch-persona-row .persona-files > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; width: auto; padding: 8px 14px; min-height: 40px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); box-sizing: border-box; }
+.launch-persona-row .persona-files-row { flex-direction: column; align-items: stretch; flex-wrap: nowrap; white-space: nowrap; } /* the More menu: its three actions one under the other */
+.persona-files-sub { display: flex; gap: 4px; padding-top: 6px; margin-top: 2px; border-top: 1px solid var(--border); } /* Export and Import: a quieter pair on one line under Save as persona (#10286) */
+.launch-persona-row .persona-files:not([open]) > .persona-files-row { display: none; } /* closed, its three buttons took no room but were still laid out (the census saw them 38 px wide) */
+.launch-persona-row .persona-files[open] .persona-files-row { position: absolute; right: 0; width: max-content; max-width: calc(100vw - 32px); z-index: 3; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; }
+.launch-persona-row .persona-files > summary::after { content: ""; margin-left: 8px; border: 4px solid transparent; border-top-color: currentColor; border-bottom-width: 0; } /* the menu's caret */
+.launch-persona-row .persona-files[open] > summary::after { transform: rotate(180deg); }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .launch-persona-row .persona-files > summary { min-height: var(--control-touch-height, 44px); } }
