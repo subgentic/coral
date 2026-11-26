@@ -104,7 +104,7 @@ func TestFireHooks_ExecutesCommand(t *testing.T) {
 				"hooks": []interface{}{
 					map[string]interface{}{
 						"type":    "command",
-						"command": "touch '" + filepath.ToSlash(markerFile) + "'", // sh keeps a quoted C:/... path (#3638)
+						"command": "touch hook_fired", // a bare name: the hook runs in tmpDir, so no shell can write a mangled C: path into the package folder (#21598)
 					},
 				},
 			},
@@ -115,7 +115,7 @@ func TestFireHooks_ExecutesCommand(t *testing.T) {
 	wfStore := store.NewWorkflowStore(db)
 	runner := NewWorkflowRunner(wfStore, nil, nil, nil, nil, tmpDir, "localhost", 8420)
 
-	runner.fireHooks(context.Background(), hooks, "StepComplete", t.TempDir(), nil)
+	runner.fireHooks(context.Background(), hooks, "StepComplete", tmpDir, nil)
 
 	// Verify the hook command was executed
 	if _, err := os.Stat(markerFile); os.IsNotExist(err) {
@@ -133,7 +133,7 @@ func TestFireHooks_SkipsUnmatchedEvent(t *testing.T) {
 				"hooks": []interface{}{
 					map[string]interface{}{
 						"type":    "command",
-						"command": "touch '" + filepath.ToSlash(markerFile) + "'", // sh keeps a quoted C:/... path (#3638)
+						"command": "touch hook_fired", // a bare name: the hook runs in tmpDir, so no shell can write a mangled C: path into the package folder (#21598)
 					},
 				},
 			},
