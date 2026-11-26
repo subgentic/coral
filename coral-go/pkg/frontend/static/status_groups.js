@@ -10,7 +10,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { sessionStateInfo } from './session_state.js';
 import { DISPLAY_PANEL_OPEN } from './display_panel.js';
 import { loadStyles } from './lazy_styles.js';
-await loadStyles('group_by.css'); // the Group by boxes and the task split: not in the start sheet (#21685)
+const groupByStyles = () => loadStyles('group_by.css'); // the Group by boxes and the task split: a request of their own the first time the Display panel opens or a task split draws, not at start (#21685)
 
 const KEYS = { server: 'coral-group-computer', team: 'coral-group-team', task: 'coral-group-task' }; // 'true' / 'false' per box; none set = the old choices (below), else all off
 const LEGACY = { server: ['coral-group-by-server', 'true'], team: ['coral-agent-grouping', 'team'] }; // what a browser chose before the three boxes
@@ -29,7 +29,8 @@ const write = (k, v) => { try { browserLocal.set(k, v); } catch { /* per-viewer 
  *  then task); none ticked is the Status view. Added to the sidebar's bar and the phone's (agent_list_bar.js builds them) at every draw and when the panel opens, so no start byte carries it.
  *  They replace the Status | Team select (#21683) and the Display panel's "Group by computer" switch. */
 const BOXES = [['server', 'Computer'], ['team', 'Team'], ['task', 'Task']];
-function mountGroupBy() {
+function mountGroupBy(e) {
+    if (e && e.type === DISPLAY_PANEL_OPEN) groupByStyles(); // the panel is opening: the boxes are about to show
     for (const id of ['agent-list-bar', 'mobile-agent-list-bar']) {
         const menu = document.querySelector(`#${id} .list-bar-menu`);
         if (!menu) continue;
@@ -139,6 +140,7 @@ const subHead = (key, label, n, folded) => `<li class="status-sub" data-status="
 /** The Task box inside one scope (a team, a computer, the whole list): On a task, then No task, each with its rows. rows(list) draws agents as that scope always does.
  *  On a phone each keeps a short list: two rows of On a task and one line that counts the rest ("1 more on a task", "3 without a task"), which opens the rest. */
 function taskSplit(list, scope, rows) {
+    groupByStyles();
     const by = { on: list.filter(hasTask), no: list.filter(s => !hasTask(s)) };
     if (!by.on.length && !by.no.length) return '';
     const phone = isPhoneLayout(), open = !phone || !isFolded('m:' + scope);
@@ -160,6 +162,7 @@ export function lay(regular, limits, archived, renderRow, wrap) {
     arch = archived;
     mountGroupBy();
     const g = groupBy();
+    if (g.server || g.team || g.task) groupByStyles(); // a grouped view is drawing: its sheet (none ticked: only the bundle's)
     if (g.team) return null;
     const sleeping = limits?.sleeping || [];
     if (limits) limits.sleeping = []; // drawn here, with the rest: render.js has none left to draw under the Team groups
