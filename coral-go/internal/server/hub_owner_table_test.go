@@ -193,7 +193,15 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/board/{project}/goals":      "owner-sees",
 		"GET /api/board/{project}/goals/{id}": "owner-sees",
 		"GET /api/board/{project}/settings":   "owner-sees", "GET /api/system/update": "owner-update",
-		"POST /api/system/update/relaunch": "owner-only", "POST /api/system/update/check-hub": "owner-only", // the Hub updates a computer only as its stamped owner, behind the person's switch (#13258)
+		// The Operator's clicks the Activity record keeps by their route (#21435): stamped so the row names the owner, refused to nobody.
+		"POST /api/sessions/live/{name}/send": "owner-sees", "POST /api/sessions/live/{name}/answer-prompt": "owner-sees",
+		"POST /api/workflows/runs/{id}/seen": "owner-sees", "POST /api/scheduled/runs/{id}/seen": "owner-sees",
+		"POST /api/board/{project}/tasks/{id}/complete": "owner-sees", "POST /api/board/{project}/tasks/{id}/cancel": "owner-sees", "POST /api/board/{project}/tasks/{id}/nudge": "owner-sees",
+		"POST /api/board/{project}/tasks/{id}/reminder": "owner-sees", "POST /api/board/{project}/tasks/{id}/publish": "owner-sees", "POST /api/board/{project}/goals/{id}/close": "owner-sees",
+		"PUT /api/board/{project}/tasks/{id}/goal": "owner-sees",
+		"PATCH /api/board/{project}/tasks/{id}":    "owner-sees", "PATCH /api/board/{project}/tasks/{id}/amend": "owner-sees", "PATCH /api/board/{project}/goals/{id}": "owner-sees",
+		"DELETE /api/board/{project}/tasks/{id}/reminder": "owner-sees",
+		"POST /api/system/update/relaunch":                "owner-only", "POST /api/system/update/check-hub": "owner-only", // the Hub updates a computer only as its stamped owner, behind the person's switch (#13258)
 	}
 	got := map[string]string{}
 	for _, r := range tunnel.OwnerRoutes() {
