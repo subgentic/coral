@@ -159,6 +159,9 @@ func (in CheckInput) actions(items []Item) []action {
 		}
 		out = append(out, action{onYou: true, age: w.Age, text: l + ". Answer them, or tell them what to do instead."})
 	}
+	for _, q := range r.Requeued {
+		out = append(out, action{age: q.Silent, text: fmt.Sprintf("%s's #%d had no activity for %s while %s was away: it went back to pending, still %s's. Reassign it (coral-board task reassign %d --to \"Name\") if %s will not be back soon.", q.Agent, q.Task, age(q.Silent), q.Agent, q.Agent, q.Task, q.Agent)})
+	}
 	for _, st := range r.Stalled {
 		out = append(out, action{age: st.Silent, text: fmt.Sprintf("%s's #%d is in progress with no activity and no wait-on for %s: stalled, not working. Ask %s what is holding it; if it waits on someone, it should say so with coral-board task wait-on.", st.Agent, st.Task, age(st.Silent), st.Agent)})
 	}

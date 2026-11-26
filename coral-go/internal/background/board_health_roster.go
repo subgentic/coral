@@ -213,7 +213,9 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 		r.Waits = append(r.Waits, *groups[k])
 	}
 	attention += m.nameIssues(ctx, in, r, awake)
-	attention += m.taskWaitLines(ctx, in, r, working)
+	expired := m.expireClaims(ctx, in, r)
+	attention += len(expired)
+	attention += m.taskWaitLines(ctx, in, r, working, expired)
 	r.Open = map[string]int{}
 	for _, t := range in.tasks {
 		if t.AssignedTo != nil && *t.AssignedTo != "" {
@@ -387,7 +389,7 @@ func limitResetClock(now time.Time, resets time.Duration) time.Time {
 
 // taskWaitLines adds what task wait-on says to the check (#21697): the tasks whose owner waits on the recipient (one line each, with the owner's reason), and the tasks in progress that show no activity and no
 // wait-on for the team's stalled_hours, which are stalled and never counted as working. It returns how many things it added.
-func (m *BoardHealthMonitor) taskWaitLines(ctx context.Context, in rosterInputs, r *teamhealth.Roster, working map[string]bool) int {
+func (m *BoardHealthMonitor) taskWaitLines(ctx context.Context, in rosterInputs, r *teamhealth.Roster, working map[string]bool, expired map[int64]bool) int {
 	waits, err := m.store.ListTaskWaits(ctx, in.project)
 	if err != nil {
 		return 0
@@ -412,7 +414,7 @@ func (m *BoardHealthMonitor) taskWaitLines(ctx context.Context, in rosterInputs,
 	}
 	stalledAgents := map[string]bool{}
 	for _, t := range in.tasks {
-		if t.Status != "in_progress" || t.AssignedTo == nil || waiting[t.ID] {
+		if t.Status != "in_progress" || t.AssignedTo == nil || waiting[t.ID] || expired[t.ID] {
 			continue
 		}
 		var sub *board.Subscriber
