@@ -417,7 +417,7 @@ func FetchFromCLI(ctx context.Context, family, path string) ([]Model, string, er
 	case "hermes":
 		return nil, "custom", nil // Hermes has no list command Coral knows (#11831): the model is typed or a custom one, and nothing is run to ask
 	case "pi":
-		out, err := runCLI(ctx, path, dir, "--list-models")
+		out, err := runCLICombined(ctx, path, dir, "--list-models") // pi 0.73.1 prints the table to stderr (#21604)
 		if err != nil {
 			return nil, "", err
 		}
@@ -463,9 +463,21 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 }
 
 func runCLI(ctx context.Context, path, dir string, args ...string) ([]byte, error) {
+	return runCLIStreams(ctx, false, path, dir, args...)
+}
+
+// runCLICombined is runCLI reading stderr too, in one stream: a CLI that prints its list to stderr (pi, #21604) still gives it.
+func runCLICombined(ctx context.Context, path, dir string, args ...string) ([]byte, error) {
+	return runCLIStreams(ctx, true, path, dir, args...)
+}
+
+func runCLIStreams(ctx context.Context, withStderr bool, path, dir string, args ...string) ([]byte, error) {
 	cmd := cliCommand(ctx, path, dir, args...)
 	var out limitedBuffer
 	cmd.Stdout = &out
+	if withStderr {
+		cmd.Stderr = &out // the same writer: exec copies both through one pipe, so the buffer is not written twice at once
+	}
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
