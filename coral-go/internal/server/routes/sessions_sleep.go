@@ -51,7 +51,7 @@ func (h *SessionsHandler) Sleep(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(boardSessions) == 0 {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "No sessions found on that board"})
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "No sessions found on that board"})
 		return
 	}
 
@@ -277,7 +277,7 @@ func (h *SessionsHandler) SleepSession(w http.ResponseWriter, r *http.Request) {
 
 	sess, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || sess == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session not found"})
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "Session not found"})
 		return
 	}
 
@@ -339,12 +339,12 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 
 	sess, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || sess == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session not found"})
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "Session not found"})
 		return
 	}
 	sess = h.startable(ctx, sess) // an ended agent is Archived: Start brings it back (#19696)
 	if sess.IsSleeping != 1 {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session is not sleeping"})
+		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": "Session is not sleeping"})
 		return
 	}
 
@@ -365,14 +365,14 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 	if err := h.wakeExistingSession(ctx, sess); err != nil {
 		log.Printf("Failed to wake session %s: %v", sessionID[:8], err)
 		if errors.Is(err, ErrStillInOldTmux) {
-			writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error(), "code": "still_in_old_tmux"})
+			writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "error": err.Error(), "code": "still_in_old_tmux"})
 			return
 		}
 		if refuse, ok := cliPathRefusal(viaHub(ctx, r), err); ok { // the setting to fix, not a bare "failed" (#115)
 			refuse(w)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Failed to relaunch session"})
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "Failed to relaunch session"})
 		return
 	}
 	// A person's wake (never an agent's) lets Coral auto-resume it again (#3613, Security's SHOULD 1).
@@ -410,7 +410,7 @@ func (h *SessionsHandler) ArchiveSession(w http.ResponseWriter, r *http.Request)
 
 	sess, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || sess == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session not found"})
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "Session not found"})
 		return
 	}
 	if h.refuseArchive(w, ctx, sess) { // a team keeps its last Orchestrator (#19673)
@@ -443,7 +443,7 @@ func (h *SessionsHandler) UnarchiveSession(w http.ResponseWriter, r *http.Reques
 
 	sess, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || sess == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session not found"})
+		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "Session not found"})
 		return
 	}
 	if err := h.ss.SetSessionArchived(ctx, sessionID, false); err != nil {

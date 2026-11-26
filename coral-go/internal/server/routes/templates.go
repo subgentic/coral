@@ -448,13 +448,13 @@ func (h *TemplatesHandler) getTemplate(w http.ResponseWriter, r *http.Request, k
 	}
 	data, err := h.githubFetch(fmt.Sprintf("cli-tool/components/%s/%s/%s", kind, category, filename))
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]interface{}{"error": err.Error()})
+		writeJSON(w, http.StatusBadGateway, map[string]interface{}{"error": err.Error()})
 		return
 	}
 
 	dataMap, ok := data.(map[string]interface{})
 	if !ok {
-		writeJSON(w, http.StatusOK, map[string]interface{}{"error": "unexpected response format"})
+		writeJSON(w, http.StatusBadGateway, map[string]interface{}{"error": "unexpected response format"})
 		return
 	}
 

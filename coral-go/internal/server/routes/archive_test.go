@@ -103,7 +103,10 @@ func TestArchiveSession_ArchiveUnarchiveWake(t *testing.T) {
 	s, a = archFlags(t, ss, archSID1)
 	assert.Equal(t, [2]int{0, 0}, [2]int{s, a}, "an explicit wake unarchives")
 
-	assert.Equal(t, false, postArchiveOK(t, srv.URL+"/api/sessions/live/"+archSID3+"/archive")["ok"], "unknown session")
+	unknown, err := http.Post(srv.URL+"/api/sessions/live/"+archSID3+"/archive", "application/json", bytes.NewReader([]byte("{}")))
+	require.NoError(t, err)
+	defer unknown.Body.Close()
+	assert.Equal(t, http.StatusNotFound, unknown.StatusCode, "unknown session (#21548)")
 }
 
 // Wake All and team wake leave archived agents asleep, and team wake keeps an
