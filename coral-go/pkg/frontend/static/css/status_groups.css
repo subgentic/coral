@@ -17,9 +17,9 @@
 /* The mock shows the time at the right of every row ("6 min", "now"); the computer's row hides it elsewhere, so a row here shows it. */
 .session-list .session-group-item[data-group="__status__"] .session-time { display: inline; }
 .session-list .session-group-item[data-need][data-state]:not([data-state="usage_limit"]) .session-name-row .chip-caps { display: none; }
-.status-caret-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0 var(--space-xs); min-width: 0; }
-.status-workers-n { margin-inline-start: auto; color: var(--text-muted); font-size: var(--fs-base); white-space: nowrap; }
+.status-workers-toggle { display: inline-flex; align-items: center; margin-inline-start: auto; color: var(--text-muted); }
+.status-workers-toggle[aria-expanded="true"] .material-icons { transform: rotate(180deg); } /* down while folded, up while open */
 .status-workers-sum, .status-workers-done { list-style: none; }
-.board-card-agents .status-workers-sum { display: flex; align-items: center; gap: var(--space-xs); padding-inline-start: calc(var(--space-2xl) * 2); min-height: 26px; color: var(--text-muted); font-size: var(--fs-base); } /* the mock's line under the orchestrator, shown while the workers are folded */
+.board-card-agents .status-workers-sum { display: flex; align-items: center; gap: var(--space-xs); padding-inline-start: calc(var(--space-2xl) * 2 - 19px); min-height: 26px; color: var(--text-muted); font-size: var(--fs-base); } /* the mock's line under the orchestrator, shown while the workers are folded */
 .status-workers-done { padding-inline-start: var(--space-md); }
 .status-workers-done .status-head-toggle { color: var(--text-muted); font-weight: var(--fw-regular); }

@@ -172,7 +172,7 @@ export function lay(regular, limits, archived, renderRow, wrap) {
 /** Draw()'s rows with each agent's task line: the markup is split per row (each starts at its <li) and the ones with a task get theirs. */
 const withTaskRows = (html, list) => { const by = new Map(list.map(s => [escapeAttr(s.session_id || ''), s])); return html.split(/(?=<li )/).map(c => { const m = c.match(/data-session-id="([^"]*)"/), s = m && by.get(m[1]); return s ? withTaskLine(c, s) : c; }).join(''); };
 
-/** The Team view's orchestrator card (the mock's "under the orchestrator"): the orchestrator's row with a caret and "5 workers" at its right; folded, the line under it says "3 working · 1 needs you · 1 ready";
+/** The Team view's orchestrator card (the mock's "under the orchestrator"): the orchestrator's row with one "5 workers" button and a chevron at its right (#21686); folded, the line under it says "3 working · 1 needs you · 1 ready";
  * open, the workers follow and end with "6 done today", which opens the team's archived workers. saved: the team's agents in their saved order; draw: draws some of them as the card always did; row: draws one agent's row (an archived agent has no place in draw's lists).
  * A small team (under WORKERS_MIN workers) is drawn whole. */
 export function teamList(saved, board, draw, row) {
@@ -183,8 +183,8 @@ export function teamList(saved, board, draw, row) {
     if (!isOrch(orch) || workers.length < WORKERS_MIN) return draw(all);
     const key = 'w:' + board, folded = isFolded(key), n = g => workers.filter(s => groupOf(s) === g).length;
     const sum = [`${n('working')} working`, n('needs') ? `<span class="status-shape st-needs" aria-hidden="true"></span>${Number(n('needs'))} needs you` : '', `${n('idle')} ready`].filter(x => x && !x.startsWith('0 ')).join(' · ');
-    const toggle = `<button type="button" class="btn btn-quiet status-caret-toggle" data-on-click="status-fold" data-group="${escapeAttr(key)}" aria-expanded="${escapeAttr(String(!folded))}" aria-label="${Number(workers.length)} workers"><span class="status-caret" aria-hidden="true"></span></button>`;
-    let html = draw([orch]).replace('<span class="session-name-spacer"></span>', `<span class="session-name-spacer"></span><span class="status-workers-n">${Number(workers.length)} workers</span>`).replace('<div class="session-name-row">', `<div class="session-name-row">${toggle}`);
+    const nw = Number(workers.length), toggle = `<button type="button" class="btn btn-quiet status-workers-toggle" data-on-click="status-fold" data-group="${escapeAttr(key)}" aria-expanded="${escapeAttr(String(!folded))}" aria-label="${escapeAttr((folded ? 'Show ' : 'Hide ') + nw + ' workers')}"><span class="status-workers-n">${Number(workers.length)} workers</span><span class="material-icons" aria-hidden="true">expand_more</span></button>`; // one button at the right of the row, before its menu: the name still opens the agent (#21686)
+    let html = draw([orch]).replace('<span class="session-name-spacer"></span>', `<span class="session-name-spacer"></span>${toggle}`);
     if (folded) return html + `<li class="status-workers-sum">${sum}</li>` + draw(asleep);
     const done = arch.filter(x => x.board_project === board && doneToday(x)), dkey = 'd:' + board, dOpen = !isFolded(dkey);
     html += draw(workers);
