@@ -15,7 +15,7 @@ func (h *BoardHandler) retargetSystemReply(ctx context.Context, project string, 
 		return content
 	}
 	asked, err := h.bs.GetMessageByID(ctx, project, replyTo)
-	if err != nil || asked == nil || !board.IsReservedName(asked.SubscriberID) {
+	if err != nil || asked == nil || !isSystemAsker(asked.SubscriberID) {
 		return content
 	}
 	lead := "@" + asked.SubscriberID
@@ -31,4 +31,9 @@ func (h *BoardHandler) retargetSystemReply(ctx context.Context, project string, 
 		return "@" + orch + " " + rest
 	}
 	return rest
+}
+
+// isSystemAsker: only Coral's own two senders of questions, compared exactly. Never the Operator, "all", a hub: name or another reserved name: a reply to those keeps its mention, because it decides who the reply reaches.
+func isSystemAsker(sender string) bool {
+	return sender == board.CoralSender || sender == board.HealthMonitorSender
 }

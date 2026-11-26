@@ -68,6 +68,30 @@ func TestReplyToACoralMadeQuestionPostsAndSpeaksToTheOrchestrator(t *testing.T) 
 	code, out = reply("team", "@Dev yes", mq.ID)
 	require.Equal(t, 200, code, "%v", out)
 	assert.Equal(t, "@Dev yes", last("team"))
+	// a reply to the Operator's own or a hub person's message keeps its mention: the rewrite is for Coral's two system senders only, because the mention decides who the reply reaches
+	for _, from := range []string{board.OperatorName, "hub:alice", "Coral Task Queue"} {
+		m, err := h.bs.PostSystemDefusedMessage(ctx, "team", from, "A question.", nil)
+		require.NoError(t, err)
+		require.NoError(t, h.bs.RecordAsk(ctx, "team", m, []string{board.OperatorName}))
+		before := last("team")
+		code, out = reply("team", "@"+from+" thanks", m.ID)
+		if from == board.OperatorName { // a name that is a member of every team's view: stored as typed
+			require.Equal(t, 200, code, "%v", out)
+			assert.Equal(t, "@Operator thanks", last("team"))
+			continue
+		}
+		assert.Equal(t, 400, code, "the mention of %s is kept, so it is refused as before: %v", from, out)
+		assert.Equal(t, "unknown_mention", out["code"])
+		assert.Equal(t, before, last("team"), "nothing was rewritten or stored for %s", from)
+	}
+	assert.Equal(t, "@Orchestrator Fine", func() string { // the health monitor's own sender is a system sender too
+		m, err := h.bs.PostSystemDefusedMessage(ctx, "team", board.HealthMonitorSender, "@Operator limit hit.", nil)
+		require.NoError(t, err)
+		require.NoError(t, h.bs.RecordAsk(ctx, "team", m, []string{board.OperatorName}))
+		code, out := reply("team", "@Coral Health Monitor Fine", m.ID)
+		require.Equal(t, 200, code, "%v", out)
+		return last("team")
+	}())
 	code, out = reply("team", "@Nobody here", id)
 	assert.Equal(t, 400, code)
 	assert.Equal(t, "unknown_mention", out["code"])
