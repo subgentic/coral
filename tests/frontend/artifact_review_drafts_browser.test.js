@@ -48,6 +48,7 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
                 return json({ state: body.decision === 'approve' ? 'approved' : 'changes', changed: true, tags: ['approved'], review: { state: body.decision === 'approve' ? 'approved' : 'changes' }, delivered: true, to: 'Builder', drafts_sent: true, batch: { status: window.__batchStatus || 'sent' } });
             }
             if (url.pathname.includes('/review-drafts')) {
+                if (method === 'GET' && window.__draftsStatus) return json({ error: 'refused', message: 'refused' }, window.__draftsStatus); // a Hub without the route (404), a person who may not keep drafts (403)
                 if (method === 'GET') return json({ drafts: url.pathname.includes('${OTHER}') ? [] : window.__drafts, revision: window.__revision, count: url.pathname.includes('${OTHER}') ? 0 : window.__drafts.length, drafts_supported: true, can_write: window.__writeAllowed !== false, can_send: window.__sendAllowed !== false, reason: window.__reason || '', targets: window.__targets || ['Builder'] });
                 window.__writes.push({ url: url.pathname, method, body });
                 if (url.pathname.endsWith('/send')) {
@@ -106,6 +107,17 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
             await waitFor(`!!document.querySelector('.ac-draft-bar:not([hidden])')`, `the saved draft shows its Send bar (${what})`, 5000);
             await realButton('Send comments');
             await waitFor(`window.__batches.length === 1 && window.__batches[0].length === 1`, `Send comments by a click (${what})`, 5000);
+            await click('.artifact-viewer-close');
+        }
+        // A drafts read answered 404 (a Hub without the route) or 403 (a guide, a grantee) means no drafts, not no commenting (#21489): the comments load and the whole-document comment button shows. Another failure still stops commenting.
+        for (const status of [404, 403, 500]) {
+            await Emulation.setDeviceMetricsOverride({ width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await ev(fixture); await ev(`window.__draftsStatus = ${status}; true`);
+            await ev(`(async () => { const m = await import(${S} + 'artifact_viewer.js'); m.openArtifactViewer('${HEX}', { filename: 'Release plan', board: 'draft-test' }); return true; })()`);
+            await waitFor(`!!document.querySelector('#artifact-viewer .ac-whole') || !!document.querySelector('#artifact-viewer .ac-reason, #artifact-viewer .ac-note')`, `the comments panel settles (drafts read ${status})`, 5000);
+            const shown = await ev(`!!document.querySelector('#artifact-viewer .ac-whole') && !document.querySelector('#artifact-viewer .ac-whole').disabled`);
+            assert.equal(shown, status !== 500, status === 500 ? 'a 500 on the drafts read still stops commenting' : `the whole-document comment button shows when the drafts read answers ${status}`);
             await click('.artifact-viewer-close');
         }
         for (const width of [1280, 390]) for (const theme of ['dark', 'light']) {
