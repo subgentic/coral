@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/custommodes"
+	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
 	"net/http"
@@ -62,6 +63,8 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		NewWorktree     *launchNewWorktree `json:"new_worktree"`
 		CheckoutBranch  string             `json:"checkout_branch"`
 		ConfirmCheckout bool               `json:"confirm_checkout"` // the person was told the folder has changes and said switch anyway
+		// WorktreeTask starts the worker in its own worktree task-N (#21468: "worker launch --worktree"): the folder and the branch are both called task-N. The one worktree "archive --remove-worktree" may remove.
+		WorktreeTask int64 `json:"worktree_task"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -179,6 +182,15 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailWorkdirUnavailable, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg, "field": "working_dir"})
 		return
+	}
+	taskWorktreeRepo := ""
+	if body.WorktreeTask != 0 {
+		if body.WorktreeTask < 0 || body.NewWorktree != nil || body.CheckoutBranch != "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "worktree_task is a task number, and is not asked together with new_worktree or checkout_branch", "field": "worktree_task"})
+			return
+		}
+		taskWorktreeRepo = gitutil.TopLevel(r.Context(), body.WorkingDir)
+		body.NewWorktree = &launchNewWorktree{Name: taskWorktreeName(body.WorktreeTask)}
 	}
 	if body.NewWorktree != nil || body.CheckoutBranch != "" {
 		placed, ok := h.placeLaunchOnBranch(w, r, body.WorkingDir, body.NewWorktree, body.CheckoutBranch, body.ConfirmCheckout)
@@ -323,6 +335,10 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	attempt.Finish(tracking.OutcomeSuccess, "", 1, 0)
+	if sid, _ := result["session_id"].(string); body.WorktreeTask != 0 && sid != "" {
+		h.recordTaskWorktree(r.Context(), sid, body.WorktreeTask, body.WorkingDir, taskWorktreeRepo)
+		result["worktree"] = map[string]any{"name": taskWorktreeName(body.WorktreeTask)}
+	}
 	if body.KeepFullAccess {
 		if sid, _ := result["session_id"].(string); sid != "" {
 			h.storeKeepFullAccess(r.Context(), r, sid, launchTargetName(body.DisplayName, body.AgentType), "launch")

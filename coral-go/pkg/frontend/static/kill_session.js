@@ -55,6 +55,7 @@ export function archivedButtons(agent, session, done) {
 
 /** Stop on a team agent, awake or asleep (#19674): ends its session and archives it. It leaves the Agents list, stays on the team, and Start brings it back. */
 function stopTeamAgent(row, who, name, sessionId) {
+    if (row.own_worktree) { toggleAgentArchive(name, row.agent_type, sessionId, 'archive'); return; } // a worker in its own worktree: the Archive dialog with its tick box (#21468)
     showConfirmModal('Stop agent', `Stop ${who}? It ends the agent's session and archives it: it leaves the Agents list and can be started again from More > Archived. Its chat stays in History.`,
         () => toggleAgentArchive(name, row.agent_type, sessionId, 'archive', true), undefined, { label: 'Stop agent', danger: true });
 }

@@ -413,6 +413,11 @@ func (h *SessionsHandler) ArchiveSession(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "Session not found"})
 		return
 	}
+	var ask struct {
+		RemoveWorktree bool `json:"remove_worktree"` // #21468: also remove the worker's own worktree (only one it was started with; the branch is kept)
+	}
+	_ = decodeJSON(r, &ask) // no body, or a body of another shape, is a plain archive
+	remove := ask.RemoveWorktree
 	if h.refuseArchive(w, ctx, sess) { // a team keeps its last Orchestrator (#19673)
 		return
 	}
@@ -430,7 +435,15 @@ func (h *SessionsHandler) ArchiveSession(w http.ResponseWriter, r *http.Request)
 		errInternalServer(w, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sleeping": true, "archived": true})
+	resp := map[string]any{"ok": true, "sleeping": true, "archived": true}
+	if remove {
+		ans := h.removeTaskWorktree(ctx, sess) // the route is the person's alone (operator-only): the Orchestrator's own stop is OrchestratorStop
+		if ans.State == "kept" {
+			h.recordWorktreeKept(r, sess, ans, "")
+		}
+		resp["worktree"] = ans
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // UnarchiveSession returns an archived agent to plain sleeping. It does not

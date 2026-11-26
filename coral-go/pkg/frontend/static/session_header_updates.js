@@ -19,24 +19,22 @@ function queueAgentKeys(row) {
 
 export function updateSessionStatus(status) {
     const el = document.getElementById("session-status");
-    if (status) {
-        setText(el.querySelector(".status-text"), status);
-    }
+    if (status) setText(el.querySelector(".status-text"), status);
 }
 
 // The terminal header shows the git branch; only an agent with no branch
 // shows its folder instead (full path on hover).
 let _headerDir = "";
 
-let _headerHasBranch = false;
+let _headerHasBranch = false, _own;
 
+// One attribute, written only when it changes: a message that changes nothing writes nothing (perf_budgets, #9919).
+const _putAttr = (el, name, v) => { if (el && (v || el.hasAttribute(name))) { if (v) setAttr(el, name, v); else el.removeAttribute(name); } };
 function _syncHeaderFolder() {
     // The header has no folder of its own (the operator, #9837): the full path is the hover and keyboard-focus tip on the agent's name (data-folder on the header, drawn by the stylesheet), and the Details disclosure has it.
-    const el = document.querySelector("#live-session-view .terminal-header");
-    if (el) { if (_headerDir) setAttr(el, 'data-folder', _headerDir); else if (el.hasAttribute('data-folder')) el.removeAttribute('data-folder'); } // written only when it changes: a message that changes nothing writes nothing (perf_budgets, #9919)
+    _putAttr(document.querySelector("#live-session-view .terminal-header"), 'data-folder', _headerDir);
     // The tip is CSS (generated content), which a screen reader does not read: the name says the folder as its description (#9899).
-    const who = document.getElementById('terminal-header-identity');
-    if (who) { if (_headerDir) setAttr(who, 'aria-description', _headerDir); else if (who.hasAttribute('aria-description')) who.removeAttribute('aria-description'); } // the same: only on a change
+    _putAttr(document.getElementById('terminal-header-identity'), 'aria-description', _headerDir);
 }
 
 // Escape puts the folder tip away without moving the keyboard (WCAG 1.4.13, #9899); it is back when the keyboard or the pointer leaves the name and returns.
@@ -106,7 +104,8 @@ function _syncWhere() {
     setHidden(el, !text && !wt);
 }
 
-export function updateSessionFolder(dir) {
+export function updateSessionFolder(dir, own) {
+    if (own || _own) importOnce('./own_worktree_dialog.js').then(m => m.paintChip(_own = own));
     _details.folder = dir || '';
     _syncPhoneDetails(); _syncWhere();
     _headerDir = dir || "";

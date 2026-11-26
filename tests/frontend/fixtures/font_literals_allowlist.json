@@ -5,6 +5,9 @@
       "font-family: ": 1,
       "font-size: calc((var(--fs-base) + var(--fs-md)) / 2)": 1,
       "line-height: 1.45": 1
+    },
+    "coral-go/pkg/frontend/static/css/own_worktree.css": {
+      "line-height: 1.45": 2
     }
   }
 }
