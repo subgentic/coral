@@ -149,3 +149,54 @@ jobs:
             for f in "${fails[@]}"; do echo "- ${f//|/ }"; done
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
+
+  # The Linux release smoke (#21673): release.yml runs tests/release/smoke_linux.sh on the built tarball only AFTER the tag, so v2.1.18 failed it at the tag
+  # (the smoke could not sign in) with the dry run green. Build the Linux programs the way release.yml's build-linux job does, for both architectures on the
+  # runners the release uses, and run the same smoke on the tarball, so it fails here, before anything is tagged. Nothing is signed or published.
+  smoke-linux:
+    name: smoke-linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: coral-go/go.mod
+          cache: false
+      - name: Sync agent docs
+        run: bash tools/sync-agent-docs.sh
+      - name: Build Linux binaries (${{ matrix.arch }})
+        working-directory: coral-go
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          LDFLAGS="-s -w -X github.com/subgentic/coral/internal/config.Version=0.0.0-dryrun"
+          mkdir -p ../dist/linux
+          OVERLAY="$(go run ./tools/strip-static)" # the dashboard ships minified (#6208): a fresh owner-only folder; only this step's go build commands read it
+          [ -n "$OVERLAY" ] || { echo "strip-static printed no overlay path" >&2; exit 1; }
+          trap 'go run ./tools/strip-static -clean "$OVERLAY"' EXIT
+          # The shipped programs: tests/release/commands.txt, as release.yml (#3855).
+          for cmd in $(grep -vE '^[[:space:]]*(#|$)' ../tests/release/commands.txt); do
+            [ -d "./cmd/$cmd" ] || continue
+            CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build \
+              -overlay "$OVERLAY" \
+              -tags fts5 \
+              -ldflags "$LDFLAGS" \
+              -o "../dist/linux/$cmd" \
+              "./cmd/$cmd/"
+          done
+          ../tests/release/verify_standard_bundle.sh ../dist/linux "$ARCH"
+      - name: Create tarball
+        run: tar czf "dist/coral-linux-${{ matrix.arch }}-dryrun.tar.gz" -C dist/linux .
+      - name: Smoke test the tarball (as release.yml)
+        run: tests/release/smoke_linux.sh "dist/coral-linux-${{ matrix.arch }}-dryrun.tar.gz" --version 0.0.0-dryrun
