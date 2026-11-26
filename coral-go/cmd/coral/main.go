@@ -327,7 +327,7 @@ func announceDashboard(cfg *config.Config, rs *startup.RunningServer, sf *server
 		// To the terminal only (stderr), never coral.log: the link is a credential and
 		// coral.log persists and is shared in bug reports (#3387).
 		if *sf.noBrowser || !canOpenBrowser() {
-			openDashboard(os.Stderr, link, false)
+			openStartupDashboard(os.Stderr, link, false)
 			if *sf.noBrowser {
 				tracking.HoldFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenSkippedNoBrowser)
 			} else {

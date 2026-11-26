@@ -46,13 +46,40 @@ func openDashboard(out io.Writer, link string, browse bool) (opened bool) {
 	return false
 }
 
+// startupIsTerminal says whether the server's startup output (stderr) is a terminal: a seam for tests. Under systemd, a container or the tray it is a journal or a log file that outlives the
+// start and is attached to bug reports, so a credential must not be printed there (#21549).
+var startupIsTerminal = func() bool { return isTerminal(os.Stderr) }
+
+// printStartupLink is the startup's "open the dashboard" line. The sign-in link carries a one-time login token, so it is printed only to a terminal; anywhere else the line says how to get one.
+func printStartupLink(out io.Writer, link string) {
+	if startupIsTerminal() {
+		fmt.Fprintf(out, "  Open the dashboard (sign-in link, single use, 10 minutes):\n  %s\n\n", link)
+		if inAgentTerminal() {
+			fmt.Fprintln(out, "  Warning: this looks like an agent's terminal (or a tmux pane an agent can read). Anything shown here can read this link and sign in as you: run 'coral open' in your own terminal instead.")
+			fmt.Fprintln(out)
+		}
+		return
+	}
+	fmt.Fprintln(out, "  To sign in to the dashboard, run 'coral open' on this computer (it makes a fresh sign-in link), or use the dashboard password if one is set. The startup sign-in link is not printed here: this output is not a terminal, and a log would keep it.")
+	fmt.Fprintln(out)
+}
+
+// openStartupDashboard is openDashboard for the server's own startup: the same, except that the link is printed only to a terminal (printStartupLink).
+func openStartupDashboard(out io.Writer, link string, browse bool) (opened bool) {
+	if browse && canOpenBrowser() && openLogin(link) {
+		return true
+	}
+	printStartupLink(out, link)
+	return false
+}
+
 // holdFunnelStep records a first-start funnel step (a test seam).
 var holdFunnelStep = tracking.HoldFunnelStep
 
 // openDashboardAtStart opens the sign-in link at startup and records what happened: "opened" only when a browser was asked to open it,
 // "printed_no_display" when the link was printed instead (no opener started, as under WSLg with no xdg-open).
 func openDashboardAtStart(out io.Writer, link string) {
-	if openDashboard(out, link, true) {
+	if openStartupDashboard(out, link, true) {
 		holdFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenBrowser)
 	} else {
 		holdFunnelStep(tracking.EventFunnelDashboardOpen, tracking.OpenPrintedNoDisplay)
