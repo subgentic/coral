@@ -66,6 +66,11 @@ func (o *IdentityObserver) serveLinkKey(w http.ResponseWriter, r *http.Request, 
 		if o.linkKeyFailed != nil && !revoked {
 			o.linkKeyFailed(r)
 		}
+		if revoked && o.revokedKeyOverCap(r) { // a cap of its own, so a Hub that never learns of its revoke cannot become load (#21660)
+			w.Header().Set("Retry-After", "60")
+			o.refuse(w, http.StatusTooManyRequests, "revoked_key_rate_limited", "Too many requests with a revoked request key from this address; wait a minute")
+			return
+		}
 		o.refuse(w, http.StatusUnauthorized, "invalid_credential", "That request key is not valid for this Coral: wrong, or revoked")
 		return
 	}

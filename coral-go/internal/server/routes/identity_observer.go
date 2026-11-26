@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -94,6 +95,7 @@ type IdentityObserver struct {
 	linkKeyFailed  func(r *http.Request)                           // counts a wrong request key against its address (the API key's rate limit) // carries a linked key's request through its link (#21220); false when the key has no link
 
 	mu         sync.Mutex
+	revokedTry map[string]*revokedWindow // revoked-key refusals per address in the current window (#21660)
 	callers    map[string]int64
 	bySession  map[string]int64 // token-attributed requests per session name
 	byTool     map[string]int64 // token-attributed requests per tool (User-Agent name)
@@ -130,6 +132,44 @@ func NewIdentityObserver(db *store.DB, bs *board.Store, hasSession func(*http.Re
 // nonce).
 func (o *IdentityObserver) SetVerifiers(validKey func(*http.Request) bool, verifyCLI func(*http.Request) (*http.Request, bool)) {
 	o.validKey, o.verifyCLI = validKey, verifyCLI
+}
+
+// revokedKeyCap is how many refusals of a revoked request key one address gets per minute before it is answered 429. It is far above any Hub that is merely slow to learn of its revoke and far below a loop, and
+// it is a count of its own: it never touches the wrong-key throttle that the other Hubs behind the same loopback address share (#21645, #21660).
+const (
+	revokedKeyCap    = 300
+	revokedKeyWindow = time.Minute
+)
+
+type revokedWindow struct {
+	start time.Time
+	n     int
+}
+
+// revokedKeyOverCap counts one revoked-key refusal for the address and reports whether it is over the cap.
+func (o *IdentityObserver) revokedKeyOverCap(r *http.Request) bool {
+	addr := r.RemoteAddr
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		addr = h
+	}
+	now := o.now()
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.revokedTry == nil {
+		o.revokedTry = map[string]*revokedWindow{}
+	}
+	for k, w := range o.revokedTry { // drop windows that ended, so the map is bounded by the addresses seen in one minute
+		if now.Sub(w.start) >= revokedKeyWindow {
+			delete(o.revokedTry, k)
+		}
+	}
+	w := o.revokedTry[addr]
+	if w == nil {
+		w = &revokedWindow{start: now}
+		o.revokedTry[addr] = w
+	}
+	w.n++
+	return w.n > revokedKeyCap
 }
 
 // SetLinkKeyRevoked gives the observer the check for a revoked request key, which it refuses without counting against the address (#21645).
