@@ -1,12 +1,9 @@
-/* Keep Save draft beside Save and send when the picture picker wraps on a phone. */
-.ac-draft-actions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
-
-.ac-action-icon { display: none; }
-.ac-action-icon::before { content: attr(data-glyph); }
+/* Review actions share one baseline, spacing, and the comment field's edges. */
+.ac-draft-actions { display: inline-flex; align-items: center; flex-wrap: nowrap; gap: 8px; margin-inline-start: auto; }
+.ac-composer:has(.ac-draft-actions) .ac-composer-row { gap: 8px; }
+.ac-composer:has(.ac-draft-actions) .ac-composer-row .btn { display: inline-flex; align-items: center; justify-content: center; margin: 0; min-height: var(--control-height); padding: 6px 10px; font-size: var(--fs-sm); }
+.ac-composer:has(.ac-draft-actions) .ac-counter:not(.ac-sendhint) { text-align: right; }
+.ac-composer:has(.ac-draft-actions) .ac-add-image::before { content: none; }
 @media (max-width: 600px) {
-    .ac-draft-actions { flex-wrap: nowrap; }
-    .ac-composer .ac-add-image::before { content: none; }
-    .ac-composer .ac-action-label { display: none; }
-    .ac-composer .ac-action-icon { display: inline-block; font-size: var(--icon-size); }
-    .ac-composer button:has(.ac-action-icon) { min-width: 44px; padding: 6px 10px; }
+    .ac-composer:has(.ac-draft-actions) .ac-composer-row .btn { min-height: var(--control-touch-height, 44px); }
 }

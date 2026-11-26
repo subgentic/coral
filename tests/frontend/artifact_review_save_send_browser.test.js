@@ -76,21 +76,22 @@ const HEX='d'.repeat(64), OTHER='e'.repeat(64);
   await Emulation.setTimezoneOverride({timezoneId:'UTC'});
   // Capture both requested widths before asserting the new action, so the old head supplies both before shots.
   for(const width of [1280,390]){await open(width);await type('Name the rollback owner.');await shot('composer-'+width);}
-  assert.equal(await ev(`document.querySelector('.ac-save-send')?.getAttribute('aria-label')`),'Send','the composer offers one-click Save and send');
+  assert.equal(await ev(`document.querySelector('.ac-save-send')?.textContent`),'Send','the composer offers one-click Save and send');
   for(const width of [1280,390]){
    await open(width);
    assert.ok(await ev(`(()=>{const a=document.querySelector('.ac-composer .ac-send').getBoundingClientRect(),b=document.querySelector('.ac-save-send').getBoundingClientRect();return Math.abs(a.y-b.y)<1 && b.right<=innerWidth;})()`),'Save draft and Save and send stay adjacent and fit');
    const labels=await ev(`[...document.querySelectorAll('.ac-composer-row button')].map(b=>b.getAttribute('aria-label') || b.textContent)`);
-   assert.deepEqual(labels,['Add image','Cancel','Save draft','Send']);
+   assert.deepEqual(labels,['Add image','Cancel','Save','Send']);
    assert.ok(await ev(`!document.querySelector('.ac-composer .ac-send').classList.contains('btn-primary') && document.querySelector('.ac-save-send').classList.contains('btn-primary')`));
    assert.match(await ev(`document.querySelector('.ac-draft-save-hint').textContent`),/Send comments.*Send/);
+   assert.ok(await ev(`(()=>{const buttons=[...document.querySelectorAll('.ac-composer-row button')],r=buttons.map(b=>b.getBoundingClientRect()),field=document.querySelector('.ac-composer textarea').getBoundingClientRect();return buttons.every(b=>getComputedStyle(b).fontSize===getComputedStyle(buttons[0]).fontSize)&&r.every(b=>Math.abs(b.y-r[0].y)<1&&Math.abs(b.height-r[0].height)<1)&&Math.abs(r[0].left-field.left)<1&&Math.abs(r.at(-1).right-field.right)<1;})()`),'text actions share one baseline, size, and field edges');
    if(width===390){
     await ev(`document.querySelector('.ac-composer textarea').focus();true`);
     await Emulation.setDeviceMetricsOverride({width:390,height:440,deviceScaleFactor:1,mobile:true});
     await waitFor(`document.body.classList.contains('keyboard-open')`,'keyboard-open phone layout');
     await ev(`document.querySelector('.ac-composer textarea').scrollIntoView({block:'start'});true`);await ev(framesJs(3));
     await shot('keyboard-390');
-    const keyboard=await ev(`({height:innerHeight,buttons:[...document.querySelectorAll('.ac-composer .ac-send')].map(b=>{const r=b.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {label:b.getAttribute('aria-label'),top:r.top,bottom:r.bottom,reachable:hit===b||b.contains(hit)};})})`);
+    const keyboard=await ev(`({height:innerHeight,buttons:[...document.querySelectorAll('.ac-composer .ac-send')].map(b=>{const r=b.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {label:b.textContent,top:r.top,bottom:r.bottom,reachable:hit===b||b.contains(hit)};})})`);
     assert.ok(keyboard.buttons.every(b=>b.top>=0&&b.bottom<=keyboard.height&&b.reachable),'both draft and send actions fit above the phone keyboard: '+JSON.stringify(keyboard));
     await ev(`document.querySelector('.ac-composer textarea').blur();true`);
     await Emulation.setDeviceMetricsOverride({width:390,height:844,deviceScaleFactor:1,mobile:true});
