@@ -1,5 +1,6 @@
 /* The private part of a document's comments panel. All content uses text nodes. */
 import { el } from './dom_el.js';
+const { commentIcon } = await importOnce('./artifact_comment_actions.js');
 import { importOnce } from './import_once.js';
 const bidi = await importOnce('./bidi_marks.js').catch(() => null);
 const markBidi = bidi ? bidi.markBidi : node => node;
@@ -34,9 +35,13 @@ export function draftPanel({ review, run, refresh, server, composing, bar }) {
             return input;
         };
         if (editors.get(review)?.id === draft.id) editForm();
-        else card.append(button('Edit', () => {
+        else {
+            const tools = el('span', 'ac-comment-tools');
+            tools.append(commentIcon(button('Edit', () => {
             editors.set(review, { id: draft.id, body: draft.body }); editForm().focus();
-        }), button('Delete', () => run(() => review.remove(draft.id), 'Draft deleted')));
+            }), 'Edit'), commentIcon(button('Delete', () => run(() => review.remove(draft.id), 'Draft deleted')), 'Delete'));
+            author.append(tools);
+        }
         host.append(card);
     }
     bar.replaceChildren();

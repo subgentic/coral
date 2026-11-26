@@ -19,6 +19,7 @@ const { showConfirmModal } = await importOnce('./confirm_dialog.js');
 const { draftPanel } = await importOnce('./artifact_review_drafts_panel.js');
 const { createHighlights } = await importOnce('./artifact_comment_highlights.js');
 import { showToast } from './utils.js';
+const { commentIcon } = await importOnce('./artifact_comment_actions.js');
 import { scrollBehavior } from './motion.js';
 const { agentLink, linkAvatar } = await importOnce('./agent_link.js'); // lazy, like the rest of the thread (#12168)
 import { pushOverlay, popOverlay } from './overlay_history.js';
@@ -420,8 +421,8 @@ export function attachComments(dialog, body, host, opts = {}) {
         const row = el('div', 'ac-actions');
         if (c.deleted) return row;
         const who = nameSaid(c);
-        if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); focusComposer(); }));
-        if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen(`Delete this comment?${(() => { const read = [...new Set((c.asks || []).filter(k => k.agent && (k.seen || k.readAt || k.replies)).map(k => k.agent))]; return read.length ? ` ${read.join(' and ')} already read it, and keeps what it read.` : ''; })()}`, () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
+        if (c.can.edit) row.append(commentIcon(act('Edit', () => { st.composing = { editId: c.id }; st.error = ''; render(); focusComposer(); }), 'Edit'));
+        if (c.can.delete) row.append(commentIcon(act('Delete', () => confirmThen(`Delete this comment?${(() => { const read = [...new Set((c.asks || []).filter(k => k.agent && (k.seen || k.readAt || k.replies)).map(k => k.agent))]; return read.length ? ` ${read.join(' and ')} already read it, and keeps what it read.` : ''; })()}`, () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))), 'Delete'));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub. Hidden while an ask is queued (sent but not yet read or replied: the status line says where it stands, and the button would just confuse; #17734).
         if (!st.reviewDrafts?.snapshot().data?.drafts_supported && top && canAsk(c) && !(c.asks || []).some(k => k.open && k.agent && !k.replies && !(k.readAt || k.seen))) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${nameSaid(c)} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
@@ -435,9 +436,11 @@ export function attachComments(dialog, body, host, opts = {}) {
     async function run(fn, said) {
         if (st.busy) return;
         st.busy = true;
+        // Reviews already show the error inline and announce success; a duplicate toast covers the comment.
+        const reviewFeedback = !!st.reviewDrafts?.snapshot().data?.drafts_supported;
         const hadKeys = panel.contains(document.activeElement); // the keyboard was in the comment box: it must not be dropped on the page when the box goes (#15174)
-        try { const sentTo = await fn(); st.error = ''; st.composing = null; st.wholeComposer = null; await refresh(); if (hadKeys && (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected)) (panel.querySelector(`.ac-card[data-id="${st.active}"] .ac-replybox`) || panel.querySelector('.ac-card .ac-replybox') || toggle).focus(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : sentTo && sentTo.queuedFor ? `. Queued for ${sentTo.queuedFor}, delivers when it's free` : '')); if (typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); else if (sentTo && sentTo.queuedFor) showToast(`Queued for ${sentTo.queuedFor}, delivers when it's free`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
-        catch (e) { st.error = e.message || 'The change was refused.'; showToast(st.error, true); render(); }
+        try { const sentTo = await fn(); st.error = ''; st.composing = null; st.wholeComposer = null; await refresh(); if (hadKeys && (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected)) (panel.querySelector(`.ac-card[data-id="${st.active}"] .ac-replybox`) || panel.querySelector('.ac-card .ac-replybox') || toggle).focus(); if (said) announce(said + (typeof sentTo === 'string' && sentTo ? `. Sent to ${sentTo}` : sentTo && sentTo.queuedFor ? `. Queued for ${sentTo.queuedFor}, delivers when it's free` : '')); if (!reviewFeedback && typeof sentTo === 'string' && sentTo) showToast(`Sent to ${sentTo}`, false); else if (!reviewFeedback && sentTo && sentTo.queuedFor) showToast(`Queued for ${sentTo.queuedFor}, delivers when it's free`, false); } // the owner's comment reaches the agent on its own (#12203): the person sees who got it
+        catch (e) { st.error = e.message || 'The change was refused.'; if (!reviewFeedback) showToast(st.error, true); render(); }
         finally { st.busy = false; }
     }
 

@@ -308,7 +308,7 @@ export function attachReview(d, { reload }) {
     d.addEventListener('av-content', () => { syncHold(); syncSend(); }); // the form's own Approve (approveWith, #15545) waits for the new content too
     const breadcrumb = document.createElement('nav'); breadcrumb.className = 'artifact-review-breadcrumb'; breadcrumb.hidden = true;
     d.querySelector('.artifact-viewer-header')?.before(breadcrumb);
-    const closeDocument = document.createElement('button'); closeDocument.type = 'button'; closeDocument.className = 'btn artifact-review-close'; closeDocument.textContent = 'Close document'; closeDocument.hidden = true;
+    const closeDocument = document.createElement('button'); closeDocument.type = 'button'; closeDocument.className = 'btn artifact-review-close'; closeDocument.textContent = 'Close'; closeDocument.setAttribute('aria-label', 'Close document'); closeDocument.title = 'Close document'; closeDocument.hidden = true;
     closeDocument.addEventListener('click', () => d.querySelector('.artifact-viewer-close')?.click());
     d.querySelector('.artifact-viewer-actions')?.prepend(closeDocument);
     const show = (s) => {

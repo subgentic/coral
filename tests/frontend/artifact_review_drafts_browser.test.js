@@ -24,7 +24,7 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
     const realButton = async (label, scope = '#artifact-viewer') => {
         for (let attempt = 0; ; attempt++) {
             await stillFor(250);
-            await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + ' button')].find(b => b.textContent === ${JSON.stringify(label)}); if (!b) throw Error('Missing button: ' + ${JSON.stringify(label)}); b.dataset.realclick = '1'; return true; })()`);
+            await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + ' button')].find(b => (b.getAttribute('aria-label') || b.textContent) === ${JSON.stringify(label)}); if (!b) throw Error('Missing button: ' + ${JSON.stringify(label)}); b.dataset.realclick = '1'; return true; })()`);
             try { await realClick('[data-realclick]'); break; } catch (e) { if (attempt >= 1 || !/is on the page/.test(String(e.message))) throw e; console.log(`realButton: "${label}" was replaced between the mark and the click; found it again`); }
             finally { await ev(`document.querySelectorAll('[data-realclick]').forEach(b => delete b.dataset.realclick); true`); }
         }
@@ -33,7 +33,7 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async name => { if (!process.env.CORAL_SCREENSHOT_DIR) return; fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const click = selector => ev(`document.querySelector(${JSON.stringify(selector)}).click(); true`);
-    const button = (label, scope = '#artifact-viewer') => ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + ' button')].find(b => b.textContent === ${JSON.stringify(label)}); if (!b) throw Error('Missing button: ' + ${JSON.stringify(label)}); b.click(); return true; })()`);
+    const button = (label, scope = '#artifact-viewer') => ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + ' button')].find(b => (b.getAttribute('aria-label') || b.textContent) === ${JSON.stringify(label)}); if (!b) throw Error('Missing button: ' + ${JSON.stringify(label)}); b.click(); return true; })()`);
     const fixture = `(() => {
         const real = fetch;
         window.__reviewRow = { id: '${HEX}', uri: 'coral://artifacts/${HEX}', name: 'Release plan', media_type: 'text/markdown', available: true, tags: ['for review'], team: 'draft-test', board_id: 'draft-test', produced_by: 'Frontend Dev', version: 2, created_at: new Date().toISOString() }; window.__drafts = []; window.__revision = 0; window.__writes = []; window.__batches = []; window.__unknown = false; window.__refuse = false; window.__seen = {}; window.__published = []; window.__decisions = []; window.__decisionReplay = null; window.__loseDecision = false;
@@ -166,16 +166,16 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
             assert.equal(await ev('window.__drafts.length'), 2);
             await save('Temporary draft to delete');
             await waitFor(`document.querySelectorAll('.ac-draft-card').length === 3`, 'temporary draft');
-            await ev(`(() => { const cards = [...document.querySelectorAll('.ac-draft-card')]; [...cards.at(-1).querySelectorAll('button')].find(b => b.textContent === 'Delete').click(); return true; })()`);
+            await ev(`(() => { const cards = [...document.querySelectorAll('.ac-draft-card')]; [...cards.at(-1).querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Delete comment').click(); return true; })()`);
             await waitFor(`window.__drafts.length === 2 && document.querySelectorAll('.ac-draft-card').length === 2`, 'private delete');
             await waitFor(`!!document.querySelector('.ac-draft-card button:not(:disabled)')`, 'draft actions ready');
-            await button('Edit');
+            await button('Edit comment');
             await ev(`document.querySelector('.ac-draft-card textarea').value = 'Discard this edit'; true`);
             await button('Cancel edit');
             await waitFor(`!document.querySelector('.ac-draft-card textarea')`, 'edit cancelled');
             assert.equal(await ev('window.__drafts[0].body'), 'First private comment');
             await waitFor(`!!document.querySelector('.ac-draft-card button:not(:disabled)')`, 'draft actions ready');
-            await button('Edit');
+            await button('Edit comment');
             await ev(`document.querySelector('.ac-draft-card textarea').value = 'Edited private comment'; true`);
             await button('Save draft', '.ac-review-drafts');
             await waitFor(`window.__drafts[0].body === 'Edited private comment'`, 'edited draft saved');

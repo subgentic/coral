@@ -267,9 +267,15 @@
     .av-draft-document[data-document-review] .artifact-viewer-body { flex: none; overflow: visible; }
     .av-draft-document[data-document-review] .artifact-viewer-main > .ac-panel { display: block; position: static; transform: none; width: 100%; max-height: none; flex: none; border-radius: 0; box-shadow: none; }
     .av-draft-document[data-document-review] .ac-sheet-close { display: none; }
-    .av-draft-document[data-document-review] .artifact-viewer-header { gap: 12px; }
+    .av-draft-document[data-document-review] .artifact-viewer-header { display: grid; align-items: center; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr); gap: 8px; padding: 12px 16px; }
+    .av-draft-document[data-document-review] .artifact-viewer-header > .artifact-viewer-title { grid-column: 1 / 3; grid-row: 1; align-self: center; }
+    .av-draft-document[data-document-review] .artifact-viewer-morewrap { grid-column: 3; grid-row: 1; justify-self: end; }
+    .av-draft-document[data-document-review] .artifact-review-close { grid-column: 1; grid-row: 2; }
+    .av-draft-document[data-document-review] .artifact-review-changes { grid-column: 2; grid-row: 2; }
+    .av-draft-document[data-document-review] .artifact-review-approve { grid-column: 3; grid-row: 2; }
+    .av-draft-document[data-document-review] :is(.artifact-review-close, .artifact-review-changes, .artifact-review-approve):not([hidden]) { display: inline-flex; align-items: center; justify-content: center; align-self: stretch; width: 100%; min-width: 0; padding-inline: 8px; min-height: 44px; font-size: var(--fs-sm); }
     .artifact-viewer.av-draft-document[data-document-review] .artifact-viewer-header:has(> .artifact-viewer-morewrap) > .artifact-viewer-title:not(.is-open) { flex: 1 1 calc(100% - 56px); min-width: 0; }
-    .av-draft-document[data-document-review] .artifact-viewer-actions { flex: 1 1 100%; order: 4; }
+    .av-draft-document[data-document-review] .artifact-viewer-actions { display: contents; flex: 1 1 100%; order: 4; }
     .av-draft-document[data-document-review] .ac-panel > .ac-composer { position: static; margin: 0; padding: 0; }
 }
 
@@ -293,13 +299,11 @@
 .ac-draft-recipients > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .ac-draft-recipients > span { display: block; }
 
-/* The approved review workspace keeps Close beside the name, with decisions below. */
-@media (max-width: 767px) {
-    .av-draft-document[data-document-review] .artifact-viewer-header { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; }
-    .av-draft-document[data-document-review] .artifact-viewer-header > .artifact-viewer-title { grid-column: 1; grid-row: 1; }
-    .av-draft-document[data-document-review] .artifact-viewer-actions { display: contents; }
-    .av-draft-document[data-document-review] .artifact-review-close { grid-column: 2; grid-row: 1; }
-    .av-draft-document[data-document-review] .artifact-viewer-morewrap { grid-column: 3; grid-row: 1; }
-    .av-draft-document[data-document-review] .artifact-review-changes { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
-    .av-draft-document[data-document-review] .artifact-review-approve { grid-column: 1 / -1; grid-row: 2; justify-self: end; }
+/* Comment actions stay with the author, leaving the comment text its own line. */
+.ac-draft-author:has(.ac-comment-tools) { align-items: center; }
+.ac-comment-tools { display: inline-flex; gap: 4px; margin-inline-start: auto; }
+.ac-panel .ac-comment-icon { display: inline-flex; align-items: center; justify-content: center; padding: 0; margin: 0; min-width: var(--control-height); min-height: var(--control-height); }
+.ac-comment-icon .material-icons { font-size: var(--icon-size); }
+@media (max-width: 767px), (pointer: coarse) {
+    .ac-panel .ac-comment-icon { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
 }
