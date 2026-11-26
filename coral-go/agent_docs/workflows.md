@@ -118,6 +118,7 @@ POST /api/workflows
 | `max_duration_s` | int | `3600` | Max run duration, 1 to 86400 seconds. |
 | `cleanup_worktree` | int | `1` | Remove the worktree after the run finishes. |
 | `enabled` | int | `1` | `1` to allow triggers, `0` to disable. |
+| `board` | string | `""` | The team the workflow's shell steps post to as `Automation: NAME` (see [Alerting automations](#alerting-automations)). Only the Operator, at this computer, sets it; it must be a team of this computer. `""` gives the steps no board identity. |
 
 ### Step hooks
 
@@ -171,6 +172,7 @@ coral-agent notify --title "Step done" --message "All tests passed" --level succ
 | `CORAL_WORKFLOW_STEP` | Current step index (0-based) |
 | `CORAL_WORKFLOW_STEP_DIR` | Current step's artifact directory |
 | `CORAL_WORKFLOW_REPO_PATH` | Workflow's configured repo path |
+| `CORAL_WORKFLOW_STATE_DIR` | The workflow's own folder, the same for every run (see [Alerting automations](#alerting-automations)) |
 
 The run folder is private (0700, files 0600). Coral makes each step's folder and its `stdout.txt`, `stderr.txt` and `exit_code` itself, and never reuses or follows anything already there. Don't create a later step's folder, or a link in place of those files: the step fails, and a link out of the run folder is never read or written through. A folder of your own inside your step's folder (`$CORAL_WORKFLOW_STEP_DIR/…`) is fine.
 
@@ -267,6 +269,79 @@ Returns the created workflow object with hydrated `steps`, `default_agent`, and 
 | 400 | `{"error": "agent step missing prompt"}` | Agent step omitted `prompt`. |
 | 400 | `{"error": "agent step missing agent_type"}` | No effective `agent_type` was provided. |
 | 409 | `{"error": "workflow name already exists"}` | Name collision. |
+
+---
+
+## Alerting automations
+
+An automation that watches something (a Prometheus check, a queue, a disk) runs every few minutes, and almost every run finds nothing. Four things make that cheap and quiet. **A quiet run** is a run a shell step ends on purpose: nothing to do, no agent starts, no failure. **A state folder** keeps what a run learned for the next one. **An identity on the team's board** lets a step post as the automation, not as the Operator. **Retention** keeps the history short.
+
+### Quiet runs
+
+A shell step that exits with **78** ends the run as `quiet`:
+
+- the step is recorded as completed, with a note saying it ended the run quietly, and every step after it is `skipped`, so an agent step after it never starts;
+- the run's status is `quiet` (not `failed`, not `completed`), it has no error, and it is marked as seen, so a run every five minutes does not leave an unread run each time;
+- a scheduled job counts a quiet run as a run that did not fail: `consecutive_failures` never counts it, and a quiet run ends a streak of failures as a completed one does;
+- only a shell step can do it, and only by exiting 78 itself: a step that times out or is killed is a failure, any other exit code is a failure, and `continue_on_failure` does not turn 78 into a failure to go on from.
+
+78 is `EX_CONFIG`, a code `sh`, `curl` and `grep` do not use, so a script that fails by accident does not go quiet by accident.
+
+### The state folder
+
+Every workflow has one folder that survives its runs: `$CORAL_WORKFLOW_STATE_DIR` (`<Coral folder>/workflows/state/<workflow id>`, private to the user, made before the first step). A step reads and writes it like any folder: for example a file with the alerts already reported. Coral deletes it, with the workflow, when the workflow is deleted. It is not part of a run, so pruning old runs does not touch it.
+
+### Posting as the automation
+
+Set the workflow's `board` to a team of this computer. Each run of that workflow then gives its **shell steps** (never its agent steps) two variables: `CORAL_AUTOMATION_BOARD` (the team) and `CORAL_AUTOMATION_TOKEN` (a token for this run). In such a step `coral-board` has one command:
+
+```bash
+coral-board post "prod: 2 alerts firing (HighErrorRate, DiskFull). @Backend Dev please look"
+echo "long text" | coral-board post -
+```
+
+The post is from `Automation: <workflow name>`, and its text starts with `[via automation <workflow name>]`; both are written by Coral from the token, so nothing a script prints can change them. What it may and may not do:
+
+- it can `@mention` an agent of that team, who reads it like any mention; it cannot mention the Operator, `@all` or `@notify-all` (the post is refused), cannot ask a question, attach a task, post to another team, or do anything else;
+- the token belongs to one run: it works on this computer's loopback, for the workflow's own team, for one route, and ends when the run ends (or when the workflow is changed, switched off or deleted, or Coral restarts);
+- at most 20 posts a run and 60 an hour for the workflow;
+- no member, agent, worker or session can be given a name that starts with `Automation:`, so a post under that name is always an automation's.
+
+A step is still your own shell on your own computer: this identity keeps an automation from posting as you by accident, and keeps agents from posting as an automation; it does not stop a step from running other commands you could run.
+
+### Retention
+
+A workflow keeps its newest 50 runs, and a scheduled job its newest 50 finished runs (a run still going is never removed). **Quiet runs are counted apart**: the newest 10 stay, and they never push the 50 out, so a day of quiet checks does not hide the one run that fired.
+
+### Recipe: a production alert check
+
+1. Make a workflow with `board` set to the team that should hear about alerts, one shell step that checks, and one agent step that looks into it:
+
+```json
+{
+  "name": "prod-alerts",
+  "repo_path": "/home/user/ops",
+  "board": "ops",
+  "steps": [
+    {
+      "name": "check",
+      "type": "shell",
+      "command": "alerts=$(curl -fsS http://prometheus:9090/api/v1/alerts) || exit 1\nfiring=$(printf '%s' \"$alerts\" | jq -r '[.data.alerts[] | select(.state == \"firing\") | .labels.alertname] | sort | join(\", \")') || exit 1\nif [ -z \"$firing\" ]; then rm -f \"$CORAL_WORKFLOW_STATE_DIR/last\"; exit 78; fi\n[ \"$firing\" = \"$(cat \"$CORAL_WORKFLOW_STATE_DIR/last\" 2>/dev/null)\" ] && exit 78\nprintf '%s' \"$firing\" > \"$CORAL_WORKFLOW_STATE_DIR/last\"\ncoral-board post \"prod alerts firing: $firing\"\necho \"$firing\""
+    },
+    {
+      "name": "look",
+      "type": "agent",
+      "prompt": "These alerts are firing on production (the previous step's output): say what to check first.",
+      "agent": {
+        "agent_type": "claude"
+      }
+    }
+  ]
+}
+```
+
+2. Schedule it every five minutes with a scheduled job that runs the workflow (`"job_type": "workflow"`, `"workflow_id"`, `"cron_expr": "*/5 * * * *"`, see [Scheduled jobs](scheduled-jobs.md)).
+3. When nothing fires, or the same alerts as last time are still firing, the `check` step exits 78: the run is `quiet`, the agent never starts, and the history shows nothing new. When Prometheus cannot be reached the step exits 1: that is a failure and is shown as one. When something new fires, the step posts to the team as `Automation: prod-alerts`, remembers it in the state folder, and the agent step runs. When the alerts clear, the step forgets them, so the same alert firing again is reported again.
 
 ---
 
