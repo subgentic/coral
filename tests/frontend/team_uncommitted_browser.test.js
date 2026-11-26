@@ -20,7 +20,9 @@ const TEAM = `qa-uncommitted-${Date.now() % 100000}`;
                 if (m === 'POST' && /\\/commit$/.test(url)) { window.__commits.push(JSON.parse(o.body)); if (window.__fail) return json({ error: 'git could not commit', code: 'commit_failed', output: 'fatal: boom' }, 409); window.__dirty = false; return json({ ok: true, folder: '/work/shop', commit: 'abc1234', files: 2 }); }
                 if (m === 'GET' && /\\/goals\\?/.test(url)) return json({ goals: [{ id: 1, title: 'Ship the shop', state: 'active' }] });
                 return real(u, o); }; true`);
-        await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM); await settle(500);
+        await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM);
+        assert.equal(await ev(`!!document.getElementById('team-page-uncommitted')`), false, 'team page has no uncommitted-files section');
+        await ev(`(async () => { const host = document.createElement('div'); host.id = 'team-page-uncommitted'; document.getElementById('team-panel-goals').append(host); const m = await import((window.__coralStatic || '/static/') + 'team_uncommitted.js'); await m.refreshUncommitted(${JSON.stringify(TEAM)}, host); })()`); await settle(500);
         const q = (s) => `document.querySelector('#team-page-uncommitted ${s}')`;
         await waitFor(`!!${q('.team-uncommitted-words')}`, 'the uncommitted line', 8000);
         // the label can arrive after the folders do (a slower runner): the words wait for it, and say a label that changes later too

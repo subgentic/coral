@@ -29,8 +29,8 @@ const { copyForAgent } = await importOnce('./agent_copy_button.js'); // the More
 const { drawStartupWaits } = await importOnce('./team_startup_waits.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
-const PHONE_MORE = ['knowledge', 'messages', 'branches']; // (the last three of TEAM_TABS: the row is the others, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
-const LABEL = { goals: 'Goals', needs: 'Needs you', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', branches: 'Branches' };
+const PHONE_MORE = ['knowledge', 'messages', 'branches', 'linked']; // (the last three of TEAM_TABS: the row is the others, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
+const LABEL = { goals: 'Goals', needs: 'Needs you', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', branches: 'Branches', linked: 'Linked teams' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
 
@@ -469,6 +469,10 @@ async function fillTab(tab, item = 0) {
             const m = await importOnce('./team_knowledge_page.js');
             if (stale()) return;
             await m.showKnowledge(host, team, { onCount: (n) => { S.counts.knowledge = n || null; drawCounts(); } });
+        } else if (tab === 'linked') {
+            const m = await importOnce('./team_linked_teams.js');
+            if (stale()) return;
+            await m.drawLinkedTeams($('team-page-links'), team, { isCurrent: () => S.team === team });
         } else if (tab === 'branches') {
             const m = await importOnce('./branches_tab.js');
             if (stale()) return;
@@ -589,21 +593,19 @@ export async function openTeamPage(team, opts = {}) {
     buildOnce();
     if (changed) { S.attention = null; // another team: the tables of the last one go, the moved-in panels and the board's column are drawn again for this one
         for (const t of ['goals', 'tasks', 'artifacts', 'agents', 'knowledge']) { const p = panel(t); p.removeAttribute('data-built'); p.replaceChildren(); }
+        $('team-page-links').replaceChildren(); $('team-page-links').hidden = true;
         drawCounts(); drawStatus(null);
         $('team-pause-bar')?.toggleAttribute('hidden', true); // the last team's pause line
-        const un = $('team-page-uncommitted'); if (un) { un.replaceChildren(); un.hidden = true; } // the last team's uncommitted line
     }
     backTo = opts.backTo || (changed ? null : backTo);
     $('team-page-back-agent').hidden = !backTo;
     if (backTo) $('team-page-back-agent').textContent = `\u2190 Back to ${backTo.display_name || backTo.name}`;
     drawHeader();
-    importOnce('./team_linked_teams.js').then(m => m.drawLinkedTeams($('team-page-links'), team)).catch(e => console.error('linked teams', e)); // #16011: the team's links to other computers, when a Hub is linked
     drawMissing(missing.get(team) === true);
     if (changed && !missing.has(team)) teamIsMissing(team).then(gone => { if (gone && S.team === team) { drawMissing(true); drawStatus(null); } });
     if (S.item) closeItem(false);
     if (!opts.silent) note(keyRoute('team', team, tab, opts.item || null), { replace: !!opts.replace, from: opts.from || '' });
     startCounts();
-    importOnce('./team_uncommitted.js').then(m => m.refreshUncommitted(team)).catch(() => {}); // work an agent left uncommitted (#17203)
     await goTab(tab, { item: opts.item || 0 });
     return true;
 }

@@ -1,4 +1,4 @@
-// The team page's "Linked teams" section (#16011, the Operator via coral-hub: "having the team link outside of the main workflow is not ideal"): under the team's header, on every tab, when this Coral is linked to
+// The team page's "Linked teams" tab (#16011, the Operator via coral-hub: "having the team link outside of the main workflow is not ideal"): only inside its own tab, when this Coral is linked to
 // a Coral Hub, the team's links in both directions (from GET /api/board/{team}/cross-team-state: links = teams that can message this one, links_out = teams this one can message) and a link out to Coral Hub's Team links
 // page to add one. Hidden when no Hub is linked and when the state cannot be read. Labels are text, never markup. Isolated dev server; the cloud status and the state are stubbed in the page.
 const assert = require('node:assert/strict');
@@ -27,13 +27,16 @@ const STATE = {
             if (get && url.pathname === '/api/cloud/status') return j({ state: window.__hub, server_id: ${JSON.stringify(SID)}, hub_url: window.__hubUrl });
             if (get && url.pathname === ${JSON.stringify(`/api/board/${TEAM}/cross-team-state`)}) return j(window.__xt.body, window.__xt.status);
             return R(u, o); }; return true; })()`);
-    const section = () => ev(`(() => { const s = [...document.querySelectorAll('#team-page-view [aria-label="Linked teams"]')].find(e => window.__na.vis(e)); if (!s) return null;
+    const section = () => ev(`(() => { const s = [...document.querySelectorAll('#team-page-links')].find(e => window.__na.vis(e)); if (!s) return null;
         const a = [...s.querySelectorAll('a')].map(x => ({ text: x.textContent.replace(/\\s+/g, ' ').trim(), href: x.getAttribute('href'), target: x.getAttribute('target'), rel: x.getAttribute('rel') }));
         return { text: s.textContent.replace(/\\s+/g, ' ').trim(), links: a, rows: [...s.querySelectorAll('li')].map(l => l.textContent.replace(/\\s+/g, ' ').trim()), imgs: s.querySelectorAll('img').length, pwned: !!window.__pwned }; })()`);
     const open = async (hub, answer, hubUrl) => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings'); await installTP(ev);
         await seed(ev, TEAM); await stub(hub, answer, hubUrl);
-        await openTeam(ev, waitFor, TEAM).catch(() => {}); await settle(1200);
+        await openTeam(ev, waitFor, TEAM);
+        assert.equal(await ev(`!!document.querySelector('#team-page-uncommitted')`), false, 'uncommitted-files section removed from team page');
+        assert.equal(await section(), null, 'Linked teams stays out of Goals');
+        await goTab(ev, settle, 'Linked teams'); await settle(300);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -44,6 +47,15 @@ const STATE = {
             await open('connected', { status: 200, body: STATE });
             await S.run(`${label}: linked to a Hub: both directions are listed, as text, with the computer each team is on`, async () => {
                 await waitFor(`!!document.querySelector('#team-page-view [aria-label="Linked teams"] li')`, 'the section lists the links', 8000);
+                if (process.env.CORAL_SCREENSHOT_DIR) {
+                    const fs = require('node:fs'), { setTheme } = require('./helpers/contrast');
+                    fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true });
+                    for (const theme of ['dark', 'light']) {
+                        await setTheme(ev, theme);
+                        fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/linked-${w}-${theme}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+                    }
+                    await setTheme(ev, 'dark');
+                }
                 const s = await section();
                 assert.equal(s.rows.length, 2, 'one row per link, both directions: ' + JSON.stringify(s.rows));
                 assert.ok(s.rows.some(r => /Design team/.test(r) && /Mac mini/.test(r) && /message/i.test(r)), 'the team that can message this one, with its computer: ' + JSON.stringify(s.rows));
@@ -56,8 +68,12 @@ const STATE = {
                 assert.ok(a, 'a link names Coral Hub: ' + JSON.stringify(s.links));
                 assert.equal(a.href, HUB + '/team-links', 'the Hub this Coral is linked to, not app.coralhub.dev'); assert.equal(a.target, '_blank'); assert.match(a.rel, /noopener/); assert.match(a.rel, /noreferrer/);
             });
-            await S.run(`${label}: it stays on every tab`, async () => {
-                for (const name of ['Tasks', 'Agents', 'Goals']) { await goTab(ev, settle, name); await settle(300); assert.ok(await section(), `the section is there on ${name}`); }
+            await S.run(`${label}: links appear only in their own tab, and the address names it`, async () => {
+                for (const name of ['Tasks', 'Agents', 'Goals']) { await goTab(ev, settle, name); await settle(300); assert.equal(await section(), null, `links are absent on ${name}`); }
+                await goTab(ev, settle, 'Linked teams');
+                await waitFor(`!!document.querySelector('#team-page-links li')`, 'links return', 8000);
+                assert.match(await ev('location.pathname'), /\/linked$/);
+                assert.ok(await section());
             });
             await open('connected', { status: 200, body: { ...STATE, links: [], links_out: [] } });
             await S.run(`${label}: linked to a Hub, no links yet: it says so and offers the link out to add one`, async () => {

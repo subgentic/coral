@@ -1,7 +1,4 @@
-/* The team page's "Linked teams" section (#16011; the Operator via coral-hub: "having the team link outside of the main workflow is not ideal"). A slim section under the team's header, on every tab: this team's links to teams on
- * other computers, in both directions, and the way out to Coral Hub's Team links page to add one. It is drawn only when this computer is linked to a Coral Hub (GET /api/cloud/status says connecting, connected or retrying), for a team
- * of this computer, and only when the team's own state can be read (GET /api/board/{team}/cross-team-state: links = teams that can message this one, links_out = teams this one can message); any other answer draws nothing, so a
- * team without a Hub or a reader without the owner's right sees no empty box. Everything is drawn as text (textContent), never HTML. The Settings > Messaging list is the same data and is left as it is. */
+/* Linked teams tab (#21597): lazy content, scoped to the selected team. Hub-only availability, owner checks and safe text/link rendering remain unchanged. */
 import { splitKey, boardFetch, isCloud } from './server_base.js';
 
 const LINKS_PATH = '/team-links'; // Coral Hub's Team links page, on the Hub this computer is linked to (#16484): its origin only, no path, query or team data
@@ -27,10 +24,10 @@ function rowsOf(state) {
 }
 
 /** Draws the section into host (the team page's slot) for team; empties and hides it whenever there is nothing to say. */
-export async function drawLinkedTeams(host, team) {
+export async function drawLinkedTeams(host, team, { isCurrent = () => true } = {}) {
     if (!host) return;
     const mine = ++seq;
-    const hide = () => { if (mine === seq) { host.hidden = true; host.replaceChildren(); } };
+    const hide = () => { if (mine === seq && isCurrent()) { host.hidden = true; host.replaceChildren(); } };
     const server = splitKey(team).server;
     if (isCloud() || (server && server !== 'local')) return hide();
     let state = null, hub = null;
@@ -40,7 +37,7 @@ export async function drawLinkedTeams(host, team) {
         if (!r.ok) return hide();
         state = await r.json();
     } catch { return hide(); }
-    if (mine !== seq || !state || typeof state !== 'object' || state.linkable === false) return hide();
+    if (!isCurrent() || mine !== seq || !state || typeof state !== 'object' || state.linkable === false) return hide();
     const rows = rowsOf(state);
     const head = mk('div', 'team-links-head');
     head.append(mk('h2', 'team-links-h', 'Linked teams'));

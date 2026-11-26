@@ -28,7 +28,7 @@ assert.equal(parse('/team/m2/settings'), null, 'team settings are a popout, not 
 assert.equal(parse('/team/%40m2/settings'), null);
 rt('/team/a%2Fb', { view: 'team', server: null, id: 'a/b', sub: null });
 // The team page's tabs and its item pages (#7453)
-for (const tab of ['goals', 'tasks', 'agents', 'artifacts', 'knowledge']) rt(`/team/qa/${tab}`, { view: 'team', server: null, id: 'qa', sub: tab });
+for (const tab of ['goals', 'tasks', 'agents', 'artifacts', 'knowledge', 'linked']) rt(`/team/qa/${tab}`, { view: 'team', server: null, id: 'qa', sub: tab });
 // The Board tab's path word is board; the page still names it messages, and the old /messages address reads as the same tab (#8652)
 rt('/team/qa/board', { view: 'team', server: null, id: 'qa', sub: 'messages' });
 assert.deepEqual(parse('/team/qa/messages'), { view: 'team', server: null, id: 'qa', sub: 'messages' }, 'the old address is the Board tab');
