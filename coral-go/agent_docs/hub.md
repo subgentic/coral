@@ -27,7 +27,7 @@ User guide: [Multi-server hub](https://subgentic.github.io/coral/multi-server-hu
 
 Status values: `online`, `unreachable`, `unauthorized` (the remote rejected the key), `key_unreadable` (the stored key cannot be decrypted).
 
-API keys are encrypted at rest (AES-256-GCM, bound to the server id). The master key is `<data dir>/.remote_secret_key` (mode 0600) or `CORAL_SECRET_KEY`.
+API keys are encrypted at rest (AES-256-GCM, bound to the server id). The master key is `<data dir>/.remote_secret_key` (mode 0600) or `CORAL_SECRET_KEY`. This field-level encryption applies only to stored remote API keys and Hub link tokens; in standard release builds, the surrounding `sessions.db` and `messageboard.db` files are plain, unencrypted SQLite (`SQLite format 3` header; whole-database SQLCipher encryption is an opt-in source-build option).
 
 ## Proxy
 
