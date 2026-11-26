@@ -37,12 +37,23 @@ if (process.platform === 'win32') { console.log('SKIPPED: ready mock wrapper req
             await waitFor(`!!document.querySelector('#nav-more-menu [data-arg="hub-inbox"]')`, 'Inbox in the view dropdown');
             await ev(`document.querySelector('#nav-more-menu [data-arg="hub-inbox"]').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-answer').length >= 2`, kind + ': real prompt choices in Inbox', { timeout: 15000 });
-            await waitFor(`(() => { const b=document.querySelector('#group-table-view .inbox-answer'); if(window.__lastChoice!==b){window.__lastChoice=b;window.__choiceAt=performance.now();return false;} return performance.now()-window.__choiceAt>500; })()`, kind + ': choices settled');
-            const point = await ev(`(() => {const b=document.querySelector('#group-table-view .inbox-answer');b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,label:b.textContent,hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===b};})()`);
+            // Tap only once the Inbox has stopped changing (#21708). The old wait watched the first choice alone, for 500 ms: a live update that redraws the list after that leaves the touch on a button that is gone,
+            // the answer is never sent and the agent stays waiting (a flake on the Linux runner). Now any change under the list (the page's own redraws) restarts the quiet time, and it is checked again at the touch.
+            await ev(`if (!window.__inboxMutAt) { window.__inboxMutAt = performance.now(); new MutationObserver(() => { window.__inboxMutAt = performance.now(); }).observe(document.getElementById('group-table-view'), { subtree: true, childList: true, attributes: true, characterData: true }); } true`);
+            let point;
+            for (let tries = 0; ; tries++) {
+                assert.ok(tries < 20, kind + ': the Inbox never stopped changing');
+                await waitFor(`performance.now() - window.__inboxMutAt > 700 && document.querySelectorAll('#group-table-view .inbox-answer').length >= 2`, kind + ': choices settled', { timeout: 15000 });
+                point = await ev(`(() => {const b=document.querySelector('#group-table-view .inbox-answer');b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,label:b.textContent,hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===b,stamp:window.__inboxMutAt};})()`);
+                if (await ev(`window.__inboxMutAt === ${point.stamp}`)) break; // nothing moved while the point was taken (scrolling it into view is not a redraw of the list)
+            }
             assert.ok(point.hit, kind + ': native touch hits the choice');
             await shot('real-' + kind + '-before-390');
+            await ev(`window.__answerClicks = 0; if (!window.__answerClickWatch) { window.__answerClickWatch = true; document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.inbox-answer')) window.__answerClicks++; }, true); } true`);
             await touchTap(client, point);
-            await waitFor(`!(${row})?.waiting_for_input`, kind + ': one tap clears real waiting state', { timeout: 20000 });
+            // Never tap again: a tap that reaches nothing is a finding, said as one, not hidden by a second try.
+            await waitFor('window.__answerClicks > 0', kind + ': the tap reaches an answer button (the choices were redrawn under the finger: a person tapping then loses the answer too)', { timeout: 5000 });
+            await waitFor(`!(${row})?.waiting_for_input`, kind + ': one tap clears real waiting state', { timeout: 20000, diag: `({clicks: window.__answerClicks, answered: [...document.querySelectorAll('#group-table-view .inbox-answered')].map(e => e.textContent), buttons: document.querySelectorAll('#group-table-view .inbox-answer').length})` });
             assert.equal(await ev(`[...document.querySelectorAll('[role="dialog"]')].some(d => d.getClientRects().length && getComputedStyle(d).visibility !== 'hidden')`), false, kind + ': no second choice sheet');
             await shot('real-' + kind + '-answered-390');
             console.log('PASS real ' + kind + ': one native tap on ' + point.label + ', hook wait cleared');
