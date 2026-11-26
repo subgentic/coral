@@ -226,6 +226,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Delete("/api/board/{project}/seats/{subscriberID}", boardHandler.RemoveSeat) // the Operator removes a seat (#11112); never through the Hub
 	r.Get("/api/board-seats/foreign", boardHandler.ListForeignSeats)               // the seats of agents launched on another board (#11112)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/messages", boardHandler.PostMessage)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/automation/post", boardHandler.PostAutomation) // an automation step's post, with its run's token only (#21502)
 	r.Get("/api/board/{project}/messages", boardHandler.ReadMessages)
 	r.Post("/api/board/{project}/clashes", boardHandler.FileClash)   // #11457, S6: an agent files two people's different directions; Coral asks the Operator to decide
 	r.Get("/api/board/{project}/guide-asks", boardHandler.GuideAsks) // #11457: the questions put to a guide (the guide's own label, from the connector's stamp)

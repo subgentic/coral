@@ -1,5 +1,6 @@
 # #3929 (Security's #3965 classification): every route the server serves, and what an agent's
 b DELETE /api/artifacts/{id}/trust-preview
+b POST /api/board/{project}/automation/post
 b DELETE /api/board/{project}/member-grants/{id}
 b GET /api/artifacts/{id}/trust-preview
 b POST /api/artifacts/{id}/gdoc/share

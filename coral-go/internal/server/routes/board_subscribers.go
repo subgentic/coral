@@ -90,6 +90,10 @@ func (h *BoardHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	}
 	// A name that starts or ends with punctuation ("Security Reviewer 2:") cannot be written after an @ and reaches a shorter member instead: refused at the join (#11687).
 	for _, n := range []string{subscriberID, body.JobTitle} {
+		if board.ReservedMemberName(n) {
+			writeError(w, http.StatusBadRequest, "reserved_name", board.ErrReservedMemberName.Error())
+			return
+		}
 		if board.ValidMemberName(n) != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_member_name", "code": "invalid_member_name",
 				"message": "the name " + strconv.Quote(clitext.Clean(n)) + " starts or ends with punctuation: a name must start and end with a letter or a digit (for example \"Security Reviewer 2\", not \"Security Reviewer 2:\")"})

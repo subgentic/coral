@@ -221,6 +221,16 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, maxBoardBody)
 		}
+		// An automation's run token (#21502): admitted or refused by its own gate, for one route only, and served as no agent and no Operator: the handler writes the sender from the token.
+		if at := r.Header.Get(store.AutomationTokenHeader); at != "" {
+			var gated bool
+			if r, gated = o.automationTokenGate(w, r, at); !gated {
+				return
+			}
+			r.Header.Del(cliauth.CLIAuthHeader)
+			next.ServeHTTP(w, r)
+			return
+		}
 		// A custom health check's run token (#20138): admitted or refused by its own gate, then identified as the member who added the check, so every check below applies to it as to that member.
 		var via *store.CheckTokenOwner
 		if ct := r.Header.Get(store.CheckTokenHeader); ct != "" {

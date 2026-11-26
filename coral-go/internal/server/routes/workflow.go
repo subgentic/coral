@@ -17,6 +17,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/background"
+	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/gitutil"
@@ -35,6 +37,35 @@ type WorkflowHandler struct {
 	ws     *store.WorkflowStore
 	cfg    *config.Config
 	runner *background.WorkflowRunner
+	bs     *board.Store // the teams on this computer, to check the team an automation posts to (#21502)
+}
+
+// SetBoardStore gives the handler the teams of this computer.
+func (h *WorkflowHandler) SetBoardStore(bs *board.Store) { h.bs = bs }
+
+// workflowBoard checks a "board" a request sets on a workflow, the team its steps post to as "Automation: NAME" (#21502): only the Operator at this computer sets it (an agent, a guide and a Hub link never do), and
+// it must be a team of this computer. "" clears it. ok false means the response is written.
+func (h *WorkflowHandler) workflowBoard(w http.ResponseWriter, r *http.Request, name string) (string, bool) {
+	if refuseNonOwner(w, r) || !operatorWrites(w, r, "choose the team an automation posts to") {
+		return "", false
+	}
+	if cloud.Tunneled(r) {
+		writeError(w, http.StatusForbidden, "workflow_board_local_only", "the team an automation posts to is set at this computer, not through Coral Hub")
+		return "", false
+	}
+	name = strings.TrimSpace(clitext.Clean(name))
+	if name == "" {
+		return "", true
+	}
+	if board.ReservedMemberName(name) || h.bs == nil {
+		errBadRequest(w, "board: not a team of this computer")
+		return "", false
+	}
+	if ok, err := h.bs.BoardExists(r.Context(), name); err != nil || !ok {
+		errBadRequest(w, "board: "+clitext.Clean(name)+" is not a team of this computer")
+		return "", false
+	}
+	return name, true
 }
 
 // SetWorkflowRunner injects the workflow runner for triggering and killing runs.
@@ -112,10 +143,18 @@ func (h *WorkflowHandler) CreateWorkflow(w http.ResponseWriter, r *http.Request)
 		MaxDurationS    *int              `json:"max_duration_s"`
 		CleanupWorktree *int              `json:"cleanup_worktree"`
 		Enabled         *int              `json:"enabled"`
+		Board           *string           `json:"board"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
 		return
+	}
+	wfBoard := ""
+	if body.Board != nil {
+		var ok bool
+		if wfBoard, ok = h.workflowBoard(w, r, *body.Board); !ok {
+			return
+		}
 	}
 
 	// Validate name
@@ -194,6 +233,7 @@ func (h *WorkflowHandler) CreateWorkflow(w http.ResponseWriter, r *http.Request)
 		MaxDurationS:     intPtrOr(body.MaxDurationS, 3600),
 		CleanupWorktree:  intPtrOr(body.CleanupWorktree, 1),
 		Enabled:          intPtrOr(body.Enabled, 1),
+		Board:            wfBoard,
 	}
 
 	created, err := h.ws.CreateWorkflow(r.Context(), wf)
@@ -300,6 +340,23 @@ func (h *WorkflowHandler) UpdateWorkflow(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	// The team its steps post to (#21502): changing it, or turning the workflow off, ends the tokens of its runs in progress.
+	if bRaw, ok := raw["board"]; ok {
+		var name string
+		if err := json.Unmarshal(bRaw, &name); err != nil {
+			errBadRequest(w, "invalid value for board")
+			return
+		}
+		set, ok := h.workflowBoard(w, r, name)
+		if !ok {
+			return
+		}
+		fields["board"] = set
+	}
+	if _, ok := fields["board"]; ok || fields["enabled"] == 0 {
+		_ = h.ws.DB().RevokeAutomationTokensForWorkflow(r.Context(), workflowID, time.Now())
+	}
+
 	// Handle steps
 	var warnings []string
 	if stepsRaw, ok := raw["steps"]; ok {
@@ -385,6 +442,7 @@ func (h *WorkflowHandler) DeleteWorkflow(w http.ResponseWriter, r *http.Request)
 	}
 	background.RemoveRunDirs(h.cfg.CoralDir(), runIDs)
 	background.RemoveWorkflowState(h.cfg.CoralDir(), workflowID) // its state folder goes with it
+	_ = h.ws.DB().RevokeAutomationTokensForWorkflow(r.Context(), workflowID, time.Now())
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

@@ -58,7 +58,7 @@ func (wr *WorkflowRunner) runStep(ctx context.Context, runID int64, workflow *st
 	var stepErr error
 	switch step.Type {
 	case "shell":
-		stepErr = wr.executeShellStep(ctx, runID, step, sf, workflow.RepoPath, env, &results[i])
+		stepErr = wr.executeShellStep(ctx, runID, step, sf, workflow.RepoPath, append(env, wr.automationEnv(runID, workflow)...), &results[i])
 	case "agent":
 		stepErr = wr.executeAgentStep(ctx, runID, step, sf, workflow.RepoPath, env, defaultAgent, &results[i])
 	default:

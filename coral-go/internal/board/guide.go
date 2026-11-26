@@ -128,6 +128,12 @@ func (s *Store) PostGuideMessage(ctx context.Context, project, label, content st
 	return s.postMessage(ctx, project, label, content, nil, OriginHubGuide, label, false, nil)
 }
 
+// PostAutomationMessage stores an automation's post: the sender is "Automation: NAME" from the workflow's name (never from the request), the origin is automation, and it is no member's message. The caller has
+// checked and marked the text.
+func (s *Store) PostAutomationMessage(ctx context.Context, project, workflowName, content string) (*Message, error) {
+	return s.postMessage(ctx, project, AutomationSender(workflowName), content, nil, OriginAutomation, "", false, nil)
+}
+
 // GuideMessage is what a guide reads of a board's message: a closed projection (these fields and no others), so a column added to a message later never reaches a guide by itself. It leaves out the
 // project, the session, the group, the cross-team envelope, the Hub user and the task a message answers.
 type GuideMessage struct {

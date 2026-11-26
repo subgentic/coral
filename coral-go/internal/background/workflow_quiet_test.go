@@ -124,3 +124,46 @@ func TestWorkflowStateDirSurvivesRuns(t *testing.T) {
 		t.Error("no workflow, no folder")
 	}
 }
+
+// A workflow with a board gives each run's shell steps a token and the team; the token works while the run does and is dead after it; a workflow with no board gives nothing.
+func TestAShellStepOfAWorkflowWithABoardGetsTheRunsTokenAndItEndsWithTheRun(t *testing.T) {
+	db := setupTestDB(t)
+	wfStore := store.NewWorkflowStore(db)
+	rt := newWfMockRuntime()
+	runner := NewWorkflowRunner(wfStore, &AgentLauncher{runtime: rt}, rt, nil, nil, t.TempDir(), "localhost", 8420)
+	steps := []StepDef{{Name: "show", Type: "shell", Command: `echo "token=$CORAL_AUTOMATION_TOKEN"; echo "board=$CORAL_AUTOMATION_BOARD"`}}
+	stepsJSON, _ := json.Marshal(steps)
+	wf := createTestWorkflow(t, wfStore, t.TempDir(), string(stepsJSON))
+	run := func(board string) (string, string, *store.WorkflowRun, *store.Workflow) {
+		wf.Board = board
+		r, err := runner.TriggerWorkflow(context.Background(), wf, "api", nil)
+		if err != nil {
+			t.Fatalf("trigger: %v", err)
+		}
+		waitForRun(t, wfStore, r.ID, 10*time.Second)
+		final, _ := wfStore.GetWorkflowRunDirect(context.Background(), r.ID)
+		var results []StepResult
+		_ = json.Unmarshal([]byte(final.StepResults), &results)
+		out := results[0].OutputTail
+		pick := func(key string) string {
+			for _, line := range strings.Split(out, "\n") {
+				if strings.HasPrefix(line, key+"=") {
+					return strings.TrimSpace(strings.TrimPrefix(line, key+"="))
+				}
+			}
+			return ""
+		}
+		return pick("token"), pick("board"), final, wf
+	}
+	tok, board, final, _ := run("crew")
+	if final.Status != "completed" || board != "crew" || !strings.HasPrefix(tok, "au1.") {
+		t.Fatalf("status %q board %q token %q", final.Status, board, tok)
+	}
+	if _, err := db.AutomationTokenOf(context.Background(), tok, time.Now()); err == nil {
+		t.Error("the token outlived its run")
+	}
+	tok, board, _, _ = run("")
+	if tok != "" || board != "" {
+		t.Errorf("a workflow with no board gives its steps nothing: token %q board %q", tok, board)
+	}
+}

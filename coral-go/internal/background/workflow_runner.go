@@ -95,6 +95,8 @@ type WorkflowRunner struct {
 	// killed: runs KillRun was called for, set before it kills the step's process, so
 	// the step's failure (its process killed) is never recorded over "killed" (#3474).
 	killed map[int64]bool
+	// runTokens: the automation token of each run in progress whose workflow has a board (#21502); it is in a shell step's environment and ends with the run.
+	runTokens map[int64]string
 	// running counts runs in progress; at maxRuns a new trigger is refused (#3424, MED-02).
 	running int
 	maxRuns int
@@ -118,7 +120,11 @@ const maxConcurrentWorkflowRuns = 5
 
 // NewWorkflowRunner creates a new WorkflowRunner.
 func NewWorkflowRunner(wfStore *store.WorkflowStore, launcher *AgentLauncher, runtime AgentRuntime, _ any, _ any, dataDir, host string, port int) *WorkflowRunner {
+	if wfStore != nil && wfStore.DB() != nil {
+		_ = wfStore.DB().RevokeAllAutomationTokens(context.Background(), time.Now()) // a token of an earlier run of Coral is dead
+	}
 	return &WorkflowRunner{
+		runTokens:      make(map[int64]string),
 		store:          wfStore,
 		launcher:       launcher,
 		runtime:        runtime,
@@ -224,6 +230,34 @@ func (wr *WorkflowRunner) pruneRuns(ctx context.Context, workflowID int64) {
 		return
 	}
 	RemoveRunDirs(wr.dataDir, ids)
+}
+
+// mintAutomationToken makes the token of this run when its workflow posts to a board (workflow.Board, set by a person), and remembers it for the run's shell steps; "" when it has none.
+func (wr *WorkflowRunner) mintAutomationToken(ctx context.Context, runID int64, workflow *store.Workflow) string {
+	if workflow.Board == "" || wr.store == nil || wr.store.DB() == nil {
+		return ""
+	}
+	tok, err := wr.store.DB().MintAutomationToken(ctx, store.AutomationTokenSpec{RunID: runID, WorkflowID: workflow.ID, WorkflowName: workflow.Name, Project: workflow.Board,
+		TTL: time.Duration(workflow.MaxDurationS)*time.Second + time.Minute}, time.Now())
+	if err != nil {
+		wr.logger.Warn("could not make the run's automation token", "workflow_id", workflow.ID, "error", err)
+		return ""
+	}
+	wr.mu.Lock()
+	wr.runTokens[runID] = tok
+	wr.mu.Unlock()
+	return tok
+}
+
+// automationEnv is what a shell step of this run gets so its coral-board posts as the automation: the token and the board. Agent steps never get it.
+func (wr *WorkflowRunner) automationEnv(runID int64, workflow *store.Workflow) []string {
+	wr.mu.Lock()
+	tok := wr.runTokens[runID]
+	wr.mu.Unlock()
+	if tok == "" {
+		return nil
+	}
+	return []string{store.AutomationTokenEnv + "=" + tok, store.AutomationBoardEnv + "=" + workflow.Board}
 }
 
 // WorkflowStateDir is the folder a workflow keeps between its runs (a step reads it as CORAL_WORKFLOW_STATE_DIR): <dataDir>/workflows/state/<workflow id>. The id is never reused, so a deleted workflow's folder is never another's.
@@ -345,6 +379,7 @@ func (wr *WorkflowRunner) executeRun(runID int64, workflow *store.Workflow) {
 		delete(wr.runCancels, runID)
 		delete(wr.activeChildren, runID)
 		delete(wr.killed, runID)
+		delete(wr.runTokens, runID)
 		wr.mu.Unlock()
 	}()
 
@@ -358,7 +393,10 @@ func (wr *WorkflowRunner) executeRun(runID int64, workflow *store.Workflow) {
 		return
 	}
 	defer rf.Close()
-	ensureWorkflowStateDir(wr.dataDir, workflow.ID) // before the first step: every step of every run sees the same folder
+	ensureWorkflowStateDir(wr.dataDir, workflow.ID)                     // before the first step: every step of every run sees the same folder
+	if tok := wr.mintAutomationToken(ctx, runID, workflow); tok != "" { // the run's own token, for its shell steps only; it ends with the run
+		defer wr.store.DB().RevokeAutomationToken(context.Background(), tok, time.Now())
+	}
 	// Before the first step (#5469): when an agent step needs a CLI that is signed out, the whole run fails at once, no step starts, and nothing tries to sign in.
 	if nsi := wr.signInPreflightIn(ctx, steps, defaultAgent, workflow.RepoPath); nsi != nil {
 		for i := range results {

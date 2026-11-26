@@ -93,6 +93,7 @@ POST /api/board/{project}/artifacts/{id}/review | (*BoardHandler).ReviewArtifact
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim | (*BoardHandler).ClaimAskButton-fm
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle | (*BoardHandler).SettleAskButton-fm
 POST /api/board/{project}/asks/{messageID}/close | (*BoardHandler).CloseAsk-fm
+POST /api/board/{project}/automation/post | (*BoardHandler).PostAutomation-fm
 POST /api/board/{project}/clashes | (*BoardHandler).FileClash-fm
 POST /api/board/{project}/cross-team-links | (*BoardHandler).AddLocalLinks-fm
 POST /api/board/{project}/cross-team/disable | (*BoardHandler).HubCrossTeamDisable-fm

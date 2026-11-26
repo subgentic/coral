@@ -78,6 +78,10 @@ func (h *SessionsHandler) RefuseMemberName(w http.ResponseWriter, ctx context.Co
 
 // refuseMemberName answers a launch or join whose name is a member's with 409 and the choices; true when it did.
 func (h *SessionsHandler) refuseMemberName(w http.ResponseWriter, ctx context.Context, project, name, exceptSessionName string) bool {
+	if board.ReservedMemberName(name) {
+		writeError(w, http.StatusBadRequest, "reserved_name", board.ErrReservedMemberName.Error())
+		return true
+	}
 	code, sub, sid := h.memberNameConflict(ctx, project, name, exceptSessionName)
 	if code == "" {
 		return false

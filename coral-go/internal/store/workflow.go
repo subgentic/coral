@@ -26,6 +26,8 @@ type Workflow struct {
 	Enabled          int    `db:"enabled" json:"enabled"`
 	CreatedAt        string `db:"created_at" json:"created_at"`
 	UpdatedAt        string `db:"updated_at" json:"updated_at"`
+	// Board is the team this automation posts to as "Automation: NAME" (#21502); "" means its steps have no board identity. Only a person sets it.
+	Board string `db:"board" json:"board"`
 
 	// Computed fields (not stored in DB directly, populated by JSON unmarshal)
 	Steps        []json.RawMessage `db:"-" json:"steps,omitempty"`
@@ -192,10 +194,10 @@ func (s *WorkflowStore) CreateWorkflow(ctx context.Context, w *Workflow) (*Workf
 	result, err := s.db.ExecContext(ctx,
 		`INSERT INTO workflows
 		 (name, description, steps_json, default_agent_json, repo_path,
-		  base_branch, max_duration_s, cleanup_worktree, enabled, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		  base_branch, max_duration_s, cleanup_worktree, enabled, board, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		w.Name, w.Description, w.StepsJSON, w.DefaultAgentJSON, w.RepoPath,
-		w.BaseBranch, w.MaxDurationS, w.CleanupWorktree, w.Enabled, now, now)
+		w.BaseBranch, w.MaxDurationS, w.CleanupWorktree, w.Enabled, w.Board, now, now)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +290,7 @@ func (s *WorkflowStore) UpdateWorkflow(ctx context.Context, id int64, fields map
 	err := dynamicUpdate(ctx, s.db, "workflows", id, fields, map[string]bool{
 		"name": true, "description": true, "steps_json": true,
 		"default_agent_json": true, "repo_path": true, "base_branch": true,
-		"max_duration_s": true, "cleanup_worktree": true, "enabled": true,
+		"max_duration_s": true, "cleanup_worktree": true, "enabled": true, "board": true,
 	}, map[string]bool{
 		"cleanup_worktree": true, "enabled": true,
 	}, true)
