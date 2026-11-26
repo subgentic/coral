@@ -1399,7 +1399,7 @@
         position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 12px; align-items: start;
         margin: 0 0 3px; padding: 14px 12px !important; min-height: 76px; border: 0; border-radius: 14px; background: var(--bg-secondary); box-shadow: none;
     }
-    #mobile-session-list .session-group-item.active { background: var(--bg-hover); box-shadow: none; }
+    #mobile-session-list .session-group-item.active { background: var(--bg-tertiary); box-shadow: none; }
     #mobile-session-list .session-avatar { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: color-mix(in srgb, var(--avatar, var(--accent)) 62%, rgb(var(--black-rgb))); color: var(--text-on-accent); font-size: var(--fs-xl); font-weight: var(--fw-medium); }
     #mobile-session-list .session-info { min-width: 0; }
     #mobile-session-list .session-dot { position: absolute; left: 46px; top: 48px; width: 16px; height: 16px; margin: 0; border: 3px solid var(--bg-secondary); box-sizing: border-box; }
