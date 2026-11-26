@@ -77,8 +77,8 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
             return real(u, options);
         }; return true;
     })()`;
-    const open = async (hex, board = 'draft-test') => {
-        await ev(`(async () => { const m = await import(${S} + 'artifact_viewer.js'); m.openArtifactViewer('${hex}', { filename: 'Release plan', board: ${JSON.stringify(board)} }); return true; })()`);
+    const open = async (hex, board = 'draft-test', navigation = false) => {
+        await ev(`(async () => { const m = await import(${S} + 'artifact_viewer.js'); m.openArtifactViewer('${hex}', { filename: 'Release plan', board: ${JSON.stringify(board)}, ...${navigation ? `{ fileIndex: 2, fileList: ['a', 'b', 'd'].map(c => ({ hex: c.repeat(64), filename: 'Release plan', board: 'draft-test' })) }` : '{}'} }); return true; })()`);
         await waitFor(`!!document.querySelector('.ac-composer textarea')`, 'document comments ready', 8000);
         if (hex === HEX && board === 'draft-test') await waitFor(`document.querySelector('#artifact-viewer').hasAttribute('data-document-review')`, 'Needs you review context');
         const state = await ev(`(() => { const p = document.querySelector('#artifact-viewer .ac-panel'), r = p.getBoundingClientRect(); return { inert: p.inert, hidden: p.hidden, shown: r.width > 0 && r.height > 0, toggleShown: !!document.querySelector('#artifact-viewer .ac-toggle')?.getClientRects().length }; })()`);
@@ -92,6 +92,33 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // #21678: measure actual label ink, rather than inferring centring from CSS.
+        const headerProblems = [];
+        for (const width of [1280, 390, 1600]) {
+            await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await ev(fixture); await open(HEX, 'draft-test', true);
+            await shot(`review-header-${width}`);
+            const layout = await ev(`(() => {
+                const controls = ['.artifact-review-close', '.artifact-review-changes', '.artifact-review-approve'].map(sel => {
+                    const b = document.querySelector(sel), r = b.getBoundingClientRect(), range = document.createRange();
+                    range.selectNodeContents(b); const label = range.getBoundingClientRect();
+                    return { text: b.textContent, height: r.height, offset: Math.abs((label.top + label.bottom - r.top - r.bottom) / 2) };
+                });
+                const title = document.querySelector('.artifact-viewer-title-name'), r = title.getBoundingClientRect();
+                const nav = document.querySelector('.artifact-file-navigation'), buttons = [...nav.querySelectorAll('button')], nr = nav.getBoundingClientRect();
+                const pager = nr.width ? buttons.map(b => { const s = getComputedStyle(b), r = b.getBoundingClientRect(); return { border: s.borderTopColor, style: s.borderTopStyle, height: r.height }; }) : [];
+                const pos = nav.querySelector('.artifact-file-position').getBoundingClientRect(), gap = nr.width ? buttons[1].getBoundingClientRect().left - pos.right : 0;
+                return { pager, gap, controls, title: title.textContent, titleVisible: r.width > 0 && r.height > 0 && r.left >= 0 && r.right <= innerWidth };
+            })()`);
+            console.log('review header', width, JSON.stringify(layout));
+            if (layout.pager.length && (layout.pager[0].border !== layout.pager[1].border || layout.pager[0].style !== layout.pager[1].style || layout.gap < 8)) headerProblems.push(width + ': pager boxes or spacing differ');
+            if (!layout.titleVisible || layout.title !== 'Release plan') headerProblems.push(width + ': document title missing');
+            if (Math.max(...layout.controls.map(b => b.height)) - Math.min(...layout.controls.map(b => b.height)) > 1) headerProblems.push(width + ': unequal button heights');
+            for (const b of layout.controls) if (b.offset > 2) headerProblems.push(width + ': ' + b.text + ' label off-centre by ' + b.offset);
+            await click('.artifact-viewer-close');
+        }
+        assert.deepEqual(headerProblems, [], 'review header has equal controls, centred labels and document context');
         // A new browser, and one that remembers the comments shut from a document that was not a review (coral-artifact-comments-open): the review's comment box works at once, at both sizes, by a person's clicks and typing (#21425).
         for (const [width, height] of [[1600, 1000], [390, 844]]) for (const remembered of [null, 'closed']) {
             await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile: width === 390 });

@@ -286,9 +286,20 @@
 .av-draft-document[data-document-review] .artifact-review-refuse { display: none; }
 
 .artifact-review-close { display: none; }
-.av-draft-document[data-document-review] .artifact-review-close:not([hidden]) { display: inline-flex; }
+.av-draft-document[data-document-review] .artifact-review-close:not([hidden]) { display: inline-flex; align-items: center; justify-content: center; }
 .av-draft-document[data-document-review] .artifact-review-breadcrumb:not([hidden]) { display: block; }
 
 .ac-draft-recipients { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .ac-draft-recipients > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .ac-draft-recipients > span { display: block; }
+
+/* The approved review workspace keeps Close beside the name, with decisions below. */
+@media (max-width: 767px) {
+    .av-draft-document[data-document-review] .artifact-viewer-header { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; }
+    .av-draft-document[data-document-review] .artifact-viewer-header > .artifact-viewer-title { grid-column: 1; grid-row: 1; }
+    .av-draft-document[data-document-review] .artifact-viewer-actions { display: contents; }
+    .av-draft-document[data-document-review] .artifact-review-close { grid-column: 2; grid-row: 1; }
+    .av-draft-document[data-document-review] .artifact-viewer-morewrap { grid-column: 3; grid-row: 1; }
+    .av-draft-document[data-document-review] .artifact-review-changes { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+    .av-draft-document[data-document-review] .artifact-review-approve { grid-column: 1 / -1; grid-row: 2; justify-self: end; }
+}
