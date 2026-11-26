@@ -242,7 +242,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                 return items;
             };
             const openPrimary = r => (r.item_kind === 'file' && open.viewer && ['approve', 'changes', 'deny'].includes(r.action)) ? open.viewer(r) : openRow(r); // "Open file" opens the file; the row's title opens its decision
-            const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
+            const teamWords = r => { const w = teamOf(r), srv = ` \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}`; return multipleServers() && !w.endsWith(srv) ? w + srv : w; }; // with several computers read, the computer is named beside the team (#15730), once: teamOf already carries it when the labels name their computers (#21571)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
             wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, teamNode: (r, words) => teamLabelLink(r.team, { full: words, cls: 'al-team' }), thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
             const gaps = loaded ? missingWords(missingComputers(), shownComputers()) : '';
