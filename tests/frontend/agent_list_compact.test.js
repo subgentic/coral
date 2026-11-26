@@ -38,6 +38,7 @@ async function run() {
   // Condition waits (#3118). Soft: on timeout they return and the next check() reports what is wrong.
   const { waitFor, waitStable, nextFrame } = require('./helpers/wait').bind((x) => ev(x));
   const until = (expression, what, timeout = 5000) => waitFor(expression, what, { soft: true, timeout });
+  await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
   const boot = async (w, h, mobile) => { await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await until(`typeof window._coralSetLiveSessions === 'function'`, 'the app hooks', 10000); // Agent summaries are off by default (a server-side setting) and sleeping agents sit behind an
     // "N sleeping" row; this suite is about the two-line rows, so turn summaries on and expand the sleepers.
     await ev(`(async () => { await window.__origFetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ show_session_summary: true }) }); await (await import((window.__coralStatic||'/static/')+'modals.js')).loadSettings(); return true; })()`);

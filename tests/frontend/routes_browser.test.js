@@ -26,6 +26,7 @@ const { Page, Runtime, Emulation } = client;
     const shown = id => `(() => { const e = document.getElementById(${JSON.stringify(id)}); return !!e && getComputedStyle(e).display !== 'none'; })()`;
     const open = async path => {
         const loaded = Page.loadEventFired();
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE + path });
         await loaded;
         await coralReady();

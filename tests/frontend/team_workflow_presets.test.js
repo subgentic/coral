@@ -25,6 +25,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
   const dialogGone = () => waitFor(`!document.getElementById('team-settings-workspace')`, 'the page to go');
   try {
     await Page.enable();
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.navigate({ url: BASE });
     await Page.loadEventFired();
 

@@ -35,6 +35,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   (async()=>{let parentBlocked=false,networkBlocked=false;try{parent.document.body.dataset.uiEscaped='yes'}catch(e){parentBlocked=true}try{await fetch('/api/sessions/live')}catch(e){networkBlocked=true}await coralUI.emit('isolation',{parentBlocked,networkBlocked});await new Promise(r=>setTimeout(r,700))/* sleep-ok: the panel's own 500 ms minimum gap between responses */;await coralUI.emit('choose',{option:'A'});})();</script>`);
   const published=cli(['publish','--id','demo','--title','<b>Demo</b>','--file',file]);
   assert.equal(published.revision,1);assert.equal(cli(['list']).length,1);
+  await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
   await Page.enable();await Runtime.enable();await Page.navigate({url:BASE});await Page.loadEventFired();await coralReady();
   await ev(`(async()=>{const {state}=await import((window.__coralStatic||'/static/')+'state.js');state.currentSession={type:'live',session_id:${JSON.stringify(sid)}};document.getElementById('live-session-view').style.display='';const ui=await import((window.__coralStatic||'/static/')+'agent_ui.js');await ui.refreshAgentUI();window.switchAgenticTab('agent-ui','top');})()`);
   await waitFor(`!!document.querySelector('.agent-ui-home-row')`, 'the panel list');

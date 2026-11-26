@@ -82,6 +82,7 @@ async function run() {
         return evalInPage(`document.querySelector('#qa-test-acf').dataset.acfModelDirty`);
     }
 
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.navigate({ url: BASE + '/' });
     await Page.loadEventFired();
     // renderAgentConfigForm and the model helpers live with the dialogs, which load on

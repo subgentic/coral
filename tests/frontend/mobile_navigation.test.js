@@ -18,6 +18,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);
         await size(390);
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         await evaluate(`new Promise(resolve => { const wait = () => typeof window.switchMobileTab === 'function' ? resolve() : setTimeout(wait, 50); wait(); })`);

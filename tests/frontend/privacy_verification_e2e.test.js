@@ -17,6 +17,7 @@ const BASE = require('./test_base').BASE;
   const guard = await require('./helpers/settings_guard').guardSettings(); // the settings this suite changes are put back in its finally (#4849)
   try {
     await Page.enable();
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.navigate({ url: BASE });
     await Page.loadEventFired();
     // This suite saves telemetry off; a server reused across runs (a --stress shard) would start the next run from

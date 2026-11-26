@@ -6,6 +6,7 @@ const BASE = require('./test_base').BASE;
  const {Page,Runtime,Emulation}=client;
  const ev=async expression=>{const r=await Runtime.evaluate({expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
  try {
+  await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
   await Page.enable();await Page.navigate({url:BASE});await Page.loadEventFired();
   const response=await ev(`fetch('/api/board/empty-availability-test/status').then(async r=>({status:r.status,body:await r.json()}))`);
   assert.equal(response.status,200);assert.deepEqual(response.body.agents,[]);

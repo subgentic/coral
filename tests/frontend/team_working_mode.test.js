@@ -13,6 +13,7 @@ const BOARD = 'working-mode-browser-' + Date.now().toString(36); // a fresh boar
  const setField=(name,v)=>`{const e=document.querySelector('#team-settings-workspace [name=${name}]');if(e.type==='checkbox')e.checked=${JSON.stringify(v)};else e.value=${JSON.stringify(v)};e.dispatchEvent(new Event('change',{bubbles:true}))}`;
  const saveNow=async()=>{await ev(`document.querySelector('#team-settings-workspace .sv-save').click()`);await ev(`new Promise(r=>{const t=()=>/Saved|Could not/.test(document.querySelector('#team-settings-workspace .sv-status').textContent)?r(true):setTimeout(t,50);t()})`)};
  try {
+  await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
   await Page.enable();await Page.navigate({url:BASE});await Page.loadEventFired();
   await ev(`showTeamWorkingMode('${BOARD}', {page:document.body.appendChild(Object.assign(document.createElement('div'),{id:'qa-ts-host',style:'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)'}))})`);
   await loaded();

@@ -1,0 +1,4 @@
+// The agent list is grouped by status unless the viewer chose Team (#21466). The suites that read the list were written for the Team view, so their pages start on it:
+// SOURCE goes to Page.addScriptToEvaluateOnNewDocument (agent_view_harness.js does it for every suite that connects through it). It seeds the choice on every load that has none,
+// and again after a localStorage.clear(). status_groups_browser.test.js does not use it: it meets the default.
+exports.SOURCE = `(() => { const seed = () => { try { if (localStorage.getItem('coral-agent-grouping') === null) localStorage.setItem('coral-agent-grouping', 'team'); } catch (e) {} }; seed(); try { const clear = Storage.prototype.clear; Storage.prototype.clear = function () { clear.call(this); if (this === localStorage) seed(); }; } catch (e) {} })();`;

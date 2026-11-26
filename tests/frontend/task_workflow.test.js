@@ -14,6 +14,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const clickBar = async text => { await waitFor(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].some(b => b.textContent === ${JSON.stringify(text)})`, 'the ' + text + ' button'); await ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar .btn')].find(b => b.textContent === ${JSON.stringify(text)}).click(); true`); };
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE }); await Page.loadEventFired();
         await ev(`(async () => {
             const {state} = await import((window.__coralStatic||'/static/')+'state.js');

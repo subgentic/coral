@@ -82,6 +82,7 @@ async function run() {
   const waitEl = async (sel) => { for (let i = 0; i < 60 && !(await ev(`!!document.querySelector(${JSON.stringify(sel)})`)); i++) await sleep(50); };
   const settleUntil = async (cond) => { for (let i = 0; i < 40 && !(await ev(cond)); i++) { await refreshOnce(); await sleep(50); } };
   await Emulation.setDeviceMetricsOverride({ width: 1500, height: 950, deviceScaleFactor: 1, mobile: false });
+  await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
   await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
   // Startup done, except the feed: this suite stubs /ws/coral, so it never connects.
   await coralReady('startup', 'liveList', 'liveListLoaded', 'history', 'settings');

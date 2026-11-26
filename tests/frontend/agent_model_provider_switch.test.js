@@ -11,6 +11,7 @@ const BASE = require('./test_base').BASE;
     return result.result.value;
   };
   try {
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
     await ev(`import((window.__coralStatic||'/static/')+'modals.js')`);
     await ev(`(() => { document.body.innerHTML='<main><div id="fixture"></div></main>'; window.fetch=async url => { const u=String(url); if(u.includes('/api/settings')) return new Response(JSON.stringify({settings:{default_model_claude:'claude-opus-5',default_model_codex:'gpt-6-sol'}})); if(u.includes('/api/agents/models')) return new Response(JSON.stringify({agent_type:'claude',models:[],refreshing:false})); if(u.includes('/api/agent-models')) return new Response(JSON.stringify({claude:['claude-opus-5'],codex:['gpt-6-sol'],agy:[],pi:[]})); return new Response('{}'); }; for (const k of Object.keys(localStorage)) if (k.startsWith('coral-models:v1:')) localStorage.removeItem(k); window.__coral._invalidateDefaultModels?.(); })()`);

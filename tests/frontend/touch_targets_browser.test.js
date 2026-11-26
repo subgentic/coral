@@ -70,6 +70,7 @@ const UNDERSIZED = `(() => {
     const { waitFor, waitStable, nextFrame, coralReady } = require('./helpers/wait').bind(ev);
     const open = async (width, height, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile });
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE }); await Page.loadEventFired();
         await ev(`new Promise(r => { const w = () => typeof window.selectLiveSession === 'function' ? r() : setTimeout(w, 50); w(); })`);
         await ev(`new Promise(r => { const t = Date.now(); const w = () => (window._coralGetLiveSessions?.() || []).some(s => s.session_id === ${JSON.stringify(sid)}) || Date.now() - t > 8000 ? r() : setTimeout(w, 100); w(); })`);

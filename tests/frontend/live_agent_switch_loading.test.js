@@ -15,6 +15,7 @@ const { framesJs } = require('./helpers/wait');
 
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         // Startup done (#3118): the app's own first live-list load can no longer replace the mocked sessions below.

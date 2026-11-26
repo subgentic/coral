@@ -32,6 +32,7 @@ const BASE = require('./test_base').BASE;
   })()`);
   const view = () => ev(`(()=>{const b=document.getElementById('settings-debug-input-log'),n=document.getElementById('settings-debug-input-log-status'),d=document.getElementById('settings-debug-input-log-delete');return {checked:b.checked,disabled:b.disabled,noteHidden:n.textContent==='',noteAttr:n.hasAttribute('hidden'),note:n.textContent,deleteHidden:d.hidden};})()`);
   try {
+    await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
     await Page.enable(); await Page.navigate({ url: BASE }); await Page.loadEventFired();
 
     // Off by default: unchecked, no note.

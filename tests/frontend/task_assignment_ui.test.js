@@ -19,6 +19,7 @@ if (!base || !/^http:\/\/(127\.0\.0\.1|localhost):\d+\/?$/.test(base) || /:8420\
     const edit = async id => { await show(id); await waitFor(`!!(${bar('Edit')})`, 'the Edit button'); await ev(`(${bar('Edit')}).click(); true`); };
     try {
         await c.Page.enable(); await c.Network.enable(); await c.Network.setCacheDisabled({cacheDisabled:true});
+        await c.Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await c.Page.navigate({url:'about:blank'}); await c.Page.loadEventFired();
         await c.Page.navigate({url:base}); await c.Page.loadEventFired();
         await ev(`(async()=>{

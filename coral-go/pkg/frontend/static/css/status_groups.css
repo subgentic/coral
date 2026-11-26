@@ -1,0 +1,30 @@
+/* The agent list grouped by status (status_groups.js, #21466): lazy, so the start sheet carries none of it. */
+.status-switch { display: flex; align-items: center; gap: var(--space-md); margin: var(--space-xs) var(--space-md) var(--space-md); list-style: none; }
+.status-switch-label { font-size: var(--fs-base); color: var(--text-muted); }
+.status-head { list-style: none; margin: var(--space-md) 0 0; }
+.status-head-toggle { display: flex; align-items: center; gap: var(--space-md); width: 100%; justify-content: flex-start; text-align: start; font-size: var(--fs-base); font-weight: var(--fw-strong); }
+.status-head-toggle .session-group-count { margin-inline-start: auto; }
+.status-caret { width: 0; height: 0; border-block: 4px solid transparent; border-inline-start: 5px solid currentColor; flex: none; }
+.status-head-toggle[aria-expanded="true"] .status-caret, .status-caret.open { border-inline-start-color: transparent; border-block-start: 5px solid currentColor; border-block-end: 0; border-inline: 4px solid transparent; }
+.status-shape { width: 9px; height: 9px; flex: none; }
+.status-shape.st-needs { width: 0; height: 0; border-inline: 5.5px solid transparent; border-block-end: 10px solid var(--warning); }
+.status-shape.st-working { border-radius: 50%; background: var(--success); }
+.status-shape.st-idle { border-radius: 50%; border: 1.5px solid var(--text-muted); }
+.status-shape.st-done { width: auto; height: auto; color: var(--text-muted); font-weight: var(--fw-strong); line-height: 1; }
+.status-shape.st-done::before { content: "\2713"; }
+.status-more { list-style: none; margin-top: var(--space-md); }
+.status-more-toggle { display: flex; align-items: center; gap: var(--space-md); width: 100%; justify-content: flex-start; text-align: start; font-size: var(--fs-base); }
+/* A row here has no dot (its heading is its status) and no drag handle (the order is the time). */
+.session-list .session-group-item[data-group="__status__"] .session-dot, .session-list .session-group-item[data-group="__status__"] .drag-grip { display: none; }
+@media (max-width: 767px) { .status-switch-phone { grid-column: 2; grid-row: 1; justify-self: end; } }
+/* A phone in landscape (the bar is a wrapping row there): the switch is laid over the bar's first line, left of the account button, so it adds no line of its own. */
+@media (min-width: 768px) { .phone-bar:has(> .status-switch-phone) { position: relative; } .status-switch-phone { position: absolute; inset-block-start: 2px; inset-inline-end: 52px; } }
+/* The mock shows the time at the right of every row ("6 min", "now"); the computer's row hides it elsewhere, so a row here shows it. */
+.session-list .session-group-item[data-group="__status__"] .session-time { display: inline; }
+.session-list .session-group-item[data-need][data-state]:not([data-state="usage_limit"]) .session-name-row .chip-caps { display: none; }
+.status-caret-toggle { display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0 var(--space-xs); min-width: 0; }
+.status-workers-n { margin-inline-start: auto; color: var(--text-muted); font-size: var(--fs-base); white-space: nowrap; }
+.status-workers-sum, .status-workers-done { list-style: none; }
+.board-card-agents .status-workers-sum { display: flex; align-items: center; gap: var(--space-xs); padding-inline-start: calc(var(--space-2xl) * 2); min-height: 26px; color: var(--text-muted); font-size: var(--fs-base); } /* the mock's line under the orchestrator, shown while the workers are folded */
+.status-workers-done { padding-inline-start: var(--space-md); }
+.status-workers-done .status-head-toggle { color: var(--text-muted); font-weight: var(--fw-regular); }

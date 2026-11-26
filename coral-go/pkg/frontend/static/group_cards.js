@@ -95,17 +95,8 @@ function _renderTeamCard(boardName, boardSessions) {
             </div>
             <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
 
-        // Apply saved order, then always pin orchestrator to top
-        const orderedBoard = _sortByOrder(boardSessions);
-        orderedBoard.sort((a, b) => {
-            const aOrch = (a.display_name || a.board_job_title || '').toLowerCase().includes('orchestrator');
-            const bOrch = (b.display_name || b.board_job_title || '').toLowerCase().includes('orchestrator');
-            if (aOrch && !bOrch) return -1;
-            if (!aOrch && bOrch) return 1;
-            return 0;
-        });
-        html += _renderAgentListWithSubgroups(orderedBoard, boardWorkDir, true, boardName);
-        html += `</ul></li>`;
+        const draw = a => _renderAgentListWithSubgroups(a, boardWorkDir, true, boardName); // the module is loaded: render.js draws no list before it is
+        html += loadedModule('./status_groups.js').teamList(_sortByOrder(boardSessions), boardName, draw, s => _renderSessionItem(s, boardName, true, false, boardWorkDir)) + `</ul></li>`;
     return html;
 }
 

@@ -37,6 +37,7 @@ const DEVICES = [
             await Emulation.setDeviceMetricsOverride({ width: d.width, height: d.height, deviceScaleFactor: 2, mobile: true });
             await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
             if (d.ua) await Emulation.setUserAgentOverride({ userAgent: d.ua });
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
             await Page.navigate({ url: BASE });
             await Page.loadEventFired();
             // Startup done: the first live list rendered, the feed connected, history and settings loaded. Seeding before

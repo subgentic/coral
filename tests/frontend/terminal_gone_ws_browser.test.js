@@ -77,6 +77,7 @@ async function run() {
 
     try {
         const live = await launch('WS Live');
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await until(`typeof window.selectLiveSession === 'function' && typeof window._coralGetLiveSessions === 'function'`, 'the app hooks', 10000);
         await ev(`localStorage.setItem('coral-live-view-mode', 'terminal'); true`);
