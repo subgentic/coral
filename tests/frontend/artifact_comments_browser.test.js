@@ -75,9 +75,9 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
     };
     const select = (text) => ev(`(() => { const body = document.querySelector('#artifact-viewer .artifact-viewer-body'); const w = document.createTreeWalker(body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { const i = n.nodeValue.indexOf(${JSON.stringify(text)}); if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + ${JSON.stringify(text)}.length); const s = getSelection(); s.removeAllRanges(); s.addRange(r); return true; } } return false; })()`);
     const click = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return false; e.click(); return true; })()`);
-    const cards = () => ev(`[...document.querySelectorAll('.ac-card')].map(c => ({ id: c.dataset.id, text: c.textContent, quote: c.querySelector('.ac-quote').textContent, active: c.classList.contains('ac-active'), acts: [...c.querySelectorAll('.ac-act, .ac-replybox')].map(b => b.textContent) }))`);
+    const cards = () => ev(`[...document.querySelectorAll('.ac-card')].map(c => ({ id: c.dataset.id, text: c.textContent, quote: c.querySelector('.ac-quote').textContent, active: c.classList.contains('ac-active'), acts: [...c.querySelectorAll('.ac-act, .ac-replybox')].map(b => /^(Edit|Delete) comment$/.test(b.getAttribute('aria-label') || '') ? b.getAttribute('aria-label').replace(' comment', '') : b.textContent) }))`);
     // an action of a thread's first entry (Resolve is in its header, Edit and Delete under its text)
-    const topAct = (id, label) => `[...document.querySelectorAll('.ac-card[data-id="${id}"] > .ac-entry:first-of-type .ac-act')].find(b => b.textContent === ${JSON.stringify(label)})`;
+    const topAct = (id, label) => `[...document.querySelectorAll('.ac-card[data-id="${id}"] > .ac-entry:first-of-type .ac-act')].find(b => (/^(Edit|Delete) comment$/.test(b.getAttribute('aria-label') || '') ? b.getAttribute('aria-label').replace(' comment', '') : b.textContent) === ${JSON.stringify(label)})`;
     const lastCall = () => ev(`window.__calls[window.__calls.length - 1]`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

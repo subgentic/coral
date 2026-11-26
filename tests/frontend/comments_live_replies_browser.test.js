@@ -71,7 +71,7 @@ const HEX = 'e'.repeat(64);
         console.log('   ✓');
 
         console.log('3. A reply that arrives while a comment is being edited keeps the edit: its words, its caret and the focus');
-        await ev(`[...document.querySelectorAll('.ac-panel button')].find(b => b.textContent === 'Edit').click(); true`);
+        await ev(`[...document.querySelectorAll('.ac-panel button')].find(b => b.getAttribute('aria-label') === 'Edit comment').click(); true`);
         await waitFor(`!!document.querySelector('.ac-panel textarea.ac-input')`, 'the editor', 8000);
         const typed = await ev(`(() => { const ta = document.querySelector('.ac-panel textarea.ac-input'), original = ta.value; ta.focus(); ta.value = original + ' - my unsaved edit'; ta.dispatchEvent(new Event('input', { bubbles: true })); ta.setSelectionRange(3, 7); return { original, typed: ta.value }; })()`);
         assert.ok(/my unsaved edit$/.test(typed.typed) && typed.original !== typed.typed, 'the edit is typed: ' + JSON.stringify(typed));
