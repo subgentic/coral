@@ -13,7 +13,7 @@ This page covers a headless Linux server (such as an Ubuntu VPS) where no deskto
 
 ## Server sizing
 
-Coral itself idles at roughly **115 MB** of RAM, while each active Claude Code session is a Node.js process that uses roughly **200–500 MB** of RAM (and is kept alive across restarts when you use `tmux`, or until idle sleep parks it):
+As a rough sizing guide, Coral itself idles at roughly **115 MB** of RAM, while each active Claude Code session is a Node.js process that uses roughly **200–500 MB** of RAM (and is kept alive across restarts when you use `tmux`, or until idle sleep parks it):
 
 | Server RAM | Concurrent active agents | Notes |
 |---|---|---|
@@ -104,11 +104,19 @@ check. This checks installation, not provider sign-in; see
 
 ## 3. Accept the Terms of Service
 
-> **[PLACEHOLDER — awaiting `#21530` (`--accept-terms` / `CORAL_ACCEPT_TERMS=1`)]:** The headless Terms of Service launch flag `--accept-terms` (and `CORAL_ACCEPT_TERMS=1`) is being added in `#21530`. The human installing Coral sets `--accept-terms` (or `CORAL_ACCEPT_TERMS=1`) after reading the Terms; an installing or deploying agent must **never** set `--accept-terms` or `CORAL_ACCEPT_TERMS=1` on a person's behalf, and must **never** fake a pseudo-terminal (`pty`) or write a helper script to accept the Terms.
->
-> Until `#21530` lands:
-> - **Interactive terminal once as the service user:** Run `sudo -u coral -i coral --no-browser` in an interactive SSH session (`ssh -t`), read the Terms of Service, type `accept`, and press `Ctrl+C` once the server prints the dashboard URL (this writes `/home/coral/.coral/.eula-accepted`).
-> - **Coral Hub bootstrap credential:** When a machine starts with a one-time Coral Hub bootstrap credential (`--bootstrap-file` or `/run/coral/bootstrap.d/credential`), Coral records the Terms acceptance confirmed by Coral Hub on enrollment ([hub.md](hub.md#enrolling-with-a-one-time-credential-cloud-hub)).
+On a headless server (where `stdin` is not an interactive terminal), read the Terms of Service first with `coral terms`:
+
+```bash
+sudo -u coral -i coral terms
+```
+
+Then have **the person installing Coral** pass `--accept-terms` on the `ExecStart` line in `coral.service` (or set `Environment=CORAL_ACCEPT_TERMS=1`), which records acceptance in `/home/coral/.coral/.eula-accepted`:
+
+```bash
+sudo -u coral -i coral --host 127.0.0.1 --port 8420 --no-browser --accept-terms
+```
+
+> **Only a human may accept the Terms:** The person installing Coral accepts the Terms of Service. An installing or deploying agent must **never** pass `--accept-terms` or `CORAL_ACCEPT_TERMS=1` on a person's behalf, and must **never** fake a pseudo-terminal (`pty`) or write a helper script to accept the Terms. (When a machine enrolls with a one-time Coral Hub bootstrap credential via `--bootstrap-file` or `/run/coral/bootstrap.d/credential`, Coral also records the Terms acceptance confirmed by Coral Hub on enrollment; see [hub.md](hub.md#enrolling-with-a-one-time-credential-cloud-hub).)
 
 ## 4. Set the dashboard password headlessly
 
@@ -166,6 +174,8 @@ WorkingDirectory=/home/coral
 Environment=HOME=/home/coral
 Environment=CORAL_DATA_DIR=/home/coral/.coral
 Environment=PATH=/home/coral/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Set by the person installing Coral after reading `coral terms` (an agent must not set this for you):
+# Environment=CORAL_ACCEPT_TERMS=1
 # Optional: seed the initial password once on first start (file must be 0600, owned by coral; deleted after read)
 # Environment=CORAL_INITIAL_PASSWORD_FILE=/home/coral/.coral-initial-password
 ExecStart=/home/coral/.local/bin/coral --host 127.0.0.1 --port 8420 --no-browser
@@ -192,6 +202,7 @@ If you installed the Coral binaries into `/usr/local/bin`, change `ExecStart` to
 | `--host 127.0.0.1` | Bind to loopback only (the default when remote access is off). Agents on the server always talk to Coral over loopback. |
 | `--port 8420` | HTTP and WebSocket port (default `8420` on Linux/macOS; also `CORAL_PORT`). |
 | `--no-browser` | Do not try to run `xdg-open` on startup. |
+| `--accept-terms` | Record that the person installing Coral accepts the Terms of Service (read them first with `coral terms`; also `CORAL_ACCEPT_TERMS=1`). An agent must never set this on a person's behalf. |
 | `--home <dir>` | Data directory (default `~/.coral`; also `CORAL_DATA_DIR`). |
 | `--backend pty\|tmux` | Terminal backend (`pty` by default). Use `--backend tmux` (with `tmux` installed) if you want agent terminals to keep running across `systemctl restart coral`. |
 | `--cloud-url <url>` | Coral Hub origin (`https://app.coralhub.dev` in release builds; `--cloud-url off` disables Hub connections). |
@@ -216,7 +227,7 @@ curl -s http://127.0.0.1:8420/api/health
 
 Keep Coral itself listening on `--host 127.0.0.1` (do **not** expose Coral's plain-HTTP port to the internet). From strongest to weakest, choose one of:
 
-### Option 1 (Recommended): Coral Hub (`coral cloud connect`, with Hub-only mode coming in `#21558`) or a private tunnel (SSH / Tailscale)
+### Option 1 (Recommended): Coral Hub (`coral cloud connect`) or a private tunnel (SSH / Tailscale)
 
 None of these opens a public web port on your server:
 
@@ -229,7 +240,6 @@ None of these opens a public web port on your server:
   ```
 
   When approving in your browser, choose the server's maximum access mode (**View**, **Interact** or **Launch**). See [Connecting a server to Coral Hub](hub.md#connecting-a-server-to-coral-hub).
-  > **[PLACEHOLDER — awaiting `#21558` (`--hub-only` / `CORAL_HUB_ONLY=1`)]:** Once `#21558` lands, pass `--hub-only` (or `Environment=CORAL_HUB_ONLY=1`) in `coral.service` to lock the server to Hub-only mode (loopback only, `require_auth_on_loopback` forced on, and any request with a forwarding header or non-local `Host` refused with `403 hub_only` while local CLIs and the Hub tunnel continue to work).
 - **SSH local port forward:** Forward port `8420` over SSH from your laptop and open `http://localhost:8420`:
 
   ```bash
