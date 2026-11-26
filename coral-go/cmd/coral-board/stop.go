@@ -56,9 +56,14 @@ func cmdStop() {
 		}
 		project = st.Project
 	}
+	archiveAgent(project, member, *removeWorktree)
+}
+
+// archiveAgent is the one archive call behind `coral-board stop` and `coral-board worker archive`: the same route, the same words.
+func archiveAgent(project, member string, removeWorktree bool) {
 	path := fmt.Sprintf("/%s/agents/%s/stop", url.PathEscape(project), url.PathEscape(member))
 	var body any
-	if *removeWorktree {
+	if removeWorktree {
 		body = map[string]any{"remove_worktree": true}
 	}
 	data := goalCall("POST", path, body, "stopping "+member, 200)

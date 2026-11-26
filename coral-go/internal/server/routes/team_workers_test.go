@@ -31,7 +31,8 @@ func TestWorkersBriefNamesTheListAndTheLaunch(t *testing.T) {
 	require.Contains(t, got, "Workers approved for this team:")
 	require.Contains(t, got, "Worker     for code tasks  (Claude · Sonnet)")
 	require.Contains(t, got, "Quick fix  small changes  (Codex)")
-	require.Contains(t, got, `coral-board worker launch "Worker" --task N`)
+	require.Contains(t, got, `coral-board worker launch "Worker" --task N [--worktree]`)
+	require.Contains(t, got, "coral-board worker archive NAME --remove-worktree")
 	require.Contains(t, got, "a first choice, not a lock")
 	require.Equal(t, "", board.WorkersBrief(nil), "no workers: nothing is added to the prompt")
 	require.True(t, board.WorkerCached(ws[0]), "Claude with instructions starts from the cache")
@@ -93,6 +94,9 @@ func callWorkerLaunch(h *SessionsHandler, ctx context.Context, project, name str
 	req := httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(body))
 	req = req.WithContext(context.WithValue(ctx, chi.RouteCtxKey, rc))
 	rec := httptest.NewRecorder()
+	req.Header.Set("Origin", "http://127.0.0.1:8420") // the dashboard's own page: the relaxed folder bounds (strict bounds are for agents outside a project)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.Host, req.RemoteAddr = "127.0.0.1:8420", "127.0.0.1:50000"
 	h.LaunchWorker(rec, withActor(req, a))
 	return rec
 }
@@ -202,4 +206,41 @@ func TestAWorkerChangePostsTheListToTheOrchestrator(t *testing.T) {
 	msgs, _ = bs.ListMessages(ctx, "crew", 100, 0, 0)
 	require.Len(t, msgs, 2)
 	require.Contains(t, msgs[0].Content+msgs[1].Content, "no approved workers now")
+}
+
+// #21481: {"worktree": true} starts the worker in its own worktree task-N (the launch route's worktree_task), needs a task, and the archive of that worker with remove_worktree takes the clean folder away and keeps the branch.
+func TestLaunchWorkerWithWorktreeUsesTheTaskNumber(t *testing.T) {
+	h, _ := workerLaunchFixture(t)
+	ctx := context.Background()
+	repo := realOf(t, worktreeRepo(t))
+	require.NoError(t, h.ss.SetSetting(ctx, "launch_in_worktree", "true"))
+	_, err := h.bs.SaveWorker(ctx, "crew", "", board.Worker{Name: "Dev", AgentType: "claude", WorkingDir: repo}, false)
+	require.NoError(t, err)
+	task, err := h.bs.CreateTask(ctx, "crew", "Fix the login", "details", "high", "Orchestrator")
+	require.NoError(t, err)
+	op := Actor{Kind: ActorOperator, Name: "Operator"}
+
+	rec := callWorkerLaunch(h, ctx, "crew", "Dev", `{"worktree":true}`, op)
+	require.Equal(t, http.StatusBadRequest, rec.Code, "a worktree is named after a task: %s", rec.Body.String())
+	require.NoDirExists(t, filepath.Join(defaultWorktreeDir(repo), "task-0"))
+
+	rec = callWorkerLaunch(h, ctx, "crew", "Dev", fmt.Sprintf(`{"task_id":%d,"worktree":true}`, task.ID), op)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	name := fmt.Sprintf("task-%d", task.ID)
+	path := filepath.Join(defaultWorktreeDir(repo), name)
+	require.DirExists(t, path)
+	require.Equal(t, name, out["worktree"].(map[string]any)["name"], "%v", out)
+	sid, _ := out["session_id"].(string)
+	require.NotEmpty(t, sid)
+	tw, err := h.ss.GetTaskWorktree(ctx, sid)
+	require.NoError(t, err)
+	require.NotNil(t, tw, "the launch remembers the folder as the worker's own")
+	require.Equal(t, path, tw.Path)
+
+	// without the flag nothing changes: no worktree, no record
+	rec = callWorkerLaunch(h, ctx, "crew", "Dev", fmt.Sprintf(`{"task_id":%d}`, task.ID), op)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NotContains(t, rec.Body.String(), `"worktree"`)
 }

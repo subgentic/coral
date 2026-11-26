@@ -56,7 +56,7 @@ func WorkersBrief(workers []Worker) string {
 		fmt.Fprintf(&b, "  %-*s  %s  (%s)\n", width, w.Name, purpose, WorkerRuns(w))
 	}
 	first := workers[0].Name
-	fmt.Fprintf(&b, "Launch one for a task with:\n  coral-board worker launch %q --task N\n", first)
+	fmt.Fprintf(&b, "Launch one for a task with:\n  coral-board worker launch %q --task N [--worktree]\nWith --worktree it works in its own git worktree task-N; when it is done:\n  coral-board worker archive NAME --remove-worktree\n", first)
 	b.WriteString("Workers of one kind start with the same instructions. The list is a first choice, not a lock: you may still start your own setup with coral-agent launch.")
 	return b.String()
 }

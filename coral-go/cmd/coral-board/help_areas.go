@@ -83,6 +83,8 @@ var boardAreas = []clihelp.Area{
 			`coral-board waiting "Frontend Dev"                  # what waits for it: unread messages, a send not typed`,
 			`coral-board wake "Frontend Dev"                      # start an asleep agent (also: sleep, restart, stop, interrupt)`,
 			`coral-board worker launch "Reviewer" --task 12      # start one of the workers the Operator approved for the team`,
+			`coral-board worker launch "Dev" --task 12 --worktree  # the same, in its own git worktree task-12`,
+			`coral-board worker archive "Dev #12" --remove-worktree  # stop it; its clean worktree goes, the branch stays`,
 			`coral-board wait --task 12                          # park until task 12 changes, then STOP your turn`,
 			`coral-board send --board other-team "message"       # another team's Orchestrator (Orchestrators and the Operator)`,
 		},

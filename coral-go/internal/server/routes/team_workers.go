@@ -171,11 +171,16 @@ func (h *SessionsHandler) LaunchWorker(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var in struct {
-		TaskID int64 `json:"task_id"`
+		TaskID   int64 `json:"task_id"`
+		Worktree bool  `json:"worktree"` // start it in its own worktree task-N (#21481); needs a task
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := decodeJSONStrict(r, &in); err != nil {
 		errBadRequest(w, `send {"task_id": N}`)
+		return
+	}
+	if in.Worktree && in.TaskID <= 0 {
+		errBadRequest(w, "worktree needs a task: the worktree is called task-N")
 		return
 	}
 	worker, err := h.bs.GetWorker(r.Context(), project, name)
@@ -219,6 +224,9 @@ func (h *SessionsHandler) LaunchWorker(w http.ResponseWriter, r *http.Request) {
 	}
 	if worker.PermissionMode == "default" || (strings.HasPrefix(worker.PermissionMode, "custom:") && !agentCaller(r)) { // an agent never starts an agent in a custom mode
 		req["permission_mode"] = worker.PermissionMode
+	}
+	if in.Worktree {
+		req["worktree_task"] = in.TaskID
 	}
 	raw, _ := json.Marshal(req)
 	inner2, _ := http.NewRequestWithContext(r.Context(), http.MethodPost, "/api/sessions/launch", strings.NewReader(string(raw)))

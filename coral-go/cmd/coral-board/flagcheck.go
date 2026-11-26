@@ -67,7 +67,7 @@ func checkKnownFlags(args []string) error {
 	case "ask":
 		spec = clihelp.FlagSpec{Values: []string{"--note", "--board"}, Positional: 4}
 	case "worker":
-		spec = clihelp.FlagSpec{Bools: []string{"--json"}, Values: []string{"--task"}, Positional: 2}
+		spec = clihelp.FlagSpec{Bools: []string{"--json", "--worktree", "--remove-worktree"}, Values: []string{"--task"}, Positional: 2}
 	case "goal":
 		if len(rest) == 0 {
 			return nil
