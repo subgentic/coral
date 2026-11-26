@@ -1,5 +1,53 @@
 # Release Notes
 
+## v2.1.18 — Run Coral on a server: one Terms switch, Hub-only mode and safer sign-in behind a proxy
+
+Task numbers in brackets. Built on v2.1.17. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### Running Coral on a server
+
+- **Accept the Terms with one switch** (#21530): `coral --accept-terms` or `CORAL_ACCEPT_TERMS=1` lets the person installing Coral accept the Terms on a start with no terminal. `coral terms` prints them.
+- **Hub-only mode** (#21558, #21578, #21581): `--hub-only` refuses every request that does not arrive through the Coral Hub tunnel. The server guide now recommends it.
+- **Sign-in behind a reverse proxy** (#21528, #21574, #21575): wrong passwords and wrong API keys are counted per client (the last X-Forwarded-For of a trusted proxy), so a stranger cannot lock the Operator out. The proxy's own address has a ceiling of 10 times one client's free tries, and Hub-carried requests are counted under their own key.
+- **Proxy warning** (#21527, #21584): Settings says when Coral was reached through a proxy while Remote access is off.
+- **The sign-in link stays out of logs** (#21549): the one-time sign-in link is printed only to a terminal, so systemd's journal and log files never keep the login token. The line says how to get a link.
+- **`coral cli-check`** (#21533): checks the agent command-line tools on a headless install.
+- **`nosniff` on every answer** (#21544), not only on `/api/`.
+- **Server docs** (#21525, #21534, #21547, #21554, #21566): a "Run Coral on a server" guide with sizing, topology and proxy rules; plain words that release builds store plain SQLite and SQLCipher is opt-in.
+- **Headless Hub setup** (#21557): the Connect dialog shows the SSH command for a Hub on a server.
+
+#### Coral Hub and several computers
+
+- **Two Hubs on one computer** (#21645): a revoked Hub key is still refused, but it no longer counts as a wrong key, so a Hub that has not yet learned of its revoke cannot lock the other Hubs out of this computer.
+- **A remote browser skips owner-only screens** (#21543): no "other_user" 403 noise on load; the Hub indicator and terminal notices wait for the owner check, which is read once.
+- **Team names link to the team page** (#21538, #21642): in Needs you and Activity rows, with a 44 px tap area on touch screens.
+- **Activity names each computer once** (#21571) when several computers are read.
+
+#### Agents
+
+- **pi** (#21604, #21615, #21618): Coral reads pi's model list from stderr too, ignores trailing warnings, and the usage spot says pi reports no usage to Coral. The docs note that pi 0.73.1 hangs on first start under Node 26.
+- **Resume keeps the agent's type** (#21603): a resume without an agent type resumes the stored type, not Claude.
+- **Windows PowerShell panes** (#21605): PowerShell 5.1 keeps its module cache out of the work folder.
+
+#### API
+
+- **Clearer error codes** (#21548, #21631): a missing session answers 404 (archive, unarchive, sleep, wake, team sleep), state conflicts answer 409, and a failed template fetch answers 502 with `template_fetch_failed` or `template_bad_response`.
+
+### Test and gate fixes in this release
+
+- A workflow approval on Windows no longer treats a rooted or drive path (`/usr/bin/env`, `C:x/y.sh`) as a file of the repo, so the approved file is the file that runs (#21649).
+- The Windows test run is green again: the fake pi in a Go test is a copy of the test binary (#21648), a node test imports by a `file://` URL (#21646), the Live file-store permission check is unix-only (#21649), and the hook test runs in its own folder (#21598).
+- Browser suites follow the owner check's single auth-status read (#21642, #21650), and the first-run walkthrough waits for the Hub offer's saved answer (#21667).
+- The short help drops the `--no-browser` line, still in `--help-all`, to stay within its 32 lines (#21639).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption, the browser gate and windows-tests are green on the gated commit, on the first attempt.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+
 ## v2.1.17 — The sidebar groups agents by status, team workers, and automations a team's Orchestrator proposes and you approve
 
 Task numbers in brackets. Built on v2.1.16. A prerelease until the Operator promotes it.
