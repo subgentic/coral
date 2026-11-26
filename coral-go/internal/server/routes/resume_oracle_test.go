@@ -445,7 +445,7 @@ func (h *SessionsHandler) resumeBefore4809(w http.ResponseWriter, r *http.Reques
 
 	agentType := body.AgentType
 	if agentType == "" {
-		agentType = at.Claude
+		agentType = h.storedResumeType(r.Context(), name, body.CurrentSessionID) // #21603, the one intended change since #4809: no agent_type resumes the stored type
 	}
 	if agentType == at.Terminal { // a plain shell has no conversation to resume (and no agent CLI to type)
 		errBadRequest(w, "Resume not supported for terminal")
