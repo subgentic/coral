@@ -23,32 +23,43 @@ const { coralReady } = require('./helpers/wait');
             }; }
             document.getElementById('template-browser-modal')?.remove();
             document.querySelectorAll('.toast').forEach(t => t.remove());
-            (await import(S + 'template_browser.js')).showTemplateBrowser('agents', () => {});
+            await (await import(S + 'template_browser.js')).showTemplateBrowser('agents', () => {});
             return true;
         })()`);
         const text = sel => ev(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
-        const toasts = () => ev(`[...document.querySelectorAll('.toast, [role="status"], [role="alert"]')].map(t => t.textContent).join('|')`);
+        const modal = '#template-browser-modal';
+        const opened = () => waitFor(`document.querySelector('${modal}')?.getClientRects().length > 0`, 'the template browser is open', 10000);
+        const errorToast = async message => {
+            // Only the error toast produced by this read; unrelated page status (e.g.
+            // the no-tmux banner) is not evidence that the template read has settled.
+            const match = `[...document.querySelectorAll('.toast.error .toast-message')].find(t => t.textContent === ${JSON.stringify(message)})`;
+            await waitFor(match, message, 10000);
+            assert.equal(await ev(`(${match}).textContent`), message);
+        };
         // a category read that fails: no categories (first: a good answer is kept for the page's life, so a later run would draw from that)
         await run(1);
-        await waitFor(`!document.querySelector('.template-browser-categories .template-browser-loading')`, 'the category read to settle', 10000);
-        assert.equal(await ev(`document.querySelectorAll('.template-cat-btn').length`), 0, 'a 502 on the categories draws none');
-        assert.match(await toasts(), /Failed to load template categories/, 'and says so: ' + await toasts());
+        await opened();
+        await errorToast('Failed to load template categories');
+        await waitFor(`!document.querySelector('#template-browser-modal .template-browser-categories .template-browser-loading')`, 'the category read to settle', 10000);
+        assert.equal(await ev(`document.querySelectorAll('#template-browser-modal .template-cat-btn').length`), 0, 'a 502 on the categories draws none');
         // a template read that fails: the preview says so
         await run(3);
-        await waitFor(`document.querySelector('.template-cat-btn')`, 'the category list', 10000);
-        await ev(`document.querySelector('.template-cat-btn').click()`);
-        await waitFor(`document.querySelector('.template-item-btn')`, 'the template list', 10000);
-        await ev(`document.querySelector('.template-item-btn').click()`);
-        await waitFor(`!document.querySelector('.template-browser-preview .template-browser-loading')`, 'the preview to settle', 10000);
-        const preview = await text('.template-browser-preview');
+        await opened();
+        await waitFor(`document.querySelector('#template-browser-modal .template-cat-btn')`, 'the category list', 10000);
+        await ev(`document.querySelector('#template-browser-modal .template-cat-btn').click()`);
+        await waitFor(`document.querySelector('#template-browser-modal .template-item-btn')`, 'the template list', 10000);
+        await ev(`document.querySelector('#template-browser-modal .template-item-btn').click()`);
+        await waitFor(`document.querySelector('#template-browser-modal .template-browser-preview .empty-state')?.textContent === 'Failed to load template'`, 'the preview error', 10000);
+        const preview = await text('#template-browser-modal .template-browser-preview');
         assert.match(preview, /Failed to load template/, 'a 502 on one template says so: ' + JSON.stringify(preview));
         // a list read that fails: no templates are drawn from the error object
         await run(2);
-        await waitFor(`document.querySelector('.template-cat-btn')`, 'the category list', 10000);
-        await ev(`document.querySelector('.template-cat-btn').click()`);
-        await waitFor(`!document.querySelector('.template-browser-list .template-browser-loading')`, 'the list read to settle', 10000);
-        assert.equal(await ev(`document.querySelectorAll('.template-item-btn').length`), 0, 'a 502 on the template list draws no templates');
-        assert.match(await toasts(), /Failed to load templates/, 'and says so: ' + await toasts());
+        await opened();
+        await waitFor(`document.querySelector('#template-browser-modal .template-cat-btn')`, 'the category list', 10000);
+        await ev(`document.querySelector('#template-browser-modal .template-cat-btn').click()`);
+        await waitFor(`!document.querySelector('#template-browser-modal .template-browser-list .template-browser-loading')`, 'the list read to settle', 10000);
+        assert.equal(await ev(`document.querySelectorAll('#template-browser-modal .template-item-btn').length`), 0, 'a 502 on the template list draws no templates');
+        await errorToast('Failed to load templates');
         console.log('PASS the template browser says it failed on a 502, for all three reads');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
