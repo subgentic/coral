@@ -1162,12 +1162,13 @@ func newTeamResolver(bs *board.Store) func(string) string {
 // artifacts, an ETag-validated reply) replaces it.
 func noStoreAPI(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A browser never guesses another type for any answer of Coral's: the /auth pages, the dashboard shell, the static files and the 404 page as much as the API (#4032, Security's #4031 finding 2; #21544).
+		// Set before the handler runs; a handler that sets it again sets the same value.
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if p := r.URL.Path; strings.HasPrefix(p, "/api/") || p == "/ws" || strings.HasPrefix(p, "/ws/") {
 			w.Header().Set("Cache-Control", "no-store")
-			// Another page can't load an answer as an image or a script, and a browser never
-			// guesses another type for it (#4032, Security's #4031 finding 2).
+			// Another page can't load an answer as an image or a script.
 			w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
-			w.Header().Set("X-Content-Type-Options", "nosniff")
 		}
 		next.ServeHTTP(w, r)
 	})

@@ -36,3 +36,21 @@ func TestQRCodeIsNotStored(t *testing.T) {
 	r.srv.Router().ServeHTTP(rec, req)
 	assert.Equal(t, "private, no-store", rec.Header().Get("Cache-Control"), "status %d", rec.Code)
 }
+
+// #21544: nosniff is on every answer, not only /api/: the /auth pages, the shell, static files and a missing path.
+func TestEveryAnswerIsNosniff(t *testing.T) {
+	h := noStoreAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	for _, path := range []string{"/api/health", "/ws/coral", "/auth", "/auth/link", "/", "/static/app.js", "/no/such/page"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"), path)
+	}
+	r := newE2ERemote(t, "nosniff", nil) // and through the real router, where a handler of its own could drop it
+	for _, path := range []string{"/auth", "/no/such/page"} {
+		req := httptest.NewRequest("GET", path, nil)
+		req.RemoteAddr, req.Host = "127.0.0.1:50000", "127.0.0.1:8420"
+		rec := httptest.NewRecorder()
+		r.srv.Router().ServeHTTP(rec, req)
+		assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"), "%s status %d", path, rec.Code)
+	}
+}
