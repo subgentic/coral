@@ -63,6 +63,7 @@ type TaskInput struct {
 
 type TaskWorkflow struct {
 	CompletionReview             *CompletionReview      `json:"completion_review,omitempty"`
+	WaitingOn                    *TaskWaitOn            `json:"waiting_on,omitempty"` // the owner waits on a member or a condition (task wait-on, #21697)
 	TeamMode                     *WorkingMode           `json:"team_mode,omitempty"`
 	RestoredInstructions         *string                `json:"restored_instructions,omitempty"`
 	RestoredInstructionsRevision int                    `json:"restored_instructions_revision,omitempty"`

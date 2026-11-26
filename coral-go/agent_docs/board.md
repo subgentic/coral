@@ -1342,6 +1342,24 @@ holds at most the team's **park limit** of parked tasks (`park_limit` in the tea
 changing the reason of a task that is parked already is never refused. Parks made before the cap are left as they
 are. The orchestrator's health check names an agent that holds a park older than 24 hours, or more parks than the cap.
 
+#### Waiting on a team member (`task wait-on`)
+
+```
+POST /api/board/{project}/tasks/{id}/wait-on   {"member": "Orchestrator", "reason": "need the API choice"}
+POST /api/board/{project}/tasks/{id}/wait-on   {"condition": "the staging deploy", "reason": "..."}
+POST /api/board/{project}/tasks/{id}/wait-on   {"clear": true}
+coral-board task wait-on <id> --member NAME --reason "why"
+coral-board task wait-on <id> --condition TEXT --reason "why"
+coral-board task wait-on <id> --clear
+```
+
+A wait **inside the team** (park is for waits outside it). The task's owner, an orchestrator or the Operator sets it on an open
+assigned task; the task stays in progress with its owner. It shows in `task show`, `task list` and the API (`waiting_on`).
+While it is set the owner gets no no-activity nudge for that task. The health check of the member waited on gets the line
+"<owner>'s #N has waited H h on you: <reason>" (other members get one board mention once the wait-escalate time passes). It
+clears when that member posts on the task (`post --task N`) or the owner clears it. An in-progress task with no tool
+activity and no wait-on for `stalled_hours` (default 4) shows as stalled in the health check. `--blocked-by` stays for waits on tasks.
+
 ### Task Status Workflow
 
 ```

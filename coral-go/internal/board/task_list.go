@@ -90,6 +90,8 @@ type TaskListItem struct {
 	ReviewInPool    bool     `db:"review_in_pool" json:"review_in_pool,omitempty"`
 	ReviewersWanted int      `db:"reviewers_wanted" json:"reviewers_wanted,omitempty"`
 	ReviewAreasJSON string   `db:"review_areas_json" json:"-"`
+	// WaitingOn: what an open task's owner waits on (task wait-on, #21697), as Task.Workflow.WaitingOn says it; absent for any other task.
+	WaitingOn *TaskWaitOn `db:"-" json:"waiting_on,omitempty"`
 }
 
 // TaskListPage is one page of the task list.
@@ -163,6 +165,7 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 		return nil, err
 	}
 	s.loadListVerification(ctx, page.Tasks)
+	s.fillListWaitingOn(ctx, page.Tasks)
 	fillListReviewers(page.Tasks)
 	s.fillListArtifactCounts(ctx, page.Tasks)
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {

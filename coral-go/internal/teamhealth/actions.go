@@ -152,6 +152,16 @@ func (in CheckInput) actions(items []Item) []action {
 			out = append(out, action{age: rv.Age, text: fmt.Sprintf("Task #%d has been in review with %s for %s. Ask %s, or give the review to someone else.", rv.Task, rv.With, age(rv.Age), rv.With)})
 		}
 	}
+	for _, w := range r.WaitedOnYou {
+		l := fmt.Sprintf("%s's #%d has waited %s on you", w.Owner, w.Task, age(w.Age))
+		if w.Reason != "" {
+			l += ": " + w.Reason
+		}
+		out = append(out, action{onYou: true, age: w.Age, text: l + ". Answer them, or tell them what to do instead."})
+	}
+	for _, st := range r.Stalled {
+		out = append(out, action{age: st.Silent, text: fmt.Sprintf("%s's #%d is in progress with no activity and no wait-on for %s: stalled, not working. Ask %s what is holding it; if it waits on someone, it should say so with coral-board task wait-on.", st.Agent, st.Task, age(st.Silent), st.Agent)})
+	}
 	for _, ni := range r.NameIssues {
 		if ni.Edge {
 			out = append(out, action{rank: 4, text: ni.Name + ": its name starts or ends with punctuation, so mentions may not reach it. Check its name."})
