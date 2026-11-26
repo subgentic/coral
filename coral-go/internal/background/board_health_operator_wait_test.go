@@ -36,7 +36,7 @@ func TestAPostThatWaitsOnTheOperatorAndIsNotInNeedsYouIsALineAndANudge(t *testin
 	post("Dev", "before the first scan: @Operator pick one") // the first scan only marks where the board is
 	h.checkTo("Orchestrator")
 
-	post("Dev", "@Operator please pick A or B")          // listed: no ask, no file
+	post("Dev", "@Operator please pick A or B?")         // listed: no ask, no file
 	post("QA", "@Operator which of the two?")            // covered by the --ask right after
 	ask("QA", "@Operator which of the two? (as an ask)") //
 	ask("Dev2", "@Operator need your choice")            // the post is itself an --ask
@@ -44,15 +44,17 @@ func TestAPostThatWaitsOnTheOperatorAndIsNotInNeedsYouIsALineAndANudge(t *testin
 	_, err0 := h.s.AddArtifactTags(ctx, "team", hex, []string{"for review"})
 	require.NoError(t, err0)
 	post("Dev2", "needs the operator to decide, the file is coral://artifacts/"+hex) // covered: a "for review" file is linked
-	post("Dev2", "the operator decides this one")                                    // listed: no ask, and the file linked above is another post
+	post("Dev2", "the operator decides this one, ok?")                               // listed: no ask, and the file linked above is another post
 	post("Dev", "your call between the two of us")                                   // not the Operator's: no word "operator"
 	post("Dev", "say if you want me to go on")                                       // no word "operator"
-	post("Late", "say if you want it, operator")                                     // listed: a phrase and the word
-	post("Orchestrator", "@Operator the release is yours to tag")                    // the orchestrator is the one told: a line, no nudge to itself
+	post("Late", "say if you want it, operator?")                                    // listed: a phrase and the word
+	post("Orchestrator", "@Operator the release is yours to tag, ok?")               // the orchestrator is the one told: a line, no nudge to itself
 	post("Operator", "@Operator test")                                               // the Operator's own post
 	_, err := h.s.PostSystemMessage(ctx, "team", "Coral Task Queue", "@Operator system", nil)
 	require.NoError(t, err)
 	post("Ghost", "@Operator not a member")
+	post("Dev", "@Operator FYI the release is out, nothing needed from you") // a mention that asks nothing is not a wait (#21702)
+	post("QA", "the operator decides this one, I will wait")                 // a phrase with no question to them is not a wait either
 
 	out := h.next()
 	assert.Contains(t, out, "Dev: posted something that waits on the Operator")
@@ -123,7 +125,7 @@ func TestAPostYoungerThanTheGraceIsJudgedLater(t *testing.T) {
 	}
 	posted := time.Now().UTC()
 	scan(posted) // the first scan marks where the board is
-	_, err = h.s.PostMessage(ctx, "team", "Dev", "@Operator a fresh question", nil)
+	_, err = h.s.PostMessage(ctx, "team", "Dev", "@Operator a fresh question?", nil)
 	require.NoError(t, err)
 
 	scan(posted.Add(5 * time.Minute))
@@ -153,7 +155,7 @@ func TestOperatorWaitSettingsSwitchGraceAndExemptAuthors(t *testing.T) {
 		posted := time.Now().UTC()
 		h.m.noteOperatorWaits(ctx, "team", "Orchestrator", subs, map[string]AgentInfo{}, posted)
 		for _, who := range []string{"Dev", "Lead"} {
-			_, err = h.s.PostMessage(ctx, "team", who, "@Operator a status that asks nothing", nil)
+			_, err = h.s.PostMessage(ctx, "team", who, "@Operator which of the two?", nil)
 			require.NoError(t, err)
 		}
 		h.m.noteOperatorWaits(ctx, "team", "Orchestrator", subs, map[string]AgentInfo{}, posted.Add(at))

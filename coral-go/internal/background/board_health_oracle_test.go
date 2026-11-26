@@ -33,7 +33,7 @@ var checkPhrases = map[string]int{
 	"Since ": 30, "No progress since": 30, "Nothing needs you": 5,
 	"Needs the Operator": 20, "(back": 10, "parked": 10, "act on these": 30, "Counts: ": 100,
 	// the orchestrator's GOALS segment (#11412): new in both, listed from the same goals, so the rest of the check and the databases must still agree with it present
-	"Goals: #": 100, "READY: close it": 30, "NEEDS THE OPERATOR": 50,
+	"Goals: #": 100, "READY [ack ": 30, "NEEDS THE OPERATOR": 50,
 }
 
 var checkSeen map[string]int
@@ -127,6 +127,14 @@ func dumpBoard(t *testing.T, path string) []string {
 	kept := out[:0]
 	for _, line := range out {
 		if !strings.Contains(line, "key=health_offbooks_post_cursor") && !strings.Contains(line, "key=health_operator_wait_cursor") { // the Operator-wait scan (#12138) marks where it has read the board the same way
+			kept = append(kept, line)
+		}
+	}
+	out = kept
+	// The acknowledgeable lines the frozen walk never noted (a ready goal, a blocked agent, a stale review: state "shown", #21702) are rows only the new check writes.
+	kept = out[:0]
+	for _, line := range out {
+		if !(strings.HasPrefix(line, "health_items ") && strings.Contains(line, " state=shown ")) {
 			kept = append(kept, line)
 		}
 	}

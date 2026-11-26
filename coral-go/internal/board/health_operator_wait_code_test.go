@@ -21,3 +21,17 @@ func TestAQuotedOperatorMentionInCodeIsNotAWait(t *testing.T) {
 		}
 	}
 }
+
+func TestOnlyAQuestionToTheOperatorIsAWaitForTheScan(t *testing.T) {
+	for text, want := range map[string]bool{
+		"@Operator please pick A or B?":               true,
+		"say if you want it, operator?":               true,
+		"@Operator FYI the release is out":            false,
+		"the operator decides this one, I will wait":  false,
+		"run `coral-board post --ask @Operator why?`": false,
+	} {
+		if got := AsksTheOperator(text); got != want {
+			t.Errorf("%q: got %v, want %v", text, got, want)
+		}
+	}
+}

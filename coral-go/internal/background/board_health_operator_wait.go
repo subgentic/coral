@@ -17,7 +17,7 @@ const (
 )
 
 // noteOperatorWaits (#12138, the Operator): a post that waits on the Operator and is not in their Needs you. Each message the board got since the last scan, once it is OperatorWaitGrace old, by a member other than
-// Coral's own, the Operator and Coral Hub users: if its words wait on the Operator (board.WaitsOnOperator) and neither it nor a later post of the author within the grace is an --ask to the Operator or links a file
+// Coral's own, the Operator and Coral Hub users: if its words wait on the Operator (board.AsksTheOperator: the words wait on them AND ask a question) and neither it nor a later post of the author within the grace is an --ask to the Operator or links a file
 // tagged "for review" (board.OperatorWaitCovered), it is a line of the check and a nudge to its author to put it in Needs you. The first scan only marks where the board is. A post younger than the grace stops the scan
 // there (it is judged at a later check), so nothing is judged before the author had the time. Said once per message; the line has the message number and its age, never the post's words.
 func (m *BoardHealthMonitor) noteOperatorWaits(ctx context.Context, project, orch string, subs []board.Subscriber, bySession map[string]AgentInfo, now time.Time) {
@@ -55,7 +55,7 @@ func (m *BoardHealthMonitor) noteOperatorWaits(ctx context.Context, project, orc
 			break // not old enough to judge: the author still has the time; a later check reads it
 		}
 		last = msg.ID
-		if msg.IsSystem || msg.Origin != nil || !member[msg.SubscriberID] || board.IsOperatorName(msg.SubscriberID) || ow.Exempt(msg.SubscriberID) || !board.WaitsOnOperator(msg.Content) {
+		if msg.IsSystem || msg.Origin != nil || !member[msg.SubscriberID] || board.IsOperatorName(msg.SubscriberID) || ow.Exempt(msg.SubscriberID) || !board.AsksTheOperator(msg.Content) {
 			continue
 		}
 		if msg.Ask != nil && askedTheOperator(msg.Ask) {
