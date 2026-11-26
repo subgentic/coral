@@ -167,6 +167,24 @@ func TestTheHubTunnelsRequestsIgnoreForwardedHeaders(t *testing.T) {
 	ks := newTestKeyStore(t)
 	r := fwd("127.0.0.1", "203.0.113.9")
 	r.Header.Set(tunnel.ViaHeader, "stamp")
-	assert.Equal(t, "127.0.0.1", ks.throttleAddr(r))
-	assert.Equal(t, "", ks.peerThrottleKey(r))
+	assert.NotEqual(t, "127.0.0.1", ks.throttleAddr(r), "a tunneled request never shares the plain loopback bucket")
+	assert.Equal(t, "", ks.peerThrottleKey(r), "and is counted once")
+}
+
+// #21574 (QA): wrong keys that carry a forged X-Coral-Via-Tunnel through a proxy landed in the plain 127.0.0.1 bucket, so the Operator's direct local sign-in was refused for the window.
+func TestAForgedTunnelHeaderFloodDoesNotLockTheDirectLoopbackClient(t *testing.T) {
+	ks := newTestKeyStore(t)
+	for i := 0; i < 300; i++ {
+		r := fwd("127.0.0.1", "203.0.113.9")
+		r.Header.Set(tunnel.ViaHeader, "forged")
+		ks.recordFailureFor(r)
+	}
+	assert.True(t, ks.rateLimitedFor(func() *http.Request {
+		r := fwd("127.0.0.1", "203.0.113.9")
+		r.Header.Set(tunnel.ViaHeader, "forged")
+		return r
+	}()), "the flood itself is throttled")
+	direct := httptest.NewRequest("GET", "/", nil)
+	direct.RemoteAddr = "127.0.0.1:5000"
+	assert.False(t, ks.rateLimitedFor(direct), "a direct local request is not")
 }
