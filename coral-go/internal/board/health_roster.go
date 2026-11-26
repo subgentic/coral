@@ -233,6 +233,19 @@ func (s *Store) MentionedBy(ctx context.Context, project, name, title string, si
 	return time.Time{}, nil
 }
 
+// AnsweredWaiterSince reports whether author has answered the waiter since the wait began (#21702): a post of theirs that is a reply (post --reply-to) to a message of the waiter, or a post on the task the waiter waits
+// for (taskID > 0). Whether it mentions the waiter is MentionedBy's question; an answer need not.
+func (s *Store) AnsweredWaiterSince(ctx context.Context, project, author, waiter string, taskID int64, since time.Time) (bool, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_messages m
+		WHERE m.project = ? AND lower(m.subscriber_id) = lower(?) AND COALESCE(m.is_system, 0) = 0 AND m.created_at >= ?
+		  AND ((? > 0 AND m.task_id = ?)
+		       OR EXISTS (SELECT 1 FROM board_replies r JOIN board_messages w ON w.id = r.reply_to AND w.project = r.project
+		                  WHERE r.project = m.project AND r.message_id = m.id AND lower(w.subscriber_id) = lower(?)))`,
+		project, author, since.UTC().Format(time.RFC3339), taskID, taskID, waiter)
+	return n > 0, err
+}
+
 // AutoAsleepNeed is an auto-asleep agent (#12111) that something directed is waiting for: a mention of it, a reply to its post, or a task assigned to it that is not started.
 type AutoAsleepNeed struct {
 	Project, SubscriberID, SessionID string

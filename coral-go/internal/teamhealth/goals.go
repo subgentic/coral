@@ -38,6 +38,9 @@ type GoalLine struct {
 	Remind      string // RemindNone, RemindClose or RemindOperator
 }
 
+// AckKey is the key of the goal's reminder as a health item (#21702): the reminder has an ack id like every item, and an acknowledged one stays off while it is the same.
+func (g GoalLine) AckKey() string { return fmt.Sprintf("goal|%d|%s", g.ID, g.Remind) }
+
 func (g GoalLine) rank() int {
 	switch g.Remind {
 	case RemindClose:
@@ -79,9 +82,9 @@ func goalEntry(g GoalLine) string {
 	}
 	switch g.Remind {
 	case RemindClose:
-		b.WriteString(" READY: close it, or put an item in the operator's inbox")
+		b.WriteString(" READY [ack " + ItemID(g.AckKey()) + "]: close it, or put an item in the operator's inbox")
 	case RemindOperator:
-		b.WriteString(" NEEDS THE OPERATOR: put an item in their inbox")
+		b.WriteString(" NEEDS THE OPERATOR [ack " + ItemID(g.AckKey()) + "]: put an item in their inbox")
 	}
 	return b.String()
 }
@@ -121,3 +124,6 @@ func goalsLine(goals []GoalLine) string {
 		}
 	}
 }
+
+// GoalLineText is the goal's line as the ack list shows it (what coral-board health list prints).
+func GoalLineText(g GoalLine) string { return goalEntry(g) }

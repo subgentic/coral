@@ -69,3 +69,28 @@ func (m *BoardHealthMonitor) operatorAskedGoals(ctx context.Context, project str
 	}
 	return out
 }
+
+// dropAcknowledgedGoals gives each goal reminder (READY, NEEDS THE OPERATOR) an ack id and leaves out one the orchestrator acknowledged while it is the same (#21702): before, a ready goal came back at every check with
+// no way to say it was seen. An acknowledged goal is listed without the reminder; it returns when the goal's reminder changes.
+func (m *BoardHealthMonitor) dropAcknowledgedGoals(ctx context.Context, project string, goals []teamhealth.GoalLine, reminders int, now time.Time) ([]teamhealth.GoalLine, int) {
+	var items []teamhealth.Item
+	for _, g := range goals {
+		if g.Remind != teamhealth.RemindNone {
+			items = append(items, teamhealth.Item{Key: g.AckKey(), State: "shown", Text: teamhealth.GoalLineText(g)})
+		}
+	}
+	if len(items) == 0 {
+		return goals, reminders
+	}
+	kept := map[string]bool{}
+	for _, it := range m.dropAcknowledged(ctx, project, items, now) {
+		kept[it.Key] = true
+	}
+	for i, g := range goals {
+		if g.Remind != teamhealth.RemindNone && !kept[g.AckKey()] {
+			goals[i].Remind = teamhealth.RemindNone
+			reminders--
+		}
+	}
+	return goals, reminders
+}

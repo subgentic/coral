@@ -66,6 +66,11 @@ func WaitsOnOperator(content string) bool {
 	return false
 }
 
+// AsksTheOperator reports whether the post waits on the Operator AND asks them something: a "?" outside code. A mention that only tells them a fact is not a wait (#21702).
+func AsksTheOperator(content string) bool {
+	return WaitsOnOperator(content) && strings.Contains(withoutCode(content), "?")
+}
+
 var artifactHexRe = regexp.MustCompile(`coral://artifacts/([0-9a-f]{64})`)
 
 // OperatorWaitCovered reports whether the author put the post in the Operator's Needs you within OperatorWaitGrace of it: the post itself or a later post of theirs inside the grace is an --ask to the Operator, or
