@@ -8,6 +8,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -67,8 +68,10 @@ func (o *IdentityObserver) serveLinkKey(w http.ResponseWriter, r *http.Request, 
 			o.linkKeyFailed(r)
 		}
 		if revoked && o.revokedKeyOverCap(r) { // a cap of its own, so a Hub that never learns of its revoke cannot become load (#21660)
-			w.Header().Set("Retry-After", "60")
-			o.refuse(w, http.StatusTooManyRequests, "revoked_key_rate_limited", "Too many requests with a revoked request key from this address; wait a minute")
+			o.mu.Lock()
+			o.refused["revoked_key_rate_limited"]++
+			o.mu.Unlock()
+			httputil.WriteActionLimit(w, 60, "revoked_key_rate_limited", "Too many requests with a revoked request key from this address; wait a minute") // marked as a per-action limit, so a poller does not take it for an overloaded server
 			return
 		}
 		o.refuse(w, http.StatusUnauthorized, "invalid_credential", "That request key is not valid for this Coral: wrong, or revoked")

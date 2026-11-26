@@ -36,6 +36,7 @@ func TestRevokedRequestKeyHasItsOwnCap(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, over.Code)
 	assert.Contains(t, over.Body.String(), `"code":"revoked_key_rate_limited"`, "the JSON error envelope")
 	assert.Equal(t, "60", over.Header().Get("Retry-After"))
+	assert.Equal(t, "action", over.Header().Get("X-Coral-Limit"), "marked as a per-action limit, not an overload")
 	assert.Equal(t, 0, wrongCounted, "revoked keys are never counted as wrong ones")
 	assert.Equal(t, http.StatusUnauthorized, ask("revoked", "10.0.0.9:1").Code, "another address has its own cap")
 	assert.Equal(t, http.StatusUnauthorized, ask("wrong", "127.0.0.1:5002").Code, "a wrong key is still a 401, counted as before")
