@@ -77,6 +77,15 @@ type Roster struct {
 	// which the check says are stalled and never counts as working.
 	WaitedOnYou []TaskWaitedOn
 	Stalled     []StalledTask
+	// Requeued: claims the monitor sent back to pending this check because their owner was asleep or idle for claim_expire_hours (#21700); each is told once, as it happens.
+	Requeued []RequeuedClaim
+}
+
+// RequeuedClaim is a task the monitor returned to pending: Agent still owns it, Silent is how long it showed no activity.
+type RequeuedClaim struct {
+	Agent  string
+	Task   int64
+	Silent time.Duration
 }
 
 // TaskWaitedOn is one task whose owner waits on the check's recipient. Owner is a member name (through Name); Reason is the owner's words, already through StoredText and quoted ("" for none).
@@ -116,7 +125,7 @@ func (r *Roster) AllWorking() bool {
 
 // NeedsAttention: something in the roster is for the reader: a wait, a prompt, an idle agent.
 func (r *Roster) NeedsAttention() bool {
-	return len(r.Waits) > 0 || len(r.WaitedOnYou) > 0 || len(r.Stalled) > 0 || r.Counts[StatePrompt] > 0 || r.Counts[StateBlocked] > 0 || r.Counts[StateRefused] > 0 || r.Counts[StateIdle] > 0 || r.Counts[StateUnknown] > 0 || r.Counts[StateStalled] > 0
+	return len(r.Waits) > 0 || len(r.WaitedOnYou) > 0 || len(r.Stalled) > 0 || len(r.Requeued) > 0 || r.Counts[StatePrompt] > 0 || r.Counts[StateBlocked] > 0 || r.Counts[StateRefused] > 0 || r.Counts[StateIdle] > 0 || r.Counts[StateUnknown] > 0 || r.Counts[StateStalled] > 0
 }
 
 // maxWaiters is how many agents one wait group lists before counting the rest.
@@ -294,6 +303,9 @@ func (r *Roster) Facts() []string {
 	}
 	for _, st := range r.Stalled {
 		out = append(out, fmt.Sprintf("s:%s/%d", st.Agent, st.Task))
+	}
+	for _, q := range r.Requeued {
+		out = append(out, fmt.Sprintf("q:%s/%d", q.Agent, q.Task))
 	}
 	sort.Strings(out)
 	return out
