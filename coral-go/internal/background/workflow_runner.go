@@ -103,6 +103,13 @@ type WorkflowRunner struct {
 	runs    sync.WaitGroup
 }
 
+// QuietExitCode is the exit code with which a shell step ends its run as quiet: it checked, there is nothing to do, so the steps after it (an agent) do not start and the run is not a failure.
+// 78 is EX_CONFIG, which sh, curl, grep and most tools do not use, so a script that fails by accident does not go quiet by accident. Only a shell step can do it, never an agent step.
+const QuietExitCode = 78
+
+// errQuietRun is what a shell step returns when its process exited with QuietExitCode by itself.
+var errQuietRun = errors.New("the step ended the run quietly")
+
 // ErrRunnerStopped: Coral is stopping, so no workflow run starts.
 var ErrRunnerStopped = errors.New("Coral is stopping: the workflow can't start now")
 

@@ -489,6 +489,16 @@ func (s *WorkflowStore) SetRunStatus(ctx context.Context, runID int64, status st
 	}
 }
 
+// RunQuiet is the status of a run a shell step ended on purpose with the quiet exit code: it checked, found nothing to do, and the steps after it did not run. It is no failure, and a person is not asked to open it (it is marked seen as it ends).
+const RunQuiet = "quiet"
+
+// SetRunQuiet ends a run as quiet: finished now, and already seen, so a check that runs every few minutes does not leave a new unread run each time.
+func (s *WorkflowStore) SetRunQuiet(ctx context.Context, runID int64) error {
+	now := nowUTC()
+	_, err := s.db.ExecContext(ctx, `UPDATE workflow_runs SET status = ?, finished_at = COALESCE(finished_at, ?), seen_at = COALESCE(seen_at, ?) WHERE id = ? AND status IN ('pending', 'running')`, RunQuiet, now, now, runID)
+	return err
+}
+
 // Error codes of a run refused before it started because its agent CLI is signed out or did not answer the sign-in check (#5469).
 const (
 	ErrorCodeNotSignedIn        = "not_signed_in"

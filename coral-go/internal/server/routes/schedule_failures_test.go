@@ -33,6 +33,10 @@ func TestCountConsecutiveFailedRuns(t *testing.T) {
 		{"currently retrying", []string{"running", "failed", "failed"}, 0},
 		{"pending stops the count", []string{"pending", "failed"}, 0},
 		{"killed is not counted as failed", []string{"killed", "failed"}, 0},
+		// A quiet run (a shell step ended the run: nothing to do, #21502) is a check that ran fine: it is never counted as a failure, and it ends a streak like a completed run.
+		{"quiet is not a failure", []string{"quiet", "quiet"}, 0},
+		{"quiet ends a streak", []string{"quiet", "failed", "failed"}, 0},
+		{"failing again after quiet", []string{"failed", "quiet", "failed"}, 1},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

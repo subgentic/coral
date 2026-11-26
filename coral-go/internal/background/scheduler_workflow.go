@@ -92,6 +92,12 @@ func (s *JobScheduler) triggerWorkflowForJob(runID int64, job store.ScheduledJob
 					"finished_at": time.Now().UTC().Format(store.ISOFormat),
 				})
 				return
+			case store.RunQuiet: // the workflow checked and had nothing to do: the scheduled run says so, and it is no failure
+				s.store.UpdateScheduledRun(ctx, runID, map[string]interface{}{
+					"status":      store.RunQuiet,
+					"finished_at": time.Now().UTC().Format(store.ISOFormat),
+				})
+				return
 			case "failed", "killed":
 				errMsg := "workflow " + run.Status
 				if run.ErrorMsg != nil {
