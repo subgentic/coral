@@ -55,3 +55,25 @@ func TestCheckNamesTheWaitAndTheStalledTask(t *testing.T) {
 	assert.Contains(t, out, "stalled", "an in-progress task with no activity and no wait-on is stalled")
 	assert.NotContains(t, out, fmt.Sprintf("Dev's #%d is in progress with no activity", task.ID), "a waiting task is not stalled")
 }
+
+// #21726: the owner's reason in the check line is stored text, defused like the @ notice's: a mention in it notifies nobody. Without a way to defuse it the reason is left out, not quoted raw.
+func TestTheWaitReasonInTheCheckCannotMentionAnyone(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 0)
+	h.member("QA", "QA Engineer", 3, 0)
+	task, err := h.s.CreateTask(ctx, "team", "billing", "", "high", "Operator", "Dev")
+	require.NoError(t, err)
+	_, err = h.s.ClaimTask(ctx, "team", "Dev", task.ID)
+	require.NoError(t, err)
+	_, err = h.s.SetTaskWaitOn(ctx, "team", task.ID, board.TaskWaitOn{Member: "Orchestrator", Reason: "ask @QA about the API", SetBy: "Dev"})
+	require.NoError(t, err)
+	out := h.checkTo("Orchestrator")
+	assert.Contains(t, out, "ask")
+	assert.NotContains(t, out, "@QA", "the mention in the reason is made unable to notify")
+	h.m.defuse = nil
+	out = h.checkTo("Orchestrator")
+	assert.NotContains(t, out, "ask @QA", "no way to defuse: the reason is not quoted raw")
+	assert.NotContains(t, out, "@QA")
+}

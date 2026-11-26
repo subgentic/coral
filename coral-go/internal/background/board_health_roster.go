@@ -400,8 +400,8 @@ func (m *BoardHealthMonitor) taskWaitLines(ctx context.Context, in rosterInputs,
 			continue
 		}
 		reason := ""
-		if t := teamhealth.StoredText(w.WaitOn.Reason, nil); t != "" && t != teamhealth.NotShown {
-			reason = `"` + strings.NewReplacer(`"`, "'").Replace(t) + `"`
+		if t := teamhealth.StoredText(w.WaitOn.Reason, nil); t != "" && t != teamhealth.NotShown && m.defuse != nil { // no way to defuse it: the reason is left out, never quoted raw (#21726)
+			reason = `"` + strings.NewReplacer(`"`, "'").Replace(m.defuse(ctx, in.project, t)) + `"` // stored text: defused like every notice that quotes one, so a mention in it notifies no one
 		}
 		r.WaitedOnYou = append(r.WaitedOnYou, teamhealth.TaskWaitedOn{Owner: teamhealth.Name(w.Owner), Task: w.TaskID, Age: in.now.Sub(w.Since()), Reason: reason})
 		n++
