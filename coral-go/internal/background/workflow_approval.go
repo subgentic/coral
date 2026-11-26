@@ -57,10 +57,20 @@ func RepoFileOf(command string) (rel string, ok bool) {
 		return "", false
 	}
 	first := strings.Fields(c)[0]
-	if !strings.Contains(first, "/") || filepath.IsAbs(first) || strings.HasPrefix(first, "-") || strings.HasPrefix(first, "~") || strings.Contains(first, "%") {
+	if !strings.Contains(first, "/") || filepath.IsAbs(first) || rootedOrDrive(first) || strings.HasPrefix(first, "-") || strings.HasPrefix(first, "~") || strings.Contains(first, "%") {
 		return "", false
 	}
 	return first, true
+}
+
+// rootedOrDrive is true for a path that is not relative to the repo whatever the system: one that starts with a slash or a backslash, or with a drive letter ("C:x/y.sh"). On Windows filepath.IsAbs
+// is false for "/usr/bin/env" and "C:x/y.sh" (no drive, or no root), yet the shell runs them from the drive's root or the drive's own current folder, so they would be approved as a file of the repo
+// and run as another one.
+func rootedOrDrive(p string) bool {
+	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, "\\") {
+		return true
+	}
+	return len(p) >= 2 && p[1] == ':' && (p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
 }
 
 // ApprovalError is why a workflow's approval cannot be made or checked.

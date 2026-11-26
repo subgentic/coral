@@ -23,7 +23,7 @@ func TestRepoFileOfNamesOnlyALonePlainCallOfARepoPath(t *testing.T) {
 			t.Errorf("RepoFileOf(%q) = %q, %v; want %q", cmd, got, ok, want)
 		}
 	}
-	for _, cmd := range []string{"make", "make clean-reports", "npm test", "go test ./...", "curl https://x/y", "/usr/bin/env x", "~/x.sh", "./a.sh && make", "./a.sh | tee out", "./a.sh; rm x", "./a.sh $(date)", "'./a.sh'", "\"./a.sh\"", "./a.sh > out", "./a.sh\nmake", "$HOME/x.sh", "-x/y", "./a*.sh", "", "   ", "bash scripts/x.sh", "{{prev_content}}/x.sh"} {
+	for _, cmd := range []string{"make", "make clean-reports", "npm test", "go test ./...", "curl https://x/y", "/usr/bin/env x", "/x/run.sh", "\\srv/x.sh", "C:/x/y.sh", "c:x/y.sh", "~/x.sh", "./a.sh && make", "./a.sh | tee out", "./a.sh; rm x", "./a.sh $(date)", "'./a.sh'", "\"./a.sh\"", "./a.sh > out", "./a.sh\nmake", "$HOME/x.sh", "-x/y", "./a*.sh", "", "   ", "bash scripts/x.sh", "{{prev_content}}/x.sh"} {
 		if got, ok := RepoFileOf(cmd); ok {
 			t.Errorf("RepoFileOf(%q) = %q: that is more than a lone call of a repo file", cmd, got)
 		}
