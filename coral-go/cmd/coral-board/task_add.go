@@ -24,7 +24,7 @@ func cmdTaskAdd(st *boardState, args []string) {
 	for i := 0; i < len(args); i++ {
 		if strings.HasPrefix(args[i], "-") {
 			reordered = append(reordered, args[i])
-			if args[i] == "--self" || args[i] == "-self" {
+			if args[i] == "--self" || args[i] == "-self" || args[i] == "--later" || args[i] == "-later" {
 				continue // a switch: the word after it is the title, not its value
 			}
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
@@ -56,6 +56,7 @@ func cmdTaskAdd(st *boardState, args []string) {
 	followUp := fs.Int64("follow-up", 0, "Make this a follow-up of that task: it takes the task's goal, reviewers and assignee unless you give your own")
 	force := fs.Bool("force", false, "Assign even though the agent already has more waiting tasks than the team's limit (the refusal names the less loaded agents); who forced it is recorded on the board")
 	self := fs.Bool("self", false, "Make the task for yourself: it is assigned to you and needs --goal; a repeat of an open title returns that task, and at most 5 can be open (#11247)")
+	later := fs.Bool("later", false, "Backlog: assign it for later, no wake and no nudge, the health check ignores it, until the assignee claims it by number (task claim N) or the orchestrator promotes it (task unpark N)")
 	goalFrom := fs.Int64("goal-from", 0, "Accept this goal request another team sent: the task is made already linked to its goal (write your own title and body; the request text is not copied)")
 	clihelp.ParseFlags(fs, reordered, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	goalGiven := false
@@ -110,6 +111,9 @@ func cmdTaskAdd(st *boardState, args []string) {
 	}
 	if *assignee != "" {
 		reqBody["assigned_to"] = *assignee
+	}
+	if *later {
+		reqBody["later"] = true
 	}
 	if *force {
 		reqBody["force"] = true

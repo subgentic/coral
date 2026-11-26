@@ -393,3 +393,18 @@ func TestNoStatusNudgeWhileTheAgentWaitsOnTheOperator(t *testing.T) {
 	_, err = n.bs.GetActiveWait(ctx, "team", "Dev")
 	require.NoError(t, err)
 }
+
+// #21701: a task given for later (backlog) to an idle agent is not nudged to claim.
+func TestNoClaimNudgeForABacklogTask(t *testing.T) {
+	n := newNudgeHarness(t, "")
+	ctx := context.Background()
+	sid := "99999999-9999-9999-9999-999999999999"
+	n.agent("Dev", sid)
+	task, err := n.bs.CreateTask(ctx, "team", "someday", "", "high", "Operator", "Dev")
+	require.NoError(t, err)
+	_, err = n.bs.SetBacklog(ctx, "team", task.ID)
+	require.NoError(t, err)
+	n.sig[sid] = agentSignal{Since: n.now.Add(-2 * time.Hour)}
+	n.run(40 * time.Minute)
+	assert.Empty(t, n.sentTo("Dev"), "backlog is not a task waiting to be claimed")
+}

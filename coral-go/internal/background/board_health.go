@@ -722,7 +722,7 @@ func (m *BoardHealthMonitor) parkItems(ctx context.Context, project string, all 
 	byAgent := map[string]*held{}
 	var order []string
 	for _, t := range all {
-		if !t.Parked(now) || t.AssignedTo == nil || *t.AssignedTo == "" {
+		if !t.Parked(now) || t.InBacklog() || t.AssignedTo == nil || *t.AssignedTo == "" { // backlog is not a wait: it is neither a park to be named nor counted
 			continue
 		}
 		agent := *t.AssignedTo

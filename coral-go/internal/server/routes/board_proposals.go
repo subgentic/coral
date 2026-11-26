@@ -121,6 +121,7 @@ type taskCreation struct {
 	Title, Body, Priority, CreatedBy, AssignedTo string
 	Opts                                         *board.CreateTaskOpts
 	RemindAt                                     time.Time
+	Later                                        bool // backlog (#21701): parked before it is announced, so the announcement is the quiet parked one
 }
 
 func (h *BoardHandler) makeTask(ctx context.Context, project string, c taskCreation) (*board.Task, error) {
@@ -134,6 +135,11 @@ func (h *BoardHandler) makeTask(ctx context.Context, project string, c taskCreat
 		}
 		at := c.RemindAt.UTC().Format(time.RFC3339)
 		task.RemindAt = &at
+	}
+	if c.Later {
+		if backlog, err := h.bs.SetBacklog(ctx, project, task.ID); err == nil {
+			task = backlog
+		}
 	}
 	h.announceCreatedTask(project, task)
 	return task, nil

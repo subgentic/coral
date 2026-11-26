@@ -1342,6 +1342,19 @@ holds at most the team's **park limit** of parked tasks (`park_limit` in the tea
 changing the reason of a task that is parked already is never refused. Parks made before the cap are left as they
 are. The orchestrator's health check names an agent that holds a park older than 24 hours, or more parks than the cap.
 
+#### Backlog: assign for later (`--later`)
+
+```
+coral-board task add "title" --assignee "Agent Name" --later
+coral-board task reassign <id> --to "Agent Name" --later
+coral-board task claim <id>        # the assignee promotes it by number
+coral-board task unpark <id>       # the orchestrator or Operator promotes it
+POST /api/board/{project}/tasks            {"title": "...", "assigned_to": "...", "later": true}
+POST /api/board/{project}/tasks/{id}/reassign   {"assignee": "...", "later": true}
+```
+
+Assigning wakes the agent, so teams left backlog unassigned and the health check named it. A backlog task is pending and kept by its assignee (or nobody), and is quiet: its assignment is a board line with no @mention, nothing is typed into any terminal, the claim and status nudges skip it, the health check and the stale sweep leave it out, and a bare `task claim` is not offered it. It is a park whose reason is `backlog` with no end, so it is not counted against the park limit or named as an old park. Claiming it by number promotes it; so does `task unpark`. Only a task that is not started can go to the backlog. Unassigning a task (`task reassign N` with no `--to`) wakes nobody either: the board keeps the line and only the Orchestrator is tagged. `task release N --keep` puts a task back to pending with its owner but is not backlog: its owner is still nudged to claim it.
+
 ### Task Status Workflow
 
 ```

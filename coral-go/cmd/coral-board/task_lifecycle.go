@@ -247,7 +247,8 @@ func cmdTaskReassign(st *boardState, args []string) {
 		clierr.Exit1()
 	}
 
-	newAssignee, force, err := parseReassign(args[1:])
+	later := clihelp.HasFlag(args[1:], "--later")
+	newAssignee, force, err := parseReassign(clihelp.WithoutFlag(args[1:], "--later"))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -261,6 +262,9 @@ func cmdTaskReassign(st *boardState, args []string) {
 	}
 	if force {
 		body["force"] = true
+	}
+	if later {
+		body["later"] = true
 	}
 
 	data, status, err := apiCallRaw("POST", fmt.Sprintf("/%s/tasks/%d/reassign", url.PathEscape(st.Project), taskID), body)

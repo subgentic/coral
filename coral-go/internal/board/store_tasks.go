@@ -766,7 +766,7 @@ func (s *Store) claimCandidates(ctx context.Context, project, subscriberID strin
 	priorityOrder := `CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, id ASC`
 	if len(requestedID) > 0 && requestedID[0] > 0 {
 		var candidateIDs []int64
-		if err := s.db.SelectContext(ctx, &candidateIDs, `SELECT id FROM board_tasks WHERE id = ? AND board_id = ? AND status = 'pending' AND (assigned_to = ? OR assigned_to IS NULL OR assigned_to = '') AND NOT `+parkedSQL, requestedID[0], project, subscriberID); err != nil || len(candidateIDs) == 0 {
+		if err := s.db.SelectContext(ctx, &candidateIDs, `SELECT id FROM board_tasks WHERE id = ? AND board_id = ? AND status = 'pending' AND (assigned_to = ? OR assigned_to IS NULL OR assigned_to = '') AND (NOT `+parkedSQL+` OR parked_reason = '`+BacklogReason+`')`, requestedID[0], project, subscriberID); err != nil || len(candidateIDs) == 0 {
 			if t, gerr := s.GetTask(ctx, project, requestedID[0]); gerr == nil && t != nil && t.Status == "pending" && t.Parked(time.Now()) {
 				return nil, fmt.Errorf("task #%d is parked and cannot be claimed until it is unparked", requestedID[0])
 			}
@@ -823,6 +823,10 @@ func (s *Store) claimOne(ctx context.Context, project, subscriberID string, task
 			return false, errSlotHeld
 		}
 		return false, nil
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET parked_reason = NULL, parked_until = NULL, parked_at = NULL WHERE id = ? AND board_id = ? AND parked_reason = ?`, taskID, project, BacklogReason); err != nil { // claiming a backlog task by number promotes it (#21701)
+		tx.Rollback()
+		return false, err
 	}
 	if err := snapshotClaimWorkflow(ctx, tx, project, taskID, inputs); err != nil {
 		tx.Rollback()

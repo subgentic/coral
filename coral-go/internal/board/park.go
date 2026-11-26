@@ -83,7 +83,7 @@ func (s *Store) ParkTaskForce(ctx context.Context, project string, id int64, rea
 	forcedPast := 0
 	if !cur.Parked && cur.Assignee != nil && *cur.Assignee != "" {
 		var held int
-		if err := tx.GetContext(ctx, &held, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND id != ? AND LOWER(assigned_to) = LOWER(?) AND status NOT IN ('completed', 'cancelled') AND `+parkedSQL, project, id, *cur.Assignee); err != nil {
+		if err := tx.GetContext(ctx, &held, `SELECT COUNT(*) FROM board_tasks WHERE board_id = ? AND id != ? AND LOWER(assigned_to) = LOWER(?) AND status NOT IN ('completed', 'cancelled') AND `+parkedSQL+` AND parked_reason != '`+BacklogReason+`'`, project, id, *cur.Assignee); err != nil {
 			return nil, 0, err
 		}
 		if held >= limit {
