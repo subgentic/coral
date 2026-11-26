@@ -24,6 +24,7 @@ Start with the two overviews: `coral-board help overview` (talking, questions to
 - [Custom checks](custom_checks.md) — `coral-board health check`: a script Coral runs on a schedule for a team and says what it prints to one member; the Operator approves the exact script (SHA-256, arguments, folder, who it runs as, may-write) with one click in Needs you; what a script may print and call; four examples
 - [Reminders](reminders.md) — `coral-board remind`: a note Coral types to an agent at a time, kept open until the agent says it is done; who may set, read and cancel one, and what happens to a one-time reminder missed while the computer is off
 - [Quickstart](quickstart.md) — Install, launch your first agent, and get a committed change
+- [Run Coral on a server](server.md) — Headless Linux install: service user, systemd unit, headless password, agent CLIs, and remote access (Coral Hub, tunnel, or nginx TLS proxy)
 - [Worked Demos](worked-demos.md) — Three multi-agent scenarios run end to end, with real output
 - [Using the Dashboard](using-the-dashboard.md) — Task-oriented: model and thinking level and the chat-bar chip, Cost by thinking level, the team health monitor, the agent list's Display panel, the sectioned dialogs, image thumbnails
 - [Hooks for tools that drive Coral's page](ui-hooks.md) — `window.__coralReady` (its parts and ordering guarantees) and `data-coral-hook`, for Coral Hub's scripts and other tools
