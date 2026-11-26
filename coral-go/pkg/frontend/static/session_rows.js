@@ -468,10 +468,10 @@ function rowLinesHtml(s) {
     return serversShown().length >= 2;
 }
 
-/** 'Group by server' (per viewer, off unless chosen); only with 2+ servers. */
+/** The Computer box of Group by (per viewer, off unless chosen; a browser that chose the old 'Group by computer' keeps it); only with 2+ servers. */
  export function isGroupedByServer() {
     if (serversShown().length < 2) return false;
-    try { return browserLocal.get('coral-group-by-server') === 'true'; } catch { return false; }
+    try { return (browserLocal.get('coral-group-computer') ?? browserLocal.get('coral-group-by-server')) === 'true'; } catch { return false; }
 }
 
 /** Sync the ≡ display menu's checkboxes and which options it offers: the sidebar's, and the phone's copy in the agent list
@@ -480,8 +480,8 @@ function rowLinesHtml(s) {
  *  page (and of a long chat) each time (#4985). */
  export function syncDisplayMenu() {
     const n = serversShown().length;
-    const checked = { summary: isRowLineShown('summary'), model: isRowLineShown('model'), server: isServerShownOnRows(), group: isGroupedByServer() };
-    const offered = { summary: true, model: true, server: n >= 1, group: n >= 2 };
+    const checked = { summary: isRowLineShown('summary'), model: isRowLineShown('model'), server: isServerShownOnRows() };
+    const offered = { summary: true, model: true, server: n >= 1 };
     for (const header of [...document.getElementsByClassName('sidebar-header'), ...document.getElementsByClassName('mobile-list-header')]) {
         for (const input of header.querySelectorAll('[data-display-input]')) setChecked(input, checked[input.dataset.displayInput] === true);
         for (const row of header.querySelectorAll('[data-display-row]')) setHidden(row, !offered[row.dataset.displayRow]);

@@ -58,7 +58,7 @@ const SETTINGS_PRELOAD = `(() => {
             headers: [...document.querySelectorAll('#live-sessions-list li.server-group-header')].map(h => ({ id: h.dataset.serverGroup, name: h.querySelector('.server-group-name').textContent, state: h.querySelector('.server-group-state')?.textContent || null, expanded: h.querySelector('.server-group-toggle').getAttribute('aria-expanded') })),
             rows: [...document.querySelectorAll('#live-sessions-list li[data-session-id]')].map(li => li.dataset.sessionId),
             showServerRow: (r => r ? !r.hidden && getComputedStyle(r).display !== 'none' : null)(document.getElementById('display-show-server-row')),
-            groupRow: (r => r ? !r.hidden && getComputedStyle(r).display !== 'none' : null)(document.getElementById('display-group-by-server')?.closest('label, li, div')),
+            oldGroupSwitch: !!document.getElementById('display-group-by-server'),
         };
     })()`);
 
@@ -93,7 +93,7 @@ const SETTINGS_PRELOAD = `(() => {
         let v = await view();
         assert.equal(v.strip, 0, 'no strip'); assert.deepEqual(v.chips, [], 'no row chips with one server');
         assert.deepEqual(v.headers, [], 'no server headers with one server');
-        assert.equal(v.groupRow, false, "'Group by computer' is not offered with one server");
+        assert.equal(v.oldGroupSwitch, false, "the Display panel's 'Group by computer' switch is gone (the Computer box of Group by replaced it, #21685); with one server there are no headers either way");
         // 'Show computer' with one server: off by default; turning it on saves the setting and shows chips.
         assert.equal(v.showServerRow, true, "'Show computer' is offered with one server");
         assert.equal(await ev(`document.getElementById('display-show-server').checked`), false, 'off by default with one server');
@@ -118,7 +118,6 @@ const SETTINGS_PRELOAD = `(() => {
         assert.equal(v.strip, 0, 'no strip');
         assert.ok(v.chips.length > 0, "'Show computer' is on by default with 2+ servers");
         assert.ok(v.chips.some(c => /^Old Laptop/.test(c)) && v.chips.some(c => /^workstation/.test(c)), `chips name each server (${JSON.stringify(v.chips)})`);
-        assert.equal(v.groupRow, true, "'Group by computer' is offered with 2+ servers");
         // #3507 ungrouped, #12949: the computer on its own quiet line UNDER the team name, in italics, with no dot; an offline one is dimmed.
         const pre = await ev(`(() => {
             const li = id => [...document.querySelectorAll('#live-sessions-list li')].find(l => l.querySelector('.group-server-line') && l.textContent.includes(id));
@@ -142,9 +141,11 @@ const SETTINGS_PRELOAD = `(() => {
         await ev(`window.exitTeamPage({ force: true }); true`);
         console.log('   ✓ ungrouped: "workstation-team-m2", server in italics first, offline dimmed with tooltip + sr text, no dots; team view opens @m2/team-m2');
         // Group by computer.
-        await ev(`document.getElementById('display-group-by-server').click(); true`);
+        await ev(`localStorage.setItem('coral_display_panel_open', '1'); T.render.renderLiveSessions(T.state.liveSessions); true`);
+        await waitFor(`!!document.querySelector('#agent-list-bar fieldset[data-group-by] input[data-box="server"]')`, 'the Computer box of Group by', 3000);
+        await ev(`document.querySelector('#agent-list-bar fieldset[data-group-by] input[data-box="server"]').click(); true`);
         await waitFor(`document.querySelectorAll('#live-sessions-list li.server-group-header').length === 3`, 'server headers', 3000);
-        assert.equal(await ev(`localStorage.getItem('coral-group-by-server')`), 'true', 'grouping persisted');
+        assert.equal(await ev(`localStorage.getItem('coral-group-computer')`), 'true', 'grouping persisted');
         v = await view();
         assert.deepEqual(v.headers.map(h => [h.id, h.name, h.state]), [['m1', 'studio-mac', null], ['m2', 'workstation', null], ['m3', 'Old Laptop', 'unreachable']]);
         assert.deepEqual(v.chips, [], 'no row chips while grouped');
@@ -202,7 +203,7 @@ const SETTINGS_PRELOAD = `(() => {
         console.log('4. Colliding short names stay distinct on the server group headers');
         // Two servers whose short names collide are shown by their full label (or a shortest unique form).
         await scene([{ id: 'a', label: 'box.lan', status: 'online' }, { id: 'b', label: 'box.home', status: 'online' }, { id: 'c', label: 'nas.lan', status: 'online' }]);
-        await ev(`localStorage.setItem('coral-group-by-server', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
+        await ev(`localStorage.setItem('coral-group-computer', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
         await waitFor(`document.querySelectorAll('#live-sessions-list li.server-group-header .server-group-name').length === 3`, 'the three server group headers rendered', 3000); // #15407: step 4 read them with no wait, so a slow render met undefined (trial 42923646822)
         const shown = await ev(`[...document.querySelectorAll('#live-sessions-list li.server-group-header')].map(h => ({ id: h.dataset.serverGroup, name: h.querySelector('.server-group-name').textContent }))`);
         const byId = Object.fromEntries(shown.map(x => [x.id, x.name]));
@@ -210,7 +211,7 @@ const SETTINGS_PRELOAD = `(() => {
         assert.ok(byId.a.startsWith('box') && 'box.lan'.startsWith(byId.a) && byId.a !== 'box', `box.lan shows as its full label or a unique prefix of it (${byId.a})`);
         assert.ok(byId.b.startsWith('box') && 'box.home'.startsWith(byId.b) && byId.b !== 'box', `box.home likewise (${byId.b})`);
         assert.equal(byId.c, 'nas', 'a name that does not collide stays short');
-        await ev(`localStorage.setItem('coral-group-by-server', 'false'); true`);
+        await ev(`localStorage.setItem('coral-group-computer', 'false'); true`);
         // The update marker per server is covered on the group headers by server_update_notice_browser (#4932 removed the pill that also showed it).
         console.log(`   ✓ colliding names on headers ${JSON.stringify(shown.map(x => x.name))}`);
 
@@ -221,7 +222,7 @@ const SETTINGS_PRELOAD = `(() => {
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         await install();
-        await ev(`localStorage.setItem('coral-group-by-server', 'true'); true`);
+        await ev(`localStorage.setItem('coral-group-computer', 'true'); true`);
         await scene(THREE);
         await ev(`(async () => { const mob = await import((window.__coralStatic || '/static/') + 'mobile.js'); mob.syncMobileAgentList(); return true; })()`);
         await waitFor(`!!document.querySelector('#mobile-agent-list li.server-group-header .server-group-toggle')`, 'phone server headers', 3000);
@@ -242,7 +243,7 @@ const SETTINGS_PRELOAD = `(() => {
         console.log(`   ✓ ${phone.count} controls ≥ 44 px, overflow 0`);
 
         console.log('6. One neutral team color unless the user picked one; an unchecked server is not shown as offline (#3507 v3)');
-        await ev(`localStorage.setItem('coral-group-by-server', 'false'); localStorage.setItem('coral-board-colors', JSON.stringify({ '@m2/team-m2': '#c678dd' })); true`);
+        await ev(`localStorage.setItem('coral-group-computer', 'false'); localStorage.setItem('coral-board-colors', JSON.stringify({ '@m2/team-m2': '#c678dd' })); true`);
         await scene([THREE[0], THREE[1], { ...THREE[2], status: 'unknown' }], `T.state.settings = { ...T.state.settings, show_session_server: 'True' };`);
         const col = await ev(`(() => {
             const probe = document.createElement('span'); probe.style.color = 'color-mix(in srgb, var(--text-primary) 82%, transparent)'; document.body.appendChild(probe);
@@ -255,12 +256,12 @@ const SETTINGS_PRELOAD = `(() => {
         assert.equal(col.m3, col.neutral, 'every such team: the same neutral color');
         assert.equal(col.m2, 'rgb(198, 120, 221)', 'a color the user picked is kept');
         assert.equal(col.m3down, false, "an 'unknown' server (not checked yet) isn't dimmed"); assert.equal(col.m3sr, '(computer)');
-        await ev(`localStorage.setItem('coral-group-by-server', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
+        await ev(`localStorage.setItem('coral-group-computer', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
         const unk = await ev(`(() => { const h = document.querySelector('#live-sessions-list li.server-group-header[data-server-group="m3"]'); return { down: h.classList.contains('is-down'), state: h.querySelector('.server-group-state')?.textContent || null }; })()`);
         assert.deepEqual(unk, { down: false, state: null }, "nor is its group header");
         // #3507 v4, the operator's variant A: one palette, brightness and weight step down from the
         // server header to team and folder rows to agent names; folders match teams.
-        await ev(`localStorage.setItem('coral-group-by-server', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
+        await ev(`localStorage.setItem('coral-group-computer', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
         const hier = await ev(`(() => {
             const L = document.getElementById('live-sessions-list'), cs = el => el && getComputedStyle(el);
             const probe = c => { const p = document.createElement('span'); p.style.color = c; document.body.appendChild(p); const v = getComputedStyle(p).color; p.remove(); return v; };
@@ -285,13 +286,13 @@ const SETTINGS_PRELOAD = `(() => {
                 folderX: folders.map(f => Math.round(f.querySelector('svg.folder-group-icon')?.getBoundingClientRect().left)), teamX };
         })()`);
         for (const grouped of [true, false]) {
-            await ev(`localStorage.setItem('coral-group-by-server', '${grouped}'); T.render.renderLiveSessions(T.state.liveSessions); true`);
+            await ev(`localStorage.setItem('coral-group-computer', '${grouped}'); T.render.renderLiveSessions(T.state.liveSessions); true`);
             const ic = await icons();
             assert.ok(ic.n >= 3 && ic.withIcon === ic.n, `${grouped ? 'grouped' : 'ungrouped'}: every folder group has the named folder icon (${JSON.stringify(ic)})`);
             assert.ok(ic.teamX.length > 0 && ic.folderX.every(x => Math.abs(x - ic.teamX[0]) <= 1), `${grouped ? 'grouped' : 'ungrouped'}: aligned with the team icons (${JSON.stringify(ic)})`);
         }
         // #3507 v4: the header row is the button (aria-expanded, Enter or Space); a team header opens the team and its chevron button collapses (#5989).
-        await ev(`localStorage.setItem('coral-group-by-server', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
+        await ev(`localStorage.setItem('coral-group-computer', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
         const chev = await ev(`(() => { const L = document.getElementById('live-sessions-list');
             const heads = [...L.querySelectorAll('.session-group-header[data-group-name]')];
             return { chevrons: L.querySelectorAll('.server-group-chevron').length + [...L.querySelectorAll('.server-group-header, .session-group-header')].filter(h => /[▸▾]/.test(h.textContent)).length,
@@ -310,7 +311,7 @@ const SETTINGS_PRELOAD = `(() => {
         const tb = await ev(`(() => { const h = document.querySelector('#live-sessions-list [data-on-click="team-name-open"]'); return { aria: h && h.getAttribute('aria-label'), role: h && h.getAttribute('role'), info: !!document.querySelector('#live-sessions-list .team-open-btn') }; })()`);
         assert.equal(tb.info, false, 'no info icon on a team row');
         assert.equal(tb.role, 'button'); assert.match(tb.aria, /^Open team team-m/);
-        await ev(`localStorage.setItem('coral-group-by-server', 'false'); localStorage.removeItem('coral-board-colors'); true`);
+        await ev(`localStorage.setItem('coral-group-computer', 'false'); localStorage.removeItem('coral-board-colors'); true`);
         console.log('   ✓ no chevrons; team, folder and workflow headers are buttons with aria-expanded (Enter/Space); a team row has no info icon');
         console.log('   ✓ variant A hierarchy (700/600/600/500, server brightest, agents muted), neutral teams, the picked color kept, unknown not dimmed, folder icons named and aligned');
 
