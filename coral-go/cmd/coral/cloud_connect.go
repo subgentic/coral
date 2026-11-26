@@ -232,6 +232,7 @@ func (c *cloudClient) call(ctx context.Context, method, path string, body any, h
 type cloudStatusReply struct {
 	cloud.Status
 	AllowHubAutoAccept bool `json:"allow_hub_auto_accept"`
+	HubOnly            bool `json:"hub_only"`
 	// DeviceWebMode is the mode a browser paired from the link starts at, this computer's own setting.
 	DeviceWebMode string `json:"device_web_mode"`
 	// ComputerFingerprint is this computer's key as the browser shows it, while waiting for approval (#19969).
@@ -250,6 +251,9 @@ func (c *cloudClient) printStatus(ctx context.Context, out io.Writer) int {
 	st, code := c.status(ctx)
 	if code >= 0 {
 		return code
+	}
+	if st.HubOnly {
+		fmt.Fprintln(out, "Hub-only:  on (reached through Coral Hub only; turn it off with: coral hub-only off)")
 	}
 	if !st.Configured {
 		fmt.Fprintln(out, notConfiguredHelp)

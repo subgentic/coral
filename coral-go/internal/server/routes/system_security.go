@@ -151,6 +151,9 @@ func (h *SystemHandler) GetPrivacyStatus(w http.ResponseWriter, r *http.Request)
 		// runs (a portable Coral in the user's profile); empty for an install in Program Files.
 		"tools_folder": toolsFolderStatus(),
 	}
+	if auth.HubOnly() { // read-only everywhere: changed from this computer only, with coral hub-only (#21558)
+		out["hub_only"] = true
+	}
 	// A proxy in front of a Coral that says remote access is off: warn, never refuse (#21527). Red when nothing but the proxy stands in front of it.
 	if !effectiveRemote && auth.ProxySeen() {
 		out["proxy_warning"] = map[string]any{

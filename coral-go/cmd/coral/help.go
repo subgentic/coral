@@ -53,6 +53,9 @@ func commands() []command {
 				"coral machine prune --older-than 7d --provider digitalocean --token-file <path|-> [--yes]",
 			}
 		}},
+		{"hub-only", "reach this Coral only through Coral Hub (on a server): on, off or status", func() []string {
+			return []string{"coral hub-only [on|off|status] [--home DIR]"}
+		}},
 		{"auto-accept", "turn auto-accept off for every agent at once", func() []string {
 			return []string{"coral auto-accept off --all [--url " + u + "]"}
 		}},
@@ -110,6 +113,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintf(w, "  %-16s %s\n", "--port N", "port to listen on (default "+strconv.Itoa(config.DefaultPort)+")")
 	fmt.Fprintf(w, "  %-16s %s\n", "--host ADDR", "address to listen on (default: this computer only)")
 	fmt.Fprintf(w, "  %-16s %s\n", "--home DIR", "data folder (default: CORAL_DATA_DIR, else .coral in your home folder)")
+	fmt.Fprintf(w, "  %-16s %s\n", "--hub-only", "listen on this computer only and refuse every proxied request: reach Coral through Coral Hub")
 	fmt.Fprintf(w, "  %-16s %s\n", "--no-browser", "don't open the dashboard in the browser at startup")
 	fmt.Fprintf(w, "  %-16s %s\n", "--cloud-url URL", "the Coral Hub this server may connect to (\"off\" disables it)")
 	fmt.Fprintln(w)

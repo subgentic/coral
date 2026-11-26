@@ -108,6 +108,11 @@ func restrictToLoopback(cfg *config.Config, reason string) {
 	if config.IsLoopbackHost(cfg.Host) {
 		return
 	}
+	if auth.HubOnly() {
+		log.Printf("[startup] hub-only: binding 127.0.0.1 instead of %q (%s).", cfg.Host, reason)
+		cfg.Host = "127.0.0.1"
+		return
+	}
 	log.Printf("[startup] remote access is off (%s): binding 127.0.0.1 instead of %q. Enable it in Settings > Coral Hub and remote access (remote_access_enabled=true) and restart Coral to accept network connections.", reason, cfg.Host)
 	cfg.Host = "127.0.0.1"
 }

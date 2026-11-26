@@ -14,6 +14,7 @@ Commands:
   reset-password   set a new password, or none (--clear); every browser is signed out
   setup-code       print the one-time code that setting the password from another computer asks for
   cloud            Coral Hub: connect this Coral, show its status, or disconnect
+  hub-only         reach this Coral only through Coral Hub (on a server): on, off or status
   auto-accept      turn auto-accept off for every agent at once
   artifacts        prune stored artifacts (diffs and objects) to free disk
   db               compact the database, or rebuild its search index (stop Coral first)
@@ -24,6 +25,7 @@ Main server flags:
   --port N         port to listen on (default DEFAULTPORT)
   --host ADDR      address to listen on (default: this computer only)
   --home DIR       data folder (default: CORAL_DATA_DIR, else .coral in your home folder)
+  --hub-only       listen on this computer only and refuse every proxied request: reach Coral through Coral Hub
   --no-browser     don't open the dashboard in the browser at startup
   --cloud-url URL  the Coral Hub this server may connect to ("off" disables it)
 
@@ -58,6 +60,8 @@ Every server flag:
     	Address to listen on, or a comma list of them (e.g. 127.0.0.1,100.101.102.103). Default: this computer only. A network address (or 0.0.0.0) is used only when remote access is on (Settings > Coral Hub and remote access, or --remote); otherwise Coral listens on 127.0.0.1
   -hub
     	Run as a multi-server hub: manage and view remote Coral servers (also CORAL_HUB=1)
+  -hub-only
+    	Listen on this computer only, ask for a credential here too, and refuse every proxied request: reach this Coral only through Coral Hub. Saved until: coral hub-only off. Also CORAL_HUB_ONLY=1
   -no-auto-loopback
     	When --host names only network addresses, don't also listen on 127.0.0.1 (also CORAL_NO_AUTO_LOOPBACK=1)
   -no-browser
@@ -134,6 +138,7 @@ Commands:
   reset-password   set a new password, or none (--clear); every browser is signed out
   setup-code       print the one-time code that setting the password from another computer asks for
   cloud            Coral Hub: connect this Coral, show its status, or disconnect
+  hub-only         reach this Coral only through Coral Hub (on a server): on, off or status
   auto-accept      turn auto-accept off for every agent at once
   artifacts        prune stored artifacts (diffs and objects) to free disk
   db               compact the database, or rebuild its search index (stop Coral first)
@@ -144,6 +149,7 @@ Main server flags:
   --port N         port to listen on (default DEFAULTPORT)
   --host ADDR      address to listen on (default: this computer only)
   --home DIR       data folder (default: CORAL_DATA_DIR, else .coral in your home folder)
+  --hub-only       listen on this computer only and refuse every proxied request: reach Coral through Coral Hub
   --no-browser     don't open the dashboard in the browser at startup
   --cloud-url URL  the Coral Hub this server may connect to ("off" disables it)
 

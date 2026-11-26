@@ -156,3 +156,13 @@ func TestPrivacyStatusWarnsWhenAProxyWasSeen(t *testing.T) {
 	handler.cfg.Host = "0.0.0.0"
 	assert.NotContains(t, privacyGetJSON(t, server.URL+"/api/system/privacy"), "proxy_warning", "remote access on: nothing to warn about")
 }
+
+// #21558: Settings reads hub-only from the status (read-only: nothing in it can change the mode).
+func TestPrivacyStatusReportsHubOnly(t *testing.T) {
+	server, handler := setupSystemTestServer(t)
+	handler.cfg.Host = "127.0.0.1"
+	assert.NotContains(t, privacyGetJSON(t, server.URL+"/api/system/privacy"), "hub_only")
+	auth.SetHubOnly(true)
+	t.Cleanup(func() { auth.SetHubOnly(false) })
+	assert.Equal(t, true, privacyGetJSON(t, server.URL+"/api/system/privacy")["hub_only"])
+}
