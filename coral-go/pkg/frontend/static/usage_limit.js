@@ -1,4 +1,7 @@
 import { loadStyles } from './lazy_styles.js';
+import { browserLocal } from './safe_storage.js';
+import { importOnce } from './import_once.js';
+import { escapeAttr } from './html_escape.js';
 /* Presentation only: the server owns detection and delivery gates. Never infer a limit from chat words. */
 const VENDORS = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity' };
 export function usageLimit(s, now = Date.now()) {
@@ -52,10 +55,15 @@ export function scheduleUsageLimitRefresh(sessions, refresh) {
     const times = sessions.map(s => usageLimit(s)?.at).filter(Boolean);
     if (times.length) refreshTimer = setTimeout(refresh, Math.min(2147483647, Math.max(1, Math.min(...times) - Date.now() + 1)));
 }
+/* #21676: per browser, which limited agents and reset times the person closed the summary for. */
+const DISMISSED = 'coral-usage-limit-dismissed'; // read here, written by usage_limit_actions.js (the same key; that module cannot import this one: import_hygiene)
+const readDismissed = () => { try { return browserLocal.get(DISMISSED) || ''; } catch { return ''; } };
+/** The summary's identity: the limited agents and their reset minutes. A new agent, or a new reset time, is a new key, so a dismissed summary comes back. */
+const summaryKey = limited => limited.map(s => { const l = usageLimit(s); return `${s.session_id}@${l.at ? Math.floor(l.at / 60000) : ''}`; }).sort().join(',');
 /** Markup stays lazy too; row rendering and escaping are the list's existing helpers. */
 export function usageLimitList(sessions, renderRow, esc) {
     const limited = sessions.filter(s => usageLimit(s));
-    if (limited.length) loadStyles('usage_limit.css');
+    if (limited.length) { loadStyles('usage_limit.css'); importOnce('./usage_limit_actions.js'); } // the dismiss's action, lazy too
     const summary = usageLimitGroups(limited, Date.now()).map(g => {
         const name = `<strong>${esc(`${g.count} ${g.vendor} agent${g.count === 1 ? '' : 's'}`)}</strong>`;
         const clock = resetClock(g.at).replace(/^tomorrow (.+)$/, '$1 tomorrow');
@@ -67,7 +75,7 @@ export function usageLimitList(sessions, renderRow, esc) {
     return {
         regular: sessions.filter(s => !usageLimit(s) && (!limited.length || !s.sleeping)),
         sleeping: limited.length ? sessions.filter(s => s.sleeping) : [],
-        summary: limited.length ? `<li class="usage-limit-summary" aria-label="${esc(usageLimitSummaries(limited).join('. '))}"><span class="usage-limit-mark" aria-hidden="true">!</span><div>${summary}<small>Coral sends nothing to them until then. Other agents carry on.</small></div></li>` : '',
+        summary: limited.length && readDismissed() !== summaryKey(limited) ? `<li class="usage-limit-summary" aria-label="${escapeAttr(usageLimitSummaries(limited).join('. '))}"><span class="usage-limit-mark" aria-hidden="true">!</span><div>${summary}<small>Coral sends nothing to them until then. Other agents carry on.</small></div><button type="button" class="btn btn-icon usage-limit-dismiss" data-on-click="usage-limit-dismiss" data-key="${escapeAttr(summaryKey(limited))}" aria-label="Dismiss the usage limit summary" title="Dismiss"><span class="material-icons" aria-hidden="true">close</span></button></li>` : '',
         waiting: limited.length ? `<li class="usage-limit-heading" role="heading" aria-level="2"><span class="usage-limit-desktop">Waiting for a usage limit to reset · ${limited.length}</span><span class="usage-limit-phone">Usage limit · ${limited.length}</span></li>` + limited.map(s => renderRow(s, '__usage_limit__', true, false, '')).join('') : '',
     };
 }

@@ -25,3 +25,6 @@
 .usage-limit-vendor { display: inline-block; margin-left: var(--space-xs); padding: 0 var(--space-xs); border: 1px solid var(--border); border-radius: var(--radius-xs); font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); }
 
 .session-group-item[data-state="usage_limit"] { position: relative; }
+/* The summary's dismiss (#21676): at the right of the box; 44px on touch. */
+.usage-limit-dismiss { margin-inline-start: auto; flex: none; }
+@media (pointer: coarse), (max-width: 767px) { .usage-limit-dismiss { min-width: 44px; min-height: 44px; } }
