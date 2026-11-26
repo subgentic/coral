@@ -225,7 +225,7 @@ func (h *SessionsHandler) RefreshHooks(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.wakeExistingSession(ctx, slept); err != nil {
 		slog.Warn("hooks update: waking the agent", "session_id", sessionID, "error", err)
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "the agent was stopped but could not be started again: wake it from the list"})
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "the agent was stopped but could not be started again: wake it from the list"})
 		return
 	}
 	h.sendAutoWakeNotice(ctx, *slept) // its board hears that its last turn may not have finished
