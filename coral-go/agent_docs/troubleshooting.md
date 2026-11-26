@@ -50,6 +50,13 @@ says why and the answer is the terminal's (or a project folder one level deeper)
 Trust is remembered per repository. Launching a team of four agents into a fresh repo
 blocks all four at once.
 
+### Pi (`pi 0.73.1`) hangs on first start at `"fd not found. Downloading... / ripgrep not found. Downloading..."` under Node 26
+
+On its first start, `@mariozechner/pi-coding-agent` (`0.73.1`, `engines.node: ">=20.6.0"`) downloads `fd` and `ripgrep` into its `bin` folder and unpacks them with `extract-zip`. Under **Node 26.13**, `extract-zip` never resolves, leaving a half-extracted folder and the terminal stuck at `"fd not found. Downloading... / ripgrep not found. Downloading..."`.
+
+- **Use Node 20 LTS, 22 LTS, or 24 LTS** (any LTS release matching `>=20.6.0` before Node 26) to run `pi`.
+- **Workaround on Node 26:** Unzip `fd` (`fd.exe` on Windows) and `rg` (`rg.exe` on Windows) into Pi's `bin` folder (`~/.pi/agent/bin` or `$PI_CODING_AGENT_DIR/bin`) by hand before launching the agent.
+
 ### A "Connect to Coral Hub" screen covers the dashboard
 
 That is the one-time first-launch screen. Click **Skip for now** (or press Escape) to keep
