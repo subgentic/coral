@@ -571,7 +571,11 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	}
 
 	// Resolve any active registered waits for this message
-	h.goBG(func() { h.resolveMessageWaits(project, subscriberID, body.Content) })
+	taskOwner := ""
+	if reply != nil && len(reply.recipients) > 0 {
+		taskOwner = reply.recipients[0] // the task's assignee (#21704)
+	}
+	h.goBG(func() { h.resolveMessageWaitsOnTask(project, subscriberID, body.Content, "", taskOwner) })
 
 	return msg, true
 }
