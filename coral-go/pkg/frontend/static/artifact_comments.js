@@ -326,9 +326,9 @@ export function attachComments(dialog, body, host, opts = {}) {
             if (keptBar.key && keptBar.key.every((v, i) => v === barKey[i]) && keptBar.nodes.length && keptBar.html === reviewBar.innerHTML && keptBar.hidden === reviewBar.hidden) reviewBar.replaceChildren(...keptBar.nodes); // the same document and the same words: the old buttons, with their listeners
             reviewBar._barKey = barKey;
         } else reviewBar._barKey = null;
-        const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked && !askedNow(c.id).size); // one an agent already has is not offered again (#20240)
+        const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked && unsent(c)); // a recorded send stays sent after reload, reply or expiry (#21769)
         if (st.bulkSent) { const b = st.bulkSent, who = b.agents.join(', '); const done = el('p', 'ac-send-done', `Sent ${plural(b.total, 'open comment')}${b.of > b.total ? ` of ${b.of}` : ''} to ${who}${b.queued ? ` (delivers when ${b.agents.length === 1 ? who : 'the agent'} is free)` : b.messages > 1 ? `, in ${b.messages} messages because of the size limit of one` : ', in one message'}. Each comment says where it stands.`); done.setAttribute('role', 'status'); panel.append(done); }
-        if (!st.reviewDrafts?.snapshot().data?.drafts_supported && sendable.length) { const sendAll = btn('ac-send-open', `Send ${plural(sendable.length, st.bulkSent ? 'remaining open comment' : 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
+        if (!st.reviewDrafts?.snapshot().data?.drafts_supported && sendable.length) { const sendAll = btn('ac-send-open', `Send ${sendable.length === 1 ? '1 comment' : plural(sendable.length, st.bulkSent ? 'remaining open comment' : 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (draftDocument && opts.inlineWhole && d.canComment && !d.locked && !opts.compact) {
             st.wholeComposer ||= { anchor: { whole: true } };
@@ -430,7 +430,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     }
     const act = (text, label, fn) => { if (typeof label === 'function') { fn = label; label = ''; } const b = btn('ac-act', text, label); b.addEventListener('click', fn); return b; };
 
-    const { resetAsk, canAsk, askSetup, openAsk, openMany, askBlock, askedNow, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint: opts.uploader, ago });
+    const { resetAsk, canAsk, askSetup, openAsk, openMany, askBlock, unsent, fillStatus } = createAsk({ st, panel, render, announce, refresh, ownHex, uploaderHint: opts.uploader, ago });
     function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
     async function run(fn, said) {
         if (st.busy) return;

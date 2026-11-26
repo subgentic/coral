@@ -3,6 +3,7 @@
 // picked, the server's answer per agent (asked, already asked, asleep ...) and its refusals in words; the agent's reply is a reply in the thread, labelled "agent". Not offered to a reply, a resolved thread, a comment made with no
 // board, or through Coral Hub. At 1280 and 390 px. The comments, the board's status and the send route are stood in at the page's fetch (the route and its limits are in internal/server/routes). Drives Chrome over CDP through agent_view_harness.js.
 const fs = require('node:fs');
+const assert = require('node:assert/strict');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -40,6 +41,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 const sub = url.split('/comments')[1].split('?')[0];
                 if (method === 'POST' && /^\\/\\d+\\/send$/.test(sub)) {
                     const b = JSON.parse(o.body); window.__sends.push({ id: Number(sub.split('/')[1]), agents: b.agents, now: b.now === true, bundle: b.bundle === true, last: b.last === true });
+                    if (window.__persistSends) { const c = window.__cs.find(c => c.id === Number(sub.split('/')[1])); c.asks = b.agents.map(agent => ({ agent, open: true, replies: 0 })); }
                     if (window.__send.body) return json(window.__send.body, window.__send.status);
                     return json({ ok: true, results: b.agents.map((a, i) => ({ agent: a, state: a === 'Backend Dev' ? 'already_asked' : 'sent', ask_id: i + 1 })) });
                 }
@@ -50,8 +52,9 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             return real(u, o);
         };
         return true; })()`;
-    const open = async (board, you, noAsks) => {
+    const open = async (board, you, noAsks, comments) => {
         await ev(STUB);
+        if (comments) await ev(`window.__cs = ${JSON.stringify(comments)}; window.__persistSends = true; true`);
         if (noAsks) await ev(`window.__cs[0].asks = []; true`);
         if (you) await ev(`window.__you = ${JSON.stringify(you)}; true`);
         await ev(`import(${S} + 'state.js').then(m => { m.state.liveSessions = [{ session_id: 'sess-qa', name: 'qa-agent', agent_type: 'claude', board_subscriber_id: 'QA Engineer', board_project: ${JSON.stringify(board || '')} }]; window.__opened = null; window.selectLiveSession = (...a) => { window.__opened = a; }; return true; })`); // QA Engineer is running; Reviewer and Docs Writer are not (#12168)
@@ -256,6 +259,26 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
                 await shot(`text-bundle-sent-${w}`);
             }
             await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click();true`);
+            // #21769: transport records survive a real reload, including completed asks.
+            const persisted = await ev(`window.__cs.filter(c => c.parent_id == null && !c.resolved_at).map(c => ({ ...c, asks: [{ agent: 'QA Engineer', open: false, replies: 1, seen: true }] }))`);
+            assert.equal(persisted.length, 2, 'two previously sent comments');
+            const fresh = { ...persisted[0], id: 5, body: 'One new comment after reload.', asks: [] };
+            await Page.reload(); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await open('ask-team', undefined, false, [...persisted, fresh]);
+            await ev(`document.querySelector('.ac-send-open')?.scrollIntoView({ block: 'center' }); true`);
+            await shot(`new-comments-after-reload-${w}`);
+            const offered = await ev(`document.querySelector('.ac-send-open')?.textContent || ''`);
+            assert.match(offered, /^Send (1 (?:open )?comment|comment) to an agent$/, 'only the new comment is offered after reload');
+            await ev(`document.querySelector('.ac-send-open').click(); true`);
+            await waitFor(`!!document.querySelector('.ac-ask input[value="QA Engineer"]')`, 'new-comment picker', 8000);
+            await ev(`document.querySelector('.ac-ask input[value="QA Engineer"]').click(); document.querySelector('.ac-ask-go').click(); true`);
+            await waitFor(`window.__sends.length === 1`, 'new comment sent', 8000);
+            assert.deepEqual(await ev(`window.__sends.map(c => c.id)`), [5], 'only the third comment is posted');
+            const allSent = await ev(`window.__cs`);
+            await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+            await open('ask-team', undefined, false, allSent);
+            assert.equal(await ev(`!!document.querySelector('.ac-send-open')`), false, 'no bulk Send when every comment was sent');
+            await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
             // Exercise the goal component's real uncommitted slot with a labelled team
             // whose worktree basename is an opaque board id.
             await ev(`(async()=>{const sb=await import(${S}+'server_base.js');sb.noteBoardLabel('local','b-n4dwtytis2','Release studio');const real=window.fetch;window.fetch=(u,o)=>String(u).endsWith('/uncommitted')?Promise.resolve(new Response(JSON.stringify({repos:[{folder:'/work/teams/b-n4dwtytis2',changed:0,new:1,files:[{path:'notes.txt',status:'new'}],secret_like:[],signing:false}]}),{headers:{'Content-Type':'application/json'}})):real(u,o);const host=document.createElement('div');host.id='labelled-goal';document.body.append(host);const g=await import(${S}+'goal_view.js');window.__labelledGoal=g.mountGoal(host,{team:'b-n4dwtytis2',id:987,back(){},goal:{id:987,title:'Release preview',state:'active',images:[],updatedAt:new Date().toISOString(),rollup:{done:1,active:0,blocked:0,queued:0}},refresh(){},status:()=>({})});return true;})()`);
