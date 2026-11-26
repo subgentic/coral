@@ -352,7 +352,7 @@ function _renderLiveSessions(sessions) {
     let html = limits?.summary || '';
     if (!SG) return; // the list by status (#21466) draws once its module is in (asked for above)
     const st = SG.lay(regularAgents, limits, archived, _renderSessionItem);
-    html += st ? st.h : SG.sw();
+    html += st ? st.h : '';
     if (!st && isGroupedByServer()) {
         for (const e of serversShown()) {
             const own = regularAgents.filter(x => sessionServer(x) === e.id);
