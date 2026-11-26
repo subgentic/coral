@@ -62,6 +62,7 @@ const BASE = require('./test_base').BASE;
             await settle(300);
             const act = await ev(`[...document.querySelectorAll('#group-table-view .al-row .al-team')].map(s => ({ text: s.textContent, link: s.querySelector('a.team-label-link')?.getAttribute('href') || '' }))`);
             assert.ok(act.length >= 2 && act.every(a => a.link.startsWith('/team/')) && new Set(act.map(a => a.link)).size === 2, 'the Activity label links to the team on its own computer: ' + JSON.stringify(act));
+            assert.ok(act.every(a => (a.text.match(/Box Two/g) || []).length <= 1 && (a.text.match(/This computer/g) || []).length <= 1), 'the computer is named once in the Activity team words (#21571): ' + JSON.stringify(act));
             await shot(`activity-${width}-dark`); await theme('light'); await shot(`activity-${width}-light`); await theme('dark');
         }
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
