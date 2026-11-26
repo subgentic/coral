@@ -116,7 +116,7 @@ func printHelp(w io.Writer) {
 	fmt.Fprintf(w, "  %-16s %s\n", "--port N", "port to listen on (default "+strconv.Itoa(config.DefaultPort)+")")
 	fmt.Fprintf(w, "  %-16s %s\n", "--host ADDR", "address to listen on (default: this computer only)")
 	fmt.Fprintf(w, "  %-16s %s\n", "--home DIR", "data folder (default: CORAL_DATA_DIR, else .coral in your home folder)")
-	fmt.Fprintf(w, "  %-16s %s\n", "--hub-only", "listen on this computer only and refuse every proxied request: reach Coral through Coral Hub")
+	fmt.Fprintf(w, "  %-16s %s\n", "--hub-only", "listen on this computer only and refuse every proxied request that shows itself (a credential is always required): reach Coral through Coral Hub")
 	fmt.Fprintf(w, "  %-16s %s\n", "--no-browser", "don't open the dashboard in the browser at startup")
 	fmt.Fprintf(w, "  %-16s %s\n", "--accept-terms", "the person installing Coral accepts the Terms (read them: coral terms); an agent must not set this for you")
 	fmt.Fprintf(w, "  %-16s %s\n", "--cloud-url URL", "the Coral Hub this server may connect to (\"off\" disables it)")
