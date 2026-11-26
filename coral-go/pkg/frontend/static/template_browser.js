@@ -13,6 +13,7 @@ async function fetchCategories(type, server) {
     if (_categoriesCache[key]) return _categoriesCache[key];
     try {
         const resp = await serverFetch(server, `/api/templates/${type}`);
+        if (!resp.ok) throw resp; // a 502 body is an error object, not the list
         const data = await resp.json();
         _categoriesCache[key] = data;
         return data;
@@ -25,6 +26,7 @@ async function fetchCategories(type, server) {
 async function fetchTemplatesInCategory(type, category, server) {
     try {
         const resp = await serverFetch(server, `/api/templates/${type}/${encodeURIComponent(category)}`);
+        if (!resp.ok) throw resp;
         return await resp.json();
     } catch (e) {
         showToast('Failed to load templates', true);
@@ -35,6 +37,7 @@ async function fetchTemplatesInCategory(type, category, server) {
 async function fetchTemplate(type, category, name, server) {
     try {
         const resp = await serverFetch(server, `/api/templates/${type}/${encodeURIComponent(category)}/${encodeURIComponent(name)}`);
+        if (!resp.ok) throw resp;
         return await resp.json();
     } catch (e) {
         showToast('Failed to load template', true);
