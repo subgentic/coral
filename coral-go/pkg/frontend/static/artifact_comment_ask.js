@@ -34,6 +34,8 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         for (const [role, words] of askedOf(id)) m.set(role, words);
         return m;
     }
+    // Bulk Send offers only comments never sent, including asks now closed or answered.
+    const unsent = c => !(c.asks || []).some(k => k.agent) && !askedOf(c.id).size;
     // The line's rows: each agent asked into the thread with where its ask stands. The server's list wins once it shows more than Sent (a read, a reply); this page's own newest words ('Asked just now') cover only the moment after a send, before the list has caught up.
     function statusNow(id) {
         const m = new Map();
@@ -159,5 +161,5 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex, upload
         redrawAsk(); for (const c of k.queue) redrawStatus(c.id);
         panel.querySelector('.ac-ask .ac-cancel')?.focus();
     }
-    return { resetAsk, canAsk, askSetup, openAsk, openMany: list => { const queue = list.filter(canAsk); if (queue.length) return openAsk(queue[0], queue); }, askBlock, askedNow, statusWords, fillStatus };
+    return { resetAsk, canAsk, askSetup, openAsk, openMany: list => { const queue = list.filter(c => canAsk(c) && unsent(c)); if (queue.length) return openAsk(queue[0], queue); }, askBlock, askedNow, unsent, statusWords, fillStatus };
 }
