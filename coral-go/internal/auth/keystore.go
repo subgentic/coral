@@ -319,8 +319,12 @@ func (ks *KeyStore) fromTrustedProxy(r *http.Request) bool {
 // trusted proxy is counted by its own address and the header is never read, so a client cannot choose its bucket; a value that is not an address is ignored.
 func (ks *KeyStore) throttleAddr(r *http.Request) string {
 	peer := clientIP(r)
-	if ks == nil || !ks.fromTrustedProxy(r) || r.Header.Get(tunnel.ViaHeader) != "" { // a request the Coral Hub connector carried is counted by its peer: no header of a Hub's user picks a bucket
+	if ks == nil || !ks.fromTrustedProxy(r) {
 		return peer
+	}
+	if r.Header.Get(tunnel.ViaHeader) != "" { // a request the Coral Hub connector carried: no header of a Hub's user picks a bucket. It has a counter of its own, with the peer ceiling, so a forged
+		// X-Coral-Via-Tunnel sent through a proxy cannot fill the plain 127.0.0.1 bucket that the Operator's own direct sign-in uses (#21574)
+		return peerPrefix + "via:" + peer
 	}
 	vals := r.Header.Values("X-Forwarded-For")
 	if len(vals) == 0 {
@@ -341,7 +345,7 @@ func (ks *KeyStore) throttleAddr(r *http.Request) string {
 // "" when the client is the peer itself, so a direct request is counted once.
 func (ks *KeyStore) peerThrottleKey(r *http.Request) string {
 	peer := clientIP(r)
-	if ks.throttleAddr(r) == rateKeyOf(peer) {
+	if a := ks.throttleAddr(r); a == rateKeyOf(peer) || strings.HasPrefix(a, peerPrefix) { // the client is the peer, or already counted under a peer key
 		return ""
 	}
 	return peerPrefix + peer
