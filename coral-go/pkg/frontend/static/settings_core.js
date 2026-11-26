@@ -7,6 +7,7 @@
 import { state } from './state.js';
 import { updateTerminalTheme, applySettingsFont } from './xterm_renderer.js';
 import { browserLocal } from './safe_storage.js';
+import { importOnce } from './import_once.js';
 // What Save sends: only the fields the person changed (here so the module is loaded at startup, import_hygiene).
 export { changedSettings } from './settings_diff.js';
 
@@ -14,36 +15,6 @@ export function settingBool(value, fallback = true) {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') return !['false', '0', 'off', 'disabled'].includes(value.trim().toLowerCase());
     return fallback;
-}
-
-export function renderRemoteAccessStatus(status, loadError = false) {
-    const el = document.getElementById('settings-remote-access-status');
-    if (!el) return;
-    if (loadError) {
-        el.textContent = 'Could not read the running access state. The saved value was not changed.';
-        el.dataset.state = 'error';
-        return;
-    }
-    const saved = settingBool(status?.remote_access_enabled, false);
-    const effective = settingBool(status?.remote_access_effective, false);
-    const box = document.getElementById('settings-remote-access-enabled');
-    if (box) box.dataset.saved = saved ? '1' : '0'; // what the server has: a switch that differs from it is waiting for Save (net note, #6579)
-    document.dispatchEvent(new CustomEvent('coral-remote-access-status'));
-    const restart = status?.remote_access_restart_required === true || saved !== effective;
-    if (restart) {
-        el.textContent = `Saved: ${saved ? 'on' : 'off'}. Running: ${effective ? 'on' : 'local only'}. Restart to apply.`;
-    } else {
-        el.textContent = ''; // the switch already says it; only a mismatch or a risk is worth a line
-    }
-    // Remote access without TLS is plain HTTP (#3355): say so wherever it is, or will be, on.
-    if ((effective || saved) && status?.remote_access_tls !== true) {
-        el.textContent = `${el.textContent} Not encrypted: the API key, login and terminal traffic cross the network as plain HTTP. Use Coral Hub, a TLS proxy, or --tls-cert and --tls-key.`.trim();
-        el.dataset.unencrypted = 'true';
-    } else {
-        delete el.dataset.unencrypted;
-        if (effective && status?.remote_access_tls === true) el.textContent = `${el.textContent} Encrypted (HTTPS).`.trim();
-    }
-    el.dataset.state = restart ? 'restart-required' : 'current';
 }
 
 // The terminal input debug log (#3256): the toggle shows the saved setting, and a
@@ -210,14 +181,14 @@ export async function loadSettings() {
             state.privacyStatus = await privacyResp.json();
             const remote = document.getElementById('settings-remote-access-enabled');
             if (remote) remote.checked = settingBool(state.privacyStatus.remote_access_enabled, false);
-            renderRemoteAccessStatus(state.privacyStatus);
+            (await importOnce('./settings_remote_status.js')).renderRemoteAccessStatus(state.privacyStatus);
             renderDebugInputLogStatus(state.privacyStatus);
             renderToolsFolderStatus(state.privacyStatus);
         } catch (error) {
             state.privacyStatus = null;
             const remote = document.getElementById('settings-remote-access-enabled');
             if (remote) remote.checked = settingBool(s.remote_access_enabled, false);
-            renderRemoteAccessStatus(null, true);
+            (await importOnce('./settings_remote_status.js')).renderRemoteAccessStatus(null, true);
         }
 
         // Apply scrollbar visibility

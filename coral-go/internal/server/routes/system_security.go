@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/dbcrypt"
 	"github.com/subgentic/coral/internal/inputlog"
@@ -134,7 +135,7 @@ func (h *SystemHandler) GetPrivacyStatus(w http.ResponseWriter, r *http.Request)
 	case effectiveRemote:
 		status = "disable_pending_restart"
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	out := map[string]any{
 		"telemetry_enabled":              telemetryEnabled,
 		"remote_access_enabled":          remoteEnabled,
 		"remote_access_configured":       configured,
@@ -149,7 +150,16 @@ func (h *SystemHandler) GetPrivacyStatus(w http.ResponseWriter, r *http.Request)
 		// H5: who besides the system and administrators can change the folder of the hooks every agent
 		// runs (a portable Coral in the user's profile); empty for an install in Program Files.
 		"tools_folder": toolsFolderStatus(),
-	})
+	}
+	// A proxy in front of a Coral that says remote access is off: warn, never refuse (#21527). Red when nothing but the proxy stands in front of it.
+	if !effectiveRemote && auth.ProxySeen() {
+		out["proxy_warning"] = map[string]any{
+			"message": auth.ProxyMessage,
+			"red":     auth.ProxyWarningRed(h.passwordSet != nil && h.passwordSet(), h.cfg.StrictLocalAuth),
+			"detail":  auth.ProxyRedDetail,
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func toolsFolderStatus() map[string]any {

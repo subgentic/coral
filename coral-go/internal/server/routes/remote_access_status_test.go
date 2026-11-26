@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/auth"
 )
 
 func privacyGetJSON(t *testing.T, url string) map[string]any {
@@ -121,4 +122,37 @@ func TestPrivacyStatusReportsWhoCanChangeTheToolsFolder(t *testing.T) {
 	agent.SetToolsFolderWriters(`C:\Program Files\Coral`, nil)
 	tools = privacyGetJSON(t, server.URL+"/api/system/privacy")["tools_folder"].(map[string]any)
 	assert.Equal(t, []any{}, tools["writable_by"], "an empty list, never null")
+}
+
+// #21527: a proxy in front of a Coral that says remote access is off shows a warning, red with no password and a trusted loopback; Settings and the status agree.
+func TestPrivacyStatusWarnsWhenAProxyWasSeen(t *testing.T) {
+	server, handler := setupSystemTestServer(t)
+	handler.cfg.Host = "127.0.0.1"
+	auth.ResetProxySeenForTest()
+	auth.SetRequireAuthOnLoopback(false)
+	t.Cleanup(auth.ResetProxySeenForTest)
+
+	s := privacyGetJSON(t, server.URL+"/api/system/privacy")
+	assert.NotContains(t, s, "proxy_warning", "no proxied request yet: no warning")
+
+	auth.NoteProxied(func() bool { return false }, true)
+	handler.cfg.StrictLocalAuth = true
+	handler.SetPasswordSet(func() bool { return false })
+	w, _ := privacyGetJSON(t, server.URL+"/api/system/privacy")["proxy_warning"].(map[string]any)
+	require.NotNil(t, w)
+	assert.Equal(t, "Coral is being reached through a proxy; set a password", w["message"])
+	assert.Equal(t, true, w["red"], "no password and require_auth_on_loopback off: red")
+
+	handler.SetPasswordSet(func() bool { return true })
+	w, _ = privacyGetJSON(t, server.URL+"/api/system/privacy")["proxy_warning"].(map[string]any)
+	require.NotNil(t, w)
+	assert.Equal(t, false, w["red"], "a password is set: a warning, not red")
+
+	handler.cfg.StrictLocalAuth = false // QA's #21526 probe: a header-less proxy passes as local even with a password
+	w, _ = privacyGetJSON(t, server.URL+"/api/system/privacy")["proxy_warning"].(map[string]any)
+	require.NotNil(t, w)
+	assert.Equal(t, true, w["red"], "a password but strict local auth off: red")
+
+	handler.cfg.Host = "0.0.0.0"
+	assert.NotContains(t, privacyGetJSON(t, server.URL+"/api/system/privacy"), "proxy_warning", "remote access on: nothing to warn about")
 }

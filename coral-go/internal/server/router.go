@@ -132,6 +132,8 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	s.goBackground(func(ctx context.Context) { RunMemberGrantSweeper(ctx, s.boardStore, linkCap, memberGrantSweepEvery) })
 	// Through Coral Hub, no path under the home directory and no hidden file names (#3559).
 	r.Use(routes.HubPaths)
+	// While Coral listens on this computer only, a request that came through a proxy is worth a warning (never a refusal) (#21527).
+	r.Use(s.watchForProxy)
 	// NOTE: middleware.RealIP was intentionally removed. It rewrites r.RemoteAddr
 	// from X-Forwarded-For headers, which would allow an attacker to spoof
 	// 127.0.0.1 and bypass auth.IsLocalhost(). Coral is a desktop app with no
@@ -345,6 +347,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	routes.ProtectDataDir(s.cfg.CoralDir())
 	sysHandler := routes.NewSystemHandler(s.db, s.cfg)
 	s.sysHandler = sysHandler
+	sysHandler.SetPasswordSet(s.keyStore.PasswordSet)
 	sessHandler.SetPiModelCheck(sysHandler.PiModelProblem) // a Pi model that Pi does not list is said so at launch (#11105)
 	sysHandler.SetTerminal(s.terminal)
 	sysHandler.SetSigninTerminal(sessHandler.LaunchSigninTerminal)
@@ -1173,4 +1176,14 @@ func (s *Server) ownHubServerID(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return c.ServerID, nil
+}
+
+// watchForProxy notes a proxied request while remote access is off, for the Settings warning and the startup log. It never changes or refuses the request; a request Coral Hub's connector forwarded is not one.
+func (s *Server) watchForProxy(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if config.IsLoopbackHost(s.cfg.Host) && !cloud.Tunneled(r) && auth.ProxiedRequest(r) {
+			auth.NoteProxied(s.keyStore.PasswordSet, s.cfg.StrictLocalAuth)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
