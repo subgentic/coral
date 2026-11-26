@@ -77,13 +77,32 @@ type resumeRequest struct {
 	CurrentSessionID string `json:"current_session_id"`
 }
 
+// storedResumeType is the type the live session being resumed was started with, or claude when the request names no
+// session that can be found (the older default).
+func (h *SessionsHandler) storedResumeType(ctx context.Context, name, currentSessionID string) string {
+	sid := currentSessionID
+	if sid == "" {
+		if _, parsed := logparse.ParseSessionName(name); parsed != "" {
+			sid = parsed
+		} else if _, err := uuid.Parse(name); err == nil {
+			sid = name
+		}
+	}
+	if sid != "" {
+		if ls, err := h.ss.GetLiveSession(ctx, sid); err == nil && ls != nil && ls.AgentType != "" {
+			return ls.AgentType
+		}
+	}
+	return at.Claude
+}
+
 // resumeResolve works out the resume as a restart plan: the type (never a terminal, and one that can resume), the
 // live session it replaces (refused when unknown, no longer live or archived), its terminal or, when that is gone,
 // its working directory (never another agent's pane, #3213), its stored settings and its board subscription.
 func (h *SessionsHandler) resumeResolve(ctx context.Context, name string, body *resumeRequest) (*restartPlan, answer) {
 	agentType := body.AgentType
 	if agentType == "" {
-		agentType = at.Claude
+		agentType = h.storedResumeType(ctx, name, body.CurrentSessionID) // #21603: a request without agent_type resumes the agent's own type, not claude
 	}
 	if agentType == at.Terminal { // a plain shell has no conversation to resume (and no agent CLI to type)
 		return nil, func(w http.ResponseWriter) { errBadRequest(w, "Resume not supported for terminal") }
