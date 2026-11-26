@@ -139,6 +139,7 @@ const taskUsageText = `Usage: coral-board task <subcommand> [args]
 
 Subcommands:
   add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--force] [--remind-at TIME] [--goal ID] [--follow-up ID]
+  add "title" --assignee "Agent Name" --later   Backlog: assigned for later. No wake, no nudge, the health check ignores it; the assignee claims it by number (task claim N), or the orchestrator promotes it (task unpark N). Unassigning (reassign with no --to) wakes nobody
   add "title" --self --goal ID     A task for yourself, any agent may: assigned to you, needs a goal; a repeat of an open title returns that task, at most 5 open
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
@@ -165,6 +166,7 @@ Subcommands:
   release-review <id> --reason "slot released pending review" (orchestrator only; for a candidate submitted before v1.4.56)
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> --message "reason"
+  reassign <id> --to "Agent Name" --later   Move it to that agent's backlog (as add --later)
   reassign <id> [--to "Agent Name"] [--force]   An agent that already has the team's limit of waiting tasks (3 by default) is refused, with the less loaded agents named; --force assigns anyway and is recorded
                                    A review task moves to another reviewer the same way: the round follows, the old reviewer is told, the others' verdicts stay
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)

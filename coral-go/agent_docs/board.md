@@ -1362,6 +1362,19 @@ While it is set the owner gets no no-activity nudge for that task. The health ch
 clears when that member posts on the task (`post --task N`) or the owner clears it. An in-progress task with no tool
 activity and no wait-on for `stalled_hours` (default 4) shows as stalled in the health check. `--blocked-by` stays for waits on tasks.
 
+#### Backlog: assign for later (`--later`)
+
+```
+coral-board task add "title" --assignee "Agent Name" --later
+coral-board task reassign <id> --to "Agent Name" --later
+coral-board task claim <id>        # the assignee promotes it by number
+coral-board task unpark <id>       # the orchestrator or Operator promotes it
+POST /api/board/{project}/tasks            {"title": "...", "assigned_to": "...", "later": true}
+POST /api/board/{project}/tasks/{id}/reassign   {"assignee": "...", "later": true}
+```
+
+Assigning wakes the agent, so teams left backlog unassigned and the health check named it. A backlog task is pending and kept by its assignee (or nobody), and is quiet: its assignment is a board line with no @mention, nothing is typed into any terminal, the claim and status nudges skip it, the health check and the stale sweep leave it out, and a bare `task claim` is not offered it. It is a park whose reason is `backlog` with no end, so it is not counted against the park limit or named as an old park. Claiming it by number promotes it; so does `task unpark`. Only a task that is not started can go to the backlog. Unassigning a task (`task reassign N` with no `--to`) wakes nobody either: the board keeps the line and only the Orchestrator is tagged. `task release N --keep` puts a task back to pending with its owner but is not backlog: its owner is still nudged to claim it.
+
 ### Task Status Workflow
 
 ```

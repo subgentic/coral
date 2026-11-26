@@ -92,6 +92,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		RemindAt       string              `json:"remind_at,omitempty"`        // RFC 3339: a one-time reminder (#4175 step 3)
 		GoalID         *int64              `json:"goal_id,omitempty"`          // a goal of this board the task works toward (#7087)
 		GoalProposalID *int64              `json:"goal_proposal_id,omitempty"` // the pending goal proposal this task is for: it waits for that goal (#11389)
+		Later          bool                `json:"later,omitempty"`            // backlog (#21701): assigned for later, no wake, no nudge, ignored by the health check until claimed or promoted
 		Force          bool                `json:"force,omitempty"`            // assign past the team's limit of waiting tasks (#14862); who forced it is recorded on the board
 		Self           bool                `json:"self,omitempty"`             // a task the caller makes for ITSELF (#11247): any member may, with a goal, one per title, at most maxOpenSelfTasks open
 		Images         map[string][]string `json:"images,omitempty"`           // the Operator's pictures by field: description, instructions (#20731)
@@ -237,7 +238,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		h.proposeAnswer(w, r, board.ProposalInput{Board: project, Kind: board.ProposalTask, Title: body.Title, Payload: payload, Proposer: createdBy, GoalProposalID: body.GoalProposalID})
 		return
 	}
-	task, err := h.makeTask(r.Context(), project, taskCreation{Title: body.Title, Body: body.Body, Priority: body.Priority, CreatedBy: createdBy, AssignedTo: body.AssignedTo, Opts: opts, RemindAt: remindAt})
+	task, err := h.makeTask(r.Context(), project, taskCreation{Title: body.Title, Body: body.Body, Priority: body.Priority, CreatedBy: createdBy, AssignedTo: body.AssignedTo, Opts: opts, RemindAt: remindAt, Later: body.Later})
 	if err != nil {
 		if task == nil {
 			if !goalError(w, err) {
@@ -278,8 +279,8 @@ func (h *BoardHandler) announceCreatedTask(project string, task *board.Task) {
 			notification := h.buildAssignmentNotification(ctx, project, task, assignee, false)
 			h.postNotice(ctx, project, notification)
 
-			// Send direct terminal nudge
-			if h.terminal != nil {
+			// Send direct terminal nudge: not for a parked task, backlog included (#21701), which wakes nobody
+			if h.terminal != nil && !task.Parked(time.Now()) {
 				if assignee != "" {
 					hasActive, _ := h.bs.HasActiveTaskForAssignee(ctx, project, assignee, task.ID)
 					if !hasActive {

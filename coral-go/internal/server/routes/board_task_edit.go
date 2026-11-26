@@ -312,6 +312,7 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 		SubscriberID string `json:"subscriber_id"`
 		Assignee     string `json:"assignee"`
 		Force        bool   `json:"force,omitempty"` // assign past the team's limit of waiting tasks (#14862)
+		Later        bool   `json:"later,omitempty"` // backlog (#21701): for later, no wake, no nudge, ignored by the health check until claimed or promoted
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -352,11 +353,24 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, err.Error())
 		return
 	}
+	if body.Later {
+		if backlog, err := h.bs.SetBacklog(r.Context(), project, task.ID); err == nil {
+			task = backlog
+		}
+	}
 	h.noteForcedAssignment(r, project, task.ID, body.Assignee, body.SubscriberID, forcedPast)
 	movedReview := task.Workflow.ReviewOf > 0 // a review moved to another reviewer (#14866)
 	h.goBG(func() {
 		ctx := context.Background()
 		notification := h.buildAssignmentNotification(ctx, project, task, body.Assignee, true)
+		if body.Assignee == "" && task.Status == "pending" && !task.Parked(time.Now()) {
+			// Unassigning wakes nobody (#21701, as a release is not a broadcast, #19623): the Orchestrator is told, the board keeps the line.
+			tag := ""
+			if orch, err := h.bs.TeamOrchestrator(ctx, project); err == nil {
+				tag = orchestratorTag(orch, body.SubscriberID)
+			}
+			notification = fmt.Sprintf("%s[Task #%d reassigned — now unassigned] %s — run 'coral-board task claim' to pick it up", tag, task.ID, h.noticeText(ctx, project, task.Title))
+		}
 		h.postNotice(ctx, project, notification)
 		if movedReview && current != "" && !strings.EqualFold(current, body.Assignee) {
 			h.postNotice(ctx, project, fmt.Sprintf("@%s Review task #%d (the review of #%d) moved to %s: you are off that review, and your verdict on it is no longer asked for.", current, task.ID, task.Workflow.ReviewOf, body.Assignee))
