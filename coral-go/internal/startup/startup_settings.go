@@ -9,6 +9,7 @@ import (
 	"runtime"
 
 	"github.com/subgentic/coral/internal/agentprio"
+	"github.com/subgentic/coral/internal/auth"
 
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/inputlog"
@@ -75,7 +76,7 @@ func applyPrivacySettings(ctx context.Context, db *store.DB, cfg *config.Config,
 	ss := store.NewSessionStore(db)
 	settings, err := ss.GetSettings(ctx)
 	if err != nil {
-		if !forceRemote {
+		if !forceRemote || auth.HubOnly() {
 			// Fail closed for the bind too: never widen exposure because the
 			// opt-in could not be read.
 			restrictToLoopback(cfg, "settings unreadable")
@@ -87,7 +88,7 @@ func applyPrivacySettings(ctx context.Context, db *store.DB, cfg *config.Config,
 	// On first launch the setting doesn't exist yet — prompt the user, unless
 	// --remote already answered: nothing is saved, so a later start without the
 	// flag still asks.
-	if configured := setreg.Has(settings, setreg.RemoteAccessEnabled); !configured && remotePrompt != nil && !forceRemote {
+	if configured := setreg.Has(settings, setreg.RemoteAccessEnabled); !configured && remotePrompt != nil && !forceRemote && !auth.HubOnly() {
 		enabled := remotePrompt()
 		value := "false"
 		if enabled {
@@ -97,10 +98,12 @@ func applyPrivacySettings(ctx context.Context, db *store.DB, cfg *config.Config,
 			log.Printf("[startup] failed to save remote_access_enabled: %v", err)
 		}
 		settings[setreg.RemoteAccessEnabled] = value
-	} else if !configured && !forceRemote {
+	} else if !configured && !forceRemote && !auth.HubOnly() {
 		log.Printf("[startup] remote access is off: Coral didn't ask, as nobody is at a terminal to answer (it accepts connections from this computer only). To let other devices connect, turn it on in Settings > Coral Hub and remote access, or start Coral with --remote")
 	}
-	if !forceRemote && !setreg.Bool(settings, setreg.RemoteAccessEnabled) {
+	if auth.HubOnly() {
+		restrictToLoopback(cfg, "hub-only: Coral is reached through Coral Hub only")
+	} else if !forceRemote && !setreg.Bool(settings, setreg.RemoteAccessEnabled) {
 		restrictToLoopback(cfg, "remote access is not enabled")
 	} else {
 		widenForRemote(cfg)

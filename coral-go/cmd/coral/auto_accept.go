@@ -101,6 +101,9 @@ func subcommand(args []string) (int, bool) {
 		fmt.Print(license.EULAText)
 		return 0, true
 	}
+	if len(args) > 0 && args[0] == "hub-only" {
+		return runHubOnly(args[1:], os.Stdout, os.Stderr), true
+	}
 	if len(args) > 0 && args[0] == "accept-terms" { // the self-hosted hub's setup over SSH (#11370); not listed in the help on purpose
 		return runAcceptTerms(args[1:], os.Stdin, os.Stdout, os.Stderr, license.RecordHubOwnerAcceptance), true
 	}

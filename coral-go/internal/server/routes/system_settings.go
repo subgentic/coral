@@ -393,7 +393,7 @@ func applyLiveSettings(values map[string]string) {
 		case inputlog.SettingKey:
 			inputlog.SetSetting(setreg.Bool(values, k))
 		case auth.RequireAuthOnLoopbackSetting:
-			auth.SetRequireAuthOnLoopback(setreg.Bool(values, k)) // #3585: takes effect for the next request
+			auth.SetRequireAuthOnLoopback(setreg.Bool(values, k) || auth.HubOnly()) // hub-only keeps it on; #3585: takes effect for the next request
 		}
 	}
 }

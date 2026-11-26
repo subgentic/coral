@@ -67,6 +67,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 
 	// Requests that came through the Cloud Hub tunnel (marked by the connector) are
 	// re-checked against the connector's route policy before anything else sees them.
+	r.Use(auth.HubOnlyGate(cloud.TunneledAuthentic, cloud.Tunneled)) // hub-only: a proxied request is refused here, before anything else (#21558)
 	r.Use(cloud.Guard(routes.MaxModeFromSettings(store.NewSessionStore(s.db))))
 	// The connector's stamp of which Hub link a request arrived on and which Hub person is behind it (#20312): a request with no known link is refused, the pair goes in the context for
 	// every writer, and Allow (which allows everything in this build) is the one check point.
