@@ -427,22 +427,29 @@ func (s *WorkflowStore) WorkflowRunIDs(ctx context.Context, workflowID int64) ([
 	return ids, err
 }
 
-// PruneWorkflowRuns deletes a workflow's runs older than its newest keep runs,
-// except ones still pending or running, and returns the deleted ids so their
-// run directories can be removed too.
+// QuietRunsKept is how many quiet runs (RunQuiet) a workflow, and a scheduled job, keeps besides its other runs: they are counted apart, so a check that runs every few minutes and finds nothing never pushes a run
+// that did something out of the history (#21502).
+const QuietRunsKept = 10
+
+// ScheduledRunsKept is how many runs of a scheduled job are kept, not counting its quiet runs (QuietRunsKept): the same as the workflow runs, which are kept 50 apiece.
+const ScheduledRunsKept = 50
+
+// PruneWorkflowRuns deletes a workflow's runs older than its newest keep runs, except ones still pending or running, and returns the deleted ids so their run directories can be removed too. Quiet runs are
+// counted apart: the newest QuietRunsKept of them stay, and they do not count toward keep.
 func (s *WorkflowStore) PruneWorkflowRuns(ctx context.Context, workflowID int64, keep int) ([]int64, error) {
-	const where = `workflow_id = ? AND status NOT IN ('pending', 'running')
-		   AND id NOT IN (SELECT id FROM workflow_runs WHERE workflow_id = ? ORDER BY id DESC LIMIT ?)`
+	const where = `workflow_id = ? AND status NOT IN ('pending', 'running') AND (
+		   (status = 'quiet' AND id NOT IN (SELECT id FROM workflow_runs WHERE workflow_id = ? AND status = 'quiet' ORDER BY id DESC LIMIT ?))
+		OR (status != 'quiet' AND id NOT IN (SELECT id FROM workflow_runs WHERE workflow_id = ? AND status != 'quiet' ORDER BY id DESC LIMIT ?)))`
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	var ids []int64
-	if err := tx.SelectContext(ctx, &ids, "SELECT id FROM workflow_runs WHERE "+where+" ORDER BY id", workflowID, workflowID, keep); err != nil || len(ids) == 0 {
+	if err := tx.SelectContext(ctx, &ids, "SELECT id FROM workflow_runs WHERE "+where+" ORDER BY id", workflowID, workflowID, QuietRunsKept, workflowID, keep); err != nil || len(ids) == 0 {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, "DELETE FROM workflow_runs WHERE "+where, workflowID, workflowID, keep); err != nil {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM workflow_runs WHERE "+where, workflowID, workflowID, QuietRunsKept, workflowID, keep); err != nil {
 		return nil, err
 	}
 	return ids, tx.Commit()
