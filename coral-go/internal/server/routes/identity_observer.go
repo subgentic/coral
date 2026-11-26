@@ -82,15 +82,16 @@ type IdentityObserver struct {
 	hasSession func(*http.Request) bool
 
 	// Strict local auth (#3418), set once before serving (SetStrict).
-	strict        bool
-	validKey      func(*http.Request) bool                                   // a valid API key in the request
-	verifyCLI     func(*http.Request) (*http.Request, bool)                  // a valid command-line signature
-	otherUser     func(*http.Request) bool                                   // a loopback caller running as another OS user
-	linkKey       func(ctx context.Context, key string) (id string, ok bool) // a self-hosted Hub's request key (#20944)
-	keyLinks      func(w http.ResponseWriter, r *http.Request, keyID string) bool
-	keyLinkHub    func(ctx context.Context, linkID string) string // the hub id a key link's Hub gave at its join ("" for none, #21261): the only secret its owner stamps may be made with
-	hostedLink    func(ctx context.Context, linkID string) bool   // whether a tunneled request's link is a hosted Hub's (not a request key's, #21220); nil: every tunneled request is callerHub
-	linkKeyFailed func(r *http.Request)                           // counts a wrong request key against its address (the API key's rate limit) // carries a linked key's request through its link (#21220); false when the key has no link
+	strict         bool
+	validKey       func(*http.Request) bool                                   // a valid API key in the request
+	verifyCLI      func(*http.Request) (*http.Request, bool)                  // a valid command-line signature
+	otherUser      func(*http.Request) bool                                   // a loopback caller running as another OS user
+	linkKey        func(ctx context.Context, key string) (id string, ok bool) // a self-hosted Hub's request key (#20944)
+	linkKeyRevoked func(ctx context.Context, key string) bool                 // a key made here and revoked since: refused, not counted as a wrong key (#21645)
+	keyLinks       func(w http.ResponseWriter, r *http.Request, keyID string) bool
+	keyLinkHub     func(ctx context.Context, linkID string) string // the hub id a key link's Hub gave at its join ("" for none, #21261): the only secret its owner stamps may be made with
+	hostedLink     func(ctx context.Context, linkID string) bool   // whether a tunneled request's link is a hosted Hub's (not a request key's, #21220); nil: every tunneled request is callerHub
+	linkKeyFailed  func(r *http.Request)                           // counts a wrong request key against its address (the API key's rate limit) // carries a linked key's request through its link (#21220); false when the key has no link
 
 	mu         sync.Mutex
 	callers    map[string]int64
@@ -129,6 +130,11 @@ func NewIdentityObserver(db *store.DB, bs *board.Store, hasSession func(*http.Re
 // nonce).
 func (o *IdentityObserver) SetVerifiers(validKey func(*http.Request) bool, verifyCLI func(*http.Request) (*http.Request, bool)) {
 	o.validKey, o.verifyCLI = validKey, verifyCLI
+}
+
+// SetLinkKeyRevoked gives the observer the check for a revoked request key, which it refuses without counting against the address (#21645).
+func (o *IdentityObserver) SetLinkKeyRevoked(f func(ctx context.Context, key string) bool) {
+	o.linkKeyRevoked = f
 }
 
 // SetLinkKeyFailures gives the observer the count of wrong request keys (the auth middleware's rate limit, #21220).

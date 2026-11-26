@@ -33,6 +33,11 @@ func (h *CloudHandler) VerifyLinkKey(ctx context.Context, key string) (string, b
 	return k.ID, ok
 }
 
+// LinkKeyWasRevoked is VerifyLinkKey's companion: true for a key made here, now revoked (#21645).
+func (h *CloudHandler) LinkKeyWasRevoked(ctx context.Context, key string) bool {
+	return h != nil && h.links != nil && h.links.LinkKeyWasRevoked(ctx, key)
+}
+
 func (h *CloudHandler) linkKeyErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrLinkKeyNone):

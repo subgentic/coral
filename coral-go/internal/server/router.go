@@ -199,6 +199,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 		return s.cloudHandler.VerifyCLI(r)
 	})
 	s.identity.SetLinkKeys(func(ctx context.Context, key string) (string, bool) { return s.cloudHandler.VerifyLinkKey(ctx, key) }) // a self-hosted Hub's request key: three calls only (#20944)
+	s.identity.SetLinkKeyRevoked(func(ctx context.Context, key string) bool { return s.cloudHandler.LinkKeyWasRevoked(ctx, key) }) // a closure: the handler is made after this line runs (#21645)
 	s.identity.SetLinkKeyFailures(s.keyStore.RecordLinkKeyFailure)                                                                 // a wrong request key is throttled like a wrong API key (#21220)
 	s.identity.SetHostedLinks(linkStamps.HostedLink)                                                                               // a key link's request is never the person (#21220, Security's round 1 MUST)
 	s.identity.SetKeyLinkHubs(linkStamps.KeyLinkHubID)                                                                             // the hub id a key link's Hub gave at its join: its owner stamps are checked against the secret held under exactly that id (#21261)

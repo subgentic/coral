@@ -175,3 +175,18 @@ func TestTenCreationsAnHourPerLinkCountRevokedOnesToo(t *testing.T) {
 	_, _, err = cs.CreateLinkKeyVia(ctx, "Hub x", "lnk-aaaa1111", now.Add(75*time.Minute))
 	assert.NoError(t, err, "an hour later")
 }
+
+// #21645: only a key made here and revoked, with its right secret, is "was revoked"; a live, wrong, unknown or malformed key is not, so those are still counted as wrong keys.
+func TestLinkKeyWasRevokedOnlyForARevokedKeyWithItsRightSecret(t *testing.T) {
+	cs, ctx, now := keyRig(t)
+	id, key, err := cs.CreateLinkKey(ctx, "Hub A", now)
+	require.NoError(t, err)
+	assert.False(t, cs.LinkKeyWasRevoked(ctx, key), "a live key")
+	require.NoError(t, cs.RevokeLinkKey(ctx, id, now))
+	assert.True(t, cs.LinkKeyWasRevoked(ctx, key), "revoked, right secret")
+	_, ok := cs.VerifyLinkKey(ctx, key, now)
+	assert.False(t, ok, "and no longer valid")
+	for _, bad := range []string{key[:len(key)-1] + "x", "lrk_" + strings.TrimPrefix(id, "lk-") + "_" + strings.Repeat("a", 32), "lrk_nope_" + strings.Repeat("a", 32), "", "lrk_", "Bearer " + key} {
+		assert.False(t, cs.LinkKeyWasRevoked(ctx, bad), bad)
+	}
+}

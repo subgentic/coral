@@ -60,7 +60,10 @@ func (o *IdentityObserver) serveLinkKey(w http.ResponseWriter, r *http.Request, 
 		}
 	}
 	if id == "" {
-		if o.linkKeyFailed != nil {
+		// A key that was revoked still has the right secret: a Hub that does not know yet keeps sending it. That is no guess, and every Hub's calls from this computer's loopback share one address, so counting it
+		// would lock the other Hubs out (#21645). A wrong or unknown key is counted.
+		revoked := o.linkKeyRevoked != nil && o.linkKeyRevoked(r.Context(), strings.TrimSpace(key))
+		if o.linkKeyFailed != nil && !revoked {
 			o.linkKeyFailed(r)
 		}
 		o.refuse(w, http.StatusUnauthorized, "invalid_credential", "That request key is not valid for this Coral: wrong, or revoked")
