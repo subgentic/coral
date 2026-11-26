@@ -33,6 +33,8 @@ type Item struct {
 	// changes (#4175 step 3). An item without a Key can't be acknowledged.
 	Key   string
 	State string
+	// Text, when set, is the whole line the check says (the roster's own rules, #21702); ItemText puts the ack id before it.
+	Text string
 	// Back: the orchestrator acknowledged it and its state has changed since; said once.
 	Back bool
 }
@@ -81,6 +83,9 @@ type CheckInput struct {
 	Goals []GoalLine
 	// Rules are the action list's thresholds (zero: the defaults) (#11729).
 	Rules Rules
+	// RosterItems are the roster's own items (RosterItems(roster, rules)) the caller has left the acknowledged out of; RosterItemsSet says it did, even when none is left. Unset, the check raises them all.
+	RosterItems    []Item
+	RosterItemsSet bool
 }
 
 // parkedNote is the team line's note on parked tasks, or "".
@@ -207,6 +212,13 @@ func ItemText(it Item) string {
 	l := ""
 	if it.Key != "" {
 		l = "[ack " + ItemID(it.Key) + "] "
+	}
+	if it.Text != "" {
+		l += it.Text
+		if it.Back {
+			l += " (back: changed since it was acknowledged)"
+		}
+		return l
 	}
 	l += fmt.Sprintf("%s: %s.", it.Agent, it.Problem)
 	if it.Evidence != "" {

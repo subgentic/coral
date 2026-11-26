@@ -136,6 +136,15 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 					you = board.SameIdentity(target.sub.SubscriberID, in.recipient.SubscriberID)
 					senders = []string{target.sub.SubscriberID, target.sub.JobTitle}
 				}
+				if you && !at.IsZero() { // answered without a mention: a reply to the waiter's message, or a post on the task it waits for (#21702)
+					var taskID int64
+					if w.WaitType == "task" {
+						fmt.Sscanf(w.TargetID, "%d", &taskID)
+					}
+					if done, err := m.store.AnsweredWaiterSince(ctx, in.project, in.recipient.SubscriberID, sub.SubscriberID, taskID, at); err == nil && done {
+						continue
+					}
+				}
 				entry := teamhealth.WaitEntry{Name: name, Age: in.now.Sub(at)}
 				if id, err := m.store.LastPostID(ctx, in.project, sub.SubscriberID); err == nil {
 					entry.Reply = id // the waiter's last message, so the orchestrator can answer it (#11729)

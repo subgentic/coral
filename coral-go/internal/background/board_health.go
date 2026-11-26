@@ -275,6 +275,9 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 		items = append([]teamhealth.Item{{Rank: 1, Agent: "Board", Problem: "board paused: no nudges go out until it is resumed", Key: "paused|" + project, State: "shown"}}, items...)
 	}
 	items = m.dropAcknowledged(ctx, project, items, now)
+	rules := actionRules(m.store.GetHealthSettings(ctx, project).ActionList)
+	roster, attention := m.buildRoster(ctx, rosterInputs{project: project, recipient: rcpt, subs: subs, bySession: bySession, waits: waits, tasks: tasks, now: now, rules: rules, sleepers: sleepers})
+	rosterItems := m.dropAcknowledged(ctx, project, teamhealth.RosterItems(roster, rules), now) // the roster's own rules have ack ids too (#21702)
 
 	m.mu.Lock()
 	since, ok := m.lastCheck[project]
@@ -284,16 +287,16 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	}
 	p, _ := m.store.ProgressSince(ctx, project, since)
 	questions := m.operatorQuestions(ctx, project)
-	roster, attention := m.buildRoster(ctx, rosterInputs{project: project, recipient: rcpt, subs: subs, bySession: bySession, waits: waits, tasks: tasks, now: now, rules: actionRules(m.store.GetHealthSettings(ctx, project).ActionList), sleepers: sleepers})
 	var goals []teamhealth.GoalLine // the open goals and what the operator has to do: the orchestrator's check only (#11412)
 	reminders := 0
 	if rcpt != nil && rcpt.SubscriberID == orch {
 		goals, reminders = m.goalLines(ctx, project, now)
+		goals, reminders = m.dropAcknowledgedGoals(ctx, project, goals, reminders, now)
 	}
 	return teamhealth.Compose(teamhealth.CheckInput{Now: now, Agents: agents, Items: items, Questions: questions, Goals: goals,
 		Progress: teamhealth.Progress{Since: since, Completed: p.Completed, Reviewed: p.Reviewed, Posts: p.Posts},
 		Parked:   len(parked), BackFromPark: backFromPark, Roster: roster,
-		PeekHint: rcpt != nil && rcpt.SubscriberID == orch, Rules: actionRules(m.store.GetHealthSettings(ctx, project).ActionList)}), len(items) + attention + reminders, healthFacts(items, questions, roster, backFromPark, goals), nil
+		PeekHint: rcpt != nil && rcpt.SubscriberID == orch, Rules: rules, RosterItems: rosterItems, RosterItemsSet: true}), len(items) + attention + reminders, healthFacts(items, questions, roster, backFromPark, goals), nil
 }
 
 // actionRules are the action list's thresholds from the team's settings (#11729).

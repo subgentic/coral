@@ -63,7 +63,8 @@ func TestADoneGoalIsNamedWithItsReminderUntilAnAskToTheOperatorNamesIt(t *testin
 	seg := goalsSegment(r.next())
 	require.NotEmpty(t, seg, "the orchestrator's check lists the open goals")
 	assert.Contains(t, seg, fmt.Sprintf(`#%d "Release 2.0.11" 2/2`, g))
-	assert.Contains(t, seg, "READY: close it, or put an item in the operator's inbox")
+	assert.Contains(t, seg, "]: close it, or put an item in the operator's inbox")
+	assert.Contains(t, seg, "READY [ack ")
 	assert.Contains(t, goalsSegment(r.next()), "READY", "repeated on each check")
 
 	r.askOperator(fmt.Sprintf("@Operator goal %d: please check the notes and say if it can close", g))
@@ -110,7 +111,7 @@ func TestAGoalBlockedOnTheOperatorOrWithADoneWhenThatNeedsThemIsNamedAndOneWaiti
 		}
 		return seg[start : start+end]
 	}
-	assert.Contains(t, entry(op), "NEEDS THE OPERATOR: put an item in their inbox")
+	assert.Contains(t, entry(op), "]: put an item in their inbox")
 	assert.Contains(t, entry(op), `blocked, in the goal's words: "Operator picks an option from the design"`)
 	assert.NotContains(t, entry(g.ID), "NEEDS THE OPERATOR", "a done-when that names the Operator on a goal with no task yet: it needs tasks from the orchestrator, not the operator")
 	assert.NotContains(t, entry(agent), "NEEDS THE OPERATOR", "waiting on an agent")
@@ -161,7 +162,7 @@ func TestADoneGoalWhoseDoneWhenNamesTheOperatorIsReadyForThem(t *testing.T) {
 	g, err := r.s.CreateGoal(ctx, "team", board.GoalInput{Title: "Sign off", Outcome: "o", DoneWhen: "The operator says it is good", CreatedBy: "Operator"})
 	require.NoError(t, err)
 	r.moreDone(g.ID, 2)
-	assert.Contains(t, goalsSegment(r.next()), "READY: close it, or put an item in the operator's inbox", "every task done")
+	assert.Contains(t, goalsSegment(r.next()), "]: close it, or put an item in the operator's inbox", "every task done")
 }
 
 // Security's SHOULD and QA's on #11412: a blocked-on is quoted like a title and said to be the goal's words, and a secret at the start of either is redacted, not shown.
