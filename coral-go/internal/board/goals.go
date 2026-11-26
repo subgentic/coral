@@ -85,6 +85,8 @@ type GoalRollup struct {
 type GoalDoneState struct {
 	Hidden string `json:"hidden,omitempty"`
 	Read   bool   `json:"read,omitempty"`
+	// Held says the computer holds the row back from the Operator (#21461): the goal has a driver, or was shown once already (#21442). The Inbox page follows it, so it and /api/needs-you agree.
+	Held bool `json:"held,omitempty"`
 }
 
 // Goal is one row of board_goals.
