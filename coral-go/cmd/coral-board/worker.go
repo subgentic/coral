@@ -16,8 +16,9 @@ import (
 	"github.com/subgentic/coral/internal/clitext"
 )
 
-// taskAssignee is who task id is assigned to, for `worker archive #N`; it stops with a plain sentence when the task has no assignee.
-func taskAssignee(project string, id int64) string {
+// taskWorker is who task id is assigned to, for `worker archive #N`, only when that agent is a worker: one `worker launch` started (the team's launch record) or one named like an approved worker.
+// A wrong #N must not stop a teammate, so any other assignee, and a task with none, is refused with a plain sentence and nothing is stopped.
+func taskWorker(project string, id int64) string {
 	data, status, err := apiCallRaw("GET", fmt.Sprintf("/%s/tasks/%d", url.PathEscape(project), id), nil)
 	if err != nil || status != http.StatusOK {
 		fmt.Fprintln(os.Stderr, "Unable to read task: "+clierr.Describe(err, status, data))
@@ -28,13 +29,36 @@ func taskAssignee(project string, id int64) string {
 		fmt.Fprintf(os.Stderr, "Task #%d has no assignee, so there is no worker to archive. Name the worker instead.\n", id)
 		clierr.Exit1()
 	}
-	return t.AssignedTo
+	data, status, err = apiCallRawAt("/api", "GET", "/board/"+url.PathEscape(project)+"/workers", nil, 10*time.Second)
+	if err != nil || status != http.StatusOK {
+		fmt.Fprintln(os.Stderr, "Unable to read the team's workers: "+clierr.Describe(err, status, data))
+		clierr.Exit1()
+	}
+	var known struct {
+		Workers  []struct{ Name string } `json:"workers"`
+		Launched map[string]string       `json:"launched"`
+	}
+	_ = json.Unmarshal(data, &known)
+	who := strings.TrimSpace(t.AssignedTo)
+	for agent := range known.Launched {
+		if strings.EqualFold(agent, who) {
+			return who
+		}
+	}
+	for _, w := range known.Workers {
+		if strings.EqualFold(w.Name, who) {
+			return who
+		}
+	}
+	fmt.Fprintf(os.Stderr, "Task #%d is assigned to %s, which was not started by worker launch and is not an approved worker, so it was not stopped. To stop that agent use: coral-board stop %q\n", id, clitext.Clean(who), who)
+	clierr.Exit1()
+	return ""
 }
 
 const workerUsageText = `Usage: coral-board worker <list|launch|archive> ...
   worker list [--json]                          The workers the Operator approved for this team
   worker launch "NAME" [--task N] [--worktree]  Start a worker of that kind, with the task's text as its first message. --worktree (needs --task N) starts it in its own git worktree task-N
-  worker archive NAME|#N [--remove-worktree]    Stop a worker and archive it (the same as coral-board stop). #N is task N's assignee. --remove-worktree also removes its own worktree task-N when it has no
+  worker archive NAME|#N [--remove-worktree]    Stop a worker and archive it (the same as coral-board stop). #N is task N's assignee, and only when that is a worker (started by worker launch). --remove-worktree also removes its own worktree task-N when it has no
                                                 changes that are not committed (the branch is kept; files git ignores, such as .env or build output, go with the folder)`
 
 // cmdWorker is the Orchestrator's side of the team's approved workers (mock v3 idea 2): the list, and a launch of one for a task. The Operator saves the workers on the team's page; the server runs the
@@ -133,7 +157,7 @@ func cmdWorker() {
 				fmt.Fprintf(os.Stderr, "Error: %q is not a task number. Give a worker name or #N for task N.\n", who)
 				os.Exit(2)
 			}
-			who = taskAssignee(st.Project, id)
+			who = taskWorker(st.Project, id)
 		}
 		archiveAgent(st.Project, who, *removeWorktree)
 	default:
