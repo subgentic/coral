@@ -66,6 +66,7 @@ const RECORDER = `(() => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`window.__coralReady && window.__coralReady.parts && ['liveList', 'liveListLoaded', 'feed', 'history', 'settings'].every(k => window.__coralReady.parts[k])`, 'the page to be ready', 20000); // the five required parts: the two optional ones (inboxListDrawn, hubFrameLoaded) stay false on this page (#12124)
         await waitFor(`performance.getEntriesByType('resource').some(e => /\\/launch_disclosure\\.js/.test(e.name))`, 'the launch notice module, requested after the first paint', 20000); // the golden keeps it in the list: it is waited for, not dropped, so a slow first paint does not move the list
+        await waitFor(`['status_groups.js', 'hub_indicator.js', 'operator_here.js', 'settings_remote_status.js'].every(n => performance.getEntriesByType('resource').some(e => new URL(e.name).pathname.endsWith('/' + n)))`, 'the other modules the first draw and the start tasks ask for', 20000); // #21634: status_groups.js is asked for by the first list draw, a millisecond after launch_disclosure.js on a fast run; the snapshot was taken between the two and the golden lost it. They are all waited for too.
         const got = await ev(`(() => {
             const log = window.__boot, text = a => a.join('\\n');
             const i1 = log.findIndex(l => l.startsWith('DOMContentLoaded handler') && l.endsWith('starts')), appStart = log.findIndex((l, i) => i >= i1 && /^fetch|^listen document:|^listen window:/.test(l));
