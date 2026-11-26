@@ -133,6 +133,8 @@ func main() {
 		cmdAsk()
 	case "workflow":
 		cmdWorkflow()
+	case "automation":
+		cmdTeamAutomation(os.Args[2:])
 	case "wait":
 		cmdWait()
 	case "health":

@@ -216,3 +216,10 @@ func TestAnAutomationMayPostTwentyTimesARun(t *testing.T) {
 	assert.Len(t, rg.messages(t), store.AutomationWritesPerRun)
 	_, _ = io.Discard.Write(nil)
 }
+
+func TestTheMarkOfAnAutomationPostNotifiesNobody(t *testing.T) {
+	got := viaAutomationMark("x @Operator @all")
+	if strings.Contains(got, "@Operator") || strings.Contains(got, "@all") {
+		t.Fatalf("the mark still carries a live mention: %q", got)
+	}
+}

@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"github.com/subgentic/coral/internal/board"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -34,7 +35,9 @@ func automationOwner(ctx context.Context) *store.AutomationTokenOwner {
 var viaAutomationRE = regexp.MustCompile(`(?i)\[via\s+automation`)
 
 // viaAutomationMark is the server's prefix on the text of every automation post: it names the workflow, and nothing a script prints can replace it.
-func viaAutomationMark(name string) string { return "[via automation " + name + "] " }
+func viaAutomationMark(name string) string {
+	return "[via automation " + board.DefuseMentions(name, nil) + "] " // the name is put in after the mention checks: an @ in it must notify nobody (Security, #21502 point 6)
+}
 
 // automationTokenGate admits or refuses a request that carries an automation token. ok false means the response is written. On ok, the request carries the run the token stands for.
 func (o *IdentityObserver) automationTokenGate(w http.ResponseWriter, r *http.Request, token string) (*http.Request, bool) {

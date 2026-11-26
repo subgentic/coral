@@ -75,7 +75,7 @@ func (h *BoardHandler) ClaimAskButton(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "board_paused", "the board is paused")
 		return
 	}
-	if board.IsCheckAction(b.Action) && checkButtonsRefused(w, r) {
+	if (board.IsCheckAction(b.Action) || board.IsAutomationAction(b.Action)) && checkButtonsRefused(w, r) {
 		return
 	}
 	switch b.Action {
@@ -111,6 +111,10 @@ func (h *BoardHandler) ClaimAskButton(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"ok": true, "id": claimed.ID, "ask_id": askID, "label": claimed.Label, "action": claimed.Action, "arg": claimed.Arg}
 	if board.IsCheckAction(claimed.Action) { // a check's approval: run here, by the record hash the question carries; the page only shows the answer
 		h.runCheckButton(w, r, project, askID, claimed, out)
+		return
+	}
+	if board.IsAutomationAction(claimed.Action) { // an automation's approval: run here, against the hash the question carries (#21505)
+		h.runAutomationButton(w, r, project, askID, claimed, out)
 		return
 	}
 	h.recordAskActivity(r, board.ActAnswer, project, askID, claimed.Label) // the option the Operator chose (text an agent wrote: cleaned, redacted and cut)

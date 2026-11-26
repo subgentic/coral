@@ -111,6 +111,17 @@ var boardAreas = []clihelp.Area{
 		More: []string{"resource-queue"},
 	},
 	{
+		Name: "automation", Summary: "Draft a workflow for the Operator to approve (the Orchestrator).",
+		What:     "The team's Orchestrator proposes, changes, disables, deletes and test-runs automations. Each starts off and waits in the Operator's Needs you with every step in full and a hash; only the Operator's own Approve turns it on, and any later change turns it off again.",
+		Commands: []string{"automation"},
+		Examples: []string{
+			`coral-board automation propose --file deps.json   # stored OFF; the Operator is asked`,
+			`coral-board automation list                       # state of each: pending, approved, changed, off`,
+			`coral-board automation run nightly-deps           # one test run of an approved one`,
+		},
+		More: []string{"workflows"},
+	},
+	{
 		Name: "health", Summary: "The team's health check: what it watches and how to tune it.",
 		What:     "The health check nudges stuck work: unclaimed tasks, long waits, stale reviews, a landing that waits, goals that are ready. The orchestrator or the Operator tunes each rule; every rule has settings keys.",
 		Commands: []string{"health"},

@@ -692,7 +692,7 @@ const { openWaitItem, waitItemCell, waitItemActions } = (await importOnce('./inb
 /** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */
 function openRun(run) { markSeen(run); go(runRoute(run)); }
 /** What a button an agent put on a question may open (#11643): the page runs these only after the server claimed the button and named its stored action. */
-const isCheckAsk = a => a.kind === 'ask' && Array.isArray(a.buttons) && a.buttons.some(b => b.action === 'approve-check');
+const isCheckAsk = a => a.kind === 'ask' && Array.isArray(a.buttons) && a.buttons.some(b => /^approve-(check|automation)$/.test(b.action)); // a check's or an automation's approval (#20139, #21505)
 const askRunners = {
     task: (a, id) => { const team = boardTeamKey(a.server, a.board); openItemRoute('tasks', team, id, `${team}#${id}`); }, // the question's own computer (#14396): a bare team name is this one's
     goal: (a, id) => go({ ...folderRoute, id: boardTeamKey(a.server, a.board), item: id }),

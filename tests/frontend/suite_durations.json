@@ -952,6 +952,7 @@
  "artifact_thumbnail_browser.test.js": 2.6,
  "board_followups_browser.test.js": 2.6,
  "chat_prefetch_browser.test.js": 2.6,
+ "automation_approval_browser.test.js": 4.5,
  "check_approval_browser.test.js": 2.6,
  "comment_image_markup_browser.test.js": 2.6,
  "docs_search_newcomer_browser.test.js": 2.6,

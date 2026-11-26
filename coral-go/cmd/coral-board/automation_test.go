@@ -84,3 +84,14 @@ func TestAnAutomationStepsPostGoesToItsRouteWithTheTokenAlone(t *testing.T) {
 	t.Setenv(automationTokenEnv, "")
 	assert.False(t, inAutomationStep())
 }
+
+func TestTheAutomationTokenIsSentToThisComputerOnly(t *testing.T) {
+	for base, want := range map[string]bool{
+		"http://127.0.0.1:8420": true, "http://localhost:8420": true, "http://[::1]:8420": true, "http://0.0.0.0:8420": true,
+		"https://evil.example": false, "http://10.0.0.5:8420": false, "http://127.0.0.1.evil.example": false, "ftp://127.0.0.1": false, "": false,
+	} {
+		if got := loopbackBase(base); got != want {
+			t.Errorf("loopbackBase(%q) = %v, want %v", base, got, want)
+		}
+	}
+}

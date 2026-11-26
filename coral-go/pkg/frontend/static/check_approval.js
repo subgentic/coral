@@ -1,6 +1,7 @@
 // A custom check's approval question in Needs you (#20139), loaded only when one is shown. Coral files the question with exactly two buttons, Approve and Deny; the click runs on the server, against the record the
 // question was filed with, and the page only shows the answer.
 import { buttonsOf, buttonsOffered, claimButton, forgetAsk, refreshOperatorAsks } from './operator_asks.js';
+import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
 import { markHidden } from './visible_marks.js';
 
@@ -13,6 +14,7 @@ export function checkButtons(a) {
 
 /** Puts Approve and Deny in the row's action box, before its other buttons. */
 export function addCheckButtons(a, box) {
+    if (buttonsOf(a).some(b => b.action === 'approve-automation')) return importOnce('./automation_approval.js').then(m => m.addAutomationButtons(a, box)); // an automation an Orchestrator proposed (#21505)
     const check = buttonsOffered(a).length ? checkButtons(a) : null;
     if (!check) return;
     const who = markHidden(a.asker, { strict: true });

@@ -5,6 +5,7 @@ DELETE /api/artifacts/{id}/review-drafts/{cid} | token-session | operator-only
 DELETE /api/board/remotes | board-unchecked | operator-only
 DELETE /api/board/{project} | board-claims | operator-only
 DELETE /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
+DELETE /api/board/{project}/automations/{name} | board-claims +token-session
 DELETE /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | board-claims | operator-only
 DELETE /api/board/{project}/health/checks/{name} | board-claims +token-session
@@ -55,6 +56,8 @@ GET /api/board/{project} | board-claims
 GET /api/board/{project}/artifacts | board-claims +token-session
 GET /api/board/{project}/artifacts/{digest}/edit | board-claims | operator-only
 GET /api/board/{project}/artifacts/{digest}/edit/send | board-claims +token-session | operator-only
+GET /api/board/{project}/automations | board-claims +token-session
+GET /api/board/{project}/automations/{name} | board-claims +token-session
 GET /api/board/{project}/branches | board-claims +token-session
 GET /api/board/{project}/context-reset-status | board-claims +token-session
 GET /api/board/{project}/cross-team-candidates | board-claims +token-session | operator-only
@@ -212,6 +215,9 @@ POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim | board-clai
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle | board-claims | operator-only
 POST /api/board/{project}/asks/{messageID}/close | board-claims
 POST /api/board/{project}/automation/post | board-claims | operator-only
+POST /api/board/{project}/automations | board-claims +token-session
+POST /api/board/{project}/automations/{name}/disable | board-claims +token-session
+POST /api/board/{project}/automations/{name}/run | board-claims +token-session
 POST /api/board/{project}/clashes | board-claims +token-session
 POST /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 POST /api/board/{project}/cross-team/disable | board-claims | operator-only
@@ -335,6 +341,7 @@ POST /api/teams/detail/{name}/daily-knowledge/revert | token-session | operator-
 PUT /api/agent/ui/{id} | token-bound
 PUT /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 PUT /api/board/{project}/artifacts/{id}/tags | board-claims | operator-only
+PUT /api/board/{project}/automations/{name} | board-claims +token-session
 PUT /api/board/{project}/guide-roster | board-claims | operator-only
 PUT /api/board/{project}/health/checks/{name} | board-claims +token-session
 PUT /api/board/{project}/health/settings | board-claims +token-session

@@ -211,6 +211,7 @@ func TestOnlyTheKnownRoutesAnswerOrCloseAnAsk(t *testing.T) {
 		"routes/board_task_reply.go":       "POST .../tasks/{id}/reply: reply_to gated by refuseUnallowedReply (message_reply)",
 		"routes/team_artifact_review.go":   "artifact review decisions: mapped (local_only for an added link)",
 		"routes/health_check_approval.go":  "closes a custom-check approval ask, called from the button route above and from the check's own code",
+		"routes/team_automations.go":       "closes an automation approval ask and runs the Approve and Deny buttons: reached only from the claim route above",
 		"routes/cross_team.go":             "the cross-team relay: not a Hub link route (never in the tunnel table)",
 	}
 	calls := []string{".RecordReply(", ".CloseAsk(", ".ClaimAskButton(", ".ReopenAsk("}

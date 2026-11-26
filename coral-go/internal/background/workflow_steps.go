@@ -58,7 +58,15 @@ func (wr *WorkflowRunner) runStep(ctx context.Context, runID int64, workflow *st
 	var stepErr error
 	switch step.Type {
 	case "shell":
-		stepErr = wr.executeShellStep(ctx, runID, step, sf, workflow.RepoPath, append(env, wr.automationEnv(runID, workflow)...), &results[i])
+		shellEnv := append(env, wr.automationEnv(runID, workflow)...)
+		if workflow.Team != "" { // a team's automation: the file its step runs is still the approved one, and the step gets an allow-listed environment (#21505)
+			if why := wr.recheckStepFile(ctx, workflow, i, step); why != "" {
+				stepErr = errors.New(why + ": the run stopped and the Operator is asked again")
+				break
+			}
+			shellEnv = append(shellEnv, strictEnvMarker)
+		}
+		stepErr = wr.executeShellStep(ctx, runID, step, sf, workflow.RepoPath, shellEnv, &results[i])
 	case "agent":
 		stepErr = wr.executeAgentStep(ctx, runID, step, sf, workflow.RepoPath, env, defaultAgent, &results[i])
 	default:
@@ -156,9 +164,13 @@ func (wr *WorkflowRunner) executeShellStep(ctx context.Context, runID int64, ste
 	}
 	cmd := exec.CommandContext(stepCtx, shell, "-c", expandedCmd)
 	cmd.Dir = startDir
-	cmd.Env = withShellDirs(append(agentenv.Filter(os.Environ()), env...), shell) // #3389: no server-only settings
-	executil.NoCwdSearch(cmd)                                                     // Windows: a `cmd /c` in a step must not run a program planted in the repository (#183)
-	executil.HideWindow(cmd)                                                      // Windows: a console program started by a Coral with no console of its own would open a visible window (#211); its output still comes through the pipes
+	base := agentenv.Filter(os.Environ())
+	if env2, strict := takeStrictEnv(env); strict { // a team's automation: no inherited secrets, only what a shell needs (#21505)
+		base, env = allowedBaseEnv(os.Environ()), env2
+	}
+	cmd.Env = withShellDirs(append(base, env...), shell) // #3389: no server-only settings
+	executil.NoCwdSearch(cmd)                            // Windows: a `cmd /c` in a step must not run a program planted in the repository (#183)
+	executil.HideWindow(cmd)                             // Windows: a console program started by a Coral with no console of its own would open a visible window (#211); its output still comes through the pipes
 	// Set process group for clean kill
 	configureChildProcess(cmd)
 

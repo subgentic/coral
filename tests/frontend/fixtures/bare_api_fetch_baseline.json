@@ -25,6 +25,10 @@
       "count": 1,
       "reason": "this computer's own board list: the remote computers' lists are read next to it with serverFetch"
     },
+    "automation_approval.js": {
+      "count": 1,
+      "reason": "the automation an Orchestrator proposed, beside its approval (GET /api/board/{}/automations/{}): the approval is refused through a Hub, so the row and this read exist only on the computer the automation runs on (#21505)"
+    },
     "board_export.js": {
       "count": 1,
       "reason": "the live list is the merged list of every computer ({sessions, servers}); the code below it keeps this board's server"

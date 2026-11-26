@@ -48,6 +48,7 @@ type BoardHandler struct {
 	artifactNudge                 *ClaudeArtifactNudger
 	inboxSettings                 func(ctx context.Context) (map[string]string, error) // the settings the Needs you switches read (#12144); nil: every kind on, every team included
 	bs                            *board.Store
+	auto                          automationDeps // the workflows a team's Orchestrator proposes (#21505)
 	terminal                      ptymanager.SessionTerminal
 	mu                            sync.RWMutex
 	paused                        map[string]bool                                                            // in-memory set of paused project names

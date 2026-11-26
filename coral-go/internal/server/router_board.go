@@ -137,7 +137,8 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 		}
 		return c.ServerID, nil
 	})
-	boardHandler.SetCheckTokens(s.cfg.CoralDir(), s.db) // the snapshots of custom checks and the end of their run tokens (#20176)
+	boardHandler.SetCheckTokens(s.cfg.CoralDir(), s.db)                                      // the snapshots of custom checks and the end of their run tokens (#20176)
+	boardHandler.SetAutomations(store.NewWorkflowStore(s.db), store.NewTeamStore(s.db), nil) // the workflows a team's Orchestrator proposes; the runner comes later (#21505)
 	boardHandler.SetAutoAttacher(routes.NewAutoAttacher(s.cfg.CoralDir(), routes.AutoAttachEnabled(sessStore), routes.SessionDirs(sessStore)))
 	s.goBackground(boardHandler.RecoverTaskNotifications)
 	s.goBackground(boardHandler.RunWaitTimeouts)
@@ -407,12 +408,19 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.With(routes.RefuseSignInLink).Post("/api/live/links/{id}/pause", liveHandler.Pause)
 	r.With(routes.RefuseSignInLink).Post("/api/live/links/{id}/resume", liveHandler.Resume)
 	r.With(routes.RefuseSignInLink).Post("/api/live/links/{id}/stop", liveHandler.Stop)
-	r.Get("/api/board/{project}/health/checks", boardHandler.ListHealthChecksRoute)                                             // a team's custom health checks (#20176)
-	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/checks", boardHandler.AddHealthCheckRoute)                // pending until the Operator approves its record
-	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/checks/{name}", boardHandler.ChangeHealthCheckRoute)       // any change is pending again, live tokens end
-	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/checks/{name}/pause", boardHandler.PauseHealthCheckRoute) // {"paused": bool}
-	r.With(routes.RefuseSignInLink).Delete("/api/board/{project}/health/checks/{name}", boardHandler.RemoveHealthCheckRoute)    // live tokens end
-	r.Get("/api/board/{project}/context-reset-status", boardHandler.GetContextResetStatus)                                      // each agent's last compaction or skip reason, for Team settings (#15066)
+	r.Get("/api/board/{project}/health/checks", boardHandler.ListHealthChecksRoute)                                              // a team's custom health checks (#20176)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/checks", boardHandler.AddHealthCheckRoute)                 // pending until the Operator approves its record
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/health/checks/{name}", boardHandler.ChangeHealthCheckRoute)        // any change is pending again, live tokens end
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/checks/{name}/pause", boardHandler.PauseHealthCheckRoute)  // {"paused": bool}
+	r.With(routes.RefuseSignInLink).Delete("/api/board/{project}/health/checks/{name}", boardHandler.RemoveHealthCheckRoute)     // live tokens end
+	r.Get("/api/board/{project}/automations", boardHandler.ListAutomationsRoute)                                                 // a team's proposed automations, read by its Orchestrator or the Operator (#21505)
+	r.Get("/api/board/{project}/automations/{name}", boardHandler.GetAutomationRoute)                                            // one, whole, with its latest runs
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/automations", boardHandler.ProposeAutomationRoute)                // stored OFF; the Operator is asked
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/automations/{name}", boardHandler.ChangeAutomationRoute)           // any change turns it off and asks again
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/automations/{name}/disable", boardHandler.DisableAutomationRoute) // off; there is no route that turns one on
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/automations/{name}/run", boardHandler.RunAutomationRoute)         // one test run of an approved one
+	r.With(routes.RefuseSignInLink).Delete("/api/board/{project}/automations/{name}", boardHandler.DeleteAutomationRoute)
+	r.Get("/api/board/{project}/context-reset-status", boardHandler.GetContextResetStatus) // each agent's last compaction or skip reason, for Team settings (#15066)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/reminder", boardHandler.RemindSubscriber)
