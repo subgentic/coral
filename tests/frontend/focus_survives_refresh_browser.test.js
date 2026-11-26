@@ -25,6 +25,7 @@ const BASE = require('./test_base').BASE;
         console.log("The sidebar's team button keeps focus when a background render replaces it, and Enter still opens the team view");
         await ev(`(async () => {
             const { state } = await import(${S}+'state.js'); const render = await import(${S}+'render.js');
+            await (await import(${S}+'import_once.js')).importOnce('./status_groups.js'); // the list draws its groups only once the lazy status_groups.js is in: wait for it, so the draw below is whole (#21767, as #21762)
             window.__state = state; window.__render = render;
             window.__sess = [{ session_id: 'fs-1', name: 'fs-1', agent_type: 'claude', board_project: 'alpha', display_name: 'Alpha agent', working_directory: '/tmp/alpha' }];
             render.renderLiveSessions(window.__sess); return true; })()`);
