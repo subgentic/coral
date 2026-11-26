@@ -385,6 +385,13 @@ func (m *BoardHealthMonitor) composeCheckBefore4599(ctx context.Context, project
 	if err != nil {
 		return "", 0, err
 	}
+	keptSubs := subs[:0:0] // new work the frozen walk does not do (#21705): a seat with no session (the Operator's) or a remote member is not an agent, so it is not counted
+	for _, sub := range subs {
+		if !isNotAnAgentHere(sub) {
+			keptSubs = append(keptSubs, sub)
+		}
+	}
+	subs = keptSubs
 	all, err := m.store.ListOpenTasks(ctx, project)
 	if err != nil {
 		return "", 0, err
