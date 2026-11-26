@@ -82,6 +82,7 @@ func workerLaunchFixture(t *testing.T) (*SessionsHandler, string) {
 	bs, err := boardtest.Open(filepath.Join(t.TempDir(), "board.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { bs.Close() })
+	stubCLIPaths(t, store.NewSessionStore(db)) // a stub CLI, never the one on this computer: CI has none (#21542)
 	cfg := &config.Config{LogDir: t.TempDir()}
 	cfg.UseCoralDir(t.TempDir())
 	return NewSessionsHandler(db, cfg, nil, newMockTerminal(), bs), t.TempDir()
