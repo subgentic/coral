@@ -49,6 +49,10 @@ const B = 'goal-done-' + Date.now().toString(36);
         assert.equal((await doneRows()).length, 0, 'inside its quiet period the goal is not an item of Needs you');
         assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'nor in /api/needs-you');
         await root('PUT', '/api/settings', { goal_done_quiet_minutes: '0' });
+        // #21442: with the default (goal_done_driven_items off) a goal the team's active Orchestrator drives is no item in /api/needs-you (the count and the phone push); the rest of this suite is about the item
+        // itself, so it switches the setting on, which brings the item back for a driven goal and for one shown before.
+        assert.ok(!(await root('GET', '/api/needs-you?limit=50')).json.items.some(i => i.id === `goal_done:${B}:${gid}`), 'a goal its Orchestrator drives is not in /api/needs-you by default (#21442)');
+        await root('PUT', '/api/settings', { goal_done_driven_items: 'true' });
         await openNeeds();
         await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(tr => tr.querySelector('.inbox-review-name') && /looks done/.test(tr.textContent))`, 'the goal item', 20000);
         let rows = await doneRows();
