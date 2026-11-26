@@ -202,7 +202,7 @@ If you installed the Coral binaries into `/usr/local/bin`, change `ExecStart` to
 
 | Flag | Purpose |
 |---|---|
-| `--hub-only` | **Recommended for servers reached through Coral Hub:** bind to `127.0.0.1` only, force `require_auth_on_loopback` on (a credential is always required), and refuse every proxied request that shows itself (`403 hub_only`). Persisted in `<data dir>/hub-only` until `coral hub-only off` is run on the server (also `CORAL_HUB_ONLY=1`). |
+| `--hub-only` | **Recommended for servers reached through Coral Hub:** bind to `127.0.0.1` only, force `require_auth_on_loopback` on (a credential is always required), and refuse every proxied request that shows itself (`403 hub_only`). Persisted in `<data dir>/hub-only` until `coral hub-only off` is run on the server and `--hub-only` is removed from `ExecStart` (also `CORAL_HUB_ONLY=1`). |
 | `--host 127.0.0.1` | Bind to loopback only (the default when remote access is off). Agents on the server always talk to Coral over loopback. |
 | `--port 8420` | HTTP and WebSocket port (default `8420` on Linux/macOS; also `CORAL_PORT`). |
 | `--no-browser` | Do not try to run `xdg-open` on startup. |
@@ -250,7 +250,8 @@ None of these opens a public web port on your server:
 
     ```bash
     sudo -u coral -i coral hub-only status
-    # To turn Hub-only off later (for example to use an nginx or Tailscale Serve reverse proxy instead), run on the server and restart Coral:
+    # To turn Hub-only off later (for example to use an nginx or Tailscale Serve reverse proxy instead),
+    # run on the server, remove --hub-only from ExecStart in coral.service (since starting with --hub-only writes the marker again), and restart Coral:
     sudo -u coral -i coral hub-only off
     ```
 
@@ -261,7 +262,7 @@ None of these opens a public web port on your server:
   ssh -L 8420:127.0.0.1:8420 user@your-server
   ```
 
-- **Tailscale:** You have two ways to reach Coral over a tailnet (both require Hub-only mode to be **off**, `sudo -u coral -i coral hub-only off`, since `tailscale serve` sends forwarding headers / a tailnet `Host` and `--remote` is refused in Hub-only mode):
+- **Tailscale:** You have two ways to reach Coral over a tailnet (both require Hub-only mode to be **off** — run `sudo -u coral -i coral hub-only off`, remove `--hub-only` from `ExecStart` in `coral.service`, and restart Coral — since `tailscale serve` sends forwarding headers / a tailnet `Host` and `--remote` is refused in Hub-only mode):
   1. **Tailscale Serve (recommended — keeps Coral on `127.0.0.1` with remote access off):** Set a dashboard password (Step 4) and turn on `require_auth_on_loopback` (Section 8), then let Tailscale terminate HTTPS on your tailnet and proxy to `127.0.0.1:8420`:
 
      ```bash
