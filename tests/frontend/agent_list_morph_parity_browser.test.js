@@ -56,6 +56,7 @@ async function session(noMorph) {
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         assert.ok(await resetOrder(), 'saved session order cleared');
         await ev(`localStorage.clear(); localStorage.setItem('coral-group-by-team', 'true'); ${noMorph ? "localStorage.setItem('coral-no-morph', '1');" : ''} true`);

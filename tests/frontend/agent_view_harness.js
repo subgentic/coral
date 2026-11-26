@@ -12,6 +12,8 @@ async function connect(opts = {}) {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222), ...(opts.target ? { target: opts.target } : {}) });
     const { Page, Runtime, Emulation, Network } = client;
     await Page.addScriptToEvaluateOnNewDocument({ source: '(() => { const reviewFixtureDigest = ' + reviewFixtureDigest.toString() + '; window.__reviewFixtureDrafts = ' + reviewFixtureDrafts.toString() + '; window.__reviewFixtureDigest = reviewFixtureDigest; window.__reviewFixtureURL = ' + reviewFixtureURL.toString() + '; window.__reviewFixturePage = ' + reviewFixturePage.toString() + '; })();' });
+    // The agent list is grouped by status unless the viewer chose Team (#21466); the suites that read the list were written for the Team view, so every page starts on it. status_groups_browser.test.js opens with { grouping: 'status' } and meets the default.
+    if (opts.grouping !== 'status') await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE });
     // A look pass (#9804): LOOK_THEME=light|dark and LOOK_FONT=32px make every page this suite opens come up in that theme and at that root font size, so the pictures a suite saves (CORAL_SCREENSHOT_DIR) show the screen in light or at 200% text. Off unless set; the suite's own assertions are for 100% and are not meant to pass at 200%.
     if (process.env.LOOK_THEME || process.env.LOOK_FONT) {
         const theme = JSON.stringify(process.env.LOOK_THEME || ''), font = JSON.stringify(process.env.LOOK_FONT || '');
@@ -203,6 +205,8 @@ async function connect(opts = {}) {
         }
         const render = await import((window.__coralStatic||'/static/')+'render.js');
         window.T = { state, liveChat, ws, render };
+        // The list draws once its status_groups.js module is in (#21466): ask for it now (a draw does), and wait until it has run (its sheet link is the sign), so a suite's first synchronous renderLiveSessions draws.
+        if (!document.querySelector('link[href$="status_groups.css"]')) { try { render.renderLiveSessions([{ session_id: 'warm-id', name: 'warm', agent_type: 'claude', sleeping: false, status: 'idle' }]); } catch (e) {} for (let i = 0; i < 300 && !document.querySelector('link[href$="status_groups.css"]'); i++) await new Promise(r => setTimeout(r, 10)); }
         window.__qaState = state;
         // Count re-selects from every caller (Wake, the feed, the test itself).
         { window.__selCalls = 0; document.addEventListener('coral:agent-selected', () => { window.__selCalls++; }); } // the page's callers reach selectLiveSession through the sessions.js module (openLive), not window, so the event it dispatches is the count (#17243)

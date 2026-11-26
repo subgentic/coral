@@ -23,6 +23,7 @@ if (process.platform === 'win32') { console.log('landscape_touch_targets_12983_b
         return { sel, name: (b.getAttribute('aria-label') || b.textContent || b.id).trim().slice(0, 28), box: Math.round(r.width) + 'x' + Math.round(r.height), h: Math.round(r.height), tall: r.height >= 44 || (hit(cx, cy - 20) && hit(cx, cy + 20)), wide: r.width >= 44 || (hit(cx - 20, cy) && hit(cx + 20, cy)) }; })))()`);
     try {
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady();
         await api('POST', `/api/board/${team}/subscribe`, { subscriber_id: 'Orchestrator', job_title: 'Orchestrator', session_name: 'orch-s' });
         const g = await api('POST', `/api/board/${team}/goals`, { subscriber_id: 'Operator', title: 'Importer is live' });

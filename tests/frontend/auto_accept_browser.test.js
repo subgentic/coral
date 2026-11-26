@@ -49,6 +49,7 @@ const BASE = require('./test_base').BASE;
         // (the list renders on the next frame). Keep it the focused, visible page, as it is for a person using it.
         await Emulation.setFocusEmulationEnabled({ enabled: true });
         await Page.bringToFront();
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE }); await Page.loadEventFired();
         await coralReady();
 

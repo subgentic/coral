@@ -67,6 +67,7 @@ const BUNDLE = { exists: true, index: '# Team alpha\\n\\nWhat the team knows.', 
     const until = (x, what, timeout = 5000) => waitFor(x, what, { soft: true, timeout });
     const S = `(window.__coralStatic||'/static/')`;
     const boot = async () => {
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE }); await Page.loadEventFired();
         await coralReady();
         await ev(`(async () => {

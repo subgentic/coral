@@ -52,6 +52,7 @@ async function httpJson(method, path, body, headers = {}) {
             localStorage.removeItem('coral-live-view-mode'); // Chat, the default
         })();` });
         const loaded = Page.loadEventFired();
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE + '/' });
         await loaded;
         await coralReady();

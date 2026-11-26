@@ -315,19 +315,19 @@ function _renderLiveSessions(sessions) {
     sessions = sessions.filter(s => !s.archived);
 
     _renderSidebarRail(sessions);
+    const SG = loadedModule('./status_groups.js') || (importOnce('./status_groups.js').then(redrawLiveList), 0); // the list by status (#21466), the default, and its Team | Status switch: asked for with the first draw, empty or not (small, and not at start)
 
     const list = liveListEl();
     // Re-render replaces every row: remember which row had keyboard focus.
-    const focusedRow = document.activeElement && document.activeElement.closest
-        ? document.activeElement.closest('.session-group-item[data-session-id]') : null;
-    const focusedSid = focusedRow ? focusedRow.dataset.sessionId : null;
+    const focusedRow = document.activeElement?.closest?.('.session-group-item[data-session-id]');
+    const focusedSid = focusedRow?.dataset.sessionId;
     // Focus inside the row's action menu (or on its button) goes back to the button when the row is redrawn, not to the row (#4621).
     const focusedInMenu = !!(focusedRow && document.activeElement.closest('.sidebar-kebab-wrapper'));
     _wireListKeyboard(list);
     _wireListKeyboard(document.getElementById('mobile-agent-list'));
 
     // Pinned folders count too: the list shows them with no agents (#3630).
-    const pinsShown = pinnedFolders().filter(p => _pinMatchesFilter(p)).length;
+    const pinsShown = pinnedFolders().filter(_pinMatchesFilter).length;
     updateSectionVisibility('live-sessions', unfilteredCount + pinnedFolders().length);
 
     if (!sessions.length && !archived.length && !pinsShown) {
@@ -338,10 +338,7 @@ function _renderLiveSessions(sessions) {
         return;
     }
 
-    // Sync the Group by Team checkmark
     const groupByTeam = browserLocal.get('coral-group-by-team') !== 'false';
-    const check = document.getElementById('group-by-team-check-top');
-    if (check) check.style.opacity = groupByTeam ? '1' : '0.2';
 
 
     // The servers UI (#3085): with two or more servers the groups below are
@@ -353,21 +350,21 @@ function _renderLiveSessions(sessions) {
     const limits = usage?.usageLimitList(sessions, _renderSessionItem, escapeHtml);
     const regularAgents = limits?.regular || sessions;
     let html = limits?.summary || '';
-    const shownServers = serversShown();
-    if (isGroupedByServer()) {
-        for (const e of shownServers) {
+    if (!SG) return; // the list by status (#21466) draws once its module is in (asked for above)
+    const st = SG.lay(regularAgents, limits, archived, _renderSessionItem);
+    html += st ? st.h : SG.sw();
+    if (!st && isGroupedByServer()) {
+        for (const e of serversShown()) {
             const own = regularAgents.filter(x => sessionServer(x) === e.id);
             const collapsed = _isServerCollapsed(e.id);
             html += serverGroupHeaderHtml(e, own.length, collapsed, _openServerDetails.has(e.id));
             if (!collapsed) html += _renderGroups(own, groupByTeam, e.id === LOCAL_SERVER);
         }
-    } else {
-        html += _renderGroups(regularAgents, groupByTeam);
-    }
+    } else if (!st) html += _renderGroups(regularAgents, groupByTeam);
 
     html += limits?.waiting || '';
     if (limits?.sleeping.length) html += _renderGroups(limits.sleeping, groupByTeam);
-    html += _renderArchivedSection(archived);
+    html += _renderArchivedSection(st ? st.a : archived);
     html = oneRowStop(html);
     // A row's open menu stays open across the redraw (#10786, Beta #10775): the list is drawn again every few seconds and the new row's menu starts closed, so a person who looked at the open menu and then clicked Rename clicked what was under it.
     const menuOpenFor = [...list.querySelectorAll('.sidebar-kebab-menu')].find(m => m.style.display !== 'none')?.closest('.session-group-item[data-session-id]')?.dataset.sessionId || '';

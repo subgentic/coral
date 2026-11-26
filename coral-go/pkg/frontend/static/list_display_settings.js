@@ -24,7 +24,7 @@ export async function toggleShowServer() {
 }
 
 export function toggleGroupByServer() {
-    try { browserLocal.set('coral-group-by-server', isGroupedByServer() ? 'false' : 'true'); } catch { /* per-viewer only */ }
+    try { browserLocal.set('coral-group-by-server', String(!isGroupedByServer())); } catch { /* per-viewer only */ }
     redrawLiveList();
 }
 
@@ -35,15 +35,13 @@ export function toggleRowLine(part) {
 
 export function toggleGroupByTeam() {
     const current = browserLocal.get('coral-group-by-team') !== 'false';
-    browserLocal.set('coral-group-by-team', !current ? 'true' : 'false');
-    const check = document.getElementById('group-by-team-check-top');
-    if (check) check.style.opacity = !current ? '1' : '0.2';
+    browserLocal.set('coral-group-by-team', String(!current));
     redrawLiveList();
 }
 
 export function expandSleepingGroup(groupName) {
     const key = `coral-sleeping-expanded:${groupName}`;
     const current = browserLocal.get(key) === 'true';
-    browserLocal.set(key, current ? 'false' : 'true');
+    browserLocal.set(key, String(!current));
     redrawLiveList();
 }

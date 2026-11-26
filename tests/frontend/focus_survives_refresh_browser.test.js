@@ -18,6 +18,7 @@ const BASE = require('./test_base').BASE;
     const S = `(window.__coralStatic||'/static/')`;
     try {
         await Page.enable();
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`!!window.__coralReady || !!document.getElementById('live-sessions-list')`, 'the page');
 

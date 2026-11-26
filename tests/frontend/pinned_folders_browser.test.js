@@ -36,6 +36,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
     const open = async (width = 1400, mobile = false) => {
         await Emulation.setDeviceMetricsOverride({ width, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile });
         const l = Page.loadEventFired();
+        await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
         await Page.navigate({ url: BASE + '/' });
         await l;
         await coralReady();
