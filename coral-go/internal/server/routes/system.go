@@ -40,6 +40,7 @@ type SystemHandler struct {
 	// models lists each agent CLI's models (#4065).
 	models *agentmodels.Service
 	// signinTerminal opens a terminal session that runs a server-built sign-in command (#16716); set by the server wiring.
+	passwordSet    func() bool
 	signinTerminal func(ctx context.Context, dir, command string) (map[string]any, error)
 	db             *store.DB
 	ss             *store.SessionStore
@@ -78,6 +79,9 @@ type SystemHandler struct {
 
 // SetTerminal tells the handler which terminal backend the server is running.
 func (h *SystemHandler) SetTerminal(t ptymanager.SessionTerminal) { h.terminal = t }
+
+// SetPasswordSet gives the privacy status a way to tell whether a password is set (the proxy warning is red without one) (#21527).
+func (h *SystemHandler) SetPasswordSet(fn func() bool) { h.passwordSet = fn }
 
 // SetSigninTerminal gives the sign-in route a way to open a Coral terminal in a folder and type a command the server built into it (#16716).
 func (h *SystemHandler) SetSigninTerminal(fn func(ctx context.Context, dir, command string) (map[string]any, error)) {
