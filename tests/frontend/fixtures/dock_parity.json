@@ -4169,32 +4169,6 @@
       "why": "the dock goes away with its tab strip, panel toggle, width and last-tab memory; the page tabs are fixed in a set order (UI/UX doc, section 4b)"
     },
     {
-      "id": "dock chrome/action/dock-more-toggle",
-      "tab": "dock chrome",
-      "kind": "action",
-      "what": "click -> dock-more-toggle",
-      "action": "dock-more-toggle",
-      "source": "templates/includes/right_dock.html:44",
-      "status": "stays",
-      "newHome": "agent page: the dock's More menu (Browse, Activity, Agent UI)",
-      "proof": null,
-      "okRef": "Orchestrator 2026-10-25 11:26Z board post 'Operator correction on the dock removal (#7457)': it is ONLY for the team view; the agent's own view keeps its dock (its tab strip with it: #7621, 170 UI 1, approved by UI/UX in #7630)",
-      "why": "the agent view keeps its dock; #7621 put its rarely used tabs behind More"
-    },
-    {
-      "id": "dock chrome/action/dock-more-open-key",
-      "tab": "dock chrome",
-      "kind": "action",
-      "what": "keydown -> dock-more-open-key",
-      "action": "dock-more-open-key",
-      "source": "templates/includes/right_dock.html:44",
-      "status": "stays",
-      "newHome": "agent page: the dock's More menu (Browse, Activity, Agent UI)",
-      "proof": null,
-      "okRef": "Orchestrator 2026-10-25 11:26Z board post 'Operator correction on the dock removal (#7457)': it is ONLY for the team view; the agent's own view keeps its dock (its tab strip with it: #7621, 170 UI 1, approved by UI/UX in #7630)",
-      "why": "the agent view keeps its dock; #7621 put its rarely used tabs behind More"
-    },
-    {
       "id": "dock chrome/action/diff-mode",
       "tab": "dock chrome",
       "kind": "action",
