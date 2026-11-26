@@ -417,7 +417,8 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	if refuseNewBoardName(w, r, h.bs, project) {
 		return nil, false
 	}
-	body.Content = h.useBoardIDs(r.Context(), project, body.Content) // a renamed agent named by its new name is stored under its board id (#17421)
+	body.Content = h.useBoardIDs(r.Context(), project, body.Content)                       // a renamed agent named by its new name is stored under its board id (#17421)
+	body.Content = h.retargetSystemReply(r.Context(), project, body.ReplyTo, body.Content) // a reply to Coral's own question never names Coral's sender (#21500)
 	if problems := h.bs.UnknownMentions(r.Context(), project, body.Content); len(problems) > 0 {
 		msg := "not posted: " + strings.Join(problems, "; ") + ". Mention a member of this board (coral-board targets lists them), or take the @ out of the text"
 		writeJSON(w, http.StatusBadRequest, map[string]any{
