@@ -65,6 +65,26 @@ const WORDS = '@Operator [Coral] A custom check waits for your approval: stale-p
             await waitFor(`document.querySelector('[data-check-action=approve]')`, at + 'the row is back again', 8000);
             await ev(`document.querySelector('[data-check-action=approve]').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 0`, at + 'a changed check leaves no stale Approve', 8000);
+            // The reply box of the same row (#21500): Coral's own sender made the question, and a plain reply must go out. The page sends it as the Operator, in answer to the question (reply_to), with the words as typed;
+            // the server (the Go test reads the real one) speaks it to the team's Orchestrator, because Coral's sender is no member of the board.
+            await ev(`window.__posts = []; window.__asks = [{ board: 'team', kind: 'ask', id: 41, key: 41, asker: 'Coral', text: ${JSON.stringify(WORDS)}, buttons: [{ id: 7, label: 'Approve', action: 'approve-check', arg: 'stale-prs:hash', state: 'pending' }, { id: 8, label: 'Deny', action: 'deny-check', arg: 'stale-prs:hash', state: 'pending' }], at: '2026-11-21T01:00:00Z' }];
+                const prev = window.fetch; window.fetch = (u, o) => { const url = String(u);
+                    if (/^\\/api\\/board\\/[^/]+\\/messages$/.test(url) && o && o.method === 'POST') { window.__posts.push({ url, body: JSON.parse(o.body) }); window.__asks = []; return Promise.resolve(new Response(JSON.stringify({ id: 99 }), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
+                    return prev(u, o); }; true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
+            await waitFor(`document.querySelector('#group-table-view tbody tr button[aria-label^="Answer the question of"]')`, at + 'the check row has an Answer button', 8000);
+            await ev(`document.querySelector('#group-table-view tbody tr button[aria-label^="Answer the question of"]').click(); true`);
+            await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog .inbox-ask-box')`, at + 'the reply box opens', 4000);
+            await ev(`document.querySelector('.inbox-ask-box').value = 'We want it to be an automation in coral'; true`);
+            await ev(`document.querySelector('dialog.inbox-ask-dialog .btn-primary').click(); true`);
+            await waitFor(`window.__posts.length === 1`, at + 'the reply was posted', 8000);
+            const sent = await ev(`window.__posts[0]`);
+            assert.equal(sent.url, '/api/board/team/messages', at + 'to the team board');
+            assert.equal(sent.body.subscriber_id, 'Operator', at + 'as the Operator'); assert.equal(sent.body.reply_to, 41, at + 'in answer to the check question');
+            assert.ok(sent.body.content.endsWith('We want it to be an automation in coral'), at + 'the words as typed: ' + sent.body.content);
+            await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'the dialog closes after Send', 4000);
+            assert.equal(await ev(`(document.querySelector('.inbox-ask-error') || {}).textContent || ''`), '', at + 'no error is shown');
+            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 0`, at + 'the answered row leaves Needs you', 8000);
             // no horizontal scroll at this width
             assert.equal(await ev(`document.documentElement.scrollWidth <= window.innerWidth + 1`), true, at + 'no horizontal scroll');
         }

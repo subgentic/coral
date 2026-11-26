@@ -17,7 +17,7 @@ import (
 const limitHitClearAfter = 30 * time.Minute
 
 // limitNoticeSender is the sender of a limit notice (the health monitor's own name, as the wait escalation uses).
-const limitNoticeSender = "Coral Health Monitor"
+const limitNoticeSender = board.HealthMonitorSender
 
 // noticeLimitHits posts one line to the team's Orchestrator for each agent that has just hit a usage limit (brief task 1, #21018): who, its open task, the
 // vendor and when it resets. A limit the agent stays blocked by is the same hit however many scans, retries and nudges see it, so there is one post per hit;

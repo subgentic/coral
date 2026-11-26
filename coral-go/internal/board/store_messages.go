@@ -658,6 +658,9 @@ func (s *Store) CountMessages(ctx context.Context, project string) (int, error) 
 // one named.
 const CoralSender = "Coral"
 
+// HealthMonitorSender is the sender of the health monitor's own notices (a limit hit, an off-books line); like CoralSender it is no member of any board.
+const HealthMonitorSender = "Coral Health Monitor"
+
 // HasPosted reports whether the member has posted on the board before: a restarted agent is not asked to introduce itself again (#17641).
 func (s *Store) HasPosted(ctx context.Context, project, subscriberID string) bool {
 	var posted bool
