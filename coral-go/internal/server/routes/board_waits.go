@@ -228,8 +228,13 @@ func (h *BoardHandler) resolveMessageWaits(project, senderID, content string) {
 
 // resolveMessageWaitsFor is resolveMessageWaits for a message meant for one subscriber: only its wait ends (#19089).
 func (h *BoardHandler) resolveMessageWaitsFor(project, senderID, content, only string) {
+	h.resolveMessageWaitsOnTask(project, senderID, content, only, "")
+}
+
+// resolveMessageWaitsOnTask is resolveMessageWaitsFor for a post on a task: taskOwner is the task's assignee, whose wait the post ends (#21704).
+func (h *BoardHandler) resolveMessageWaitsOnTask(project, senderID, content, only, taskOwner string) {
 	ctx := context.Background()
-	resolved, err := h.bs.ResolveMatchingMessageWaitsFor(ctx, project, senderID, content, only)
+	resolved, err := h.bs.ResolveMatchingMessageWaitsOnTask(ctx, project, senderID, content, only, taskOwner)
 	if err != nil || len(resolved) == 0 {
 		return
 	}

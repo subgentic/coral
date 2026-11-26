@@ -310,6 +310,12 @@ func (s *Store) ResolveMatchingMessageWaits(ctx context.Context, project, sender
 // ResolveMatchingMessageWaitsFor is ResolveMatchingMessageWaits for a message meant for one agent (a held comment delivered to it, #19089): only that subscriber's wait can end, not every Operator
 // question open on the board. An empty only matches every wait.
 func (s *Store) ResolveMatchingMessageWaitsFor(ctx context.Context, project, senderID, content, only string) ([]RegisteredWait, error) {
+	return s.ResolveMatchingMessageWaitsOnTask(ctx, project, senderID, content, only, "")
+}
+
+// ResolveMatchingMessageWaitsOnTask is ResolveMatchingMessageWaitsFor for a post made on a task (#21704): when the task is assigned to a waiter (taskOwner), the post is meant for that waiter
+// as if it @mentioned them, so their wait ends on it even when the words name someone else. Without it a "wait --from X" stayed open for hours after X posted on the waiter's own task.
+func (s *Store) ResolveMatchingMessageWaitsOnTask(ctx context.Context, project, senderID, content, only, taskOwner string) ([]RegisteredWait, error) {
 	waits, err := s.ListActiveWaits(ctx, project)
 	if err != nil || len(waits) == 0 {
 		return nil, err
@@ -352,7 +358,8 @@ func (s *Store) ResolveMatchingMessageWaitsFor(ctx context.Context, project, sen
 			jobTitle, receiveMode, canPeek = sub.JobTitle, sub.ReceiveMode, sub.CanPeek
 		}
 		numbered := s.numberedNamesCached(ctx, project)
-		explicitlyForWaiter := containsExplicitTag(content, w.SubscriberID, jobTitle, numbered)
+		explicitlyForWaiter := containsExplicitTag(content, w.SubscriberID, jobTitle, numbered) ||
+			(taskOwner != "" && SameIdentity(taskOwner, w.SubscriberID)) // a post on the waiter's task is for the waiter (#21704)
 
 		if w.WaitType != "message" && w.WaitType != "any" {
 			// A task or commit wait also ends on a message that explicitly tags the waiter (#247): whoever wrote to it by
