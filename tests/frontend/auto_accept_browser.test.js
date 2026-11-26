@@ -73,6 +73,7 @@ const BASE = require('./test_base').BASE;
             };
             const { state } = await import(${S}+'state.js');
             const render = await import(${S}+'render.js');
+            await (await import(${S}+'import_once.js')).importOnce('./status_groups.js'); // the list draws its groups only once the lazy status_groups.js is in: wait for it, so the draw below is whole (#21767, as #21762)
             const aa = await import(${S}+'auto_accept.js');
             window.__state = state; window.__render = render; window.__aa = aa;
             state.liveSessions = [
