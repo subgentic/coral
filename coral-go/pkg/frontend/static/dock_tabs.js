@@ -1,24 +1,19 @@
-/* The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621; #15855, Design C5): four tabs, Board, Files, Artifacts and Tasks (the Operator's choice, 2026-11-12), show their word beside
- * their icon when ALL the words fit the row on one line, at any width (a panel dragged narrow, or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and
- * the row does not wrap), and every other tab the page has (Browse, Activity, Notes, Info, Agent UI, Branches, Saved) sits behind one More menu, in the order the person gave in Customize tabs. They stay the real tab buttons (their panels, counts and handlers are the old ones): in More they are only drawn out of the way (.tab-more) and out of the tab order, and the menu's items
- * open them through switchAgenticTab. The open one swaps into the row and More stays (#15733). */
+/* The agent's side panel tabs say their words (#7621, #15855): every tab the page has stays in the row, in Customize tabs' order, with its word when ALL the words fit on one line, else icons alone (title and aria-label
+ * name them). Only when icons do not fit do the LAST tabs go under one More at the END of the row, by the row's width alone, never by the open tab or a count (#21684); More lights when the open tab is behind it. */
 import { registerActions } from './actions.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 import { setHidden, setAttr, setHtml } from './dom_write.js';
 import { menuMove } from './menu_keys.js';
 import { watchScrollCue } from './scroll_cue.js';
 
-const PRIMARY = ['board', 'files', 'artifacts', 'tasks']; // the four that stay in the row with their words (#15855)
 const $ = id => document.getElementById(id);
 const strip = () => document.querySelector('#agentic-block-top .agentic-state-tabs');
-const rareTabs = () => [...(strip()?.querySelectorAll('.agentic-tab[data-tab]') || [])].filter(b => !PRIMARY.includes(b.dataset.tab)); // in the row's own (Customize tabs) order
 const wordOf = b => b.getAttribute('aria-label') || b.dataset.tab;
 const iconOf = b => b.querySelector('.material-icons')?.textContent || '';
-const shown = b => getComputedStyle(b).display !== 'none'; // the page's own rules (data-page, data-scope) and the customizer's .tab-hidden say which tabs this page has
+const shown = b => getComputedStyle(b).display !== 'none'; // the page's rules and .tab-hidden say which tabs this page has
 let menuOpen = false;
 
-/** The words fit when every tab of the row is on one line with them showing and none is clipped: measured, so a narrow panel, a large text size and an unusual word all fall back the same way.
- *  The words are put on to look (only when they are off) and taken off again when they do not fit; with them already on it only looks. */
+/** The words fit when every tab is on one line with them showing and none is clipped (measured); else icons alone. */
 export function fitWords() {
     const row = strip();
     if (!row) return;
@@ -29,30 +24,32 @@ export function fitWords() {
     const crowded = () => tabs.some(b => b.offsetTop !== top || b.scrollWidth > b.clientWidth + 1) || (row.scrollWidth > row.clientWidth && !row.closest('.mobile-panel-overlay'));
     if (!crowded()) { row.removeAttribute('data-active-word'); return; }
     row.removeAttribute('data-words'); // not all on one line, or a word clipped in its tab: icons alone
-    // ...but the open tab still says its word when that fits, whichever tab is open (#9999: eight icons and a newcomer guessing which one is Artifacts): each tab is tried as the open one
-    // each tab on its own (#10876): one whose word does not fit at the panel's narrowest (Artifacts) does not take the word from Files; a tab that fits is marked, and the marked open one says its word
+    // the open tab still says its word when that fits (#9999): each tab is tried on its own (#10876) and a fit is marked
     const fit = tabs.map(b => { b.setAttribute('data-probe', ''); const ok = !crowded(); b.removeAttribute('data-probe'); b.toggleAttribute('data-word-ok', ok); return ok; });
     const fits = fit.some(Boolean);
     row.toggleAttribute('data-active-word', fits);
 }
 
 let lastShape = '';
-/** Which of the rare tabs this page has, drawn out of the row, and More as the one tab that opens them. Writes only what changed (the startup sequence counts every write). */
+/** Every tab stays in the row; only the row's width puts the LAST tabs under More (#21684). Writes only what changed (the startup sequence counts every write). */
 function syncMore() {
     const row = strip(), more = $('agentic-tab-more');
     if (!row || !more) return;
-    const here = rareTabs().filter(shown);
-    const open = here.find(b => b.classList.contains('active')); // the open one is a real tab of the row (#15733)
-    const left = here.filter(b => b !== open);
-    const was = open?.classList.contains('tab-more');
-    for (const b of rareTabs()) {
+    const tabsNow = [...row.querySelectorAll('.agentic-tab[data-tab]')]; // More is the last of the row: the page puts it there and the customizer places tabs before it
+    const here = tabsNow.filter(shown), rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, tabW = Math.max(44, 1.125 * rootPx + 8); // an icon tab; the tabs stretch
+    // places in the row after Customize (and close) and two kept free for the open tab's word and counts: constants, so placement follows the width alone
+    const room = Math.floor((row.clientWidth - 5.5 * rootPx) / tabW) - [$('agentic-tab-customize'), $('agentic-mobile-close-btn')].filter(b => b?.offsetWidth).length;
+    const keep = row.clientWidth > 0 && here.length > room ? Math.max(1, room - 1) : here.length; // More takes one place
+    const left = here.slice(keep);
+    for (const b of tabsNow) {
         const away = left.includes(b);
-        if (b.classList.contains('tab-more') !== away) b.classList.toggle('tab-more', away);
-        if (away) { if (b.tabIndex !== -1) b.tabIndex = -1; setAttr(b, 'aria-hidden', 'true'); }
-        else { if (b.hasAttribute('tabindex')) b.removeAttribute('tabindex'); if (b.hasAttribute('aria-hidden')) b.removeAttribute('aria-hidden'); }
+        if (b.classList.contains('tab-more') === away) continue;
+        b.classList.toggle('tab-more', away);
+        if (away) { b.tabIndex = -1; b.setAttribute('aria-hidden', 'true'); b.removeAttribute('data-word-ok'); } // behind More: no word
+        else { b.removeAttribute('tabindex'); b.removeAttribute('aria-hidden'); }
     }
-    if (was) open.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     setHidden(more, !left.length);
+    more.classList.toggle('active', left.some(b => b.classList.contains('active')));
     setHtml($('agentic-more-menu'), left.map(b => `<button type="button" role="menuitem" class="menu-item agentic-more-item" data-on-click="dock-more-pick" data-on-keydown="dock-more-key" data-tab="${escapeAttr(b.dataset.tab)}"><span class="material-icons" aria-hidden="true">${escapeHtml(iconOf(b))}</span><span>${escapeHtml(wordOf(b))}</span><span class="agentic-more-count">${escapeHtml(b.querySelector('.agentic-tab-count')?.textContent || '')}</span></button>`).join(''));
     if (!left.length) closeMore(false);
     const shape = left.map(b => b.id).join();
@@ -73,15 +70,14 @@ function openMore(first) {
     if (!menu || !more || more.hidden) return;
     menuOpen = true;
     menu.hidden = false;
-    const r = more.getBoundingClientRect(); // the row scrolls sideways on a phone and clips what is inside it: the menu is fixed to the screen, under More
+    const r = more.getBoundingClientRect(); // the menu is fixed to the screen, under More
     menu.style.top = `${Math.round(r.bottom + 4)}px`; menu.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
     more.setAttribute('aria-expanded', 'true');
     const items = [...menu.querySelectorAll('[role=menuitem]')];
     (first === 'last' ? items[items.length - 1] : items.find(i => i.classList.contains('active')) || items[0])?.focus();
 }
 
-/** After a pick the menu is gone, and the item that had the focus with it: the focus goes to the panel that opened, named for its tab, so a keyboard or screen-reader user is
- *  where they asked to be (coral-hub's UI review of the Branches tab: never body or a hidden item). A panel that cannot take it (not shown) leaves the focus on More. */
+/** After a pick the focus goes to the panel that opened, named for its tab (never body or a hidden item); a panel that cannot take it leaves the focus on More. */
 function focusPanel(t) {
     const p = $(`agentic-panel-${t}`), tab = $(`agentic-tab-${t}`);
     if (p) {
@@ -96,7 +92,7 @@ const items = () => [...($('agentic-more-menu')?.querySelectorAll('[role=menuite
 
 registerActions({
     'dock-more-toggle': () => { if (menuOpen) closeMore(true); else openMore(); },
-    'dock-more-pick': el => { const t = el.dataset.tab; closeMore(false); if (!PRIMARY.includes(t) && $(`agentic-tab-${t}`)) { window.switchAgenticTab?.(t, 'top'); focusPanel(t); } },
+    'dock-more-pick': el => { const t = el.dataset.tab; closeMore(false); if ($(`agentic-tab-${t}`)) { window.switchAgenticTab?.(t, 'top'); focusPanel(t); } },
     'dock-more-key': (el, event) => {
         const list = items(), i = list.indexOf(el);
         if (event.key === 'Escape') { event.preventDefault(); closeMore(true); }
@@ -113,11 +109,11 @@ export function initDockTabs() {
     if (state) new MutationObserver(syncMore).observe(state, { attributes: true, attributeFilter: ['class', 'data-page'] }); // a page, or the customizer's hidden tabs
     const row = strip();
     if (row) {
-        const ro = new ResizeObserver(fitWords);
+        const ro = new ResizeObserver(() => { syncMore(); fitWords(); });
         ro.observe(row);
-        for (const b of row.children) ro.observe(b); // with the words on the row does not wrap (agentic.css), so a larger text size or a tab's new count widens the tabs and leaves the row's size alone: the tabs are watched, and the words come off when they do not fit (#9435)
+        for (const b of row.children) ro.observe(b); // a larger text size or a new count widens the tabs, not the row (#9435)
         watchScrollCue(row);
     } // the phone's overlay strip scrolls: a fade says which edge hides tabs
-    document.addEventListener('click', e => { if (menuOpen && !e.target.closest?.('#agentic-more, #agentic-more-menu')) closeMore(false); }); // the menu is beside the More wrapper (#10214): both are the control
+    document.addEventListener('click', e => { if (menuOpen && !e.target.closest?.('#agentic-more, #agentic-more-menu')) closeMore(false); });
     document.addEventListener('focusout', e => { if (menuOpen && e.relatedTarget && !e.relatedTarget.closest?.('#agentic-more, #agentic-more-menu')) closeMore(false); });
 }
