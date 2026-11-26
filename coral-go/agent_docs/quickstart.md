@@ -76,7 +76,7 @@ $ uname -m        # x86_64 → the amd64 tarball, aarch64 → the arm64 tarball
 $ tar xzf coral-linux-amd64.tar.gz
 ```
 
-Put the extracted tools in a directory on your `PATH`, or run `./coral` from the extracted folder. See the [public installation walkthrough](https://subgentic.github.io/coral/getting-started/) for complete installation commands.
+Put the extracted tools in a directory on your `PATH`, or run `./coral` from the extracted folder. See [Run Coral on a server](server.md) for a complete headless Linux setup (service user, `systemd` unit, headless password, agent CLI setup, and remote access via Coral Hub, a tunnel, or nginx), or the [public installation walkthrough](https://subgentic.github.io/coral/getting-started/) for desktop installation commands.
 
 ### Getting the CLI tools on macOS
 
@@ -356,6 +356,7 @@ Never `pkill`, `pkill -f`, `killall` or `kill $(pgrep ...)` by a name or a patte
 
 ## Next
 
+- [Run Coral on a server](server.md) — headless Linux setup with a service user, `systemd`, headless password, and remote access.
 - [Teams and multi-agent runs](teams.md) — and read
   [Worked demos](worked-demos.md) first for what team isolation does and does not do.
 - [Message board](board.md)

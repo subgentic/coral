@@ -203,6 +203,8 @@ export PATH="$HOME/.local/bin:$PATH"
 coral --no-browser
 ```
 
+For a headless Linux server or VPS (service user, `systemd` unit, headless password, and remote access), see **[Run Coral on a server](coral-go/agent_docs/server.md)** (`coral-agent docs server`).
+
 #### Windows (`x64`)
 
 Download and run [`Coral-x64.msi`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi), or install from PowerShell in one step:
