@@ -60,7 +60,7 @@ function moreMenu(r, x) {
     return d;
 }
 
-/** One row. `x`: { parts(r) -> { did, on, detail, about }, opens(r), openRow(r), openLabel(r), teamWords(r), fromWords(r), keyOf(r) }. */
+/** One row. `x`: { parts(r) -> { did, on, detail, about }, opens(r), openRow(r), openLabel(r), teamWords(r), teamNode?(r, words), fromWords(r), keyOf(r) }. */
 export function ledgerRow(r, x) {
     const p = x.parts(r), kind = tileKind(r), v = verdictOf(r), open = x.opens(r);
     const li = el('li', `al-row${r.action === 'wait_send' ? ' is-noise' : ''}`); li.dataset.key = x.keyOf(r); li.dataset.kind = kind || 'other';
@@ -105,7 +105,7 @@ export function ledgerRow(r, x) {
     main.append(meta);
     const right = el('div', 'al-right'), rm = el('div', 'al-right-meta');
     const team = x.teamWords(r); // a row with no team has no team name and no dot before the time (#19871)
-    if (team) rm.append(el('span', 'al-team', team), el('span', 'al-dot', '·'));
+    if (team) rm.append(x.teamNode ? x.teamNode(r, team) : el('span', 'al-team', team), el('span', 'al-dot', '·')); // teamNode: the team's name as a link to its page (#21538)
     rm.append(timeCell(r.at));
     right.append(rm);
     if (open) { const word = r.item_kind === 'file' && r.file_n && r.file_latest_n > r.file_n ? `Open v${r.file_n}` : OPEN_WORD[r.item_kind] || 'Open'; const b = el('button', 'btn btn-small al-open', word); b.type = 'button'; b.setAttribute('aria-label', `${word}: ${x.openLabel(r)}`); b.addEventListener('click', () => (x.openPrimary || x.openRow)(r)); const acts = el('div', 'al-actions'); acts.append(b); const vs = versionsOf(r, x); if (vs) acts.append(vs); right.append(acts); }

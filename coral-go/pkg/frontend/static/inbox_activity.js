@@ -18,6 +18,7 @@ const DT = await importOnce('./data_table.js');
 const Threads = await importOnce('./activity_threads.js');
 const Ledger = await importOnce('./activity_ledger.js');
 const AF = await importOnce('./operator_activity_filters.js'); // lazy, as the sidebar loads it: its failure is retried
+const { teamLabelLink } = await importOnce('./team_label_link.js');
 await loadStyles('inbox_activity.css'); // the folder's rules load with the folder, not at start (page_weight)
 await loadStyles('activity_ledger.css'); // the ledger's rows (#19816)
 await loadStyles('activity_kinds.css'); // the kind chips' rules (several at once, #16087): not at start
@@ -243,7 +244,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             const openPrimary = r => (r.item_kind === 'file' && open.viewer && ['approve', 'changes', 'deny'].includes(r.action)) ? open.viewer(r) : openRow(r); // "Open file" opens the file; the row's title opens its decision
             const teamWords = r => multipleServers() ? `${teamOf(r)} \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}` : teamOf(r); // with several computers read, the computer is named beside the team (#15730)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
-            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
+            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, teamNode: (r, words) => teamLabelLink(r.team, { full: words, cls: 'al-team' }), thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
             const gaps = loaded ? missingWords(missingComputers(), shownComputers()) : '';
             if (gaps) { // the mock's "Partial multi-computer view" notice: the same icon, heading and sentence as the record check (#19924)
                 const n = DT.el('div', 'activity-check activity-check-partial'), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
