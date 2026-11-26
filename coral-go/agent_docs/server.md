@@ -2,7 +2,7 @@
 
 > Install Coral headless on a Linux server with a service user, a systemd unit, a dashboard password and remote access.
 
-This page covers a headless Linux server (such as an Ubuntu VPS) where no desktop or browser runs on the machine itself. Everything runs as a dedicated service user, listens on loopback (`127.0.0.1:8420`), and is reached through **Coral Hub**, an **SSH or Tailscale tunnel**, or a **same-computer TLS reverse proxy** with a dashboard password set first.
+This page covers a headless Linux server (such as an Ubuntu VPS) where no desktop or browser runs on the machine itself. Everything runs as a dedicated service user and listens on loopback (`127.0.0.1:8420`). The **recommended server topology** is **Hub-only mode (`--hub-only`)**: Coral listens on `127.0.0.1` only, always requires a credential, refuses every proxied request that shows itself (`403 hub_only`), and is reached through **Coral Hub** (`coral cloud connect` over SSH) with no reverse proxy or open web port needed. You can also reach a loopback-only server over an **SSH or Tailscale tunnel**, or (if you do not use Hub-only mode) through a **same-computer TLS reverse proxy** with a dashboard password set first.
 
 > **Security threat model — on a server, every agent runs as the Coral user and can act as the Operator:**
 > Coral and every agent it launches run as the same Unix user (`coral`). Because Coral does not sandbox agents at the OS level, any agent (including a prompt-injected agent or a package it installs) can read `/home/coral/.coral` directly — including `cli-token`, `api_key`, the `password` hash, `sessions.db`, `messageboard.db`, and every board and transcript — and can use `cli-token` or `api_key` to sign API requests as the **Operator**.
@@ -110,13 +110,14 @@ On a headless server (where `stdin` is not an interactive terminal), read the Te
 sudo -u coral -i coral terms
 ```
 
-Then have **the person installing Coral** pass `--accept-terms` on the `ExecStart` line in `coral.service` (or set `Environment=CORAL_ACCEPT_TERMS=1`), which records acceptance in `/home/coral/.coral/.eula-accepted`:
+Then have **the person installing Coral** run Coral once in the foreground with `--accept-terms`, press `Ctrl+C` once it starts (which records acceptance in `/home/coral/.coral/.eula-accepted`), and then start the `systemd` service in [Section 5](#5-run-coral-under-systemd):
 
 ```bash
+# Run once in a terminal to record `/home/coral/.coral/.eula-accepted`, then press Ctrl+C:
 sudo -u coral -i coral --host 127.0.0.1 --port 8420 --no-browser --accept-terms
 ```
 
-> **Only a human may accept the Terms:** The person installing Coral accepts the Terms of Service. An installing or deploying agent must **never** pass `--accept-terms` or `CORAL_ACCEPT_TERMS=1` on a person's behalf, and must **never** fake a pseudo-terminal (`pty`) or write a helper script to accept the Terms. (When a machine enrolls with a one-time Coral Hub bootstrap credential via `--bootstrap-file` or `/run/coral/bootstrap.d/credential`, Coral also records the Terms acceptance confirmed by Coral Hub on enrollment; see [hub.md](hub.md#enrolling-with-a-one-time-credential-cloud-hub).)
+> **Only a human may accept the Terms:** The person installing Coral accepts the Terms of Service. Do not put `CORAL_ACCEPT_TERMS=1` in `coral.service` (agents inherit the service's environment). An installing or deploying agent must **never** pass `--accept-terms` or `CORAL_ACCEPT_TERMS=1` on a person's behalf, and must **never** fake a pseudo-terminal (`pty`) or write a helper script to accept the Terms. (When a machine enrolls with a one-time Coral Hub bootstrap credential via `--bootstrap-file` or `/run/coral/bootstrap.d/credential`, Coral also records the Terms acceptance confirmed by Coral Hub on enrollment; see [hub.md](hub.md#enrolling-with-a-one-time-credential-cloud-hub).)
 
 ## 4. Set the dashboard password headlessly
 
@@ -174,11 +175,10 @@ WorkingDirectory=/home/coral
 Environment=HOME=/home/coral
 Environment=CORAL_DATA_DIR=/home/coral/.coral
 Environment=PATH=/home/coral/.local/bin:/usr/local/bin:/usr/bin:/bin
-# Set by the person installing Coral after reading `coral terms` (an agent must not set this for you):
-# Environment=CORAL_ACCEPT_TERMS=1
 # Optional: seed the initial password once on first start (file must be 0600, owned by coral; deleted after read)
 # Environment=CORAL_INITIAL_PASSWORD_FILE=/home/coral/.coral-initial-password
-ExecStart=/home/coral/.local/bin/coral --host 127.0.0.1 --port 8420 --no-browser
+# Recommended when reaching the server through Coral Hub (persists in /home/coral/.coral/hub-only; omit if using an nginx or Tailscale Serve reverse proxy):
+ExecStart=/home/coral/.local/bin/coral --host 127.0.0.1 --port 8420 --no-browser --hub-only
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
@@ -193,16 +193,17 @@ WantedBy=multi-user.target
 
 > **Note — the systemd unit is not an agent sandbox:** `ProtectSystem=full` and `ProtectHome=read-only` (with `ReadWritePaths=/home/coral`) keep the service from writing to `/usr`, `/boot`, `/etc` or other users' home directories, but every agent Coral launches runs with the full read/write permissions of `User=coral` inside `/home/coral` (including `/home/coral/.coral` and any provider credentials in `/home/coral`). If your agents need to edit repositories outside `/home/coral` (for example `/srv/projects`), add that path to `ReadWritePaths=`.
 
-If you installed the Coral binaries into `/usr/local/bin`, change `ExecStart` to `/usr/local/bin/coral --host 127.0.0.1 --port 8420 --no-browser`.
+If you installed the Coral binaries into `/usr/local/bin`, change `ExecStart` to `/usr/local/bin/coral --host 127.0.0.1 --port 8420 --no-browser --hub-only` (drop `--hub-only` and run `sudo -u coral -i coral hub-only off` only if you plan to put an nginx or Tailscale Serve reverse proxy in front instead of Coral Hub).
 
 ### Flags for a server
 
 | Flag | Purpose |
 |---|---|
+| `--hub-only` | **Recommended for servers reached through Coral Hub:** bind to `127.0.0.1` only, force `require_auth_on_loopback` on (a credential is always required), and refuse every proxied request that shows itself (`403 hub_only`). Persisted in `<data dir>/hub-only` until `coral hub-only off` is run on the server (also `CORAL_HUB_ONLY=1`). |
 | `--host 127.0.0.1` | Bind to loopback only (the default when remote access is off). Agents on the server always talk to Coral over loopback. |
 | `--port 8420` | HTTP and WebSocket port (default `8420` on Linux/macOS; also `CORAL_PORT`). |
 | `--no-browser` | Do not try to run `xdg-open` on startup. |
-| `--accept-terms` | Record that the person installing Coral accepts the Terms of Service (read them first with `coral terms`; also `CORAL_ACCEPT_TERMS=1`). An agent must never set this on a person's behalf. |
+| `--accept-terms` | Record that the person installing Coral accepts the Terms of Service (read them first with `coral terms`; run once in a terminal, then `Ctrl+C`, before starting the service). An agent must never set this on a person's behalf. |
 | `--home <dir>` | Data directory (default `~/.coral`; also `CORAL_DATA_DIR`). |
 | `--backend pty\|tmux` | Terminal backend (`pty` by default). Use `--backend tmux` (with `tmux` installed) if you want agent terminals to keep running across `systemctl restart coral`. |
 | `--cloud-url <url>` | Coral Hub origin (`https://app.coralhub.dev` in release builds; `--cloud-url off` disables Hub connections). |
@@ -227,26 +228,37 @@ curl -s http://127.0.0.1:8420/api/health
 
 Keep Coral itself listening on `--host 127.0.0.1` (do **not** expose Coral's plain-HTTP port to the internet). From strongest to weakest, choose one of:
 
-### Option 1 (Recommended): Coral Hub (`coral cloud connect`) or a private tunnel (SSH / Tailscale)
+### Option 1 (Recommended): Hub-only mode (`--hub-only`) with Coral Hub (`coral cloud connect`), or a private tunnel (SSH / Tailscale)
 
 None of these opens a public web port on your server:
 
-- **Coral Hub (recommended):** The server connects outbound over TLS to Coral Hub (or your self-hosted Hub); nothing listens on the public network. (The dashboard's **Connect to Coral Hub** button requires a browser on the server itself and is refused through a remote proxy, so on a headless server run the CLI over SSH as the service user:)
+- **Hub-only mode with Coral Hub (recommended):** Start Coral with `--hub-only` (or `Environment=CORAL_HUB_ONLY=1`, or run `sudo -u coral -i coral hub-only on` once; persisted in `/home/coral/.coral/hub-only` across restarts) and connect the server outbound over TLS to Coral Hub (or your self-hosted Hub) — no reverse proxy and no open inbound port are needed:
+  - **What `--hub-only` enforces:** Coral binds to `127.0.0.1` only (any `--host` other than loopback or `--remote` is refused at startup), never prompts for Remote access, forces `require_auth_on_loopback` on so **a credential is always required**, and refuses every proxied request that shows itself — any request carrying forwarding headers (`X-Forwarded-*`, `Forwarded`, `Via`, `X-Real-IP`, `Tailscale-*`), a non-local `Host`, or a Hub stamp that did not arrive through the Hub tunnel (`403` with `error_code: hub_only`). A bare local proxy that adds no forwarding header and keeps `Host: 127.0.0.1` cannot be distinguished from a local caller by headers alone, so it is refused unless it presents a valid credential (keep strict local auth on). Hub-only is not a sandbox: because agents run as the `coral` OS user, an agent can run `coral hub-only off` or delete `/home/coral/.coral/hub-only` for the next start unless `--hub-only` is passed on the `ExecStart` command line in `coral.service` (which is root-owned).
+  - **Local tools and the Hub tunnel keep working:** `coral-board`, `coral-agent`, the `coral-hook-*` hooks, `coral cloud`, `coral cli-check`, and the Coral Hub tunnel continue to work normally.
+  - **Link the server over SSH:** Because the dashboard's **Connect to Coral Hub** dialog requires a browser on the machine itself, enroll a headless server from SSH as the `coral` user (if `--hub-only` starts before a Hub is linked, Coral keeps running and prints this command as the next step):
 
-  ```bash
-  sudo -u coral -i coral cloud connect
-  # Prints an https://app.coralhub.dev/enroll?code=... link and a code — open and approve it in any browser, then verify:
-  sudo -u coral -i coral cloud status
-  ```
+    ```bash
+    sudo -u coral -i coral cloud connect
+    # Prints an https://app.coralhub.dev/enroll?code=... link and a code — open and approve it in any browser, then verify:
+    sudo -u coral -i coral cloud status
+    ```
 
-  When approving in your browser, choose the server's maximum access mode (**View**, **Interact** or **Launch**). See [Connecting a server to Coral Hub](hub.md#connecting-a-server-to-coral-hub).
-- **SSH local port forward:** Forward port `8420` over SSH from your laptop and open `http://localhost:8420`:
+    When approving in your browser, choose the server's maximum access mode (**View**, **Interact** or **Launch**). Check or change Hub-only mode on the server at any time with:
+
+    ```bash
+    sudo -u coral -i coral hub-only status
+    # To turn Hub-only off later (for example to use an nginx or Tailscale Serve reverse proxy instead), run on the server and restart Coral:
+    sudo -u coral -i coral hub-only off
+    ```
+
+    See [Connecting a server to Coral Hub](hub.md#connecting-a-server-to-coral-hub) and [Hub-only mode](auth.md#hub-only-the-recommended-setup-for-a-server).
+- **SSH local port forward:** Forward port `8420` over SSH from your laptop and open `http://localhost:8420` (works with `--hub-only` too, because the browser connects straight to `127.0.0.1:8420` with a local `Host` header and signs in with your dashboard password or API key):
 
   ```bash
   ssh -L 8420:127.0.0.1:8420 user@your-server
   ```
 
-- **Tailscale:** You have two ways to reach Coral over a tailnet:
+- **Tailscale:** You have two ways to reach Coral over a tailnet (both require Hub-only mode to be **off**, `sudo -u coral -i coral hub-only off`, since `tailscale serve` sends forwarding headers / a tailnet `Host` and `--remote` is refused in Hub-only mode):
   1. **Tailscale Serve (recommended — keeps Coral on `127.0.0.1` with remote access off):** Set a dashboard password (Step 4) and turn on `require_auth_on_loopback` (Section 8), then let Tailscale terminate HTTPS on your tailnet and proxy to `127.0.0.1:8420`:
 
      ```bash
