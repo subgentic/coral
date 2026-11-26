@@ -23,6 +23,7 @@ These links open the maintained source documentation on GitHub. They follow `mai
 
 | Topic | Reference |
 | --- | --- |
+| Headless Linux server setup (service user, systemd, nginx, sizing) | [Run Coral on a server](server.md) ([agent reference](https://github.com/subgentic/coral/blob/main/coral-go/agent_docs/server.md)) |
 | Team board commands and API | [Message board](https://github.com/subgentic/coral/blob/main/coral-go/agent_docs/board.md) |
 | Task dependencies, results, and artifacts | [Task workflows](https://github.com/subgentic/coral/blob/main/coral-go/agent_docs/task-workflows.md) |
 | Personal agent tasks | [Agent tasks](https://github.com/subgentic/coral/blob/main/coral-go/agent_docs/agent-tasks.md) |

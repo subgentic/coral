@@ -7,6 +7,18 @@ description: "Turn on remote access so your phone or another device can reach th
 
 Remote access lets another device, such as your phone, reach the dashboard over your network. **It is off by default.** Until you turn it on and restart, Coral listens on `127.0.0.1` only and accepts no direct network connections from other machines. A tunnel, proxy or port forward that you set up yourself can still expose that local listener.
 
+For a remote server, the recommended setup is to leave remote access **off** so Coral stays on `127.0.0.1` (while remote access is off, `--host` being narrowed to `127.0.0.1` at startup is expected), set a dashboard password and turn on `require_auth_on_loopback`, and put Coral Hub, an SSH or Tailscale tunnel, or a same-machine TLS reverse proxy (such as nginx) in front of it; see [Run Coral on a server](server.md).
+
+## Connect a headless server to Coral Hub (recommended)
+
+Because the dashboard's **Connect to Coral Hub** dialog requires a local browser session on the machine itself (it is refused when you open the dashboard from a remote browser through a reverse proxy), connect a headless server over SSH as the service user:
+
+```bash
+sudo -u coral -i coral cloud connect
+# Prints an https://app.coralhub.dev/enroll?code=... link and code — open and approve it in any browser, then check:
+sudo -u coral -i coral cloud status
+```
+
 ## Saved and effective settings
 
 Two values are reported separately:
@@ -31,7 +43,7 @@ To turn it off, clear the setting and restart. Existing remote connections are n
 
 ## Authentication
 
-By default every request needs a credential, including ones from this computer: the dashboard's sign-in (run `coral open`), the password, a signed command line, an agent's session token or the API key (generated on first run and shown with the QR code; treat it like a password). A request a same-machine reverse proxy forwarded (it carries a forwarding header such as `X-Forwarded-For`) is treated like a remote one, but a proxy that strips those headers still looks local: set the password first, or turn on `require_auth_on_loopback`.
+By default every request needs a credential, including ones from this computer: the dashboard's sign-in (run `coral open`), the password, a signed command line, an agent's session token or the API key (generated on first run and shown with the QR code; treat it like a password). A request a same-machine reverse proxy forwarded (it carries a forwarding header such as `X-Forwarded-For`) is treated like a remote one, but a proxy that strips those headers still looks local: set the password first, keep strict local auth on (the default) and send forwarding headers, or turn on `require_auth_on_loopback` (a password alone does not protect a header-less proxy when strict local auth is off).
 
 ## What this does and does not cover
 
