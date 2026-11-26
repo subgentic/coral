@@ -1,0 +1,2 @@
+/* Keep Save draft beside Save and send when the picture picker wraps on a phone. */
+.ac-draft-actions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
