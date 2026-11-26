@@ -728,3 +728,10 @@ b POST /api/live/links/{id}/reconfirm
 b POST /api/live/links/{id}/pause
 b POST /api/live/links/{id}/resume
 b POST /api/live/links/{id}/stop
+
+a GET /api/board/{project}/workers
+a GET /api/board/{project}/workers/{name}
+a POST /api/board/{project}/workers/{name}/launch
+b POST /api/board/{project}/workers
+b PUT /api/board/{project}/workers/{name}
+b DELETE /api/board/{project}/workers/{name}

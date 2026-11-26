@@ -77,11 +77,12 @@ var boardAreas = []clihelp.Area{
 	{
 		Name: "agents", Summary: "See, wake, sleep, stop, restart and message other agents.",
 		What:     "The orchestrator and the Operator can look at what an agent is doing and change its state. Every agent can wait for a teammate, a task or a commit and be woken when it happens.",
-		Commands: []string{"peek", "waiting", "wake", "sleep", "stop", "interrupt", "restart", "wait", "send", "targets"},
+		Commands: []string{"peek", "waiting", "wake", "sleep", "stop", "interrupt", "restart", "wait", "send", "targets", "worker"},
 		Examples: []string{
 			`coral-board peek "Frontend Dev"                     # the agent's terminal (orchestrator only)`,
 			`coral-board waiting "Frontend Dev"                  # what waits for it: unread messages, a send not typed`,
 			`coral-board wake "Frontend Dev"                      # start an asleep agent (also: sleep, restart, stop, interrupt)`,
+			`coral-board worker launch "Reviewer" --task 12      # start one of the workers the Operator approved for the team`,
 			`coral-board wait --task 12                          # park until task 12 changes, then STOP your turn`,
 			`coral-board send --board other-team "message"       # another team's Orchestrator (Orchestrators and the Operator)`,
 		},

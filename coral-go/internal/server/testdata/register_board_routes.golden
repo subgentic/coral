@@ -12,6 +12,7 @@ DELETE /api/board/{project}/subscribe | (*BoardHandler).Unsubscribe-fm
 DELETE /api/board/{project}/tasks/{taskID}/park | (*BoardHandler).ParkTask-fm
 DELETE /api/board/{project}/tasks/{taskID}/reminder | (*BoardHandler).RemindTask-fm
 DELETE /api/board/{project}/waits | (*BoardHandler).CancelWait-fm
+DELETE /api/board/{project}/workers/{name} | (*BoardHandler).Worker-fm
 GET /api/board/projects | (*BoardHandler).ListProjects-fm
 GET /api/board/remotes | (*BoardRemotesHandler).ListSubscriptions-fm
 GET /api/board/remotes/proxy/{remoteServer}/projects | (*BoardRemotesHandler).ProxyProjects-fm
@@ -68,6 +69,8 @@ GET /api/board/{project}/tasks/{taskID}/history | (*BoardHandler).TaskHistory-fm
 GET /api/board/{project}/tasks/{taskID}/review-size | (*BoardHandler).TaskReviewSize-fm
 GET /api/board/{project}/waits | (*BoardHandler).GetActiveWait-fm
 GET /api/board/{project}/waits/poll | (*BoardHandler).PollWait-fm
+GET /api/board/{project}/workers | (*BoardHandler).Workers-fm
+GET /api/board/{project}/workers/{name} | (*BoardHandler).Worker-fm
 GET /api/board/{project}/working-mode | (*BoardHandler).GetWorkingMode-fm
 GET /api/board/{project}/working-mode/presets | (*BoardHandler).ListWorkflowPresets-fm
 GET /api/goal-links | (*BoardHandler).GoalLinks-fm
@@ -151,6 +154,8 @@ POST /api/board/{project}/tasks/{taskID}/review-size/split | (*BoardHandler).Spl
 POST /api/board/{project}/tasks/{taskID}/send-back | (*BoardHandler).SendBack-fm
 POST /api/board/{project}/tasks/{taskID}/submit-review | (*BoardHandler).SubmitCompletionReview-fm
 POST /api/board/{project}/waits | (*BoardHandler).RegisterWait-fm
+POST /api/board/{project}/workers | (*BoardHandler).Workers-fm
+POST /api/board/{project}/workers/{name}/launch | (*SessionsHandler).LaunchWorker-fm
 POST /api/board/{project}/working-mode/presets | (*BoardHandler).SaveWorkflowPreset-fm
 POST /api/board/{project}/working-mode/presets/{presetID}/reset | (*BoardHandler).ResetWorkflowPreset-fm
 POST /api/cloud/cross-team-links | (*BoardHandler).PostCrossTeamLinks-fm
@@ -167,5 +172,6 @@ PUT /api/board/{project}/review-size | (*BoardHandler).PutReviewSizeSetting-fm
 PUT /api/board/{project}/settings | (*BoardHandler).UpdateBoardSettings-fm
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | (*BoardHandler).SetReviewSettings-fm
 PUT /api/board/{project}/tasks/{taskID}/goal | (*BoardHandler).SetTaskGoal-fm
+PUT /api/board/{project}/workers/{name} | (*BoardHandler).Worker-fm
 PUT /api/board/{project}/working-mode | (*BoardHandler).SetWorkingMode-fm
 PUT /api/board/{project}/working-mode/presets/{presetID} | (*BoardHandler).SaveWorkflowPreset-fm

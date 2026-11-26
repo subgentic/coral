@@ -529,6 +529,18 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_team_workers_1",
+      "sql": null,
+      "tbl_name": "team_workers",
+      "type": "index"
+    },
+    {
+      "name": "sqlite_autoindex_worker_launches_1",
+      "sql": null,
+      "tbl_name": "worker_launches",
+      "type": "index"
+    },
+    {
       "name": "artifact_kinds",
       "sql": "CREATE TABLE artifact_kinds (\n\t\tboard_id   TEXT NOT NULL,\n\t\thex        TEXT NOT NULL,\n\t\tkind       TEXT NOT NULL,\n\t\tsession_id TEXT NOT NULL,\n\t\tset_at     TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, hex)\n\t)",
       "tbl_name": "artifact_kinds",
@@ -976,6 +988,18 @@
       "name": "task_workflows",
       "sql": "CREATE TABLE task_workflows (\n\t task_id INTEGER PRIMARY KEY REFERENCES board_tasks(id), data TEXT NOT NULL, has_artifacts INTEGER NOT NULL DEFAULT 0, eff_state INTEGER NOT NULL DEFAULT 0, eff_review_of INTEGER NOT NULL DEFAULT 0, eff_author TEXT NOT NULL DEFAULT '', eff_submitted TEXT NOT NULL DEFAULT '', eff_rejected INTEGER NOT NULL DEFAULT 0, lst_state INTEGER NOT NULL DEFAULT 0, lst_outcome TEXT NOT NULL DEFAULT '', lst_author TEXT NOT NULL DEFAULT '', lst_review_requested INTEGER NOT NULL DEFAULT 0, lst_reviewers TEXT NOT NULL DEFAULT '[]', lst_review_areas TEXT NOT NULL DEFAULT '[]', lst_in_pool INTEGER NOT NULL DEFAULT 0, lst_wanted INTEGER NOT NULL DEFAULT 0, lst_artifacts INTEGER NOT NULL DEFAULT 0, lst_art_refs TEXT NOT NULL DEFAULT '', lst_parent INTEGER NOT NULL DEFAULT 0)",
       "tbl_name": "task_workflows",
+      "type": "table"
+    },
+    {
+      "name": "team_workers",
+      "sql": "CREATE TABLE team_workers (\n\t\tboard_id   TEXT NOT NULL,\n\t\tname_key   TEXT NOT NULL,\n\t\tname       TEXT NOT NULL,\n\t\tsetup      TEXT NOT NULL,\n\t\tcreated_at TEXT NOT NULL,\n\t\tupdated_at TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, name_key)\n\t)",
+      "tbl_name": "team_workers",
+      "type": "table"
+    },
+    {
+      "name": "worker_launches",
+      "sql": "CREATE TABLE worker_launches (\n\t\tboard_id    TEXT NOT NULL,\n\t\tsession     TEXT NOT NULL,\n\t\tworker_name TEXT NOT NULL,\n\t\ttask_id     INTEGER NOT NULL DEFAULT 0,\n\t\tlaunched_at TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, session)\n\t)",
+      "tbl_name": "worker_launches",
       "type": "table"
     },
     {
@@ -9441,6 +9465,183 @@
           "partial": 1,
           "seq": 0,
           "unique": 0
+        }
+      ]
+    },
+    "team_workers": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "name_key",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "name",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "setup",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "updated_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "name_key",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_team_workers_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "worker_launches": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "worker_name",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "task_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "launched_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "session",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_worker_launches_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
         }
       ]
     }
