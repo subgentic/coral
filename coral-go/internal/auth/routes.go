@@ -126,7 +126,7 @@ func (ar *Routes) ValidateKey(w http.ResponseWriter, r *http.Request) {
 
 	// Only wrong keys count against the limit (as in Middleware): a user who signs in often,
 	// or several people behind one address, never get a 429 for using the right key.
-	ip := clientIP(r)
+	ip := ar.ks.throttleAddr(r)
 	if ar.ks.RateLimited(ip) {
 		httputil.WriteActionLimit(w, 0, "too_many_attempts", "Too many attempts. Try again later.") // #3434
 		return

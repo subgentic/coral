@@ -105,7 +105,7 @@ func Middleware(ks *KeyStore) func(http.Handler) http.Handler {
 			// A self-hosted Hub's request key, sent with no API key and no session cookie (#21220: before, a Hub on another computer could not reach even its three join calls): on to the identity layer,
 			// which checks it. Wrong keys count against the address like wrong API keys, so a guesser is throttled here first.
 			if len(r.Header.Values(LinkKeyHeader)) > 0 && extractAPIKey(r) == "" && ks.extractSessionCookie(r) == "" {
-				if ks.RateLimited(clientIP(r)) {
+				if ks.RateLimited(ks.throttleAddr(r)) {
 					w.Header().Set(httputil.ActionLimitHeader, "action")
 					http.Error(w, "Too many authentication attempts", http.StatusTooManyRequests)
 					return
@@ -120,7 +120,7 @@ func Middleware(ks *KeyStore) func(http.Handler) http.Handler {
 			// as a Coral hub polling this server every few seconds) into 429s.
 			keyRefused := false
 			if key := extractAPIKey(r); key != "" {
-				if ks.RateLimited(clientIP(r)) {
+				if ks.RateLimited(ks.throttleAddr(r)) {
 					// Too many wrong keys from this address: a limit on signing in (#3434).
 					w.Header().Set(httputil.ActionLimitHeader, "action")
 					http.Error(w, "Too many authentication attempts", http.StatusTooManyRequests)
@@ -141,7 +141,7 @@ func Middleware(ks *KeyStore) func(http.Handler) http.Handler {
 					next.ServeHTTP(w, withMethod(r, MethodAPIKey))
 					return
 				}
-				ks.RecordFailure(clientIP(r))
+				ks.RecordFailure(ks.throttleAddr(r))
 				log.Printf("[auth] invalid API key from %s", clientIP(r))
 				keyRefused = true
 			}
@@ -275,6 +275,6 @@ const RefusedHeader = "X-Coral-Refused"
 // RecordLinkKeyFailure counts a wrong or revoked request key against the address it came from, as a wrong API key is (#21220, Security's MUST 1): the identity layer calls it when it refuses one.
 func (ks *KeyStore) RecordLinkKeyFailure(r *http.Request) {
 	if ks != nil {
-		ks.RecordFailure(clientIP(r))
+		ks.RecordFailure(ks.throttleAddr(r))
 	}
 }

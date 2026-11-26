@@ -100,7 +100,7 @@ func tooMany(w http.ResponseWriter, wait time.Duration) {
 // checkPassword runs one throttled password check for r's address against the stored hash. It
 // answers 429 itself (and returns false, false) when the address must wait or no slot is free.
 func (ar *Routes) checkPassword(w http.ResponseWriter, r *http.Request, pw string) (match, answered bool) {
-	ip := clientIP(r)
+	ip := ar.ks.throttleAddr(r)
 	if wait := ar.throttle.delay(ip); wait > 0 {
 		tooMany(w, wait)
 		return false, true
@@ -206,7 +206,7 @@ func (ar *Routes) hashNew(w http.ResponseWriter, r *http.Request, pw string) (st
 		}
 		return "", false
 	}
-	release, ok := ar.throttle.acquire(clientIP(r))
+	release, ok := ar.throttle.acquire(ar.ks.throttleAddr(r))
 	if !ok {
 		tooMany(w, slotWait)
 		return "", false

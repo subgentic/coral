@@ -312,6 +312,30 @@ func (ks *KeyStore) fromTrustedProxy(r *http.Request) bool {
 	return false
 }
 
+// throttleAddr is the address a wrong password or a wrong key is counted against. Behind a reverse proxy on this computer every browser has the proxy's address as its peer, so one counter would
+// serve everybody: a stranger's wrong guesses would slow the Operator down. From a trusted proxy (fromTrustedProxy) that names its client in X-Forwarded-For, the count is kept under the LAST value
+// (the proxy's own entry: nginx `proxy_set_header X-Forwarded-For $remote_addr` overwrites, an appending proxy puts itself last; what the client sent comes before it). A peer that is not a
+// trusted proxy is counted by its own address and the header is never read, so a client cannot choose its bucket; a value that is not an address is ignored.
+func (ks *KeyStore) throttleAddr(r *http.Request) string {
+	peer := clientIP(r)
+	if ks == nil || !ks.fromTrustedProxy(r) {
+		return peer
+	}
+	vals := r.Header.Values("X-Forwarded-For")
+	if len(vals) == 0 {
+		return peer
+	}
+	parts := strings.Split(vals[len(vals)-1], ",")
+	last := strings.TrimSpace(parts[len(parts)-1])
+	if i := strings.IndexByte(last, '%'); i >= 0 {
+		last = last[:i]
+	}
+	if a, err := netip.ParseAddr(last); err == nil {
+		return a.String()
+	}
+	return peer
+}
+
 // ForwardedHost is the host the browser reached Coral on, as a trusted reverse proxy
 // (fromTrustedProxy) reports it in X-Forwarded-Host, when the proxy rewrites Host to
 // Coral's own address. It is the LAST value (across repeated headers and comma lists): a
