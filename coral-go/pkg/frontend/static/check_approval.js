@@ -13,6 +13,7 @@ export function checkButtons(a) {
 
 /** Puts Approve and Deny in the row's action box, before its other buttons. */
 export function addCheckButtons(a, box) {
+    if (buttonsOf(a).some(b => b.action === 'approve-automation')) return import('./automation_approval.js').then(m => m.addAutomationButtons(a, box)); // an automation an Orchestrator proposed (#21505)
     const check = buttonsOffered(a).length ? checkButtons(a) : null;
     if (!check) return;
     const who = markHidden(a.asker, { strict: true });
