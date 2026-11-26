@@ -21,3 +21,6 @@
 /* The mock shows the time at the right of every row ("6 min", "now"); the computer's row hides it elsewhere, so a row here shows it. */
 .session-list .session-group-item[data-group="__status__"] .session-time { display: inline; }
 .session-list .session-group-item[data-need][data-state]:not([data-state="usage_limit"]) .session-name-row .chip-caps { display: none; }
+.status-workers { list-style: none; }
+.status-workers .status-head-toggle { flex-wrap: wrap; font-weight: var(--fw-regular); color: var(--text-muted); }
+.status-workers-sum { display: inline-flex; align-items: center; gap: var(--space-xs); flex-basis: 100%; padding-inline-start: var(--space-xl); font-size: var(--fs-base); } /* the mock's second line, under the orchestrator */

@@ -83,6 +83,18 @@ const { connect } = require('./agent_view_harness');
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await scene(); await waitFor(`!!document.querySelector('.sidebar .status-switch')`, 'the switch in the Team view', 6000);
         assert.deepEqual((await picture(false)).switchOn, ['Team'], 'Team is kept after a reload');
+        console.log('computer: the team folds its workers under the orchestrator');
+        await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) T.state.liveSessions.find(s => s.name === n).board_project = 'shop'; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
+        const line = () => ev(`(() => { const b = document.querySelector('.sidebar .status-workers button'); return b ? { text: b.textContent.replace(/\\s+/g, ' ').trim(), open: b.getAttribute('aria-expanded'), rows: document.querySelectorAll('.sidebar .session-board-card .session-group-item').length } : null; })()`);
+        const folded = await line();
+        assert.equal(folded.text, '5 workers 3 working · 1 needs you · 1 ready', 'one line counts the workers');
+        assert.equal(folded.open, 'false');
+        assert.equal(folded.rows, 1, 'only the orchestrator row shows while the workers are folded');
+        await shot('team-folded-desktop-1440');
+        await click('.sidebar .status-workers button');
+        await waitFor(`document.querySelectorAll('.sidebar .session-board-card .session-group-item').length === 6`, 'the workers open', 4000);
+        assert.equal((await line()).open, 'true');
+        await click('.sidebar .status-workers button');
         await click('.sidebar .status-switch .btn[data-mode="status"]');
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'Status again', 6000);
 

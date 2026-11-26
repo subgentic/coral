@@ -15,6 +15,7 @@ const FOLD = 'coral-status-folded'; // JSON: the groups the person opened or fol
 const MORE = 'coral-status-more'; // the phone's one line is open
 const DAY = 86400;
 const SHAPE = { needs: 'st-needs', working: 'st-working', idle: 'st-idle', done: 'st-done' };
+const WORKERS_MIN = 4; // a team folds its workers under the orchestrator from this many
 const PHONE_WORKING = 2; // working agents a phone shows before the line that counts the rest
 const GROUPS = [['needs', 'Needs you'], ['working', 'Working'], ['idle', 'Idle'], ['done', 'Done today']];
 
@@ -27,7 +28,7 @@ const write = (k, v) => { try { browserLocal.set(k, v); } catch { /* per-viewer 
 export const grouping = () => (read(KEY, 'status') === 'team' ? 'team' : 'status');
 
 const foldedMap = () => { try { return JSON.parse(read(FOLD, '{}')) || {}; } catch { return {}; } };
-const isFolded = key => (key in foldedMap() ? !!foldedMap()[key] : key === 'done'); // Done today is folded until it is opened
+const isFolded = key => (key in foldedMap() ? !!foldedMap()[key] : key === 'done' || key.startsWith('w:')); // Done today and a team's workers are folded until opened
 
 /** The group an agent is in (an archived one is Done). */
 export function groupOf(s) {
@@ -84,9 +85,9 @@ export function renderStatusGroups(sessions, renderRow) {
         const rest = open ? [] : by.working.slice(PHONE_WORKING);
         const hidden = open ? [] : [...by.idle, ...by.done];
         for (const [key, label] of GROUPS) {
-            const list = key === 'needs' ? by.needs : key === 'working' ? shownWorking : open ? by[key] : [];
-            if (!list.length) continue;
-            html += headHtml(key, label, by[key].length, false) + list.map(s => rowHtml(s, renderRow)).join('');
+            const shown = key === 'needs' ? by.needs : key === 'working' ? shownWorking : open ? by[key] : [];
+            if (!shown.length) continue;
+            html += headHtml(key, label, by[key].length, false) + shown.map(s => rowHtml(s, renderRow)).join('');
         }
         const parts = [rest.length ? `${rest.length} more working` : '', !open && by.idle.length ? `${by.idle.length} idle` : '', !open && by.done.length ? `${by.done.length} done today` : ''].filter(Boolean);
         if (open) return html + `<li class="status-more"><button type="button" class="btn btn-quiet status-more-toggle" data-on-click="status-more" aria-expanded="true"><span class="status-caret open" aria-hidden="true"></span>Show fewer</button></li>`;
@@ -117,3 +118,16 @@ export function lay(regular, limits, archived, renderRow) {
 
 /** The Team view's own switch: the same two buttons, drawn above the teams. */
 export const sw = () => switchHtml('team');
+
+/** The Team view's orchestrator card: the orchestrator's row, then one folded line, "5 workers · 3 working · 1 needs you · 1 ready", that opens to the workers (the mock's "under the orchestrator, folded").
+ * saved: the team's agents in their saved order; draw: draws some of them as the card always did. A small team (under WORKERS_MIN workers) is drawn whole. */
+export function teamList(saved, board, draw) {
+    const isOrch = s => /orchestrator/i.test(s.display_name || s.board_job_title || '');
+    const all = [...saved.filter(isOrch), ...saved.filter(s => !isOrch(s))]; // the saved order, the orchestrator pinned to the top
+    const [orch, ...rest] = all, workers = rest.filter(s => !s.sleeping), asleep = rest.filter(s => s.sleeping); // sleeping ones keep the list's own "N sleeping" row
+    if (!isOrch(orch) || workers.length < WORKERS_MIN) return draw(all);
+    const key = 'w:' + board, folded = isFolded(key), n = g => workers.filter(s => groupOf(s) === g).length;
+    const sum = [`${n('working')} working`, n('needs') ? `<span class="status-shape st-needs" aria-hidden="true"></span>${Number(n('needs'))} needs you` : '', `${n('idle')} ready`].filter(x => x && !x.startsWith('0 ')).join(' · ');
+    return draw([orch]) + `<li class="status-workers"><button type="button" class="btn btn-quiet status-head-toggle" data-on-click="status-fold" data-group="${escapeAttr(key)}" aria-expanded="${escapeAttr(String(!folded))}">`
+        + `<span class="status-caret" aria-hidden="true"></span><span class="status-name">${workers.length} workers</span> ${folded ? `<span class="status-workers-sum">${sum}</span>` : ''}</button></li>` + (folded ? '' : draw(workers)) + draw(asleep);
+}
