@@ -148,9 +148,9 @@
 .artifact-viewer-trail[hidden] { display: none; }
 .artifact-viewer-back { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.artifact-file-navigation { display: inline-flex; align-items: center; gap: 2px; flex: none; } /* in the header row, beside Details (#19771): the file arrows and where this one is in the list; the keys help is in Details */
+.artifact-file-navigation { display: inline-flex; align-items: center; gap: 8px; flex: none; } /* in the header row, beside Details (#19771): the file arrows and where this one is in the list; the keys help is in Details */
 .artifact-file-navigation[hidden], .artifact-file-help-text[hidden], .artifact-file-helpwrap[hidden] { display: none; }
-.artifact-file-navigation .btn { min-width: var(--control-compact-height, 32px); min-height: var(--control-compact-height, 32px); padding-block: 0; }
+.artifact-file-navigation .btn { border-color: var(--border); display: inline-flex; align-items: center; justify-content: center; min-width: var(--control-compact-height, 32px); min-height: var(--control-compact-height, 32px); padding-block: 0; }
 @media (pointer: coarse) { .artifact-file-navigation .btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } }
 .artifact-file-position { color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; }
 .artifact-file-helpwrap { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
