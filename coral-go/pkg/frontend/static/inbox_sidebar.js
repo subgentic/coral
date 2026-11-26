@@ -1517,9 +1517,16 @@ export function showTeamNeeds(host, team, { onCount = () => {} } = {}) {
     needsFilters = profile.filters; needsBar = profile.bar; needsOrder = profile.order; queries.needs = profile.query; needsState = profile.state; needsTable = profile.table;
     const toolbarHost = DT.el('div', 'team-needs-toolbar'), body = DT.el('div', 'team-needs-body');
     host.replaceChildren(toolbarHost, body);
-    let disposed = false, drawing = false, signature = '';
+    let disposed = false, drawing = false, signature = '', pressed = null, deferred = false;
+    // A live update does not replace what the finger is pressing (#21716): while a press is down inside this page, the redraw waits for the lift (the click of that press lands first), then happens once. A press older than 10 s, or on a control that has left the page, holds nothing.
+    const holding = () => !!pressed && Date.now() - pressed.at < 10000 && pressed.el.isConnected && host.contains(pressed.el);
+    const letGo = () => { if (!pressed) return; pressed = null; if (deferred) { deferred = false; setTimeout(() => { if (!holding()) redraw(); }, 0); } };
+    const onDown = e => { if (e.target instanceof Element && host.contains(e.target) && e.target.closest('button, a, [data-on-click], [role="button"]')) pressed = { el: e.target, at: Date.now() }; };
+    host.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('pointerup', letGo, true); document.addEventListener('pointercancel', letGo, true); window.addEventListener('blur', letGo);
     const redraw = () => {
         if (disposed || drawing || !host.isConnected || host.hidden) return;
+        if (holding()) { if (!deferred) { deferred = true; setTimeout(function again() { if (disposed || !deferred) return; if (holding()) { setTimeout(again, 300); return; } deferred = false; redraw(); }, 300); } return; } // a lift that never arrives is not waited for past the 10 s above
         drawing = true;
         try {
             const spec = needsListSpec(), toolbar = inboxNeedsToolbar();
@@ -1543,6 +1550,7 @@ export function showTeamNeeds(host, team, { onCount = () => {} } = {}) {
     const dispose = () => {
         if (disposed) return;
         disposed = true;
+        document.removeEventListener('pointerup', letGo, true); document.removeEventListener('pointercancel', letGo, true); window.removeEventListener('blur', letGo);
         needsProfiles.set(team, { filters: needsFilters, bar: needsBar, order: needsOrder, query: queries.needs, state: needsState, table: needsTable });
         needsFilters = prior.filters; needsBar = prior.bar; needsOrder = prior.order; queries.needs = prior.query; needsState = prior.state; needsTable = prior.table;
         activeNeedsTeam = '';
