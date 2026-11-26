@@ -136,6 +136,10 @@ func MigrateLegacyEULAMarker() {
 // own terms dialog.
 func WriteEULAMarker() error { return writeEULAMarker("dialog") }
 
+// RecordFlagAcceptance records that the person starting Coral accepted the current terms with --accept-terms or CORAL_ACCEPT_TERMS=1 (source "flag", #21530): the way a start with
+// no terminal (a server) takes them. The caller says what the flag stands for; this only writes the marker.
+func RecordFlagAcceptance() error { return writeEULAMarker("flag") }
+
 // RecordHubTermsAcceptance records the acceptance the Coral Hub confirmed when a
 // machine enrolled: only when the Hub's terms_accepted is exactly this binary's
 // EULAVersion (contract §12.1). A local marker, legacy or not, is never
@@ -196,7 +200,7 @@ func AcceptedSource() (source string, ok bool) {
 		return "legacy", true
 	}
 	switch m.Source {
-	case "dialog", "legacy", "hub":
+	case "dialog", "legacy", "hub", "flag":
 		return m.Source, true
 	}
 	return "", false
@@ -283,7 +287,8 @@ func TerminalEULADialog(tosText string) bool {
 		// Nobody can answer: a background start must not block in read(0).
 		noTerminal.Store(true)
 		fmt.Println("The Terms of Service have not been accepted and stdin is not a terminal, so Coral cannot ask.")
-		fmt.Println("To accept them, run this once in a terminal, read the terms and type 'accept':")
+		fmt.Println("Rerun with --accept-terms (or CORAL_ACCEPT_TERMS=1) to accept the Terms, which you can read with: coral terms")
+		fmt.Println("Or run this once in a terminal, read the terms and type 'accept':")
 		fmt.Println()
 		for _, line := range eulaCommand() {
 			fmt.Println("    " + line)

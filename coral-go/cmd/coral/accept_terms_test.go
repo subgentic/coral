@@ -65,3 +65,14 @@ func TestAcceptTermsIsNotInTheHelp(t *testing.T) {
 		assert.NotEqual(t, "accept-terms", c.name, "it is the setup's command, not a person's")
 	}
 }
+
+// #21530: `coral terms` prints the Terms of Service a person reads before passing --accept-terms.
+func TestTermsCommandIsKnownAndTakesNoArguments(t *testing.T) {
+	code, ok := subcommand([]string{"terms"})
+	if !ok || code != 0 {
+		t.Fatalf("coral terms: handled=%v code=%d", ok, code)
+	}
+	if _, ok := subcommand([]string{"terms", "extra"}); !ok {
+		t.Fatal("coral terms with an argument is still a command word, reported as unknown, not started as a server")
+	}
+}

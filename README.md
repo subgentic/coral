@@ -203,6 +203,8 @@ export PATH="$HOME/.local/bin:$PATH"
 coral --no-browser
 ```
 
+On first launch Coral asks you to accept the Terms of Service in the terminal. On a server with no terminal, read them with `coral terms`, then start Coral with `--accept-terms` (or `CORAL_ACCEPT_TERMS=1`). The person installing Coral accepts the Terms; an agent must not pass this flag on someone's behalf.
+
 #### Windows (`x64`)
 
 Download and run [`Coral-x64.msi`](https://github.com/subgentic/coral/releases/latest/download/Coral-x64.msi), or install from PowerShell in one step:

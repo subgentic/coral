@@ -97,7 +97,7 @@ func TestAcceptedSourceReadsTheMarkerAnotherProcessWrote(t *testing.T) {
 	marker := markerAt(t)
 	_, ok := AcceptedSource()
 	assert.False(t, ok, "no marker: not accepted")
-	for _, source := range []string{"dialog", "legacy", "hub"} {
+	for _, source := range []string{"dialog", "legacy", "hub", "flag"} {
 		writeMarker(t, marker, "accepted\nversion="+terms.EULAVersion+"\nsha256="+terms.EULADigest()+"\nsource="+source+"\n")
 		got, ok := AcceptedSource()
 		assert.True(t, ok, source)
