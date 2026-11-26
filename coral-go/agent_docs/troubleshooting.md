@@ -652,7 +652,7 @@ coral db compact            # or: coral db compact --home <data folder>
 It refuses while a Coral server runs on that data folder (and Coral can't start
 while it works), writes a backup `sessions.before-compact-<time>.db` next to the
 database first, then compacts it and prints the sizes. It needs free disk about
-twice the database's size. An encrypted database isn't supported yet. Delete the
+twice the database's size. An encrypted database (from an opt-in `-tags sqlcipher,fts5` source build; standard release builds use plain SQLite) isn't supported yet. Delete the
 backup once Coral works as before. Measured on a 2 GB database: 15 s, 2.0 GB to
 1.24 GB.
 

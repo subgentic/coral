@@ -830,7 +830,7 @@ Agents sign in through each CLI's own login, not a key stored in Coral. Check as
 
 Applies after restart.
 
-Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.
+Official release packages store `sessions.db` and `messageboard.db` as plain, unencrypted SQLite (`SQLite format 3` header) and hide this setting. Whole-database encryption (SQLCipher) is an experimental, opt-in source-build feature (`CGO_ENABLED=1` with `-tags sqlcipher,fts5`) and is not included in release downloads. In an encrypted source build, Coral never stores a database password in browser storage, URLs, logs, or ordinary settings.
 
 ### Usage analytics
 

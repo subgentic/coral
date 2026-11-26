@@ -50,7 +50,7 @@ This protects against mistakes and prompt-injected agents acting through Coral's
 
 ## Your data on disk
 
-Coral stores sessions, history and the message board in SQLite databases under `~/.coral` (or the directory set with `--home`). Regular releases store them unencrypted. Database encryption (SQLCipher) is an **experimental, opt-in source-build feature** and is not included in release packages.
+Coral stores sessions, history and the message board in SQLite databases (`sessions.db` and `messageboard.db`) under `~/.coral` (or the directory set with `--home`). **Official release packages store these databases as plain, unencrypted SQLite** (`SQLite format 3` header). Database encryption (SQLCipher) is an **experimental, opt-in source-build feature** (`CGO_ENABLED=1` with `-tags sqlcipher,fts5`) and is not included in release packages (although release CI runs a separate `encryption-verify.yml` check to keep the opt-in source build working).
 
 ## Related
 

@@ -29,7 +29,7 @@ Coral does not sandbox agents: an agent can run any command and read or write an
 sudo useradd --system --create-home --home-dir /home/coral --shell /bin/bash coral
 ```
 
-By default Coral keeps all of its state in `~/.coral` (`/home/coral/.coral` for the `coral` user), created with mode `0700` and `0600` files: `sessions.db`, `messageboard.db`, `api_key`, `password`, `cli-token`, `session_tokens/`, `logs/`, `artifacts/` and `uploads/`. Override the folder with `--home <dir>` or `CORAL_DATA_DIR=<dir>`. See [What Coral stores on this computer](what-coral-stores.md).
+By default Coral keeps all of its state in `~/.coral` (`/home/coral/.coral` for the `coral` user), created with mode `0700` and `0600` files: `sessions.db`, `messageboard.db`, `api_key`, `password`, `cli-token`, `session_tokens/`, `logs/`, `artifacts/` and `uploads/`. Official release builds store `sessions.db` and `messageboard.db` as plain, unencrypted SQLite (`SQLite format 3` header); whole-database encryption (`SQLCipher`) is an experimental, opt-in source-build option (`CGO_ENABLED=1` with `-tags sqlcipher,fts5`) and is not included in release downloads. Override the folder with `--home <dir>` or `CORAL_DATA_DIR=<dir>`. See [What Coral stores on this computer](what-coral-stores.md).
 
 ## 2. Install Coral and an agent CLI
 
@@ -432,7 +432,7 @@ Coral rotates its own logs inside `<data dir>` (`/home/coral/.coral`) automatica
 
 ### Backing up and restoring the data directory
 
-All persistent state lives in `/home/coral/.coral` (primarily the two SQLite WAL databases `sessions.db` and `messageboard.db`, plus `api_key`, `password`, `cli-token`, `artifacts/`, `uploads/` and `agent_knowledge/`):
+All persistent state lives in `/home/coral/.coral` (primarily the two SQLite WAL databases `sessions.db` and `messageboard.db`, which release builds store as plain, unencrypted SQLite, plus `api_key`, `password`, `cli-token`, `artifacts/`, `uploads/` and `agent_knowledge/`):
 
 > **Encrypt backups and store them off the host:** Every backup of `/home/coral/.coral` holds `api_key`, the `password` hash, `cli-token` (if taken while running), `.remote_secret_key`, and unredacted terminal logs and transcripts. Encrypt backup archives before storing them (for example with `gpg` or `age`), keep mode `0600`, and copy them **off the server** so neither an agent running as `coral` nor a compromised host can read or overwrite your backups.
 

@@ -92,8 +92,8 @@ function renderDatabaseEncryptionStatus(status, loadError = false) {
     const restart = status.restart_required === true;
     const surface = status.unlock_surface || 'unknown';
     const capability = status.encryption_compiled === false
-        ? ' Experimental database encryption is not included in this standard build.'
-        : status.feature_available === false ? ' Encryption is unavailable in this build.' : ' Database encryption is experimental.';
+        ? ' Release builds use plain SQLite; experimental SQLCipher database encryption is an opt-in source-build option (-tags sqlcipher,fts5).'
+        : status.feature_available === false ? ' Encryption is unavailable in this build.' : ' Database encryption (opt-in SQLCipher source build) is experimental.';
     hint.textContent = `Saved: ${mode}; running: ${effective}${restart ? '; restart required' : ''}. Unlock: ${surface}.${capability}`;
 }
 
