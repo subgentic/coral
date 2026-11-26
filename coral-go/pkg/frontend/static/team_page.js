@@ -29,7 +29,7 @@ const { copyForAgent } = await importOnce('./agent_copy_button.js'); // the More
 const { drawStartupWaits } = await importOnce('./team_startup_waits.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
-const PHONE_MORE = ['knowledge', 'messages', 'branches', 'linked']; // (the last three of TEAM_TABS: the row is the others, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
+const PHONE_MORE = ['knowledge', 'messages', 'branches', 'linked']; // (the last four of TEAM_TABS: the row is the others, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
 const LABEL = { goals: 'Goals', needs: 'Needs you', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', branches: 'Branches', linked: 'Linked teams' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
