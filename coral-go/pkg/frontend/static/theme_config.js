@@ -10,6 +10,8 @@ import { applyTheme, applyThemeData, clearCustomThemeVars } from './settings_cor
 const { withAccent } = await importOnce('./theme_accent.js');
 import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('theme-configurator.css'); // the editor's rules load with it, not at start: the room for the status list's rules (#21546)
 const { moreMenu } = await importOnce('./more_menu.js'); // Import, Export, Reset and Preview live in a More menu (#15845, guidelines 4.8)
 
 let variableGroups = {};   // { groupName: { cssVar: label, ... }, ... }

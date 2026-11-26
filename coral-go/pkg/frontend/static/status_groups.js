@@ -1,14 +1,13 @@
 /* The agent list grouped by status (#21466, the Operator's approved mock, concept mocks v3 idea 4): Needs you, Working, Idle and Done today (folded), the newest update first inside each group.
  * The group heading carries the status shape, so a row here has no dot of its own. Status is the default; Team (the orchestrator-folded view, group_cards.js) is the other choice, and the
  * choice is remembered per viewer. On a phone the list is short: every agent that needs you, two that are working, and one line that counts the rest ("2 more working · 3 idle · 6 done today").
- * Loaded when the list draws (render.js asks for it), so the first paint carries none of these bytes; its sheet is lazy too (css/status_groups.css). */
+ * Loaded when the list draws (render.js asks for it), so the first paint carries none of these bytes; its rules are in the start sheet (css/status_groups.css, last before forced-colors), paid for by the theme editor's sheet going lazy. */
 import { browserLocal } from './safe_storage.js';
 import { registerActions } from './actions.js';
 import { redrawLiveList } from './list_hooks.js';
 import { escapeHtml, escapeAttr } from './utils.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { sessionStateInfo } from './session_state.js';
-import { loadStyles } from './lazy_styles.js';
 
 const KEY = 'coral-agent-grouping'; // 'status' (the default) or 'team'
 const FOLD = 'coral-status-folded'; // JSON: the groups the person opened or folded by hand
@@ -18,8 +17,6 @@ const SHAPE = { needs: 'st-needs', working: 'st-working', idle: 'st-idle', done:
 const WORKERS_MIN = 4; // a team folds its workers under the orchestrator from this many
 const PHONE_WORKING = 2; // working agents a phone shows before the line that counts the rest
 const GROUPS = [['needs', 'Needs you'], ['working', 'Working'], ['idle', 'Idle'], ['done', 'Done today']];
-
-loadStyles('status_groups.css');
 
 const read = (k, d) => { try { return browserLocal.get(k) ?? d; } catch { return d; } };
 const write = (k, v) => { try { browserLocal.set(k, v); } catch { /* per-viewer only */ } };
