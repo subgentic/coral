@@ -332,3 +332,91 @@ func allowedBaseEnv(env []string) []string {
 	}
 	return out
 }
+
+// approvalSnapshot is what an approval is of, in the words a card needs: kept with the approval so a later card can say what changed.
+type approvalSnapshot struct {
+	Description string           `json:"description"`
+	RepoPath    string           `json:"repo_path"`
+	Cron        string           `json:"cron"`
+	Timezone    string           `json:"timezone"`
+	Steps       []map[string]any `json:"steps"`
+}
+
+// ApprovalSnapshot is the JSON stored with an approval.
+func ApprovalSnapshot(wf *store.Workflow, job *store.ScheduledJob) string {
+	snap := approvalSnapshot{Description: wf.Description, RepoPath: wf.RepoPath}
+	if job != nil {
+		snap.Cron, snap.Timezone = job.CronExpr, job.Timezone
+	}
+	_ = json.Unmarshal([]byte(wf.StepsJSON), &snap.Steps)
+	b, _ := json.Marshal(snap)
+	return string(b)
+}
+
+// ApprovalChanges lists, in words, what differs between an approved snapshot and the workflow now: "- Step 2 · Prompt: old" then "+ Step 2 · Prompt: new". Empty when the snapshot is unknown or nothing differs.
+// Every value is shown whole.
+func ApprovalChanges(snapshot string, wf *store.Workflow, job *store.ScheduledJob) []string {
+	var old, cur approvalSnapshot
+	if json.Unmarshal([]byte(snapshot), &old) != nil || json.Unmarshal([]byte(ApprovalSnapshot(wf, job)), &cur) != nil {
+		return nil
+	}
+	var out []string
+	pair := func(what, a, b string) {
+		if a != b {
+			out = append(out, "- "+what+": "+a, "+ "+what+": "+b)
+		}
+	}
+	pair("Schedule", old.Cron+" "+old.Timezone, cur.Cron+" "+cur.Timezone)
+	pair("Repo folder", old.RepoPath, cur.RepoPath)
+	pair("Description", old.Description, cur.Description)
+	n := len(old.Steps)
+	if len(cur.Steps) > n {
+		n = len(cur.Steps)
+	}
+	field := func(m map[string]any, k string) string {
+		switch v := m[k].(type) {
+		case nil:
+			return ""
+		case string:
+			return v
+		default:
+			b, _ := json.Marshal(v)
+			return string(b)
+		}
+	}
+	for i := 0; i < n; i++ {
+		where := fmt.Sprintf("Step %d", i+1)
+		switch {
+		case i >= len(old.Steps):
+			out = append(out, "+ "+where+" added: "+field(cur.Steps[i], "name"))
+			continue
+		case i >= len(cur.Steps):
+			out = append(out, "- "+where+" removed: "+field(old.Steps[i], "name"))
+			continue
+		}
+		keys := map[string]bool{}
+		for k := range old.Steps[i] {
+			keys[k] = true
+		}
+		for k := range cur.Steps[i] {
+			keys[k] = true
+		}
+		names := make([]string, 0, len(keys))
+		for k := range keys {
+			names = append(names, k)
+		}
+		sortStrings(names)
+		for _, k := range names {
+			pair(where+" · "+k, field(old.Steps[i], k), field(cur.Steps[i], k))
+		}
+	}
+	return out
+}
+
+func sortStrings(s []string) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j-1] > s[j]; j-- {
+			s[j-1], s[j] = s[j], s[j-1]
+		}
+	}
+}

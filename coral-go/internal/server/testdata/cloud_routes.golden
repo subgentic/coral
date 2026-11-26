@@ -12,6 +12,7 @@ DELETE /api/auth/sessions/{id} never
 DELETE /api/board/remotes never
 DELETE /api/board/{project} launch
 DELETE /api/board/{project}/artifacts/{id}/review interact
+DELETE /api/board/{project}/automations/{name} never
 DELETE /api/board/{project}/cross-team-links never
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} never
 DELETE /api/board/{project}/health/checks/{name} never
@@ -106,6 +107,8 @@ GET /api/board/{project} view
 GET /api/board/{project}/artifacts view
 GET /api/board/{project}/artifacts/{digest}/edit view
 GET /api/board/{project}/artifacts/{digest}/edit/send view
+GET /api/board/{project}/automations never
+GET /api/board/{project}/automations/{name} never
 GET /api/board/{project}/branches view
 GET /api/board/{project}/context-reset-status never
 GET /api/board/{project}/cross-team-candidates never
@@ -400,6 +403,9 @@ POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim interact
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle interact
 POST /api/board/{project}/asks/{messageID}/close interact
 POST /api/board/{project}/automation/post never
+POST /api/board/{project}/automations never
+POST /api/board/{project}/automations/{name}/disable never
+POST /api/board/{project}/automations/{name}/run never
 POST /api/board/{project}/clashes never
 POST /api/board/{project}/cross-team-links never
 POST /api/board/{project}/cross-team/disable launch
@@ -638,6 +644,7 @@ PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never
 PUT /api/board/{project}/artifacts/{id}/review interact
 PUT /api/board/{project}/artifacts/{id}/tags interact
+PUT /api/board/{project}/automations/{name} never
 PUT /api/board/{project}/guide-roster launch
 PUT /api/board/{project}/health/checks/{name} never
 PUT /api/board/{project}/health/settings never

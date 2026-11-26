@@ -23,6 +23,7 @@ const (
 	TeamWorkflowEventDisable  = "disable"
 	TeamWorkflowEventDelete   = "delete"
 	TeamWorkflowEventRefused  = "refused" // a run stopped because what would run is not what was approved
+	TeamWorkflowEventTestRun  = "test_run"
 	teamWorkflowEventsKeepFor = 30 * 24 * time.Hour
 )
 
@@ -282,7 +283,7 @@ func (s *WorkflowStore) DeleteTeamWorkflow(ctx context.Context, id int64, kind, 
 
 // ApproveTeamWorkflow enables the workflow and its job IF what is stored hashes to expect: current computes the hash of the rows read inside this transaction, so a change that landed after the card was
 // shown, or after the caller looked, enables nothing (ErrTeamWorkflowChanged). files is the repo files that hash covers, stored with it for the run's check.
-func (s *WorkflowStore) ApproveTeamWorkflow(ctx context.Context, id int64, expect, files, who string, current func(w *Workflow, job *ScheduledJob) (string, error)) error {
+func (s *WorkflowStore) ApproveTeamWorkflow(ctx context.Context, id int64, expect, files, who string, current func(w *Workflow, job *ScheduledJob) (hash, snapshot string, err error)) error {
 	return s.db.WithTx(ctx, func(tx *sqlx.Tx) error {
 		w, err := teamWorkflowTx(ctx, tx, id)
 		if err != nil {
@@ -295,7 +296,7 @@ func (s *WorkflowStore) ApproveTeamWorkflow(ctx context.Context, id int64, expec
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		now, err := current(w, job)
+		now, snapshot, err := current(w, job)
 		if err != nil || now != expect {
 			return ErrTeamWorkflowChanged
 		}
@@ -303,7 +304,7 @@ func (s *WorkflowStore) ApproveTeamWorkflow(ctx context.Context, id int64, expec
 		if _, err := tx.ExecContext(ctx, `UPDATE workflows SET enabled = 1, updated_at = ? WHERE id = ?`, stamp, id); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE team_workflows SET approved_hash = ?, approved_files = ?, approved_at = ? WHERE workflow_id = ?`, expect, files, stamp, id); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE team_workflows SET approved_hash = ?, approved_files = ?, approved_snapshot = ?, approved_at = ? WHERE workflow_id = ?`, expect, files, snapshot, stamp, id); err != nil {
 			return err
 		}
 		if job != nil {
@@ -374,4 +375,11 @@ func teamWorkflowTx(ctx context.Context, tx *sqlx.Tx, id int64) (*Workflow, erro
 	r.put(&w)
 	w.HydrateSteps()
 	return &w, nil
+}
+
+// TeamTestRunsSince counts the test runs the team's Orchestrator started since t.
+func (s *WorkflowStore) TeamTestRunsSince(ctx context.Context, team string, t time.Time) (int, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM team_workflow_events WHERE team = ? AND kind = ? AND at >= ?`, team, TeamWorkflowEventTestRun, t.Unix())
+	return n, err
 }

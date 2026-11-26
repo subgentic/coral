@@ -48,9 +48,9 @@ func approveNow(t *testing.T, ws *store.WorkflowStore, wf *store.Workflow) strin
 	if err != nil {
 		t.Fatalf("approval: %v", err)
 	}
-	cur := func(w *store.Workflow, j *store.ScheduledJob) (string, error) {
+	cur := func(w *store.Workflow, j *store.ScheduledJob) (string, string, error) {
 		x, err := ApprovalOf(w, j)
-		return x.Hash, err
+		return x.Hash, ApprovalSnapshot(w, j), err
 	}
 	if err := ws.ApproveTeamWorkflow(ctx, wf.ID, a.Hash, a.FilesJSON(), "Operator", cur); err != nil {
 		t.Fatalf("approve: %v", err)

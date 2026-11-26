@@ -1,6 +1,7 @@
 DELETE /api/board/remotes | (*BoardRemotesHandler).RemoveSubscription-fm
 DELETE /api/board/{project} | (*BoardHandler).DeleteBoard-fm
 DELETE /api/board/{project}/artifacts/{id}/review | (*BoardHandler).UnmarkArtifactForReview-fm
+DELETE /api/board/{project}/automations/{name} | (*BoardHandler).DeleteAutomationRoute-fm
 DELETE /api/board/{project}/cross-team-links | (*BoardHandler).RemoveLocalLinks-fm
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | (*BoardHandler).RemoveGroupMember-fm
 DELETE /api/board/{project}/health/checks/{name} | (*BoardHandler).RemoveHealthCheckRoute-fm
@@ -23,6 +24,8 @@ GET /api/board/{project} | (*BoardHandler).GetBoardInfo-fm
 GET /api/board/{project}/artifacts | (*BoardHandler).ListTeamArtifacts-fm
 GET /api/board/{project}/artifacts/{digest}/edit | (*BoardHandler).GetArtifactEdit-fm
 GET /api/board/{project}/artifacts/{digest}/edit/send | (*SessionsHandler).getEditSend-fm
+GET /api/board/{project}/automations | (*BoardHandler).ListAutomationsRoute-fm
+GET /api/board/{project}/automations/{name} | (*BoardHandler).GetAutomationRoute-fm
 GET /api/board/{project}/branches | (*SessionsHandler).TeamBranches-fm
 GET /api/board/{project}/context-reset-status | (*BoardHandler).GetContextResetStatus-fm
 GET /api/board/{project}/cross-team-candidates | (*BoardHandler).GetCrossTeamCandidates-fm
@@ -94,6 +97,9 @@ POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim | (*BoardHan
 POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle | (*BoardHandler).SettleAskButton-fm
 POST /api/board/{project}/asks/{messageID}/close | (*BoardHandler).CloseAsk-fm
 POST /api/board/{project}/automation/post | (*BoardHandler).PostAutomation-fm
+POST /api/board/{project}/automations | (*BoardHandler).ProposeAutomationRoute-fm
+POST /api/board/{project}/automations/{name}/disable | (*BoardHandler).DisableAutomationRoute-fm
+POST /api/board/{project}/automations/{name}/run | (*BoardHandler).RunAutomationRoute-fm
 POST /api/board/{project}/clashes | (*BoardHandler).FileClash-fm
 POST /api/board/{project}/cross-team-links | (*BoardHandler).AddLocalLinks-fm
 POST /api/board/{project}/cross-team/disable | (*BoardHandler).HubCrossTeamDisable-fm
@@ -160,6 +166,7 @@ POST /api/tasks/run | (*TasksHandler).SubmitTask-fm
 POST /api/tasks/runs/{runID}/kill | (*TasksHandler).KillTask-fm
 PUT /api/board/{project}/artifacts/{id}/review | (*BoardHandler).MarkArtifactForReview-fm
 PUT /api/board/{project}/artifacts/{id}/tags | (*BoardHandler).SetArtifactTags-fm
+PUT /api/board/{project}/automations/{name} | (*BoardHandler).ChangeAutomationRoute-fm
 PUT /api/board/{project}/guide-roster | (*BoardHandler).GuideRoster-fm
 PUT /api/board/{project}/health/checks/{name} | (*BoardHandler).ChangeHealthCheckRoute-fm
 PUT /api/board/{project}/health/settings | (*BoardHandler).PutHealthSettings-fm

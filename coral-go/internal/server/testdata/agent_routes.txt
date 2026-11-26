@@ -374,6 +374,13 @@ b POST /api/board/{project}/goals/{goalID}/driver
 b POST /api/board/{project}/goals/{goalID}/move
 b POST /api/board/{project}/groups/{groupID}/members
 a POST /api/board/{project}/health/ack
+a DELETE /api/board/{project}/automations/{name}
+a GET /api/board/{project}/automations
+a GET /api/board/{project}/automations/{name}
+a POST /api/board/{project}/automations
+a POST /api/board/{project}/automations/{name}/disable
+a POST /api/board/{project}/automations/{name}/run
+a PUT /api/board/{project}/automations/{name}
 a DELETE /api/board/{project}/health/checks/{name}
 a GET /api/board/{project}/health/checks
 a GET /api/board/{project}/health/items

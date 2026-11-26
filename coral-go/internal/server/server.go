@@ -422,6 +422,9 @@ func (s *Server) SetWorkflowRunner(wr *background.WorkflowRunner) {
 	if s.workflowHandler != nil {
 		s.workflowHandler.SetWorkflowRunner(wr)
 	}
+	if s.boardHandler != nil {
+		s.boardHandler.SetAutomationRunner(wr) // the test run, and the question filed again when an approved automation changed (#21505)
+	}
 }
 
 // SetSummarizeFn injects the summarize function into the history handler for sync resummarize.
