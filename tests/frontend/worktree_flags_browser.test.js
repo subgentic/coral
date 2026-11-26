@@ -44,6 +44,7 @@ const BASE = require('./test_base').BASE;
             await select('w-402');
             await waitFor(`[...document.querySelectorAll('.own-worktree-chip')].some(c => c.getClientRects().length)`, `${at}: the chip`, 8000);
             assert.deepEqual([...new Set(await visibleChips())], ['Own worktree · task-402'], `${at}: the header says where it works`);
+            assert.equal(await ev(`getComputedStyle([...document.querySelectorAll('.own-worktree-chip')].find(c => c.getClientRects().length)).fontSize`), '12px', `${at}: the chip's text is the mock's 12px`);
             await ev(framesJs(3)); await shot(`header-${width}-${theme}`, '.terminal-header');
             await select('w-plain');
             await waitFor(`![...document.querySelectorAll('.own-worktree-chip')].some(c => c.getClientRects().length)`, `${at}: no chip on a worker without the flag`, 8000);
@@ -56,6 +57,9 @@ const BASE = require('./test_base').BASE;
             assert.equal(dlg.tick, true, `${at}: the box is on, as the mock draws it`);
             assert.equal(dlg.tickWords, 'Also remove its worktree The folder task-402 is deleted, with any files git ignores (such as .env or build output). The branch is kept.');
             assert.deepEqual(dlg.buttons, ['Cancel', 'Archive']);
+            // the mock's own sizes for the tick box (measured in the mock at 1440 and 390: title 13px, help 12px at 17.4px, 3px under the title)
+            const sizes = await ev(`(() => { const q = e => { const s = getComputedStyle(e); return { fs: s.fontSize, lh: s.lineHeight, mt: s.marginTop }; }; const c = document.getElementById('confirm-modal-choice'); return { title: q(c.querySelector('b')), help: q(c.querySelector('div > div')), code: q(c.querySelector('code')) }; })()`);
+            assert.deepEqual(sizes, { title: { fs: '13px', lh: '18.85px', mt: '0px' }, help: { fs: '12px', lh: '17.4px', mt: '3px' }, code: { fs: '12px', lh: sizes.code.lh, mt: '0px' } }, `${at}: the tick box's sizes are the mock's`);
             await ev(framesJs(3)); await shot(`dialog-${width}-${theme}`, '#confirm-modal .modal-content');
             // Archive with the box on: the server is asked to remove it, and what became of it is told
             await pressArchive();

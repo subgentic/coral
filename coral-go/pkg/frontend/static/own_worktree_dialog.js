@@ -2,9 +2,12 @@
  * only for a worker that has one. The server removes the folder only when it is clean and always keeps the branch; what it did comes back in the answer. */
 import { showConfirmModal } from './confirm_dialog.js';
 import { showToast } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
 import { serverFetch } from './server_base.js';
 import { agentWords, WHAT_STAYS_ARCHIVE } from './agent_words.js';
 import { resolveSessionIdentity } from './session_state.js';
+
+await loadStyles('own_worktree.css'); // the chip's and the tick box's sizes, the mock's (a lazy sheet: the start sheet stays as it is)
 
 /** The dialog of the mock: Archive "<worker>"? with the tick box (on, as the mock draws it) and what it does. onAnswer(removeWorktree) runs on Archive, onCancel() on Cancel. */
 export function askArchive(label, worktreeName, onAnswer, onCancel) {
@@ -13,9 +16,10 @@ export function askArchive(label, worktreeName, onAnswer, onCancel) {
     const box = document.getElementById('confirm-modal-choice');
     if (!box) return;
     const tick = box.querySelector('input'), words = document.createElement('div'), title = document.createElement('b'), help = document.createElement('div'), code = document.createElement('code');
-    title.textContent = 'Also remove its worktree';
+    box.classList.add('own-worktree-choice');
+    title.textContent = 'Also remove its worktree'; title.className = 'own-worktree-title';
     code.textContent = worktreeName;
-    help.className = 'text-muted-sm';
+    help.className = 'own-worktree-help';
     help.append('The folder ', code, ' is deleted, with any files git ignores (such as .env or build output). The branch is kept.');
     words.append(title, help); // the tick box's words and, under them, what it does (the mock)
     box.replaceChildren(tick, words);
@@ -32,7 +36,6 @@ export function tellWorktree(label, wt) {
 export function paintChip(name) {
     for (const c of document.querySelectorAll('.own-worktree-chip')) {
         c.hidden = !name; c.textContent = name ? 'Own worktree \u00b7 ' + name : '';
-        Object.assign(c.style, { border: '1px solid var(--border-light)', color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }); // the mock's chip: an outline, no fill (a lazy module's own style, so the start sheet stays as it is)
     }
 }
 
