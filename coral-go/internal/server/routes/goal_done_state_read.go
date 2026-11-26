@@ -18,9 +18,8 @@ func (h *BoardHandler) attachGoalDoneState(r *http.Request, goals ...*board.Goal
 		return
 	}
 	hidden, read := h.goalDoneHiddenSet(r.Context()), h.goalDoneReadSet(r.Context())
-	if len(hidden) == 0 && len(read) == 0 {
-		return
-	}
+	drivens := map[string]goalDoneDrivenState{} // read once per board (#21461)
+	quiet, now := h.goalDoneQuietFor(r.Context()), h.goalDoneClock()()
 	for _, g := range goals {
 		if g == nil {
 			continue
@@ -34,7 +33,19 @@ func (h *BoardHandler) attachGoalDoneState(r *http.Request, goals ...*board.Goal
 			st.Hidden = "not_yet"
 		}
 		st.Read = read[goalDoneReadKey(g.BoardID, g.ID, g.Rollup.Total, g.UpdatedAt)]
-		if st.Hidden != "" || st.Read {
+		if g.State == board.GoalActive && g.Rollup.Total > 0 && g.Rollup.Done == g.Rollup.Total && g.MovedOpen == 0 { // a goal that looks done: the rule of Needs you decides whether the row is held back (#21461)
+			d, ok := drivens[g.BoardID]
+			if !ok {
+				d = h.goalDoneDriven(r.Context(), g.BoardID)
+				drivens[g.BoardID] = d
+			}
+			if d.skips(*g) {
+				st.Held = true
+			} else if st.Hidden == "" && !st.Read && goalDoneQuietOver(*g, now, quiet) {
+				d.record(r.Context(), h, *g) // shown now: the once of #21442, the same entry /api/needs-you writes
+			}
+		}
+		if st.Hidden != "" || st.Read || st.Held {
 			g.DoneState = &st
 		}
 	}

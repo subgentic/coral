@@ -43,7 +43,9 @@ export function quietEndsAt(g, settings = state.settings) {
 }
 
 const remoteGoal = g => splitKey(g?.board_id || '').server !== LOCAL_SERVER;
-const hiddenGoal = (team, g, hidden) => remoteGoal(g) ? ['dismissed', 'not_yet'].includes(g.done_state?.hidden) : hidden.has(keyOf(team, g)) || hidden.has(starOf(team, g));
+// done_state.held: the computer holds the row back (a goal with a driver, or one shown before): the rule of /api/needs-you, read here and not repeated (#21461).
+const hiddenGoal = (team, g, hidden) => g.done_state?.held || (remoteGoal(g) ? g.done_state?.hidden : // hidden is only ever dismissed or not_yet
+ hidden.has(keyOf(team, g)) || hidden.has(starOf(team, g)));
 
 /** The goals that look done and are not hidden, once their quiet period is over. teamOf(g) is the team's own id on this computer, or '' for a goal that is not on it. */
 export function doneGoals(goals, teamOf, settings = state.settings, now = Date.now()) {
