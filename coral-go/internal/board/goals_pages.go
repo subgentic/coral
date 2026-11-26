@@ -282,6 +282,7 @@ func (s *Store) GoalTaskPage(ctx context.Context, board string, goalID int64, st
 		page.NextCursor = encodeTaskCursor(board, "g", key, page.Tasks[limit-1].ID)
 	}
 	s.loadListVerification(ctx, page.Tasks)
+	s.fillListWaitingOn(ctx, page.Tasks)
 	fillListReviewers(page.Tasks)
 	s.fillListArtifactCounts(ctx, page.Tasks)
 	if err := s.loadListBlockedBy(ctx, page.Tasks); err != nil {

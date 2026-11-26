@@ -202,6 +202,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if answer != nil && !body.DryRun { // the member an owner waits on answered on the task: the wait is over (#21697)
+		if _, err := h.bs.ClearWaitOnForPost(r.Context(), project, answer.taskID, msg.SubscriberID); err != nil {
+			slog.Warn("task wait-on not cleared", "board", project, "task", answer.taskID, "error", err)
+		}
+	}
 	notLinked := false // the post asked to be the same question as an earlier one and was not linked: the reply says so (#17789)
 	if owner, verified := VerifiedSession(r.Context()); verified && owner != nil {
 		if err := h.bs.RecordMessageSession(r.Context(), project, msg.ID, owner.SessionID); err != nil {

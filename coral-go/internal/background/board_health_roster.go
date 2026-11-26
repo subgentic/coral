@@ -98,7 +98,8 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 	groups := map[string]*teamhealth.WaitGroup{}
 	var order []string
 	attention := 0
-	awake := map[string]bool{} // members awake and alive, for the mentions rule (#11729)
+	awake := map[string]bool{}   // members awake and alive, for the mentions rule (#11729)
+	working := map[string]bool{} // members counted as working, so a stalled task can move one out of that count (#21697)
 	for i := range in.subs {
 		sub := &in.subs[i]
 		if board.SameIdentity(sub.SubscriberID, in.recipient.SubscriberID) {
@@ -188,6 +189,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 					break
 				}
 				r.Counts[teamhealth.StateWorking]++
+				working[sub.SubscriberID] = true
 			default:
 				if model, refused := m.modelRefused(ctx, a); refused { // its model is refused (#13480): not idle, and not for a nudge
 					r.Counts[teamhealth.StateRefused]++
@@ -211,6 +213,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 		r.Waits = append(r.Waits, *groups[k])
 	}
 	attention += m.nameIssues(ctx, in, r, awake)
+	attention += m.taskWaitLines(ctx, in, r, working)
 	r.Open = map[string]int{}
 	for _, t := range in.tasks {
 		if t.AssignedTo != nil && *t.AssignedTo != "" {
@@ -380,4 +383,146 @@ func limitResetClock(now time.Time, resets time.Duration) time.Time {
 		return time.Time{}
 	}
 	return now.Add(resets).Truncate(time.Minute)
+}
+
+// taskWaitLines adds what task wait-on says to the check (#21697): the tasks whose owner waits on the recipient (one line each, with the owner's reason), and the tasks in progress that show no activity and no
+// wait-on for the team's stalled_hours, which are stalled and never counted as working. It returns how many things it added.
+func (m *BoardHealthMonitor) taskWaitLines(ctx context.Context, in rosterInputs, r *teamhealth.Roster, working map[string]bool) int {
+	waits, err := m.store.ListTaskWaits(ctx, in.project)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	waiting := map[int64]bool{}
+	for _, w := range waits {
+		waiting[w.TaskID] = true
+		if w.WaitOn.Member == "" || !board.SameIdentity(w.WaitOn.Member, in.recipient.SubscriberID) {
+			continue
+		}
+		reason := ""
+		if t := teamhealth.StoredText(w.WaitOn.Reason, nil); t != "" && t != teamhealth.NotShown {
+			reason = `"` + strings.NewReplacer(`"`, "'").Replace(t) + `"`
+		}
+		r.WaitedOnYou = append(r.WaitedOnYou, teamhealth.TaskWaitedOn{Owner: teamhealth.Name(w.Owner), Task: w.TaskID, Age: in.now.Sub(w.Since()), Reason: reason})
+		n++
+	}
+	stalledAfter := time.Duration(m.store.GetHealthSettings(ctx, in.project).StalledHours) * time.Hour
+	if stalledAfter <= 0 {
+		return n
+	}
+	stalledAgents := map[string]bool{}
+	for _, t := range in.tasks {
+		if t.Status != "in_progress" || t.AssignedTo == nil || waiting[t.ID] {
+			continue
+		}
+		var sub *board.Subscriber
+		for i := range in.subs {
+			if board.SameIdentity(in.subs[i].SubscriberID, *t.AssignedTo) {
+				sub = &in.subs[i]
+				break
+			}
+		}
+		if sub == nil || board.SameIdentity(sub.SubscriberID, in.recipient.SubscriberID) {
+			continue
+		}
+		a, live := in.bySession[sub.SessionName]
+		if !live {
+			continue // asleep or offline: not a stall of a working agent
+		}
+		last, _ := m.store.TaskLastActivity(ctx, in.project, t.ID)
+		if sig, known := m.signal(ctx, a.SessionID); known && sig.LastEvent.After(last) {
+			last = sig.LastEvent
+		}
+		if last.IsZero() || in.now.Sub(last) < stalledAfter {
+			continue
+		}
+		r.Stalled = append(r.Stalled, teamhealth.StalledTask{Agent: teamhealth.Name(sub.SubscriberID), Task: t.ID, Silent: in.now.Sub(last)})
+		n++
+		if working[sub.SubscriberID] && !stalledAgents[sub.SubscriberID] {
+			r.Counts[teamhealth.StateWorking]--
+			r.Counts[teamhealth.StateStalled]++
+		}
+		stalledAgents[sub.SubscriberID] = true
+	}
+	return n
+}
+
+// ruleTaskWaitedOn names the one line a member is told that a task waits on it, in the store's counters: one per (member waited on, task and the wait's start).
+const ruleTaskWaitedOn = "task-waited-on"
+
+// escalateTaskWaits tells a member, once per wait, that a task's owner waits on them (#21697): a direct mention on the board, "<owner>'s #N has waited H h on you: <reason>", after the team's wait_escalate
+// time, within the store's per-target and per-team limits. The check's recipient is not told here: their check carries the line (taskWaitLines).
+func (m *BoardHealthMonitor) escalateTaskWaits(ctx context.Context, project string, recipient string) {
+	if m.defuse == nil || m.postNotice == nil {
+		return
+	}
+	waits, err := m.store.ListTaskWaits(ctx, project)
+	if err != nil || len(waits) == 0 {
+		return
+	}
+	subs, err := m.store.ListSubscribers(ctx, project)
+	if err != nil {
+		return
+	}
+	now := m.now()
+	after := time.Duration(m.store.GetHealthSettings(ctx, project).WaitEscalate.AfterMin) * time.Minute
+	sleeping, _ := m.store.SleepingSubscribers(ctx, project)
+	live := map[string]bool{}
+	for _, w := range waits {
+		live[fmt.Sprintf("%d@%s", w.TaskID, w.WaitOn.SetAt)] = true
+	}
+	if esc, err := m.store.HealthEscalations(ctx, project); err == nil {
+		for _, e := range esc { // a wait that ended (answered, cleared, the task done) is forgotten, so the next one is told
+			if e.Rule == ruleTaskWaitedOn && !live[e.Subject] {
+				_ = m.store.ResetHealthCounter(ctx, project, e.Rule, e.Target, e.Subject)
+			}
+		}
+	}
+	for _, w := range waits {
+		if w.WaitOn.Member == "" || board.SameIdentity(w.WaitOn.Member, w.Owner) || (recipient != "" && board.SameIdentity(w.WaitOn.Member, recipient)) {
+			continue
+		}
+		since := w.Since()
+		if since.IsZero() || now.Sub(since) <= after {
+			continue
+		}
+		var target *board.Subscriber
+		for i := range subs {
+			if board.SameIdentity(subs[i].SubscriberID, w.WaitOn.Member) {
+				target = &subs[i]
+				break
+			}
+		}
+		if target == nil || sleeping[target.SubscriberID] {
+			continue // gone from the team, or asleep: due again on waking
+		}
+		subject := fmt.Sprintf("%d@%s", w.TaskID, w.WaitOn.SetAt)
+		if c, err := m.store.GetHealthCounter(ctx, project, ruleTaskWaitedOn, target.SubscriberID, subject); err != nil || c.Escalated {
+			continue
+		}
+		if why, err := m.store.TakeHealthAction(ctx, project, ruleTaskWaitedOn, target.SubscriberID, now, board.HealthLimits{PerTargetPerHour: 6, TeamPerHour: 30}); err != nil || why != "" {
+			continue
+		}
+		text := fmt.Sprintf("@%s %s's #%d has waited %s on you", teamhealth.Name(target.SubscriberID), teamhealth.Name(w.Owner), w.TaskID, teamhealth.Age(now.Sub(since)))
+		if t := teamhealth.StoredText(w.WaitOn.Reason, nil); t != "" && t != teamhealth.NotShown {
+			text += `: "` + strings.NewReplacer(`"`, "'").Replace(m.defuse(ctx, project, t)) + `"` // stored text: defused like every notice that quotes one
+		}
+		text += ". Reply on the task (post --task " + fmt.Sprint(w.TaskID) + "), or tell them what to do instead."
+		if _, err := m.postNotice(ctx, project, "Coral Health Monitor", text); err != nil {
+			m.logger.Warn("task wait-on line could not be posted", "project", project, "error", err)
+			continue
+		}
+		_ = m.store.MarkHealthEscalated(ctx, project, ruleTaskWaitedOn, target.SubscriberID, subject, now)
+	}
+}
+
+// checkRecipient is who the team's check goes to: the settings' recipient while they are on the team, else the orchestrator; "" when the team has none.
+func (m *BoardHealthMonitor) checkRecipient(ctx context.Context, project string, hs board.HealthSettings) string {
+	if hs.Recipient != "" {
+		if sub, err := m.store.GetProjectSubscription(ctx, project, hs.Recipient); err == nil && sub != nil {
+			return sub.SubscriberID
+		}
+	}
+	orch, _ := m.store.TeamOrchestrator(ctx, project)
+	return orch
 }

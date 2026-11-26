@@ -375,6 +375,7 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reply", boardHandler.ReplyToTask) // a message linked to the task, the creator mentioned (#5463)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/wait-on", boardHandler.SetTaskWaitOn)   // the owner marks a task waiting on a member or a condition (#21697)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/release", boardHandler.ReleaseTaskByID) // "not now" work back to the queue (#11660)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/ack", boardHandler.AckHealthItem)
 	r.With(routes.RefuseSignInLink).Get("/api/board/{project}/health/items", boardHandler.ListHealthItems)     // the open items with their ack ids (#20495)

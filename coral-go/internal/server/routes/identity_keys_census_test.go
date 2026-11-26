@@ -22,6 +22,7 @@ var notIdentityFields = map[string]string{
 	"acts_as":            "custom health checks (#20176): the member a check speaks as; the route stores the board member's own spelling of it and refuses the Operator and any name that is not a member, so the request's spelling is never kept",
 	"promoted_by":        "written by the server into the upload record of an edit made in Dropbox that the Operator chose to use (#14714): the word operator, or auto_sync when auto-sync promoted it; read back from the data folder, never from a request",
 	"keep_assigned":      "task release (#11660): a flag, whether the released task stays with its owner; the owner is the task's own, never a name from the request",
+	"member":             "task wait-on (#21697): the team member a task waits on; the route refuses a name that is not a subscriber and stores that member's canonical id, never the request's spelling",
 	"agent_type":         "which CLI to launch, not a participant",
 	"same_as":            "post --ask --same-as (#17738): a message id of an earlier open ask, checked against the board; never a name",
 	"owner_kind":         "written by the server into the upload record (#5577) from the launch path's team owner; read back from the data folder, never from a request",

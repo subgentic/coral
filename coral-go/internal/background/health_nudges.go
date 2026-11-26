@@ -169,6 +169,7 @@ type healthRun struct {
 	now                                    time.Time
 	claimed, statused, escalated, renudged []string
 	budgetHit                              bool
+	taskWaits                              map[int64]bool // tasks marked waiting (task wait-on, #21697)
 }
 
 // take spends one automatic action (board.TakeHealthAction: the cooldown, the per-agent and team limits), and
@@ -194,6 +195,12 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 		return
 	}
 	waits, _ := h.store.ListActiveWaits(ctx, project)
+	taskWaits := map[int64]bool{} // tasks whose owner waits on a member or a condition (task wait-on, #21697): silence on them is not a stall
+	if tw, err := h.store.ListTaskWaits(ctx, project); err == nil {
+		for _, w := range tw {
+			taskWaits[w.TaskID] = true
+		}
+	}
 	waiting, onOperator := map[string]bool{}, map[string]bool{}
 	waitOf := map[string]*reviewWait{}
 	for _, w := range waits {
@@ -204,7 +211,7 @@ func (h *HealthNudges) runProject(ctx context.Context, project string, bySession
 			onOperator[w.SubscriberID] = true
 		}
 	}
-	r := &healthRun{h: h, project: project, hs: hs, now: h.now()}
+	r := &healthRun{h: h, project: project, hs: hs, now: h.now(), taskWaits: taskWaits}
 	for _, sub := range subs {
 		a, live := bySession[sub.SessionName]
 		if !live {
@@ -292,6 +299,10 @@ func (r *healthRun) statusNudges(ctx context.Context, sub board.Subscriber, a Ag
 		return
 	}
 	for _, t := range mine {
+		if r.taskWaits[t.ID] {
+			h.store.ResetHealthCounter(ctx, project, ruleStatusNudge, sub.SubscriberID, fmt.Sprint(t.ID)) // it waits on someone: no nudge, and none carried over to when the wait ends
+			continue
+		}
 		if until, _ := h.store.TaskSnoozedUntil(ctx, project, t.ID); until.After(r.now) {
 			continue // the reminder is snoozed (long tests, a release gate)
 		}

@@ -45,6 +45,8 @@ type HealthSettings struct {
 	StaleSweepHours int `json:"stale_sweep_hours"`
 	// ParkLimit is how many parked tasks an agent may hold before parking another is refused (#15362, the Operator: the number is a team setting, default 3); --force on task park overrides. A body without it (0) is the default.
 	ParkLimit int `json:"park_limit"`
+	// StalledHours: a task in progress with no tool activity and no wait-on (task wait-on, #21697) for this many hours shows as stalled in the orchestrator's check, not as working. 4 by default, 1 to 168.
+	StalledHours int `json:"stalled_hours"`
 	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
@@ -389,6 +391,12 @@ const (
 // DefaultStaleSweepHours is how often the stale-task sweep goes to the orchestrator (#14863).
 const DefaultStaleSweepHours = 12
 
+// DefaultStalledHours is how long a task in progress may show no activity and no wait-on before the check calls it stalled (#21697); StalledHoursMax bounds the setting.
+const (
+	DefaultStalledHours = 4
+	StalledHoursMax     = 168
+)
+
 // DefaultHealthSettings are the design's values. The check is ON for a team that has not set it (the operator, 2026-11-07: "turn health check on for teams by default", #14091, which reverses #4962's off-by-default):
 // a team that stored OFF keeps off, and the migration that kept the older teams on stays as it is. The rules and numbers below are what it uses; its cost is bounded (a check goes out only when something changed,
 // and the heartbeat is off: see TestANewTeamsFirstHourOfHealthChecksIsFew).
@@ -408,6 +416,7 @@ func DefaultHealthSettings() HealthSettings {
 		AssignLimit:     DefaultAssignLimit,
 		StaleSweepHours: DefaultStaleSweepHours,
 		ParkLimit:       DefaultParkLimit,
+		StalledHours:    DefaultStalledHours,
 		AskReminder:     HealthMentionNudge{On: true, AfterMin: 15},
 		OperatorWait:    HealthOperatorWait{On: true, GraceMin: OperatorWaitGraceDefaultMin, ChatMaxAgeMin: OperatorWaitChatMaxAgeDefaultMin},
 		Deviations:      HealthDeviations{HealthRuleOn: HealthRuleOn{On: true}, FactorPct: DeviationFactorDefault},
@@ -457,6 +466,10 @@ func (h HealthSettings) Clamp() HealthSettings {
 		h.ParkLimit = DefaultParkLimit // a body that does not carry the setting
 	}
 	h.ParkLimit = min(max(h.ParkLimit, 1), ParkLimitMax)
+	if h.StalledHours == 0 {
+		h.StalledHours = DefaultStalledHours // a body that does not carry the setting
+	}
+	h.StalledHours = min(max(h.StalledHours, 1), StalledHoursMax)
 	h.AskReminder.AfterMin = min(max(h.AskReminder.AfterMin, 5), 1440)
 	h.ActionList = h.ActionList.clamp()
 	h.Landing.Branch = strings.TrimSpace(h.Landing.Branch)

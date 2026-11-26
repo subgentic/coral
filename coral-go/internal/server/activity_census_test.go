@@ -190,6 +190,7 @@ var activityNotAnInboxAction = map[string]string{
 	"POST /api/board/{project}/tasks/{taskID}/attach":                      "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/tasks/{taskID}/mark-landed":                 "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/tasks/{taskID}/release-review":              "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
+	"POST /api/board/{project}/tasks/{taskID}/wait-on":                     "a task owner's note of who the task waits on, shown in health: not an Inbox action",
 	"POST /api/board/{project}/tasks/{taskID}/review":                      "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/tasks/{taskID}/submit-review":               "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",
 	"POST /api/board/{project}/waits":                                      "a team's own settings and plumbing (members, modes, links, relays), not an Inbox action",

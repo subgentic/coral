@@ -216,6 +216,7 @@ const boardOther = "Your own tasks, launching agents, files, history, notify and
 var healthRules = []struct{ groups, watches string }{
 	{"interval_min, heartbeat_min, recipient", "how often the check runs and posts, and who gets its items (the Orchestrator by default)"},
 	{"claim_nudge", "a task assigned to someone who has not claimed it"},
+	{"stalled_hours", "a task in progress with no activity and no wait-on (task wait-on) for this many hours: shown as stalled, not working"},
 	{"status_nudge, busy_no_task, held_notice", "a task in progress with no update; an agent busy with no task; work held too long"},
 	{"mention_renudge, ask_reminder", "an @mention or a question nobody has answered"},
 	{"unowned_tasks, goals_ready, goal_size", "tasks with no owner; a goal whose tasks are done; a goal with too many open tasks"},

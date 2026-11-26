@@ -36,6 +36,8 @@ type taskShow struct {
 	Body        string `json:"body,omitempty"`
 	Outcome     string `json:"outcome,omitempty"`
 	Message     string `json:"message,omitempty"`
+	// WaitingOn: what the owner waits on and why (task wait-on, #21697).
+	WaitingOn string `json:"waiting_on,omitempty"`
 	// FollowUpOf is the task this one was made from (task add --follow-up), and FollowUps the tasks made from it (#7791).
 	FollowUpOf int64              `json:"follow_up_of,omitempty"`
 	FollowUps  []taskShowFollowUp `json:"follow_ups,omitempty"`
@@ -102,6 +104,12 @@ func parseTaskShow(data []byte) (taskShow, error) {
 			AssignedTo *string `json:"assigned_to"`
 		} `json:"follow_ups"`
 		Workflow struct {
+			WaitingOn *struct {
+				Member    string `json:"member"`
+				Condition string `json:"condition"`
+				Reason    string `json:"reason"`
+				SetAt     string `json:"set_at"`
+			} `json:"waiting_on"`
 			ParentTaskID int64  `json:"parent_task_id"`
 			Outcome      string `json:"outcome"`
 			Artifacts    []struct {
@@ -127,6 +135,13 @@ func parseTaskShow(data []byte) (taskShow, error) {
 		AssignedTo: clitext.CleanName(val(raw.AssignedTo)), CreatedBy: clitext.CleanName(raw.CreatedBy), CompletedBy: clitext.CleanName(val(raw.CompletedBy)),
 		Body: val(raw.Body), Outcome: clitext.CleanName(raw.Workflow.Outcome), Message: val(raw.CompletionMessage), Artifacts: []taskShowArtifact{}}
 	t.FollowUpOf = raw.Workflow.ParentTaskID
+	if w := raw.Workflow.WaitingOn; w != nil {
+		target := w.Member
+		if target == "" {
+			target = w.Condition
+		}
+		t.WaitingOn = clitext.CleanName(target) + " since " + clitext.CleanName(w.SetAt) + ": " + clitext.Clean(w.Reason)
+	}
 	for _, f := range raw.FollowUps {
 		t.FollowUps = append(t.FollowUps, taskShowFollowUp{ID: f.ID, Title: clitext.CleanName(f.Title), Status: clitext.CleanName(f.Status), AssignedTo: clitext.CleanName(val(f.AssignedTo))})
 	}
@@ -156,6 +171,9 @@ func printTaskShow(w io.Writer, t taskShow) {
 	}
 	if len(who) > 0 {
 		fmt.Fprintln(w, strings.Join(who, "  "))
+	}
+	if t.WaitingOn != "" {
+		fmt.Fprintln(w, "Waiting on: "+t.WaitingOn)
 	}
 	if t.FollowUpOf > 0 {
 		fmt.Fprintf(w, "Follow-up of task #%d\n", t.FollowUpOf)

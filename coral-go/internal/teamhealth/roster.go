@@ -24,6 +24,7 @@ const (
 	StateAvailable = "available" // auto-asleep (#12111): put to sleep for being idle; any delivery wakes it, so it is free for work and nothing to act on
 	StateOffline   = "offline"   // it has a session but nothing is running
 	StateUnknown   = "unknown"   // awake, but Coral has no signal of its state (no hook events)
+	StateStalled   = "stalled"   // awake, holding a task in progress that shows no activity and no wait-on for stalled_hours (#21697): never counted as working
 )
 
 // WaitEntry is one agent in a wait group.
@@ -72,6 +73,25 @@ type Roster struct {
 	Reviews []ReviewAge
 	// NameIssues: members mentions may not reach (#11729 rule 4).
 	NameIssues []NameIssue
+	// WaitedOnYou: tasks whose owner marked them waiting on the recipient (task wait-on, #21697), each with the owner's reason; and Stalled: tasks in progress with no activity and no wait-on for the team's stalled_hours,
+	// which the check says are stalled and never counts as working.
+	WaitedOnYou []TaskWaitedOn
+	Stalled     []StalledTask
+}
+
+// TaskWaitedOn is one task whose owner waits on the check's recipient. Owner is a member name (through Name); Reason is the owner's words, already through StoredText and quoted ("" for none).
+type TaskWaitedOn struct {
+	Owner  string
+	Task   int64
+	Age    time.Duration
+	Reason string
+}
+
+// StalledTask is a task in progress that shows no activity and no wait-on: Agent holds it, Silent is how long it has shown none.
+type StalledTask struct {
+	Agent  string
+	Task   int64
+	Silent time.Duration
 }
 
 // NameIssue is a member that mentions may not reach: its name starts or ends with punctuation (Edge), or no mention has reached it for Window while Posts posts @-addressed a part of its name; Age
@@ -86,7 +106,7 @@ type NameIssue struct {
 
 // Awake is how many agents are awake (every state but asleep and offline).
 func (r *Roster) Awake() int {
-	return r.Counts[StateWorking] + r.Counts[StateWaiting] + r.Counts[StatePrompt] + r.Counts[StateBlocked] + r.Counts[StateRefused] + r.Counts[StateIdle] + r.Counts[StateUnknown]
+	return r.Counts[StateWorking] + r.Counts[StateWaiting] + r.Counts[StatePrompt] + r.Counts[StateBlocked] + r.Counts[StateRefused] + r.Counts[StateIdle] + r.Counts[StateUnknown] + r.Counts[StateStalled]
 }
 
 // AllWorking: every awake agent is in a turn (and there is at least one): the only case the check says nobody is stuck.
@@ -96,7 +116,7 @@ func (r *Roster) AllWorking() bool {
 
 // NeedsAttention: something in the roster is for the reader: a wait, a prompt, an idle agent.
 func (r *Roster) NeedsAttention() bool {
-	return len(r.Waits) > 0 || r.Counts[StatePrompt] > 0 || r.Counts[StateBlocked] > 0 || r.Counts[StateRefused] > 0 || r.Counts[StateIdle] > 0 || r.Counts[StateUnknown] > 0
+	return len(r.Waits) > 0 || len(r.WaitedOnYou) > 0 || len(r.Stalled) > 0 || r.Counts[StatePrompt] > 0 || r.Counts[StateBlocked] > 0 || r.Counts[StateRefused] > 0 || r.Counts[StateIdle] > 0 || r.Counts[StateUnknown] > 0 || r.Counts[StateStalled] > 0
 }
 
 // maxWaiters is how many agents one wait group lists before counting the rest.
@@ -115,6 +135,9 @@ func (r *Roster) headerCounts() string {
 	}
 	if n := r.Counts[StateRefused]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d BLOCKED (model refused)", n))
+	}
+	if n := r.Counts[StateStalled]; n > 0 {
+		parts = append(parts, fmt.Sprintf("%d STALLED", n))
 	}
 	if n := r.Counts[StateIdle]; n > 0 {
 		parts = append(parts, fmt.Sprintf("%d idle", n))
@@ -265,6 +288,12 @@ func (r *Roster) Facts() []string {
 	}
 	for _, ni := range r.NameIssues {
 		out = append(out, fmt.Sprintf("n:%s/%t/%d", ni.Name, ni.Edge, ni.Posts)) // a new one is news; its age ticking is not (#11729)
+	}
+	for _, w := range r.WaitedOnYou {
+		out = append(out, fmt.Sprintf("o:%s/%d", w.Owner, w.Task))
+	}
+	for _, st := range r.Stalled {
+		out = append(out, fmt.Sprintf("s:%s/%d", st.Agent, st.Task))
 	}
 	sort.Strings(out)
 	return out

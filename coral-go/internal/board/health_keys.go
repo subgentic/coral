@@ -23,7 +23,7 @@ type HealthKey struct {
 
 // healthKeyRanges: the accepted range of each number, as Clamp and the Problem checks enforce it.
 var healthKeyRanges = map[string]string{
-	"interval_min": "5 to 1440 minutes", "heartbeat_min": "0 (never) or 5 to 1440 minutes", "assign_limit": "0 (no limit) to 50", "stale_sweep_hours": "0 (off) to 720 hours", "park_limit": "1 to 20",
+	"interval_min": "5 to 1440 minutes", "heartbeat_min": "0 (never) or 5 to 1440 minutes", "assign_limit": "0 (no limit) to 50", "stale_sweep_hours": "0 (off) to 720 hours", "park_limit": "1 to 20", "stalled_hours": "1 to 168 hours",
 	"claim_nudge.after_min": "5 to 1440 minutes", "claim_nudge.nudges": "1 to 5", "status_nudge.after_min": "5 to 1440 minutes", "status_nudge.escalate_after_min": "5 to 1440 minutes",
 	"mention_renudge.after_min": "5 to 1440 minutes", "held_notice.after_min": "5 to 1440 minutes", "busy_no_task.after_min": "5 to 1440 minutes", "ask_reminder.after_min": "5 to 1440 minutes",
 	"goal_size.limit": "5 to 500", "compact_context.threshold_k": "50 to 900 (thousand tokens)",

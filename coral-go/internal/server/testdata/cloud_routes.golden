@@ -466,6 +466,7 @@ POST /api/board/{project}/tasks/{taskID}/review-size/send-back never
 POST /api/board/{project}/tasks/{taskID}/review-size/split never
 POST /api/board/{project}/tasks/{taskID}/send-back never
 POST /api/board/{project}/tasks/{taskID}/submit-review never
+POST /api/board/{project}/tasks/{taskID}/wait-on never
 POST /api/board/{project}/waits never
 POST /api/board/{project}/workers never
 POST /api/board/{project}/workers/{name}/launch never

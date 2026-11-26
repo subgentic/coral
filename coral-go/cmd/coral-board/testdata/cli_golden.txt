@@ -856,6 +856,8 @@ Subcommands:
                                    (orchestrator or Operator only). At most the team's limit (3 by default) parked per agent, --force parks past it; a reviewer wait is submit-review;
                                    a wait on the Operator needs the Inbox question: post it with --ask "@Operator ..." and pass its id
   unpark <id>                      Bring a parked task back
+  wait-on <id> (--member NAME | --condition TEXT) --reason TEXT | --clear   Say your task waits on a member or a condition (the owner): no no-activity nudges for it, and that member's health line says
+                                   how long you have waited; it clears when they post on it (post --task N) or with --clear. A wait on another task is --blocked-by
   amend <id> --revision N --reason "..." [--body "..." --workflow-instructions "..." --completion-gates JSON (experimental, disabled by default; "[]" clears)]
 
 Workflow options for add:
@@ -930,6 +932,8 @@ Subcommands:
                                    (orchestrator or Operator only). At most the team's limit (3 by default) parked per agent, --force parks past it; a reviewer wait is submit-review;
                                    a wait on the Operator needs the Inbox question: post it with --ask "@Operator ..." and pass its id
   unpark <id>                      Bring a parked task back
+  wait-on <id> (--member NAME | --condition TEXT) --reason TEXT | --clear   Say your task waits on a member or a condition (the owner): no no-activity nudges for it, and that member's health line says
+                                   how long you have waited; it clears when they post on it (post --task N) or with --clear. A wait on another task is --blocked-by
   amend <id> --revision N --reason "..." [--body "..." --workflow-instructions "..." --completion-gates JSON (experimental, disabled by default; "[]" clears)]
 
 Workflow options for add:

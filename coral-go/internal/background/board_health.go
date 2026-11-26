@@ -146,6 +146,7 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	}
 	// A long wait is escalated to who it waits on at every scan, not only when the check goes out (#4583).
 	m.escalateWaits(ctx, project)
+	m.escalateTaskWaits(ctx, project, m.checkRecipient(ctx, project, hs)) // a task's owner waits on a member (#21697)
 	m.mu.Lock()
 	last, checked := m.lastCheck[project]
 	evalAt, evaluated := m.lastEval[project]

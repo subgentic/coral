@@ -12,6 +12,7 @@ import (
 
 	"github.com/subgentic/coral/internal/clierr"
 	"github.com/subgentic/coral/internal/clihelp"
+	"github.com/subgentic/coral/internal/clitext"
 )
 
 func cmdTask() {
@@ -121,6 +122,8 @@ Subcommands:
 		cmdTaskAmend(st, taskArgs)
 	case "release":
 		cmdTaskRelease(st, taskArgs)
+	case "wait-on":
+		cmdTaskWaitOn(st, taskArgs)
 	case "park", "unpark":
 		cmdTaskPark(st, taskArgs, sub == "unpark")
 	case "--help", "-h", "help":
@@ -171,6 +174,8 @@ Subcommands:
                                    (orchestrator or Operator only). At most the team's limit (3 by default) parked per agent, --force parks past it; a reviewer wait is submit-review;
                                    a wait on the Operator needs the Inbox question: post it with --ask "@Operator ..." and pass its id
   unpark <id>                      Bring a parked task back
+  wait-on <id> (--member NAME | --condition TEXT) --reason TEXT | --clear   Say your task waits on a member or a condition (the owner): no no-activity nudges for it, and that member's health line says
+                                   how long you have waited; it clears when they post on it (post --task N) or with --clear. A wait on another task is --blocked-by
   amend <id> --revision N --reason "..." [--body "..." --workflow-instructions "..." --completion-gates JSON (experimental, disabled by default; "[]" clears)]
 
 Workflow options for add:
@@ -233,6 +238,13 @@ func cmdTaskListGoal(st *boardState, asJSON bool, goal int64) {
 			tAssignee = a
 		}
 		tTitle, _ := task["title"].(string)
+		if w, ok := task["waiting_on"].(map[string]any); ok { // the owner waits on someone (#21697)
+			target, _ := w["member"].(string)
+			if target == "" {
+				target, _ = w["condition"].(string)
+			}
+			tTitle += " (waiting on " + clitext.CleanName(target) + ")"
+		}
 
 		fmt.Printf("#%-3.0f %-12s %-9s %-15s %s\n", id, tStatus, tPriority, tAssignee, tTitle)
 	}
