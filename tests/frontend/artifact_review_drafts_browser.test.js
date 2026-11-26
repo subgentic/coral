@@ -25,7 +25,7 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
         for (let attempt = 0; ; attempt++) {
             await stillFor(250);
             await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(scope)} + ' button')].find(b => b.textContent === ${JSON.stringify(label)}); if (!b) throw Error('Missing button: ' + ${JSON.stringify(label)}); b.dataset.realclick = '1'; return true; })()`);
-            try { await realClick('[data-realclick]'); break; } catch (e) { if (attempt >= 1 || !/is on the page/.test(String(e.message))) throw e; }
+            try { await realClick('[data-realclick]'); break; } catch (e) { if (attempt >= 1 || !/is on the page/.test(String(e.message))) throw e; console.log(`realButton: "${label}" was replaced between the mark and the click; found it again`); }
             finally { await ev(`document.querySelectorAll('[data-realclick]').forEach(b => delete b.dataset.realclick); true`); }
         }
     };
@@ -104,6 +104,10 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
             assert.equal(await ev('window.__batches.length'), 0, 'Save never delivers');
             await shot(`draft-review-first-paint-${width}${remembered ? '-remembered' : ''}`);
             await waitFor(`!!document.querySelector('.ac-draft-bar:not([hidden])')`, `the saved draft shows its Send bar (${what})`, 5000);
+            // The live tick must not draw the same Send bar again (#21484): the button a person is about to press is the same node after a tick that redraws with the drafts' words unchanged.
+            await ev(`window.__sendNode = [...document.querySelectorAll('#artifact-viewer .ac-draft-bar button')].find(b => b.textContent === 'Send comments'); true`);
+            for (let i = 0; i < 3; i++) { await ev(`window.__revision++; document.dispatchEvent(new Event('visibilitychange')); true`); await new Promise(r => setTimeout(r, 80)); } // the drafts' revision moved, so the tick draws; the bar's words did not change
+            assert.ok(await ev(`[...document.querySelectorAll('#artifact-viewer .ac-draft-bar button')].find(b => b.textContent === 'Send comments') === window.__sendNode`), `the Send button is the same node after the live tick (${what})`);
             await realButton('Send comments');
             await waitFor(`window.__batches.length === 1 && window.__batches[0].length === 1`, `Send comments by a click (${what})`, 5000);
             await click('.artifact-viewer-close');
