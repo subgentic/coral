@@ -11,7 +11,7 @@ Coral runs the agent CLIs you already use, each in its own terminal session, and
 
 | Requirement | Notes |
 |---|---|
-| **An agent CLI** | At least one of Claude Code (`claude`), Codex (`codex`), Antigravity (`agy`) or Pi (`pi`), installed **and signed in**. Coral does not install or authenticate these. Follow each vendor's own instructions: [Claude Code](https://code.claude.com/docs/en/overview), [Codex](https://github.com/openai/codex), [Antigravity](https://antigravity.google), [Pi](https://pi.dev). |
+| **An agent CLI** | At least one of Claude Code (`claude`), Codex (`codex`), Antigravity (`agy`) or Pi (`pi`), installed **and signed in**. Coral does not install or authenticate these. Follow each vendor's own instructions: [Claude Code](https://code.claude.com/docs/en/overview), [Codex](https://github.com/openai/codex), [Antigravity](https://antigravity.google), [Pi](https://pi.dev) (`pi 0.73.1` requires Node `>=20.6.0`; use Node 20 LTS, 22 LTS, or 24 LTS — under Node 26.13 its first-run `fd`/`ripgrep` zip extraction hangs unless you unzip `fd` and `rg` into Pi's `bin` folder manually). |
 | **git** | Needed for worktree, branch and diff features. |
 | **tmux** | Optional. Coral runs agents in its own built-in terminal by default; tmux is for agents that keep running when Coral quits. Included in the macOS app; Linux needs your own tmux if you choose it. See [Platforms](#platforms). |
 

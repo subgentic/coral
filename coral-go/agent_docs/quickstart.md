@@ -24,7 +24,7 @@ Coral supports exactly six agent CLIs, the six the New agent form offers:
 | Claude Code | `claude` | [Claude Code documentation](https://code.claude.com/docs/en/overview) |
 | Codex | `codex` | [openai/codex](https://github.com/openai/codex) |
 | Antigravity CLI | `agy` | [antigravity.google](https://antigravity.google), or `curl -fsSL https://antigravity.google/cli/install.sh \| bash` |
-| Pi.dev | `pi` | [pi.dev](https://pi.dev) |
+| Pi.dev | `pi` | [pi.dev](https://pi.dev) (`@mariozechner/pi-coding-agent` requires Node `>=20.6.0`; use **Node 20 LTS, 22 LTS, or 24 LTS** — `pi 0.73.1` hangs on first start under **Node 26.13** while `extract-zip` unpacks `fd` and `ripgrep`; if you must use Node 26, unzip `fd` and `rg` into Pi's `bin` folder by hand first) |
 | OpenCode | `opencode` | [opencode.ai](https://opencode.ai) |
 | Hermes | `hermes` | [hermes-agent.nousresearch.com](https://hermes-agent.nousresearch.com) (not offered on Windows) |
 
