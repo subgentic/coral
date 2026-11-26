@@ -436,7 +436,7 @@ function _syncViewedSession(data) {
             updateSessionStatus(s.status);
             updateSessionSummary(s.summary, s.summary_at);
             updateSessionBranch(s.branch, s.repo_name, s.git_state, s.commit_short);
-            updateSessionFolder(s.current_directory || s.working_directory || "");
+            updateSessionFolder(s.current_directory || s.working_directory || "", s.own_worktree);
             updateSessionModel(s);
             updateModelChip(s, sessionServer(s));
             updateWaitingIndicator(s);

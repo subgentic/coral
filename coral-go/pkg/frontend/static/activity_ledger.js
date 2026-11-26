@@ -108,7 +108,7 @@ export function ledgerRow(r, x) {
     if (team) rm.append(el('span', 'al-team', team), el('span', 'al-dot', '·'));
     rm.append(timeCell(r.at));
     right.append(rm);
-    if (open) { const word = r.item_kind === 'file' && r.file_n && r.file_latest_n > r.file_n ? `Open v${r.file_n}` : OPEN_WORD[r.item_kind] || 'Open'; const b = el('button', 'btn btn-small al-open', word); b.type = 'button'; b.setAttribute('aria-label', `${word}: ${x.openLabel(r)}`); b.addEventListener('click', () => (x.openPrimary || x.openRow)(r)); const acts = el('div', 'al-actions'); acts.append(b); const vs = versionsOf(r, x); if (vs) acts.append(vs); right.append(acts); }
+    if (open) { const word = r.item_kind === 'file' && r.file_n && r.file_latest_n > r.file_n ? `Open v${r.file_n}` : r.action === 'worktree_kept' ? 'Open the folder' : OPEN_WORD[r.item_kind] || 'Open'; /* a kept worktree: the worker's page lists its Files (#21468) */ const b = el('button', 'btn btn-small al-open', word); b.type = 'button'; b.setAttribute('aria-label', `${word}: ${x.openLabel(r)}`); b.addEventListener('click', () => (x.openPrimary || x.openRow)(r)); const acts = el('div', 'al-actions'); acts.append(b); const vs = versionsOf(r, x); if (vs) acts.append(vs); right.append(acts); }
     const more = moreMenu(r, x); if (more) (right.querySelector('.al-actions') || right.appendChild(el('div', 'al-actions'))).append(more);
     li.append(tile, main, right);
     return li;

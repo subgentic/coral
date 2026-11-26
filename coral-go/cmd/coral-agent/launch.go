@@ -40,8 +40,10 @@ func cmdLaunch(args []string) {
 	model := fs.String("model", "", "Model (default: your Coral setting for the agent type)")
 	prompt := fs.String("prompt", "", "Initial prompt")
 	boardID := fs.String("board", "", "Join this board: its id (coral-board's state, or GET /api/board/projects). An agent seated on a team whose Orchestrator access is on joins its own team when this is not given")
+	worktree := fs.Bool("worktree", false, "Start the agent in its own git worktree task-N (needs --task N); remove it later with: coral-board stop NAME --remove-worktree")
+	task := fs.Int64("task", 0, "The task number the agent is started for; with --worktree it names the worktree: task-N")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, `Usage: coral-agent launch [dir] [--type T] [--name N] [--model M] [--prompt P] [--board ID]`)
+		fmt.Fprintln(os.Stderr, `Usage: coral-agent launch [dir] [--type T] [--name N] [--model M] [--prompt P] [--board ID] [--worktree --task N]`)
 		fs.PrintDefaults()
 	}
 	clihelp.ParseFlags(fs, flagArgs, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
@@ -67,6 +69,17 @@ func cmdLaunch(args []string) {
 		if val != "" {
 			body[key] = val
 		}
+	}
+
+	if *worktree {
+		if *task <= 0 {
+			fmt.Fprintln(os.Stderr, "--worktree needs --task N: the worktree is called task-N")
+			clierr.Exit1()
+		}
+		body["worktree_task"] = *task
+	} else if *task != 0 {
+		fmt.Fprintln(os.Stderr, "--task N goes with --worktree")
+		clierr.Exit1()
 	}
 
 	// Launching checks the agent CLI and starts its session, which can take a
@@ -104,6 +117,11 @@ func cmdLaunch(args []string) {
 		}
 	}
 	fmt.Printf("Launched %s in %s\n", label, absDir)
+	if wt, _ := result["worktree"].(map[string]any); wt != nil {
+		if n, _ := wt["name"].(string); n != "" {
+			fmt.Printf("  Own worktree: %s (coral-board stop %q --remove-worktree takes it away when it is clean; the branch is kept)\n", n, label)
+		}
+	}
 	fmt.Printf("  Session: %s\n", sessionName)
 	printLaunchNotice(os.Stdout, result)
 	fmt.Printf("  Open Coral to work with it: %s\n", hooks.RedactedURL(serverURL))

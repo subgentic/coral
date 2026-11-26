@@ -7,7 +7,7 @@ import { redrawLiveList } from './list_hooks.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { importOnce } from './import_once.js';
 import { resolveSessionIdentity } from './session_state.js';
-import { agentWords, WHAT_STAYS_ARCHIVE, WHAT_STAYS_SLEEP } from './agent_words.js';
+import { agentWords, WHAT_STAYS_SLEEP } from './agent_words.js';
 import { applySleepingView } from './sleeping_view.js';
 import { isHomeFolderAsk, askHomeFolder } from './home_folder_ask.js';
 
@@ -245,10 +245,7 @@ export function toggleAgentArchive(name, agentType, sessionId, action, quiet) {
     };
     if (action === 'archive' && !quiet) {
         const s = state.liveSessions.find(s => s.session_id === sessionId && sessionServer(s) === server);
-        const stops = s && !s.sleeping ? ' It stops now.' : '';
-        return new Promise(resolve => showConfirmModal('Archive agent',
-            `Archive ${agentWords(s, s ? resolveSessionIdentity(s) : name).label}?${stops} Archived agents are not woken with their team or by Wake All. ${WHAT_STAYS_ARCHIVE}`,
-            async () => resolve(await doIt()), () => resolve(false), { danger: false, label: 'Archive' }));
+        return importOnce('./own_worktree_dialog.js').then(m => m.confirmArchive(s, name, server, doIt));
     }
     return doIt();
 }
