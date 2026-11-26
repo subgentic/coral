@@ -1,8 +1,8 @@
 # Release Notes
 
-## v2.1.18 — Run Coral on a server: one Terms switch, Hub-only mode and safer sign-in behind a proxy
+## v2.1.19 — Run Coral on a server: one Terms switch, Hub-only mode and safer sign-in behind a proxy
 
-Task numbers in brackets. Built on v2.1.17. A prerelease until the Operator promotes it.
+Task numbers in brackets. Built on v2.1.17. v2.1.18 was tagged but never published: its Linux release smoke still read the sign-in link from the server log, which this release no longer writes. v2.1.19 is the same code with the smoke fixed (#21669). A prerelease until the Operator promotes it.
 
 ### Changes
 
@@ -40,8 +40,9 @@ Task numbers in brackets. Built on v2.1.17. A prerelease until the Operator prom
 - A workflow approval on Windows no longer treats a rooted or drive path (`/usr/bin/env`, `C:x/y.sh`) as a file of the repo, so the approved file is the file that runs (#21649).
 - The Windows test run is green again: the fake pi in a Go test is a copy of the test binary (#21648), a node test imports by a `file://` URL (#21646), the Live file-store permission check is unix-only (#21649), and the hook test runs in its own folder (#21598).
 - Browser suites follow the owner check's single auth-status read (#21642, #21650), and the first-run walkthrough waits for the Hub offer's saved answer (#21667).
+- The Linux release smoke gets its sign-in link from `coral open --print` instead of the server log (#21669).
 - The short help drops the `--no-browser` line, still in `--help-all`, to stay within its 32 lines (#21639).
-- Gate: go-tests, go-race, gofmt, cross-build, Encryption, the browser gate and windows-tests are green on the gated commit, on the first attempt.
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption, the browser gate and windows-tests are green on the gated commit, on the first attempt, and the Linux release smoke passes on amd64 and arm64.
 
 ### Known issues
 
