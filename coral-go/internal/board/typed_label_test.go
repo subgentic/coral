@@ -36,3 +36,26 @@ func TestTypedText(t *testing.T) {
 	assert.Equal(t, "it s x y", TypedLabel("it\u02bcs x\u02c6y"))
 	assert.Equal(t, typedTextMax+3, len([]rune(TypedText(strings.Repeat("a", 2000)))), "cut at the cap, with ...")
 }
+
+// #21501: a percentage in a typed notice keeps its sign ("5xx rate above 2% for 10m" arrived as "2 for 10m"); a '%' that is not right after a digit stays out, because cmd.exe expands %NAME% and "%s", "%%" are no number.
+func TestTypedTextKeepsAPercentageAndNothingElseWithAPercent(t *testing.T) {
+	for in, want := range map[string]string{
+		"firing: HighErrorRate, web-1: 5xx rate above 2% for 10m": "firing: HighErrorRate, web-1: 5xx rate above 2% for 10m",
+		"disk 100% full, 99.5% ok, 0%":                            "disk 100% full, 99.5% ok, 0%",
+		"%":                                                       "",
+		"%s %d %v":                                                "s d v",
+		"%%":                                                      "",
+		"2%%":                                                     "2%",
+		"rate %PATH% here":                                        "rate PATH here",
+		"%USERPROFILE%":                                           "USERPROFILE",
+		"50 % off":                                                "50 off",
+		"1%A1%":                                                   "1 A1%",
+		"5%X2%":                                                   "5 X2%",
+		"1%1%":                                                    "1 1%",
+		"1%_x%":                                                   "1 _x",
+	} {
+		assert.Equal(t, want, TypedText(in), "%q", in)
+		assert.Equal(t, want, TypedLabel(in), "%q (a label keeps the same rule)", in)
+	}
+	assert.NotContains(t, TypedText("up 3%\nnext %x %PATH% 4%"), "%x", "no format verb or variable gets through")
+}

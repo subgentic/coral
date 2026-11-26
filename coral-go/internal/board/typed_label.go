@@ -45,10 +45,16 @@ func typedOnly(s, extra string, max int) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	space := true // drops leading spaces
+	lastDigit := false
 	n := 0
-	for _, r := range s {
+	rs := []rune(s)
+	for i, r := range rs {
 		keep := typedLetter(r) || unicode.IsDigit(r) || strings.ContainsRune(extra, r)
+		if r == '%' && !space && lastDigit && !(i+1 < len(rs) && nameRune(rs[i+1])) {
+			keep = true // a percentage: "2%" (#21501). A '%' anywhere else stays out: cmd.exe reads %NAME% as a variable, and "%s" or "%%" is no number. One followed by a name character ("1%A1%") stays out too: it would open a variable
+		}
 		if !keep {
+			lastDigit = false
 			if !space {
 				b.WriteByte(' ')
 				space = true
@@ -61,7 +67,13 @@ func typedOnly(s, extra string, max int) string {
 		}
 		b.WriteRune(r)
 		space = false
+		lastDigit = unicode.IsDigit(r)
 		n++
 	}
 	return strings.TrimRight(b.String(), " ")
+}
+
+// nameRune reports whether r can sit in an environment variable name.
+func nameRune(r rune) bool {
+	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }
