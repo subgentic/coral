@@ -31,6 +31,9 @@ func (h *SessionsHandler) startupPromptState(name, agentType, sessionID string) 
 		if err != nil {
 			return false, ""
 		}
+		if ptymanager.CodexFullAccessConfirmOnScreen(screen) { // drawn indented, so the generic read and the card parser do not take it for a prompt (#21677)
+			return true, ptymanager.StartupPrompt + "\x00" + fullAccessConfirmSummary
+		}
 		reason := ptymanager.StartupPromptOnScreen(screen)
 		if reason == "" {
 			return false, ""
@@ -91,6 +94,8 @@ func (h *SessionsHandler) rateLimitNoticeState(name, agentType, sessionID string
 			return true, rateLimitNoticeSummary
 		case ptymanager.CodexHooksReviewOnScreen(screen): // a restart that changed a hook: the agent has events, so the no-event startup read never looks (#21427)
 			return true, hooksReviewSummary
+		case ptymanager.CodexFullAccessConfirmOnScreen(screen): // the second dialog of Codex's own /permissions: Full Access (#21677)
+			return true, fullAccessConfirmSummary
 		}
 		return false, ""
 	})
@@ -101,9 +106,10 @@ func (h *SessionsHandler) rateLimitNoticeState(name, agentType, sessionID string
 }
 
 const (
-	rateLimitReadSuffix    = "|ratelimit"
-	rateLimitNoticeSummary = "Approaching rate limits: Codex asks whether to switch to a cheaper model"
-	hooksReviewSummary     = "Hooks need review: Codex asks whether to trust a new or changed hook"
+	rateLimitReadSuffix      = "|ratelimit"
+	rateLimitNoticeSummary   = "Approaching rate limits: Codex asks whether to switch to a cheaper model"
+	hooksReviewSummary       = "Hooks need review: Codex asks whether to trust a new or changed hook"
+	fullAccessConfirmSummary = "Enable full access?: Codex asks you to confirm Full Access (no sandbox, no approvals). 1. Yes, continue anyway (full access for this session) 2. Cancel. Answer it in the agent's terminal"
 )
 
 // forgetPromptReads drops the cached screen reads of a session's startup-style prompts: the prompt was answered, the next state reads what replaced it.

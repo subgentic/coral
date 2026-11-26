@@ -210,6 +210,7 @@ var (
 	// An agent whose hook programs are gone (the app it started from was replaced) takes the message but cannot say so: said plainly, not as "may not have been sent" (#6089).
 	errSendHooksGone   = &errHumanSend{"hooks_unreachable", "Coral can't reach this agent's hooks, so it can't tell whether your message arrived. Check the agent's terminal. To fix this, reopen Coral or restart the agent."}
 	errSendHooksReview = &errHumanSend{"codex_hooks_review_pending", "Answer Codex's question about Coral's hooks above first: your message was not sent. Trust them only if you want them to run outside Codex's sandbox."}
+	errSendFullAccess  = &errHumanSend{"codex_full_access_pending", "Answer Codex's Enable full access question above first: your message was not sent. Full access lets the agent change any file and use the network without asking."}
 	errSendBusy        = &errHumanSend{"agent_busy", "Other messages to this agent are still being sent: yours was not sent. Try again in a moment."}
 	// An agent whose CLI has exited and left its pane at a plain shell (Hermes after a first-use setup that failed): the message would be typed into the shell and run as a command (#12425).
 	errSendAgentExited = &errHumanSend{"agent_exited", "The agent has exited and left its terminal at a shell, so your message was not sent. Restart the agent to talk to it."}
@@ -302,6 +303,9 @@ func (h *SessionsHandler) deliverHumanSend(ctx context.Context, name, agentType,
 	}
 	if ptymanager.CodexHooksReviewOnScreen(screen) && !hooksReviewAnswerRe.MatchString(strings.TrimSpace(text)) {
 		return errSendHooksReview // not an answer to the question: its Enter would pick "Review hooks" and the message would be lost
+	}
+	if ptymanager.CodexFullAccessConfirmOnScreen(screen) && !fullAccessAnswerRe.MatchString(strings.TrimSpace(text)) {
+		return errSendFullAccess // Enter would pick "Yes, continue anyway": only the person's own digit answers it (#21677)
 	}
 	if open, _ := ptymanager.PromptOnScreen(screen); open {
 		return send() // an answer to the prompt, typed as before: no input box to confirm it in
@@ -480,6 +484,9 @@ func echoedSince(before, now, text string) bool {
 // hooksReviewAnswerRe is a person picking one of the hooks-review dialog's three options by its digit, which is the dialog's own way
 // to answer (the digit alone selects it): the only thing typed into that dialog, because it is the person's choice.
 var hooksReviewAnswerRe = regexp.MustCompile(`^[1-3]$`)
+
+// fullAccessAnswerRe is a person picking one of Codex's "Enable full access?" two options by its digit.
+var fullAccessAnswerRe = regexp.MustCompile(`^[1-2]$`)
 
 // slowCommandRe is a CLI command that runs for seconds before anything shows: /compact (Claude, Codex, Antigravity) and /init.
 var slowCommandRe = regexp.MustCompile(`^/(compact|init)(?:[ \t].*)?$`)

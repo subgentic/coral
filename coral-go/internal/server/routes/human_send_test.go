@@ -668,6 +668,28 @@ func TestHumanSendIsSubmittedOrSaysSo(t *testing.T) {
 			})
 		}
 	}
+	// Codex's "Enable full access?" confirmation (#21677): a message is not its answer either (its Enter would pick "Yes, continue anyway"); only the person's own 1 or 2 goes in.
+	for _, msg := range []string{"hello there", "/clear", "3"} {
+		t.Run("codex full access confirmation: "+msg+" is refused with 409 and nothing is typed", func(t *testing.T) {
+			h := setup(t, "codex", false)
+			h.term.show(codexFullAccessConfirmScreen)
+			rec := h.send(msg)
+			assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+			assert.Equal(t, "codex_full_access_pending", code(rec))
+			typed, enters := h.term.counts()
+			assert.Empty(t, typed, "SendInput is never called")
+			assert.Zero(t, enters)
+		})
+	}
+	t.Run("codex full access confirmation: the person's own digit is typed", func(t *testing.T) {
+		h := setup(t, "codex", false)
+		h.term.show(codexFullAccessConfirmScreen)
+		h.term.onType = func(string) { h.term.show(codexReady(t, "")) }
+		rec := h.send("2")
+		assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		typed, _ := h.term.counts()
+		assert.Equal(t, []string{"2"}, typed)
+	})
 	t.Run("codex: once the hooks are trusted a message is sent as usual", func(t *testing.T) {
 		h := setup(t, "codex", false)
 		h.term.show(codexReady(t, ""))

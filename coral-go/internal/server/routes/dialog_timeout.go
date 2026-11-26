@@ -82,9 +82,9 @@ func dialogCloseFor(agentType, kind string, s promptScreen) (dialogClose, bool) 
 }
 
 // dialogScreenExcluded says the screen's text is one Coral never closes, whatever parsed from it: a trust question (its No can exit the CLI) or an update offer at launch, a sign-in screen,
-// Codex's hook review. (StartupPromptOnScreen's third answer, any other prompt, means something only before the agent's first event; the agent's WaitingKind decides those.)
+// Codex's hook review and its Full Access confirmation (#21677). (StartupPromptOnScreen's third answer, any other prompt, means something only before the agent's first event; the agent's WaitingKind decides those.)
 func dialogScreenExcluded(text string) bool {
-	if why := ptymanager.StartupPromptOnScreen(text); why == ptymanager.StartupTrust || why == ptymanager.StartupUpdate || ptymanager.CodexHooksReviewOnScreen(text) {
+	if why := ptymanager.StartupPromptOnScreen(text); why == ptymanager.StartupTrust || why == ptymanager.StartupUpdate || ptymanager.CodexHooksReviewOnScreen(text) || ptymanager.CodexFullAccessConfirmOnScreen(text) {
 		return true
 	}
 	login, _ := ptymanager.ClaudeLoginOnScreen(text)
