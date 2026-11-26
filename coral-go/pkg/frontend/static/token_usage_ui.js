@@ -1,12 +1,12 @@
 /* Token usage in the header and the team's token usage view, and the team's knowledge button (moved out of render.js, #4996; no behaviour change). */
 import { historyFetch } from './history_source.js';
 import { serverFetch, serverForSession, teamFetch, keyLabel } from './server_base.js';
-import { formatTokens } from './format.js';
-import { formatCost } from './format.js';
-import { compactDuration } from './format.js';
+import { formatTokens, formatCost, compactDuration } from './format.js';
 import { importOnce } from './import_once.js';
 
 const formatDuration = sec => (sec > 0 ? compactDuration(sec) : ''); // execution time: nothing for none or zero
+
+const usageWords = (u, time) => [formatTokens(u.total_tokens) + ' tokens', u.cost_usd > 0 && formatCost(u.cost_usd), time && u.execution_time_sec > 0 && formatDuration(u.execution_time_sec)].filter(Boolean).join(' · '); // tokens, cost and (the team's) execution time
 
 export async function updateTokenUsage(sessionId) {
     const el = document.getElementById('session-token-usage');
@@ -17,11 +17,9 @@ export async function updateTokenUsage(sessionId) {
         const resp = await serverFetch(serverForSession(null, sessionId), `/api/token-usage?session_id=${encodeURIComponent(sessionId)}`);
         if (!resp.ok) { el.style.display = 'none'; return; }
         const data = await resp.json();
-        if (!data.totals.total_tokens || data.totals.total_tokens === 0) { el.style.display = 'none'; return; }
+        if (!data.totals.total_tokens) { importOnce('./no_usage_line.js').then(m => m.noUsage(el)); return; }
 
-        const parts = [formatTokens(data.totals.total_tokens) + ' tokens'];
-        if (data.totals.cost_usd > 0) parts.push(formatCost(data.totals.cost_usd));
-        el.textContent = parts.join(' · ');
+        el.textContent = usageWords(data.totals);
         el.style.display = '';
     } catch {
         el.style.display = 'none';
@@ -35,10 +33,9 @@ export async function updateHistoryTokenUsage(sessionId) {
 
     try {
         const resp = await historyFetch(`/api/token-usage?session_id=${encodeURIComponent(sessionId)}`);
-        if (!resp.ok) { container.style.display = 'none'; return; }
-        const data = await resp.json();
-        const t = data.totals;
-        if (!t || !t.total_tokens || t.total_tokens === 0) { container.style.display = 'none'; return; }
+        if (!resp.ok) throw resp;
+        const t = (await resp.json()).totals;
+        if (!t?.total_tokens) throw resp;
 
         document.getElementById('htu-input').textContent = formatTokens(t.input_tokens || 0);
         document.getElementById('htu-output').textContent = formatTokens(t.output_tokens || 0);
@@ -58,11 +55,8 @@ export async function getTeamTokenUsage(boardName) {
         const resp = await teamFetch(boardName, n => `/api/token-usage?board_name=${encodeURIComponent(n)}`);
         if (!resp.ok) return null;
         const data = await resp.json();
-        if (!data.totals.total_tokens || data.totals.total_tokens === 0) return null;
-        const parts = [formatTokens(data.totals.total_tokens) + ' tokens'];
-        if (data.totals.cost_usd > 0) parts.push(formatCost(data.totals.cost_usd));
-        if (data.totals.execution_time_sec > 0) parts.push(formatDuration(data.totals.execution_time_sec));
-        return parts.join(' · ');
+        if (!data.totals.total_tokens) return null;
+        return usageWords(data.totals, true);
     } catch {
         return null;
     }
