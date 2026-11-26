@@ -1,5 +1,41 @@
 # Release Notes
 
+## v2.1.17 — The sidebar groups agents by status, team workers, and automations a team's Orchestrator proposes and you approve
+
+Task numbers in brackets. Built on v2.1.16. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### What you will notice first
+
+- **The sidebar groups agents by status** (#21466, #21546): Needs you, Working, Idle, and a folded Done today, with a Team/Status switch; Status is the default. In the Team view the Orchestrator folds its workers under one line, such as "5 workers · 3 working · 1 needs you · 1 ready". On a phone in the light theme the selected row is a shade lighter, so its grey text is easy to read.
+- **Workers for a team** (#21467, #21468, #21475, #21481, #21494): a team's Settings has a Workers section of approved workers. The Orchestrator starts one with `coral-board worker launch`, optionally in its own git worktree (`--worktree`), and archives it with `coral-board worker archive NAME|#N`, which can remove the worktree too. `archive #N` acts only on a worker, so a wrong number cannot stop a teammate.
+
+#### Automations
+
+- **A team's Orchestrator proposes automations; you approve them** (#21505): the Orchestrator can propose, change, disable, delete and test-run a workflow with `coral-board automation`. Each one starts off and runs only after your own Approve of its exact steps, schedule and repo files. Any change needs a new Approve. The approval card in Needs you shows every step in full, the files it covers, and what changed since the last approval.
+- **Alerting automations** (#21502): a workflow can post to its team's board as "Automation: NAME". A shell step that exits 78 ends the run as quiet. Each workflow has a state folder that survives runs (`CORAL_WORKFLOW_STATE_DIR`). Old scheduled runs are pruned per job. The docs have an alert recipe.
+- **Downgrades keep workflows** (#21502, #21512): the team a workflow posts to is kept in its own table, and workflow reads ignore a column they do not know, so an older Coral still lists your workflows.
+
+#### Messages
+
+- **Replies to Coral's questions** (#21500): a reply to a question Coral posted now goes to the Orchestrator instead of to Coral's own sender. Only Coral's two system senders are rewritten, never the Operator or a Hub name.
+- **Percentages in notices** (#21501): "2%" no longer arrives as "2". A % after a digit is kept only when no name character follows it.
+- **Goal looks done** (#21470): a goal is counted as shown only where its row is actually listed, so the Inbox no longer skips one first seen on the Goals page.
+
+### Test and gate fixes in this release
+
+- The automation 429s are per-action limits (`X-Coral-Limit`), and the two new file joins are reviewed in the safefs census (#21541).
+- The worker launch tests stub the agent CLI, which CI does not have (#21542).
+- The status sidebar's stylesheet is in the start sheet. The theme editor's and the New agent persona menu's rules load with their screens, so the start CSS is 170 bytes smaller than v2.1.16 and the cap is unchanged (#21546).
+- The list suites register the status sidebar module the page's own way before they draw, and label_injection removes the preload scripts it added (#21546).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption and the browser gate are green on the gated commit, on the first attempt. No Windows run: no change in this release is Windows-only.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+
 ## v2.1.16 — Fewer "Goal looks done" items, Codex and Claude start on safe defaults, Activity through a Hub, and a Custom (cron) reminder repeat
 
 Task numbers in brackets. Built on v2.1.15. A prerelease until the Operator promotes it.
