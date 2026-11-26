@@ -452,7 +452,8 @@ func (h *SessionsHandler) OrchestratorInterrupt(w http.ResponseWriter, r *http.R
 
 // OrchestratorStop: POST /api/board/{project}/agents/{subscriber}/stop. Stop archives (#19673): the agent's session ends (a working agent is cut off with it), the seat stays with the team, and the agent shows as
 // Archived until it is started again. Behind the grant's stop switch. The Orchestrator seat and the team's last Orchestrator are refused; an agent that waits for the person's answer or sits at a dialog is refused
-// too (archiving it would hide the question). An agent already archived gets a plain sentence. No body is read.
+// too (archiving it would hide the question). An agent already archived gets a plain sentence. The body is optional: {"remove_worktree": true} also removes the worker's own worktree (#21468), only one it was started
+// with, only when clean, and the branch is kept; the answer says what happened in "worktree".
 func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Request) {
 	project := chi.URLParam(r, "project")
 	g, seat, ok := h.orchSeat(w, r, project)
@@ -467,6 +468,10 @@ func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
+	var ask struct {
+		RemoveWorktree bool `json:"remove_worktree"`
+	}
+	_ = decodeJSON(r, &ask) // no body is a plain stop
 	actor, who := h.orchActor(seat), orchName(member)
 	if target.IsArchived == 1 {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": false, "name": who, "note": who + " is already archived"})
@@ -495,7 +500,15 @@ func (h *SessionsHandler) OrchestratorStop(w http.ResponseWriter, r *http.Reques
 	_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
 	h.sayLifecycle(r.Context(), project, actor+" stopped and archived "+who)
 	h.kickWS()
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "stopped": true, "archived": true, "name": who})
+	resp := map[string]any{"ok": true, "stopped": true, "archived": true, "name": who}
+	if ask.RemoveWorktree { // the seat is this board's Orchestrator and the target is on this board (orchTargetFor): the flag is theirs to ask
+		ans := h.removeTaskWorktree(r.Context(), target)
+		if ans.State == "kept" {
+			h.recordWorktreeKept(r, target, ans, actor)
+		}
+		resp["worktree"] = ans
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // refuseSleepNowPrompt is the part of that refusal about the person: the agent waits on a permission prompt, a question, a dialog or an answer from the Operator (hiding it, by sleep or archive, would lose it).

@@ -3,6 +3,9 @@
 package store
 
 const schemaSQL = `
+CREATE TABLE IF NOT EXISTS task_worktrees (
+ session_id TEXT PRIMARY KEY, task_id INTEGER NOT NULL DEFAULT 0, name TEXT NOT NULL, path TEXT NOT NULL, repo TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS chief_checks (
  id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER NOT NULL UNIQUE REFERENCES scheduled_jobs(id),
  revision INTEGER NOT NULL DEFAULT 1, name TEXT NOT NULL, instruction TEXT NOT NULL,

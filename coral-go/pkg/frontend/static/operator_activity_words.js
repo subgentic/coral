@@ -43,6 +43,7 @@ export function activityParts(row, itemWords) {
     if (row.action === 'file_share') return mk('Shared', obj, note);
     if (row.action === 'file_edit_send') return mk('Sent your edit', `${row.title || 'a file'}`, [note, 'to agents'].filter(Boolean).join(' · '));
     if (row.action === 'file_edit') return mk('Saved a new version', `${row.title || 'a file'}`, note);
+    if (row.action === 'worktree_kept') return mk('Kept a worktree', row.title || who, note); // an archive asked for the worker's own worktree to go and it was kept (#21468): the title says which worker, the note why
     if (row.action === 'wait_dismiss') return mk('Dismissed', `${who}’s waiting card`);
     if (row.action === 'wait_send') return mk('Sent held words to', who);
     let did = ACTION_LABEL[row.action] || row.action;

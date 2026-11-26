@@ -273,6 +273,7 @@ export function showAgents(host, team, h = {}) {
     root = host.firstChild;
     draw();
     watch();
+    importOnce('./team_workers.js').then(m => m.attachWorkers(root, team)).catch(() => {}); // the approved workers: their section and the From chips
     return load();
 }
 

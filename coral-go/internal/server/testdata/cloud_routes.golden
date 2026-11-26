@@ -23,6 +23,7 @@ DELETE /api/board/{project}/subscribe never
 DELETE /api/board/{project}/tasks/{taskID}/park never
 DELETE /api/board/{project}/tasks/{taskID}/reminder interact
 DELETE /api/board/{project}/waits never
+DELETE /api/board/{project}/workers/{name} never
 DELETE /api/chief/checks/{checkID} never
 DELETE /api/cloud/devices/{kid} never
 DELETE /api/cloud/link-keys/{id} never
@@ -151,6 +152,8 @@ GET /api/board/{project}/tasks/{taskID}/history view
 GET /api/board/{project}/tasks/{taskID}/review-size never
 GET /api/board/{project}/waits view
 GET /api/board/{project}/waits/poll view
+GET /api/board/{project}/workers never
+GET /api/board/{project}/workers/{name} never
 GET /api/board/{project}/working-mode view
 GET /api/board/{project}/working-mode/presets view
 GET /api/call-metrics/summary view
@@ -457,6 +460,8 @@ POST /api/board/{project}/tasks/{taskID}/review-size/split never
 POST /api/board/{project}/tasks/{taskID}/send-back never
 POST /api/board/{project}/tasks/{taskID}/submit-review never
 POST /api/board/{project}/waits never
+POST /api/board/{project}/workers never
+POST /api/board/{project}/workers/{name}/launch never
 POST /api/board/{project}/working-mode/presets interact
 POST /api/board/{project}/working-mode/presets/{presetID}/reset never
 POST /api/call-metrics never
@@ -645,6 +650,7 @@ PUT /api/board/{project}/review-size never
 PUT /api/board/{project}/settings launch
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never
 PUT /api/board/{project}/tasks/{taskID}/goal interact
+PUT /api/board/{project}/workers/{name} never
 PUT /api/board/{project}/working-mode interact
 PUT /api/board/{project}/working-mode/presets/{presetID} never
 PUT /api/chief/checks/{checkID} never

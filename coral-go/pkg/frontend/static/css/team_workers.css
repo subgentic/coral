@@ -1,0 +1,17 @@
+/* The team page's Workers (mock v3 idea 2, #21467): the panel under the Agents table, lazy with the tab (page_weight). Colours are tokens only; the row menu is the one .menu (menu_census). */
+.workers-host { margin-top: var(--space-2xl); }
+.workers-card { --table-row-h: 49px; padding: var(--card-pad); background: var(--card-fill); border: var(--card-border); border-radius: var(--card-radius); box-shadow: var(--card-shadow); }
+.workers-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.workers-title { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-strong); color: var(--text-primary); }
+.workers-count { background: var(--bg-tertiary); color: var(--text-secondary); border-radius: var(--radius-lg); font-size: var(--fs-base); font-weight: var(--fw-strong); padding: 0 6px; }
+.workers-spacer { flex: 1 1 auto; }
+.workers-add { flex: none; }
+.workers-name, .workers-sub { display: block; }
+.workers-name { display: block; font-weight: var(--fw-strong); color: var(--text-primary); }
+.workers-sub { display: block; font-weight: var(--fw-regular); color: var(--text-secondary); font-size: var(--fs-base); }
+.workers-cost-none { color: var(--text-secondary); }
+.workers-tick { color: var(--text-secondary); font-weight: var(--fw-strong); }
+.workers-more { position: relative; display: inline-block; }
+.workers-cap { margin: 6px 2px 0; font-size: var(--fs-base); color: var(--text-secondary); }
+.team-agent-from { flex: none; margin-left: .5rem; padding: 0 8px; border: 1px solid var(--border-light, var(--border)); border-radius: var(--radius-xl); font-size: var(--fs-base); color: var(--text-secondary); white-space: nowrap; }
+.goals-detail-line .team-agent-from { margin-left: 0; }

@@ -258,6 +258,8 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM artifact_tags WHERE board_id = ?", 1},        // a board made again under the name inherits none of its tags
 		{"DELETE FROM artifact_questions WHERE board_id = ?", 1},   // nor its review questions
 		{"DELETE FROM artifact_kinds WHERE board_id = ?", 1},       // nor the kinds of its files (#12144)
+		{"DELETE FROM team_workers WHERE board_id = ?", 1},         // the workers it approved (#21467)
+		{"DELETE FROM worker_launches WHERE board_id = ?", 1},      // and which of them started which agent
 		{"DELETE FROM artifact_task_chains WHERE board_id = ?", 1}, // nor the latest file of a task chain
 		{"DELETE FROM artifact_task_files WHERE board_id = ?", 1},  // nor a task's open file of each name (#15159)
 		{"DELETE FROM artifact_reviews WHERE board_id = ?", 1},     // nor the decisions on its artifacts (#136584)

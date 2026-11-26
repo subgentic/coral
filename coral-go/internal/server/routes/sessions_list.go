@@ -325,6 +325,7 @@ func listedName(stored, terminal string) string {
 // listData is the batch-read enrichment for the awake agents' rows (never nil maps).
 type listData struct {
 	displayNames, icons, nameColors, latestGoals map[string]string
+	taskWorktrees                                map[string]string // a worker's own worktree's name by session (#21468)
 	waitIgnored                                  map[string]string // {session id: the request the Operator hid from Needs you} (#11946)
 	waitRemoved                                  map[string]string // {session id: the request the Operator removed from Needs you after hiding it} (#14266)
 	goalAt                                       map[string]string // when each row's goal was written (#10123)
@@ -361,6 +362,7 @@ func (h *SessionsHandler) readListData(ctx context.Context, trace *phaseTrace, a
 		func() { d.displayNames, displayErr = h.ss.GetDisplayNames(ctx, sessionIDs) },
 		func() { d.icons, _ = h.ss.GetIcons(ctx, sessionIDs) },
 		func() { d.nameColors, _ = h.ss.GetNameColors(ctx, sessionIDs) },
+		func() { d.taskWorktrees, _ = h.ss.TaskWorktreeNames(ctx) },
 		func() { d.waitIgnored, _ = h.ss.WaitIgnoredKeys(ctx) },
 		func() { d.waitRemoved, _ = h.ss.WaitRemovedKeys(ctx) },
 		func() { d.gitState, _ = h.gs.GetLiveGitState(ctx, sessionAgents) },
@@ -555,6 +557,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"branch":                branchVal,
 		"repo_name":             repoNameVal,
 		"git_state":             worktreeVal,
+		"own_worktree":          ptr.NullIfEmpty(d.taskWorktrees[sid]), // task-N: the worker was started in its own worktree (#21468)
 		"commit_short":          detachedCommit(git),
 		"waiting_for_input":     state.NeedsInput,
 		"notices_paused":        noticesPaused,

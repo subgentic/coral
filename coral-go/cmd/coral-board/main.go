@@ -124,6 +124,8 @@ func main() {
 		cmdTask()
 	case "goal":
 		cmdGoal()
+	case "worker":
+		cmdWorker()
 	case "ask":
 		cmdAsk()
 	case "workflow":
@@ -308,6 +310,11 @@ Commands:
                                Reminders for an agent: tell it something at a time, once or
                                on a schedule, and keep it open until it runs 'remind done'
                                ('help remind' has the forms)
+  worker list|launch|archive "NAME" [--task N] [--worktree] [--remove-worktree]
+                               The workers the Operator approved for this team: list them, and
+                               (the Orchestrator) start one with a task's text as its first message
+                               (--worktree: in its own worktree task-N), or archive one (--remove-worktree
+                               also takes its clean worktree away)
   restart <member> [--board <project>] [--when-idle]
                                The Orchestrator only, with the Operator's grant: restart an
                                agent of this board as a fresh session with its launch settings

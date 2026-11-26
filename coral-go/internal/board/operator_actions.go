@@ -114,6 +114,7 @@ const (
 	ActInboxHide      = "inbox_hide"    // Dismiss or Not yet on a goal-looks-done row, a welcome item's Dismiss: kept in settings
 	ActAgentSleep     = "agent_sleep"   // the Operator put one agent to sleep (#16972); the item is the agent
 	ActAgentWake      = "agent_wake"    // the Operator woke one agent (#16972)
+	ActWorktreeKept   = "worktree_kept" // an archive asked for the worker's own worktree to go and it was kept (#21468); the item is the agent, the note says why, the asker is the agent that archived it
 	ActLinkKeyMake    = "link_key_make" // a request key for a self-hosted Hub was made at this computer (#20959); the item is the key id, the title its name, the note who made it, never the key
 	ActLinkKeyRevoke  = "link_key_revoke"
 	ActSettingChange  = "setting_change" // the Operator saved settings (#16972); the note names the settings, never their values

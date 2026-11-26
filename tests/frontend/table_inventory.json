@@ -158,6 +158,12 @@
    "covered_by": "tasks"
   },
   {
+   "file": "team_workers.js",
+   "calls": 1,
+   "surface": "Team page: approved workers",
+   "covered_by": "tasks"
+  },
+  {
    "file": "team_knowledge_page.js",
    "calls": 1,
    "surface": "Team page: knowledge",

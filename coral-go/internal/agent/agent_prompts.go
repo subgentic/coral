@@ -112,6 +112,13 @@ func isOrchestratorRole(role string) bool {
 // join, so this is where it learns what the team is working toward.
 var boardGoalsBrief func(boardName string) string
 
+// boardWorkersBrief, when set (the server sets it at startup), is asked for the workers a board's team approved (mock v3 idea 2): the Orchestrator's board system prompt carries the list, written again at every start,
+// so the Orchestrator needs no telling. Only an Orchestrator is given it.
+var boardWorkersBrief func(boardName string) string
+
+// SetBoardWorkersBrief sets (or, with nil, clears) the source of the workers block of the Orchestrator's board system prompt.
+func SetBoardWorkersBrief(f func(boardName string) string) { boardWorkersBrief = f }
+
 // SetBoardGoalsBrief sets (or, with nil, clears) the goals block source of the board system prompt.
 func SetBoardGoalsBrief(f func(boardName string) string) { boardGoalsBrief = f }
 
@@ -144,6 +151,12 @@ func BuildBoardSystemPrompt(boardName, role, prompt string, promptOverrides map[
 		if boardGoalsBrief != nil {
 			if goals := boardGoalsBrief(boardName); goals != "" {
 				boardIntro += goals + "\n\n"
+			}
+		}
+
+		if boardWorkersBrief != nil && isOrchestratorRole(role) {
+			if workers := boardWorkersBrief(boardName); workers != "" {
+				boardIntro += workers + "\n\n"
 			}
 		}
 

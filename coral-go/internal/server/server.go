@@ -146,6 +146,7 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 	}
 	if boardStore != nil {
 		agent.SetBoardGoalsBrief(boardGoalsPromptBlock(boardStore))                                  // an agent's board system prompt lists the board's open goals (#7296)
+		agent.SetBoardWorkersBrief(boardWorkersPromptBlock(boardStore))                              // the Orchestrator's system prompt lists the workers its team approved
 		agent.SetBoardAbilities(routes.BoardAbilitiesSection(boardStore, store.NewSessionStore(db))) // an Orchestrator's system prompt lists what its team's settings let it do (#17622)
 	}
 	if db != nil {

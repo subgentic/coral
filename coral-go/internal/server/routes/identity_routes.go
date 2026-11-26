@@ -86,6 +86,9 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/board/{project}/lifecycle-log":            "read what agents did to a board's agents",
 	"GET /api/artifacts/{id}/private":                   "read whether an artifact is private to the manager",
 	"PUT /api/artifacts/{id}/private":                   "mark an artifact private to the manager, or clear it",
+	"POST /api/board/{project}/workers":                 "approve a worker for a team",
+	"PUT /api/board/{project}/workers/{name}":           "change a team's approved worker",
+	"DELETE /api/board/{project}/workers/{name}":        "remove a worker from a team",
 	"GET /api/board/{project}/guide-roster":             "read the names of the guides of a board",
 	"PUT /api/board/{project}/guide-roster":             "change the names of the guides of a board",
 	"GET /api/board/{project}/member-grants":            "read who a Hub's people may reach on a team",
@@ -572,9 +575,10 @@ var hubModeRoutes = map[string]bool{
 // its team, terminal ones included, by design) but each call is recorded in the identity
 // report's agent_operator_calls, so the owner can see who launched what (#3445).
 var recordedAgentRoutes = map[string]string{
-	"POST /api/chief/triggers/{triggerID}/state": "report a check trigger outcome",
-	"POST /api/sessions/launch":                  "launch an agent",
-	"POST /api/sessions/launch-team":             "launch a team",
+	"POST /api/chief/triggers/{triggerID}/state":      "report a check trigger outcome",
+	"POST /api/sessions/launch":                       "launch an agent",
+	"POST /api/sessions/launch-team":                  "launch a team",
+	"POST /api/board/{project}/workers/{name}/launch": "launch a worker the team approved",
 }
 
 // guardPrefixes limit the (costly) route match: per method, the static start of every entry of

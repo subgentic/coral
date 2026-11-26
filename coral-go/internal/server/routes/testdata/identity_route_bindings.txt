@@ -16,6 +16,7 @@ DELETE /api/board/{project}/subscribe | board-claims
 DELETE /api/board/{project}/tasks/{taskID}/park | board-claims +token-session
 DELETE /api/board/{project}/tasks/{taskID}/reminder | board-claims
 DELETE /api/board/{project}/waits | board-claims
+DELETE /api/board/{project}/workers/{name} | board-claims | operator-only
 DELETE /api/launch-disclosure/ack | token-session | operator-only
 DELETE /api/reminders/{reminderID} | token-session
 DELETE /api/sessions/history/{sessionID}/tags/{tagID} | unbound | operator-only
@@ -99,6 +100,8 @@ GET /api/board/{project}/tasks/{taskID}/history | board-claims
 GET /api/board/{project}/tasks/{taskID}/review-size | board-claims
 GET /api/board/{project}/waits | board-claims
 GET /api/board/{project}/waits/poll | board-claims
+GET /api/board/{project}/workers | board-claims
+GET /api/board/{project}/workers/{name} | board-claims
 GET /api/board/{project}/working-mode | board-claims
 GET /api/board/{project}/working-mode/presets | board-claims
 GET /api/filesystem/trust-probe | token-session | operator-only
@@ -266,6 +269,8 @@ POST /api/board/{project}/tasks/{taskID}/review-size/split | board-claims +token
 POST /api/board/{project}/tasks/{taskID}/send-back | board-claims
 POST /api/board/{project}/tasks/{taskID}/submit-review | board-claims +token-session
 POST /api/board/{project}/waits | board-claims
+POST /api/board/{project}/workers | board-claims | operator-only
+POST /api/board/{project}/workers/{name}/launch | board-claims +token-session
 POST /api/board/{project}/working-mode/presets | board-claims | operator-only
 POST /api/board/{project}/working-mode/presets/{presetID}/reset | board-claims | operator-only
 POST /api/chief/triggers/{triggerID}/state | token-session
@@ -337,6 +342,7 @@ PUT /api/board/{project}/review-size | board-claims +token-session
 PUT /api/board/{project}/settings | board-claims +token-session | operator-only
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | board-claims | operator-only
 PUT /api/board/{project}/tasks/{taskID}/goal | board-claims
+PUT /api/board/{project}/workers/{name} | board-claims | operator-only
 PUT /api/board/{project}/working-mode | board-claims | operator-only
 PUT /api/board/{project}/working-mode/presets/{presetID} | board-claims | operator-only
 PUT /api/scheduled/jobs/{jobID} | token-session | operator-only

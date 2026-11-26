@@ -1,0 +1,7 @@
+/* A worker started in its own worktree (#21468, mocks v3 idea 3), loaded with own_worktree_dialog.js: the header chip and the Archive dialog's tick box. The mock's own sizes: the box's title 13px, its help 12px
+ * at a line height of 1.45 (17.4px) and 3px under the title. Only this dialog's box is styled (its own classes), so no other confirm dialog changes. */
+.own-worktree-chip { border: 1px solid var(--border-light); color: var(--text-secondary); }
+#confirm-modal-choice.own-worktree-choice { gap: 10px; }
+#confirm-modal-choice .own-worktree-title { font-size: var(--fs-md); font-weight: var(--fw-strong); line-height: 1.45; }
+#confirm-modal-choice .own-worktree-help { margin-top: 3px; font-size: var(--fs-base); font-weight: var(--fw-regular); line-height: 1.45; color: var(--text-muted); }
+#confirm-modal-choice .own-worktree-help code { font-size: var(--fs-base); }

@@ -13,10 +13,12 @@ import (
 	"github.com/subgentic/coral/internal/clitext"
 )
 
-const stopUsageText = `Usage: coral-board stop <member> [--board <project>]
+const stopUsageText = `Usage: coral-board stop <member> [--remove-worktree] [--board <project>]
 
   Stop an agent: its session ends and it is archived. It stays with the team (name, role, tasks and history), leaves the Agents list, and no longer gets nudges or tasks; coral-board wake <member> starts it
   again, coral-board sleep <member> turns it into a sleeping agent. A working agent is cut off with its session. To end only the current turn use coral-board interrupt <member>.
+  --remove-worktree also removes the worktree the worker was started in with its own flag (task-N); it does nothing for a worker started without one. It is refused, with the reason, when the worktree has
+  changes that are not committed (and one row says so in Activity). The branch is always kept. Files git ignores (such as .env or build output) are deleted with the folder.
   An agent already archived gets a plain sentence. The Orchestrator itself and the team's last Orchestrator are refused, and so is an agent that waits for a person's answer or sits at a dialog.
 
   Only the board's Orchestrator, and only while BOTH the main orchestrator switch AND the separate "stop" setting are on in the board's orchestrator grant: any other caller, either switch off, is refused
@@ -38,6 +40,7 @@ func cmdStop() {
 	}
 	fs := flag.NewFlagSet("stop", flag.ContinueOnError)
 	boardFlag := fs.String("board", "", "The board (default: the one you joined)")
+	removeWorktree := fs.Bool("remove-worktree", false, "Also remove the worker's own worktree (task-N); the branch is kept")
 	clihelp.ParseFlags(fs, args, func() string { return stopUsageText })
 	member = strings.TrimSpace(member)
 	if member == "" || strings.HasPrefix(member, "-") {
@@ -53,12 +56,26 @@ func cmdStop() {
 		}
 		project = st.Project
 	}
+	archiveAgent(project, member, *removeWorktree)
+}
+
+// archiveAgent is the one archive call behind `coral-board stop` and `coral-board worker archive`: the same route, the same words.
+func archiveAgent(project, member string, removeWorktree bool) {
 	path := fmt.Sprintf("/%s/agents/%s/stop", url.PathEscape(project), url.PathEscape(member))
-	data := goalCall("POST", path, nil, "stopping "+member, 200)
+	var body any
+	if removeWorktree {
+		body = map[string]any{"remove_worktree": true}
+	}
+	data := goalCall("POST", path, body, "stopping "+member, 200)
 	var out struct {
-		Stopped bool   `json:"stopped"`
-		Name    string `json:"name"`
-		Note    string `json:"note"`
+		Stopped  bool   `json:"stopped"`
+		Name     string `json:"name"`
+		Note     string `json:"note"`
+		Worktree *struct {
+			State  string `json:"state"`
+			Name   string `json:"name"`
+			Reason string `json:"reason"`
+		} `json:"worktree"`
 	}
 	_ = json.Unmarshal(data, &out)
 	who := member
@@ -71,4 +88,14 @@ func cmdStop() {
 		return
 	}
 	fmt.Printf("Stopped %s: its session ended and it is archived (coral-board wake %q starts it again).\n", who, who)
+	if w := out.Worktree; w != nil { // the same words an Activity row carries when it was kept
+		switch w.State {
+		case "removed":
+			fmt.Printf("Its worktree %s was removed. The branch is kept.\n", clitext.Clean(w.Name))
+		case "kept":
+			fmt.Printf("%s was archived, but its worktree was kept: %s\n", who, clitext.Clean(w.Reason))
+		default:
+			fmt.Println(clitext.Clean(w.Reason))
+		}
+	}
 }
