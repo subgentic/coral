@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/ptr"
 )
@@ -113,6 +114,12 @@ type WorkflowStore struct {
 	db *DB
 }
 
+// tolerant returns the handle for reads that scan a table into a struct. It
+// ignores a column the struct has no field for, so an older Coral still lists
+// workflows in a data dir a newer Coral gave one more column (#21512: v2.1.16
+// failed with "missing destination name board").
+func (s *WorkflowStore) tolerant() *sqlx.DB { return s.db.DB.Unsafe() }
+
 // NewWorkflowStore creates a new WorkflowStore.
 func NewWorkflowStore(db *DB) *WorkflowStore {
 	return &WorkflowStore{db: db}
@@ -213,7 +220,7 @@ func (s *WorkflowStore) CreateWorkflow(ctx context.Context, w *Workflow) (*Workf
 // GetWorkflow returns a workflow by ID.
 func (s *WorkflowStore) GetWorkflow(ctx context.Context, id int64) (*Workflow, error) {
 	var w Workflow
-	err := s.db.GetContext(ctx, &w, "SELECT * FROM workflows WHERE id = ?", id)
+	err := s.tolerant().GetContext(ctx, &w, "SELECT * FROM workflows WHERE id = ?", id)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -228,7 +235,7 @@ func (s *WorkflowStore) GetWorkflow(ctx context.Context, id int64) (*Workflow, e
 // GetWorkflowByName returns a workflow by its unique name.
 func (s *WorkflowStore) GetWorkflowByName(ctx context.Context, name string) (*Workflow, error) {
 	var w Workflow
-	err := s.db.GetContext(ctx, &w, "SELECT * FROM workflows WHERE name = ?", name)
+	err := s.tolerant().GetContext(ctx, &w, "SELECT * FROM workflows WHERE name = ?", name)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -253,7 +260,7 @@ type workflowWithLastRun struct {
 // ListWorkflows returns all workflows with last_run summary in a single query.
 func (s *WorkflowStore) ListWorkflows(ctx context.Context) ([]Workflow, error) {
 	var rows []workflowWithLastRun
-	err := s.db.SelectContext(ctx, &rows,
+	err := s.tolerant().SelectContext(ctx, &rows,
 		`SELECT w.*,
 		        lr.id AS lr_id, lr.status AS lr_status,
 		        lr.trigger_type AS lr_trigger_type,
@@ -383,7 +390,7 @@ func (s *WorkflowStore) CreateWorkflowRun(ctx context.Context, workflowID int64,
 // GetWorkflowRun returns a run by ID with workflow name.
 func (s *WorkflowStore) GetWorkflowRun(ctx context.Context, runID int64) (*WorkflowRun, error) {
 	var run WorkflowRun
-	err := s.db.GetContext(ctx, &run,
+	err := s.tolerant().GetContext(ctx, &run,
 		`SELECT r.*, w.name as workflow_name
 		 FROM workflow_runs r
 		 JOIN workflows w ON w.id = r.workflow_id
@@ -429,7 +436,7 @@ func (s *WorkflowStore) ListRunsForWorkflow(ctx context.Context, workflowID int6
 	}
 	query += " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
-	err := s.db.SelectContext(ctx, &runs, query, args...)
+	err := s.tolerant().SelectContext(ctx, &runs, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +468,7 @@ func (s *WorkflowStore) ListRecentRuns(ctx context.Context, limit, offset int, s
 	}
 	query += " ORDER BY r.created_at DESC, r.id DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
-	err := s.db.SelectContext(ctx, &runs, query, args...)
+	err := s.tolerant().SelectContext(ctx, &runs, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +513,7 @@ func (s *WorkflowStore) PruneWorkflowRuns(ctx context.Context, workflowID int64,
 // GetActiveRunsForWorkflow returns pending/running runs for a workflow.
 func (s *WorkflowStore) GetActiveRunsForWorkflow(ctx context.Context, workflowID int64) ([]WorkflowRun, error) {
 	var runs []WorkflowRun
-	err := s.db.SelectContext(ctx, &runs,
+	err := s.tolerant().SelectContext(ctx, &runs,
 		`SELECT * FROM workflow_runs
 		 WHERE workflow_id = ? AND status IN ('pending', 'running')
 		 ORDER BY created_at DESC, id DESC`, workflowID)
@@ -587,7 +594,7 @@ func (s *WorkflowStore) UpdateStepResults(ctx context.Context, runID int64, curr
 // GetWorkflowRunDirect returns a run by ID without joining workflow name (for internal use).
 func (s *WorkflowStore) GetWorkflowRunDirect(ctx context.Context, runID int64) (*WorkflowRun, error) {
 	var run WorkflowRun
-	err := s.db.GetContext(ctx, &run, "SELECT * FROM workflow_runs WHERE id = ?", runID)
+	err := s.tolerant().GetContext(ctx, &run, "SELECT * FROM workflow_runs WHERE id = ?", runID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

@@ -414,3 +414,45 @@ func TestWorkflowStore_HydrateStepsJSON(t *testing.T) {
 	assert.Equal(t, 2, wf.StepCount)
 	assert.NotNil(t, wf.DefaultAgent)
 }
+
+// #21512: a newer Coral adds a column to workflows and workflow_runs; reading them must still work (an older build downgraded onto that data dir).
+func TestWorkflowStore_ReadsTablesWithAnExtraColumn(t *testing.T) {
+	db := openTestDB(t)
+	ws := NewWorkflowStore(db)
+	ctx := context.Background()
+
+	wf, err := ws.CreateWorkflow(ctx, &Workflow{Name: "extra-col", StepsJSON: `[{"name":"s","type":"shell","command":"true"}]`, RepoPath: "/tmp", Enabled: 1})
+	require.NoError(t, err)
+	run, err := ws.CreateWorkflowRun(ctx, wf.ID, "manual", nil)
+	require.NoError(t, err)
+
+	_, err = db.ExecContext(ctx, `ALTER TABLE workflows ADD COLUMN future_col TEXT NOT NULL DEFAULT ''`)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `ALTER TABLE workflow_runs ADD COLUMN future_col TEXT NOT NULL DEFAULT ''`)
+	require.NoError(t, err)
+
+	list, err := ws.ListWorkflows(ctx)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	got, err := ws.GetWorkflow(ctx, wf.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	byName, err := ws.GetWorkflowByName(ctx, "extra-col")
+	require.NoError(t, err)
+	require.NotNil(t, byName)
+	r, err := ws.GetWorkflowRun(ctx, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	direct, err := ws.GetWorkflowRunDirect(ctx, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, direct)
+	runs, err := ws.ListRunsForWorkflow(ctx, wf.ID, 10, 0, nil)
+	require.NoError(t, err)
+	assert.Len(t, runs, 1)
+	active, err := ws.GetActiveRunsForWorkflow(ctx, wf.ID)
+	require.NoError(t, err)
+	assert.Len(t, active, 1)
+	all, err := ws.ListRecentRuns(ctx, 10, 0, nil)
+	require.NoError(t, err)
+	assert.Len(t, all, 1)
+}
