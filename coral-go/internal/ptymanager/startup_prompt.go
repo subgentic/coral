@@ -51,3 +51,23 @@ func CodexRateLimitNoticeOnScreen(screen string) bool {
 	text := strings.ToLower(strings.Join(strings.Fields(strings.Join(tailLines(screenText(screen), 25), " ")), " "))
 	return strings.Contains(text, "approaching rate limits") && strings.Contains(text, "1. switch to ") && strings.Contains(text, "2. keep current model") && strings.Contains(text, "3. keep current model (never show again)")
 }
+
+// CodexFullAccessConfirmOnScreen reports whether Codex's "Enable full access?" confirmation is open (Codex 0.172, #21677): the second dialog a person meets after choosing Full Access in Codex's own /permissions picker ("Enable full access? When
+// Codex runs with full access, it can edit any file on your computer and run commands with network, without your approval ... 1. Yes, continue anyway 2. Cancel"). No event says so, and Coral's send is held behind it: the screen is what
+// tells. It never answers: widening what an agent may do is the person's choice, and a message is never typed into it as if it were an answer. Found by its stable words and its two numbered rows, not the version.
+func CodexFullAccessConfirmOnScreen(screen string) bool {
+	// Not PromptOnScreen: Codex draws this dialog indented, with its composer still drawn under it and the footer "enter select · esc back", none of which the generic menu read takes for a prompt. The cursor on
+	// one of its two rows is what says it is open, and not a reply that quotes the words.
+	lines := tailLines(screenText(screen), 25)
+	text := strings.ToLower(strings.Join(strings.Fields(strings.Join(lines, " ")), " "))
+	if !strings.Contains(text, "enable full access?") || !strings.Contains(text, "1. yes, continue anyway") || !strings.Contains(text, "2. cancel") {
+		return false
+	}
+	for _, l := range lines {
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, "› 1.") || strings.HasPrefix(t, "› 2.") || strings.HasPrefix(t, "> 1.") || strings.HasPrefix(t, "> 2.") {
+			return true
+		}
+	}
+	return false
+}
