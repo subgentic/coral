@@ -44,7 +44,28 @@ const { coralReady } = require('./helpers/wait');
         await close(); await openV(h3, '');
         await waitFor(`!!document.querySelector('.artifact-review-approve') && !document.querySelector('.artifact-review-approve').hidden`, 'the review bar again', 12000);
         await waitFor(`document.querySelector('.artifact-review-approve')?.textContent === 'Approve' && !document.querySelector('.artifact-review-approve').disabled`, 'latest approval ready', 12000);
-        await ev(`document.querySelector('.artifact-review-approve').click(); true`);
+        // #21770: hold the first transport request open so both physical clicks
+        // happen while approval is pending, independently of machine speed.
+        await ev(`(() => { const real = window.fetch; window.__approveRequests = 0;
+            window.fetch = (url, options) => {
+                if (String(url).endsWith('/review') && options?.method === 'POST') {
+                    window.__approveRequests++;
+                    return new Promise((resolve, reject) => { window.__releaseApproval = () => real(url, options).then(resolve, reject); });
+                }
+                return real(url, options);
+            }; return true;
+        })()`);
+        const point = await ev(`(() => { const r = document.querySelector('.artifact-review-approve').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+        const clickApprove = async count => {
+            await client.Input.dispatchMouseEvent({ type: 'mousePressed', ...point, button: 'left', clickCount: count });
+            await client.Input.dispatchMouseEvent({ type: 'mouseReleased', ...point, button: 'left', clickCount: count });
+        };
+        await clickApprove(1);
+        await waitFor(`window.__approveRequests === 1`, 'first approval is pending', 5000);
+        assert.equal(await ev(`document.querySelector('.artifact-review-approve').disabled`), true, 'pending approval disables the button');
+        await clickApprove(2);
+        assert.equal(await ev(`window.__approveRequests`), 1, 'double click sends one approval');
+        await ev(`window.__releaseApproval(); true`);
         await waitFor(`/Approved/.test(document.querySelector('.artifact-review-state')?.textContent || '')`, 'one press approves even with an unopened file', 12000);
         console.log('PASS latest version approves in one press; file names and older-version warnings remain');
     } finally {

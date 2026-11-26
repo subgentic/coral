@@ -123,15 +123,6 @@ export function attachVersions(dialog, hooks) {
         hooks.show(row);
     }
 
-    const unopenedCount = (rows, files) => files > 1 ? String([...new Set(rows.map(r => r.name).filter(Boolean))].filter(n => !rows.some(r => r.name === n && st.seen.has(r.digest))).length) : '';
-    dialog.addEventListener('av-content', () => { // the shown version's content has rendered: now it counts as opened (#15254, #15636)
-        if (dialog.dataset.contentPending || !st.rows || st.seenOf !== st.rows[0].digest) return;
-        const i = cur(); if (i < 0) return;
-        st.seen.add(st.rows[i].digest);
-        const files = new Set(st.rows.map(r => r.name).filter(Boolean)).size;
-        dialog.dataset.unopenedFiles = unopenedCount(st.rows, files); dialog.dispatchEvent(new CustomEvent('av-version'));
-    });
-
     function draw() {
         const keepFocus = bar.contains(document.activeElement) ? document.activeElement.className.split(' ').find(c => c.startsWith('av-')) : '';
         bar.replaceChildren();
@@ -147,10 +138,6 @@ export function attachVersions(dialog, hooks) {
         const wantLatest = hooks.wantLatest?.(); // asked once, for the first version drawn, so an open that already shows the newest uses it up (#15601: left set, it sent the person's next pick of v2 back to v3)
         if (!latest && wantLatest) { choose(rows[total - 1]); return; } // opened from Needs you: the newest version, not the one the row was made for
         const files = new Set(rows.map(r => r.name).filter(Boolean)).size; // one series can hold several files (a task's chain, #12144): a decision on the newest covers them all (#15233)
-        dialog.dataset.coversFiles = files > 1 ? String(files) : '';
-        if (st.seenOf !== rows[0].digest) { st.seenOf = rows[0].digest; st.seen = new Set(); } // the versions shown since this series opened: a file none of whose versions was shown has not been opened (#15254)
-        if (!dialog.dataset.contentPending) st.seen.add(row.digest); // a version counts as shown when its content is on screen, not when the bar is drawn (#15636): else it is added by av-content below
-        dialog.dataset.unopenedFiles = unopenedCount(rows, files);
         dialog.dataset.shownVersion = String(row.version); dialog.dataset.newerVersion = latest ? '' : String(rows[total - 1].version); dialog.dispatchEvent(new CustomEvent('av-version')); // the review bar names the version it approves (#15197)
         const prev = btn('av-prev av-icon', '◀', 'Previous version'); prev.setAttribute('aria-disabled', String(i === 0));
         prev.addEventListener('click', () => stepTo(-1));
