@@ -142,6 +142,7 @@ func (h *BoardHandler) DelegateReview(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		SubscriberID string   `json:"subscriber_id"`
 		Reviewers    []string `json:"reviewers"`
+		Replace      bool     `json:"replace,omitempty"` // the named reviewers are the whole round: any other reviewer is taken off it (#21747); without it they are added to it
 	}
 	derr := decodeJSON(r, &body)
 	if derr == nil {
@@ -160,13 +161,22 @@ func (h *BoardHandler) DelegateReview(w http.ResponseWriter, r *http.Request) {
 		errForbidden(w, err.Error())
 		return
 	}
+	named := body.Reviewers
+	if !body.Replace { // the reviewers already on an open round stay on it: one more name is one more reviewer, never one fewer (#21747)
+		have, herr := h.bs.OpenRoundReviewers(ctx, project, id)
+		if herr != nil {
+			errTaskGone(w, herr)
+			return
+		}
+		body.Reviewers = append(have, body.Reviewers...)
+	}
 	task, reviews, err := h.bs.DelegateReview(ctx, project, id, body.SubscriberID, body.Reviewers)
 	if err != nil {
 		errTaskGone(w, err)
 		return
 	}
 	if len(reviews) == 0 { // every name was already on the round: nothing was created, and the answer says so instead of an empty success (#12869)
-		writeJSON(w, http.StatusOK, map[string]any{"task": task, "reviews": reviews, "note": fmt.Sprintf("no change: %s already on the review of task #%d (no new review task was created)", strings.Join(body.Reviewers, ", "), id)})
+		writeJSON(w, http.StatusOK, map[string]any{"task": task, "reviews": reviews, "note": fmt.Sprintf("no change: %s already on the review of task #%d (no new review task was created)", strings.Join(named, ", "), id)})
 		return
 	}
 	names := make([]string, 0, len(reviews))

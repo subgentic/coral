@@ -181,6 +181,7 @@ func cmdTaskReviewFlow(st *boardState, args []string, action string) {
 	}
 	fs := flag.NewFlagSet(action, flag.ContinueOnError)
 	to := fs.String("to", "", "Reviewers, comma-separated (review)")
+	replace := fs.Bool("replace", false, "review: the named reviewers are the whole round; any other reviewer on it is taken off")
 	note := fs.String("note", "", "Your note (approve; required for reject)")
 	taskVersion := fs.Int("task-version", 0, "The task text version reviewed (default: last task detail)")
 	revision := fs.Int("revision", -1, "The revision of the round you read (approve): patches that joined it since it opened; default: the one task detail last showed you")
@@ -208,6 +209,9 @@ func cmdTaskReviewFlow(st *boardState, args []string, action string) {
 			os.Exit(2) // usage
 		}
 		body["reviewers"] = reviewers
+		if *replace {
+			body["replace"] = true
+		}
 	case "reject":
 		if strings.TrimSpace(*note) == "" {
 			fmt.Fprintln(os.Stderr, `--note "why" is required`)
