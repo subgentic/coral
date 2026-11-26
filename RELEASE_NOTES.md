@@ -1,5 +1,31 @@
 # Release Notes
 
+## v2.1.20 — A limit for revoked Hub keys, clearer template errors and plain encryption notices
+
+Task numbers in brackets. Built on v2.1.19. A prerelease until the Operator promotes it.
+
+### Changes
+
+- **Revoked Hub keys have their own limit** (#21660): a Hub that keeps sending a revoked key is still refused, and after 300 tries a minute from one address it is told to wait (429 with `X-Coral-Limit` and `Retry-After`). This counter is separate from the wrong-key throttle, so it cannot lock other Hubs out.
+- **Template browser** (#21635): when a template read fails (the 502 from v2.1.19), the browser shows the failure text instead of treating the error as a template.
+- **Encryption notices** (#21554): the SQLCipher and MPL notices say at the top that official downloads store plain SQLite, and that the SQLCipher notice applies only to source builds that turn it on.
+
+### Test and gate fixes in this release
+
+- The release dry run now builds the Linux packages and runs the Linux release smoke on amd64 and arm64, so a smoke failure shows before a tag (#21673).
+- The two-Hubs tests reset the join-code throttle at the start of each run, so they pass when repeated (#21655).
+- A browser test checks that the team link's tap area never takes a tap meant for another control (#21652).
+- The template browser test waits for its own window and checks the exact error message, so a page banner such as "tmux is not installed" cannot confuse it (#21707).
+- The Needs you prompt test taps an answer only after the Inbox list stops changing, and fails with its own message if a tap is lost (#21708).
+- The status groups browser test gives the page the same scene on every live-list read, so a late read on a slow machine can no longer replace it (#21725).
+- The team menu spacing browser test waits for the Team groups code to load before it taps the menu, so a slow Windows runner no longer finds no button (#21762).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption, the browser gate and windows-tests are green on the gated commit, and the Linux release smoke passes on amd64 and arm64.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+
 ## v2.1.19 — Run Coral on a server: one Terms switch, Hub-only mode and safer sign-in behind a proxy
 
 Task numbers in brackets. Built on v2.1.17. v2.1.18 was tagged but never published: its Linux release smoke still read the sign-in link from the server log, which this release no longer writes. v2.1.19 is the same code with the smoke fixed (#21669). A prerelease until the Operator promotes it.
