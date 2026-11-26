@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
 import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon, toggleChatFlag } from './sessions.js';
-import { toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, setKeepFullAccess, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
+import { toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, setKeepFullAccess, sleepTerminalGone, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
 import { toggleAgenticPanel, toggleSidebarRail, focusSidebarSearch } from './sidebar.js';
 import { connectTerminalWs, disconnectTerminalWs } from './xterm_renderer.js';
@@ -200,7 +200,6 @@ registerActions({
     'display-panel-key': (el, event) => displayPanelKey(event),
     'toggle-show-server': () => window.toggleShowServer(),
     'toggle-row-line': el => window.toggleRowLine(el.dataset.displayInput),
-    'toggle-group-by-server': () => window.toggleGroupByServer(),
 });
 
 const AGENTIC_TABS = new Set(['board', 'files', 'browse', 'artifacts', 'tasks', 'notes', 'activity', 'info', 'agent-ui', 'branches', 'saved']);
@@ -424,7 +423,7 @@ Object.assign(window, {
     toggleSidebarKebab, closeSidebarKebabs,
     // render (sidebar actions)
     filterLiveAgents, agentSearchKey, syncDisplayMenu,
-    toggleShowServer, toggleGroupByServer, toggleRowLine,
+    toggleShowServer, toggleRowLine,
     toggleGroupCollapse, groupHeaderKey, teamHeaderKey, killGroup, moveGroupUp, moveGroupDown,
     copyFolderPath, killBoard, setBoardAccentColor, resetTeam,
     moveSessionUp, moveSessionDown,

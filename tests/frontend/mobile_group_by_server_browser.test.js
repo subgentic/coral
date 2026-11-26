@@ -1,8 +1,8 @@
-// The agent list's ≡ display menu on a phone (#3991). Its "Group by computer" and "Show computer" options lived only in the sidebar header,
+// The agent list's ≡ display menu on a phone (#3991). Its "Group by computer" (now the Computer box of Group by, #21685) and "Show computer" options lived only in the sidebar header,
 // which is hidden below 768 px, so a phone could not group the list by server at all. The phone's list header now has the same menu.
-// At 390 px with two servers: the menu button is there (44 px target), it offers Show summary, Show model (#10816), Show computer and Group by computer (the other switches went with the one-line row, #9686),
-// ticking Group by computer groups the phone's list under the two servers and the menu stays open, unticking puts it back; with one
-// server there is no Group by computer; the menu fits the screen. Run against an isolated dev server.
+// At 390 px with two servers: the menu button is there (44 px target), it offers Show summary, Show model (#10816) and Show computer (the other switches went with the one-line row, #9686) and the Group by boxes,
+// ticking the Computer box groups the phone's list under the two servers and the menu stays open, unticking puts it back; with one
+// server there are no headers; the menu fits the screen. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
@@ -13,7 +13,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`localStorage.removeItem('coral-group-by-server'); true`);
+        await ev(`localStorage.removeItem('coral-group-by-server'); localStorage.removeItem('coral-group-computer'); true`);
         const scene = servers => ev(`(async () => {
             T.state.hub = true; T.state.cloud = true; T.state.servers = ${JSON.stringify(servers)}; T.state.liveSessions = []; window.__m.agents = {};
             ${JSON.stringify(servers)}.forEach(s => { window.__m.add('solo-' + s.id, 'S', 3, { sleeping: false, server: s.id }); window.__m.add('team-' + s.id, 'T', 3, { sleeping: false, server: s.id, board_project: 'team-' + s.id }); });
@@ -30,8 +30,9 @@ const { connect } = require('./agent_view_harness');
             return { menu: !!menu, button: sr ? { w: Math.round(sr.width), h: Math.round(sr.height), shown: vis(sum) } : null, open: !!(sum && sum.getAttribute('aria-expanded') === 'true'), rows,
                 panelFits: pr ? pr.left >= 0 && pr.right <= innerWidth : null, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
                 headers: [...list.querySelectorAll('li.server-group-header')].map(h => h.querySelector('.server-group-name').textContent.trim()),
-                grouped: localStorage.getItem('coral-group-by-server'), dupIds: ['display-group-by-server', 'display-show-server', 'display-show-summary'].filter(id => document.querySelectorAll('#' + id).length > 1) };
+                grouped: localStorage.getItem('coral-group-computer'), dupIds: ['display-group-by-server', 'display-show-server', 'display-show-summary'].filter(id => document.querySelectorAll('#' + id).length > 1) };
         })()`);
+        const box = k => ev(`document.querySelector('#mobile-agent-list-bar input[data-box="${k}"]').click(); true`);
         const click = label => ev(`(() => { const l = [...document.querySelectorAll('#mobile-agent-list .list-display-option')].find(x => x.textContent.trim() === ${JSON.stringify(label)}); l.querySelector('input').click(); return true; })()`);
 
         const TWO = [{ id: 'm1', label: 'studio-mac', status: 'online' }, { id: 'm2', label: 'workstation', status: 'online' }];
@@ -43,26 +44,28 @@ const { connect } = require('./agent_view_harness');
         assert.deepEqual(v.dupIds, [], 'no id appears twice (the sidebar keeps its ids)');
         await ev(`(() => { const b = document.querySelector('#mobile-agent-list [data-display-button]'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`);
         v = await view();
-        assert.deepEqual(v.rows.map(r => [r.text, r.shown]), [['Show summary', true], ['Show model', true], ['Show computer', true], ['Group by computer', true]], 'Show summary, Show model, Show computer and Group by computer are offered with two servers');
+        assert.deepEqual(v.rows.map(r => [r.text, r.shown]), [['Show summary', true], ['Show model', true], ['Show computer', true]], 'Show summary, Show model and Show computer are offered with two servers (Group by computer is the Computer box now)');
+        assert.equal(await ev(`[...document.querySelectorAll('#mobile-agent-list-bar fieldset[data-group-by] label')].map(l => l.textContent.trim()).join()`), 'Computer,Team,Task', 'the Group by boxes are in the phone panel');
         assert.equal(v.panelFits, true, 'the menu panel fits the 390 px screen');
         assert.equal(v.overflow, 0, 'no horizontal overflow');
         assert.equal(v.headers.length, 0, 'not grouped to begin with');
-        await click('Group by computer');
+        await box('server');
         await waitFor(`document.querySelectorAll('#mobile-agent-list li.server-group-header').length === 2`, 'two server headers in the phone list', 4000);
         v = await view();
         assert.deepEqual(v.headers.sort(), ['studio-mac', 'workstation'], 'the phone list is grouped under its two servers');
         assert.equal(v.grouped, 'true'); assert.ok(v.open, 'the menu stays open while it is used');
-        assert.equal(v.rows.find(r => r.text === 'Group by computer').checked, true, 'and its box reads ticked');
-        await click('Group by computer');
+        assert.equal(await ev(`document.querySelector('#mobile-agent-list-bar input[data-box="server"]').checked`), true, 'and its box reads ticked');
+        await box('server');
         await waitFor(`document.querySelectorAll('#mobile-agent-list li.server-group-header').length === 0`, 'the grouping is gone', 4000);
         v = await view();
-        assert.equal(v.grouped, 'false'); assert.equal(v.rows.find(r => r.text === 'Group by computer').checked, false);
+        assert.equal(v.grouped, 'false'); assert.equal(await ev(`document.querySelector('#mobile-agent-list-bar input[data-box="server"]').checked`), false);
         // one server: nothing to group by
         await scene([TWO[0]]);
         await waitFor(`!![...document.querySelectorAll('#mobile-agent-list .list-display-option')].length`, 'the menu with one server', 4000);
         v = await view();
-        const group = v.rows.find(r => r.text === 'Group by computer');
-        assert.ok(!group || group.shown === false, 'with one server there is no Group by computer');
+        await box('server'); // ticked with one server: nothing to group, no headers
+        await ev(`T.render.renderLiveSessions(T.state.liveSessions); true`);
+        assert.equal(await ev(`document.querySelectorAll('#mobile-agent-list li.server-group-header').length`), 0, 'with one server the Computer box makes no headers');
         console.log('PASS phone display menu: present at 390 px, Group by computer groups the phone list and stays open, absent with one server');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

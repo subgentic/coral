@@ -44,10 +44,12 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             assert.equal(await dot(), false, at + 'no dot with nothing on');
             assert.equal(await label(), 'Display options');
 
-            // 2. display settings only (what is left of them: Show computer and Group by computer): still no dot, no line. The switches are drawn only with servers to choose between, so they are flipped where they are in the panel (#9686 removed the other five)
+            // 2. display settings only (what is left of them: Show computer; Group by is three boxes now, #21685): still no dot, no line. The switches are drawn only with servers to choose between, so they are flipped where they are in the panel (#9686 removed the other five)
             await panel(true);
-            await waitFor(`!!document.querySelector('${header} [data-display-input="server"]') && !!document.querySelector('${header} [data-display-input="group"]')`, 'the display options', 8000);
-            for (const k of ['server', 'group']) await ev(`(() => { const c = document.querySelector('${header} [data-display-input="${k}"]'); c.click(); return true; })()`);
+            await waitFor(`!!document.querySelector('${header} [data-display-input="server"]')`, 'the display options', 8000);
+            await ev(`(() => { const c = document.querySelector('${header} [data-display-input="server"]'); c.click(); return true; })()`);
+            await waitFor(`!!document.querySelector('${bar} fieldset[data-group-by] input[data-box="server"]')`, 'the Group by boxes', 8000);
+            await ev(`document.querySelector('${bar} fieldset[data-group-by] input[data-box="server"]').click(); true`); // a grouping is not a filter either (#21685)
             await panel(false);
             await gone('after the display settings');
             assert.equal(await dot(), false, at + 'no dot for show/hide display settings');
