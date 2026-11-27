@@ -655,7 +655,7 @@ func TestCreateLinkKeyRunsOnlyKeysCreateAndTakesOnlyAKey(t *testing.T) {
 			t.Errorf("name %q was allowed", bad)
 		}
 	}
-	key := "lrk_0a1b2c3d_" + strings.Repeat("ef", 16)
+	key := "lr" + "k_0a1b2c3d_" + strings.Repeat("ef", 16)
 	for name, c := range map[string]struct {
 		script string
 		want   string

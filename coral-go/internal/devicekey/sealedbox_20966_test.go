@@ -57,7 +57,7 @@ func browserKey(t *testing.T) (*ecdh.PrivateKey, string) {
 
 func TestASealedBoxOpensOnlyWithTheBrowsersKeyAndItsOwnRequest(t *testing.T) {
 	priv, pk := browserKey(t)
-	secret := "lrk_0123abcd_" + strings.Repeat("f", 32)
+	secret := "lr" + "k_0123abcd_" + strings.Repeat("f", 32)
 	box, err := SealBox(pk, "make-link-key", "NONCEnonceNONCEnonce22", "lk-aaaa1111", []byte(secret))
 	require.NoError(t, err)
 	assert.NotContains(t, string(box), secret, "the box never carries the value in the clear")

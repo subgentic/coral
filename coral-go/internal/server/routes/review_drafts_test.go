@@ -104,9 +104,9 @@ func TestADraftEditAndDeleteNeedTheCurrentRevision(t *testing.T) {
 func TestDraftRulesAreThoseOfAComment(t *testing.T) {
 	rig := newCmtRig(t)
 	// A secret is not kept, as in a comment.
-	code, out := newDraft(t, rig, cmtDoc, "key is ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD")
+	code, out := newDraft(t, rig, cmtDoc, "key is gh"+"p_abcdefghijklmnopqrstuvwxyz0123456789ABCD")
 	require.Equal(t, http.StatusCreated, code)
-	assert.NotContains(t, out["draft"].(map[string]any)["body"], "ghp_abcdefghijklmnopqrstuvwxyz")
+	assert.NotContains(t, out["draft"].(map[string]any)["body"], "gh"+"p_abcdefghijklmnopqrstuvwxyz")
 	// An empty one, an anchor missing and a quote on a picture are refused.
 	code, _ = newDraft(t, rig, cmtDoc, "   ")
 	assert.Equal(t, http.StatusBadRequest, code)

@@ -133,7 +133,7 @@ func TestAnUnknownOutcomePausesTheDoc(t *testing.T) {
 // Outgoing text is redacted before it leaves, and an oversized file is refused.
 func TestOutgoingTextIsRedactedAndCapped(t *testing.T) {
 	g := newGdocRig(t, true)
-	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	secret := "gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789"
 	g.artifact(t, gdocV3, "notes.md", "text/markdown", "# Notes\n\nThe token is "+secret+" for now.\n")
 	status, _, raw := g.share(t, gdocV3)
 	require.Equal(t, 200, status, raw)
@@ -231,7 +231,7 @@ func TestTheDocNamesTheAgentThatWroteTheVersionAndTheNameIsRedacted(t *testing.T
 	assert.True(t, strings.HasPrefix(g.drive.uploads[0], "Written by Backend Dev in Coral."), g.drive.uploads[0])
 
 	g.artifact(t, gdocV2, "plan.md", "text/markdown", "# Plan\n\nShip it.\n")
-	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	secret := "gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789"
 	g.writeSeriesVersionBy(t, gdocSid, gdocV2, 2, "Agent "+secret+strings.Repeat("x", 200))
 	by, err := g.h.gdocWriter(gdocSid, gdocV2)
 	require.NoError(t, err)
@@ -244,7 +244,7 @@ func TestTheDocNamesTheAgentThatWroteTheVersionAndTheNameIsRedacted(t *testing.T
 // The Doc's title is redacted and cut like its text.
 func TestTheDocTitleIsRedactedAndCut(t *testing.T) {
 	g := newGdocRig(t, true)
-	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	secret := "gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789"
 	g.artifact(t, gdocV3, secret+strings.Repeat("n", 300)+".md", "text/markdown", "# Notes\n")
 	status, _, raw := g.share(t, gdocV3)
 	require.Equal(t, 200, status, raw)

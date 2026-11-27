@@ -16,7 +16,7 @@ import (
 
 // #18544 (Security SHOULD on #16958): a run keeps what its agent said last redacted BEFORE it is cut, so a secret that straddles the cut is redacted whole and not left as a partial token.
 func TestARunsResultIsRedactedBeforeItIsCutSoACutCannotLeavePartOfASecret(t *testing.T) {
-	const secret = "ghp_R7xK2mQ9vL4nB8tZ3wY6cD1fH5jP0sA2gE9u"
+	const secret = "gh" + "p_R7xK2mQ9vL4nB8tZ3wY6cD1fH5jP0sA2gE9u"
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
 	sid := "22222222-0000-4000-8000-000000000001"

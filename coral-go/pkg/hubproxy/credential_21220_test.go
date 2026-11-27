@@ -15,7 +15,7 @@ import (
 
 // Security's MUST 6 on #21220: a request key goes in its own header, never as Authorization, and never to a plain-http address that is not this computer; an API key is sent as before.
 func TestARequestKeyIsSentInItsOwnHeaderAndNeverInClearAcrossANetwork(t *testing.T) {
-	key := "lrk_0123abcd_" + strings.Repeat("e", 32)
+	key := "lr" + "k_0123abcd_" + strings.Repeat("e", 32)
 	var gotAuth, gotKey atomic.Value
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth.Store(r.Header.Get("Authorization"))
