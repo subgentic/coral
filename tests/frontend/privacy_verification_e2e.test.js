@@ -94,7 +94,12 @@ const BASE = require('./test_base').BASE;
       };
     })()`);
 
-    assert.equal(afterSaveState.statusText, '', 'status is empty once it is local only (the switch says it)');
+    // The proxy warning (#21527) is sticky for the whole server process: an earlier suite in this shard's server that sent a proxied request (a forwarding header or a public Host)
+    // leaves "A proxy was seen in front of Coral since Coral started" on the line, whatever this suite does. It is a separate signal, so it is cut off (the line puts it last, after
+    // the access text, marked data-proxy) and the rest must be empty: the test no longer depends on which suites ran before it (#21909).
+    const proxyAt = afterSaveState.statusText.indexOf('A proxy was seen in front of Coral');
+    const accessText = (proxyAt >= 0 ? afterSaveState.statusText.slice(0, proxyAt) : afterSaveState.statusText).trim();
+    assert.equal(accessText, '', 'status is empty once it is local only (the switch says it), apart from the sticky proxy warning');
     assert.equal(afterSaveState.statusState, 'current');
 
     // 4. Verify backend persistence via direct fetch
