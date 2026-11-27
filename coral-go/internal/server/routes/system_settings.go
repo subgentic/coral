@@ -55,13 +55,14 @@ func (h *SystemHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 // hubTrustSettingRoutes are the Coral Hub link's trust settings and the routes that write them
 // (all of them are denied to a Coral Hub sign-in, and the dashboard writes them there).
 var hubTrustSettingRoutes = map[string]string{
-	MaxModeSetting:             "PUT /api/cloud/max-mode",
-	AllowHubAutoAcceptSetting:  "PUT /api/cloud/allow-auto-accept",
-	RedactTokensSetting:        "PUT /api/cloud/redact-tokens",
-	HubRelaunchSetting:         "PUT /api/cloud/hub-relaunch",       // #5280
-	CodexTrustHooksSetting:     "PUT /api/system/codex-trust-hooks", // #153
-	HubDropboxShareSetting:     "PUT /api/cloud/hub-dropbox-share",  // #16109
-	store.DeviceWebModeSetting: "PUT /api/cloud/device-web-mode",    // #19669
+	MaxModeSetting:               "PUT /api/cloud/max-mode",
+	AllowHubAutoAcceptSetting:    "PUT /api/cloud/allow-auto-accept",
+	RedactTokensSetting:          "PUT /api/cloud/redact-tokens",
+	HubRelaunchSetting:           "PUT /api/cloud/hub-relaunch",       // #5280
+	CodexTrustHooksSetting:       "PUT /api/system/codex-trust-hooks", // #153
+	HubDropboxShareSetting:       "PUT /api/cloud/hub-dropbox-share",  // #16109
+	store.DeviceWebModeSetting:   "PUT /api/cloud/device-web-mode",    // #19669
+	store.OwnerCertAcceptSetting: "PUT /api/cloud/owner-cert/accept",  // #21889
 }
 
 // hubSigninSettingKey: a Sign in with Coral Hub setting (server.HubSigninEnabledSetting and its
