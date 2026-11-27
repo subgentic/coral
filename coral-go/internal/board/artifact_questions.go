@@ -97,3 +97,31 @@ func (s *Store) SetArtifactQuestionByOperator(ctx context.Context, boardID, hex,
 	}
 	return err
 }
+
+// A decision answers what an upload asked and clears its question (#11555); the words are kept here, apart, for the ledger that says "Approved · <question>" (#21992). Nothing else reads them: the live question stays
+// the one in artifact_questions.
+func (s *Store) ensureArtifactDecidedQuestionsSchema(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS artifact_decided_questions (
+		board_id TEXT NOT NULL,
+		hex      TEXT NOT NULL,
+		question TEXT NOT NULL,
+		PRIMARY KEY (board_id, hex)
+	)`)
+	return err
+}
+
+// ArtifactDecidedQuestions maps each object of the board whose review was decided to the question its upload asked. One read.
+func (s *Store) ArtifactDecidedQuestions(ctx context.Context, boardID string) (map[string]string, error) {
+	var rows []struct {
+		Hex      string `db:"hex"`
+		Question string `db:"question"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT hex, question FROM artifact_decided_questions WHERE board_id = ?`, boardID); err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.Hex] = r.Question
+	}
+	return out, nil
+}

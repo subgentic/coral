@@ -254,9 +254,10 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM board_ask_links WHERE project = ?", 1},    // and the links between questions that are the same (#17738)
 		{"DELETE FROM board_ask_buttons WHERE project = ?", 1},  // and the buttons an agent declared on a question (#11643)
 		{"DELETE FROM board_ask_task_snapshots WHERE project = ?", 1},
-		{"DELETE FROM board_ask_subjects WHERE project = ?", 1},    // and the goal and task a question named (#12164)
-		{"DELETE FROM artifact_tags WHERE board_id = ?", 1},        // a board made again under the name inherits none of its tags
-		{"DELETE FROM artifact_questions WHERE board_id = ?", 1},   // nor its review questions
+		{"DELETE FROM board_ask_subjects WHERE project = ?", 1},  // and the goal and task a question named (#12164)
+		{"DELETE FROM artifact_tags WHERE board_id = ?", 1},      // a board made again under the name inherits none of its tags
+		{"DELETE FROM artifact_questions WHERE board_id = ?", 1}, // nor its review questions
+		{"DELETE FROM artifact_decided_questions WHERE board_id = ?", 1},
 		{"DELETE FROM artifact_kinds WHERE board_id = ?", 1},       // nor the kinds of its files (#12144)
 		{"DELETE FROM team_workers WHERE board_id = ?", 1},         // the workers it approved (#21467)
 		{"DELETE FROM worker_launches WHERE board_id = ?", 1},      // and which of them started which agent

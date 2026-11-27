@@ -37,11 +37,12 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 	if err != nil || len(tags) == 0 {
 		return
 	}
-	questions, _ := h.bs.ArtifactQuestions(ctx, project)   // what each upload for review asks (#11555); a read that fails leaves the rows without it
-	reviews, _ := h.bs.ArtifactReviews(ctx, project)       // when a review was decided (#136584); a read that fails leaves the rows without it
-	sent, _ := h.bs.ArtifactReviewSent(ctx, project)       // when each file was sent for review (#13231); a read that fails leaves the rows without it
-	savedAt, _ := h.bs.ArtifactSavedAt(ctx, project)       // when each file was saved for later (#20519); a read that fails leaves the rows without it
-	senders, _ := h.bs.ArtifactReviewSenders(ctx, project) // who sent a file for review when it was the Operator (#17819); a read that fails leaves the rows as an agent's
+	questions, _ := h.bs.ArtifactQuestions(ctx, project)      // what each upload for review asks (#11555); a read that fails leaves the rows without it
+	reviews, _ := h.bs.ArtifactReviews(ctx, project)          // when a review was decided (#136584); a read that fails leaves the rows without it
+	sent, _ := h.bs.ArtifactReviewSent(ctx, project)          // when each file was sent for review (#13231); a read that fails leaves the rows without it
+	savedAt, _ := h.bs.ArtifactSavedAt(ctx, project)          // when each file was saved for later (#20519); a read that fails leaves the rows without it
+	decided, _ := h.bs.ArtifactDecidedQuestions(ctx, project) // what a decided file asked, kept for the ledger (#21992); a read that fails leaves the rows without it
+	senders, _ := h.bs.ArtifactReviewSenders(ctx, project)    // who sent a file for review when it was the Operator (#17819); a read that fails leaves the rows as an agent's
 	for i := range items {
 		if items[i].managed != "" {
 			items[i].Tags = tags[items[i].managed]
@@ -50,6 +51,8 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 			}
 			if q, ok := questions[items[i].managed]; ok && hasTag(items[i].Tags, tagForReview) {
 				items[i].ReviewQuestion = q.Question
+			} else if rv, ok := reviews[items[i].managed]; ok && (rv.State == board.ReviewApproved || rv.State == board.ReviewChangesRequested) {
+				items[i].ReviewQuestion = decided[items[i].managed] // an approved or sent-back file still says what it asked (#21992); a file never sent for review has none
 			}
 			if at, ok := sent[items[i].managed]; ok && hasTag(items[i].Tags, tagForReview) {
 				items[i].ReviewSentAt = at
