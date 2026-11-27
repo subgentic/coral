@@ -1,6 +1,6 @@
 ---
 title: "Connect a second self-hosted Hub to a Coral"
-description: "Link a second self-hosted Hub to a Coral server using Coral's Connect or coral cloud links add and the Hub's enroll page, or over SSH / with an HTTP join key and the Inbox Needs you Allow card."
+description: "Link a second self-hosted Hub to a Coral with the Hub's enroll page, over SSH or with an HTTP join key, and approve it from the Inbox Needs you Allow card."
 ---
 
 # Connect a second self-hosted Hub to a Coral
