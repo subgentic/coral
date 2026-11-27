@@ -66,7 +66,7 @@ const OTHER = 'e'.repeat(64);
   await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(fixture);
   await ev(`window.__drafts = [{ id: 1, body: 'Name the rollback owner before launch.', anchor: { whole: true }, source: 'owner', images: [] }]; window.__revision = 1; true`);
   await ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', { filename: 'Release plan for the spring launch, reviewed by legal and the press office', board: 'draft-test' }))`);
-  await waitFor(`!!document.querySelector('.ac-draft-card') && !document.querySelector('.ac-draft-bar button.btn-primary')?.disabled`, 'review ready'); await ev(framesJs(3));
+  await waitFor(`!!document.querySelector('.ac-draft-card') && !document.querySelector('.ac-draft-bar button.btn-primary')?.disabled`, 'review ready'); await waitFor(`!!document.querySelector('#artifact-viewer.av-draft-document[data-document-review]')`, 'the viewer is the document review (its class and attribute follow the draft card under load)'); await ev(framesJs(3));
  };
  try {
   await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setTimezoneOverride({ timezoneId: 'UTC' });
