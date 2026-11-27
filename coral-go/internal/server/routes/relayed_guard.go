@@ -1,11 +1,13 @@
 package routes
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
@@ -65,6 +67,24 @@ func (s *hubWriteRecorder) Write(b []byte) (int, error) {
 }
 
 func (s *hubWriteRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
+// Flush and Hijack pass through only when the writer underneath supports them, so a relayed streaming write keeps its flushes and an upgrade keeps its connection.
+func (s *hubWriteRecorder) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		if s.status == 0 {
+			s.status = http.StatusOK
+		}
+		f.Flush()
+	}
+}
+
+func (s *hubWriteRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := s.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("the response writer cannot be hijacked")
+	}
+	return h.Hijack()
+}
 
 // logHubWrite is the attribution line for every write a Hub relays (#21941): the link and the Hub account id behind a write this computer took; for a refusal only the status code, no account, no label, no route or
 // name, so a refusal tells a log reader nothing a stranger could use.

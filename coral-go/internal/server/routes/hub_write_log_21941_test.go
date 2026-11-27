@@ -56,3 +56,22 @@ func TestAHubRelayedWriteIsLoggedWithTheLinkAndTheAccountAndARefusalWithOnlyItsC
 	assert.NotContains(t, hubWriteLogRun(t, false, true, "GET", "/api/sessions/live", http.StatusOK), "relayed write", "a read is not a write")
 	assert.NotContains(t, hubWriteLogRun(t, false, false, "POST", send, http.StatusOK), "relayed write", "a request that did not come through the Hub is not logged here")
 }
+
+func TestARelayedStreamingWriteStillFlushesBehindTheAttributionLog(t *testing.T) {
+	g := RelayedGuard(func() *devicekey.Verifier { return &devicekey.Verifier{Store: emptyStore{}} }, func(context.Context) (string, error) { return rlOwner, nil }, func(context.Context) bool { return false })
+	r := httptest.NewRequest("POST", "/api/sessions/live/agent1/send", strings.NewReader("{}"))
+	stamp(r)
+	r = r.WithContext(cloud.WithVia(r.Context(), cloud.Via{LinkID: rlLink, HubUser: rlOwner}))
+	rec := httptest.NewRecorder()
+	var canFlush bool
+	g(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		f, ok := w.(http.Flusher)
+		canFlush = ok
+		_, _ = w.Write([]byte("a"))
+		if ok {
+			f.Flush()
+		}
+	})).ServeHTTP(rec, r)
+	assert.True(t, canFlush, "the handler still sees a Flusher")
+	assert.True(t, rec.Flushed, "and its flush reaches the writer underneath")
+}
