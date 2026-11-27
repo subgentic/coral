@@ -211,6 +211,34 @@ func TestAKeyAlreadyListedAsBootstrapIsPromotedWithoutChangingItsMode(t *testing
 	assert.Equal(t, "view", l[0].Mode, "the one upward step is the origin, not the mode")
 }
 
+// #21880 SHOULD 1: a promoted key becomes trusted, so it never keeps a mode above the one the person just chose on Allow; it is capped, never raised.
+func TestAPromotedKeyIsCappedToTheModeThePersonChose(t *testing.T) {
+	for _, c := range []struct{ was, allow, want string }{
+		{"launch", "view", "view"},
+		{"launch", "interact", "interact"},
+		{"interact", "view", "view"},
+		{"view", "launch", "view"}, // never raised
+		{"interact", "launch", "interact"},
+	} {
+		t.Run(c.was+"_allow_"+c.allow, func(t *testing.T) {
+			r := connectedRig(t)
+			pk, _ := b64u.DecodeString(newDevicePK(t))
+			_, err := r.ss.AddDeviceKey(context.Background(), store.DeviceKey{KID: devicekey.KIDOf(pk), PK: pk, Label: "Old browser", Mode: c.was, Origin: store.DeviceOriginNoProof, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}, time.Now())
+			require.NoError(t, err)
+			r.m.o.MaxMode = func() tunnel.Mode { return tunnel.TierLaunch }
+			v, link := startPair(t, r)
+			b := answerFor(t, v, "Phone", pk)
+			_, err = b.ask(r.m, link)
+			require.NoError(t, err)
+			require.NoError(t, r.m.AllowPairBrowser(context.Background(), c.allow))
+			l := r.listed(t)
+			require.Len(t, l, 1)
+			assert.Equal(t, store.DeviceOriginPairing, l[0].Origin)
+			assert.Equal(t, c.want, l[0].Mode)
+		})
+	}
+}
+
 func TestNoPairingStartsWithoutAConnectionOrAComputerKey(t *testing.T) {
 	r := pairingSetup(t, true) // not connected
 	_, err := r.m.StartPairBrowser(context.Background())

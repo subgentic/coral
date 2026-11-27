@@ -39,6 +39,8 @@ func DeviceKeyNoticeItems(ss *store.SessionStore, now func() time.Time) func(ctx
 			fp := devicekey.DisplayFingerprint(k.PK)
 			var line string
 			switch {
+			case k.RaisedBy == store.PairBrowserBy: // allowed here through the pair-a-browser flow (#21880): the person pressed Allow, and still sees what the key can now do
+				line = label(k.KID) + " can now act on this computer as " + k.Mode + ": " + fp
 			case k.RaisedBy == store.PairOwner:
 				continue // raised here, by the person at this computer: nothing to tell them
 			case k.RaisedBy != "": // a signed raise: the signer who raised it, whoever approved the key

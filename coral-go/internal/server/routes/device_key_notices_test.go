@@ -70,3 +70,33 @@ func TestDeviceKeyNoticesShowANewKeyByItsFingerprintForADay(t *testing.T) {
 	items, _ = DeviceKeyNoticeItems(ss, func() time.Time { return t0 })(ctx)
 	assert.Len(t, items, 2)
 }
+
+// #21880: a browser the person allowed at this computer is told as "<label> can now act on this computer as <mode>", with its fingerprint, and a key whose mode the person raised here still is not.
+func TestDeviceKeyNoticesTellABrowserAllowedThroughPairing(t *testing.T) {
+	db, err := storetest.Open(t, t.TempDir()+"/s.db")
+	require.NoError(t, err)
+	ss := store.NewSessionStore(db)
+	ctx := context.Background()
+	t0 := time.Unix(1_800_000_000, 0)
+	mk := func() store.DeviceKey {
+		k, err := ecdh.P256().GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		raw := k.PublicKey().Bytes()
+		sum := sha256.Sum256(raw)
+		return store.DeviceKey{KID: base64.RawURLEncoding.EncodeToString(sum[:]), PK: raw, Label: "Phone", Mode: "view", Origin: store.DeviceOriginNoProof, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}
+	}
+	k := mk()
+	_, err = ss.AddDeviceKey(ctx, k, t0.Add(-time.Hour))
+	require.NoError(t, err)
+	require.NoError(t, devicekey.AddPairedKey(ctx, ss, k.KID, k.PK, "Phone", "view", t0))
+	local := mk()
+	local.Label = "Mine"
+	_, err = ss.AddDeviceKey(ctx, local, t0.Add(-time.Hour))
+	require.NoError(t, err)
+	require.NoError(t, ss.SetDeviceMode(ctx, local.KID, "interact", "", t0))
+	items, err := DeviceKeyNoticeItems(ss, func() time.Time { return t0 })(ctx)
+	require.NoError(t, err)
+	require.Len(t, items, 1, "the person's own raise here is not told, the allowed browser is")
+	assert.Contains(t, items[0].Line, "\"Phone\" can now act on this computer as view")
+	assert.Contains(t, items[0].Line, devicekey.DisplayFingerprint(k.PK))
+}
