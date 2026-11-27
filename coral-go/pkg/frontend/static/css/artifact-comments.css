@@ -268,8 +268,9 @@
     .av-draft-document[data-document-review] .artifact-viewer-main > .ac-panel { display: block; position: static; transform: none; width: 100%; max-height: none; flex: none; border-radius: 0; box-shadow: none; }
     .av-draft-document[data-document-review] .ac-sheet-close { display: none; }
     .av-draft-document[data-document-review] .artifact-viewer-header { display: grid; align-items: center; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr); gap: 8px; padding: 12px 16px; }
-    .av-draft-document[data-document-review] .artifact-viewer-header > .artifact-viewer-title { grid-column: 1 / -1; grid-row: 1; align-self: center; margin-inline-end: 52px; }
+    .av-draft-document[data-document-review] .artifact-viewer-header > .artifact-viewer-title { grid-column: 1 / -1; grid-row: 1; align-self: center; margin-inline-end: 84px; }
     .av-draft-document[data-document-review] .artifact-viewer-morewrap { grid-column: 3; grid-row: 1; justify-self: end; }
+    .av-draft-document[data-document-review] .artifact-viewer-fullscreen { display: inline-flex; grid-column: 3; grid-row: 1; justify-self: end; margin-inline-end: 48px; min-width: 36px; width: 36px; padding-inline: 0; min-height: 44px; align-items: center; justify-content: center; } /* #21851: beside the ⋯ in the name's row; the icon is 36 px wide x 44 tall so the name keeps 252 px (the #21777 rule, 250): ⋯ 44 + gap 4 + expand 36 at the right, the name still its own full-width row */
     .av-draft-document[data-document-review] .artifact-review-close { grid-column: 1; grid-row: 2; }
     .av-draft-document[data-document-review] .artifact-review-changes { grid-column: 2; grid-row: 2; }
     .av-draft-document[data-document-review] .artifact-review-approve { grid-column: 3; grid-row: 2; }
@@ -281,8 +282,8 @@
 
 .av-draft-document[data-document-review] .artifact-viewer-header > .ac-toggle,
 .av-draft-document[data-document-review] .artifact-viewer-actions > .ac-toggle,
-.av-draft-document[data-document-review] .artifact-viewer-fullscreen,
 .av-draft-document[data-document-review] .artifact-viewer-chips { display: none; }
+.av-draft-document[data-document-review] .artifact-viewer-fullscreen-item { display: none; } /* #21851: the expand icon is in the top bar at every width (#21185 had hidden it; a phone had only the menu item), so no second copy in the ⋯ menu */
 
 @media (min-width: 768px) {
     .av-draft-document[data-document-review] .artifact-viewer-main > .ac-panel { flex: 0 0 var(--ac-w, 44%); width: var(--ac-w, 44%); }
