@@ -1,9 +1,13 @@
 // The items of a row's ⋯ menu (#137104), built when the menu is first opened: kept out of the start bundle (start bytes, #21915).
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
+await loadStyles('row_more_items.css');
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 export function fillMenu(menu, id, actions) {
+    menu.classList.add('row-action-menu');
     for (const a of actions) {
-        const b = el('button', 'menu-item', a.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); if (a.title) b.title = a.title;
+        if (a.separatorBefore) { const hr = el('hr', 'menu-sep'); hr.setAttribute('role', 'separator'); menu.append(hr); }
+        const b = el('button', a.danger ? 'menu-item menu-item-danger mb-action-danger' : 'menu-item', a.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); if (a.title) b.title = a.title;
         if (a.help) {
             b.classList.add('menu-item-with-help'); b.setAttribute('aria-label', a.label);
             const help = el('span', 'menu-item-state', a.help); help.id = `${id}-help-${menu.children.length}`;

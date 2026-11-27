@@ -68,11 +68,22 @@ const sceneShots = require('./helpers/scene_shots');
             await openMenu('Billing Revamp');
             assert.deepEqual(await items(), ['Open team', 'Team settings', 'Sleep team', 'Archive team', 'Remove team'], `${at}a live team's row menu`);
             assert.ok(/Puts the team away; nothing is deleted/.test(await ev(`[...document.querySelectorAll('[role="menu"]')].filter(m => !m.hidden).map(m => m.textContent).join(' ')`)), `${at}Archive team says what it does`);
+            const menuStyle = await ev(`(() => { const m = [...document.querySelectorAll('[role="menu"]')].find(m => !m.hidden && m.getBoundingClientRect().height > 0); const remove = [...m.querySelectorAll('[role="menuitem"]')].find(b => b.textContent.trim() === 'Remove team'); const archive = [...m.querySelectorAll('[role="menuitem"]')].find(b => /Archive team/.test(b.textContent)); return { divider: archive.previousElementSibling?.getAttribute('role'), red: remove.classList.contains('menu-item-danger') }; })()`);
+            assert.deepEqual(menuStyle, { divider: 'separator', red: true }, `${at}the archive group is separated and Remove is red`);
             await shot('rowmenu-' + w);
             // Archive team: asks once (what stops, what stays, the way back), then the server is asked
+            await ev(`import(${S} + 'state.js').then(m => { m.state.liveSessions = [1,2,3].map(i => ({ name: 'Builder '+i, board_project: 'billing-revamp', sleeping: false, archived: false })); return true; })`);
             await pick('Archive team');
             await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${at}the Archive team question`);
             const ask = await ev(`document.getElementById('confirm-modal-message').textContent`);
+            assert.equal(await ev(`document.getElementById('confirm-modal-title').textContent`), 'Archive team "Billing Revamp"?', `${at}the title names the team`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#confirm-modal-message b')].map(b => b.textContent)`), ['Stops:', 'Stays:', 'Bring it back:'], `${at}the mock labels are bold`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#confirm-modal-message p')].map(p => p.textContent)`), [
+                'Stops: its 3 agents (they are archived, as an agent Archive does today). Wake All skips them.',
+                'Stays: everything: the board and its messages, goals, tasks, artifacts, chats and History.',
+                'Bring it back: Restore team, on the Teams page under Archived. It leaves the sidebar now. Agents come back asleep; Wake team starts them.'
+            ], `${at}the running-team question matches every mock word`);
+            await shot('archive-question-' + w);
             assert.ok(/Stays: everything/.test(ask) && /Restore team/.test(ask) && /Teams page/.test(ask), `${at}it says what stays and the way back: ${ask}`);
             await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /^archive team$/i.test(b.textContent.trim())).click(); true`);
             await waitFor(`window.__archiveCalls.some(c => /^POST /.test(c))`, `${at}the archive call`, 8000);
@@ -90,7 +101,7 @@ const sceneShots = require('./helpers/scene_shots');
             await shot('menu-' + w);
             await ev(`document.querySelector('#team-page-more-menu [data-stop="archive"]').click(); true`);
             await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${at}the Archive team question from the menu`);
-            assert.ok(/No agent of this team is running, so nothing is stopped/.test(await ev(`document.getElementById('confirm-modal-message').textContent`)), `${at}it says nothing is stopped`);
+            assert.ok(/Stops: nothing; no agent of this team is running\./.test(await ev(`document.getElementById('confirm-modal-message').textContent`)), `${at}it says nothing is stopped`);
             await shot('confirm-' + w);
             await ev(`document.querySelector('#confirm-modal .btn:not(#confirm-modal-yes)').click(); true`);
             // The Remove team question points to Archive, and its extra button goes with it.
@@ -106,6 +117,17 @@ const sceneShots = require('./helpers/scene_shots');
             await waitFor(`!!document.querySelector('#team-page-archived button')`, `${at}the archived banner`, 8000);
             assert.ok(/Docs Site is archived\. Its board, goals and tasks are kept\./.test(await ev(`document.getElementById('team-page-archived').textContent`)), `${at}the banner words`);
             await shot('banner-' + w);
+        }
+        if (process.env.CORAL_ARCHIVE_MOCK) {
+            const html = require('node:fs').readFileSync(process.env.CORAL_ARCHIVE_MOCK, 'utf8');
+            for (const w of [1280, 390]) for (const [scene, selector] of [['rowmenu', '.menu'], ['archive-question', '.dlg']]) {
+                await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile: w === 390 });
+                await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired();
+                const { frameTree } = await Page.getFrameTree();
+                await Page.setDocumentContent({ frameId: frameTree.frame.id, html });
+                await ev(`(() => { const ref = document.querySelector(${JSON.stringify(selector)}).cloneNode(true); document.body.replaceChildren(ref); document.body.style.padding = '24px'; return true; })()`);
+                await shot('mock-' + scene + '-' + w);
+            }
         }
     } finally { await client.close(); }
     console.log('PASS Teams page: Archived teams last with Restore team, Archive team and Remove team on a row, Remove team points to Archive, an archived team shows its banner');

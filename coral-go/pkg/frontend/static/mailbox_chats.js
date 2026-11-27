@@ -234,8 +234,8 @@ const teamActions = (g, ctx) => {
     return [open,
         { label: 'Team settings', run: () => importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(k)).catch(() => {}) },
         { label: 'Sleep team', help: 'Stops every agent for now', run: () => window.toggleTeamSleep?.(k, 'sleep') },
-        { label: 'Archive team', help: 'Puts the team away; nothing is deleted', run: () => window.toggleTeamSleep?.(k, 'archive') },
-        { label: 'Remove team', run: () => importOnce('./message_board.js').then(m => m.deleteTeam(k)) }];
+        { separatorBefore: true, label: 'Archive team', help: 'Puts the team away; nothing is deleted', run: () => window.toggleTeamSleep?.(k, 'archive') },
+        { danger: true, label: 'Remove team', run: () => importOnce('./message_board.js').then(m => m.deleteTeam(k)) }];
 };
 /** A team row's one line as the approved mock draws it (#21915): "Team · today · 3 agents running", "Team · 23 Nov · no agent running", an archived team's "Team · archived 24 Nov · 4 agents". */
 const teamLine = g => {
