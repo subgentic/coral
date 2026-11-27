@@ -44,6 +44,8 @@ const ADD = `(() => {
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // #21853: explicitly show done; verification markers belong to finished tasks. Fresh-default coverage lives in task_show_done_browser.
+        await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-hide-completed', 'false');` });
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         await install();

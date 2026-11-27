@@ -26,6 +26,8 @@ const { coralReady } = require('./helpers/wait');
  };
  try {
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+  // #21853: explicitly show done; scope isolation includes done tasks as well as open tasks. Fresh-default coverage lives in task_show_done_browser.
+  await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-hide-completed', 'false');` });
   await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();
   await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');

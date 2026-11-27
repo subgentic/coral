@@ -39,6 +39,8 @@ async function run() {
     const { Page, Runtime } = client;
     await Promise.all([Page.enable(), Runtime.enable()]);
     await Page.addScriptToEvaluateOnNewDocument({ source: HANG });
+    // #21853: explicitly show done; paging must exercise the done-task pages. Fresh-default coverage lives in task_show_done_browser.
+    await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-hide-completed', 'false');` });
     const exceptions = [];
     Runtime.exceptionThrown(e => exceptions.push((((e.exceptionDetails || {}).exception || {}).description || 'exception').slice(0, 200)));
     const ev = async (x) => { const r = await Runtime.evaluate({ expression: x, awaitPromise: true, returnByValue: true }); if (r.exceptionDetails) throw new Error('page eval: ' + JSON.stringify(r.exceptionDetails).slice(0, 300)); return r.result.value; };
