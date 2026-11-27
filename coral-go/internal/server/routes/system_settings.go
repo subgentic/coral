@@ -63,6 +63,7 @@ var hubTrustSettingRoutes = map[string]string{
 	HubDropboxShareSetting:         "PUT /api/cloud/hub-dropbox-share",          // #16109
 	HubRequireTrustedDeviceSetting: "PUT /api/cloud/hub-require-trusted-device", // #21883
 	store.DeviceWebModeSetting:     "PUT /api/cloud/device-web-mode",            // #19669
+	store.OwnerCertAcceptSetting:   "PUT /api/cloud/owner-cert/accept",          // #21889
 }
 
 // hubSigninSettingKey: a Sign in with Coral Hub setting (server.HubSigninEnabledSetting and its
