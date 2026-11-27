@@ -186,14 +186,14 @@ func TestGoalUpdateSendsOnlyWhatWasGivenAndClears(t *testing.T) {
 func TestGoalCloseReportsOpenTasksAndNeedsAReason(t *testing.T) {
 	gs := newGoalServer(t)
 	gs.setReply("POST /api/board/team/goals/3/close", `{"goal":{"id":3,"state":"dropped"},"open_tasks":2}`)
-	res := goalRun(t, gs, "goal", "close", "3", "--reason", "not doing it", "--state", "dropped")
+	res := goalRun(t, gs, "goal", "close", "3", "--reason", "not doing it", "--no-result", "dropped, nothing was made", "--state", "dropped")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "Closed Goal #3 (dropped)")
 	assert.Contains(t, res.stdout, "2 tasks of this goal are still open")
-	assert.Equal(t, map[string]any{"reason": "not doing it", "state": "dropped", "subscriber_id": "Tester"}, bodyOf(t, gs.requests()[0]))
+	assert.Equal(t, map[string]any{"reason": "not doing it", "state": "dropped", "subscriber_id": "Tester", "no_result": "dropped, nothing was made"}, bodyOf(t, gs.requests()[0]))
 
 	gs.setReply("POST /api/board/team/goals/4/close", `{"goal":{"id":4,"state":"done"},"open_tasks":1}`)
-	res = goalRun(t, gs, "goal", "close", "4", "--reason", "shipped")
+	res = goalRun(t, gs, "goal", "close", "4", "--reason", "shipped", "--no-result", "shipped, the report is in the post")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Contains(t, res.stdout, "1 task of this goal is still open")
 

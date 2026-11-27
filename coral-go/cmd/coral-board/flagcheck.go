@@ -86,7 +86,7 @@ func checkKnownFlags(args []string) error {
 		case "update":
 			spec = clihelp.FlagSpec{Values: []string{"--title", "--outcome", "--done-when", "--state", "--driver", "--blocked-on"}, Positional: 1}
 		case "close":
-			spec = clihelp.FlagSpec{Values: []string{"--reason", "--state"}, Positional: 1}
+			spec = clihelp.FlagSpec{Values: []string{"--reason", "--state", "--result", "--no-result"}, Positional: 1}
 		case "request":
 			spec = clihelp.FlagSpec{Values: []string{"--to", "--ask"}, Positional: 1}
 		case "requests":

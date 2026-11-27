@@ -568,6 +568,8 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 		Reason       string `json:"reason"`
 		State        string `json:"state"`
 		SubscriberID string `json:"subscriber_id"`
+		Result       string `json:"result"`    // #21811: the coral://artifacts link of the goal's finished result, already sent to Needs you by the CLI
+		NoResult     string `json:"no_result"` // #21811: why there is no result file
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -577,7 +579,12 @@ func (h *BoardHandler) CloseGoal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	g, open, err := h.bs.CloseGoalBy(r.Context(), project, id, body.Reason, body.State, actor)
+	reason, refused := goalCloseReason(h.coralDir, project, body.Reason, body.Result, body.NoResult)
+	if refused != "" {
+		errBadRequest(w, refused)
+		return
+	}
+	g, open, err := h.bs.CloseGoalBy(r.Context(), project, id, reason, body.State, actor)
 	if err != nil {
 		if !goalError(w, err) {
 			errInternalServer(w, err.Error())
@@ -788,4 +795,43 @@ func (h *BoardHandler) goalEditPictures(w http.ResponseWriter, r *http.Request, 
 		kept = append(kept, board.GoalImage{Hex: pics[0].Hex, Name: pics[0].Name, ContentType: pics[0].ContentType})
 	}
 	return kept, true
+}
+
+// goalCloseReason is the reason a goal is closed with, with its result on the end (#21811): " Result: coral://artifacts/<digest>" for a result file, or " No result file: <why>". The goals page shows the reason, so the
+// result link is there. The link must be a file of this team (an upload of its own or one it adopted); a link to anyone else's file is refused. The words the person wrote are cut to leave room for the end.
+func goalCloseReason(coralDir, project, reason, result, noResult string) (string, string) {
+	result, noResult = strings.TrimSpace(result), strings.TrimSpace(noResult)
+	if result == "" && noResult == "" {
+		return reason, ""
+	}
+	var tail string
+	if result != "" {
+		id := strings.TrimPrefix(result, "coral://artifacts/")
+		if !objectNameRe.MatchString(id) {
+			return "", "result must be a coral://artifacts/<digest> link"
+		}
+		if coralDir != "" {
+			mine := false
+			for _, rr := range recordsOfDigest(coralDir, id) {
+				if rr.rec.Board == project {
+					mine = true
+					break
+				}
+			}
+			if !mine {
+				return "", "result is not a file of this team: send it first with coral-board goal close --result <file>"
+			}
+		}
+		tail = " Result: coral://artifacts/" + id
+	} else {
+		tail = " No result file: " + noResult
+	}
+	room := board.MaxGoalReason - len([]rune(tail)) - 1
+	if room < 20 {
+		return "", "no_result is too long: say it in a short line"
+	}
+	if rs := []rune(strings.TrimSpace(reason)); len(rs) > room {
+		reason = string(rs[:room])
+	}
+	return strings.TrimSpace(reason) + tail, ""
 }
