@@ -226,6 +226,13 @@ func (s *Store) PausedBoardsBy(ctx context.Context) (map[string]string, error) {
 	return out, nil
 }
 
+// CountRelayBoards is how many boards list at least one source server in cross_team_servers: the boards that accept a message relayed through Coral Hub from that Coral without a person's signature (#21883).
+func (s *Store) CountRelayBoards(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM board_settings WHERE key = ? AND value NOT IN ('', '[]', 'null')`, settingCrossTeamServers)
+	return n, err
+}
+
 // GetBoardSettings returns a board's settings (defaults when none are stored).
 func (s *Store) GetBoardSettings(ctx context.Context, project string) (BoardSettings, error) {
 	var rows []struct {

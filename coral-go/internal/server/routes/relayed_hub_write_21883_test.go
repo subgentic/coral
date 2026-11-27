@@ -106,6 +106,8 @@ func TestHubWriteExemptRoutesNeedTheirOwnAuthority(t *testing.T) {
 	}{
 		{"device-keys message: its own signature is the authority", "POST", "/api/device-keys/message", nil, rlOwner, true},
 		{"device-keys certificate", "POST", "/api/device-keys/certificate", nil, rlOwner, true},
+		{"device-keys pair: the MAC and the local hold are its authority", "POST", "/api/device-keys/pair", nil, rlOwner, true},
+		{"device-keys pair with no Hub person", "POST", "/api/device-keys/pair", nil, "", true},
 		{"guide-revoked on the service stream", "POST", "/api/cloud/guide-revoked", map[string]string{tunnel.HubServiceHeader: "1", tunnel.HubAskBoardHeader: "team1", tunnel.HubAskServerHeader: "srv1"}, "", true},
 		{"guide-revoked from a person", "POST", "/api/cloud/guide-revoked", nil, rlOwner, false},
 		{"guide-revoked on the service stream but with a person", "POST", "/api/cloud/guide-revoked", map[string]string{tunnel.HubServiceHeader: "1", tunnel.HubAskBoardHeader: "team1"}, rlOwner, false},
@@ -172,4 +174,11 @@ func TestEveryGetInTheGoldenIsReviewedReadOnly(t *testing.T) {
 func relayedRequiredFor(method, target string) bool {
 	k, ok := devicekey.KindOfRoute(method, target)
 	return ok && relayedRequired[k]
+}
+
+func TestThePairAnswerIsExemptAndNeverAHubWrite(t *testing.T) {
+	assert.True(t, devicekey.HubWriteExempt("POST", "/api/device-keys/pair"))
+	assert.False(t, devicekey.IsHubWrite("POST", "/api/device-keys/pair"), "it is not signed as hub-write")
+	rec, reached := guardRunFor(true, "POST", "/api/device-keys/pair", nil)
+	assert.True(t, reached, "the switch does not refuse it device_required: %s", rec.Body.String())
 }
