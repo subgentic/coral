@@ -97,3 +97,11 @@ body.keyboard-open .ac-composer-row .ac-counter { display: none; }
     .artifact-review-form .ac-picker { flex: 1 0 100%; }
     .artifact-review-form > .artifact-review-cancel { order: 3; }
 }
+
+/* The empty board composer shares the space left below wrapped team tabs. Let
+   its textarea shrink and scroll, keeping Add image and Send in the viewport. */
+.mb-post-form:not(:has(.ac-thumb)) { display: flex; flex-direction: column; }
+.mb-post-form:not(:has(.ac-thumb)) .mb-post-card { flex: 1; min-height: 0; }
+.mb-post-form:not(:has(.ac-thumb)) .field-pictures { align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
+.mb-post-form:not(:has(.ac-thumb)) .mb-post-input { flex: 1 1 auto; }
+.mb-post-form:not(:has(.ac-thumb)) .ac-picker { flex: none; }
