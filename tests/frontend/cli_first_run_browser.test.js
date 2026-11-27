@@ -48,7 +48,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.__found = false; window.__launches.length = 0; document.getElementById('launch-dir').value = '/tmp'; true`);
         await ev(`window._selectLaunchType('back'); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } true`);
         await ev(`window.__coral._checkAgentCLI('claude', document.querySelector('#launch-cli-slot .acf-cli-warning'), true); true`); // a fresh look: the last answer (found) is cached for 30 s
-        await waitFor(`!!document.querySelector('#launch-cli-slot [data-blocks-launch]')`, 'the missing CLI blocks the launch', 8000);
+        await waitFor(`(() => { const w = document.querySelector('#launch-cli-slot [data-blocks-launch]'), go = document.getElementById('launch-agent-go'); return !!w && !!go && go.disabled && go.getAttribute('aria-describedby') === w.id; })()`, 'the missing CLI blocks the launch and is the button\'s reason (the cli-blocks-launch event has run)', 8000);
         const off = await ev(`(() => { const go = document.getElementById('launch-agent-go'), w = document.querySelector('#launch-cli-slot [data-blocks-launch]'); const links = [...w.querySelectorAll('p')].map(p => p.textContent.slice(0, 12));
             go.click(); window.launchSession(); return { disabled: go.disabled, describedBy: go.getAttribute('aria-describedby') === w.id, order: links, launches: window.__launches.length, dialog: !!document.querySelector('body > .modal:not([id]) [data-action="recheck"]') }; })()`);
         assert.deepEqual(off, { disabled: true, describedBy: true, order: ['Install it f', 'In your term'], launches: 0, dialog: false });
