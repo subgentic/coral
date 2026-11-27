@@ -284,11 +284,40 @@ func main() {
 			w.Dispatch(func() { w.Navigate(link) })
 		}()
 	})
+	// A page process that died leaves the window white for good (renderer_watch.go): the page reports that it is alive, and when
+	// the reports stop the window opens the dashboard again on the page it last showed, signed in with a fresh link.
+	var watch rendererWatch
+	w.Bind("__coralNativeAlive", func(token, page string) {
+		if !guard.Allowed(token) {
+			refused("alive")
+			return
+		}
+		watch.alive(time.Now(), page)
+	})
+	natives = append(natives, apptoken.Native{Page: "_coralAlive", Native: "__coralNativeAlive"})
+	if rendererWatchOn {
+		stopWatch := make(chan struct{})
+		defer close(stopWatch)
+		go watch.run(stopWatch, func(page string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			target := cfg.url
+			if link, err := loginlink.FromCLI(ctx, cfg.url, config.ResolveCoralDir(cfg.dataDir)); err == nil {
+				target = loginlink.MarkApp(loginlink.OnPage(link, page))
+			} else {
+				log.Printf("[WEBVIEW] no sign-in link for the reopen (%v); opening %s", err, cfg.url)
+			}
+			log.Printf("[WEBVIEW] the page has not answered for %v (its process may be gone): opening %s", rendererStale, loginlink.Redact(target))
+			w.Dispatch(func() { w.Navigate(target) })
+		})
+	}
+
 	// The page-facing functions (_coralOpenExternal, _coralAppSignIn, _coralLog), which add the token, exist only on the
 	// dashboard's origin (apptoken.ShimScript). Registered after the Binds and BEFORE the sign-in call below, so the shim is there when
 	// that script runs. A native navigation allowlist (WebView2 NavigationStarting) and a dashboard CSP are still wanted (#78 W1):
 	// webview_go does not expose the first.
 	w.Init(guard.ShimScript(baseOrigin, natives))
+	w.Init(aliveScript)
 	w.Init(fmt.Sprintf(`(function(){ if (location.origin === %q && location.pathname === '/auth' && window._coralAppSignIn) window._coralAppSignIn(new URLSearchParams(location.search).get('return_to') || '/'); })();`, baseOrigin))
 
 	log.Printf("[WEBVIEW] navigating to %s", loginlink.Redact(startURL))
