@@ -285,8 +285,7 @@
 .av-draft-document[data-document-review] .artifact-viewer-chips { display: none; }
 
 @media (min-width: 768px) {
-    .av-draft-document[data-document-review] .artifact-viewer-main > .ac-panel { flex: 0 0 44%; width: 44%; }
-    .av-draft-document[data-document-review] .ac-resizer { display: none; }
+    .av-draft-document[data-document-review] .artifact-viewer-main > .ac-panel { flex: 0 0 var(--ac-w, 44%); width: var(--ac-w, 44%); }
 }
 
 .av-draft-document[data-document-review] .artifact-review-refuse { display: none; }

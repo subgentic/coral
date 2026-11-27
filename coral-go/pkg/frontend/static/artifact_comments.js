@@ -90,8 +90,8 @@ export function attachComments(dialog, body, host, opts = {}) {
     const resizer = el('div', 'ac-resizer'); resizer.setAttribute('role', 'separator'); resizer.setAttribute('aria-orientation', 'vertical'); resizer.tabIndex = 0;
     resizer.setAttribute('aria-label', 'Resize the comments'); resizer.setAttribute('aria-controls', panel.id); resizer.title = 'Drag, or use the arrow keys, to resize the comments. Double-click to reset.';
     const widthBounds = () => { const room = host.getBoundingClientRect().width || window.innerWidth; return { min: AC_MIN_W, max: Math.max(AC_MIN_W, Math.min(AC_MAX_W, Math.round(room * 0.6))) }; };
-    const setWidth = (px, keep = true) => { const { min, max } = widthBounds(), w = Math.max(min, Math.min(max, Math.round(px))); host.style.setProperty('--ac-w', w + 'px'); resizer.setAttribute('aria-valuemin', String(min)); resizer.setAttribute('aria-valuemax', String(max)); resizer.setAttribute('aria-valuenow', String(w)); resizer.setAttribute('aria-valuetext', `${w} pixels wide`); if (keep) browserLocal.set(AC_WIDTH_KEY, String(w)); return w; };
-    const savedWidth = Number(browserLocal.get(AC_WIDTH_KEY)) || AC_DEFAULT_W;
+    const setWidth = (px, keep = true, apply = true) => { const { min, max } = widthBounds(), w = Math.max(min, Math.min(max, Math.round(px))); if (apply) host.style.setProperty('--ac-w', w + 'px'); resizer.setAttribute('aria-valuemin', String(min)); resizer.setAttribute('aria-valuemax', String(max)); resizer.setAttribute('aria-valuenow', String(w)); resizer.setAttribute('aria-valuetext', `${w} pixels wide`); if (keep) browserLocal.set(AC_WIDTH_KEY, String(w)); return w; };
+    const savedWidth = Number(browserLocal.get(AC_WIDTH_KEY)) || 0;
     const currentWidth = () => Math.round(panel.getBoundingClientRect().width) || Number(browserLocal.get(AC_WIDTH_KEY)) || AC_DEFAULT_W;
     resizer.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; e.preventDefault(); resizer.setPointerCapture?.(e.pointerId); resizer.classList.add('is-dragging'); resizer.focus({ preventScroll: true }); });
     resizer.addEventListener('pointermove', (e) => { if (!resizer.classList.contains('is-dragging')) return; setWidth(host.getBoundingClientRect().right - e.clientX, false); });
@@ -104,8 +104,8 @@ export function attachComments(dialog, body, host, opts = {}) {
         e.preventDefault(); setWidth(next);
     });
     resizer.addEventListener('dblclick', () => setWidth(AC_DEFAULT_W));
-    window.addEventListener('resize', () => { if (host.isConnected && host.style.getPropertyValue('--ac-w')) setWidth(currentWidth(), false); });
-    setWidth(savedWidth, false);
+    window.addEventListener('resize', () => { if (host.isConnected) setWidth(currentWidth(), false, !!host.style.getPropertyValue('--ac-w')); });
+    setWidth(savedWidth || AC_DEFAULT_W, false, !!savedWidth);
     const reviewBar = el('div', 'ac-draft-bar'); reviewBar.hidden = true; host.after(reviewBar);
     host.append(resizer, panel); if (!opts.toggleHost) (dialog.querySelector('.artifact-viewer-actions') || dialog.querySelector('.artifact-viewer-header'))?.prepend(toggle);
     dialog.append(selBtn);
@@ -476,7 +476,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         body.inert = !!st.shownNow && sheet() && open && !st.video && phone.matches && !draftMode(); // only a phone's sheet is modal: a docked pane's open sheet leaves the file above it to scroll (#14846)
     }
     phone.addEventListener('change', () => { syncInert(); syncOn(); });
-    dialog.addEventListener('av-review-layout', () => { if (st.shownNow && draftMode() && !isOpen()) setSheet(true); }); // the review context (data-document-review) arrives after the comments: the column opens when it does
+    dialog.addEventListener('av-review-layout', () => { if (st.shownNow && draftMode() && !isOpen()) setSheet(true); setWidth(currentWidth(), false, !!host.style.getPropertyValue('--ac-w')); }); // the review context (data-document-review) arrives after the comments: the column opens when it does
     if (opts.observe && typeof ResizeObserver === 'function') new ResizeObserver(() => { syncInert(); syncToggle(); paintToggle(); }).observe(opts.observe); // the pane's width decides whether the panel is a sheet
 
     // ── a card or a highlight is made current, and the other follows
