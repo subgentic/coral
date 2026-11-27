@@ -484,3 +484,4 @@ node picture_tray.test.mjs
 node field_pictures.test.mjs
 node artifacts_first_update_unit.test.mjs
 node reminder_cron.test.mjs
+node launch_default_type.test.mjs
