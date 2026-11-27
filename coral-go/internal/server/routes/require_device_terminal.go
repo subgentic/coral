@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -30,8 +31,34 @@ func (h *SessionsHandler) refuseTerminalFrame(viaHub bool, msgType string) bool 
 	return false
 }
 
-// RequireTrustedDeviceFromSettings reads the switch for each frame from the settings at most a second old; an unreadable store falls back to the environment, as the request guard does.
+// RequireTrustedDeviceReader reads the switch from the settings on each call and fails closed: when the settings cannot be read, it keeps the last value it read, and with none yet it answers on (an
+// unreadable store must never turn require-signing off, #21931). The first failure of a run is logged once; a good read ends the run. The environment switch still applies.
+func RequireTrustedDeviceReader(get func(context.Context) (map[string]string, error)) func(context.Context) bool {
+	var mu sync.Mutex
+	known, on, failing := false, false, false
+	return func(ctx context.Context) bool {
+		s, err := get(ctx)
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			if !failing {
+				failing = true
+				slog.Warn("[device] the settings could not be read; keeping the last value of the require-a-trusted-device switch (on when none was read yet)", "error", err)
+			}
+			if hubRequireEnv() {
+				return true
+			}
+			return !known || on
+		}
+		failing = false
+		known, on = true, HubRequireTrustedDevice(s)
+		return on
+	}
+}
+
+// RequireTrustedDeviceFromSettings reads the switch for each frame from the settings at most a second old, failing closed like the request guard.
 func RequireTrustedDeviceFromSettings(ss *store.SessionStore) func() bool {
+	read := RequireTrustedDeviceReader(ss.GetSettings)
 	var mu sync.Mutex
 	var at time.Time
 	on := false
@@ -41,11 +68,7 @@ func RequireTrustedDeviceFromSettings(ss *store.SessionStore) func() bool {
 		if time.Since(at) < time.Second {
 			return on
 		}
-		s, err := ss.GetSettings(context.Background())
-		if err != nil {
-			s = nil
-		}
-		on, at = HubRequireTrustedDevice(s), time.Now()
+		on, at = read(context.Background()), time.Now()
 		return on
 	}
 }
