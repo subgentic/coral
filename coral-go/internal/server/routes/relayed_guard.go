@@ -28,6 +28,58 @@ var relayedRequired = map[devicekey.Kind]bool{devicekey.GrantMember: true, devic
 // RelayedGuard is the guard, after the link stamp and before the grant check. verifier is the computer's one device verifier (nil when there is none); ownerLabel is the owner label confirmed for the link the
 // request came through, "" when none.
 func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.Context) (string, error), requireDevice func(context.Context) bool) func(http.Handler) http.Handler {
+	guard := relayedGuard(verifier, ownerLabel, requireDevice)
+	return func(next http.Handler) http.Handler {
+		inner := guard(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			via, tunneled := cloud.ViaFrom(r.Context())
+			if !tunneled || r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+				inner.ServeHTTP(w, r)
+				return
+			}
+			rec := &hubWriteRecorder{ResponseWriter: w}
+			inner.ServeHTTP(rec, r)
+			logHubWrite(via, r.Method, rec.status)
+		})
+	}
+}
+
+// hubWriteRecorder keeps the status a handler wrote, so the attribution line can say whether the write was taken.
+type hubWriteRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *hubWriteRecorder) WriteHeader(code int) {
+	if s.status == 0 {
+		s.status = code
+	}
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *hubWriteRecorder) Write(b []byte) (int, error) {
+	if s.status == 0 {
+		s.status = http.StatusOK
+	}
+	return s.ResponseWriter.Write(b)
+}
+
+func (s *hubWriteRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
+// logHubWrite is the attribution line for every write a Hub relays (#21941): the link and the Hub account id behind a write this computer took; for a refusal only the status code, no account, no label, no route or
+// name, so a refusal tells a log reader nothing a stranger could use.
+func logHubWrite(via cloud.Via, method string, status int) {
+	if status == 0 {
+		status = http.StatusOK
+	}
+	if status >= 400 {
+		slog.Info("[hub] a relayed write was refused", "status", status)
+		return
+	}
+	slog.Info("[hub] a relayed write was accepted", "link", via.LinkID, "account", via.HubUser, "method", method, "status", status)
+}
+
+func relayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.Context) (string, error), requireDevice func(context.Context) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			via, tunneled := cloud.ViaFrom(r.Context())
