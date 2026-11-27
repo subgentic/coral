@@ -14,7 +14,7 @@ import (
 // (#21811): before, "coral-agent artifact review" said "this team has no such file", because a received row names a send and never an upload. The bytes are not copied: the object is shared by digest;
 // what is added is an upload record by this agent's session on this team's board, saying where it came from (ReceivedFrom). Only a row on THIS team's own board counts: the rule that no agent reads another
 // team's files is unchanged, and a file the team was never sent is still refused.
-func adoptReceivedFile(coralDir, teamBoard, sessionID, id string) bool {
+func adoptReceivedFile(coralDir, teamBoard, sessionID, id string, meta agentArtifactMeta) bool {
 	if coralDir == "" || teamBoard == "" || !objectNameRe.MatchString(id) {
 		return false
 	}
@@ -28,8 +28,7 @@ func adoptReceivedFile(coralDir, teamBoard, sessionID, id string) bool {
 	if json.Unmarshal(data, &row) != nil || row.Board != teamBoard || row.ID != id { // the row is on this team's board and names this file
 		return false
 	}
-	meta, ok := readSidecar(filepath.Join(coralDir, "artifacts", "objects", id+".json"))
-	if !ok { // the bytes are not in the store (removed, or never stored): nothing to review
+	if meta.Digest == "" { // the bytes are not in the store (removed, or never stored): nothing to review
 		return false
 	}
 	up := uploadsDir(coralDir, sessionID)

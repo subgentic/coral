@@ -58,7 +58,8 @@ func (h *SessionsHandler) reviewAgentArtifact(w http.ResponseWriter, r *http.Req
 		}
 	}
 	if !in { // a file a linked team sent this team is the team's to send for review too (#21811)
-		in = adoptReceivedFile(coralDir, teamBoard, sid, id)
+		sc, _ := readSidecar(filepath.Join(coralDir, "artifacts", "objects", id+".json"))
+		in = adoptReceivedFile(coralDir, teamBoard, sid, id, sc)
 	}
 	if !in {
 		errNotFound(w, "this team has no such file")
