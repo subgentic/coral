@@ -40,6 +40,8 @@ type cloudStatus struct {
 	// RequireTrustedDevice is the local switch "Require a trusted device for Hub actions" (#21883); RequireTrustedDeviceEnv says it was turned on by CORAL_REQUIRE_TRUSTED_DEVICE=1, which the dashboard cannot turn off.
 	RequireTrustedDevice    bool `json:"require_trusted_device"`
 	RequireTrustedDeviceEnv bool `json:"require_trusted_device_env,omitempty"`
+	// RelayBoards is how many boards still accept a cross-team message relayed through the Hub with the switch on (they list a source server; the relay is the Hub's, not a person's), so the person sees what the switch does not cover.
+	RelayBoards int `json:"require_trusted_device_relay_boards,omitempty"`
 	// HubRelaunchUpdatesAtLaunch: the server was started with --allow-hub-update / CORAL_ALLOW_HUB_UPDATE, which turns the switch above on at every start: Settings shows "On (set at launch)" while it is on, and says turning it off lasts only until the next start (#13258).
 	HubRelaunchUpdatesAtLaunch bool `json:"hub_relaunch_updates_at_launch,omitempty"`
 	// HubRelaunchNeedsHere: on Windows an update installs only when a person at this computer approves it, so the switch above cannot let Coral Hub install; the page says so (#7338).
@@ -107,6 +109,11 @@ func (h *CloudHandler) status() cloudStatus {
 		out.RequireTrustedDevice = hubRequireEnv()
 	}
 	out.RequireTrustedDeviceEnv = hubRequireEnv()
+	if out.RequireTrustedDevice && h.bs != nil {
+		if n, err := h.bs.CountRelayBoards(context.Background()); err == nil {
+			out.RelayBoards = n
+		}
+	}
 	out.HubOnly = auth.HubOnly()
 	if m := h.manager(); m != nil && st.State == cloud.StateEnrolling {
 		out.ComputerFingerprint = m.DisplayFingerprint()

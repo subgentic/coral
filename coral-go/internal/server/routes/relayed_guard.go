@@ -131,12 +131,12 @@ func relayedHeaders(r *http.Request) (any, whole bool) {
 }
 
 // hubWriteExemptAuthority says whether a write of devicekey's hubWriteExempt list has the authority that admits it with no signature (#21883). The device-keys message and certificate carry their own signature in the body and
-// read no Hub header. guide-revoked is the Hub's own service stream, never a person. A cross-team relay is another Coral's, stamped by the connector with a source server and no Hub person. hub-notice is the
+// read no Hub header; the pair answer (#21880) carries a MAC over the fragment secret that the handler checks against the live local hold. guide-revoked is the Hub's own service stream, never a person. A cross-team relay is another Coral's, stamped by the connector with a source server and no Hub person. hub-notice is the
 // Hub's fixed template, stamped by the connector with the notice header. Anything else on those routes (a person's request, a forged stamp) is an unsigned write and is refused.
 func hubWriteExemptAuthority(r *http.Request, via cloud.Via) bool {
 	path := devicekey.RoutePath(r.URL.RequestURI())
 	switch {
-	case path == "/api/device-keys/message" || path == "/api/device-keys/certificate":
+	case path == "/api/device-keys/message" || path == "/api/device-keys/certificate" || path == "/api/device-keys/pair":
 		return true
 	case path == "/api/cloud/guide-revoked":
 		_, ok := cloud.ServiceAsker(r)

@@ -73,11 +73,12 @@ func MatchRoute(k Kind, method, target string) (map[string]string, bool) {
 // hubWriteExempt is the closed list of writes the hub-write kind is never signed for, each with the authority that admits it without a signature (the guard, routes/relayed_guard.go, checks that authority; a request
 // that does not have it is refused like any unsigned write, and a signature on it is wrong_request):
 //   - POST /api/device-keys/message and /certificate: the device signature in the body is the authority (they read no Hub header).
+//   - POST /api/device-keys/pair (#21880): a browser's answer to a pairing the person started here; its authority is the MAC over the fragment-only secret and the live local hold (one 403 pairing_refused for every failure), it reads no Hub header.
 //   - POST /api/cloud/guide-revoked: the Hub's own service stream (cloud.ServiceAsker), never a person.
 //   - POST .../external-messages and .../external-artifacts: another Coral's relay, authentic only with the connector's stamp, a source server and no Hub person; the board's cross_team_servers allowlist (local only) is its authority.
 //   - POST .../hub-notice: the Hub's fixed-template notice (the connector's stamp and the notice header), information only.
 var hubWriteExempt = []Route{
-	{"POST", "/api/device-keys/message"}, {"POST", "/api/device-keys/certificate"}, {"POST", "/api/cloud/guide-revoked"},
+	{"POST", "/api/device-keys/message"}, {"POST", "/api/device-keys/certificate"}, {"POST", "/api/device-keys/pair"}, {"POST", "/api/cloud/guide-revoked"},
 	{"POST", "/api/board/{project}/external-messages"}, {"POST", "/api/board/{project}/external-artifacts"}, {"POST", "/api/board/{project}/hub-notice"},
 }
 
