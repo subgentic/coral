@@ -49,3 +49,18 @@ func TestNeedsYouKindListsOnlyThatKindAndKeepsTheCounts(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	assert.Empty(t, needsYouItems(out), "a kind with nothing waiting is an empty list, with the true count")
 }
+
+// #21880: device_key is a kind ?kind= takes, so a page reads the new-browser notices alone.
+func TestNeedsYouKindTakesDeviceKey(t *testing.T) {
+	h, _ := operatorAsksRig(t)
+	h.SetNeedsYouDeviceKeys(func(context.Context) ([]NeedsYouItem, error) {
+		return []NeedsYouItem{{Kind: "device_key", Line: "\"Phone\" can now act on this computer as view: ABCD-EFGH-IJKL-MNOP", Team: "", ID: "device_key:k:1", At: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano)}}, nil
+	})
+	code, out := readNeedsYou(t, h, "?kind=device_key", asPerson)
+	require.Equal(t, http.StatusOK, code, out)
+	items := needsYouItems(out)
+	require.Len(t, items, 1)
+	assert.Equal(t, "device_key", items[0]["kind"])
+	code, _ = readNeedsYou(t, h, "?kind=device_keys", asPerson)
+	assert.Equal(t, http.StatusBadRequest, code)
+}

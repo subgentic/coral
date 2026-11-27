@@ -167,6 +167,20 @@ func TestCompletePairingPromotesABootstrapKey(t *testing.T) {
 	assert.Equal(t, "view", k.Mode, "the mode it already had is not changed by a promotion")
 }
 
+// #21883: a key that was above the chosen mode and is promoted by the pairing proof ends at the chosen mode (capped, never raised).
+func TestCompletePairingCapsAPromotedKeyAtTheChosenMode(t *testing.T) {
+	for _, c := range []struct{ was, chosen, want string }{{"launch", "view", "view"}, {"interact", "view", "view"}, {"launch", "interact", "interact"}, {"view", "launch", "view"}} {
+		r := newRig(t)
+		secret, uc, label, s, ans := pairingFixture(t)
+		r.add(s, c.was, store.DeviceOriginNoProof, store.DeviceKindDevice)
+		_, err := devicekey.CompletePairing(context.Background(), r.ss, secret, uc, label, ans, c.chosen, t0)
+		require.NoError(t, err)
+		k, _ := r.listed(s.kid)
+		assert.Equal(t, store.DeviceOriginPairing, k.Origin)
+		assert.Equal(t, c.want, k.Mode, c.was+" promoted at "+c.chosen)
+	}
+}
+
 // Only the pairing-proof path reaches the promotion: no other non-test file calls it.
 func TestOnlyThePairingPathCallsPromoteDeviceOrigin(t *testing.T) {
 	var hits []string

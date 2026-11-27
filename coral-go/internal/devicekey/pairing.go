@@ -142,6 +142,9 @@ func CompletePairing(ctx context.Context, st PairingStore, secret []byte, userCo
 		if _, err := st.PromoteDeviceOrigin(ctx, a.KID, now); err != nil {
 			return "", err
 		}
+		if _, err := cappedMode(ctx, st, a.KID, mode, now); err != nil {
+			return "", err
+		}
 	}
 	return a.KID, nil
 }
@@ -157,15 +160,8 @@ func AddPairedKey(ctx context.Context, st PairingStore, kid string, pk []byte, l
 		if _, err := st.PromoteDeviceOrigin(ctx, kid, now); err != nil {
 			return err
 		}
-		// A promoted key becomes trusted (#21883): it never keeps a mode above the one the person just chose. Capped, never raised.
-		k, err := st.ActiveDeviceKey(ctx, kid, now)
-		if err != nil {
-			return mapStoreErr(err)
-		}
-		have, ok := tunnel.ParseMode(k.Mode)
-		want, wok := tunnel.ParseMode(mode)
-		if ok && wok && have <= want {
-			final = k.Mode
+		if final, err = cappedMode(ctx, st, kid, mode, now); err != nil {
+			return err
 		}
 	}
 	// The mark the Needs you notice reads: the person at this computer allowed this key at this mode (and it stamps the time of the change).
@@ -173,6 +169,23 @@ func AddPairedKey(ctx context.Context, st PairingStore, kid string, pk []byte, l
 		return mapStoreErr(err)
 	}
 	return nil
+}
+
+// cappedMode is the mode a just-promoted key ends with: a promoted key becomes trusted (#21883), so it keeps no mode above the one the person chose. Capped, never raised: a key below the chosen mode stays where it is. When the stored mode is above, it is set down here (by this computer).
+func cappedMode(ctx context.Context, st PairingStore, kid, chosen string, now time.Time) (string, error) {
+	k, err := st.ActiveDeviceKey(ctx, kid, now)
+	if err != nil {
+		return "", mapStoreErr(err)
+	}
+	have, ok := tunnel.ParseMode(k.Mode)
+	want, wok := tunnel.ParseMode(chosen)
+	if ok && wok && have <= want {
+		return k.Mode, nil
+	}
+	if err := st.SetDeviceMode(ctx, kid, chosen, "", now); err != nil {
+		return "", mapStoreErr(err)
+	}
+	return chosen, nil
 }
 
 const secretLife = 10 * time.Minute

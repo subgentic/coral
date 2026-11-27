@@ -28,7 +28,7 @@ const (
 )
 
 // needsYouKinds are the kinds an item can be (the keys of the answer's counts), the values ?kind= takes.
-var needsYouKinds = map[string]bool{"agent": true, "question": true, "wait": true, "proposal": true, "review": true, "goal_done": true, "skill": true}
+var needsYouKinds = map[string]bool{"agent": true, "question": true, "wait": true, "proposal": true, "review": true, "goal_done": true, "skill": true, "device_key": true}
 
 // needsYouNotIncluded names what the Inbox counts that this read cannot see. A consumer must treat a word it does not know as informational (a later release may name more), never as an error: it means "this read does not cover that", not that the answer is invalid. A read that fails (refused, 404) is a different thing from an empty answer and must be shown as an incomplete list.
 var needsYouNotIncluded = []string{"failed_runs", "welcome", "unrecorded_agents"}
@@ -276,7 +276,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	// ?kind=<kind> (#13834): only that kind's items are listed (count and counts stay the whole answer's, true), so a Hub's shell can read the skill rows without paging past newer questions. One of the kinds in counts; anything else is 400.
 	kind := r.URL.Query().Get("kind")
 	if kind != "" && !needsYouKinds[kind] {
-		errBadRequest(w, "kind is one of agent, question, wait, proposal, review, goal_done, skill")
+		errBadRequest(w, "kind is one of agent, question, wait, proposal, review, goal_done, skill, device_key")
 		return
 	}
 	items, unread, muted, err := h.needsYouItemsOf(r, kind == "skill") // ?kind=skill reads the skills only: count and counts then say what that read holds (#18623)
