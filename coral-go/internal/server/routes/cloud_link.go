@@ -37,6 +37,9 @@ type cloudStatus struct {
 	RedactTokens bool `json:"redact_tokens"`
 	// HubRelaunchUpdates is the local switch "Let Coral Hub relaunch this Coral to install updates" (#5280).
 	HubRelaunchUpdates bool `json:"hub_relaunch_updates"`
+	// RequireTrustedDevice is the local switch "Require a trusted device for Hub actions" (#21883); RequireTrustedDeviceEnv says it was turned on by CORAL_REQUIRE_TRUSTED_DEVICE=1, which the dashboard cannot turn off.
+	RequireTrustedDevice    bool `json:"require_trusted_device"`
+	RequireTrustedDeviceEnv bool `json:"require_trusted_device_env,omitempty"`
 	// HubRelaunchUpdatesAtLaunch: the server was started with --allow-hub-update / CORAL_ALLOW_HUB_UPDATE, which turns the switch above on at every start: Settings shows "On (set at launch)" while it is on, and says turning it off lasts only until the next start (#13258).
 	HubRelaunchUpdatesAtLaunch bool `json:"hub_relaunch_updates_at_launch,omitempty"`
 	// HubRelaunchNeedsHere: on Windows an update installs only when a person at this computer approves it, so the switch above cannot let Coral Hub install; the page says so (#7338).
@@ -98,6 +101,12 @@ func (h *CloudHandler) status() cloudStatus {
 	}
 	out := cloudStatus{Status: st, DeviceWebMode: h.ss.DeviceWebMode(context.Background()), AllowHubAutoAccept: allow, MaxModeSaved: modeSaved, RedactTokens: redact, HubRelaunchUpdates: relaunch, HubRelaunchNeedsHere: relaunchNeedsLocalApproval, HubRelaunchAvailable: updateRelaunchFeature, HubCrossTeamSettings: crossTeam, AllowHubAutoAcceptChanged: changed, Bootstrap: boot, OfferAtLaunch: h.OfferAtLaunch}
 	out.HubRelaunchUpdatesAtLaunch = h.HubUpdateAtLaunch
+	if s, err := h.ss.GetSettings(context.Background()); err == nil {
+		out.RequireTrustedDevice = HubRequireTrustedDevice(s)
+	} else {
+		out.RequireTrustedDevice = hubRequireEnv()
+	}
+	out.RequireTrustedDeviceEnv = hubRequireEnv()
 	out.HubOnly = auth.HubOnly()
 	if m := h.manager(); m != nil && st.State == cloud.StateEnrolling {
 		out.ComputerFingerprint = m.DisplayFingerprint()

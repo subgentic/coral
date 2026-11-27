@@ -65,6 +65,8 @@ type SessionsHandler struct {
 	artifactNudge *ClaudeArtifactNudger
 	// indexKick asks the history indexer for a pass soon (set by SetIndexKick): an agent's reply has just been written to its transcript (#6198).
 	indexKick func()
+	// requireDevice says whether "Require a trusted device for Hub actions" is on, for a terminal frame through the Hub (require_device_terminal.go); nil: off.
+	requireDevice func() bool
 	// newUUID, when set, makes this handler's new session ids (a test that compares two handlers gives both the same ones without
 	// touching the package variable, so such tests can run in parallel, #4982); nil is generateUUID.
 	newUUID func() string

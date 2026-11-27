@@ -19,6 +19,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safego"
@@ -774,6 +775,14 @@ func (t *terminalStream) handleFrame(msg terminalFrame) {
 	var sendErr error
 	if t.keyLink && (msg.Type == "composer_send" || msg.Type == "terminal_input") { // a key link is never the person (#21220): nothing it sends is typed
 		frame := map[string]any{"type": "terminal_input_failed", "code": keyLinkPersonActCode, "error": keyLinkPersonActText, "not_sent": true}
+		if msg.ID != nil {
+			frame["id"] = *msg.ID
+		}
+		wsWriteJSON(t.ctx, t.conn, frame)
+		return
+	}
+	if t.h.refuseTerminalFrame(t.viaHub, msg.Type) { // #21883: a frame through the Hub cannot be signed
+		frame := map[string]any{"type": "terminal_input_failed", "code": devicekey.ErrDeviceRequired.Error(), "error": requireDeviceFrameText, "not_sent": true}
 		if msg.ID != nil {
 			frame["id"] = *msg.ID
 		}

@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,6 +57,19 @@ const HubCrossTeamSetting = "hub_cross_team_settings"
 // HubCrossTeamAllowed reads the lock (default on).
 func HubCrossTeamAllowed(settings map[string]string) bool {
 	return setreg.Bool(settings, HubCrossTeamSetting)
+}
+
+// HubRequireTrustedDeviceSetting is the local switch "Require a trusted device for Hub actions" (#21883). Off unless set to "true" or CORAL_REQUIRE_TRUSTED_DEVICE=1 at start. Written only by PUT /api/cloud/hub-require-trusted-device, by the person at this computer: never through the tunnel, never by an agent, and PUT /api/settings refuses it.
+const HubRequireTrustedDeviceSetting = "hub_require_trusted_device"
+
+// HubRequireTrustedDeviceEnv turns the switch on at start; the dashboard cannot turn it off while it is set.
+const HubRequireTrustedDeviceEnv = "CORAL_REQUIRE_TRUSTED_DEVICE"
+
+func hubRequireEnv() bool { return os.Getenv(HubRequireTrustedDeviceEnv) == "1" }
+
+// HubRequireTrustedDevice reads the switch.
+func HubRequireTrustedDevice(settings map[string]string) bool {
+	return hubRequireEnv() || setreg.Bool(settings, HubRequireTrustedDeviceSetting)
 }
 
 // HubRelaunchAllowed reads the switch: on only for the word true, so a person who never touched it (nothing stored, or any other word) is off (#6290).

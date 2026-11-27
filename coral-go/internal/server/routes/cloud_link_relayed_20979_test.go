@@ -218,7 +218,7 @@ func (noStore) ActiveDeviceKey(context.Context, string, time.Time) (store.Device
 
 func guardFor(t *testing.T, link string, v func() *devicekey.Verifier, mut func(*http.Request)) (rec *httptest.ResponseRecorder, reached bool) {
 	t.Helper()
-	g := RelayedGuard(v, func(context.Context) (string, error) { return rlOwner, nil })
+	g := RelayedGuard(v, func(context.Context) (string, error) { return rlOwner, nil }, nil)
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { reached = true })
 	c := rlBase(devicekey.AllowLink)
 	r := httptest.NewRequest(c.method, c.target, strings.NewReader("{}"))
@@ -238,7 +238,7 @@ func guardFor(t *testing.T, link string, v func() *devicekey.Verifier, mut func(
 func TestTheGuardRefusesEachKindWithNoSignatureAtAll(t *testing.T) {
 	for _, k := range rlKinds {
 		c := rlBase(k)
-		g := RelayedGuard(func() *devicekey.Verifier { return &devicekey.Verifier{Store: noStore{}} }, func(context.Context) (string, error) { return rlOwner, nil })
+		g := RelayedGuard(func() *devicekey.Verifier { return &devicekey.Verifier{Store: noStore{}} }, func(context.Context) (string, error) { return rlOwner, nil }, nil)
 		reached := false
 		r := httptest.NewRequest(c.method, c.target, strings.NewReader("{}"))
 		stamp(r)
