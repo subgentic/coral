@@ -28,7 +28,8 @@ const CASES = [ // key, title, message, options, class, the button's words
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const colours = {};
             for (const [key, title, message, opts, cls, words] of CASES) {
-                await ev(`window.showConfirmModal(${JSON.stringify(title)}, ${JSON.stringify(message)}, () => {}, undefined, ${JSON.stringify(opts)}); true`);
+                const immediate = await ev(`(() => { window.showConfirmModal(${JSON.stringify(title)}, ${JSON.stringify(message)}, () => {}, undefined, ${JSON.stringify(opts)}); const cancel = document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)'); return { shown: getComputedStyle(document.getElementById('confirm-modal')).display !== 'none', cancelFocused: document.activeElement === cancel }; })()`);
+                assert.deepEqual(immediate, { shown: true, cancelFocused: true }, `${at}${key}: Cancel owns focus before open returns`);
                 await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${at}${key}: the dialog`, 8000);
                 const got = await ev(`(() => { const b = document.getElementById('confirm-modal-yes'); const s = getComputedStyle(b); return { cls: b.className, bg: s.backgroundColor, color: s.color, text: b.textContent }; })()`);
                 assert.ok(got.cls.split(/\s+/).includes(cls) && !got.cls.split(/\s+/).includes(cls === 'btn-danger' ? 'btn-primary' : 'btn-danger'), `${at}${key}: the confirming button is ${cls}: ${got.cls}`);
