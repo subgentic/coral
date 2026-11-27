@@ -20,6 +20,7 @@ var identityWords = map[string]bool{"subscriber": true, "session": true, "sender
 var notIdentityFields = map[string]string{
 	"hub_owner_links":    "a remote's health answer (#21213): the version of its per-hub owner secrets, a number; never a participant",
 	"acts_as":            "custom health checks (#20176): the member a check speaks as; the route stores the board member's own spelling of it and refuses the Operator and any name that is not a member, so the request's spelling is never kept",
+	"received_from":      "written by the server into the upload record of a file another team sent that this team sent for review (#21811): the sending team's board label, read from our own received row; read back from the data folder, never from a request",
 	"promoted_by":        "written by the server into the upload record of an edit made in Dropbox that the Operator chose to use (#14714): the word operator, or auto_sync when auto-sync promoted it; read back from the data folder, never from a request",
 	"keep_assigned":      "task release (#11660): a flag, whether the released task stays with its owner; the owner is the task's own, never a name from the request",
 	"agent_type":         "which CLI to launch, not a participant",
