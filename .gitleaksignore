@@ -374,3 +374,24 @@ ac25224cc16381ec01c8536f84facd9319190d41:coral-go/internal/server/routes/dropbox
 5d169f2fa81c1547b10ea245dad42e337697f801:tests/frontend/dropbox_settings.test.js:generic-api-key:103
 5d169f2fa81c1547b10ea245dad42e337697f801:coral-go/internal/server/routes/dropbox_app_key_test.go:generic-api-key:26
 5d169f2fa81c1547b10ea245dad42e337697f801:coral-go/internal/server/routes/dropbox_app_key_test.go:generic-api-key:27
+# #21997: test fixtures added after Nov 11 (device-key and Google Doc tests); all fake values in test files and one public test vector
+19661907ae8391023e5096f880e8eaff56b12076:coral-go/internal/devicekey/sealedbox_20966_test.go:generic-api-key:60
+229b6088487ec675507aef6b71c48da119de6657:coral-go/cmd/coral/cloud_keys_20944_test.go:generic-api-key:21
+47050be9d8bdc23a09f214a7eb64200606a5b33e:coral-go/internal/server/routes/gdoc_drafts_test.go:github-pat:77
+59bb8bac7a5db3058eb75947860b0553af2653a1:coral-go/internal/sshprov/start_test.go:generic-api-key:658
+5ce628c7e96b2eb4672f61d6247161a56243a1fc:coral-go/internal/cloud/device_key_test.go:generic-api-key:40
+615c67ce8f0dd76c8f63d9baea5803e7e83fdd14:coral-go/internal/server/routes/review_drafts_test.go:github-pat:106
+67c92a84ac3487ab106736e747c9447ce032edd7:coral-go/internal/server/routes/hub_key_join_21220_test.go:generic-api-key:29
+699747abd9b793e091b54256525c3e56536b3589:coral-go/internal/startup/run_result_reader_test.go:github-pat:19
+6ad68c5d35ea220a12d27aa177fba78566fb5ea4:coral-go/internal/store/remote_link_key_21220_test.go:generic-api-key:20
+6ad68c5d35ea220a12d27aa177fba78566fb5ea4:coral-go/pkg/hubproxy/credential_21220_test.go:generic-api-key:18
+735a71cf08d8ccbb754c69f11e1860b488b67e25:coral-go/internal/server/routes/hub_dropbox_test.go:generic-api-key:124
+95a944bf564b6821b9dec6682f2c688c9afb9896:coral-go/internal/devicekey/testdata/device-keys-vectors.json:generic-api-key:6
+b76b6e84204b6e6f2a13891d7e2a5f865983bfc2:coral-go/internal/server/routes/gdoc_sync_test.go:github-pat:231
+b76b6e84204b6e6f2a13891d7e2a5f865983bfc2:coral-go/internal/server/routes/gdoc_sync_test.go:github-pat:244
+c6ba818f6ce25fa0b959fef33012e72b65f8658a:coral-go/internal/server/routes/reminders_standalone_test.go:generic-api-key:112
+d2196771626c8ac7ccbcd7c1dc5a2addbe305480:coral-go/internal/server/routes/gdoc_comments_test.go:github-pat:183
+d42bab3da580cc8372aaface749cd3029705175f:coral-go/internal/gdocsync/fake_test.go:generic-api-key:37
+ed1b0986e62852fbd2fd2e9a2c3b2375022ffcb7:coral-go/internal/server/routes/hub_key_join_21220_test.go:generic-api-key:14
+f8adbef58a74551b02c488d39ab4db8966a727a5:coral-go/internal/server/routes/gdoc_sync_test.go:github-pat:134
+f94f5f8c041e74755816603d2fa43063186fdc4d:coral-go/internal/server/routes/gdoc_comments_test.go:github-pat:74
