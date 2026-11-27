@@ -35,7 +35,7 @@ export function createComposer({ st, render, run, ownHex }) {
         const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.wholeComposer = null; st.error = ''; render(); });
         const draft = !editOf && review;
         const send = btn(`${draft ? '' : 'btn-primary '}ac-send`, editOf ? 'Save' : review ? 'Save' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
-        const saveSend = draft ? btn('btn-primary ac-send ac-save-send', 'Send') : null;
+        const saveSend = draft ? btn('btn-primary ac-send ac-save-send', 'Send', 'Send comment') : null;
         if (saveSend) saveSend.type = 'submit';
         const err = el('p', 'ac-error', st.error); err.setAttribute('role', 'alert'); err.hidden = !st.error;
         const actionWord = !editOf && review ? 'save this draft' : 'send';
