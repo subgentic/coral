@@ -58,14 +58,14 @@ function pathField(type, label, recheck, settings) {
             const r = await serverFetch(currentServer(), '/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: path }) });
             if (!r.ok) {
                 let why = ''; try { const d = await r.json(); why = String(d.error || d.message || ''); } catch { /* said below */ }
-                note.textContent = `Not saved. ${why || `The server answered ${r.status}.`} Enter the full path to the ${label} program file, or set it in Settings > Providers.`;
+                note.textContent = `Not saved. ${why || `Coral answered ${r.status}.`} Enter the full path to the ${label} program file, or set it in Settings > Providers.`;
                 return;
             }
             state.settings = { ...(state.settings || {}), [key]: path };
             note.textContent = 'Saved. Checking…';
             await recheck();
             note.textContent = 'Saved.';
-        } catch { note.textContent = 'Not saved: the server could not be reached. Try again.'; } finally { save.disabled = false; }
+        } catch { note.textContent = 'Not saved: Coral could not be reached. Try again.'; } finally { save.disabled = false; }
     };
     input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save.click(); } });
     row.append(input, save); box.append(lead, row, note, more);
@@ -95,7 +95,7 @@ export async function openSetupDialog({ onReady, onSkip } = {}) {
         const signin = el('p', null, `2. Run ${info.name || type} once and sign in.`), help = el('p');
         if (info.url) { const a = el('a', null, info.url.replace(/^https?:\/\//, '')); a.href = info.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; help.append('More: ', a); }
         steps.append(line);
-        if (type === 'codex') steps.append(el('p', null, 'Or use the standalone installer from github.com/openai/codex.')); // what the Operator used (#583): Coral finds that install too (#582)
+        if (type === 'codex') steps.append(el('p', null, 'Or use the standalone installer from github.com/openai/codex.')); // a common way to install it (#583): Coral finds that install too (#582)
         steps.append(signin, help, pathField(type, label, () => run(true), () => { shut(); window.showSettingsModal?.('providers'); }));
         more.onclick = () => { steps.hidden = !steps.hidden; more.textContent = steps.hidden ? 'Show steps' : 'Hide steps'; };
         row.append(top, steps); body.append(row); rows[type] = { status, label };
