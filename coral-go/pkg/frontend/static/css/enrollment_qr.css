@@ -1,0 +1,5 @@
+/* Local-only enrollment image; loaded with the Connect screen. The encoder's
+   white quiet zone stays intact in either theme. */
+.enrollment-qr { margin: 16px 0 0; max-width: 100%; }
+.enrollment-qr img { display: block; width: 256px; max-width: 100%; height: auto; }
+.enrollment-qr figcaption { margin-top: 8px; max-width: 42ch; overflow-wrap: anywhere; }

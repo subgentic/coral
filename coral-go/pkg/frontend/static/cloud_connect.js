@@ -18,6 +18,7 @@ export const { enrolledRetrying, rekeyText, describe } = await importOnce('./clo
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS, HUB_RELAUNCH_AT_LAUNCH, HUB_RELAUNCH_OFF_AT_LAUNCH, HUB_RELAUNCH_OFF_TOAST_AT_LAUNCH } = await importOnce('./update_words.js'); // a lazy module loads the others through importOnce, so a failed load is retried
 
 const STATUS_URL = '/api/cloud/status';
+let settingsQRCloseBound = false;
 // 'Let Coral Hub act as the Operator' (#3377): a local-only owner setting. The route answers only
 // on this computer (404 through the hub), so the row is shown only when it answers 200.
 const HUB_OPERATOR_URL = '/api/system/hub-operator';
@@ -137,6 +138,18 @@ class CloudPanel {
         if (!enrolling) this.pairingSecret = null; // a secret is for one pairing: gone with it
         const code = this.part('code');
         if (code) code.hidden = !enrolling;
+        const qrActive = enrolling && !this.qrPaused && this.root.offsetParent !== null;
+        if (this.qr) this.qr.render(qrActive ? st : { state: 'idle' });
+        if (!qrActive) this.qrGeneration = (this.qrGeneration || 0) + 1;
+        else if (!this.qr && !this.qrImport) {
+            const own = this.qrGeneration = (this.qrGeneration || 0) + 1;
+            this.qrImport = importOnce('./cloud_enrollment_qr.js').then(({ enrollmentQR }) => {
+                this.qrImport = null;
+                if (own !== this.qrGeneration || this.qrPaused || !this.root.isConnected || this.root.offsetParent === null) return;
+                this.qr = enrollmentQR(this.root);
+                this.qr.render(this.lastSt);
+            }).catch(() => { this.qrImport = null; }); // optional image: the link and code already work
+        }
         put(this.part('computer-key'), enrolling ? st.computer_fingerprint || '' : ''); // this computer's key as the browser shows it, to compare; gone with the pairing (#19969)
         const fr = this.part('computer-key-row'); if (fr) fr.hidden = !(enrolling && st.computer_fingerprint);
         if (enrolling) {
@@ -500,6 +513,7 @@ class CloudPanel {
 
     // Owner-only refusal: keep the local browser path and offer the existing SSH flow (#21557).
     elsewhere(body) {
+        this.qrGeneration = (this.qrGeneration || 0) + 1; this.qr?.stop();
         this.say(`${ELSEWHERE_TEXT} ${HEADLESS_TEXT}`);
         for (const role of ['code', 'connect', 'cancel', 'disconnect', 'mode-row', 'ask-row', 'auto-accept-row']) { const el = this.part(role); if (el) el.hidden = true; }
         const row = this.part('command-row');
@@ -633,13 +647,13 @@ class CloudPanel {
         this.say(msg);
     }
 
-    stop() { clearTimeout(this.timer); clearTimeout(this.ownerTimer); clearInterval(this.retryTick); }
+    stop() { this.qrPaused = true; this.qrGeneration = (this.qrGeneration || 0) + 1; this.qr?.stop(); clearTimeout(this.timer); clearTimeout(this.ownerTimer); clearInterval(this.retryTick); }
 }
 
 /** Mount the connect flow in `root` and load its status. Returns the panel (load(), stop()). */
 export function mountCloudConnect(root, { onState } = {}) {
     if (!root) return null;
-    if (root._cloudPanel) { root._cloudPanel.onState = onState || root._cloudPanel.onState; root._cloudPanel.load(); return root._cloudPanel; }
+    if (root._cloudPanel) { root._cloudPanel.qrPaused = false; root._cloudPanel.onState = onState || root._cloudPanel.onState; root._cloudPanel.load(); return root._cloudPanel; }
     const p = new CloudPanel(root, onState);
     root._cloudPanel = p;
     p.bind();
@@ -650,6 +664,17 @@ export function mountCloudConnect(root, { onState } = {}) {
 // Settings > Coral Hub and remote access.
 export function initCloudConnect() {
     const root = document.getElementById('settings-cloud');
+    if (root && !settingsQRCloseBound) {
+        document.addEventListener('coral:settings-closed', () => document.getElementById('settings-cloud')?._cloudPanel?.stop());
+        document.addEventListener('coral-settings-group', e => {
+            const panel = document.getElementById('settings-cloud')?._cloudPanel;
+            if (e.detail?.id !== document.getElementById('settings-pane-network')?.dataset.group) { panel?.stop(); return; }
+            // Settings announces its pane before showing the dialog. Read a
+            // waiting enrollment once that synchronous open has finished.
+            queueMicrotask(() => { if (panel?.lastSt?.state === 'enrolling' && panel.root.offsetParent !== null) loadCloudStatus().catch(() => {}); });
+        });
+        settingsQRCloseBound = true;
+    }
     if (root && !root._cloudPanel) { const p = new CloudPanel(root); p.commandsInRow = true; root._cloudPanel = p; p.bind(); }
 }
 
@@ -657,6 +682,7 @@ export async function loadCloudStatus() {
     const root = document.getElementById('settings-cloud');
     if (!root) return;
     if (!root._cloudPanel) initCloudConnect();
+    root._cloudPanel.qrPaused = false;
     root._cloudPanel.ownerRefresh = true; // Settings was opened: look for the last owner the Hub showed again (the panel outlives the dialog, #6108)
     await root._cloudPanel.load();
 }
