@@ -50,7 +50,7 @@ var routeQueries = map[string]string{
 	"GET /api/filesystem/is-git":                  "path*",
 	"GET /api/filesystem/list":                    "path*",
 	"GET /api/goal-links":                         "cursor,limit,request_id",
-	"GET /api/goals":                              "board,cursor,limit,state",
+	"GET /api/goals":                              "board,cursor,include_archived,limit,state",
 	"GET /api/goals/metrics":                      "hours",
 	"GET /api/launch/check":                       "base,branch,new_worktree,path*,type,worktree_path*",
 	"GET /api/launch/where":                       "path*",

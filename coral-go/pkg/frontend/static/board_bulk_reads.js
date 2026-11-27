@@ -1,7 +1,9 @@
 /* Complete board scans and paged exports load when requested, keeping reads off startup. */
 import { fetchMessages, mergeMessages } from './board_fetch.js';
 import { state } from './state.js';
+import { importOnce } from './import_once.js';
 import { isCloud, identityKey, noteBoardLabels, serverFetch, sessionServer, responseUpdateError } from './server_base.js';
+const { noteArchivedRows } = await importOnce('./archived_teams.js'); // which teams are archived (#21850)
 // The export reads whole boards and transcripts in pages (#3718): through Coral Hub a JSON reply
 // is held whole to be checked for secrets and refused over 2 MiB, so it never asks for all of one
 // at once.
@@ -59,6 +61,7 @@ export async function fetchProjects() {
     const data = resp ? await resp.json() : [];
     const local = Array.isArray(data) ? data : [];
     noteBoardLabels(local, 'project'); // board_label beside each key (#3536)
+    noteArchivedRows(local); // which teams are archived (#21850)
     const remotes = !state.hub ? [] : (state.servers || []).filter(s => s.id !== 'local' && s.status === 'online');
     const updates = [];
     const lists = await Promise.all(remotes.map(async srv => {
@@ -67,6 +70,7 @@ export async function fetchProjects() {
             if (!r.ok) { const update = await responseUpdateError(r, srv.id); if (update) updates.push(update.message); return []; }
             const rows = await r.json();
             noteBoardLabels(rows, 'project', srv.id);
+            noteArchivedRows(rows, srv.id);
             return (Array.isArray(rows) ? rows : []).map(p => ({ ...p, project: identityKey(srv.id, p.project), server: srv.id }));
         } catch { return []; }
     }));

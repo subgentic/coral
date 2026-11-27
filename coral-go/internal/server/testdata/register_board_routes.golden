@@ -1,5 +1,6 @@
 DELETE /api/board/remotes | (*BoardRemotesHandler).RemoveSubscription-fm
 DELETE /api/board/{project} | (*BoardHandler).DeleteBoard-fm
+DELETE /api/board/{project}/archive | (*SessionsHandler).RestoreTeam-fm
 DELETE /api/board/{project}/artifacts/{id}/review | (*BoardHandler).UnmarkArtifactForReview-fm
 DELETE /api/board/{project}/automations/{name} | (*BoardHandler).DeleteAutomationRoute-fm
 DELETE /api/board/{project}/cross-team-links | (*BoardHandler).RemoveLocalLinks-fm
@@ -93,6 +94,7 @@ POST /api/board/{project}/agents/{subscriber}/restart | (*SessionsHandler).Orche
 POST /api/board/{project}/agents/{subscriber}/sleep | (*SessionsHandler).OrchestratorSleep-fm
 POST /api/board/{project}/agents/{subscriber}/stop | (*SessionsHandler).OrchestratorStop-fm
 POST /api/board/{project}/agents/{subscriber}/wake | (*SessionsHandler).OrchestratorWake-fm
+POST /api/board/{project}/archive | (*SessionsHandler).ArchiveTeam-fm
 POST /api/board/{project}/artifacts/{digest}/edit | (*BoardHandler).SaveArtifactEdit-fm
 POST /api/board/{project}/artifacts/{digest}/edit/send | (*SessionsHandler).sendEditDiff-fm
 POST /api/board/{project}/artifacts/{id}/review | (*BoardHandler).ReviewArtifact-fm

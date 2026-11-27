@@ -142,6 +142,8 @@ type AllGoalsQuery struct {
 	Boards []string
 	Limit  int
 	Cursor string
+	// HideArchived leaves out the goals of archived teams (#21850).
+	HideArchived bool
 }
 
 // AllGoalsMaxBoards is the most boards one all-boards goal read may name.
@@ -193,6 +195,9 @@ func (s *Store) AllGoalsPage(ctx context.Context, q AllGoalsQuery) (*GoalPage, e
 		for _, b := range q.Boards {
 			args = append(args, b)
 		}
+	}
+	if q.HideArchived {
+		where += " AND " + notArchivedSQL
 	}
 	if q.Cursor != "" {
 		at, after, err := decodeTaskCursor(q.Cursor, allBoardsTag, "A")

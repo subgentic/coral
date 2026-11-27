@@ -1,7 +1,7 @@
 // The Tasks folder's opener is spent once Back has used it (#12319, the review's MUST on its first round): opening a task from Inbox > Tasks stores the list's scroll offset and the row's key so Back can put them back; that
 // note must not outlive the Back, or a LATER fresh open of Tasks (another folder, then Tasks again) is thrown back to the old offset with the old row focused. It is the other consumer of the opener (openInboxGroup), not the one
 // Needs you uses. Twelve tasks assigned to the Operator on a real board; a short window so the list scrolls; a real mouse click on a row far down; Back; the restore lets go; another folder, then Tasks again.
-// 1280 and 390 px, isolated dev server. (Board history stores its opener the same way, but its key is the chat's session id, which no row of the list carries as its data-key, so a stale one finds no row and restores nothing:
+// 1280 and 390 px, isolated dev server. (Teams stores its opener the same way, but its key is the chat's session id, which no row of the list carries as its data-key, so a stale one finds no row and restores nothing:
 // the symptom cannot show there, and no test can pin its delete.)
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');

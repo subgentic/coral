@@ -1,4 +1,4 @@
-// A task referenced in an Inbox Board history message opens in the Inbox (#8861, Goal #73 step 2): the `#N` link of a message in /inbox/boards/<team> opens /inbox/tasks/<team>/<id> in the shared task screen, never the
+// A task referenced in an Inbox Teams message opens in the Inbox (#8861, Goal #73 step 2): the `#N` link of a message in /inbox/boards/<team> opens /inbox/tasks/<team>/<id> in the shared task screen, never the
 // team page; Back returns to the board. At 1280 and 390. Real board, task and message on the isolated dev server (removed again).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -25,19 +25,19 @@ const { coralReady } = require('./helpers/wait');
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            console.log(`${at}a task referenced in Board history opens in the Inbox, Back returns to the board`);
+            console.log(`${at}a task referenced in Teams opens in the Inbox, Back returns to the board`);
             await load(boardUrl);
-            await waitFor(`!![...document.querySelectorAll('#inbox-page .mb-message')].find(r => r.textContent.includes('See task #${T}'))`, 'the message in Board history', 15000);
+            await waitFor(`!![...document.querySelectorAll('#inbox-page .mb-message')].find(r => r.textContent.includes('See task #${T}'))`, 'the message in Teams', 15000);
             await ev(`(() => { const row = [...document.querySelectorAll('#inbox-page .mb-message')].find(r => r.textContent.includes('See task #${T}')); row.querySelector('.mb-row-toggle').click(); row.querySelector('.mb-task-link').click(); return true; })()`);
             await waitFor(`location.pathname === ${JSON.stringify(taskUrl)} && document.querySelector('#inbox-page .team-task-page')?.textContent.includes(${JSON.stringify(TASK)})`, 'the task in the Inbox at ' + taskUrl, 15000);
             assert.equal(await ev(`getComputedStyle(document.getElementById('team-page-view')).display === 'none'`), true, at + 'the team page is not on screen');
-            assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`), '\u2190 Board history', at + 'the task opened from Board history says Board history');
+            assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`), '\u2190 Teams', at + 'the task opened from Teams says Teams');
             await shot(`inbox-board-task-landing-${w}`);
             await ev(`document.querySelector('#inbox-page .goals-back').click(); true`);
             await waitFor(`location.pathname === ${JSON.stringify(boardUrl)} && !!document.querySelector('#inbox-page .mb-message')`, 'Back returns to the board', 15000);
             await shot(`inbox-board-task-back-${w}`);
             console.log('   ✓');
         }
-        console.log('PASS inbox board task in place: a task referenced in Board history opens in the Inbox, Back returns to the board, at 1280 and 390');
+        console.log('PASS inbox board task in place: a task referenced in Teams opens in the Inbox, Back returns to the board, at 1280 and 390');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

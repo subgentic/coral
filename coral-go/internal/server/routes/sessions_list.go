@@ -143,6 +143,29 @@ func (h *SessionsHandler) addTeamHealth(r *http.Request, rows []map[string]any) 
 	}
 }
 
+// addTeamArchived marks each row of an archived team "team_archived": true (#21850), and every other row of a team false: the sidebar leaves an archived team and its agents out
+// entirely (no team row, no agent rows, no Archived caption for them). A failed read marks nothing, so a team never disappears for a tick.
+func (h *SessionsHandler) addTeamArchived(r *http.Request, rows []map[string]any) {
+	if h.bs == nil {
+		return
+	}
+	var archived map[string]string
+	for _, row := range rows {
+		project, _ := row["board_project"].(string)
+		if project == "" {
+			continue
+		}
+		if archived == nil {
+			var err error
+			if archived, err = h.bs.ArchivedBoards(r.Context()); err != nil {
+				return
+			}
+		}
+		_, ok := archived[project]
+		row["team_archived"] = ok
+	}
+}
+
 // healthOnMemo is the last health state read of every team (addTeamHealth).
 type healthOnMemo struct {
 	mu sync.Mutex
@@ -245,6 +268,7 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	addPermissionFields(sessions, lv.extras) // the Operator's keep-Full-access choice and the effective mode (#14061, #14085), for Claude, Codex and agy, awake or asleep
 	dropOwnerOnlyCodexFields(r, sessions)
 	h.addTeamHealth(r, sessions)
+	h.addTeamArchived(r, sessions)
 	if off, err := h.ss.AutoSleepOffSessions(r.Context()); err == nil && len(off) > 0 { // the Operator's per-agent opt-out (#12111), for the menu's wording
 		for _, row := range sessions {
 			if sid, _ := row["session_id"].(string); off[sid] {

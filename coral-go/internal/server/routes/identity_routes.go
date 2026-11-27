@@ -56,6 +56,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/goal-links":                              "read the tasks another team made for a goal request (Coral Hub's own service reads it, #7364)",
 	"POST /api/board/{project}/pause":                  "pause a board",
 	"POST /api/board/{project}/resume":                 "resume a board",
+	"POST /api/board/{project}/archive":                "archive a team (every agent asleep and archived, the board paused)",
+	"DELETE /api/board/{project}/archive":              "restore an archived team",
 	// #6329: the instruction of an agent's reminder is the Operator's own text to that agent; another agent's token cannot read it.
 	"GET /api/board/{project}/reminder":        "read an agent's reminder instruction",
 	"DELETE /api/artifacts/series/{series_id}": "delete an artifact series", // #6357: every version of it

@@ -710,6 +710,7 @@ async function _loadAgentBoardProjects() {
         if (!Array.isArray(projects) || server !== _effectiveServer(launch.server)) return;
         noteBoardLabels(projects, 'project', server);
         for (const p of projects) {
+            if (p.archived) continue; // an archived team is not launched into (#21850)
             if (preset && p.project === preset) continue; // already the one option, and selected
             const opt = document.createElement("option");
             opt.value = p.project;

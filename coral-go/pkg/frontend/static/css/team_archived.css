@@ -1,0 +1,2 @@
+/* An archived team opened from the Teams page (team_page.js, #21850). Lazy: loaded with the team page, not at start. */
+.team-page-archived { flex: 1 1 100%; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 14px; border: 1px solid rgba(var(--warning-rgb), 0.5); border-radius: var(--radius-md, 8px); background: rgba(var(--warning-rgb), 0.12); color: var(--text-primary); } /* an archived team (#21850): the notice and Restore team */

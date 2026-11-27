@@ -13,7 +13,7 @@ const { pathToFileURL } = require('node:url');
     assert.equal(m.backLabelFor('task', '/inbox/tasks', ''), 'Tasks');
     assert.equal(m.backLabelFor('task', '/inbox/needs', ''), 'Needs you');
     assert.equal(m.backLabelFor('task', '/inbox/artifacts', ''), 'Artifacts');
-    assert.equal(m.backLabelFor('task', '/inbox/boards/alpha', ''), 'Board history');
+    assert.equal(m.backLabelFor('task', '/inbox/boards/alpha', ''), 'Teams');
     assert.equal(m.backLabelFor('goal', '/inbox/goals', ''), 'Goals');
     assert.equal(m.backLabelFor('goal', '/inbox/needs', ''), 'Needs you');
     // another goal or task: its title when it was remembered, else the kind

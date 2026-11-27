@@ -48,7 +48,7 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(f.dot, 'a tag has its colour dot');
         // the column for a screen reader and the keyboard (#8022): each view's name and count read apart and once, one Tab stop for the column, the arrows move between the views
         const names = await ev(`[...document.querySelectorAll('.view-list-item')].map(b => [b.getAttribute('aria-label'), (${ROW_WORDS})(b)])`);
-        assert.ok(names.some(([a]) => a === 'All chats, 119') && names.some(([a]) => a === 'Board history, 1') && !names.some(([a]) => a === 'Pi'), 'a folder with nothing unread says its name and how many it holds (a CLI with none counted, its name alone): ' + JSON.stringify(names.slice(0, 8)));
+        assert.ok(names.some(([a]) => a === 'All chats, 119') && names.some(([a]) => a === 'Teams, 1') && !names.some(([a]) => a === 'Pi'), 'a folder with nothing unread says its name and how many it holds (a CLI with none counted, its name alone): ' + JSON.stringify(names.slice(0, 8)));
         assert.equal(await ev(`[...document.querySelectorAll('.view-list-item')].filter(b => b.tabIndex === 0).map(b => b.dataset.key).join()`), 'chats', 'one Tab stop: the current view');
         await ev(`document.querySelector('.view-list-item[data-key="chats"]').focus(); true`);
         const key = async k => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: k, code: k }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code: k }); };
@@ -112,11 +112,11 @@ const { coralReady } = require('./helpers/wait');
             // the heading's number is the folder's total (what the folder says), never the rows loaded
             await waitFor(`(document.querySelector('#group-table-view .session-group-count') || {}).textContent === String(window.__folderN['${key}'])`, `${key}: the heading says the folder's count ` + (await ev(`window.__folderN['${key}']`)));
         }
-        // the boards' chats live in Board history: the name once, "1 message"
+        // the boards' chats live in Teams: the name once, "1 message"
         await ev(`document.querySelector('.view-list-item[data-key="chats-group"]').click(); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 1 && !!document.querySelector('#group-table-view .dt-tag')`, 'the Board history folder: the one board');
-        assert.deepEqual(await ev(`(() => { const r = document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)'); return [r.querySelector('.dt-primary').textContent, !!r.querySelector('.dt-chat-snippet'), r.querySelector('.dt-tag').textContent]; })()`), ['release-crew', false, 'Archived'], 'a group chat says its name once with no summary line (#8961), and one chip at most: Board history already says Board, so the board is marked only for being archived (#9730)');
-        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-tag')].map(t => t.textContent).join()`), 'Archived', 'an archived board stays in Board history, marked with its one chip');
+        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === 1 && !!document.querySelector('#group-table-view .dt-tag')`, 'the Teams folder: the one board');
+        assert.deepEqual(await ev(`(() => { const r = document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group)'); return [r.querySelector('.dt-primary').textContent, !!r.querySelector('.dt-chat-snippet'), r.querySelector('.dt-tag').textContent]; })()`), ['release-crew', false, 'Archived'], 'a group chat says its name once with no summary line (#8961), and one chip at most: Teams already says Board, so the board is marked only for being archived (#9730)');
+        assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-tag')].map(t => t.textContent).join()`), 'Archived', 'an archived board stays in Teams, marked with its one chip');
         console.log('   ✓');
 
         console.log('5. Phone: mail rows (the agent, the title, the time), the folders are in the ☰ drawer, select by the avatar');
@@ -150,7 +150,7 @@ const { coralReady } = require('./helpers/wait');
         const nums = () => ev(`Object.fromEntries([...document.querySelectorAll('.sidebar-pane[data-pane="hub-inbox"] .view-list-item')].map(b => [b.dataset.key, [(b.querySelector('.view-list-count') || {}).textContent || '', b.getAttribute('aria-label'), b.title]]))`);
         let nm = await nums();
         assert.deepEqual([nm['chats'], nm['chats-group'], nm['chats-active'], nm['chats-archived'], nm['chats-starred'], nm['chats-cli-codex'], nm['chats-notes']],
-            [['119', 'All chats, 119 unread', '119 in all'], ['1', 'Board history, 1 unread', '1 in all'], ['1', 'Active now, 1 running', '1 running'], ['3', 'Archived, 3', '3 in all'], undefined, ['30', 'Codex, 30 unread', '30 in all'], ['9', 'With notes, 9', '9 in all']], 'each folder\'s number is its unread chats, named so, the total in its tooltip; a folder with nothing unread shows how many it holds instead (#10319), plain, not the unread pill; Archived is the agents-only folder (#17482), so the one unread archived chat here is a board chat (in Board history) and Archived has none unread ' + JSON.stringify(nm));
+            [['119', 'All chats, 119 unread', '119 in all'], ['1', 'Teams, 1 unread', '1 in all'], ['1', 'Active now, 1 running', '1 running'], ['3', 'Archived, 3', '3 in all'], undefined, ['30', 'Codex, 30 unread', '30 in all'], ['9', 'With notes, 9', '9 in all']], 'each folder\'s number is its unread chats, named so, the total in its tooltip; a folder with nothing unread shows how many it holds instead (#10319), plain, not the unread pill; Archived is the agents-only folder (#17482), so the one unread archived chat here is a board chat (in Teams) and Archived has none unread ' + JSON.stringify(nm));
         await ev(`window.__asked.length = 0; true`);
         await ev(`document.querySelector('#group-table-view .dt-table tbody tr:not(.dt-group) button.dt-primary').click(); true`);
         await waitFor(`(document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="chats"] .view-list-count') || {}).textContent === '118'`, 'a chat opened lowers All chats\' number', 8000);

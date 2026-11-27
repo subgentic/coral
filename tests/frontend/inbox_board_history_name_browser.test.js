@@ -1,4 +1,4 @@
-// #11070 round 2 (Mobile Beta Tester, next-release phone pass): the Inbox's Board history folder names a team-launched board by its label, not its id. The folder's rows are built by mailbox_chats.js, not
+// #11070 round 2 (Mobile Beta Tester, next-release phone pass): the Inbox's Teams folder names a team-launched board by its label, not its id. The folder's rows are built by mailbox_chats.js, not
 // by the Chats page's history_list.js that #11070 first fixed: a row whose title is the board's id (b-guj2uyancw) read as the id while its detail page and the BOARDS filter said "smoke". The label is the page's
 // registry's (the sidebar's name) first, else the row's own board_label, else the title. 390 px with touch and 1280; the history list is stubbed in the page.
 const assert = require('node:assert/strict');
@@ -38,8 +38,8 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(!names.some(n => /b-guj2uyancw|b-4tt7u67wul/.test(n)), at + 'no board is read as its id: ' + JSON.stringify(names));
             const heads = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr.dt-group')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
             assert.ok(heads.includes('No messages yet') && !heads.some(h => /unknown/i.test(h)), at + 'a board with no messages is under "No messages yet", not "Date unknown": ' + JSON.stringify(heads));
-            if (mobile) assert.equal(await ev(`getComputedStyle(document.getElementById('phone-nav')).display`), 'flex', 'the phone\'s nav pill is on the Inbox\'s Board history page too');
-            console.log(`PASS ${width} px: Board history names ${JSON.stringify(names)}`);
+            if (mobile) assert.equal(await ev(`getComputedStyle(document.getElementById('phone-nav')).display`), 'flex', 'the phone\'s nav pill is on the Inbox\'s Teams page too');
+            console.log(`PASS ${width} px: Teams names ${JSON.stringify(names)}`);
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -70,6 +70,7 @@ func (h *BoardHandler) queryAllTasks(w http.ResponseWriter, r *http.Request) boo
 		errInternalServer(w, err.Error())
 		return true
 	}
+	query.HideArchived = len(query.Boards) == 0 && len(query.IDs) == 0 // an archived team's tasks are left out of the all-boards list, not out of its own page or a task asked for by id (#21850)
 	// Through Coral Hub the reply is redacted after the filter has matched, so an exact match on a name a token makes up would confirm a
 	// guess of that token. A filter value the redactor would change cannot match anything the viewer can see: refuse it (a value
 	// without a secret in it matches only names without one).

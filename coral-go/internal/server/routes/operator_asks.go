@@ -103,6 +103,9 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	rows := []operatorAskRow{}
 	for _, p := range projects {
+		if p.Archived {
+			continue // an archived team asks nothing of anyone until it is restored (#21850)
+		}
 		h.keepExpiredOperatorQuestions(ctx, p.Project) // a wait that ran out is an ask from now on (#11919)
 		asks, err := h.bs.OpenAsksOf(ctx, p.Project, "Operator", now)
 		if err != nil {

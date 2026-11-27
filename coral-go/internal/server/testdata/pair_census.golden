@@ -5,6 +5,7 @@ DELETE /api/artifacts/{id}/review-drafts/{cid} recorded
 DELETE /api/artifacts/{id}/star recorded
 DELETE /api/artifacts/{id}/trust-preview recorded
 DELETE /api/board/{project} recorded
+DELETE /api/board/{project}/archive recorded
 DELETE /api/board/{project}/artifacts/{id}/review recorded
 DELETE /api/board/{project}/messages/{messageID} recorded
 DELETE /api/board/{project}/reminder recorded
@@ -38,6 +39,7 @@ POST /api/artifacts/{id}/opened recorded
 POST /api/artifacts/{id}/review-drafts recorded
 POST /api/artifacts/{id}/review-drafts/send recorded
 POST /api/auto-accept/disable-all recorded
+POST /api/board/{project}/archive recorded
 POST /api/board/{project}/artifacts/{digest}/edit recorded
 POST /api/board/{project}/artifacts/{digest}/edit/send recorded
 POST /api/board/{project}/artifacts/{id}/review recorded

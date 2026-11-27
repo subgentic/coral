@@ -1,6 +1,6 @@
 // A reply shows once even when the board changes around it (walk 56, #17644; #17019's pin covered only the plain path): the person's reply is drawn under the message it answers (a thread draws a reply away from its place
 // in time), and a plain message that arrives after it, or a slow round trip of the reply's own POST, must not draw that reply a second time at the end ("Replies (2)" with two You rows until a reload).
-// Team Board and Inbox Board history, 1280 px. Real board over the API; the POST's answer is delayed 2.5 s in the page, and a poll (the 10 s timer's, here pollBoardNow) runs while it is out.
+// Team Board and Inbox Teams, 1280 px. Real board over the API; the POST's answer is delayed 2.5 s in the page, and a poll (the 10 s timer's, here pollBoardNow) runs while it is out.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -20,7 +20,7 @@ const BASE = require('./test_base').BASE;
         const first = await post('Boss', 'Status of the recipe book?');
         for (const t of ['Index page is up.', 'Styles next.']) await post('Boss', t);
         let shownReplies = 0, plain = 0;
-        for (const [label, path] of [['team Board', `/team/${B}/messages`], ['Board history', `/inbox/boards/${B}`]]) {
+        for (const [label, path] of [['team Board', `/team/${B}/messages`], ['Teams', `/inbox/boards/${B}`]]) {
             shownReplies++;
             await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await coralReady();
             const rowSel = `#mb-messages > .mb-message[data-message-id="${first}"]`;

@@ -1,4 +1,4 @@
-// #17482 (walks 70, 72, 73, 75, 77): the number beside Active now (and Archived) counts agents' chats only. A team's board chat is in Board history; a live team made the board 'active' too, so 3 agents showed Active now 4. Same fixture as chats_unread_foreign, with the board live and a second board archived.
+// #17482 (walks 70, 72, 73, 75, 77): the number beside Active now (and Archived) counts agents' chats only. A team's board chat is in Teams; a live team made the board 'active' too, so 3 agents showed Active now 4. Same fixture as chats_unread_foreign, with the board live and a second board archived.
 // (from #11873: the unread numbers beside the chat folders, and the unread dots on the rows, count only chats of agents Coral launched (a row with an agent name) and board
 // history. A transcript Coral did not launch (another Claude on the same computer) is in the list and the totals, never unread. History stubbed in the page: three agent chats, one foreign transcript with no agent
 // name, one board; the read marker began long ago, so every chat has changed since it. Desktop.
@@ -31,7 +31,7 @@ const { coralReady } = require('./helpers/wait');
         const nums = await ev(`Object.fromEntries([...document.querySelectorAll('.view-list-item')].map(b => [b.dataset.key, (b.querySelector('.view-list-count') || {}).textContent || '']))`);
         assert.equal(nums['chats'], '3', 'All chats: the three agents\' chats are unread, the foreign transcript is not: ' + JSON.stringify(nums));
         assert.equal(nums['chats-active'], '2', 'Active now: the two agents, not the foreign transcript that is also running: ' + JSON.stringify(nums));
-        assert.equal(nums['chats-group'], '2', 'Board history: its two boards: ' + JSON.stringify(nums));
+        assert.equal(nums['chats-group'], '2', 'Teams: its two boards: ' + JSON.stringify(nums));
         assert.equal(nums['chats-archived'], undefined, 'Archived is hidden: no agent chat is archived, the archived board is not counted: ' + JSON.stringify(nums));
         // opening an unread live board (or flagging it) takes nothing off Active now or Archived: the board is not counted there to begin with (#17626, QA3's SHOULD on #17482)
         const after = await ev(`import((window.__coralStatic || '/static/') + 'mailbox_chats.js').then(m => { const at = new Date(Date.now() - 300000).toISOString(); m.chatOpened({ session_id: 'board:team', type: 'group', source_type: 'claude', active: true, archived: false, starred: false, last_timestamp: at, summary: 'team - 1 messages' }); m.chatOpened({ session_id: 'board:old', type: 'group', source_type: 'claude', active: false, archived: true, starred: false, last_timestamp: at, summary: 'old - 1 messages' }); return Object.fromEntries(m.chatSections().flatMap(x => x.items).map(i => [i.key, String(i.count || '')])); })`);

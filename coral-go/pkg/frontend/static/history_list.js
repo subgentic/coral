@@ -43,7 +43,7 @@ export function chatWhen(iso, durationSec, now = new Date()) {
     return { day: whenText(iso, now), iso: d.toISOString(), full: d.toLocaleString(), ran: ranFor(durationSec) };
 }
 
-/** A group chat's (board's) name as people read it: the label the sidebar uses for that board key, else the row's own board_label, else its title, else the key (#11070: Board history showed team-launched boards by their id,
+/** A group chat's (board's) name as people read it: the label the sidebar uses for that board key, else the row's own board_label, else its title, else the key (#11070: Teams showed team-launched boards by their id,
  *  b-wvvnbdjqjb, because the row's title was empty and the board-label registry was never asked). The key itself (board-open, the active row) stays the title or id. */
 export function groupChatKeyName(s) { return s.title || String(s.session_id || '').replace(/^board:/, ''); }
 export function groupChatName(s) {
@@ -122,7 +122,7 @@ function dayGroup(iso, now = new Date()) {
 
 function groupOfChat(s) {
     if (chatsGroupBy() === 'agent') {
-        if (isGroupChat(s)) return { key: 'group-chats', label: 'Board history' };
+        if (isGroupChat(s)) return { key: 'group-chats', label: 'Teams' };
         const name = s.display_name || s.agent_name || '';
         return name ? { key: 'agent:' + name, label: name } : { key: 'no-agent', label: 'No agent' };
     }
@@ -158,7 +158,7 @@ function chatTableRow(s) {
     if (isGroupChat(s)) {
         const name = groupChatKeyName(s);
         const when = chatWhen(s.updated_at, null);
-        return { title: groupChatName(s), action: 'board-open', data: { board: identityKey(historyServer(), name) }, cells: ['Group chat', when ? when.day : '', ''] };
+        return { title: groupChatName(s), action: 'board-open', data: { board: identityKey(historyServer(), name) }, cells: ['Team', when ? when.day : '', ''] };
     }
     const when = chatWhen(s.last_timestamp, s.duration_sec);
     return { title: historyLabel(s), action: 'history-open', data: { 'session-id': s.session_id }, cells: [s.display_name || s.agent_name || '', when ? when.day : '', when ? when.ran.replace(/^ran /, '') : ''] };

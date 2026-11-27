@@ -76,7 +76,7 @@ export function openMoveGoal({ project, goal, openTasks, onMoved, onClose }) {
     dlg.append(form); document.body.append(dlg);
     const { server, name: here } = splitKey(project); // the other teams are the goal's own computer's: the move is made there (#13517)
     serverFetch(server, '/api/board/projects').then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))).then(rows => {
-        const others = (Array.isArray(rows) ? rows : []).filter(t => t && t.board_id && t.board_id !== here);
+        const others = (Array.isArray(rows) ? rows : []).filter(t => t && t.board_id && t.board_id !== here && !t.archived); // an archived team is not moved into (#21850)
         teamSel.replaceChildren(new Option(others.length ? 'Choose a team' : 'There is no other team', ''), ...others.map(t => new Option(t.board_label || t.board_id, t.board_id)));
         teamSel.disabled = !others.length;
     }).catch(() => { teamSel.replaceChildren(new Option('The teams could not be read', '')); });

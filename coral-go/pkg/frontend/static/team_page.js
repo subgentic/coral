@@ -6,7 +6,7 @@ import { menuMove } from './menu_keys.js';
  * and Agents, Knowledge and Settings are today's panels of the right dock moved in, until their own builds (stage 3 of #7453). Lazy: loaded by openTeamPage (lazy_panels.js). */
 import { state } from './state.js';
 import { showSidebarPane } from './sidebar.js';
-import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam, hasBoardLabel } from './server_base.js';
+import { keyLabel, splitKey, boardFetch, teamFetch, isCloud, teamWorkDir, inTeam } from './server_base.js';
 const { wakingSince, stopWaking } = await importOnce('./team_waking.js'); // lazy like this file (the Wake action loads it too)
 import { showView } from './utils.js';
 import { loadStyles } from './lazy_styles.js';
@@ -21,6 +21,8 @@ import { setPreviewSession } from './preview_pane.js';
 import { renderLiveSessions } from './render.js';
 import { watchScrollCue } from './scroll_cue.js';
 import { isPhoneLayout } from './phone_layout.js';
+const { isArchived } = await importOnce('./archived_teams.js');
+await loadStyles('team_archived.css');
 await loadStyles('team_tabs.css'); // the tab strip's steady widths (count room, no width animation): not at start (page_weight), loaded with the page before the strip is built (#15494)
 const { revealInStrip } = await importOnce('./strip_reveal.js'); // a part of the team page's group: loaded with it
 const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
@@ -146,17 +148,17 @@ let moreOpen = false;
 function openSettings() { importOnce('./team_settings_modal.js').then(m => m.openTeamSettings(S.team)).catch(e => console.error('team settings', e)); }
 
 /** Stopping a team: one menu, the same words and the same actions as the team's row in the sidebar (Sleep team or Wake team, Reset team, Stop agents; the last two apart, each asks first). A wide header has the Stop button; a phone's has the same items in More (#10008, Beta Tester and Mobile tester). */
-const teamArchived = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length && m.every(s => s.archived); }; // every agent is archived: the team is (#17491)
+const teamArchived = () => isArchived(S.team) || (state.liveSessions || []).some(s => inTeam(s, S.team) && s.team_archived); // the board's archived flag (the projects list, Archive team; the live rows carry it too, #21850)
 const teamAsleep = () => { const m = (state.liveSessions || []).filter(s => inTeam(s, S.team)); return m.length > 0 && m.every(s => s.sleeping); };
 function stopItems() {
     const m = (state.liveSessions || []).filter(s => inTeam(s, S.team));
     const why = m.length ? '' : 'No agent of this team is running'; // a team with no live agent has nothing to put to sleep, reset or stop: say so, do not offer a button that does nothing (#10187)
-    if (teamArchived()) return [{ key: 'restore', label: 'Restore team', hint: 'Brings every agent back, asleep', run: () => window.toggleTeamSleep?.(S.team, 'restore') }]; // an archived team has nothing to sleep, reset or stop (#17491)
+    if (teamArchived()) return [{ key: 'restore', label: 'Restore team', hint: 'Brings the team back to the sidebar; its agents come back asleep', run: () => window.toggleTeamSleep?.(S.team, 'restore') }]; // an archived team has nothing to sleep, reset or stop (#17491)
     // Sleep team while any agent is awake, Wake team while any sleeps: a half-asleep team has both (#17536).
     return [
         ...[['sleep', 'Sleep team', 'Stops every agent for now; Wake team starts them again', !m.length || m.some(s => !s.sleeping)], ['wake', 'Wake team', 'Starts the sleeping agents again', m.some(s => s.sleeping)]].filter(x => x[3]).map(([mode, label, hint]) => ({ key: mode, label, hint, why, run: () => window.toggleTeamSleep?.(S.team, mode) })),
         { key: 'reset', label: 'Reset team (clear context)', hint: 'Clears every agent\'s context; each starts in a new chat', why, run: () => window.resetTeam?.(S.team) },
-        { key: 'archive', label: 'Archive team', hint: 'Puts every agent away; Restore team brings them back', why, run: () => window.toggleTeamSleep?.(S.team, 'archive') },
+        { key: 'archive', label: 'Archive team', hint: 'Puts the team away; nothing is deleted. Restore team brings it back', run: () => window.toggleTeamSleep?.(S.team, 'archive') },
         { key: 'kill', label: 'Stop agents', hint: 'Ends every agent now; their chats stay in History', danger: true, why, run: () => window.killBoard?.(S.team) },
     ];
 }
@@ -239,7 +241,14 @@ function drawHeader() {
         if (computer) h.append(el('span', 'team-page-machine', ` on ${computer.label || computer.id}`));
     }
     document.title = `${keyLabel(S.team)} · Coral`;
+    let b = $('team-page-archived'); // an archived team opened from the Teams page says so, with Restore team (#21850)
+    if (teamArchived()) {
+        if (!b) { b = el('div', 'team-page-archived'); b.id = 'team-page-archived'; b.setAttribute('role', 'status'); $('team-page-head').append(b); }
+        const restore = el('button', 'btn btn-primary btn-small', 'Restore team'); restore.type = 'button'; restore.addEventListener('click', () => window.toggleTeamSleep?.(S.team, 'restore'));
+        b.replaceChildren(el('span', null, `${keyLabel(S.team)} is archived. Its board, goals and tasks are kept.`), restore);
+    } else b?.remove();
 }
+document.addEventListener('coral:team-archived-changed', () => { if (S.team && $('team-page-head')) { drawHeader(); syncStop(); } });
 
 function drawStatus(data) {
     const s = $('team-page-status'); if (!s) return;
@@ -582,7 +591,7 @@ export async function openTeamPage(team, opts = {}) {
         const here = location.pathname + location.search, was = here.startsWith('/team/') ? history.state?.prev : here;
         cameFrom = typeof was === 'string' && was.startsWith('/') && !was.startsWith('/team/') ? was : '';
     }
-    if (!hasBoardLabel(team)) importOnce('./board_fetch.js').then(m => m.fetchProjects()).then(() => S.team === team && drawHeader(), () => {});
+    importOnce('./board_fetch.js').then(m => m.fetchProjects()).then(() => S.team === team && (drawHeader(), syncStop()), () => {}); // the board's label, and whether the team is archived (the banner, Restore team; #21850)
     state.selectedTeam = team; // the team on screen (the sidebar marks its row; the panels moved in read it)
     if (changed && state.liveSessions?.length) renderLiveSessions(state.liveSessions); // the sidebar marks the new team's row (#16669)
     state.boardPageProject = team;

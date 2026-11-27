@@ -570,6 +570,9 @@ var routeTable = cat(
 		"/api/board/{project}/pause",
 	),
 	rules(http.MethodDelete, TierLaunch, "/api/board/{project}/messages/{id}"),
+	// Archive team puts every agent to sleep, archives it and pauses the board (#21850): Launch, like sleeping a team and like Remove team; Restore team is the same Launch.
+	rules(http.MethodPost, TierLaunch, "/api/board/{project}/archive"),
+	rules(http.MethodDelete, TierLaunch, "/api/board/{project}/archive"),
 
 	// ── launch: starts or wakes processes, browses folders, opens editors ─
 	// Coral Hub's owner turns a team's cross-team messaging or file sharing on or off (#5572): the machine refuses anyone else and the local lock "Let Coral Hub change cross-team

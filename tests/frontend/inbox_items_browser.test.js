@@ -1,4 +1,4 @@
-// #8633: Inbox task and Board history rows keep their reader in the Inbox.
+// #8633: Inbox task and Teams rows keep their reader in the Inbox.
 // Real isolated board/task/message fixtures; both mounts at desktop and phone widths.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

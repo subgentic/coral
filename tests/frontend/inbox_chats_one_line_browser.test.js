@@ -1,4 +1,4 @@
-// #8961 (Goal #79, #8935's list items 3 and 4): the Inbox's chat folders and Board history show ONE line per chat: Title | Agent | When (| Server with more than one machine); the agent's role and the first message are
+// #8961 (Goal #79, #8935's list items 3 and 4): the Inbox's chat folders and Teams show ONE line per chat: Title | Agent | When (| Server with more than one machine); the agent's role and the first message are
 // in the chat that opens, not on the row. The shared one-row table (#8931): it never folds and drops Server, then Agent as the box narrows, so a phone keeps Title and When. 1280 and 390; the history list is stubbed in the page.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');

@@ -193,6 +193,8 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
 		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
 		r.Get("/api/board/{project}/lifecycle-log", sessHandler.LifecycleLog)
+		r.Post("/api/board/{project}/archive", sessHandler.ArchiveTeam)                           // Archive team (#21850): sleep, archive each agent, flag and pause the board
+		r.Delete("/api/board/{project}/archive", sessHandler.RestoreTeam)                         // Restore team
 		sessHandler.RegisterEditSend(r)                                                           // Send to agent with the diff (#13802)
 		r.Get("/api/board/{project}/branches", sessHandler.TeamBranches)                          // the team's Branches tab (goal #11): read-only, from the git poller's snapshot
 		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/workers", boardHandler.Workers) // the workers a team approves (mock v3 idea 2): read by the team, written by the Operator, launched by the Orchestrator

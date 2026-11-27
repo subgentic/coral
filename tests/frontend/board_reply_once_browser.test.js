@@ -1,4 +1,4 @@
-// A reply sent from an open board message shows once (walk 46, #17019): the thread said "Replies (2)" with two You rows while the board held one message. On the team's Board and on the Inbox's Board history, 1280 px:
+// A reply sent from an open board message shows once (walk 46, #17019): the thread said "Replies (2)" with two You rows while the board held one message. On the team's Board and on the Inbox's Teams, 1280 px:
 // open a message, press Reply, send, and when the reply has arrived the message lists one reply, there is one row for it and the rows' ids are all different. Real board over the API through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -19,7 +19,7 @@ const BASE = require('./test_base').BASE;
         const first = await post('Boss', 'Status of the recipe book?');
         for (const t of ['Index page is up.', 'Styles next.', 'Then the print layout.']) await post('Boss', t); // the message is not the newest: a reply to it is drawn under it, not at the end
         let replies = 0;
-        for (const [label, path] of [['team Board', `/team/${B}/messages`], ['Board history', `/inbox/boards/${B}`]]) {
+        for (const [label, path] of [['team Board', `/team/${B}/messages`], ['Teams', `/inbox/boards/${B}`]]) {
             replies++; // each pass adds the person's reply (the agent's answer adds another below)
             await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await coralReady();
             await waitFor(`!!document.querySelector('#mb-messages > .mb-message[data-message-id="${first}"]')`, `${label}: the message`, 15000);

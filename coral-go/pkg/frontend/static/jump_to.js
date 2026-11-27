@@ -46,7 +46,7 @@ const has = (words, text) => words.every(w => text.toLowerCase().includes(w));
 async function search() {
     const text = $('jump-input').value.trim().toLowerCase(), mine = ++seq, words = text.split(/\s+/).filter(Boolean);
     if (mode === 'commands') { matches = COMMANDS().filter(c => has(words, c.label)); current = matches.length ? 0 : -1; draw(true); return; }
-    const agents = (state.liveSessions || []).filter(s => !s.archived && has(words, `${label(s)} ${s.name || ''} ${s.board_project || ''}`)).slice(0, 8)
+    const agents = (state.liveSessions || []).filter(s => !s.archived && !s.team_archived && has(words, `${label(s)} ${s.name || ''} ${s.board_project || ''}`)).slice(0, 8)
         .map(s => ({ label: s.board_project ? `${label(s)} (${keyLabel(s.board_project)})` : label(s), open: () => window.selectLiveSession(s.name, s.agent_type, s.session_id || '', sessionServer(s), { focusChat: true }) }));
     const teams = [...new Set((state.liveSessions || []).map(s => sessionTeamKey(s)).filter(Boolean))].filter(k => has(words, keyLabel(k))).slice(0, 5)
         .map(k => ({ label: `${keyLabel(k)} (team)`, open: () => window.openTeamPage(k, { tab: 'goals' }) }));

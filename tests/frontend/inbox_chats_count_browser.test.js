@@ -50,7 +50,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             check(`${label}: the re-read was one read`, (await reads()) === before + 1, `${before} then ${await reads()}`);
             await ev(`window.__slow = 0; true`);
             // a list kept from an earlier look is read again once it is old, with no counts read at all (#10262: after a restart the folder kept the one chat it was first opened with)
-            await ev(`window.__n = 1; window.__stuck = false; (async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); m.resetChatLists(); })(); true`); await openFolder('chats-group', mobile, 'Board history'); await openFolder('chats', mobile, 'All chats'); await waitFor(`document.querySelectorAll('button.dt-primary, button.dt-person').length === 1`, 'the list with one chat', 8000).catch(() => {});
+            await ev(`window.__n = 1; window.__stuck = false; (async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); m.resetChatLists(); })(); true`); await openFolder('chats-group', mobile, 'Teams'); await openFolder('chats', mobile, 'All chats'); await waitFor(`document.querySelectorAll('button.dt-primary, button.dt-person').length === 1`, 'the list with one chat', 8000).catch(() => {});
             await ev(`window.__n = 2; true`);
             const staleBefore = await reads();
             await ev(`(async () => { const g = await import((window.__coralStatic || '/static/') + 'sidebar_groups.js'); g.refreshGroupTable('hub-inbox'); return true; })()`); await settle(300);

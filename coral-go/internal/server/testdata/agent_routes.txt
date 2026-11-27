@@ -390,6 +390,8 @@ a PUT /api/board/{project}/health/checks/{name}
 c POST /api/board/{project}/hub-notice
 a POST /api/board/{project}/messages
 a POST /api/board/{project}/messages/mark-read
+b POST /api/board/{project}/archive
+b DELETE /api/board/{project}/archive
 b POST /api/board/{project}/pause
 a POST /api/board/{project}/relay-messages
 a POST /api/board/{project}/reminder

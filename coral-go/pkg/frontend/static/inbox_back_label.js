@@ -1,5 +1,5 @@
 /* The Back link of an Inbox task or goal screen says where it goes (#8861, UI/UX): "<- Keep this goal in the Inbox" for a task opened from that goal, "<- Tasks" only when the screen before is the Tasks folder, "<- Goals", "<- Needs you",
- * "<- Artifacts", "<- Board history" likewise; a goal opened from a task says the task. The screen before is read from the history entry (the address the Inbox was at); the title of a goal or task it was opened from is
+ * "<- Artifacts", "<- Teams" likewise; a goal opened from a task says the task. The screen before is read from the history entry (the address the Inbox was at); the title of a goal or task it was opened from is
  * written into the history entry by the opener (go(route, { from })), so it survives a reload and is never taken from a different move. Pure: tested in node. */
 
 const MAX = 24;
@@ -22,7 +22,7 @@ export function backLabelFor(kind, prev, remembered) {
     if (p === '/inbox/goals') return 'Goals';
     if (p === '/inbox/needs') return 'Needs you';
     if (p === '/inbox/artifacts') return 'Artifacts';
-    if (/^\/inbox\/boards(\/|$)/.test(p)) return 'Board history';
+    if (/^\/inbox\/boards(\/|$)/.test(p)) return 'Teams';
     if (/^\/inbox\/goals\/./.test(p)) return remembered ? shortLabel(remembered) : 'Goal';
     if (/^\/inbox\/tasks\/./.test(p)) return remembered ? shortLabel(remembered) : 'Task';
     return fallback;
