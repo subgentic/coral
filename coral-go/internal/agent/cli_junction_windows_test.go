@@ -186,9 +186,16 @@ func TestUnderJunctionRootIsAFolderBoundaryWithoutCase(t *testing.T) {
 		`C:\Users\me\..\me2\codex.exe`:                                        false,
 		`C:\Program Files Extra\codex.exe`:                                    false,
 		`C:\Windows\Temp\codex.exe`:                                           false, // a whole drive (C:\) is no root
+		"C:\\Program F\u0130les\\OpenAI\\codex.exe":                           false, // a dotted capital I (U+0130) is not an i to NTFS: another folder
+		"C:\\Program Files\\\u212Aodex\\codex.exe":                            true,  // inside a root, any name is fine
 	} {
 		assert.Equal(t, want, underJunctionRoot(p, roots), p)
 	}
+	// A Kelvin sign (U+212A) is not a k to NTFS: a look-alike of a root with a k in it is another folder.
+	kroots := []string{`C:\Users\kim`, `C:\Program Files\Kits`}
+	assert.False(t, underJunctionRoot("C:\\Users\\\u212Aim\\codex.exe", kroots))
+	assert.False(t, underJunctionRoot("C:\\Program Files\\\u212Aits\\codex.exe", kroots))
+	assert.True(t, underJunctionRoot(`C:\USERS\KIM\codex.exe`, kroots), "A-Z still folds")
 }
 
 // A junction in the chain that leads out of the roots stops the walk: to another drive's folder, or to a folder whose name only begins with the profile's.
@@ -245,5 +252,5 @@ func TestAConfiguredPathWindowsOpensIsNotScreened(t *testing.T) {
 	_, _, real := codexLayout(t, "1.0.0") // the real file: a path with no junction in it, which Windows opens
 	got, err := FindCLIForLaunchScreened(map[string]string{CLIPathSettingKey("codex"): real}, "codex", func(string) string { return "refused" })
 	require.NoError(t, err)
-	assert.Equal(t, strings.ToLower(real), strings.ToLower(got))
+	assert.Equal(t, foldASCII(real), foldASCII(got))
 }

@@ -126,9 +126,9 @@ var junctionRoots = func() []string {
 // underJunctionRoot reports whether p lies in one of roots: compared after filepath.Clean, without regard to case, on a folder boundary (C:\Users\me2 is not in C:\Users\me).
 // A root that is not absolute, or is a whole drive, counts for nothing.
 func underJunctionRoot(p string, roots []string) bool {
-	p = strings.ToLower(filepath.Clean(p))
+	p = foldASCII(filepath.Clean(p))
 	for _, r := range roots {
-		r = strings.ToLower(filepath.Clean(r))
+		r = foldASCII(filepath.Clean(r))
 		if !filepath.IsAbs(r) || len(r) <= len(filepath.VolumeName(r))+1 {
 			continue
 		}
@@ -137,6 +137,18 @@ func underJunctionRoot(p string, roots []string) bool {
 		}
 	}
 	return false
+}
+
+// foldASCII lowers A-Z only. strings.ToLower would also fold letters NTFS keeps apart (a dotted capital I, U+0130, to i; a Kelvin sign, U+212A, to k), so a folder
+// named with one would count as inside a root it is not in.
+func foldASCII(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if 'A' <= c && c <= 'Z' {
+			b[i] = c + ('a' - 'A')
+		}
+	}
+	return string(b)
 }
 
 // FollowedCLIRefusal is why the program a chain of junctions led to is not run, or "": in a temporary folder, or the reason screen gives (an agent's working folder, Coral's
