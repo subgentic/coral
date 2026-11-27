@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
@@ -50,8 +51,11 @@ func (h *SessionsHandler) uploadKindFor(ctx context.Context, r *http.Request, ta
 			return "", "--kind decided is accepted only from the team's Orchestrator"
 		}
 	case board.KindDone, board.KindRelease:
+		if gq := strings.TrimSpace(r.URL.Query().Get("goal")); gq != "" && asked == board.KindDone && taskID <= 0 {
+			return h.goalResultKind(ctx, sub.Project, sub.SubscriberID, gq)
+		}
 		if taskID <= 0 {
-			return "", "--kind " + asked + " needs --task N: the task this file is for, one of yours on this board"
+			return "", "--kind " + asked + " needs --task N (or --goal N for a goal's result): the task this file is for, one of yours on this board"
 		}
 		task, terr := h.bs.GetTask(ctx, sub.Project, taskID)
 		if terr != nil || task == nil || task.AssignedTo == nil || *task.AssignedTo != sub.SubscriberID {
@@ -81,4 +85,21 @@ func seriesKindFor(seriesKind, asked string) (kind, refused string) {
 		}
 		return "", "this series is a " + seriesKind + " file: a new version cannot be a " + asked + " (the kind belongs to the series)"
 	}
+}
+
+// goalResultKind accepts --kind done --goal N (#21811): the finished result of a goal, open or closed. Only the team's Orchestrator or the goal's driver may send it, so no other agent can post a
+// "done" file against a goal that is not theirs; the goal must be on the uploader's own board.
+func (h *SessionsHandler) goalResultKind(ctx context.Context, project, who, goalArg string) (kind, refused string) {
+	id, err := strconv.ParseInt(strings.TrimPrefix(goalArg, "#"), 10, 64)
+	if err != nil || id <= 0 {
+		return "", "--goal needs a goal number"
+	}
+	g, gerr := h.bs.GetGoal(ctx, project, id)
+	if gerr != nil || g == nil {
+		return "", "--kind done --goal N: that goal is not on this board"
+	}
+	if h.bs.RequireTaskReviewer(ctx, project, who) != nil && !board.SameIdentity(g.Driver, who) {
+		return "", "--kind done --goal N is for the goal's driver or the team's Orchestrator"
+	}
+	return board.KindDone, ""
 }

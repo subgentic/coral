@@ -20,7 +20,7 @@ import (
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
-const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT] [--no-review]
+const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--goal N] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT] [--no-review]
        coral-agent artifact review <coral://artifacts/digest | file id> [--question TEXT]
        coral-agent artifact download <coral://artifacts/digest | file id | file id@version> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash> <comment-id> <text | ->
@@ -59,7 +59,7 @@ nothing is stored. Test screenshots, logs and walk evidence are not for review: 
 The tag is also refused for a file Needs you cannot show inline (it shows Markdown, HTML, an image, a PDF, a CSV or TSV table and other text).
 
 --kind says what a file for review is, so the Operator can choose what reaches Needs you; no --kind is a plain file, which cannot be muted. Coral checks the fact for a kind, not your word:
-done needs --task N of an OPERATOR task assigned to you (the file that says it is finished); release needs --task N of the task titled exactly Release vX.Y.Z assigned to you;
+done needs --task N of an OPERATOR task assigned to you (the file that says it is finished; the task may already be completed), or --goal N for a goal's finished result (the goal's driver or the Orchestrator; the goal may already be closed); release needs --task N of the task titled exactly Release vX.Y.Z assigned to you;
 decided is accepted only from the team's Orchestrator; a digest is written only by Coral. Anything else is refused in words. The kind belongs to the file's series: a new version
 carries the same kind (or none, and then has it), never another. A question you need answered is never a kind: ask it with coral-board post --ask or wait --operator.
 
@@ -152,7 +152,7 @@ func cmdArtifact(args []string) {
 		fmt.Fprintln(os.Stderr, artifactUsageText)
 		clierr.Exit1()
 	}
-	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question", "kind", "note"}, []string{"no-task", "rename", "no-review"})
+	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "goal", "tag", "question", "kind", "note"}, []string{"no-task", "rename", "no-review"})
 	if err != nil || len(opts.Positional) != 1 {
 		if err == nil {
 			err = fmt.Errorf("upload needs exactly one file")
@@ -182,6 +182,13 @@ func cmdArtifact(args []string) {
 	name = mediatype.EnsureExtension(name, file)
 	mediaType := mediatype.Resolve(opts.Values["media-type"], file, name)
 	uploadNoReview = opts.Bools["no-review"]
+	if g := strings.TrimPrefix(strings.TrimSpace(opts.Values["goal"]), "#"); g != "" {
+		if n, perr := strconv.ParseInt(g, 10, 64); perr != nil || n <= 0 || opts.Values["kind"] != "done" {
+			fmt.Fprintf(os.Stderr, "Error: --goal N goes only with --kind done (a goal's finished result)\n%s\n", artifactUploadUsageText)
+			os.Exit(2)
+		}
+		uploadGoal = g
+	}
 	if err := uploadArtifactFull(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], opts.Values["kind"], opts.Values["note"], opts.Bools["rename"], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
@@ -218,7 +225,7 @@ func uploadArtifactFull(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		return err
 	}
 	defer f.Close()
-	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question)+kindQuery(kind)+noteQuery(note)+noReviewQuery(), f)
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question)+kindQuery(kind)+noteQuery(note)+noReviewQuery()+goalQuery(), f)
 	if err != nil {
 		return err
 	}
@@ -416,6 +423,16 @@ func tagQuery(tags []string) string {
 var uploadNoReview bool
 
 // noReviewQuery is the no_review parameter of an upload: "&no_review=1", or nothing.
+func goalQuery() string {
+	if uploadGoal == "" {
+		return ""
+	}
+	return "&goal=" + url.QueryEscape(uploadGoal)
+}
+
+// uploadGoal is --goal N on this upload (#21811): the goal a --kind done file is the result of.
+var uploadGoal string
+
 func noReviewQuery() string {
 	if uploadNoReview {
 		return "&no_review=1"

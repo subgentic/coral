@@ -327,7 +327,7 @@ Completed results are immutable. Dependencies must belong to this agent session.
 === coral-agent help artifact
 exit 0
 --- stdout
-Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT] [--no-review]
+Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--goal N] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT] [--no-review]
        coral-agent artifact review <coral://artifacts/digest | file id> [--question TEXT]
        coral-agent artifact download <coral://artifacts/digest | file id | file id@version> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash> <comment-id> <text | ->
@@ -512,7 +512,7 @@ Completed results are immutable. Dependencies must belong to this agent session.
 exit 1
 --- stdout
 --- stderr
-Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT] [--no-review]
+Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <file id>[@version]] [--rename] [--task N | --no-task] [--goal N] [--tag WORD]... [--question TEXT] [--kind done|release|decided] [--note TEXT] [--no-review]
        coral-agent artifact review <coral://artifacts/digest | file id> [--question TEXT]
        coral-agent artifact download <coral://artifacts/digest | file id | file id@version> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest | coral://goals/team/number | coral://diffs/team/session/hash> <comment-id> <text | ->

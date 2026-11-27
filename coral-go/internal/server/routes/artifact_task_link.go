@@ -61,7 +61,10 @@ func (h *SessionsHandler) artifactTaskLink(ctx context.Context, r *http.Request)
 		}
 		switch task.Status { // a finished task takes no more files: said now, never an upload that links to a task that is closed and vanishes from its page (#12755)
 		case "completed", "skipped":
-			return 0, "task " + strconv.FormatInt(id, 10) + " is " + task.Status + ": it takes no more files. Upload with --no-task, or to a task that is open", ""
+			if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("kind")), board.KindDone) {
+				return id, "", "" // #21811: the file that says the work is finished is the one file a finished task still takes (uploadKindFor checks it is the agent's own OPERATOR task)
+			}
+			return 0, "task " + strconv.FormatInt(id, 10) + " is " + task.Status + ": it takes no more files (but its finished result: --kind done with --tag \"for review\"). Upload with --no-task, or to a task that is open", ""
 		}
 		return id, "", ""
 	}
