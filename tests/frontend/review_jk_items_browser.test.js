@@ -68,7 +68,7 @@ const OTHER = 'e'.repeat(64);
   await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(fixture);
   await ev(`window.__drafts = [{ id: 1, body: 'Name the rollback owner before launch.', anchor: { whole: true }, source: 'owner', images: [] }]; window.__revision = 1; true`);
   await ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', { filename: 'Release plan', board: 'draft-test', fileList: ${LIST}, fileIndex: 0 }))`);
-  await waitFor(`!!document.querySelector('.ac-draft-card') && !document.querySelector('.ac-draft-bar button.btn-primary')?.disabled`, 'review ready'); await ev(framesJs(3));
+  await waitFor(`!!document.querySelector('.ac-draft-card') && !document.querySelector('.ac-draft-bar button.btn-primary')?.disabled`, 'review ready'); await waitFor(`!!document.querySelector('#artifact-viewer.av-draft-document[data-document-review]') && document.querySelector('.artifact-file-position')?.textContent === '1 of 2'`, 'the viewer is the document review with its list (class, attribute and position follow the draft card under load)'); await ev(framesJs(3));
  };
  const title = () => ev(`document.querySelector('.artifact-viewer-title').textContent.trim()`);
  const key = async (k, target) => { if (target) await ev(`document.querySelector(${JSON.stringify(target)}).focus(); true`); await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code: 'Key' + k.toUpperCase(), text: k, windowsVirtualKeyCode: k.toUpperCase().charCodeAt(0) }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code: 'Key' + k.toUpperCase(), windowsVirtualKeyCode: k.toUpperCase().charCodeAt(0) }); await ev(framesJs(4)); };
