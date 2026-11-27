@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #340: a CLI that is on PATH only through a folder Windows will not open is refused with one clear line, in the launch, and shown by the CLI-paths check before a launch.
@@ -102,4 +103,31 @@ func TestCLICheckFindsTheProgramAnUntrustedMountLeadsTo(t *testing.T) {
 	cliThroughUntrustedMount = func(string) (string, string, bool) { return "", `C:\Codex\bin`, true }
 	out = cliCheck(t, newSystemHandlerForTest(t), "type=codex")
 	assert.Equal(t, false, out["found"], "junctions that lead nowhere: not found")
+}
+
+// #582 (coral-go-team Security): a configured path through junctions is screened at its real program, as a launch screens it; a path Windows opens as it is is checked as before.
+func TestCLICheckScreensWhereAConfiguredPathsJunctionsLead(t *testing.T) {
+	prevReal, prevTemp := cliRealPath, cliTempDirs
+	t.Cleanup(func() { cliRealPath, cliTempDirs = prevReal, prevTemp })
+	tmp := t.TempDir()
+	cliTempDirs = func() []string { return []string{tmp} }
+	h := newSystemHandlerForTest(t)
+	configured := filepath.Join(t.TempDir(), "Codex", "bin", "codex.exe") // never run: the screen refuses it first
+	require.NoError(t, store.NewSessionStore(h.db).SetSetting(context.Background(), agent.CLIPathSettingKey("codex"), configured))
+
+	real := filepath.Join(tmp, "releases", "1.0.0", "bin", "codex.exe")
+	cliRealPath = func(string) (string, error) { return real, nil }
+	out := cliCheck(t, h, "type=codex")
+	assert.Equal(t, false, out["found"])
+	assert.Equal(t, true, out["configured"])
+	msg, _ := out["message"].(string)
+	assert.Contains(t, msg, "leads through junctions to "+real)
+	assert.Contains(t, msg, "in a temporary folder")
+
+	cliRealPath = func(p string) (string, error) { return p, nil } // Windows opens it: no screen, the usual check (here: no file)
+	out = cliCheck(t, h, "type=codex")
+	assert.Equal(t, false, out["found"])
+	msg, _ = out["message"].(string)
+	assert.NotContains(t, msg, "junctions")
+	assert.Contains(t, msg, "can't be run")
 }

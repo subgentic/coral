@@ -78,9 +78,22 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if p := agent.ResolveCLIPath(settings, agentType); p != "" {
-				run := p
-				if real, rerr := agent.RealCLIPath(p); rerr == nil { // through junctions Windows will not open: the program they lead to, as launch runs it (#582)
+				run, refused := p, ""
+				if real, rerr := cliRealPath(p); rerr == nil && real != p { // through junctions Windows will not open: the program they lead to, screened as launch screens it (#582)
+					refused = agent.FollowedCLIRefusal(real, func(q string) string { return untrustedLocationOf(r.Context(), h.cfg, h.ss, q) })
 					run = real
+				}
+				if refused != "" {
+					writeJSON(w, http.StatusOK, hubCLIReply(r, map[string]any{
+						"found":      false,
+						"status":     tracking.PrereqMissing,
+						"binary":     p,
+						"agent_type": agentType,
+						"configured": true,
+						"setting":    agent.CLIPathSettingKey(agentType),
+						"message":    fmt.Sprintf("the CLI path set in Settings > Providers (%s = \"%s\") leads through junctions to %s, which is %s, so a launch refuses it: install it somewhere else or set another path", agent.CLIPathSettingKey(agentType), p, run, refused),
+					}))
+					return
 				}
 				if err := configuredCLIRunnable(run, agentType); err != nil {
 					writeJSON(w, http.StatusOK, hubCLIReply(r, map[string]any{
@@ -341,6 +354,8 @@ var (
 	cliCommonPath = agent.FindCLIInCommonPaths
 	// cliThroughUntrustedMount is agent.CLIThroughUntrustedMount (a variable so a test stands in for Windows).
 	cliThroughUntrustedMount = agent.CLIThroughUntrustedMount
+	// cliRealPath is agent.RealCLIPath, for a configured path (a variable so a test stands in for Windows).
+	cliRealPath = agent.RealCLIPath
 	// cliRefreshSavedPath re-reads the Path the system keeps for the person (Windows: the registry), on a person's Check again only.
 	cliRefreshSavedPath = agent.RefreshSavedPath
 	// cliShareSkipped: a common place on a network share did not answer in time for this CLI (#464).

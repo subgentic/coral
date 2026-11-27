@@ -12,7 +12,8 @@ import (
 // installer gives %LOCALAPPDATA%\Programs\OpenAI\Codex\bin\codex.exe, where bin is a junction to ~\.codex\packages\standalone\current\bin and current a junction to
 // releases\<version>. Where Windows will not open that path, the person had no way on (#582: Settings refused it, and they did not know where the real folder is), so Coral
 // follows the chain itself, one link at a time, to the real program, and runs that. It does so again at each use and never saves the versioned path, so an update of the CLI
-// (a new releases\<version>, current pointed at it) is followed. A path Windows opens is used as it is: nothing here runs unless Windows refused it.
+// (a new releases\<version>, current pointed at it) is followed. A path Windows opens is used as it is: nothing here runs unless Windows refused it. A chain is followed only
+// while it stays in the person's own folders or Program Files (junctionRoots), and the program it leads to is screened as any CLI path is before a launch runs it.
 
 // maxJunctionHops bounds the links followed for one path (Codex's chain is two).
 const maxJunctionHops = 8
@@ -35,6 +36,9 @@ func RealCLIPath(p string) (string, error) {
 	real, rerr := resolveJunctionChain(p)
 	if rerr != nil {
 		return p, &UnfollowedChainError{Path: p, Err: rerr}
+	}
+	if !underJunctionRoot(real, junctionRoots()) {
+		return p, &UnfollowedChainError{Path: p, Err: outsideRootsError(real)}
 	}
 	info, serr := statCLI(real)
 	if serr != nil {
@@ -94,6 +98,9 @@ func resolveJunctionChain(p string) (string, error) {
 			if !filepath.IsAbs(target) { // a relative symbolic link is read against the folder that holds it
 				target = filepath.Join(cur, target)
 			}
+			if !underJunctionRoot(target, junctionRoots()) {
+				return "", outsideRootsError(target)
+			}
 			p = filepath.Join(append([]string{filepath.Clean(target)}, parts[i+1:]...)...)
 			followed = true
 			break
@@ -102,6 +109,50 @@ func resolveJunctionChain(p string) (string, error) {
 			return cur, nil
 		}
 	}
+}
+
+// junctionRoots are the folders a followed chain may lead into: every link's target and the program it ends on must lie in the person's profile, their local application
+// data, or Program Files. Read at each use, so a test sets them.
+var junctionRoots = func() []string {
+	var roots []string
+	for _, k := range []string{"USERPROFILE", "LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)"} {
+		if v := os.Getenv(k); v != "" {
+			roots = append(roots, v)
+		}
+	}
+	return roots
+}
+
+// underJunctionRoot reports whether p lies in one of roots: compared after filepath.Clean, without regard to case, on a folder boundary (C:\Users\me2 is not in C:\Users\me).
+// A root that is not absolute, or is a whole drive, counts for nothing.
+func underJunctionRoot(p string, roots []string) bool {
+	p = strings.ToLower(filepath.Clean(p))
+	for _, r := range roots {
+		r = strings.ToLower(filepath.Clean(r))
+		if !filepath.IsAbs(r) || len(r) <= len(filepath.VolumeName(r))+1 {
+			continue
+		}
+		if p == r || strings.HasPrefix(p, r+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
+// FollowedCLIRefusal is why the program a chain of junctions led to is not run, or "": in a temporary folder, or the reason screen gives (an agent's working folder, Coral's
+// data folder). screen may be nil.
+func FollowedCLIRefusal(real string, screen func(path string) string) string {
+	if InTempFolder(real) {
+		return "in a temporary folder"
+	}
+	if screen != nil {
+		return screen(real)
+	}
+	return ""
+}
+
+func outsideRootsError(p string) error {
+	return fmt.Errorf("%s leads outside your user folders or Program Files", p)
 }
 
 // CLIThroughUntrustedMount is binary in the PATH or common-place folder Windows will not open (UntrustedMountDir), followed to the real program (RealCLIPath): the path a
