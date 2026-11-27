@@ -84,12 +84,13 @@ func TestTheGoalListCountsOpenCommentThreadsPerGoalAndMarksNothingSeen(t *testin
 	got := rows(ps.URL)
 	assert.EqualValues(t, 2, got[a.ID]["comments_open"], "two open: the resolved and the deleted thread do not count")
 	assert.EqualValues(t, 1, got[b.ID]["comments_open"])
-	assert.Nil(t, got[c.ID]["comments_open"], "a goal with none has no field")
+	assert.Contains(t, got[c.ID], "comments_open", "always serialized")
+	assert.EqualValues(t, 0, got[c.ID]["comments_open"], "a goal with none says 0")
 	assert.EqualValues(t, 1, got[a.ID]["new_comments"], "and the unseen reply is still unseen after the read")
 	after, err := ss.UnseenAgentReplies(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, before, after, "a goal-list read marks nothing seen")
-	assert.Nil(t, rows(as.URL)[a.ID]["comments_open"], "an agent's or guest's list has no count")
+	assert.EqualValues(t, 0, rows(as.URL)[a.ID]["comments_open"], "an agent's or guest's list has no count")
 }
 
 func TestAFileWithChangesRequestedCarriesTheLatestNoteAndAnApprovedOneDoesNot(t *testing.T) {
