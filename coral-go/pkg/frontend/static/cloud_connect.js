@@ -252,7 +252,7 @@ class CloudPanel {
         const reqDev = this.part('hub-require-device');
         if (reqDev) { reqDev.checked = st.require_trusted_device === true; reqDev.disabled = st.require_trusted_device_env === true; }
         const reqDevState = this.part('hub-require-device-state');
-        if (reqDevState) reqDevState.textContent = st.require_trusted_device_env === true ? 'On because Coral was started with CORAL_REQUIRE_TRUSTED_DEVICE=1.' : st.require_trusted_device === true ? 'On: Hub actions that are not signed by a trusted device are refused.' : '';
+        if (reqDevState) reqDevState.textContent = st.require_trusted_device_env === true ? 'On because Coral was started with CORAL_REQUIRE_TRUSTED_DEVICE=1.' : st.require_trusted_device === true ? 'On: Hub actions that are not signed by a trusted device are refused. If the last device paired with a code is removed, every Hub action is refused until you turn this off here.' : '';
         // Cross-team switches from the hub (#5572): the owner may turn a team's messaging and file sharing on or off unless this lock is off (the server reads an unset or unreadable lock as off).
         const hubCrossTeam = this.part('hub-cross-team');
         if (hubCrossTeam) hubCrossTeam.checked = st.hub_cross_team_settings !== false;
