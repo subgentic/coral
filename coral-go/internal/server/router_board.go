@@ -122,6 +122,10 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 		}
 		return news, nil
 	})
+	boardHandler.SetReviewNotes(func(ctx context.Context) (map[string]string, error) { // the latest Request-changes note per file (#21989)
+		return sessStore.LatestChangeNotes(ctx, routes.ChangeWordsPrefix)
+	})
+	boardHandler.SetGoalThreads(sessStore.OpenGoalThreads)                                      // open comment threads per goal, read-only (#21989)
 	boardHandler.SetWaitingComments(func(ctx context.Context) ([]store.WaitingComment, error) { // the Operator's comments sent to an agent that it has not answered (#19916)
 		return sessStore.WaitingComments(ctx, time.Now(), 7*24*time.Hour)
 	})
