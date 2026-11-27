@@ -25,11 +25,19 @@ func ValidateCLIPath(path string) error {
 	if !filepath.IsAbs(path) {
 		return errors.New("the CLI path must be absolute (for example /usr/local/bin/claude)")
 	}
-	info, err := os.Stat(path)
+	// A path through junctions Windows will not open (an untrusted mount point, #340) is followed to the program it leads to (#582): the path is saved as the person typed it
+	// (the installer's), and launch follows it again each time, so the CLI's own updates (a new version folder) are followed too.
+	real, err := RealCLIPath(path)
 	if err != nil {
-		if isUntrustedMount(err) { // the saved path goes through junctions Windows no longer trusts: say that, not "no file" (#340)
-			return fmt.Errorf("%s goes through a folder Windows will not open (an untrusted mount point): use the real folder of the program, not the junction that points at it", path)
+		var unfollowed *UnfollowedChainError
+		if errors.As(err, &unfollowed) {
+			return unfollowed
 		}
+		return fmt.Errorf("no file at %s", path)
+	}
+	path = real
+	info, err := statCLI(path)
+	if err != nil {
 		return fmt.Errorf("no file at %s", path)
 	}
 	if !info.Mode().IsRegular() {

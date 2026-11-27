@@ -13,9 +13,9 @@ const BASE = require('./test_base').BASE;
         // cli-check answers from window.__ready (flipped by the test); settings writes are kept in window.__puts.
         await ev(`(() => { const real = window.fetch; window.__ready = { claude: false, codex: false, agy: false }; window.__puts = [];
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.href), p = url.pathname;
-                if (p === '/api/system/cli-check') { const t = url.searchParams.get('type') || 'claude'; return Promise.resolve(Response.json({ agent_type: t, found: !!window.__ready[t], status: window.__ready[t] ? 'ok' : 'missing' })); }
+                if (p === '/api/system/cli-check') { const t = url.searchParams.get('type') || 'claude'; (window.__sources ||= []).push(url.searchParams.get('source') || ''); return Promise.resolve(Response.json({ agent_type: t, found: !!window.__ready[t], status: window.__ready[t] ? 'ok' : 'missing' })); }
                 if (p === '/api/board/projects') return Promise.resolve(Response.json([]));
-                if (p === '/api/settings' && o.method === 'PUT') { window.__puts.push(JSON.parse(o.body)); return Promise.resolve(Response.json({ ok: true })); }
+                if (p === '/api/settings' && o.method === 'PUT') { const b = JSON.parse(o.body); if (b.cli_path_claude === 'C:\\\\nowhere\\\\claude.exe') return Promise.resolve(Response.json({ error: 'cli_path_claude: no file at C:\\\\nowhere\\\\claude.exe' }, { status: 400 })); window.__puts.push(b); return Promise.resolve(Response.json({ ok: true })); }
                 return real(u, o); };
             window.T.state.settings = { ...window.T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '', inbox_welcome_setup: 'on', default_agent_type: 'claude' }; window.T.state.liveSessions = []; window.T.state.servers = []; window.switchNavTab('hub-inbox'); return true; })()`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
@@ -30,9 +30,24 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await ev(`[...document.querySelectorAll('#setup-agent-modal .setup-agent-top b')].map(b => b.textContent)`), ['Claude Code', 'Codex', 'Antigravity']);
         await ev(`document.querySelector('#setup-agent-modal .setup-agent-top button').click(); true`);
         assert.match(await ev(`document.querySelector('#setup-agent-modal .setup-agent-steps code').textContent`), /npm install -g @anthropic-ai\/claude-code/, 'Claude\'s own install line');
+        // #583: installed somewhere else, the path is entered here. A refused one says the server's reason and what to do; an accepted one is saved and checked again.
+        const typePath = v => ev(`(() => { const box = document.querySelector('#setup-agent-modal .setup-agent-path'), i = box.querySelector('input'); i.value = ${JSON.stringify(v)}; box.querySelector('button').click(); return true; })()`);
+        await typePath('C:\\nowhere\\claude.exe');
+        await waitFor(`/Not saved/.test(document.querySelector('#setup-agent-modal .setup-agent-path-note').textContent)`, 'a refused path says so');
+        const refusedNote = await ev(`document.querySelector('#setup-agent-modal .setup-agent-path-note').textContent`);
+        assert.match(refusedNote, /no file at C:\\nowhere\\claude\.exe/, 'the server\'s reason: ' + refusedNote);
+        assert.match(refusedNote, /Enter the full path to the Claude Code program file, or set it in Settings > Providers/, 'and what to do: ' + refusedNote);
+        await ev(`window.__sources = []; true`);
+        await typePath('D:\\tools\\claude.exe');
+        await waitFor(`document.querySelector('#setup-agent-modal .setup-agent-path-note').textContent === 'Saved.'`, 'an accepted path is saved and checked again');
+        assert.ok((await ev(`window.__puts`)).some(p => p.cli_path_claude === 'D:\\tools\\claude.exe'), 'saved as cli_path_claude');
+        assert.deepEqual(await ev(`window.__sources`), ['cli_recheck', 'cli_recheck', 'cli_recheck'], 'the check after a saved path is a re-check');
+        assert.ok(await ev(`[...document.querySelectorAll('#setup-agent-modal .setup-agent-steps p')].some(p => /standalone installer from github\\.com\\/openai\\/codex/.test(p.textContent))`), 'Codex\'s steps name its standalone installer');
         // Codex gets installed: Check again says so, Continue ends it, the row goes and the default follows the agent that is ready.
-        await ev(`window.__ready.codex = true; [...document.querySelectorAll('#setup-agent-modal .modal-actions button')].find(b => b.textContent === 'Check again').click(); true`);
+        await ev(`window.__sources = []; window.__ready.codex = true; [...document.querySelectorAll('#setup-agent-modal .modal-actions button')].find(b => b.textContent === 'Check again').click(); true`);
         await waitFor(`/Codex is ready/.test(document.querySelector('#setup-agent-modal .setup-agent-result').textContent)`, 'Check again finds Codex');
+        // #582: the dialog's Check again is a re-check, so the server re-reads the Path Windows keeps (a CLI installed after Coral started is found without a restart).
+        assert.deepEqual(await ev(`window.__sources`), ['cli_recheck', 'cli_recheck', 'cli_recheck'], 'each of the three checks is sent as a re-check');
         await ev(`[...document.querySelectorAll('#setup-agent-modal .modal-actions button')].find(b => b.textContent === 'Continue').click(); true`);
         await waitFor(`!document.getElementById('setup-agent-modal') && ![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(h => /Get set up/.test(h.textContent))`, 'the dialog closes and the row is gone');
         const puts = await ev(`window.__puts`);

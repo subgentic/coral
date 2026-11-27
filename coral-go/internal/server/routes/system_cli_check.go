@@ -78,7 +78,29 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if p := agent.ResolveCLIPath(settings, agentType); p != "" {
-				if err := configuredCLIRunnable(p, agentType); err != nil {
+				run, refused := p, ""
+				real, rerr := cliRealPath(p)
+				var unfollowed *agent.UnfollowedChainError
+				// Junctions Coral would not follow are refused as a launch refuses them, never checked as typed; through junctions Windows will not open, the program they
+				// lead to is screened as a launch screens it (#582).
+				unfollowable := errors.As(rerr, &unfollowed)
+				if rerr == nil && real != p {
+					refused = agent.FollowedCLIRefusal(real, func(q string) string { return untrustedLocationOf(r.Context(), h.cfg, h.ss, q) })
+					run = real
+				}
+				if refused != "" {
+					writeJSON(w, http.StatusOK, hubCLIReply(r, map[string]any{
+						"found":      false,
+						"status":     tracking.PrereqMissing,
+						"binary":     p,
+						"agent_type": agentType,
+						"configured": true,
+						"setting":    agent.CLIPathSettingKey(agentType),
+						"message":    fmt.Sprintf("the CLI path set in Settings > Providers (%s = \"%s\") leads through junctions to %s, which is %s, so a launch refuses it: install it somewhere else or set another path", agent.CLIPathSettingKey(agentType), p, run, refused),
+					}))
+					return
+				}
+				if unfollowable || configuredCLIRunnable(run, agentType) != nil {
 					writeJSON(w, http.StatusOK, hubCLIReply(r, map[string]any{
 						"found":      false,
 						"status":     tracking.PrereqMissing,
@@ -90,7 +112,7 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 					}))
 					return
 				}
-				binaryPath = p
+				binaryPath = run
 			}
 		}
 	}
@@ -128,6 +150,12 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 					refused = agent.CommonLookup{Refused: why, RefusedPath: found}
 					found = ""
 				}
+			}
+		}
+		if found == "" && refused.Refused == "" && agentType != "" && r.URL.Query().Get("binary") == "" {
+			// On PATH only through junctions Windows will not open: the program they lead to, as a launch follows them (#582), with the same screen.
+			if p, _, _ := cliThroughUntrustedMount(binaryPath); p != "" && !agent.InTempFolder(p) && untrustedLocationOf(r.Context(), h.cfg, h.ss, p) == "" {
+				found = p
 			}
 		}
 		if found != "" {
@@ -329,6 +357,10 @@ func cliShareNote(agentType, binaryPath string) string {
 var (
 	cliLookPath   = exec.LookPath
 	cliCommonPath = agent.FindCLIInCommonPaths
+	// cliThroughUntrustedMount is agent.CLIThroughUntrustedMount (a variable so a test stands in for Windows).
+	cliThroughUntrustedMount = agent.CLIThroughUntrustedMount
+	// cliRealPath is agent.RealCLIPath, for a configured path (a variable so a test stands in for Windows).
+	cliRealPath = agent.RealCLIPath
 	// cliRefreshSavedPath re-reads the Path the system keeps for the person (Windows: the registry), on a person's Check again only.
 	cliRefreshSavedPath = agent.RefreshSavedPath
 	// cliShareSkipped: a common place on a network share did not answer in time for this CLI (#464).

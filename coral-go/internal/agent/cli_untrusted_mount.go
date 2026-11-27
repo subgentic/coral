@@ -19,11 +19,17 @@ const errorUntrustedMountPoint = syscall.Errno(448)
 // false off Windows.
 //
 // A variable so a test can stand for the Windows answer.
+//
+// The common places Coral also searches (windowsCommonBases: Codex's standalone folder among them, #582) are looked at after PATH, so the folder is named wherever the CLI is.
 var UntrustedMountDir = func(binary string) (string, bool) {
 	if runtime.GOOS != "windows" {
 		return "", false
 	}
-	return untrustedMountDir(binary, os.Getenv("PATH"), os.Getenv("PATHEXT"), os.Stat)
+	dirs := os.Getenv("PATH")
+	if home, _ := os.UserHomeDir(); home != "" {
+		dirs = strings.Join(append([]string{dirs}, windowsCommonBases(home)...), string(os.PathListSeparator))
+	}
+	return untrustedMountDir(binary, dirs, os.Getenv("PATHEXT"), statCLI)
 }
 
 // untrustedMountDir is UntrustedMountDir with the PATH, PATHEXT and the lookup given (a test stands in for Windows' answer).
