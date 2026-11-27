@@ -21,7 +21,9 @@ const { coralReady } = require('./helpers/wait');
         for (const w of [390, 320]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 700, deviceScaleFactor: 2, mobile: true });
             await ev(`window.showLaunchModal(); window._selectLaunchType('team'); true`);
-            await waitFor(`getComputedStyle(document.getElementById('launch-step-team')).display !== 'none'`, 'the team step', 8000);
+            // The lazy opener returns before modals.js inserts the complete, hidden template.
+            // Wait for the visible step; a missing step is not ready, not a layout failure.
+            await waitFor(`(() => { const step = document.getElementById('launch-step-team'); return !!step && step.getClientRects().length > 0; })()`, 'the visible team step', 8000);
             await ev(`(async () => { document.getElementById('team-board-name').value = 'a-team-with-a-rather-long-name'; const d = document.getElementById('team-dir'); if (d) d.value = '/home/someone/work/a-very-long-folder-name/for-the-new-team'; const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('start'); return true; })()`);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the step draws
             const head = await ev(`(() => { const sub = document.getElementById('team-stage-sub'), box = document.querySelector('#launch-modal .modal-content').getBoundingClientRect(), r = sub.getBoundingClientRect(); return { text: sub.textContent.trim().slice(0, 90), left: Math.round(r.left), right: Math.round(r.right), boxLeft: Math.round(box.left), boxRight: Math.round(box.right), over: sub.scrollWidth - sub.clientWidth }; })()`);
