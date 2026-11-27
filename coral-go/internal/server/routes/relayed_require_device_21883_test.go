@@ -85,7 +85,7 @@ func TestTheSwitchLeavesAReadAndAnUnlistedRouteAlone(t *testing.T) {
 	_, reached := guardRunFor(true, "GET", "/api/sessions/live/agent1/send", nil)
 	assert.True(t, reached, "a read of a listed path")
 	_, reached = guardRunFor(true, "POST", "/api/not/a/listed/route", nil)
-	assert.True(t, reached, "an unlisted write is commit 2's (hub-write)")
+	assert.False(t, reached, "an unlisted write is the generic hub-write kind: unsigned it is refused")
 }
 
 func TestWithTheSwitchOnAHalfSetOfHeadersIsStillBadForm(t *testing.T) {

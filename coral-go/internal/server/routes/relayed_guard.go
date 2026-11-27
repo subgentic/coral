@@ -37,13 +37,29 @@ func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.C
 			}
 			target := r.URL.RequestURI()
 			kind, listed := devicekey.KindOfRoute(r.Method, target)
+			on := requireDevice != nil && requireDevice(r.Context())
+			if !listed && on { // the local switch (#21883): every other write the Hub carries is the one generic kind, hub-write, except the few the Hub itself sends with no person
+				switch {
+				case devicekey.IsHubWrite(r.Method, target):
+					kind, listed = devicekey.HubWrite, true
+				case devicekey.HubWriteExempt(r.Method, target):
+					if !hubWriteExemptAuthority(r, via) {
+						deviceMsgLimiter.failed(via.LinkID+"|required", time.Now())
+						slog.Info("[device] an exempt Hub write without its own authority was refused: this computer requires a trusted device", "link", via.LinkID, "path", devicekey.RoutePath(target))
+						deviceReply(w, devicekey.ErrDeviceRequired)
+						return
+					}
+					if isAuthenticRelay(r) {
+						slog.Info("[device] a cross-team relay was accepted while this computer requires a trusted device", "link", via.LinkID, "path", devicekey.RoutePath(target))
+					}
+				}
+			}
 			if !listed {
 				next.ServeHTTP(w, r)
 				return
 			}
 			any, whole := relayedHeaders(r)
 			now := time.Now()
-			on := requireDevice != nil && requireDevice(r.Context())
 			required := relayedRequired[kind] || on // the local switch: every listed kind is required (#21883)
 			if !any && !required {
 				next.ServeHTTP(w, r)
@@ -112,4 +128,23 @@ func relayedHeaders(r *http.Request) (any, whole bool) {
 		}
 	}
 	return any, whole
+}
+
+// hubWriteExemptAuthority says whether a write of devicekey's hubWriteExempt list has the authority that admits it with no signature (#21883). The device-keys message and certificate carry their own signature in the body and
+// read no Hub header. guide-revoked is the Hub's own service stream, never a person. A cross-team relay is another Coral's, stamped by the connector with a source server and no Hub person. hub-notice is the
+// Hub's fixed template, stamped by the connector with the notice header. Anything else on those routes (a person's request, a forged stamp) is an unsigned write and is refused.
+func hubWriteExemptAuthority(r *http.Request, via cloud.Via) bool {
+	path := devicekey.RoutePath(r.URL.RequestURI())
+	switch {
+	case path == "/api/device-keys/message" || path == "/api/device-keys/certificate":
+		return true
+	case path == "/api/cloud/guide-revoked":
+		_, ok := cloud.ServiceAsker(r)
+		return ok && via.HubUser == ""
+	case isAuthenticRelay(r):
+		return via.HubUser == ""
+	case isAuthenticHubNotice(r):
+		return via.HubUser == ""
+	}
+	return false
 }

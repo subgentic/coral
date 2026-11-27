@@ -27,6 +27,9 @@ type RelayedRequest struct {
 // Hub person in its stamp is refused outside_pair: no actor, no message.
 func (v *Verifier) HandleRelayedRequest(ctx context.Context, in RelayedRequest, pin OwnerPinFunc, now time.Time) (Relayed, error) {
 	k, ok := KindOfRoute(in.Method, in.Target)
+	if !ok && IsHubWrite(in.Method, in.Target) { // every other write: the one generic kind (#21883); the guard asks for it only when this computer requires a trusted device
+		k, ok = HubWrite, true
+	}
 	if !ok {
 		return Relayed{}, ErrWrongRequest
 	}

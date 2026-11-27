@@ -1256,5 +1256,7 @@ CREATE TABLE IF NOT EXISTS device_keys (
  created_at INTEGER NOT NULL, last_used_at INTEGER, removed_at INTEGER, removed_reason TEXT CHECK (removed_reason IS NULL OR removed_reason IN ('removed','expired'))
 );
 CREATE TABLE IF NOT EXISTS device_nonces (nonce TEXT PRIMARY KEY, kid TEXT NOT NULL, accepted_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_device_nonces_kid_expires ON device_nonces(kid, expires_at);
+CREATE INDEX IF NOT EXISTS idx_device_nonces_expires ON device_nonces(expires_at);
 CREATE TABLE IF NOT EXISTS device_meta (k TEXT PRIMARY KEY, v INTEGER NOT NULL);
 `

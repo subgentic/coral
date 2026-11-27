@@ -17,3 +17,6 @@ func SetNonceKidShareForTest(t *testing.T, n int) {
 	deviceNonceKidShare = n
 	t.Cleanup(func() { deviceNonceKidShare = old })
 }
+
+// NonceLimitsForTest is the nonce count cap and one signer's share of it.
+func NonceLimitsForTest() (total, share int) { return deviceNonceCap, deviceNonceKidShare }
