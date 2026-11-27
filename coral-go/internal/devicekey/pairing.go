@@ -32,6 +32,9 @@ type PairingAnswer struct {
 	KID, MAC string
 	UserCode string
 	PK       string
+	// AnchorPK and AnchorCred are sign once (#21889): the 65-byte point (base64url) and the credential id of the passkey the browser offers as this computer's anchor. When either is present the MAC is the v4 pair MAC, which covers
+	// both, and never the v1 one: a Hub cannot add an anchor to an answer that was made without one.
+	AnchorPK, AnchorCred string
 }
 
 // String prints the kid only: the mac and the key never reach a log or a failing test's output through a stray %v.
@@ -52,33 +55,57 @@ func ParsePairingSecret(s string) ([]byte, bool) { return fixedB64(s, 22, 16) }
 
 // CheckPairing decides whether the browser's key may be added. Coral uses its OWN user_code and the label the Hub holds, never the answer's echo. The order: the secret is held, pk is there, v is 1, pk is a point, kid is the hash of pk, then the MAC compare in constant time. A refusal returns no key and writes nothing; the caller stores nothing before it passes.
 func CheckPairing(secret []byte, userCode, label string, a PairingAnswer) ([]byte, error) {
+	pk, _, _, err := CheckPairingAnchor(secret, userCode, label, a)
+	return pk, err
+}
+
+// CheckPairingAnchor is CheckPairing that also returns the anchor the browser offered (nil and "" when none): the passkey's point and credential id, valid and covered by the v4 MAC. An answer with an anchor field must pass the v4 MAC; one
+// without must pass the v1 MAC.
+func CheckPairingAnchor(secret []byte, userCode, label string, a PairingAnswer) (pk, anchorPK []byte, anchorCred string, err error) {
 	if len(secret) != 16 {
-		return nil, ErrPairingNoSecret
+		return nil, nil, "", ErrPairingNoSecret
 	}
 	if a.PK == "" {
-		return nil, ErrPairingNoKey
+		return nil, nil, "", ErrPairingNoKey
 	}
 	pk, ok := fixedB64(a.PK, 87, 65)
 	if !ok || a.V != 1 {
-		return nil, ErrPairingMAC
+		return nil, nil, "", ErrPairingMAC
 	}
 	if _, err := ecdh.P256().NewPublicKey(pk); err != nil {
-		return nil, ErrPairingMAC
+		return nil, nil, "", ErrPairingMAC
 	}
 	sum := sha256.Sum256(pk)
 	if b64.EncodeToString(sum[:]) != a.KID {
-		return nil, ErrPairingMAC
+		return nil, nil, "", ErrPairingMAC
 	}
 	mac, ok := fixedB64(a.MAC, 43, 32)
-	if !ok || !hmac.Equal(PairMAC(secret, userCode, label, pk), mac) {
-		return nil, ErrPairingMAC
+	if !ok {
+		return nil, nil, "", ErrPairingMAC
 	}
-	return pk, nil
+	if a.AnchorPK != "" || a.AnchorCred != "" {
+		ap, ok := fixedB64(a.AnchorPK, 87, 65)
+		if !ok || a.AnchorCred == "" || len(a.AnchorCred) > 172 || ap[0] != 0x04 {
+			return nil, nil, "", ErrPairingMAC
+		}
+		if _, err := ecdh.P256().NewPublicKey(ap); err != nil {
+			return nil, nil, "", ErrPairingMAC
+		}
+		if _, err := b64.DecodeString(a.AnchorCred); err != nil || !hmac.Equal(PairMACV4(secret, userCode, label, pk, ap, a.AnchorCred), mac) {
+			return nil, nil, "", ErrPairingMAC
+		}
+		return pk, ap, a.AnchorCred, nil
+	}
+	if !hmac.Equal(PairMAC(secret, userCode, label, pk), mac) {
+		return nil, nil, "", ErrPairingMAC
+	}
+	return pk, nil, "", nil
 }
 
 const (
-	pairMACInfo  = "coral-hub/device-keys/1/pair-mac"
-	replyMACInfo = "coral-hub/device-keys/1/reply-mac"
+	pairMACInfoV4 = "coral-hub/device-keys/4/pair-mac" // sign once (#21889): the pair MAC that also covers the anchor
+	pairMACInfo   = "coral-hub/device-keys/1/pair-mac"
+	replyMACInfo  = "coral-hub/device-keys/1/reply-mac"
 )
 
 func macKey(secret []byte, info string) []byte {
@@ -92,6 +119,18 @@ func PairMAC(secret []byte, userCode, label string, pkRaw []byte) []byte {
 	h := hmac.New(sha256.New, macKey(secret, pairMACInfo))
 	h.Write([]byte("v1\x00" + userCode + "\x00" + label + "\x00"))
 	h.Write(pkRaw)
+	return h.Sum(nil)
+}
+
+// PairMACV4 is the pair MAC of an answer that offers an anchor passkey: HMAC-SHA256(HKDF(secret, empty salt, "coral-hub/device-keys/4/pair-mac"), "v4" 0x00 user_code 0x00 label 0x00 pk_raw 0x00 anchor_pk_raw 0x00 anchor_cred). Its own info label means a v1 MAC is never a v4 one.
+func PairMACV4(secret []byte, userCode, label string, pkRaw, anchorPK []byte, anchorCred string) []byte {
+	h := hmac.New(sha256.New, macKey(secret, pairMACInfoV4))
+	h.Write([]byte("v4\x00" + userCode + "\x00" + label + "\x00"))
+	h.Write(pkRaw)
+	h.Write([]byte{0})
+	h.Write(anchorPK)
+	h.Write([]byte{0})
+	h.Write([]byte(anchorCred))
 	return h.Sum(nil)
 }
 

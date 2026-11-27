@@ -120,6 +120,8 @@ type ClientOptions struct {
 	OwnerKind func() string
 	// DeviceKey says whether the handshake offers CapDeviceKey (#16726). Read on every (re)connect. Nil: not offered.
 	DeviceKey func() bool
+	// OwnerCert says whether the handshake offers CapOwnerCert (#21889): this Coral understands Coral-Device-Cert and Coral-Device-Revoke. Offered only beside CapDeviceKey. Nil: not offered.
+	OwnerCert func() bool
 	// OnState is called from Run when the tunnel connects (nil error) or a
 	// connection attempt or session ends (with the reason).
 	OnState func(connected bool, err error)
@@ -281,6 +283,9 @@ func Dial(ctx context.Context, rawURL, token string, o ClientOptions) (*ClientSe
 	caps := []string{CapCrossTeamAllowlist, CapCrossTeamLinks, CapabilityLocalMode, CapGoals, CapGoalLinks, CapTeamOwner, CapGuideRole}
 	if o.DeviceKey != nil && o.DeviceKey() {
 		caps = append(caps, CapDeviceKey) // only when this Coral has a device key AND the steps that use it are built (the Hub's ruling, #16726)
+		if o.OwnerCert != nil && o.OwnerCert() {
+			caps = append(caps, CapOwnerCert)
+		}
 	}
 	hello, _ := json.Marshal(Hello{ProtocolVersion: ProtocolVersion, ServerToken: token, CoralVersion: o.CoralVersion, LocalMode: currentMode(o.LocalMode).String(), Capabilities: caps, OwnerKind: currentOwnerKind(o.OwnerKind), BootID: thisBoot.id, StartedAt: thisBoot.at.Format(time.RFC3339)})
 	if err := c.Write(hctx, websocket.MessageBinary, hello); err != nil {

@@ -56,6 +56,21 @@ func DeviceKeyNoticeItems(ss *store.SessionStore, now func() time.Time) func(ctx
 			}
 			items = append(items, NeedsYouItem{Kind: "device_key", Line: needsYouLine(line), ID: "device_key:" + k.KID + ":" + strconv.FormatInt(k.ChangedAt, 10), At: time.Unix(k.ChangedAt, 0).UTC().Format(time.RFC3339)})
 		}
+		// Sign once (#21889, Security MUST 3): read from this computer's own state, never from a Hub message. A certified browser that has not been Kept or Removed waits for the person (shown by its fingerprint only: its label is the
+		// Hub page's word), and an anchor learned lately is told once.
+		if ds, err := ss.ListCertifiedDevices(ctx); err == nil {
+			for _, d := range ds {
+				if d.DeniedAt != 0 || d.KeptAt != 0 || d.LastSeen < now().Add(-7*24*time.Hour).Unix() {
+					continue
+				}
+				line := "A browser certified by your passkey is waiting for you to Keep or Remove it: " + devicekey.FingerprintOfKID(d.KID)
+				items = append(items, NeedsYouItem{Kind: "device_key", Line: needsYouLine(line), ID: "certified:" + d.KID + ":" + strconv.FormatInt(d.FirstSeen, 10), At: time.Unix(d.FirstSeen, 0).UTC().Format(time.RFC3339)})
+			}
+		}
+		if a, has, err := ss.OwnerAnchorRow(ctx); err == nil && has && a.SetAt >= cutoff {
+			line := "A passkey was set as this computer's anchor: " + devicekey.FingerprintOfKID(a.KID) + ". It can certify browsers that may send to agents here, after you Keep them."
+			items = append(items, NeedsYouItem{Kind: "device_key", Line: needsYouLine(line), ID: "anchor:" + a.KID + ":" + strconv.FormatInt(a.SetAt, 10), At: time.Unix(a.SetAt, 0).UTC().Format(time.RFC3339)})
+		}
 		return items, nil
 	}
 }

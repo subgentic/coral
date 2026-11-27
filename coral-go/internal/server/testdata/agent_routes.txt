@@ -608,6 +608,11 @@ b POST /api/cloud/devices/clear-clock
 b POST /api/device-keys/message
 b POST /api/device-keys/certificate
 b POST /api/device-keys/pair
+b GET /api/cloud/owner-cert
+b PUT /api/cloud/owner-cert/accept
+b POST /api/cloud/owner-cert/devices/{kid}/keep
+b DELETE /api/cloud/owner-cert/devices/{kid}
+b DELETE /api/cloud/owner-cert/anchor
 b GET /api/cloud/pair-browser
 b POST /api/cloud/pair-browser
 b DELETE /api/cloud/pair-browser

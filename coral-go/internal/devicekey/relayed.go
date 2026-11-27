@@ -298,6 +298,12 @@ func ParseRelayed(k Kind, raw []byte) (Relayed, error) {
 // signature, then authority) with the body hash after the signature: a body that is not the signed one is refused as body_hash and spends nothing. authorize is required: it is given the parsed message and the signer's row
 // from this computer's own list, before the nonce is spent, and decides what that signer may do for the kind (the per-kind checks, #20514); a refusal spends nothing.
 func (v *Verifier) HandleRelayedOn(ctx context.Context, arrivedLink, method, path string, k Kind, canonical, body []byte, sig string, now time.Time, authorize func(Relayed, store.DeviceKey) error) (Relayed, error) {
+	return v.handleRelayed(ctx, arrivedLink, method, path, k, canonical, body, sig, "", now, authorize)
+}
+
+// handleRelayed is HandleRelayedOn with the Coral-Device-Cert header's value (empty when the request carried none). A signer that is not in the list but brought a certificate is a certified browser (sign once, #21889): its
+// certificate is checked cheap-first, its own request signature next, and the anchor's assertion last (cached); it then goes on through the same pair, body, nonce and authority rules, with its nonce in the anchor's own pool.
+func (v *Verifier) handleRelayed(ctx context.Context, arrivedLink, method, path string, k Kind, canonical, body []byte, sig, certHeader string, now time.Time, authorize func(Relayed, store.DeviceKey) error) (Relayed, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if authorize == nil {
@@ -332,7 +338,16 @@ func (v *Verifier) HandleRelayedOn(ctx context.Context, arrivedLink, method, pat
 	if err := v.Store.CheckClock(ctx, now); err != nil {
 		return Relayed{}, mapStoreErr(err)
 	}
+	var cert *certified
+	var certV OwnerCert
 	signer, err := v.Store.ActiveDeviceKey(ctx, m.KID, now)
+	if errors.Is(err, store.ErrUnknownSigner) && certHeader != "" {
+		c, oc, cerr := v.certifiedSignerOf(ctx, m.KID, certHeader, now)
+		if cerr != nil {
+			return Relayed{}, cerr
+		}
+		cert, certV, signer, err = &c, oc, c.Signer, nil
+	}
 	if err != nil {
 		return Relayed{}, mapStoreErr(err)
 	}
@@ -341,6 +356,19 @@ func (v *Verifier) HandleRelayedOn(ctx context.Context, arrivedLink, method, pat
 	}
 	if !verifyP1363(signer.PK, RelayedSigningInput(k, canonical), sig) {
 		return Relayed{}, ErrBadSignature
+	}
+	if cert != nil {
+		if !v.assertionVerified(certHeader, certV, cert.Anchor, now) { // the P-256 assertion, once per certificate, only after the request's own signature held
+			return Relayed{}, ErrBadSignature
+		}
+		// A certificate that verified makes the browser known here, kept or not: the first sight is what raises the notice with Keep and Remove, and a browser nobody Kept is then refused below (cert_not_allowed).
+		dev, first, serr := v.Owner.SeenCertifiedDevice(ctx, m.KID, cert.Anchor.KID, certV.Label, now)
+		if serr != nil {
+			return Relayed{}, mapStoreErr(serr)
+		}
+		if v.CertSeen != nil {
+			v.CertSeen(first, dev, signer.Mode)
+		}
 	}
 	// The signature is good, so what it covers is the signer's. The body must be exactly what it names, and the pair in it the signer's own.
 	if subtle.ConstantTimeCompare([]byte(BodySHA256(body)), []byte(m.BodySHA256)) != 1 {
@@ -359,8 +387,17 @@ func (v *Verifier) HandleRelayedOn(ctx context.Context, arrivedLink, method, pat
 	if err := v.Store.NonceSeen(ctx, m.Nonce, now); err != nil {
 		return Relayed{}, mapStoreErr(err)
 	}
+	if cert != nil {
+		authorize = certifiedAuthorizer(authorize)
+	}
 	if err := authorize(m, signer); err != nil {
 		return Relayed{}, err
+	}
+	if cert != nil {
+		if err := v.Owner.RecordCertNonce(ctx, m.Nonce, cert.Anchor.KID, m.KID, now, relayedWindow); err != nil {
+			return Relayed{}, mapStoreErr(err)
+		}
+		return m, nil
 	}
 	if err := v.Store.RecordNonce(ctx, m.Nonce, m.KID, now, relayedWindow); err != nil {
 		return Relayed{}, mapStoreErr(err)

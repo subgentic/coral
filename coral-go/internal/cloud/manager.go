@@ -757,6 +757,7 @@ func (m *Manager) runTunnel(ctx context.Context, gen int) {
 		LocalMode:     m.currentMode,
 		OwnerKind:     m.ownerKind,
 		DeviceKey:     m.offersDeviceKey,
+		OwnerCert:     m.offersDeviceKey, // sign once ships with the device key steps (#21889)
 		AllowInsecure: config.AllowInsecureCloud,
 		HTTPClient:    m.hc,
 		Backoff:       m.o.Backoff,
@@ -834,6 +835,9 @@ func (m *Manager) linkLost(ctx context.Context) {
 		m.o.OnLinkLost(ctx)
 	}
 }
+
+// MaxMode is the most this computer allows Coral Hub today: the ceiling of a Keep (#21889).
+func (m *Manager) MaxMode() tunnel.Mode { return m.currentMode() }
 
 func (m *Manager) currentMode() tunnel.Mode {
 	if m.o.MaxMode == nil {

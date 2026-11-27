@@ -1259,4 +1259,8 @@ CREATE TABLE IF NOT EXISTS device_nonces (nonce TEXT PRIMARY KEY, kid TEXT NOT N
 CREATE INDEX IF NOT EXISTS idx_device_nonces_kid_expires ON device_nonces(kid, expires_at);
 CREATE INDEX IF NOT EXISTS idx_device_nonces_expires ON device_nonces(expires_at);
 CREATE TABLE IF NOT EXISTS device_meta (k TEXT PRIMARY KEY, v INTEGER NOT NULL);
+-- Sign once (#21889): the one owner anchor passkey (learned only at a pairing), the highest epoch seen per anchor, and the browsers an anchor certified (first seen, Keep, local deny).
+CREATE TABLE IF NOT EXISTS owner_anchor (kid TEXT PRIMARY KEY, pk BLOB NOT NULL CHECK (length(pk) = 65), cred TEXT NOT NULL, set_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS owner_epochs (owner_kid TEXT PRIMARY KEY, epoch INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS certified_devices (kid TEXT PRIMARY KEY, owner_kid TEXT NOT NULL, label TEXT NOT NULL, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, kept_mode TEXT NOT NULL DEFAULT '', kept_at INTEGER NOT NULL DEFAULT 0, denied_at INTEGER NOT NULL DEFAULT 0);
 `
