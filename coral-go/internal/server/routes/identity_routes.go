@@ -211,12 +211,13 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/device-keys/list":                      "list the trusted browsers and passkeys for the Hub's owner (display only)", // #19971
 	"GET /api/device-keys/link":                      "read which Hub link this request arrived on (only a Hub-forwarded owner)",  // #20903
 	"PUT /api/cloud/allow-auto-accept":               "change whether Coral Hub may turn on auto-accept",
-	"POST /api/hub-auto-accept":                      "change whether Coral Hub may turn on auto-accept (Coral Hub's owner)",      // #5840
-	"PUT /api/cloud/hub-dropbox-share":               "change whether Coral Hub may send files you share to its Dropbox",          // #16109
-	"POST /api/dropbox/upload-anyway/{digest}":       "let a held file go to Dropbox through Coral Hub",                           // #16109
-	"POST /api/dropbox/prepare":                      "check a file for sharing through Coral Hub (Coral Hub's owner)",            // #16109
-	"POST /api/dropbox/push":                         "send a file to Dropbox through Coral Hub (Coral Hub's owner)",              // #16109
-	"POST /api/dropbox/shared":                       "tell Coral whether a file is shared through Coral Hub (Coral Hub's owner)", // #16109
+	"POST /api/hub-auto-accept":                      "change whether Coral Hub may turn on auto-accept (Coral Hub's owner)",        // #5840
+	"PUT /api/cloud/hub-require-trusted-device":      "change whether this computer accepts Hub actions only from a trusted device", // #21883
+	"PUT /api/cloud/hub-dropbox-share":               "change whether Coral Hub may send files you share to its Dropbox",            // #16109
+	"POST /api/dropbox/upload-anyway/{digest}":       "let a held file go to Dropbox through Coral Hub",                             // #16109
+	"POST /api/dropbox/prepare":                      "check a file for sharing through Coral Hub (Coral Hub's owner)",              // #16109
+	"POST /api/dropbox/push":                         "send a file to Dropbox through Coral Hub (Coral Hub's owner)",                // #16109
+	"POST /api/dropbox/shared":                       "tell Coral whether a file is shared through Coral Hub (Coral Hub's owner)",   // #16109
 	"PUT /api/cloud/redact-tokens":                   "change whether tokens are hidden from Coral Hub viewers",
 	"PUT /api/cloud/hub-relaunch":                    "change whether Coral Hub may relaunch Coral for an update",                         // #5280
 	"PUT /api/cloud/hub-cross-team":                  "change whether Coral Hub may turn cross-team messaging and file sharing on or off", // #5572

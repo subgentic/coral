@@ -83,7 +83,11 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 		return m.NewDeviceVerifier(store.NewSessionStore(s.db))
 	}
 	relayedOwner, _ := routes.LinkOwnerSources(linkStamps)
-	r.Use(routes.RelayedGuard(relayedVerifier, relayedOwner))
+	requireDevice := func(ctx context.Context) bool { // read on each request
+		s, err := store.NewSessionStore(s.db).GetSettings(ctx)
+		return err != nil && routes.HubRequireTrustedDevice(nil) || err == nil && routes.HubRequireTrustedDevice(s)
+	}
+	r.Use(routes.RelayedGuard(relayedVerifier, relayedOwner, requireDevice))
 	routes.SetRelayedSignerMode(func(ctx context.Context, kid string) (string, bool, bool) { // #20966: the mode of the device that signed a relayed join request, and whether it is the owner's, from this computer's own list
 		v := relayedVerifier()
 		if v == nil {
@@ -351,7 +355,8 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	sysHandler := routes.NewSystemHandler(s.db, s.cfg)
 	s.sysHandler = sysHandler
 	sysHandler.SetPasswordSet(s.keyStore.PasswordSet)
-	sessHandler.SetPiModelCheck(sysHandler.PiModelProblem) // a Pi model that Pi does not list is said so at launch (#11105)
+	sessHandler.SetRequireDevice(routes.RequireTrustedDeviceFromSettings(store.NewSessionStore(s.db))) // a terminal frame through the Hub cannot be signed (#21883)
+	sessHandler.SetPiModelCheck(sysHandler.PiModelProblem)                                             // a Pi model that Pi does not list is said so at launch (#11105)
 	sysHandler.SetTerminal(s.terminal)
 	sysHandler.SetSigninTerminal(sessHandler.LaunchSigninTerminal)
 	if s.boardStore != nil {
@@ -719,12 +724,13 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// Device keys, slice 7 (#19669): what a trusted browser signed, forwarded by the Hub unstamped. The signature is the only authority; these routes read no Hub user, owner or account header.
 	r.Post("/api/device-keys/message", s.cloudHandler.DeviceKeyMessage)
 	r.Post("/api/device-keys/certificate", s.cloudHandler.DeviceKeyCertificate)
-	r.Post("/api/device-keys/pair", s.cloudHandler.DeviceKeyPair)          // a browser's answer to a pairing the person started here (#21880): MAC-proved, unsigned, through the Hub
-	r.Get("/api/device-keys/list", s.cloudHandler.TunnelDevices)           // the owner's read-only display list through the Hub (#19971); owner only, Launch tier, in the tunnel table
-	r.Get("/api/device-keys/link", s.cloudHandler.TunnelLink)              // the link this request arrived on, for the Hub owner to name in a signed text (#20903); owner only, Launch tier, in the tunnel table
-	r.Put("/api/cloud/hub-relaunch", s.cloudHandler.SetHubRelaunch)        // #5280
-	r.Put("/api/cloud/hub-cross-team", s.cloudHandler.SetHubCrossTeam)     // #5572
-	r.Get("/api/system/codex-trust-hooks", s.cloudHandler.CodexTrustHooks) // #153
+	r.Post("/api/device-keys/pair", s.cloudHandler.DeviceKeyPair)                             // a browser's answer to a pairing the person started here (#21880): MAC-proved, unsigned, through the Hub
+	r.Get("/api/device-keys/list", s.cloudHandler.TunnelDevices)                              // the owner's read-only display list through the Hub (#19971); owner only, Launch tier, in the tunnel table
+	r.Get("/api/device-keys/link", s.cloudHandler.TunnelLink)                                 // the link this request arrived on, for the Hub owner to name in a signed text (#20903); owner only, Launch tier, in the tunnel table
+	r.Put("/api/cloud/hub-relaunch", s.cloudHandler.SetHubRelaunch)                           // #5280
+	r.Put("/api/cloud/hub-cross-team", s.cloudHandler.SetHubCrossTeam)                        // #5572
+	r.Get("/api/system/codex-trust-hooks", s.cloudHandler.CodexTrustHooks)                    // #153
+	r.Put("/api/cloud/hub-require-trusted-device", s.cloudHandler.SetHubRequireTrustedDevice) // #21883: the person here only
 	r.Put("/api/system/codex-trust-hooks", s.cloudHandler.SetCodexTrustHooks)
 	// Coral Hub's relaunch into a staged update (#5280): 404 until the feature is switched on and the updater exists.
 	// Where the owner routes read the owner's label recorded at enrolment (#5307).

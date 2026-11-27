@@ -23,9 +23,11 @@ import (
 // access (#20883) is one: a Hub request for it with no signature is never a local request and never a grant. The handler asks again (RelayedFrom), so removing either check still leaves the route refused.
 var relayedRequired = map[devicekey.Kind]bool{devicekey.GrantMember: true, devicekey.AllowLink: true, devicekey.MakeLinkKey: true, devicekey.RevokeLinkKey: true, devicekey.DenyLink: true}
 
+// With the local switch hub_require_trusted_device on (#21883), every kind of devicekey.KindRoutes is required, not only relayedRequired: a request on one of its routes with no signature is refused 403 device_required before any handler.
+//
 // RelayedGuard is the guard, after the link stamp and before the grant check. verifier is the computer's one device verifier (nil when there is none); ownerLabel is the owner label confirmed for the link the
 // request came through, "" when none.
-func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.Context) (string, error)) func(http.Handler) http.Handler {
+func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.Context) (string, error), requireDevice func(context.Context) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			via, tunneled := cloud.ViaFrom(r.Context())
@@ -41,8 +43,15 @@ func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.C
 			}
 			any, whole := relayedHeaders(r)
 			now := time.Now()
-			if !any && !relayedRequired[kind] {
+			required := relayedRequired[kind] || (requireDevice != nil && requireDevice(r.Context())) // the local switch: every listed kind is required (#21883)
+			if !any && !required {
 				next.ServeHTTP(w, r)
+				return
+			}
+			if !any && required && !relayedRequired[kind] { // the switch refuses it, with a reply that says nothing about which devices exist; one line per link, rate limited with the other refusals
+				deviceMsgLimiter.failed(via.LinkID+"|required", now)
+				slog.Info("[device] a relayed request without a signature was refused: this computer requires a trusted device", "link", via.LinkID)
+				deviceReply(w, devicekey.ErrDeviceRequired)
 				return
 			}
 			refuse := func(key string, err error) {

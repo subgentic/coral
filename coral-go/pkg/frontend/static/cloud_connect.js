@@ -262,6 +262,11 @@ class CloudPanel {
         // Coral Hub's relaunch exists only in a build that has the feature (#7343): without it the switch does nothing, so neither the switch nor its sentence is drawn
         for (const id of ['settings-cloud-hub-relaunch-row', 'settings-cloud-hub-relaunch-state']) { const el = this.root.querySelector('#' + id); if (el) el.hidden = st.hub_relaunch_available !== true; }
         this.hubRelaunchWords(hubRelaunch);
+        // Require a trusted device for Hub actions (#21883): off until the person here turns it on; set by the environment it cannot be turned off here.
+        const reqDev = this.part('hub-require-device');
+        if (reqDev) { reqDev.checked = st.require_trusted_device === true; reqDev.disabled = st.require_trusted_device_env === true; }
+        const reqDevState = this.part('hub-require-device-state');
+        if (reqDevState) reqDevState.textContent = st.require_trusted_device_env === true ? 'On because Coral was started with CORAL_REQUIRE_TRUSTED_DEVICE=1.' : st.require_trusted_device === true ? 'On: Hub actions that are not signed by a trusted device are refused.' : '';
         // Cross-team switches from the hub (#5572): the owner may turn a team's messaging and file sharing on or off unless this lock is off (the server reads an unset or unreadable lock as off).
         const hubCrossTeam = this.part('hub-cross-team');
         if (hubCrossTeam) hubCrossTeam.checked = st.hub_cross_team_settings !== false;
@@ -645,6 +650,7 @@ class CloudPanel {
         this.part('owner-record')?.addEventListener('click', () => this.confirmOwner());
         this.part('redact-tokens')?.addEventListener('change', (e) => this.act('PUT', '/api/cloud/redact-tokens', { redact: e.target.checked }, e.target.checked ? 'Saved. Tokens are hidden from view-only hub users.' : 'Saved. Tokens are visible to view-only hub users.'));
         this.part('hub-relaunch')?.addEventListener('change', (e) => { this.hubRelaunchWords(e.target); this.act('PUT', '/api/cloud/hub-relaunch', { allow: e.target.checked }, e.target.checked ? 'Saved. Coral Hub may relaunch Coral to install updates.' : (this.hubRelaunchAtLaunch ? HUB_RELAUNCH_OFF_TOAST_AT_LAUNCH : 'Saved. Coral Hub may not relaunch Coral.')); });
+        this.part('hub-require-device')?.addEventListener('change', (e) => this.act('PUT', '/api/cloud/hub-require-trusted-device', { require: e.target.checked }, e.target.checked ? 'Saved. Hub actions now need a trusted device.' : 'Saved. Hub actions no longer need a trusted device.'));
         this.part('hub-cross-team')?.addEventListener('change', (e) => this.act('PUT', '/api/cloud/hub-cross-team', { allow: e.target.checked }, e.target.checked ? 'Saved. Coral Hub may change cross-team settings.' : 'Saved. Coral Hub may not change cross-team settings.'));
         this.part('hub-operator')?.addEventListener('change', (e) => this.setHubOperator(!e.target.checked)); // the checkbox is "let", the stored setting is "disabled": the opposite
     }

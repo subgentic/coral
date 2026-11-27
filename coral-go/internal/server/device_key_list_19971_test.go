@@ -42,7 +42,8 @@ func TestTheOwnersDeviceListThroughTheHubIsDisplayOnlyAndOwnerOnly(t *testing.T)
 	require.Equal(t, 200, rec.Code, rec.Body.String())
 	var out map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
-	assert.Len(t, out, 1, "only the devices")
+	assert.Len(t, out, 2, "the devices and the switch state (#21883)")
+	assert.JSONEq(t, "false", string(out["require_trusted_device"]))
 	var rows []map[string]any
 	require.NoError(t, json.Unmarshal(out["devices"], &rows))
 	require.Len(t, rows, 1, "the removed key is left out")

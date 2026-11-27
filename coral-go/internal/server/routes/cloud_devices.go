@@ -69,9 +69,11 @@ func (h *CloudHandler) TunnelDevices(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "Could not read the device list")
 		return
 	}
+	s, _ := h.ss.GetSettings(r.Context())
 	writeJSON(w, http.StatusOK, struct {
-		Devices []deviceRow `json:"devices"`
-	}{out.Devices})
+		Devices              []deviceRow `json:"devices"`
+		RequireTrustedDevice bool        `json:"require_trusted_device"` // #21883: whether this computer accepts Hub actions only from a trusted device
+	}{out.Devices, HubRequireTrustedDevice(s)})
 }
 
 // TunnelLink: GET /api/device-keys/link: the link this request arrived on (lnk-<8 hex>) and, when this computer has a key, its own key id ("computer", #21331), for Coral Hub's owner (#20903, coral-hub #20897), so the Hub can name it in the v3 text a browser signs. It is the connector's own stamp read from the request context, never from a body or query; nothing is stored. Owner only, Launch tier, read only. A local call has no link and gets 404.

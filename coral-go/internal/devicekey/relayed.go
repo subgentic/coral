@@ -74,6 +74,9 @@ var ErrWrongLink = errors.New("wrong_link")
 // ErrOutsidePair is code outside_pair: the message acts on, or is made for, another (link, Hub label) pair than its signer's.
 var ErrOutsidePair = errors.New("outside_pair")
 
+// ErrDeviceRequired is code device_required: this computer is set to accept Hub actions only from a trusted device (the local switch hub_require_trusted_device), and the request carried no signature. It says nothing about which devices exist (#21883).
+var ErrDeviceRequired = errors.New("device_required")
+
 // ErrNoAuthority is returned when HandleRelayed is called without the function that decides what the signer may do: a signature alone is never enough.
 var ErrNoAuthority = errors.New("no_authority")
 

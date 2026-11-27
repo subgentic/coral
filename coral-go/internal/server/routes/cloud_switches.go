@@ -103,6 +103,52 @@ func (h *CloudHandler) SetHubRelaunch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, h.status())
 }
 
+// SetHubRequireTrustedDevice: PUT /api/cloud/hub-require-trusted-device {"require": bool}. The person at this computer only: the dashboard or the signed command line, never through the tunnel and never an agent (its session token is refused). Turning it on is refused while this
+// computer has no active trusted device, since no Hub action could then pass (#21883). Every change is logged with who made it.
+func (h *CloudHandler) SetHubRequireTrustedDevice(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get(store.SessionTokenHeader) != "" {
+		errForbidden(w, "Only the person at this computer can change this")
+		return
+	}
+	if h.refuseCloud(w, r, allowDashboard|allowCLI) || !requireJSON(w, r) {
+		return
+	}
+	var body struct {
+		Require *bool `json:"require"`
+	}
+	if err := decodeJSON(r, &body); err != nil || body.Require == nil {
+		errBadRequest(w, "require is required")
+		return
+	}
+	if *body.Require {
+		keys, err := h.ss.ListDeviceKeys(r.Context())
+		if err != nil {
+			errInternalServer(w, "Could not read the trusted devices")
+			return
+		}
+		active := false
+		for _, k := range keys {
+			if k.RemovedAt == 0 && k.Kind == store.DeviceKindDevice && k.Origin == store.DeviceOriginPairing { // a key added without proof never counts: a broken-into Hub could have planted it
+				active = true
+			}
+		}
+		if !active {
+			writeError(w, http.StatusConflict, "no_trusted_device", "Pair a trusted device first (one made with the pairing code, not added through the Hub): with none, every Hub action would be refused")
+			return
+		}
+	}
+	if hubRequireEnv() && !*body.Require {
+		writeError(w, http.StatusConflict, "set_by_environment", "This is on because "+HubRequireTrustedDeviceEnv+"=1 was set when Coral started")
+		return
+	}
+	if err := h.ss.SetSetting(r.Context(), HubRequireTrustedDeviceSetting, strconv.FormatBool(*body.Require)); err != nil {
+		errInternalServer(w, "Could not save the setting")
+		return
+	}
+	slog.Info("[hub] require a trusted device for Hub actions changed", "on", *body.Require, "by", "this computer", "from", r.RemoteAddr)
+	writeJSON(w, http.StatusOK, h.status())
+}
+
 // SetHubDropboxShare: PUT /api/cloud/hub-dropbox-share {"allow": bool}. Local dashboard and the signed command line only (never through the tunnel, any role): whether Coral Hub's owner may send a file the person pressed Share on
 // to the Dropbox connected on the Hub (#16109). Off by default.
 func (h *CloudHandler) SetHubDropboxShare(w http.ResponseWriter, r *http.Request) {
