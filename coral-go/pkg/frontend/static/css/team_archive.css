@@ -1,0 +1,5 @@
+/* The approved archive question: three distinct lists and colored bold labels. */
+#confirm-modal-message:has(> .team-archive-line) { color: var(--text-primary); }
+.team-archive-line { margin: 0 0 8px; }
+.team-archive-line:first-child > b { color: var(--warning-text); }
+.team-archive-line:nth-child(2) > b { color: var(--success); }

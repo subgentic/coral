@@ -1,0 +1,3 @@
+/* Destructive rows stay visibly distinct before hover; a separated group reads as one. */
+.row-action-menu > .menu-item-danger { color: var(--error-text); }
+.row-action-menu > .menu-sep { border: 0; border-top: 1px solid var(--border); margin: 5px 0; }

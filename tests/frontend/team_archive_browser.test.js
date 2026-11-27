@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('li.session-team-group')].find(l => /recipe/i.test(l.textContent)).querySelector('[data-mode="archive"]').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the question');
         const ask = await ev(`document.getElementById('confirm-modal-message').textContent`);
-        assert.ok(/to sleep, then archives everything/.test(ask) && /Stays: everything/.test(ask) && /Restore team/.test(ask), 'it says what stops, what stays and the way back: ' + ask);
+        assert.ok(/Stops: its 3 agents/.test(ask) && /Stays: everything/.test(ask) && /Restore team/.test(ask), 'it says what stops, what stays and the way back: ' + ask);
         await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /archive team/i.test(b.textContent)).click(); true`);
         await waitFor(`T.state.liveSessions.filter(s => s.board_project === 'recipe').every(s => s.archived)`, 'every member archived', 8000);
         await waitFor(`document.getElementById('command-pane').classList.contains('agent-sleeping')`, 'the open chat shows its agent asleep at once, as Archive agent does, not on the next feed tick (#17647)', 1000);
