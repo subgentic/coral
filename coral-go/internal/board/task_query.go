@@ -80,6 +80,8 @@ type TaskQuery struct {
 	Statuses   []string
 	AssignedTo []string
 	Boards     []string
+	// HideArchived leaves out the tasks of archived teams (#21850): set by the all-boards reads, never by the query string.
+	HideArchived bool
 	// IDs is the id filter, in the order the caller gave them, each once (nil: no id filter): the answer is these tasks in this order, and Missing lists the ids it does not hold.
 	IDs           []int64
 	Priorities    []string
@@ -582,6 +584,9 @@ func taskQueryWhere(q *TaskQuery, sortExpr string) (join string, where []string,
 	in("priority", q.Priorities)
 	in("assigned_to", q.AssignedTo)
 	in("board_id", q.Boards)
+	if q.HideArchived {
+		where = append(where, notArchivedSQL)
+	}
 	in("created_by", q.CreatedBy)
 	if len(q.GoalIDs) > 0 || q.NoGoal {
 		var alts []string

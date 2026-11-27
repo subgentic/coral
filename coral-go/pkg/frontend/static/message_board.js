@@ -266,7 +266,7 @@ export async function deleteTeam(project) {
     const running = runningAgentsOn(project);
     const label = keyLabel(project);
     const { deleteTeamWords } = await importOnce('./delete_team_words.js'); // the words are read when the dialog is asked for, not at start (#16895)
-    const words = deleteTeamWords(label, running);
+    const words = deleteTeamWords(label, running, project); // and puts "Archive team instead" beside Remove team once the question is up (#21850)
     window.showConfirmModal('Remove team', words, async () => {
         try {
             if (running.length) { // a board with agents running is not deleted (#5043): they are stopped first, here, so the team is not left half there

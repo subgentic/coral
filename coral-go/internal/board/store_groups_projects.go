@@ -106,9 +106,13 @@ func (s *Store) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
 			ids[i] = projects[i].Project
 		}
 		labels := s.BoardLabels(ctx, ids)
+		archived, _ := s.ArchivedBoards(ctx) // a failed read lists no team as archived: nothing hides
 		for i := range projects {
 			projects[i].BoardLabel = labels[projects[i].Project]
 			projects[i].BoardID = projects[i].Project
+			if at, ok := archived[projects[i].Project]; ok {
+				projects[i].Archived, projects[i].ArchivedAt = true, at
+			}
 			projects[i].Goals = &GoalsBrief{Open: projects[i].GoalsOpen, Seq: projects[i].GoalsSeq}
 		}
 	}

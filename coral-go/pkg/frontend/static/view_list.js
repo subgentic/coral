@@ -1,5 +1,5 @@
 /* The one "view list" of the mailbox (#7785, goal #20; UI/UX's mock #7773): a column of named views with a count each, one of them current, at the left of a list: Needs you, Tasks, Goals, Saved, and the chat
- * folders (All chats, Board history, By CLI, Tags). Workflows and Jobs reuse it later. Below the phone width the same views are ONE select (44 px) at the top, so the list is never squeezed beside a column.
+ * folders (All chats, Teams, By CLI, Tags). Workflows and Jobs reuse it later. Below the phone width the same views are ONE select (44 px) at the top, so the list is never squeezed beside a column.
  * An item is a button (a view is not a link); the current one says aria-current and is marked by a bar and weight, not by colour alone; a view that is not built yet is disabled and says "soon" in words.
  * A colour dot (a tag's colour) is a hex colour only. Text is set with textContent only.
  *
@@ -47,7 +47,7 @@ function draw(root, { sections, current }) {
             const total = it.unread && it.count == null && it.total != null ? it.total : null; // a chat folder with nothing unread says how many it holds, as the other folders do (#10319): the unread number, when there is one, is the pill
             b.setAttribute('aria-label', it.soon ? `${it.label}, soon` : it.words ? `${it.label}, ${it.words}` : total != null ? `${it.label}, ${total}` : (it.count != null ? `${it.label}, ${it.count}${it.unread ? ' unread' : ''}` : it.label)); // a number that is the unread count says so
             if (it.tip) b.title = it.tip; // what is behind the row, in one line (#10074)
-            if (it.unread && it.total != null) b.title = `${it.total} in all`; // the name and the count are read apart ("Board history, 1"), the count once (it is not in the name's text twice)
+            if (it.unread && it.total != null) b.title = `${it.total} in all`; // the name and the count are read apart ("Teams, 1"), the count once (it is not in the name's text twice)
             if (it.words) b.title = it.words; // a count that is part of a larger list says both in words (#13979)
             if (it.soon) { b.disabled = true; b.classList.add('view-list-soon'); b.append(el('span', 'view-list-count', 'soon')); }
             else if (total != null) b.append(el('span', 'view-list-count', total));

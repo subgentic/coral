@@ -57,6 +57,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 			delete(r, "notices_paused")         // new in #11387 (Coral's notices to the agent are paused): the old implementation has no such field; notice_pause_test.go pins it through the list
 			delete(r, "paused_until")           // new in #11387 (when the pause ends)
 			delete(r, "commit_short")           // new in #11580 (the short commit of a detached checkout, in place of the word HEAD): the old implementation has no such field; detached_commit_test.go pins it
+			delete(r, "team_archived")          // new in #21850 (the agent's team is archived): the old implementation has no such field; team_archive_test.go pins it through the list
 			delete(r, "own_worktree")           // new in #21468 (the worker was started in its own worktree: task-N): the old implementation has no such field; task_worktree_21468_test.go pins the name the list reads
 			delete(r, "notices_waiting")        // new in #11387 (how many notices are held)
 			delete(r, "notices_holding")        // new in #11387 (held only while the person types to the agent)

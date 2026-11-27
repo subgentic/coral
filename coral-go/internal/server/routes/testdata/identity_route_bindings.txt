@@ -4,6 +4,7 @@ DELETE /api/artifacts/{id}/gdoc/share | token-session | operator-only
 DELETE /api/artifacts/{id}/review-drafts/{cid} | token-session | operator-only
 DELETE /api/board/remotes | board-unchecked | operator-only
 DELETE /api/board/{project} | board-claims | operator-only
+DELETE /api/board/{project}/archive | board-claims | operator-only
 DELETE /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 DELETE /api/board/{project}/automations/{name} | board-claims +token-session
 DELETE /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
@@ -208,6 +209,7 @@ POST /api/board/{project}/agents/{subscriber}/restart | board-claims +token-sess
 POST /api/board/{project}/agents/{subscriber}/sleep | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/stop | board-claims +token-session
 POST /api/board/{project}/agents/{subscriber}/wake | board-claims +token-session
+POST /api/board/{project}/archive | board-claims | operator-only
 POST /api/board/{project}/artifacts/{digest}/edit | board-claims | operator-only
 POST /api/board/{project}/artifacts/{digest}/edit/send | board-claims +token-session | operator-only
 POST /api/board/{project}/artifacts/{id}/review | board-claims | operator-only

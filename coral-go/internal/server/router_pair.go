@@ -50,6 +50,7 @@ var pairRecordedRoutes = routes.PairRecorded{
 
 	// Batch 3 (#20369): the board's writes.
 	"DELETE /api/board/{project}":                                          true,
+	"DELETE /api/board/{project}/archive":                                  true,
 	"DELETE /api/board/{project}/artifacts/{id}/review":                    true,
 	"DELETE /api/board/{project}/messages/{messageID}":                     true,
 	"DELETE /api/board/{project}/reminder":                                 true,
@@ -57,6 +58,7 @@ var pairRecordedRoutes = routes.PairRecorded{
 	"PATCH /api/board/{project}/goals/{goalID}":                            true,
 	"PATCH /api/board/{project}/tasks/{taskID}":                            true,
 	"PATCH /api/board/{project}/tasks/{taskID}/amend":                      true,
+	"POST /api/board/{project}/archive":                                    true,
 	"POST /api/board/{project}/artifacts/{digest}/edit":                    true,
 	"POST /api/board/{project}/artifacts/{digest}/edit/send":               true,
 	"POST /api/board/{project}/artifacts/{id}/review":                      true,

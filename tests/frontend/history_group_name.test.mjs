@@ -1,4 +1,4 @@
-// #11070: Board history names a board the way the sidebar does. Team-launched boards (b-wvvnbdjqjb) came as their id: the row's title is empty and the board-label registry (noteBoardLabels,
+// #11070: Teams names a board the way the sidebar does. Team-launched boards (b-wvvnbdjqjb) came as their id: the row's title is empty and the board-label registry (noteBoardLabels,
 // fed by board_label) was never asked. The label wins, then the row's own title, then the key.
 import assert from 'node:assert/strict';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';

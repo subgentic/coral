@@ -311,7 +311,7 @@ function _renderLiveSessions(sessions) {
     syncAgentListBars(everyAgent, sessions.length); // the list bar's options, filters and count (agent_list_bar.js)
     // Archived agents leave the main list, its groups and counts; they are
     // listed in their own section at the bottom.
-    const archived = sessions.filter(s => s.archived);
+    const archived = sessions.filter(s => s.archived && !s.team_archived); // an archived team's agents are not listed here either: nothing of the team is in the sidebar (#21850)
     sessions = sessions.filter(s => !s.archived);
 
     _renderSidebarRail(sessions);

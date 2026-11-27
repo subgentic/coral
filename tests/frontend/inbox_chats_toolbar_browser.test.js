@@ -1,5 +1,5 @@
 // The Inbox's chat folders have the shared list toolbar (#8603, goal #62; UI/UX #8589 section 9): on each folder's page the search box and the Filters icon in the same row, to its right; in the panel the fields the
-// folder does not already decide (CLI, Agent, Tag, Dates; a CLI folder has no CLI, Board history only the dates), as chips with "N on" on the icon; they become the history read's parameters and the folder's own rule
+// folder does not already decide (CLI, Agent, Tag, Dates; a CLI folder has no CLI, Teams only the dates), as chips with "N on" on the icon; they become the history read's parameters and the folder's own rule
 // (Starred, Archived, a CLI, a board's history) stays; they are kept in the browser per folder; the sidebar (the folder list) is not touched. At 1280 and at 390. GET /api/sessions/history and its counts are stood in
 // (the requests are recorded). Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
@@ -78,10 +78,10 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             check(`${label}: Starred keeps its own rule (starred=1) beside the filter`, (await lastRead()).starred === '1' && (await lastRead()).agent_name === 'QA Engineer', JSON.stringify(await lastRead()));
             await openFolder('chats-cli-claude', mobile, 'Claude'); await panel();
             check(`${label}: a CLI folder has no CLI field: Agent, Tag, From, To`, (await labels()) === 'Agent|Tag|From|To', await labels());
-            await openFolder('chats-group', mobile, 'Board history'); await panel();
-            check(`${label}: Board history has the dates only`, (await labels()) === 'From|To', await labels());
+            await openFolder('chats-group', mobile, 'Teams'); await panel();
+            check(`${label}: Teams has the dates only`, (await labels()) === 'From|To', await labels());
             const bg = await ev(`(() => { const q = document.querySelector('.inbox-folder-toolbar .list-bar-search-row input[type=search]'); return q && { name: q.getAttribute('aria-label'), placeholder: q.getAttribute('placeholder') || '' }; })()`);
-            check(`${label}: the Board history search box names boards, not chats (#12664)`, bg && bg.name === 'Search boards' && !/chats/i.test(bg.placeholder), JSON.stringify(bg));
+            check(`${label}: the Teams search box names teams, not chats (#12664)`, bg && bg.name === 'Search teams' && !/chats/i.test(bg.placeholder), JSON.stringify(bg));
             await setField('inbox-chats-from', '2026-10-05'); await waitFor(`(window.__hist || []).some(p => p.type === 'group' && p.date_from === '2026-10-05')`, 'a board read with the date', 6000);
             check(`${label}: its date is date_from beside type=group`, (await lastRead()).type === 'group' && (await lastRead()).date_from === '2026-10-05', JSON.stringify(await lastRead()));
             await openFolder('chats', mobile, 'All chats'); await panel();

@@ -17,7 +17,7 @@ import (
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
-// #11070: a group chat row (Inbox > Board history) carries its board's display name beside its key. A team-launched board's key is an id (b-wvvnbdjqjb); the title stays that key (it is what
+// #11070: a group chat row (Inbox > Teams) carries its board's display name beside its key. A team-launched board's key is an id (b-wvvnbdjqjb); the title stays that key (it is what
 // the row opens), and board_label is what people read, so the list shows "Release crew" and not the id.
 func TestHistoryGroupRowCarriesTheBoardsLabel(t *testing.T) {
 	ctx := context.Background()

@@ -157,9 +157,11 @@ type ProjectInfo struct {
 	SubscriberCount int    `db:"subscriber_count" json:"subscriber_count"`
 	MessageCount    int    `db:"message_count" json:"message_count"`
 	// GoalsBrief is what the feed carries of the board's goals, with no text (#7116): how many are open and the board's change counter. A Coral Hub viewer gets it as every viewer does (the operator's decision of 2026-10-24: View sees everything but secrets).
-	Goals     *GoalsBrief `db:"-" json:"goals_brief"`
-	GoalsOpen int         `db:"goals_open" json:"-"`
-	GoalsSeq  int64       `db:"goals_seq" json:"-"`
+	Goals      *GoalsBrief `db:"-" json:"goals_brief"`
+	Archived   bool        `db:"-" json:"archived"`              // the team is put away (#21850): the dashboard leaves it out of the sidebar and lists it under Archived teams
+	ArchivedAt string      `db:"-" json:"archived_at,omitempty"` // when, RFC3339 UTC
+	GoalsOpen  int         `db:"goals_open" json:"-"`
+	GoalsSeq   int64       `db:"goals_seq" json:"-"`
 }
 
 // GoalsBrief is a board's goals as the feed counts them: open (proposed, active or blocked) and the change counter, which moves on every goal write and every task change touching a goal.

@@ -30,7 +30,7 @@ const { coralReady } = require('./helpers/wait');
         const nums = await ev(`Object.fromEntries([...document.querySelectorAll('.view-list-item')].map(b => [b.dataset.key, (b.querySelector('.view-list-count') || {}).textContent || '']))`);
         assert.equal(nums['chats'], '3', 'All chats: the three agents\' chats are unread, the foreign transcript is not: ' + JSON.stringify(nums));
         assert.equal(nums['chats-active'], '2', 'Active now: the two agents, not the foreign transcript that is also running: ' + JSON.stringify(nums));
-        assert.equal(nums['chats-group'], '1', 'Board history: its one board');
+        assert.equal(nums['chats-group'], '1', 'Teams: its one board');
         const dots = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].map(r => [r.textContent.includes('Some other Claude'), r.classList.contains('dt-unread') || !!r.querySelector('.dt-unread, .unread-dot, [data-unread="true"]')])`);
         const foreign = dots.find(([isForeign]) => isForeign), agents = dots.filter(([isForeign]) => !isForeign);
         assert.ok(foreign && foreign[1] === false, 'the foreign transcript is listed, with no unread dot: ' + JSON.stringify(dots));

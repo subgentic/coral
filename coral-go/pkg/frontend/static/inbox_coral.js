@@ -31,7 +31,7 @@ async function json(resp, server) {
     return data;
 }
 
-/** The local Inbox spans the same online registered machines as Saved and Board history.
+/** The local Inbox spans the same online registered machines as Saved and Teams.
  * IDs are only unique on their source machine; qualify the team before any row is opened. */
 async function inboxRows(path, field, personal = false) {
     const servers = personal && isCloud() ? personalInboxSources().filter(s => personalInboxAllowed(s.id)).map(s => s.id) : [...(isCloud() ? [] : ['local']), ...new Set(state.hub ? (state.servers || []).filter(s => s.id && s.id !== 'local' && s.status === 'online').map(s => s.id) : [])];

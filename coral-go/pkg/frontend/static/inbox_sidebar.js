@@ -164,7 +164,7 @@ function moreFilesLine() {
     return p;
 }
 const needsFoot = () => { const parts = [mutedLine(), moreFilesLine(), cutShortLine(), lastSeenLine()].filter(Boolean); if (!parts.length) return null; const wrap = DT.el('div', 'inbox-needs-foot'); wrap.append(...parts); return wrap; };
-const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
+const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Teams, By CLI, Tags
 const IR = await importOnce('./inbox_read.js'); // which chats, boards and tasks the person has opened since they changed (#9687)
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
 const { proposalItems, pendingProposals, refreshProposals, onProposalsChanged, proposalActions, openProposalDialog, proposalSummary, proposalSnippet, markedText, carriesInstructions } = await importOnce('./inbox_proposals.js'); // what agents asked to add, waiting for the Operator (#11389)
@@ -1113,19 +1113,19 @@ const countOf = key => key === 'needs' ? needsCount(unreadReviewCount()) : key =
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', activity: 'checklist',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
-/** The phone drawer's Boards group (#9583, UI/UX's spec #9529): each team's board by its name, opening its messages in the Inbox. No unread count: nothing records what was read yet. A desktop's sidebar has the Board history folder only. */
+/** The phone drawer's Boards group (#9583, UI/UX's spec #9529): each team's board by its name, opening its messages in the Inbox. No unread count: nothing records what was read yet. A desktop's sidebar has the Teams folder only. */
 let boardList = []; // { key: team key, label }
 async function refreshBoards() {
     if (!isPhoneLayout()) return;
     try {
         const { fetchProjects } = await importOnce('./board_fetch.js');
-        boardList = (await fetchProjects()).map(p => ({ key: String(p.project), label: teamLabel(p.project, p.board_label || '') })).filter(b => b.key).sort((a, b) => a.label.localeCompare(b.label));
+        boardList = (await fetchProjects()).filter(p => !p.archived).map(p => ({ key: String(p.project), label: teamLabel(p.project, p.board_label || '') })).filter(b => b.key).sort((a, b) => a.label.localeCompare(b.label));
     } catch { boardList = []; }
     renderInboxNav(true);
 }
 const BOARD_ITEM = 'board:';
 const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boards', items: boardList.map(b => ({ key: BOARD_ITEM + b.key, label: b.label })) }] : []);
-/** What the folder list shows as current: on a phone an open board is its own entry of the Boards group (the folder it belongs to elsewhere is Board history). */
+/** What the folder list shows as current: on a phone an open board is its own entry of the Boards group (the folder it belongs to elsewhere is Teams). */
 const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
 const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you, not the ones your agents work on (those are on each team\u2019s page and goal)', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared', activity: 'What you did in Needs you' }; // one line each (#10074)
 // The Needs you number is the unread ones, and when the list holds more (read files are listed, not counted: #9277) it says so as the kind pills do, "1 of 4" (#12789, the Operator: "Needs you 0" over a table of read files). The welcome items are listed and never counted (#11622): they do not make it "0 of 5" on a new install.
@@ -1163,7 +1163,7 @@ function pickFolder(key) {
     openGroupTable('hub-inbox', key, { focus: true });
     const route = routeForFolder(key); if (route) note(route);
 }
-/** The address follows the folder (#8652): /inbox/<folder>, so a link, Back and a reload keep it. Goals, Tasks and Board history are other page families' paths (#8571, #8633) where this build has them. A folder that has no path (the route
+/** The address follows the folder (#8652): /inbox/<folder>, so a link, Back and a reload keep it. Goals, Tasks and Teams are other page families' paths (#8571, #8633) where this build has them. A folder that has no path (the route
  *  parser does not know it) leaves the address as it is; the old /chats address is replaced by the folder's, not stacked under it (Back would otherwise come back to it and rewrite it). */
 function noteFolder(key) {
     if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') return;

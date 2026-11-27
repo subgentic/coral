@@ -141,6 +141,7 @@ func (h *BoardHandler) ListAllTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query.Limit = limit
+	query.HideArchived = true // an archived team's tasks are not in the all-boards list (#21850)
 	tasks, res, err := h.bs.QueryTaskRowsResult(r.Context(), query)
 	if err != nil {
 		errInternalServer(w, err.Error())

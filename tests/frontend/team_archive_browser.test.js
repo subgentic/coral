@@ -1,4 +1,4 @@
-// Archive team and Restore team (#17491, walk 71 H3): a team can be put away and brought back as one. Before this, Archive was per agent: archiving a team's three agents made the team vanish from the sidebar,
+// Archive team and Restore team (#17491, walk 71 H3; the server's team archive, #21850): a team can be put away and brought back as one. Before this, Archive was per agent: archiving a team's three agents made the team vanish from the sidebar,
 // leaving a nameless 'Archived (3)', and bringing it back was Unarchive three times. Here, on the harness's stand-in agents: the sidebar team menu offers Archive team, asks once, and archives every member; the
 // Archived line names the team; the team's caption has Restore team, which brings every agent back asleep (nothing is woken) and the team returns to the list; the team page's menu says Restore team while archived.
 const assert = require('node:assert/strict');
@@ -26,22 +26,22 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('li.session-team-group')].find(l => /recipe/i.test(l.textContent)).querySelector('[data-mode="archive"]').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the question');
         const ask = await ev(`document.getElementById('confirm-modal-message').textContent`);
-        assert.ok(/3 agents stop/.test(ask) && /goals, tasks, files and chats stay/i.test(ask) && /Restore team/.test(ask), 'it says what stops, what stays and the way back: ' + ask);
+        assert.ok(/to sleep, then archives everything/.test(ask) && /Stays: everything/.test(ask) && /Restore team/.test(ask), 'it says what stops, what stays and the way back: ' + ask);
         await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /archive team/i.test(b.textContent)).click(); true`);
         await waitFor(`T.state.liveSessions.filter(s => s.board_project === 'recipe').every(s => s.archived)`, 'every member archived', 8000);
         await waitFor(`document.getElementById('command-pane').classList.contains('agent-sleeping')`, 'the open chat shows its agent asleep at once, as Archive agent does, not on the next feed tick (#17647)', 1000);
-        // 2. the team leaves the list; the Archived line names it; its caption has Restore team
-        const after = await ev(`({ summary: (document.querySelector('.archived-summary-row') || {}).textContent.trim().replace(/\s+/g, ' '), groups: [...document.querySelectorAll('li.session-team-group')].map(l => l.textContent.trim().slice(0, 30)), restore: [...document.querySelectorAll('.archived-team-caption button')].map(b => b.textContent.trim()) })`);
-        assert.match(after.summary, /^Archived \(3\) · recipe$/, 'the Archived line names the team: ' + JSON.stringify(after));
-        assert.deepEqual(after.restore, ['Restore team'], 'the team caption has Restore team: ' + JSON.stringify(after));
+        // 2. an archived team is nowhere in the sidebar: no team row, no agent rows, no Archived line (#21850: Restore team is on the Teams page)
+        const after = await ev(`({ summary: !!document.querySelector('.archived-summary-row'), caption: !!document.querySelector('.archived-team-caption'), groups: [...document.querySelectorAll('li.session-team-group')].map(l => l.textContent.trim().slice(0, 30)), rows: document.querySelectorAll('#live-sessions-list .session-group-item[data-session-id]').length })`);
+        assert.ok(!after.summary && !after.caption, 'no Archived line or team caption for it in the sidebar: ' + JSON.stringify(after));
         assert.ok(!after.groups.some(g => /recipe/i.test(g)), 'the team is out of the list: ' + JSON.stringify(after));
-        // 3. Restore team: every agent is back, asleep, nothing woken; the team returns
-        await ev(`document.querySelector('.archived-team-caption button').click(); true`);
+        assert.ok(await ev(`T.state.liveSessions.filter(s => s.board_project === 'recipe').every(s => s.team_archived && s.sleeping)`), 'its agents are archived with the team, asleep');
+        // 3. Restore team (the Teams page has the button; its action is this one): every agent is back, asleep, nothing woken; the team returns
+        await ev(`window.toggleTeamSleep('recipe', 'restore'); true`);
         await waitFor(`T.state.liveSessions.filter(s => s.board_project === 'recipe').every(s => !s.archived)`, 'every member restored', 8000);
         const back = await rows();
         assert.ok(back.length === 3 && back.every(r => !r.a && r.z), 'all three are back, asleep (nothing woken): ' + JSON.stringify(back));
         const list = await ev(`({ archivedLine: !!document.querySelector('.archived-summary-row'), groups: [...document.querySelectorAll('li.session-team-group')].map(l => l.textContent.trim().slice(0, 30)) })`);
         assert.ok(!list.archivedLine && list.groups.some(g => /recipe/i.test(g)), 'the Archived line is gone and the team is back in the list: ' + JSON.stringify(list));
-        console.log('PASS team_archive_browser: Archive team, the named Archived line, Restore team');
+        console.log('PASS team_archive_browser: Archive team leaves the sidebar entirely, Restore team brings it back');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

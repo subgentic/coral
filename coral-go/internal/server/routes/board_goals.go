@@ -345,7 +345,7 @@ func (h *BoardHandler) ListAllGoals(w http.ResponseWriter, r *http.Request) {
 	}
 	for k := range query {
 		switch k {
-		case "state", "board", "limit", "cursor":
+		case "state", "board", "limit", "cursor", "include_archived":
 		default:
 			errBadRequest(w, "unknown parameter "+k)
 			return
@@ -357,7 +357,7 @@ func (h *BoardHandler) ListAllGoals(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	q := board.AllGoalsQuery{Cursor: query.Get("cursor")}
+	q := board.AllGoalsQuery{Cursor: query.Get("cursor"), HideArchived: query.Get("include_archived") != "1" && len(query["board"]) == 0} // an archived team's goals are left out unless asked for (#21850)
 	split := func(name string, vals []string) ([]string, bool) {
 		var out []string
 		seen := map[string]bool{}

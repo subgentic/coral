@@ -45,7 +45,7 @@ try {
     assert.doesNotMatch(sidebar, /dock \? \{\} : \{ mail:/, "the agent dock's Saved tab has the mail row too, the same one as the Inbox page (#9786: it was a table on a phone with a Done button on every row)");
     assert.match(arts, /\.\.\.\(inbox \|\| phoneTeam \? \{ mail: item => \(\{ data: \{ artifactId: itemKey\(item\) \}, lead: \{ node: artifactThumbnail\(/, 'Artifacts of the Inbox: a reserved file thumbnail/type-icon lead, the name, its team and task');
     assert.ok(!/mail:/.test(arts.slice(0, arts.indexOf('...(inbox || phoneTeam ? { mail:'))), 'only the Inbox list and a team list on a phone (#12230), not an agent or goal list');
-    // a board of the group opens that board's messages in the Inbox (its address), not the Board history folder
+    // a board of the group opens that board's messages in the Inbox (its address), not the Teams folder
     folderButtons().find(b => /^[a-z_]*Alpha team/.test(b.textContent.trim())).click(); await settle(500);
     assert.equal(location.pathname, '/inbox/boards/alpha-team', 'the board opens in the Inbox at its address');
     console.log('inbox_phone_mail_rows: ok');
