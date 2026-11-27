@@ -51,6 +51,7 @@ type shellNever struct {
 
 // shellNeverRoutes: a never route one script calls, with what it does today. The key is "script METHOD route" with {} for a variable segment.
 var shellNeverRoutes = map[string]shellNever{
+	"cloud_enrollment_qr.js GET /api/cloud/enroll-qr":                      {bHidden, `image\.onerror = .*clear\(\)`, "the enrollment QR is hidden until its local-human-only image answers; an image error removes it, preserving the link and code fallback. The route is never tunneled (#21881)", 0},
 	"live_controller.js GET /api/cloud/links":                              {bLocal, `if \(!answeredLocally\(team\)`, "mountLiveControls returns before drawing controls or fetching active Hub links on a Hub-served page or for a remote team; answeredLocally requires a local dashboard and local server (#21128)", 0},
 	"live_controller.js GET /api/live/links":                               {bLocal, `if \(!answeredLocally\(team\)`, "the census sees the API root as GET; controller requests are reachable only after mountLiveControls refuses Hub-served pages and remote teams, while its exported list read delegates to live_links.js's own local guard (#21128)", 0},
 	"live_links.js GET /api/live/links":                                    {bLocal, `if \(!answeredLocally\(team\)`, "localLiveLinks returns null before fetch on a Hub-served page or for a remote team; answeredLocally requires a local dashboard and local server (#21128)", 0},

@@ -67,6 +67,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 
 	// Requests that came through the Cloud Hub tunnel (marked by the connector) are
 	// re-checked against the connector's route policy before anything else sees them.
+	r.Use(routes.EnrollmentQRLocalOnly)                              // the secret-bearing image is absent through every tunnel
 	r.Use(auth.HubOnlyGate(cloud.TunneledAuthentic, cloud.Tunneled)) // hub-only: a proxied request is refused here, before anything else (#21558)
 	r.Use(cloud.Guard(routes.MaxModeFromSettings(store.NewSessionStore(s.db))))
 	// The connector's stamp of which Hub link a request arrived on and which Hub person is behind it (#20312): a request with no known link is refused, the pair goes in the context for
@@ -603,6 +604,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	s.cloudHandler.OfferAtLaunch = s.cfg.OffersCloudConnect()
 	s.cloudHandler.HubUpdateAtLaunch = s.cfg.AllowHubUpdate
 	r.Get("/api/cloud/status", s.cloudHandler.GetStatus)
+	r.Get("/api/cloud/enroll-qr", s.cloudHandler.EnrollmentQR)
 	r.Post("/api/cloud/connect", s.cloudHandler.Connect)
 	r.Post("/api/cloud/connect/cancel", s.cloudHandler.CancelConnect)
 	// Dropbox sign-in (#14609): the Operator's, from this computer's dashboard only.
