@@ -59,36 +59,40 @@ func TestKeywordGateIsLinearOnTextOfNames(t *testing.T) {
 		t.Skip("the time is not read under -race")
 	}
 	for _, unit := range []string{"token=", "key:", "token%3D", "api_key=v;", "--password=x"} {
-		if ratio, ok := growthRatio(func(text string) { keywordSpans(text) }, unit); ok && ratio > maxLinearGrowth {
-			t.Errorf("%q repeated: four times the text took %.1f times as long (linear is 4, quadratic 16)", unit, ratio)
+		if ratio, ok := growthRatio(func(text string) { keywordSpans(text) }, unit, growthSmall, growthBig, growthRuns); ok && ratio > maxLinearGrowth {
+			t.Errorf("%q repeated: sixteen times the text took %.1f times as long (linear is 16, quadratic 256)", unit, ratio)
 		}
 	}
 }
 
-// The check is relative, not a wall-clock budget (#21793: a loaded CI runner took 1.81 s against a fixed 1.5 s): the same run times a text and one four times as long and compares them, so a slow machine slows
-// both. Linear is a ratio of 4 and quadratic 16; the bound sits between them, generous for noise.
-const maxLinearGrowth = 9.0
+// The check is relative, not a wall-clock budget (#21793: a loaded CI runner took 1.81 s against a fixed 1.5 s; #21894: a loaded runner then showed 10.8 against a bound of 9 on texts only four times apart): the same run
+// times a short text and one sixteen times as long and compares them. Linear is a ratio of 16 and quadratic 256; the bound sits between them, far from both, so a noisy machine has to be 4 times off to fail it.
+// The runs alternate (short, long, short, long ...) and each size keeps its best, so a load that comes and goes cannot slow only one of the two sizes for every run.
+const (
+	maxLinearGrowth = 64.0
+	growthSmall     = 16 << 10
+	growthBig       = 256 << 10
+	growthRuns      = 7
+)
 
-// growthRatio times run on n and 4n bytes of repeated unit (the best of three each, so one slow run does not decide) and returns big/small. ok is false when the small run is too quick to measure: nothing quadratic
-// is that quick at this size.
-func growthRatio(run func(string), unit string) (ratio float64, ok bool) {
-	best := func(size int) time.Duration {
-		text := strings.Repeat(unit, size/len(unit))
-		var min time.Duration
-		for i := 0; i < 3; i++ {
+// growthRatio times run on small and big bytes of repeated unit, alternating the two sizes for reps rounds and keeping the best of each, and returns big/small. ok is false when the small run is too quick to measure:
+// nothing quadratic is that quick at this size.
+func growthRatio(run func(string), unit string, small, big, reps int) (ratio float64, ok bool) {
+	texts := [2]string{strings.Repeat(unit, small/len(unit)), strings.Repeat(unit, big/len(unit))}
+	var best [2]time.Duration
+	for i := 0; i < reps; i++ {
+		for k, text := range texts {
 			start := time.Now()
 			run(text)
-			if d := time.Since(start); i == 0 || d < min {
-				min = d
+			if d := time.Since(start); i == 0 || d < best[k] {
+				best[k] = d
 			}
 		}
-		return min
 	}
-	small, big := best(64<<10), best(256<<10)
-	if small < 2*time.Millisecond {
+	if best[0] < time.Millisecond {
 		return 0, false
 	}
-	return float64(big) / float64(small), true
+	return float64(best[1]) / float64(best[0]), true
 }
 
 // The mutant: a scan that goes back to the end of the text once per name (what the gate did before it remembered the stretch scanned) is quadratic, and the relative check says so.
@@ -107,7 +111,7 @@ func TestTheGrowthCheckCatchesAQuadraticScan(t *testing.T) {
 		}
 		_ = n
 	}
-	ratio, ok := growthRatio(quadratic, "token=")
+	ratio, ok := growthRatio(quadratic, "token=", 8<<10, 128<<10, 2) // smaller texts than the real check: the stand-in is quadratic and must stay quick
 	if !ok || ratio <= maxLinearGrowth {
 		t.Fatalf("a quadratic scan was not caught: ratio %.1f ok=%v", ratio, ok)
 	}
@@ -120,7 +124,7 @@ func TestTheGrowthCheckCatchesAQuadraticScan(t *testing.T) {
 		}
 		_ = n
 	}
-	if ratio, ok := growthRatio(linear, "token="); ok && ratio > maxLinearGrowth {
+	if ratio, ok := growthRatio(linear, "token=", growthSmall, growthBig, growthRuns); ok && ratio > maxLinearGrowth {
 		t.Fatalf("a linear scan was called quadratic: ratio %.1f", ratio)
 	}
 }
