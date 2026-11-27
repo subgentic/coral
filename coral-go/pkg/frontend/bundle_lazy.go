@@ -215,6 +215,7 @@ func buildLazyModules(static fs.FS, startup map[string]bool, alias map[string]st
 		}
 	}
 	plugin := lazyPlugin(static, startup, alias, exports, registered)
+	inboxHints := inboxPreloads(static, startup)
 
 	type job struct {
 		name   string   // the file's own name
@@ -270,7 +271,12 @@ func buildLazyModules(static fs.FS, startup map[string]bool, alias map[string]st
 				skipped[j.name] = e
 				return
 			}
-			files[j.name] = out.js
+			out.mapFile, e = inboxPreloadSourceMap(j.name, out.mapFile, inboxHints)
+			if e != nil {
+				skipped[j.name] = e
+				return
+			}
+			files[j.name] = withInboxPreloads(j.name, out.js, inboxHints)
 			if len(out.mapFile) > 0 {
 				files[j.name+".map"] = out.mapFile
 			}
