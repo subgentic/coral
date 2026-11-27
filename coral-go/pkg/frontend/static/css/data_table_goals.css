@@ -13,3 +13,18 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .inbox-needs-results .dt-selecting tr.dt-row :is(button, a) { pointer-events: none; }
 }
+
+/* #21846, approved v4: a simple collapsible Goal bar, separate from file rows. */
+.inbox-needs-results .dt-group-goal th{padding:0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-xl)}
+.inbox-needs-results .dt-group-goal .dt-group-toggle{display:flex;align-items:center;gap:10px;min-height:44px;padding:10px 14px;box-sizing:border-box;flex-wrap:wrap;width:100%;white-space:normal}
+.inbox-needs-results .dt-group-goal .dt-group-words{flex:1;min-width:0;white-space:normal}
+.inbox-goal-heading{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:8px 14px;min-width:0}
+.inbox-goal-heading-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;min-width:0;overflow-wrap:anywhere;color:var(--text-primary)}
+.inbox-goal-heading-id{font-size:var(--fs-sm);color:var(--text-muted);font-weight:var(--fw-strong)}
+.inbox-goal-heading-meta{font-size:var(--fs-sm);font-weight:var(--fw-regular);color:var(--text-secondary);overflow-wrap:anywhere;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.inbox-needs-results .dt-group-goal .dt-group-chip{color:var(--accent);border:1px solid var(--border);border-radius:var(--radius-xl);font-size:var(--fs-sm);white-space:nowrap}
+@media(max-width:760px){.inbox-goal-heading-meta{flex-basis:100%}.inbox-needs-results .dt-group-goal .dt-group-toggle{padding:12px}}
+.inbox-goal-unread{color:var(--accent);border-color:var(--border)}.dt-group-goal .dt-group-pair{align-items:center}.dt-group-goal .dt-group-link{flex:none;white-space:nowrap}
+@media(max-width:760px){.dt-group-goal .dt-group-pair{flex-wrap:wrap}}
+.dt-group-custom .dt-group-toggle::before{display:none}.inbox-goal-chevron{display:inline-flex;flex:none;width:18px;color:var(--text-secondary)}
+@media(max-width:760px){.inbox-needs-results .dt-group-custom .dt-group-pair .dt-group-toggle{padding-inline-start:12px}.dt-group-goal .dt-group-link{display:none}}

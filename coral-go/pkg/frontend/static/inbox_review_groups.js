@@ -2,6 +2,8 @@
  * selected sort; a divider is never an item, a selection, or an unread count. */
 import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
+import { build } from './routes.js';
+import { el } from './dom_el.js';
 import { boardTeamKey } from './server_base.js';
 const { stillWaitingOnAgent: waitingOnAgent } = await importOnce('./inbox_agent_wait.js');
 const { storyNode } = await importOnce('./thread_story.js'); // the story under a task (#14444)
@@ -60,12 +62,25 @@ export function reviewGroupLookup(rows, grouped, isRead, sourceLabel, tasks = nu
         if (key === 'other-items') entry = { key, label: 'Other items' };
         else if (key === 'pinned') entry = { key, label: `Starred \u00b7 ${count}` };
         else if (key === 'waiting-agent') entry = { key, label: `Waiting on agent \u00b7 ${count}` };
-        else if (key === 'no-goal') entry = { key, label: `No goal \u00b7 ${count}` };
+        else if (key === 'no-goal' && byTask) entry = { key, label: `No goal · ${count}` };
+        else if (key === 'no-goal') { const open = tasks ? tasks.open(key, true) : true; entry = { key, label: 'Direct · Not tied to a goal', chip: `${unread} unread`, level: 'goal', open, ...(tasks ? { onToggle: () => tasks.toggle(key, !open) } : {}) }; }
         else if (byTask && taskKey(row) === key) {
             const x = aboutOf(row), title = markHidden(String(x.taskTitle || ''), { strict: true }), line = markHidden(cut(latest.review ? latest.review.name : latest.waiting_summary, 70), { strict: true }); // words an agent wrote: hidden characters written out, like the titles
             const open = tasks ? tasks.open(key, unread > 0) : true;
             entry = { key, label: `Task #${x.taskId}${title ? ` \u00b7 ${title}` : ''}\n${count}${line ? ` \u00b7 newest: ${line}` : ''}`, chip: unread > 0 ? 'Waiting on you' : '', level: 'task', open, ...(tasks ? { onToggle: () => tasks.toggle(key, !open) } : {}), ...(tasks && tasks.toggleStory && x.team && x.taskId ? { onStory: () => tasks.toggleStory(key, !tasks.storyOpen(key)), storyOpen: tasks.storyOpen(key), story: () => storyNode(x.team, x.taskId) } : {}), parent: { key: goalKey(row), label: goalLabel(goalKey(row)) } };
-        } else entry = { key, label: goalLabel(key) };
+        } else if (byTask) entry = { key, label: goalLabel(key) };
+        else {
+            const x = aboutOf(row), open = tasks ? tasks.open(key, true) : true;
+            entry = { key, link: { label: 'Open Goal ↗', href: build({ view: 'inbox-goals', sub: 'goals', id: x.team, item: x.goalId }) }, label: `Goal #${x.goalId}${x.goalTitle ? ` · ${markHidden(String(x.goalTitle), { strict: true })}` : ''}`, level: 'goal', chip: `${unread} unread`, open, ...(tasks ? { onToggle: () => tasks.toggle(key, !open) } : {}), heading: () => {
+                const h = el('span', 'inbox-goal-heading'), title = el('span', 'inbox-goal-heading-title');
+                const chevron = el('span', 'inbox-goal-chevron', open ? '▾' : '▸'); chevron.setAttribute('aria-hidden', 'true'); title.append(chevron, el('span', 'inbox-goal-heading-id', `Goal #${x.goalId}`), el('span', null, markHidden(String(x.goalTitle || ''), { strict: true })));
+                title.append(el('span', 'chip inbox-goal-unread', `${unread} unread`));
+                const mine = rows.filter(r => !pinned(r) && goalKey(r) === key && !(r.review && waitingOnAgent(r.review))), review = mine.filter(r => r.review).length, questions = mine.filter(r => r.operatorAsk).length;
+                const counts = [review ? `${review} to review` : '', questions ? `${questions} ${questions === 1 ? 'question' : 'questions'}` : '', shown > review + questions ? `${shown - review - questions} other ${shown - review - questions === 1 ? 'item' : 'items'}` : ''].filter(Boolean).join(' · ');
+                const right = el('span', 'inbox-goal-heading-meta'); right.append(el('span', null, counts), el('span', 'chip chip-tag', sourceLabel(x.team)));
+                h.append(title, right); return h;
+            } };
+        }
         labels.set(key, entry);
     }
     return row => labels.get(keyOf(row)) || null;

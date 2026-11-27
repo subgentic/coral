@@ -52,17 +52,18 @@ async function inboxRows(path, field, personal = false) {
 }
 
 /** Open goals from this Coral and its registered machines, preserving team identity. */
-let goalsFailed = false, doneCapped = false, goalUpdates = [];
+let goalsFailed = false, doneCapped = false, allCapped = false, goalUpdates = [];
 export const goalsUpdateNote = () => goalUpdates.join('. ');
 const DONE_PAGE = 100;
 /** Whether a computer sent a whole page of finished goals: there may be newer ones that are not listed (#14613); the Done list then says it shows the first ones. */
-export const doneGoalsCapped = () => doneCapped;
+export const doneGoalsCapped = (kind = 'done') => kind === 'all' ? allCapped : doneCapped;
 export const goalsReadFailed = () => goalsFailed;
 /** ONE read of the goals per call, as Security's conditions on the goals reader pin (#13389: one request in flight, one per gap): the open goals, or, with `finished`, the goals that are done (state=done, the first DONE_PAGE a computer sends, oldest first). The Goals folder asks for the finished ones only while its Done pill is picked (#14601, #14641: a second read on every gap broke the one-read-per-gap rule and the Hub's query census). */
 export async function listInboxGoals(finished = false) { // finished: true or 'done' for the done goals, 'dropped' for the dropped ones (#16371), false for the open ones
-    const state = finished === 'dropped' ? 'dropped' : 'done';
+    const state = finished === 'all' ? 'proposed,active,blocked,done,dropped' : finished === 'dropped' ? 'dropped' : 'done';
     const rows = await inboxRows(finished ? `/api/goals?state=${state}&limit=` + DONE_PAGE : '/api/goals?limit=100', 'goals');
     goalsFailed = !!rows.failed; goalUpdates = rows.updates || [];
+    if (finished === 'all') allCapped = Object.values(rows.reduce((n, d) => (n[d.server] = (n[d.server] || 0) + 1, n), {})).some(n => n >= DONE_PAGE);
     if (finished && state === 'done') doneCapped = Object.values(rows.reduce((n, d) => (n[d.server] = (n[d.server] || 0) + 1, n), {})).some(n => n >= DONE_PAGE);
     return rows;
 }

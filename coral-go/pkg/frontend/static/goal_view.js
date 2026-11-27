@@ -17,6 +17,7 @@ import * as W from './goal_words.js';
 const C = await importOnce('./goal_closed_words.js'); // who closed a goal, and what Close and Reopen do (#15244): loads with the goal page
 const { shortTitle } = await importOnce('./goal_short.js');
 import { onGoalsSeq } from './goals_feed.js';
+import { markHidden } from './visible_marks.js';
 import { looksDone, hiddenList, hideGoalDone, quietEndsAt } from './goal_done.js';
 import { pollEvery } from './overload.js';
 /** What an active goal with every task done says on its page (#15166, walk 6): that it is, and when it reaches Needs you, after the quiet period (#12161). '' for any other goal. */
@@ -47,9 +48,9 @@ const { bindStartupWaits } = await importOnce('./team_startup_waits.js');
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
-export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals' }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
+export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals', initialTab = 'tasks', initialArtifact = null, initialFiles = {} }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
     const root = host;
-    const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', tab: 'tasks', creating: false };
+    const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', tab: ['tasks', 'artifacts', 'comments'].includes(initialTab) ? initialTab : 'tasks', creating: false };
     let current = goal, uncommittedBox = null;
     let disposed = false, stopStartupWaits = null;
     const goalById = gid => current?.id === gid ? current : null;
@@ -256,16 +257,19 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     // whole width until one does). On a narrow screen the pane covers the list with a Back. The pane's element lives across drawings, so what is open stays open while the page is drawn again.
     const previewEl = el('aside', 'pane pane-aside detail-pane goal-detail-pane'); previewEl.hidden = true; previewEl.setAttribute('aria-label', 'Details'); // named, as the team page's own Details pane is (#9117)
     const preview = { key: '', rowKey: '' };
+    let clearArtifactReview = () => {};
     const artifacts = { id: 0, host: null, api: null, total: null };
     const comments = { id: 0, host: null, api: null, open: null }; // the Comments tab (#11955): one mount for the goal on show, as the Artifacts list has
     const splitEl = () => root.querySelector('.goal-split');
 
     function markPreviewRow() {
-        for (const tr of root.querySelectorAll('.goal-list tr[data-key]')) { if (preview.rowKey && tr.dataset.key === preview.rowKey) tr.setAttribute('aria-current', 'true'); else tr.removeAttribute('aria-current'); }
+        const selected = (!previewEl.hidden && previewEl.dataset.goalArtifactKey) || preview.rowKey;
+        for (const tr of root.querySelectorAll('.goal-list tr[data-key], .goal-list [data-file-key]')) { if (selected && (tr.dataset.key || tr.dataset.fileKey) === selected) tr.setAttribute('aria-current', 'true'); else tr.removeAttribute('aria-current'); }
     }
     function closePreview(restoreFocus = false) { if (!previewEl.hidden) closeDetailPane({ restoreFocus }); }
     /** What closing the pane does: the list has the whole width again, the row is no longer current, and the keyboard is back on the row that opened it (#8830). */
     const paneClosed = opener => () => {
+        clearArtifactReview();
         const rowKey = preview.rowKey; preview.key = ''; preview.rowKey = '';
         splitEl()?.classList.remove('goal-split-open'); markPreviewRow(); queueMicrotask(namePane); // the pane is put away after this runs
         (opener && opener.isConnected ? opener : root.querySelector(`.goal-list tr[data-key="${CSS.escape(rowKey)}"] .dt-primary`))?.focus?.({ preventScroll: true });
@@ -275,17 +279,19 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     function namePane() {
         previewEl.setAttribute('aria-labelledby', 'detail-pane-title'); previewEl.removeAttribute('aria-label');
         if (previewEl.hidden) { previewEl.removeAttribute('role'); return; }
-        if (narrowQuery && narrowQuery.matches) { previewEl.setAttribute('role', 'dialog'); }
+        if (narrowQuery && narrowQuery.matches && !(initialTab === 'artifacts' && model.tab === 'artifacts')) { previewEl.setAttribute('role', 'dialog'); }
         else previewEl.setAttribute('role', 'complementary');
     }
     narrowQuery?.addEventListener?.('change', namePane);
     function opened(opener, key) {
         namePane();
-        const tr = opener && opener.closest && opener.closest('tr');
-        preview.key = key; preview.rowKey = tr ? tr.dataset.key || '' : '';
+        const tr = opener && opener.closest && opener.closest('tr, [data-file-key]');
+        preview.key = key; preview.rowKey = tr ? tr.dataset.key || tr.dataset.fileKey || '' : '';
         splitEl()?.classList.add('goal-split-open'); markPreviewRow();
+        if (initialTab === 'artifacts' && model.tab === 'artifacts' && narrowQuery?.matches) previewEl.scrollIntoView({ block: 'start' });
     }
     function openPreviewTask(task, opener) {
+        clearArtifactReview();
         const g = goalById(model.openId);
         const shown = openDetailPane({
             key: `task:${task.id}`, opener, host: previewEl, onClose: paneClosed(opener),
@@ -297,6 +303,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     }
     function openPreviewArtifact(item, opener, files) {
         importOnce('./goal_artifacts.js').then(m => {
+            if (disposed) return;
+            clearArtifactReview = () => m.disposeGoalArtifactReview(previewEl);
             const shown = m.openArtifactInPane(item, { files, team: model.project, host: previewEl, opener, backLabel: 'Artifacts', onClose: paneClosed(opener) });
             if (shown) opened(opener, `artifact:${item.id || item.uri || item.name}`);
         }).catch(() => {});
@@ -435,16 +443,26 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const g = goalById(model.openId);
         const keep = document.activeElement && document.activeElement.id === 'goals-detail-title', keepBack = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('goals-back') && col.contains(document.activeElement);
         const keepMore = !!(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('task-more-btn') && col.contains(document.activeElement) && document.activeElement.closest('.goal-head-actions')); // Escape from the header's More menu leaves the keyboard on its button: a redraw that waited for the menu keeps it there
+        const splitScroll = col.querySelector('.goal-review-desk')?.scrollTop || 0;
         const place = scrollPlace(col); // the person's place (#11646): the page is drawn again for a tab, and the box that scrolled it is a new one
         col.replaceChildren();
         const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.classList.toggle('goal-split-open', !previewEl.hidden);
         const main = el('div', 'goal-main');
-        split.append(main, previewEl); col.append(split);
-        const h = drawGoalMain(main, g);
+        split.append(main, previewEl);
+        let h;
+        if (initialTab === 'artifacts' && model.tab === 'artifacts') {
+            split.classList.add('goal-review-desk');
+            const head = el('header', 'goal-review-desk-head'); head.append(backButton(backLabel, () => closeGoal()));
+            const title = el('div', 'goal-review-desk-title'); h = el('h2', 'goals-detail-title', `Goal #${g.id} · ${markHidden(g.title, { strict: true })}`); h.id = 'goals-detail-title'; h.tabIndex = -1;
+            title.append(h, el('span', 'chip chip-tag', keyLabel(team)), stateChip(g)); head.append(title);
+            const done = el('p', 'goal-review-desk-done'); done.append(el('strong', null, 'Done when: '), g.doneWhen || 'Not specified'); head.append(done);
+            const lists = drawTabs(g), tabs = lists.querySelector('.goal-tabs'); head.append(tabs); main.append(lists); col.append(head, split);
+        } else { col.append(split); h = drawGoalMain(main, g); }
         markPreviewRow();
+        if (split.classList.contains('goal-review-desk')) split.scrollTop = splitScroll;
         place.restore(main);
         if (keep) h.focus();
-        else if (keepBack) main.querySelector('.goals-back')?.focus({ preventScroll: true });
+        else if (keepBack) col.querySelector('.goals-back')?.focus({ preventScroll: true });
         else if (keepMore) main.querySelector('.goal-head-actions .task-more-btn')?.focus({ preventScroll: true });
     }
 
@@ -565,7 +583,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const mo = new MutationObserver(() => { if (disposed || !open.isConnected || open.getAttribute('aria-expanded') !== 'true') { mo.disconnect(); waitingForMenu = false; if (!disposed) drawPage(); } });
         mo.observe(open, { attributes: true, attributeFilter: ['aria-expanded'] });
     };
-    const update = g => { const again = current && current.id === g.id && JSON.stringify(current.rollup) !== JSON.stringify(g.rollup); current = g; drawWhenMenuClosed(); if (again) { artifacts.api?.refresh(); countArtifacts(g.id, true); } }; // the tasks moved: their files may have
+    let firstArtifact = initialArtifact;
+    const update = g => { const again = current && current.id === g.id && JSON.stringify(current.rollup) !== JSON.stringify(g.rollup); current = g; drawWhenMenuClosed(); if (firstArtifact) { const item = firstArtifact; firstArtifact = null; openPreviewArtifact(item, null, initialFiles); } if (again) { artifacts.api?.refresh(); countArtifacts(g.id, true); } }; // the tasks moved: their files may have
     let reading = false, again = false, signature = '', first = true;
     async function reload() {
         if (disposed) return;
@@ -599,6 +618,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         window.addEventListener('focus', visibleRefresh);
     }
     return { update, openClose: (g, preset) => openClose(g, preset), refreshTasks: () => loadTasks(id), dispose: () => {
-        disposed = true; stopStartupWaits?.(); narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); comments.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
+        disposed = true; clearArtifactReview(); stopStartupWaits?.(); narrowQuery?.removeEventListener?.('change', namePane); if (!previewEl.hidden) closeDetailPane(); artifacts.api?.destroy(); comments.api?.destroy(); stop?.(); if (timer) clearInterval(timer); window.removeEventListener('focus', visibleRefresh);
     }, focus: focusDetail };
 }

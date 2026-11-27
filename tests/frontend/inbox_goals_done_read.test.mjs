@@ -42,4 +42,15 @@ asked.length = 0;
 got = await C.listInboxGoals('dropped');
 assert.deepEqual(asked.filter(u => u.startsWith('/api/goals')), ['/api/goals?state=dropped&limit=100'], 'the Dropped read is the one dropped-goals request: ' + asked.join(' | '));
 assert.deepEqual(got.map(g => g.title), ['Dropped one']);
+// #21846 All includes the closed states in the same single request and discloses a full page.
+const allURL = '/api/goals?state=proposed,active,blocked,done,dropped&limit=100';
+rows[allURL] = [...rows['/api/goals?limit=100'], ...rows['/api/goals?state=dropped&limit=100']];
+asked.length = 0;
+got = await C.listInboxGoals('all');
+assert.deepEqual(asked.filter(u => u.startsWith('/api/goals')), [allURL]);
+assert.deepEqual(got.map(g => g.state).sort(), ['active', 'dropped']);
+assert.equal(C.doneGoalsCapped('all'), false);
+rows[allURL] = rows['/api/goals?state=done&limit=100'];
+await C.listInboxGoals('all');
+assert.equal(C.doneGoalsCapped('all'), true, 'All discloses a full per-computer page');
 console.log('PASS inbox_goals_done_read: the Done pill has the finished goals');

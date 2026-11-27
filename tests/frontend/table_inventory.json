@@ -99,7 +99,7 @@
   },
   {
    "file": "inbox_sidebar.js",
-   "calls": 4,
+   "calls": 3,
    "surface": "Inbox: Saved, Needs you, Tasks, Goals",
    "covered_by": "needs (live, the operator's mix)"
   },
