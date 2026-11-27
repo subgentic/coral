@@ -395,3 +395,11 @@ d42bab3da580cc8372aaface749cd3029705175f:coral-go/internal/gdocsync/fake_test.go
 ed1b0986e62852fbd2fd2e9a2c3b2375022ffcb7:coral-go/internal/server/routes/hub_key_join_21220_test.go:generic-api-key:14
 f8adbef58a74551b02c488d39ab4db8966a727a5:coral-go/internal/server/routes/gdoc_sync_test.go:github-pat:134
 f94f5f8c041e74755816603d2fa43063186fdc4d:coral-go/internal/server/routes/gdoc_comments_test.go:github-pat:74
+# and the same fixtures in the unrebased commits of branches still open on origin
+214ed9dfb6d0e51845f55fafd8c845e3990bf6d5:coral-go/internal/sshprov/start_test.go:generic-api-key:588
+3261be9de70ea1bcf3f4254b455daf2295aab2c4:coral-go/internal/server/routes/hub_key_join_21220_test.go:generic-api-key:29
+8e34c108eb920b1b71173b4c3d028a1f81369e7b:coral-go/internal/server/routes/gdoc_drafts_test.go:github-pat:77
+d0a59cd35f208ee4fffa095443d585d79658e3a5:coral-go/internal/server/routes/review_drafts_test.go:github-pat:106
+da5383b71d0abaacdb7b0377c768843154dd22cb:coral-go/internal/server/routes/hub_key_join_21220_test.go:generic-api-key:14
+eaf22c332d77872eded6c70f2b04a7d2fe0cf013:coral-go/internal/store/remote_link_key_21220_test.go:generic-api-key:20
+eaf22c332d77872eded6c70f2b04a7d2fe0cf013:coral-go/pkg/hubproxy/credential_21220_test.go:generic-api-key:18
