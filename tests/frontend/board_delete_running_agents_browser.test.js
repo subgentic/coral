@@ -29,7 +29,7 @@ const { safePaused } = require('./helpers/paused');
         // The harness detaches the real feed in install(), but the feed's first message (the test server's empty list) can reach the page before that on a slow machine and replace the mocked agent; nothing then
         // brings it back inside the wait below (Windows, ci/v161: "timed out waiting for the running agent in the list", #6529). The list is asked for again, from the mock, so the agent is there however the two raced.
         await ev(`import((window.__coralStatic || '/static/') + 'api.js').then(m => m.loadLiveSessions()).then(() => true)`);
-        await waitFor(`!!document.getElementById('mb-delete-btn') && document.getElementById('team-page-more').getBoundingClientRect().width > 0`, 'the team page and its More menu (Delete sits behind it, #6279; the board page is the team page now, #8129)', 15000);
+        await waitFor(`!!document.getElementById('mb-delete-btn') && !!document.getElementById('team-page-more') && document.getElementById('team-page-more').getBoundingClientRect().width > 0`, 'the team page and its More menu (Delete sits behind it, #6279; the board page is the team page now, #8129)', 15000);
         await waitFor(`(window.T.state.liveSessions || []).some(s => s.name === 'bd-agent')`, 'the running agent in the list', 15000);
         await ev(`window.__confirm = null; window.__deletes = []; window.__server409 = false;
             window.__kills = []; window.showConfirmModal = (title, msg, cb, _x, opts) => { window.__confirm = { title, msg, cb, label: opts && opts.label }; };
@@ -86,7 +86,7 @@ const { safePaused } = require('./helpers/paused');
         await ev(`window.__confirm.cb(); true`);
         await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Removed team/.test(t.textContent))`, 'the toast', 10000);
         assert.equal((await ev(`window.__kills`)).length, 1, 'the team was stopped once, before the delete');
-        await waitFor(`getComputedStyle(document.getElementById('team-page-view')).display === 'none' && !location.pathname.startsWith('/team/')`, 'the page leaving the deleted board (to Agents)', 10000);
+        await waitFor(`!!document.getElementById('team-page-view') && getComputedStyle(document.getElementById('team-page-view')).display === 'none' && !location.pathname.startsWith('/team/')`, 'the page leaving the deleted board (to Agents)', 10000);
         assert.equal(await boardListed(), false, 'the board is gone');
         console.log('   ✓');
     } finally { await removeBoards(ev, [B]); await client.close(); }
