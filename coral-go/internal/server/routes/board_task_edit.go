@@ -301,6 +301,16 @@ func (h *BoardHandler) AmendTask(w http.ResponseWriter, r *http.Request) {
 
 // ReassignTask changes ownership, preserving any prerequisite block.
 // POST /api/board/{project}/tasks/{taskID}/reassign
+// releaseHint is what the reassign refusal adds for a caller who holds the task: they can give it back themselves (eval #577: agents asked to put their own task back
+// in the queue tried reassign, were refused, and then guessed commands that do not exist).
+func (h *BoardHandler) releaseHint(ctx context.Context, project string, taskID int64, actor string) string {
+	t, err := h.bs.GetTask(ctx, project, taskID)
+	if err != nil || t == nil || t.AssignedTo == nil || actor == "" || !board.SameIdentity(*t.AssignedTo, actor) {
+		return ""
+	}
+	return fmt.Sprintf(". To put your own task back in the queue, unassigned, run: coral-board task release %d (add --keep to stay its assignee)", taskID)
+}
+
 func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	taskID, err := parseID(chi.URLParam(r, "taskID"))
@@ -323,7 +333,7 @@ func (h *BoardHandler) ReassignTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body.SubscriberID = attrWho
-	if !h.requireTaskPlanner(w, r, project, body.SubscriberID) {
+	if !h.requireTaskPlannerHint(w, r, project, body.SubscriberID, h.releaseHint(r.Context(), project, taskID, body.SubscriberID)) {
 		return
 	}
 	if h.refuseArchivedAssignee(w, r.Context(), project, body.Assignee) {

@@ -137,14 +137,9 @@ func cmdTaskComplete(st *boardState, args []string) {
 		body["candidate_revision"] = *candidateRevision
 	}
 	if *artifactsFile != "" {
-		data, err := os.ReadFile(*artifactsFile)
+		artifacts, err := clihelp.ReadArtifactManifest(*artifactsFile)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			clierr.Exit1()
-		}
-		var artifacts []map[string]any
-		if err := json.Unmarshal(data, &artifacts); err != nil {
-			fmt.Fprintln(os.Stderr, "Invalid artifacts JSON:", err)
 			clierr.Exit1()
 		}
 		body["artifacts"] = artifacts

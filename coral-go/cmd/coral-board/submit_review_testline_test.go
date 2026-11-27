@@ -57,6 +57,12 @@ func TestSubmitReviewWithoutATestLineIsRefusedUnlessNoTestsSaysWhy(t *testing.T)
 	if err == nil || !strings.Contains(out, "paste the last line of the test run") || calls != 0 {
 		t.Fatalf("a note with no test line must exit 1 before any request: err=%v calls=%d out=%q", err, calls, out)
 	}
+	if !strings.Contains(out, "into the note with --message, e.g. coral-board task submit-review 42 --reason") || !strings.Contains(out, "--no-tests") {
+		t.Fatalf("the refusal names the flag and gives an example with this task's number: %q", out)
+	}
+	if out, err = run("--message", "<the last line of your test run>"); err == nil || calls != 0 {
+		t.Fatalf("the example's placeholder copied as it is is not a test result: err=%v calls=%d out=%q", err, calls, out)
+	}
 	if out, err = run("--message", "go test: ok  github.com/subgentic/coral/cmd/coral-board 0.6s"); err != nil || calls != 1 {
 		t.Fatalf("a pasted result goes through: err=%v calls=%d out=%q", err, calls, out)
 	}

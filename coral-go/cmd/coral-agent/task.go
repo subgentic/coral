@@ -48,6 +48,9 @@ func printTaskUsage() {
 	fmt.Fprintln(os.Stderr, taskUsageText())
 }
 
+// agentTaskSubcommands are the subcommands of coral-agent task: an unknown subcommand's error lists them (eval #577).
+var agentTaskSubcommands = []string{"add", "list", "current", "detail", "claim", "edit", "publish", "complete", "cancel"}
+
 func cmdTask() {
 	if len(os.Args) < 3 {
 		printTaskUsage()
@@ -86,7 +89,7 @@ func cmdTask() {
 		printTaskUsage()
 		os.Exit(0)
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown task subcommand: %s\n", sub)
+		fmt.Fprintf(os.Stderr, "Unknown task subcommand: %s\nThe task subcommands are: %s.\nRun coral-agent task --help for what each one does.\n", sub, strings.Join(agentTaskSubcommands, ", "))
 		os.Exit(2) // usage
 	}
 }
@@ -327,14 +330,9 @@ func cmdTaskFinish(args []string, verb string) {
 			body["candidate_revision"] = *candidateRevision
 		}
 		if *artifactsFile != "" {
-			data, err := os.ReadFile(*artifactsFile)
+			artifacts, err := clihelp.ReadArtifactManifest(*artifactsFile)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
-				clierr.Exit1()
-			}
-			var artifacts []map[string]any
-			if err := json.Unmarshal(data, &artifacts); err != nil {
-				fmt.Fprintln(os.Stderr, "Invalid artifacts JSON:", err)
 				clierr.Exit1()
 			}
 			body["artifacts"] = artifacts

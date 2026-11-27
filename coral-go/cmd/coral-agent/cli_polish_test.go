@@ -217,6 +217,7 @@ func TestUnknownTaskSubcommandIsUsageAgent(t *testing.T) {
 	code, _, stderr := runAgent(t, srv.URL, "task", "frobnicate")
 	assert.Equal(t, 2, code, stderr)
 	assert.Contains(t, stderr, "Unknown task subcommand")
+	assert.Contains(t, stderr, "The task subcommands are: add, list, current, detail, claim, edit, publish, complete, cancel.", "the real ones are listed (eval #577)")
 }
 
 // Where the file system has no hard links (FAT/exFAT on a USB stick, some shares), --output is still written: the verified bytes are copied into a file created

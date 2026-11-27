@@ -130,10 +130,15 @@ Subcommands:
 		fmt.Println(taskUsageText)
 		os.Exit(0)
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown task subcommand: %s\n", sub)
+		fmt.Fprintf(os.Stderr, "Unknown task subcommand: %s\nThe task subcommands are: %s.\nRun coral-board task --help for what each one does.\n", sub, strings.Join(taskSubcommands, ", "))
 		os.Exit(2) // usage
 	}
 }
+
+// taskSubcommands are the subcommands cmdTask runs, the common ones first: an unknown subcommand's error lists them, so an agent that guessed a name (task unassign, task read)
+// sees the real ones (eval #577).
+var taskSubcommands = []string{"add", "list", "show", "detail", "current", "claim", "release", "complete", "cancel", "reassign", "edit", "amend", "history", "goal", "unblock",
+	"submit-review", "release-review", "review", "approve", "reject", "attach", "send-back", "mark-landed", "unlanded", "wait-on", "park", "unpark"}
 
 const taskUsageText = `Usage: coral-board task <subcommand> [args]
 
@@ -167,7 +172,7 @@ Subcommands:
   complete <id> [--revision N] [--message "note"] [--outcome success|failed] [--candidate-revision REVISION] [--artifacts manifest.json]
   cancel <id> --message "reason"
   reassign <id> --to "Agent Name" --later   Move it to that agent's backlog (as add --later)
-  reassign <id> [--to "Agent Name"] [--force]   An agent that already has the team's limit of waiting tasks (3 by default) is refused, with the less loaded agents named; --force assigns anyway and is recorded
+  reassign <id> [--to "Agent Name"] [--force]   An agent that already has the team's limit of waiting tasks (3 by default) is refused, with the less loaded agents named; --force assigns anyway and is recorded. Only the Operator or an orchestrator reassigns; to give back your own task, use release <id>
                                    A review task moves to another reviewer the same way: the round follows, the old reviewer is told, the others' verdicts stay
   unblock <id> (--blocker ID | --all) Remove one or all prerequisites (orchestrator only)
   release <id> [--keep]            Put work that is not for now back in the queue (unassigned; --keep leaves it yours): use it, not park

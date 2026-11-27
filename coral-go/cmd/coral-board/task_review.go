@@ -64,7 +64,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		clierr.Exit1()
 	}
 	if action == "submit-review" && strings.TrimSpace(*noTests) == "" && !hasTestResult(*message+"\n"+*reason) {
-		fmt.Fprintln(os.Stderr, "paste the last line of the test run you did (npm test:cloud, go test, or the one browser suite) into the note; a docs-only change says why with --no-tests \"why\"")
+		fmt.Fprintf(os.Stderr, "paste the last line of the test run you did (npm test:cloud, go test, or the one browser suite) into the note with --message, e.g. coral-board task submit-review %d --reason \"ready\" --message \"<the last line of your test run>\"; a docs-only change says why with --no-tests \"why\"\n", id)
 		clierr.Exit1()
 	}
 	body := map[string]any{"subscriber_id": resolveSubscriberID(), "reason": *reason, "message": *message, "outcome": *outcome}
@@ -114,13 +114,8 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		body["expected_revision"] = *revision
 	}
 	if *manifest != "" {
-		data, err := os.ReadFile(*manifest)
+		artifacts, err := clihelp.ReadArtifactManifest(*manifest)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			clierr.Exit1()
-		}
-		var artifacts []map[string]any
-		if err := json.Unmarshal(data, &artifacts); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			clierr.Exit1()
 		}
