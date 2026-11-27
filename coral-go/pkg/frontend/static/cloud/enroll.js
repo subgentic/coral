@@ -137,7 +137,10 @@ function fmtTime(ts) {
         if (r.ok) {
             review.hidden = true; done.hidden = false; setStatus(status, '');
         } else if (r.status === 409) {
-            setStatus(status, 'You have reached the limit of connected machines. Revoke one first.', 'error'); $('approve').disabled = false;
+            // Coral Hub's own refusal (#21976): the account's computer limit, in its words; any other 409 keeps the older line
+            setStatus(status, r.data && r.data.error === 'server_limit'
+                ? 'This account has reached its computer limit. During the beta each account can connect 2 computers; contact support to raise it.'
+                : 'You have reached the limit of connected machines. Revoke one first.', 'error'); $('approve').disabled = false;
         } else if (r.status === 404) {
             setStatus(status, 'That code is no longer valid. Start again on your machine.', 'error'); $('approve').disabled = false;
         } else if (r.status === 429) {
