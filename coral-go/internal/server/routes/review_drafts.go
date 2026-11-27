@@ -173,7 +173,6 @@ func (h *SessionsHandler) listReviewDrafts(w http.ResponseWriter, r *http.Reques
 		canWrite, reason = false, "comments_locked"
 	}
 	switch {
-	case len(views) == 0:
 	case h.boardHandler != nil && board != "" && h.boardHandler.IsPaused(board):
 		if reason == "" {
 			reason = "board_paused"

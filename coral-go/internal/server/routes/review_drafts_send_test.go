@@ -205,6 +205,22 @@ func TestTheDraftReadSaysWhoWouldGetTheSendAndWhetherItCanGo(t *testing.T) {
 	assert.Empty(t, out["reason"])
 }
 
+func TestTheEmptyDraftReadNamesTheRecipientBeforeTheFirstComment(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	_, out := rig.do(http.MethodGet, draftsPath(cmtDoc)+"?board=team-a", cmtAsOwner, nil)
+	assert.EqualValues(t, 0, out["count"])
+	assert.Equal(t, false, out["can_send"])
+	assert.Equal(t, "no_uploader", out["reason"])
+	rig.uploadedBy(1, "team-a")
+	_, out = rig.do(http.MethodGet, draftsPath(cmtDoc)+"?board=team-a", cmtAsOwner, nil)
+	assert.EqualValues(t, 0, out["count"])
+	assert.Equal(t, true, out["can_send"], "the first typed comment can save then send")
+	assert.Equal(t, []any{"Dev"}, out["targets"])
+	assert.Empty(t, out["reason"])
+	assert.Empty(t, rig.operatorMessages(), "capability reads do not send")
+}
+
 func TestTheInboxCountOfDraftsIsTheOwnersOnTheVersionTheyAreOn(t *testing.T) {
 	rig := newCmtRig(t)
 	rig.draft("one", map[string]any{"whole": true})
