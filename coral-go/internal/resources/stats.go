@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -20,7 +21,7 @@ import (
 // Stats is what one resource's machine looks like now (#17560): the numbers an agent needs to pick a box (is it up, how loaded, how much memory and disk is free). They come from the machine itself: gopsutil here,
 // one fixed read-only command over ssh on a remote one. Never the resource's description or anything an agent typed.
 type Stats struct {
-	State        string  `json:"state"` // ok | unreachable | unavailable (a box with no way to be read yet, such as Windows)
+	State        string  `json:"state"` // ok | unreachable | no_stats (ssh connected but the box has no Unix tools, such as Windows) | unavailable (no way to read it yet)
 	LoadPerCore  float64 `json:"load_per_core,omitempty"`
 	CPUCount     int     `json:"cpu_count,omitempty"`
 	MemAvailMB   int64   `json:"mem_available_mb,omitempty"`
@@ -35,12 +36,22 @@ func (s Stats) Words() string {
 		return fmt.Sprintf("up; load %.2f per core on %d cores; %d MB memory free; %.0f GB disk free", s.LoadPerCore, s.CPUCount, s.MemAvailMB, s.DiskFreeGB)
 	case "unreachable":
 		return "unreachable (ssh failed or timed out)"
+	case NoStats:
+		return "up (no stats on this OS)"
 	case "checking":
 		return "checking"
 	default:
 		return "stats not available for this machine"
 	}
 }
+
+// NoStats is the state of a remote machine that took the ssh connection but could not run the Unix stats command (Windows' cmd.exe): it is up, and its numbers are unknown (#21948).
+const NoStats = "no_stats"
+
+// RemoteExit is what an SSHRunner answers when ssh connected and the remote command ran but exited non-zero (ssh itself exits 255 for a connection failure). The runner still returns the output it read.
+type RemoteExit struct{ Code int }
+
+func (e *RemoteExit) Error() string { return fmt.Sprintf("the remote command exited %d", e.Code) }
 
 // statsScript is the whole command a remote machine is asked to run: fixed text, read-only, with no input from anywhere.
 const statsScript = `uptime; echo '---'; (nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null); echo '---'; df -k . | tail -1; echo '---'; free -m 2>/dev/null | sed -n 2p`
@@ -93,6 +104,10 @@ func realSSH(ctx context.Context, alias, script string) (string, error) {
 	out := &cappedBuffer{max: maxSSHOutput}
 	cmd.Stdout = out
 	err := cmd.Run()
+	var ee *exec.ExitError
+	if errors.As(err, &ee) && ee.ExitCode() != 255 && ee.ExitCode() >= 0 {
+		err = &RemoteExit{Code: ee.ExitCode()} // ssh itself connected: the command is what failed
+	}
 	return out.b.String(), err
 }
 
@@ -218,10 +233,15 @@ func (b *StatsBoard) remoteStats(machine string) Stats {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	out, err := run(ctx, alias, statsScript)
-	if err != nil {
+	var re *RemoteExit
+	if err != nil && !errors.As(err, &re) {
 		return Stats{State: "unreachable"}
 	}
-	return ParseRemoteStats(out)
+	st := ParseRemoteStats(out)
+	if st.State != "ok" && re != nil {
+		return Stats{State: NoStats} // connected, but the box could not run the Unix command (a Windows machine's cmd.exe)
+	}
+	return st
 }
 
 func localStats() Stats {

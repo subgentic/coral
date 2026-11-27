@@ -101,3 +101,19 @@ func TestAColdLookNeverWaitsOnSshAndStartsOneReadPerBox(t *testing.T) {
 	assert.Equal(t, 25, n, "the writer is never told it was cut, so ssh does not block")
 	assert.Len(t, c.b.String(), 10)
 }
+
+// #21948: a Windows box takes the ssh connection but cmd.exe cannot run the Unix command; that is "up, no stats", never "unreachable". A connection failure still is.
+func TestAConnectedMachineThatCannotRunTheCommandIsUpWithNoStats(t *testing.T) {
+	now := time.Now()
+	run := func(out string, err error) *StatsBoard {
+		return &StatsBoard{Now: func() time.Time { return now }, Run: func(context.Context, string, string) (string, error) { return out, err }}
+	}
+	st := run("The system cannot find the path specified.\n", &RemoteExit{Code: 1}).remoteStats("frontier")
+	assert.Equal(t, NoStats, st.State)
+	assert.Equal(t, "up (no stats on this OS)", st.Words())
+	assert.False(t, (&StatsBoard{cache: map[string]Stats{"remote:frontier": st}}).Closed("frontier", "remote"), "an up box with no numbers stays open to runs")
+
+	assert.Equal(t, "unreachable", run("", errors.New("exit status 255")).remoteStats("frontier").State, "ssh failing to connect is still unreachable")
+	assert.Equal(t, "ok", run(linuxOut, &RemoteExit{Code: 1}).remoteStats("epoch").State, "a Unix box whose last command exits non-zero still reads")
+	assert.Equal(t, "ok", run(linuxOut, nil).remoteStats("epoch").State)
+}
