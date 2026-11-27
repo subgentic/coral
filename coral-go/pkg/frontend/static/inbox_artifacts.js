@@ -8,12 +8,16 @@ import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
 import { el } from './dom_el.js';
 import { refreshGroupTable } from './sidebar_groups.js';
+import { isPhoneLayout } from './phone_layout.js';
 let DT, IT, PH, inboxBarSpec, list = null, pageLoading = null, pageError = false;
 function ensurePage() {
     if (list || pageLoading || pageError) return;
     pageLoading = Promise.all([importOnce('./data_table.js'), importOnce('./team_artifacts_page.js'), importOnce('./team_artifact_bar.js'), importOnce('./inbox_toolbar.js'), importOnce('./page_header.js')]).then(([dt, page, bar, it, ph]) => {
         DT = dt; IT = it; PH = ph; inboxBarSpec = bar.inboxBarSpec; list = page.createArtifactsList({ inbox: true });
+        const host = document.getElementById('group-table-view');
+        const focusSearch = !isPhoneLayout() && host?.dataset.group === 'hub-inbox:artifacts' && document.activeElement?.id === 'group-table-title';
         refreshGroupTable('hub-inbox');
+        if (focusSearch) host.querySelector('.list-bar-search')?.focus({ preventScroll: true });
     }).catch(() => { pageLoading = null; pageError = true; refreshGroupTable('hub-inbox'); });
 }
 
@@ -95,7 +99,7 @@ export function artifactsSpec() {
     if (!list) {
         ensurePage();
         return { title: 'Artifacts', rows: [], signature: 'artifacts-loading-' + pageError, node: () => {
-            const node = el('div', 'empty-state'); node.append(el('p', '', pageError ? 'Artifacts could not be loaded.' : 'Loading Artifacts…'));
+            const node = el('div', 'empty-state'), status = el('p', 'goals-note team-count-line', pageError ? 'Artifacts could not be loaded.' : 'Loading artifacts…'); status.setAttribute('role', pageError ? 'alert' : 'status'); node.append(status);
             if (pageError) { const retry = el('button', 'btn', 'Retry'); retry.type = 'button'; retry.addEventListener('click', () => { pageError = false; ensurePage(); refreshGroupTable('hub-inbox'); }); node.append(retry); }
             return node;
         } };
