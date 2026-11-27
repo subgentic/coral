@@ -21,16 +21,17 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_images", "board_id"}, {"board_field_images", "board_id"}, {"board_field_uploads", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
 	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_opening_ask", "project"}, {"board_ask_reopened", "project"}, {"board_ask_links", "project"}, {"board_ask_buttons", "project"}, {"board_ask_subjects", "project"}, {"board_orch_grant", "project"}, {"member_grant", "board_id"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
-	{"artifact_tags", "board_id"},        // #8583: a team's tags of its artifacts
-	{"artifact_reviews", "board_id"},     // #136584: when the Operator decided a review of a team's artifact
-	{"artifact_questions", "board_id"},   // #11555: what an upload for review asks the Operator
-	{"artifact_review_sent", "board_id"}, // #13231: when a file was sent for review
-	{"artifact_saved_at", "board_id"},    // #20519: when a file was saved for later
-	{"artifact_kinds", "board_id"},       // #12144: the kind of a file for review
-	{"artifact_task_chains", "board_id"}, // #12144: the latest file for review of a task chain
-	{"artifact_task_files", "board_id"},  // #15159: a task's open file of each name
-	{"team_workers", "board_id"},         // #21467: the workers a team approved
-	{"worker_launches", "board_id"},      // #21467: which worker started which agent
+	{"artifact_tags", "board_id"},              // #8583: a team's tags of its artifacts
+	{"artifact_reviews", "board_id"},           // #136584: when the Operator decided a review of a team's artifact
+	{"artifact_questions", "board_id"},         // #11555: what an upload for review asks the Operator
+	{"artifact_decided_questions", "board_id"}, // #21992: what a decided file asked, kept for the ledger
+	{"artifact_review_sent", "board_id"},       // #13231: when a file was sent for review
+	{"artifact_saved_at", "board_id"},          // #20519: when a file was saved for later
+	{"artifact_kinds", "board_id"},             // #12144: the kind of a file for review
+	{"artifact_task_chains", "board_id"},       // #12144: the latest file for review of a task chain
+	{"artifact_task_files", "board_id"},        // #15159: a task's open file of each name
+	{"team_workers", "board_id"},               // #21467: the workers a team approved
+	{"worker_launches", "board_id"},            // #21467: which worker started which agent
 }
 
 // Audit trails: what the Hub's operators did and what the health rules did are a record of what happened, not part of the board, so they stay.
