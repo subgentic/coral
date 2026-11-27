@@ -8,6 +8,7 @@ import (
 
 	"github.com/subgentic/coral/internal/devicekey"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // NewDeviceVerifier is the one place a production devicekey.Verifier is built (#19669 slice 7): Refuse is this manager's pending-clear mark (while a clear is pending every message is refused with list_unavailable), HubOrigin is the Hub address this computer is configured with (its HubURL, never an address from a message) (never an address from a message), Computer is this computer's own fingerprint, and Audit writes a removal's kids and mode to the log (no label). It is nil when there is no computer key, so nothing is ever checked against no computer.
@@ -39,6 +40,19 @@ func (m *Manager) NewDeviceVerifier(st devicekey.Store) *devicekey.Verifier {
 		Refuse:    m.DeviceClearPending,
 		Audit:     devicekey.AuditLine(m.o.Logger),
 		AuditCert: devicekey.AuditCertLine(m.o.Logger),
+	}
+	if os, ok := st.(devicekey.OwnerStore); ok { // sign once (#21889): the anchor, epochs and certified browsers live in the same store; the setting is the person's own and defaults to off
+		v.Owner = os
+		if acc, ok := st.(interface {
+			OwnerCertAccept(ctx context.Context) (string, bool)
+		}); ok {
+			v.CertCap = func() (tunnel.Mode, bool) {
+				word, on := acc.OwnerCertAccept(context.Background())
+				md, ok := tunnel.ParseMode(word)
+				return md, on && ok
+			}
+		}
+		v.CertSeen = devicekey.CertSeenLine(m.o.Logger)
 	}
 	// The nonce store is probed when the verifier is built (the first message after start), with retries so one transient error does not decide: if it still cannot be read, a message whose ts is before now plus the window is refused with before_start, so no replay of an older message gets through a store that forgot it (design page v4 section 4). The probe is repeated later (below) and moves the refusal up to the recovery time once the store reads again.
 	m.devProbeAt = time.Now()
