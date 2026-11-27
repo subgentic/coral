@@ -24,6 +24,7 @@ const model = defineFilters({
     team: { type: 'custom', empty: '', clean: v => text(v, 200), filtered: v => !!v, chip: teamChip, clear: f => ({ ...f, team: '' }) },
     driver: { type: 'custom', empty: '', clean: v => text(v, 80), filtered: v => !!v, chip: v => `Driver: ${v}`, clear: f => ({ ...f, driver: '' }) },
     from: { type: 'day', chip: v => `Updated since ${v}` },
+    archived: { type: 'flag', chip: 'Archived teams included' }, // the goals of an archived team are left out unless asked for (#21915; GET /api/goals?include_archived=1)
     sort: { type: 'order', values: SORTS, default: 'newest' },
 });
 export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;

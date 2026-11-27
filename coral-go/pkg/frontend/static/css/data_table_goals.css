@@ -13,3 +13,7 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .inbox-needs-results .dt-selecting tr.dt-row :is(button, a) { pointer-events: none; }
 }
+
+/* a team row's ⋯ is as tall as the row's other buttons at a mouse; a phone keeps the touch size (#21915) */
+.dt-chat-flags .dt-mail-more-toggle { width: var(--control-compact-height); min-height: var(--control-compact-height); height: var(--control-compact-height); }
+@media (max-width: 767px), (pointer: coarse) { .dt-chat-flags .dt-mail-more-toggle { width: var(--table-touch); min-height: var(--table-touch); } }

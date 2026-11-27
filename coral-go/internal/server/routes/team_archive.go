@@ -18,12 +18,20 @@ func (h *SessionsHandler) ArchiveTeam(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "the message board is not available")
 		return
 	}
+	if known, err := h.bs.BoardKnown(ctx, project); err != nil {
+		errInternalServer(w, err.Error())
+		return
+	} else if !known {
+		errNotFound(w, "no team named "+project)
+		return
+	}
 	sessions, err := h.ss.GetBoardSessions(ctx, project)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
 	archived, slept := 0, 0
+	var archivedIDs []string // only these come back on Restore: an agent archived on its own stays archived
 	for _, sess := range sessions {
 		if sess.IsArchived == 1 {
 			continue
@@ -44,8 +52,13 @@ func (h *SessionsHandler) ArchiveTeam(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		archived++
+		archivedIDs = append(archivedIDs, sess.SessionID)
 	}
 	if err := h.bs.SetBoardArchived(ctx, project, true); err != nil {
+		errInternalServer(w, err.Error())
+		return
+	}
+	if err := h.bs.SetBoardArchivedAgents(ctx, project, archivedIDs); err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
@@ -64,14 +77,25 @@ func (h *SessionsHandler) RestoreTeam(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "the message board is not available")
 		return
 	}
+	if known, err := h.bs.BoardKnown(ctx, project); err != nil {
+		errInternalServer(w, err.Error())
+		return
+	} else if !known {
+		errNotFound(w, "no team named "+project)
+		return
+	}
 	sessions, err := h.ss.GetBoardSessions(ctx, project)
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
+	mine := map[string]bool{}
+	for _, id := range h.bs.BoardArchivedAgents(ctx, project) {
+		mine[id] = true
+	}
 	restored := 0
 	for _, sess := range sessions {
-		if sess.IsArchived != 1 {
+		if sess.IsArchived != 1 || !mine[sess.SessionID] {
 			continue
 		}
 		if err := h.ss.SetSessionArchived(ctx, sess.SessionID, false); err != nil {

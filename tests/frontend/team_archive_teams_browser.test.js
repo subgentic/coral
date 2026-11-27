@@ -37,28 +37,36 @@ const sceneShots = require('./helpers/scene_shots');
             await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr.dt-group')].some(r => /Archived teams/.test(r.textContent))`, `${at}the Archived teams divider`, 8000);
             const rows = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => r.classList.contains('dt-group') ? '== ' + r.textContent.replace(/\\s+/g, ' ').trim() : (r.querySelector('button.dt-primary') || r).textContent.replace(/\\s+/g, ' ').trim())`);
             const last = rows.slice(-2).map(x => x.replace(/ now(Unread)?$/, ''));
-            assert.deepEqual(last, ['== Archived teams', 'Docs Site'], `${at}the archived team lists last, under Archived teams: ${JSON.stringify(rows)}`);
+            assert.deepEqual(last, ['== Archived teams (1)', 'Docs Site'], `${at}the archived team lists last, under Archived teams: ${JSON.stringify(rows)}`);
             assert.ok(rows.some(x => x.startsWith('Billing Revamp')) && rows.some(x => x.startsWith('Mobile Beta')), `${at}the live teams are listed: ${JSON.stringify(rows)}`);
             const nav = await ev(`document.body.innerText`);
             assert.ok(!/Board history/.test(nav), `${at}no "Board history" is left on the page`);
             assert.ok(/Teams/.test(await ev(`[...document.querySelectorAll('#inbox-nav button, .view-list button, #view-list button, [data-inbox-folder], .view-list-item')].map(b => b.textContent).join('|') || document.body.innerText`)), `${at}the folder is named Teams`);
             await shot('teams-' + w);
-            if (!mobile) { // the row's buttons (they show on hover or focus; a phone's rows have none)
-                const btns = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].map(r => [(r.querySelector('button.dt-primary') || r).textContent.trim(), [...r.querySelectorAll('[data-team-action]')].map(b => b.dataset.teamAction)])`);
-                assert.deepEqual(btns.find(b => b[0] === 'Billing Revamp')[1], ['Archive team', 'Remove team'], `${at}a live team's row: Archive team and Remove team: ${JSON.stringify(btns)}`);
-                assert.deepEqual(btns.find(b => b[0] === 'Docs Site')[1], ['Restore team'], `${at}an archived team's row: Restore team: ${JSON.stringify(btns)}`);
-                // Archive team: asks once (what stops, what stays, the way back), then the server is asked
-                await ev(`document.querySelectorAll('#group-table-view [data-team-action="Archive team"]')[0].click(); true`);
-                await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${at}the Archive team question`);
-                const ask = await ev(`document.getElementById('confirm-modal-message').textContent`);
-                assert.ok(/Stays: everything/.test(ask) && /Restore team/.test(ask) && /Teams page/.test(ask), `${at}it says what stays and the way back: ${ask}`);
-                await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /^archive team$/i.test(b.textContent.trim())).click(); true`);
-                await waitFor(`window.__archiveCalls.some(c => /^POST /.test(c))`, `${at}the archive call`, 8000);
-                await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')).slice(-3).some(t => /Billing Revamp/.test(t))`, `${at}the archived team moves to the end`, 8000);
-                // Restore team
-                await ev(`window.__archiveCalls = []; [...document.querySelectorAll('#group-table-view [data-team-action="Restore team"]')].pop().click(); true`);
-                await waitFor(`window.__archiveCalls.some(c => /^DELETE /.test(c))`, `${at}the restore call`, 8000);
-            }
+            // The row's ⋯ menu as the mock draws it (the same on a computer and a phone: a phone has no hover): Open team, Team settings, Sleep team, Archive team, Remove team.
+            const openMenu = async team => {
+                await ev(`[...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].find(r => (r.querySelector('.dt-primary') || r).textContent.replace(/\\s+/g, ' ').trim().startsWith(${JSON.stringify(team)})).querySelector('button.dt-mail-more-toggle').click(); true`);
+                await waitFor(`[...document.querySelectorAll('[role="menu"]')].some(m => !m.hidden && m.getBoundingClientRect().height > 0 && /Open team|Restore team/.test(m.textContent))`, `${at}the ${team} row menu opens`, 8000);
+            };
+            const items = () => ev(`[...document.querySelectorAll('[role="menu"]')].filter(m => !m.hidden && m.getBoundingClientRect().height > 0).flatMap(m => [...m.querySelectorAll('[role="menuitem"]')].map(b => b.getAttribute('aria-label') || b.textContent.trim()))`);
+            const pick = label => ev(`[...document.querySelectorAll('[role="menu"]')].filter(m => !m.hidden).flatMap(m => [...m.querySelectorAll('[role="menuitem"]')]).find(b => (b.getAttribute('aria-label') || b.textContent.trim()) === ${JSON.stringify(label)}).click(); true`);
+            await openMenu('Billing Revamp');
+            assert.deepEqual(await items(), ['Open team', 'Team settings', 'Sleep team', 'Archive team', 'Remove team'], `${at}a live team's row menu`);
+            assert.ok(/Puts the team away; nothing is deleted/.test(await ev(`[...document.querySelectorAll('[role="menu"]')].filter(m => !m.hidden).map(m => m.textContent).join(' ')`)), `${at}Archive team says what it does`);
+            await shot('rowmenu-' + w);
+            // Archive team: asks once (what stops, what stays, the way back), then the server is asked
+            await pick('Archive team');
+            await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${at}the Archive team question`);
+            const ask = await ev(`document.getElementById('confirm-modal-message').textContent`);
+            assert.ok(/Stays: everything/.test(ask) && /Restore team/.test(ask) && /Teams page/.test(ask), `${at}it says what stays and the way back: ${ask}`);
+            await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /^archive team$/i.test(b.textContent.trim())).click(); true`);
+            await waitFor(`window.__archiveCalls.some(c => /^POST /.test(c))`, `${at}the archive call`, 8000);
+            await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')).slice(-3).some(t => /Billing Revamp/.test(t))`, `${at}the archived team moves to the end`, 8000);
+            // Restore team: a button on a computer's archived row, the row's menu on a phone
+            await ev(`window.__archiveCalls = []; true`);
+            if (!mobile) await ev(`[...document.querySelectorAll('#group-table-view [data-team-action="Restore team"]')].pop().click(); true`);
+            else { await openMenu('Docs Site'); await pick('Restore team'); }
+            await waitFor(`window.__archiveCalls.some(c => /^DELETE /.test(c))`, `${at}the restore call`, 8000);
             // The Archive team question from a team page's More menu (a team with no agent running can be archived too).
             await ev(`window.openTeamPage('mobile-beta').then(() => true)`);
             await waitFor(`!!document.getElementById('team-page-more')`, `${at}the team page`, 8000);

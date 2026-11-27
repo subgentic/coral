@@ -95,7 +95,64 @@ func TestArchiveTeam_NoAgents(t *testing.T) {
 	r.Post("/api/board/{project}/archive", handler.ArchiveTeam)
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
+	_, err := handler.bs.PostMessage(context.Background(), "empty-team", "Lead", "a team with a board and no agent", nil)
+	require.NoError(t, err)
 	out := postArchiveOK(t, srv.URL+"/api/board/empty-team/archive")
 	assert.EqualValues(t, 0, out["agents_archived"])
 	assert.True(t, handler.bs.BoardArchived(context.Background(), "empty-team"))
+}
+
+// Restore team unarchives only the agents Archive team archived: an agent the Operator archived on its own stays archived (#21915).
+func TestArchiveTeam_RestoreLeavesAnAgentArchivedOnItsOwn(t *testing.T) {
+	_, handler, terminal, ss := setupSessionsTestServer(t)
+	handler.SetBoardHandler(NewBoardHandler(handler.bs))
+	r := chi.NewRouter()
+	r.Post("/api/board/{project}/archive", handler.ArchiveTeam)
+	r.Delete("/api/board/{project}/archive", handler.RestoreTeam)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	ctx := context.Background()
+	registerTerminalAgent(t, ss, terminal, taSID1, "put-away", false)
+	registerTerminalAgent(t, ss, terminal, taSID2, "put-away", true)
+	_, err := handler.bs.Subscribe(ctx, "put-away", "Lead", "Orchestrator", naming.SessionName("terminal", taSID1), nil, "all")
+	require.NoError(t, err)
+	require.NoError(t, ss.SetSessionArchived(ctx, taSID2, true)) // archived by the Operator, before the team was
+
+	out := postArchiveOK(t, srv.URL+"/api/board/put-away/archive")
+	assert.EqualValues(t, 1, out["agents_archived"], "the agent that was already archived is not the team's to restore")
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/api/board/put-away/archive", bytes.NewReader([]byte("{}")))
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	_, a1 := archFlags(t, ss, taSID1)
+	_, a2 := archFlags(t, ss, taSID2)
+	assert.Equal(t, 0, a1, "the agent Archive team archived is back")
+	assert.Equal(t, 1, a2, "the agent archived on its own stays archived")
+	assert.Nil(t, handler.bs.BoardArchivedAgents(ctx, "put-away"), "the record goes with the flag")
+}
+
+// A team that does not exist answers 404 and writes nothing: no settings rows, no flag (#21915).
+func TestArchiveTeam_UnknownTeamIs404AndWritesNothing(t *testing.T) {
+	_, handler, _, _ := setupSessionsTestServer(t)
+	handler.SetBoardHandler(NewBoardHandler(handler.bs))
+	r := chi.NewRouter()
+	r.Post("/api/board/{project}/archive", handler.ArchiveTeam)
+	r.Delete("/api/board/{project}/archive", handler.RestoreTeam)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	for _, method := range []string{http.MethodPost, http.MethodDelete} {
+		req, _ := http.NewRequest(method, srv.URL+"/api/board/no-such-team/archive", bytes.NewReader([]byte("{}")))
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode, method)
+	}
+	ctx := context.Background()
+	assert.False(t, handler.bs.BoardArchived(ctx, "no-such-team"))
+	assert.Nil(t, handler.bs.BoardArchivedAgents(ctx, "no-such-team"))
+	archived, err := handler.bs.ArchivedBoards(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, archived)
+	assert.False(t, handler.boardHandler.IsPaused("no-such-team"), "the pause is not written either")
 }

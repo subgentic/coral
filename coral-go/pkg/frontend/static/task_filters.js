@@ -40,6 +40,7 @@ const model = defineFilters({
     team: { type: 'custom', empty: '', clean: teamValue, filtered: v => !!v, chip: v => `Team: ${teamNames.get(v) || v}` },
     goal: { type: 'custom', empty: '', clean: goalValue, filtered: v => !!v, chip: v => goalChipLabel(v) },
     from: { type: 'day', chip: v => `Updated since ${v}` },
+    archived: { type: 'flag', chip: 'Archived teams included' },
     sort: { type: 'order', values: SORTS, default: 'open' },
 });
 export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
