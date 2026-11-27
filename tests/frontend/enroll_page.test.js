@@ -31,13 +31,14 @@ async function runEnroll(search, hookSrc, replyOf, lateHookSrc) {
     src = src.replace(/^import \{[^}]*\} from '\.\/common\.js';/m, '');
     const els = {};
     const calls = [];
+    const statuses = [];
     const sandbox = {
         document: { getElementById: id => (els[id] = els[id] || fakeEl()), createElement: () => fakeEl() },
         location: { pathname: '/enroll', search, replace() {} },
         URLSearchParams, Date, Math, Number, String,
         getSession: async () => { if (lateHookSrc) vm.runInContext('window.CoralPairing = ' + lateHookSrc, ctx); return { authenticated: true, csrf: 'csrf' }; }, // lateHookSrc: a script that sets the hook while the session is being read (#16728)
         postJSON: async (p, body, csrf) => { calls.push([p, body, csrf]); if (p === '/api/enroll/confirm') return replyOf || { status: 200, ok: true, data: { ok: true, secret: 'x' } }; return { status: 200, ok: true, data: { nonce: 'n', requester: { ip: '1.2.3.4', hostname: 'box', coral_version: '1.4.15', requested_at: new Date().toISOString() } } }; },
-        setStatus: () => {}, setTimeout, clearTimeout, // Object, JSON and Promise are the context's own: a hook built in the page's realm is a plain object there
+        setStatus: (_el, text) => { statuses.push(text); }, setTimeout, clearTimeout, // Object, JSON and Promise are the context's own: a hook built in the page's realm is a plain object there
         safeNext: (raw, fb) => fb,
     };
     sandbox.window = {};
@@ -46,7 +47,7 @@ async function runEnroll(search, hookSrc, replyOf, lateHookSrc) {
     if (hookSrc) vm.runInContext('window.CoralPairing = ' + hookSrc, ctx); // defined in the page's own realm, as a same-origin script would
     vm.runInContext(src, ctx);
     for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r));
-    return { els, calls, ctx };
+    return { els, calls, ctx, statuses };
 }
 
 (async () => {
@@ -116,5 +117,13 @@ async function runEnroll(search, hookSrc, replyOf, lateHookSrc) {
     assert.strictEqual(after.body, plain.body);
     assert.strictEqual(vm.runInContext('window.__r', after.r.ctx), '{"status":200,"ok":true,"data":{"ok":true,"secret":"x"}}', 'afterConfirm gets the reply only');
     assert.ok(after.r.els.done.hidden === false, 'a throwing afterConfirm does not stop the done screen');
+    // #21976: the Hub's 409 server_limit gets its own line; any other 409 keeps the older one
+    const confirmStatus = async reply => (await confirmBody(null, reply)).r.statuses.filter(x => x && x !== 'Approving…').at(-1);
+    assert.strictEqual(await confirmStatus({ status: 409, ok: false, data: { error: 'server_limit' } }),
+        'This account has reached its computer limit. During the beta each account can connect 2 computers; contact support to raise it.', 'server_limit: the account limit line');
+    for (const data of [{ error: 'machine_limit' }, {}, undefined, null]) {
+        assert.strictEqual(await confirmStatus({ status: 409, ok: false, data }), 'You have reached the limit of connected machines. Revoke one first.', `another 409 (${JSON.stringify(data)}): the older line`);
+    }
+    assert.strictEqual(await confirmStatus({ status: 404, ok: false, data: { error: 'server_limit' } }), 'That code is no longer valid. Start again on your machine.', 'server_limit only counts on a 409');
     console.log('PASS enroll page: Coral Hub wording, ?code= prefill');
 })().catch(e => { console.error(e); process.exit(1); });
