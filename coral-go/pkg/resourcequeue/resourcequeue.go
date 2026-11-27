@@ -61,6 +61,7 @@ type Claimant struct {
 	Polls    bool     // #14170: the claim came from a command that keeps asking about its place (the CLI, every 3 s); only such a place can be taken for abandoned
 	Pattern  string   // for a hook claim, the resource's match pattern that fired (never the command)
 	Needs    []string // what the member that takes this claim must have (a pool's Needs, copied when the claim is made); empty: any member
+	RunPID   int      // #21800: the process of that `claim --run` on the server's own computer (0: not known, or not local); a run whose process is gone is dropped on the next Reap, so a killed run frees the slot at once
 	RunID    string   // #21790: the id of one `claim --run` (its own, made by the CLI): a second ask from the same agent joins the entry, and the run that ends gives back only its own share of it. "": a plain claim
 }
 
@@ -70,15 +71,16 @@ type Entry struct {
 	Resource string
 	Claimant
 	Enqueued time.Time
-	Granted  time.Time // zero while waiting
-	Lease    time.Time // when the hold ends unless renewed; zero while waiting
-	Member   string    // on a pool's entry that holds a slot: the member (the machine) it was granted, "" otherwise (#13719)
-	Pin      int       // a person's override: bigger is nearer the front among the waiting (set by Move)
-	Renews   int       // #14222: how many times the lease was renewed while held, told once in the hold's end event (a row per renewal buried the record: 46,260 in 31 hours)
-	Polled   time.Time // #14170: when the agent last asked about this place (a waiting claim asks every few seconds); an entry nobody has asked about for WaitStale is not waited on: its command ended
-	Runs     []string  // #21790: the ids of the `claim --run` commands that share this entry (an agent holds one slot per resource, so a second run joins the first); it is given back when the last of them ends
-	Base     bool      // #21790: a claim that is not a run (by hand, or the hook's) is on the entry too: a run ending does not end it
-	Away     time.Time // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
+	Granted  time.Time      // zero while waiting
+	Lease    time.Time      // when the hold ends unless renewed; zero while waiting
+	Member   string         // on a pool's entry that holds a slot: the member (the machine) it was granted, "" otherwise (#13719)
+	Pin      int            // a person's override: bigger is nearer the front among the waiting (set by Move)
+	Renews   int            // #14222: how many times the lease was renewed while held, told once in the hold's end event (a row per renewal buried the record: 46,260 in 31 hours)
+	Polled   time.Time      // #14170: when the agent last asked about this place (a waiting claim asks every few seconds); an entry nobody has asked about for WaitStale is not waited on: its command ended
+	Runs     []string       // #21790: the ids of the `claim --run` commands that share this entry (an agent holds one slot per resource, so a second run joins the first); it is given back when the last of them ends
+	RunPIDs  map[string]int // #21800: run id -> its process, for the runs whose process is known
+	Base     bool           // #21790: a claim that is not a run (by hand, or the hook's) is on the entry too: a run ending does not end it
+	Away     time.Time      // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
 }
 
 // Waiting reports whether the entry is still in line.
@@ -102,6 +104,7 @@ type Status struct {
 // Config tunes a Queue; the zero value is usable.
 type Config struct {
 	Now         func() time.Time           // the clock (default time.Now)
+	PidAlive    func(pid int) bool         // #21800: false: that run's process is gone (nil: every run is alive)
 	Alive       func(agent string) bool    // false: the agent's session is gone, and its entries are dropped on the next Reap (default: everyone is alive)
 	MaxPerAgent int                        // entries one agent may have waiting per resource (0: DefaultMaxPerAgent)
 	AgeStep     time.Duration              // every AgeStep spent waiting is worth one point of priority (0: DefaultAgeStep; negative: no aging)
@@ -423,7 +426,7 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		return Result{}, ErrNotAllowed
 	}
 	if e := q.entryFor(key, who.Agent); e != nil {
-		e.join(who.RunID)
+		e.join(who.RunID, who.RunPID)
 		if e.Waiting() {
 			e.Polled = q.now()
 		}
@@ -454,8 +457,8 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		return Result{}, ErrQueueFull
 	}
 	e := &Entry{ID: q.nextID, Resource: key, Claimant: who, Enqueued: q.now(), Polled: q.now()}
-	e.Claimant.RunID = ""
-	e.join(who.RunID)
+	e.Claimant.RunID, e.Claimant.RunPID = "", 0
+	e.join(who.RunID, who.RunPID)
 	q.nextID++
 	q.entries = append(q.entries, e)
 	q.note("enqueued", e)
@@ -467,13 +470,14 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 }
 
 // join records one more ask on the entry: a run (RunID) shares it, a plain claim is its base.
-func (e *Entry) join(runID string) {
+func (e *Entry) join(runID string, pid int) {
 	if runID == "" {
 		e.Base = true
 		return
 	}
 	for _, r := range e.Runs {
 		if r == runID {
+			e.setPID(runID, pid)
 			return
 		}
 	}
@@ -482,6 +486,35 @@ func (e *Entry) join(runID string) {
 		return
 	}
 	e.Runs = append(e.Runs, runID)
+	e.setPID(runID, pid)
+}
+
+func (e *Entry) setPID(runID string, pid int) {
+	if pid <= 1 {
+		return
+	}
+	if e.RunPIDs == nil {
+		e.RunPIDs = map[string]int{}
+	}
+	e.RunPIDs[runID] = pid
+}
+
+// dropDeadRuns forgets the runs whose process is gone (#21800) and says whether that left the hold with nothing standing on it: no run, no plain claim.
+func (e *Entry) dropDeadRuns(alive func(pid int) bool) (orphaned bool) {
+	if alive == nil || len(e.RunPIDs) == 0 {
+		return false
+	}
+	var keep []string
+	for _, r := range e.Runs {
+		if pid, ok := e.RunPIDs[r]; ok && !alive(pid) {
+			delete(e.RunPIDs, r)
+			continue
+		}
+		keep = append(keep, r)
+	}
+	dropped := len(keep) != len(e.Runs)
+	e.Runs = keep
+	return dropped && !e.Base && len(e.Runs) == 0
 }
 
 // MaxRunsPerEntry bounds the run ids one agent's entry remembers (#21797).
@@ -502,6 +535,7 @@ func (q *Queue) ReleaseRun(key, agent, runID string) error {
 					continue
 				}
 				e.Runs = append(append([]string(nil), e.Runs[:i]...), e.Runs[i+1:]...)
+				delete(e.RunPIDs, runID)
 				if e.Base || len(e.Runs) > 0 {
 					err := q.save()
 					q.unlockEmit()
@@ -636,6 +670,12 @@ func (q *Queue) Reap() (ended []Entry, err error) {
 	for _, e := range q.entries {
 		dead := q.cfg.Alive != nil && !q.cfg.Alive(e.Claimant.Agent)
 		expired := !e.Waiting() && !e.Lease.IsZero() && !now.Before(e.Lease)
+		if !e.Waiting() && !dead && e.dropDeadRuns(q.cfg.PidAlive) { // every run on the hold was killed without ending it (#21800)
+			q.noteWhy("gone", "run gone", e)
+			ended = append(ended, *e)
+			keys[e.Resource] = true
+			continue
+		}
 		if e.Waiting() && e.Away.IsZero() && q.abandoned(e) { // a stopped `claim --wait` (#14170): its place is kept for the grace as for an agent that walked away, and skipped meanwhile; asking again clears it
 			e.Away = now.Add(DefaultAwayGrace)
 			q.note("away", e)

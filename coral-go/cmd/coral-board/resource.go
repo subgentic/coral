@@ -359,6 +359,7 @@ func resourceClaim(rest []string) {
 	if *run {
 		runID = newRunID() // this run's own: a second run of the same agent on the resource shares the slot, and this one's end gives back only its share (#21790)
 		body["run_id"] = runID
+		body["run_pid"] = os.Getpid() // if this process is killed, the server sees it gone and frees the run's share (#21800)
 	}
 	data, status, err := resourceCall("POST", "/"+name+"/claim", body)
 	if err != nil || (status != http.StatusOK && status != http.StatusAccepted) {

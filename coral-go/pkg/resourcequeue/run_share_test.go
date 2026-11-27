@@ -67,3 +67,47 @@ func TestAnAgentsEntryRemembersAtMostMaxRunsRunIds(t *testing.T) {
 	st, _ := q.Status("epoch")
 	assert.Len(t, st.Holders, 1, "the slot is still held")
 }
+
+// #21800: a `claim --run` killed with SIGKILL never ends its run. The server drops a run whose process is gone: the other run's end then frees the slot at once, and an entry with only dead runs goes on the next Reap.
+func TestARunWhoseProcessIsGoneIsDroppedOnReap(t *testing.T) {
+	dead := map[int]bool{}
+	q, _ := fixture(t, Config{PidAlive: func(pid int) bool { return !dead[pid] }})
+	require.NoError(t, q.Define(Resource{Key: "epoch", Slots: 1}))
+	held := func() int { st, _ := q.Status("epoch"); return len(st.Holders) }
+	_, err := q.Claim("epoch", Claimant{Agent: "Dev", RunID: "run-1", RunPID: 111})
+	require.NoError(t, err)
+	_, err = q.Claim("epoch", Claimant{Agent: "Dev", RunID: "run-2", RunPID: 222})
+	require.NoError(t, err)
+
+	_, err = q.Reap()
+	require.NoError(t, err)
+	assert.Equal(t, 1, held(), "both runs alive: held")
+
+	dead[222] = true // run-2 killed: it never gives its share back
+	_, err = q.Reap()
+	require.NoError(t, err)
+	assert.Equal(t, 1, held(), "run-1 still runs")
+	require.NoError(t, q.ReleaseRun("epoch", "Dev", "run-1"))
+	assert.Equal(t, 0, held(), "run-1's end frees the slot at once: the dead run-2 no longer holds it")
+
+	_, err = q.Claim("epoch", Claimant{Agent: "Dev", RunID: "run-3", RunPID: 333})
+	require.NoError(t, err)
+	dead[333] = true
+	ended, err := q.Reap()
+	require.NoError(t, err)
+	assert.Len(t, ended, 1, "an entry with only dead runs is ended")
+	assert.Equal(t, 0, held())
+}
+
+func TestAPlainClaimOnTheEntryKeepsItWhenItsRunDies(t *testing.T) {
+	q, _ := fixture(t, Config{PidAlive: func(int) bool { return false }})
+	require.NoError(t, q.Define(Resource{Key: "epoch", Slots: 1}))
+	_, err := q.Claim("epoch", Claimant{Agent: "Dev"})
+	require.NoError(t, err)
+	_, err = q.Claim("epoch", Claimant{Agent: "Dev", RunID: "run-1", RunPID: 111})
+	require.NoError(t, err)
+	_, err = q.Reap()
+	require.NoError(t, err)
+	st, _ := q.Status("epoch")
+	assert.Len(t, st.Holders, 1)
+}
