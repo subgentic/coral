@@ -1,6 +1,7 @@
 package resourcequeue
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,4 +48,22 @@ func TestARunEndingDoesNotEndAPlainClaimOnTheSameEntryAndAPlainReleaseStillRelea
 	require.NoError(t, err)
 	require.NoError(t, q.ReleaseRun("epoch", "Dev", "other"))
 	assert.Equal(t, 0, held())
+}
+
+// #21797: one agent sending many different run ids cannot grow its own entry without bound: past the cap an extra run folds into the plain claim.
+func TestAnAgentsEntryRemembersAtMostMaxRunsRunIds(t *testing.T) {
+	q, _ := fixture(t, Config{})
+	require.NoError(t, q.Define(Resource{Key: "epoch", Slots: 1}))
+	for i := 0; i < MaxRunsPerEntry+20; i++ {
+		res, err := q.Claim("epoch", Claimant{Agent: "Dev", RunID: fmt.Sprintf("run-%d", i)})
+		require.NoError(t, err)
+		require.True(t, res.Granted)
+	}
+	e := q.entryFor("epoch", "Dev")
+	require.NotNil(t, e)
+	assert.Len(t, e.Runs, MaxRunsPerEntry)
+	assert.True(t, e.Base, "the extras stand on the plain claim, which a run ending does not end")
+	require.NoError(t, q.ReleaseRun("epoch", "Dev", "run-0"))
+	st, _ := q.Status("epoch")
+	assert.Len(t, st.Holders, 1, "the slot is still held")
 }
