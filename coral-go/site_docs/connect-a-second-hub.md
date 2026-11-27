@@ -68,6 +68,8 @@ If the Hub did not name an owner during enrollment, run `coral cloud links arm-o
 
 Coral also includes a local join-key and **Inbox > Needs you** approval flow so a second self-hosted Hub (or an enrollment script you run for it) can request access without you starting the command on the Coral server first.
 
+> **Note:** Coral's **Join key created** and **Finish connecting on the other Hub** screens show helper lines such as *Paste it into Add computer on \<Hub\>* and *In Add computer, enter this code to finish*. Those words describe a Hub that offers a separate join-key screen; on today's Coral Hub, use the `/enroll` steps in Method 1 (or finish the join request over `/api/cloud/link-requests` below and approve the enrollment URL on the Hub's `/enroll` page).
+
 A join key grants **no access on its own**. It is accepted on only three endpoints (`POST /api/cloud/link-requests`, `GET /api/cloud/link-requests/{id}`, and `POST /api/cloud/link-requests/{id}/finish`) to start, check, and finish its own join request.
 
 ### 1. Create a join key (over SSH or in Settings at the Coral computer)
@@ -107,20 +109,20 @@ curl -sS -X POST http://127.0.0.1:8420/api/cloud/link-requests \
   -d '{"hub":"https://hub-two.example.com","cap":"launch"}'
 ```
 
-Coral returns `request_id`, a one-time `poll_secret`, `"state": "pending"`, and `expires_at`, and places an approval card in **Inbox > Needs you** on the Coral computer.
+Coral returns `request_id`, a one-time `poll_secret`, `"state": "pending"`, and `expires_at`, and places an approval card in **Inbox > Needs you** on the Coral computer. A join request left unanswered expires after **10 minutes** (`LinkRequestPendingTTL`).
 
 ### 3. Allow the request in Coral's Inbox and copy the 8-digit code
 
 1. At the Coral computer's dashboard, open **Inbox > Needs you** (under **Waiting on you**). A card titled **Another Hub wants to connect** shows:
    - The key name that made the request (`via key <name>`, for example `via key Studio Hub`).
    - **Requesting Hub**, **Computer**, and **Access requested** (**View**, **Interact**, or **Launch**) with a summary of what that level allows.
-   - How many Hub connections this computer has (`1 of 8 Hub connections`) and the notice: *Only allow a Hub you recognize. Your existing Hubs stay connected.*
+   - How many Hub connections this computer has (`1 of 8 Hub connections`), how long remains in the 10-minute pending request window, and the notice: *Only allow a Hub you recognize. Your existing Hubs stay connected.*
 
 ![The Inbox Needs you view on the Coral server showing the Another Hub wants to connect card, with Requesting Hub, Computer, Access requested, the Allow access picker, and Deny and Allow buttons](assets/second-hub-inbox-request.png)
 
 2. Under **Allow access**, keep the requested level or choose a lower one (**View**, **Interact**, or **Launch**; you cannot grant more than the request asked for), then press **Allow** — or press **Deny** to refuse the request.
    - **Allow** works **only at the Coral computer**. Allowing a second Hub through an already-connected Hub is gated off.
-   - Pressing **Allow** switches the card to **Finish connecting on the other Hub** (`Allowed · waiting for the code`) and displays a one-time **8-digit Connection code** (formatted as two four-digit groups, such as `7394 2186`) that expires in 5 minutes (`Code expires in 5:00 · Can be used once`), with **Copy code** and **Cancel connection** buttons.
+   - Pressing **Allow** switches the card to **Finish connecting on the other Hub** (`Allowed · waiting for the code`) and displays a one-time **8-digit Connection code** (formatted as two four-digit groups, such as `7394 2186`) that expires in **5 minutes** (`LinkRequestAllowedTTL`; `Code expires in 5:00 · Can be used once`), with **Copy code** and **Cancel connection** buttons.
 
 ![The Inbox Needs you card after pressing Allow: Finish connecting on the other Hub, showing the one-time 8-digit Connection code, Copy code, and Cancel connection](assets/second-hub-inbox-code.png)
 
@@ -183,6 +185,7 @@ A **join key** and a **Hub link** are separate:
 
 - **Up to 8 Hub connections and 8 live join keys.** A Coral server allows at most 8 linked Hubs and 8 live join keys at one time. Revoke an unused key before creating a ninth.
 - **What a join key can do.** A join key is accepted on only three endpoints (`POST /api/cloud/link-requests`, `GET /api/cloud/link-requests/{id}`, and `POST /api/cloud/link-requests/{id}/finish`) to start, check, and finish its own join request. It is refused everywhere else.
+- **Request and code expiry.** A pending join request left unanswered expires after 10 minutes (`LinkRequestPendingTTL`). Once you press **Allow**, the one-time 8-digit connection code expires after 5 minutes (`LinkRequestAllowedTTL`).
 - **Cooldown after repeated denials.** If requests from the same Hub are denied twice, that Hub is muted from asking again for one hour.
 - **Wrong-code protection.** After too many wrong 8-digit code attempts across the server within 10 minutes, finishing a join request pauses briefly before trying again.
 - **Built-in multi-server hub mode.** If you want one Coral server to pull in other Coral servers directly without running a separate Coral Hub service, see [Multi-server hub](multi-server-hub.md).
