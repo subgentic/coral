@@ -165,7 +165,7 @@ func relayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.C
 			} else if certHeader != "" {
 				key = via.LinkID + "|cert" // browsers that bring a certificate share one budget of their own, so they never take the owner's keys' or the unknown bucket's (#21889)
 			}
-			if len(r.Header.Values(tunnel.DeviceCertHeader)) > 1 { // a second certificate is never read (the connector already drops it)
+			if len(r.Header.Values(tunnel.DeviceCertHeader)) > 1 || len(r.Header.Values(tunnel.DeviceRevokeHeader)) > 1 { // a second certificate or statement is never read (the connector already drops it)
 				refuse(key, devicekey.ErrBadForm)
 				return
 			}
@@ -184,7 +184,7 @@ func relayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.C
 				return label, err == nil && label != ""
 			}
 			m, err := v.HandleRelayedRequest(r.Context(), devicekey.RelayedRequest{Link: via.LinkID, HubUser: via.HubUser, Method: r.Method, Target: target,
-				KID: kid, Sig: r.Header.Get(tunnel.DeviceSigHeader), Ts: r.Header.Get(tunnel.DeviceTsHeader), Nonce: r.Header.Get(tunnel.DeviceNonceHeader), Cert: certHeader, Body: body, RequireTrusted: on}, pin, now)
+				KID: kid, Sig: r.Header.Get(tunnel.DeviceSigHeader), Ts: r.Header.Get(tunnel.DeviceTsHeader), Nonce: r.Header.Get(tunnel.DeviceNonceHeader), Cert: certHeader, Revoke: r.Header.Get(tunnel.DeviceRevokeHeader), Body: body, RequireTrusted: on}, pin, now)
 			if err != nil {
 				refuse(key, err)
 				return

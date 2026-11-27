@@ -145,6 +145,7 @@ type OwnerStore interface {
 	OwnerEpoch(ctx context.Context, ownerKID string) (int64, error)
 	SeenCertifiedDevice(ctx context.Context, kid, ownerKID, label string, now time.Time) (store.CertifiedDevice, bool, error)
 	CertifiedDeviceRow(ctx context.Context, kid string) (store.CertifiedDevice, bool, error)
+	RaiseOwnerEpoch(ctx context.Context, ownerKID string, epoch int64, now time.Time) error
 	RecordCertNonce(ctx context.Context, nonce, anchorKID, deviceKID string, now time.Time, window time.Duration) error
 }
 
@@ -262,13 +263,18 @@ func (v *Verifier) checkAssertion(c OwnerCert, anchor store.OwnerAnchor) bool {
 	if !ok {
 		return false
 	}
-	ad, e1 := b64.DecodeString(c.AuthenticatorData)
-	cd, e2 := b64.DecodeString(c.ClientDataJSON)
-	der, e3 := b64.DecodeString(c.Signature)
+	return v.anchorAssertion(OwnerCertChallenge(c, devRaw), c.AuthenticatorData, c.ClientDataJSON, c.Signature, anchor)
+}
+
+// anchorAssertion verifies the anchor's WebAuthn assertion (authenticator data, client data, DER signature, all base64url) over challenge.
+func (v *Verifier) anchorAssertion(challenge []byte, adS, cdS, sigS string, anchor store.OwnerAnchor) bool {
+	ad, e1 := b64.DecodeString(adS)
+	cd, e2 := b64.DecodeString(cdS)
+	der, e3 := b64.DecodeString(sigS)
 	if e1 != nil || e2 != nil || e3 != nil || len(cd) > maxClientData || len(der) > maxDERSig {
 		return false
 	}
-	if !v.assertionOK(ad, cd, OwnerCertChallenge(c, devRaw)) {
+	if !v.assertionOK(ad, cd, challenge) {
 		return false
 	}
 	msg := append(append([]byte{}, ad...), sum(cd)...)
@@ -315,4 +321,107 @@ func FingerprintOfKID(kid string) string {
 	}
 	e := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(h)[:16]
 	return e[0:4] + "-" + e[4:8] + "-" + e[8:12] + "-" + e[12:16]
+}
+
+const ownerRevokePrefix = "coral-hub/device-keys/4/owner-revoke"
+
+// OwnerRevoke is an epoch statement: the anchor passkey says every certificate below Epoch is void.
+type OwnerRevoke struct {
+	OwnerKID          string
+	Epoch             int64
+	AuthenticatorData string
+	ClientDataJSON    string
+	Signature         string
+}
+
+// OwnerRevokeChallenge is SHA-256 of the prefix, 0x00, owner_kid, 0x00 and the epoch as 8 bytes big-endian. No computer is in it, so one statement raises the epoch on every computer that listed the anchor.
+func OwnerRevokeChallenge(r OwnerRevoke) []byte {
+	h := sha256.New()
+	h.Write([]byte(ownerRevokePrefix))
+	h.Write([]byte{0})
+	h.Write([]byte(r.OwnerKID))
+	h.Write([]byte{0})
+	var b [8]byte
+	binary.BigEndian.PutUint64(b[:], uint64(r.Epoch))
+	h.Write(b[:])
+	return h.Sum(nil)
+}
+
+var revokeKeys = []string{"owner_kid", "epoch", "authenticator_data", "client_data_json", "signature"}
+
+// ParseOwnerRevoke reads a Coral-Device-Revoke header value: base64url of one strict JSON object with exactly the revoke keys. Anything else is bad_form.
+func ParseOwnerRevoke(header string) (OwnerRevoke, error) {
+	var r OwnerRevoke
+	if header == "" || len(header) > CertHeaderMax {
+		return r, ErrBadForm
+	}
+	raw, err := b64.DecodeString(header)
+	if err != nil {
+		return r, ErrBadForm
+	}
+	m, ok := strictObject(raw)
+	if !ok || len(m) != len(revokeKeys) {
+		return r, ErrBadForm
+	}
+	ok = true
+	for _, f := range []struct {
+		k string
+		p *string
+	}{{"owner_kid", &r.OwnerKID}, {"authenticator_data", &r.AuthenticatorData}, {"client_data_json", &r.ClientDataJSON}, {"signature", &r.Signature}} {
+		rm, has := m[f.k]
+		ok = ok && has && json.Unmarshal(rm, f.p) == nil
+	}
+	en, has := m["epoch"]
+	t := string(bytes.TrimSpace(en))
+	n, perr := strconv.ParseInt(t, 10, 64)
+	if !ok || !has || !plainInt(t) || perr != nil || n < 0 || n > 9_999_999_999_999 {
+		return OwnerRevoke{}, ErrBadForm
+	}
+	r.Epoch = n
+	if _, ok := fixedB64(r.OwnerKID, 43, 32); !ok || len(r.AuthenticatorData) > maxCertField || len(r.ClientDataJSON) > maxCertField || len(r.Signature) > maxCertField {
+		return OwnerRevoke{}, ErrBadForm
+	}
+	return r, nil
+}
+
+// applyRevoke applies an epoch statement that rode on a request whose own signature already held. Cheap first: form and size, the listed anchor, the epoch against the stored one (equal is nothing to do, lower is cert_epoch,
+// more than store.EpochStepCap above is bad_form), and only then the P-256 assertion. It raises the stored epoch for the anchor and nothing else. It works whether or not this computer accepts certified browsers: revoking is never refused for a setting.
+func (v *Verifier) applyRevoke(ctx context.Context, header string, now time.Time) error {
+	if v.Owner == nil {
+		return ErrCertNotAllowed
+	}
+	r, err := ParseOwnerRevoke(header)
+	if err != nil {
+		return err
+	}
+	anchor, has, err := v.Owner.OwnerAnchorRow(ctx)
+	if err != nil {
+		return err
+	}
+	if !has || anchor.KID != r.OwnerKID {
+		return ErrBadSignature
+	}
+	cur, err := v.Owner.OwnerEpoch(ctx, anchor.KID)
+	if err != nil {
+		return err
+	}
+	switch {
+	case r.Epoch < cur:
+		return ErrCertEpoch
+	case r.Epoch == cur:
+		return nil
+	case r.Epoch-cur > store.EpochStepCap:
+		return ErrBadForm
+	}
+	if !v.anchorAssertion(OwnerRevokeChallenge(r), r.AuthenticatorData, r.ClientDataJSON, r.Signature, anchor) {
+		return ErrBadSignature
+	}
+	switch err := v.Owner.RaiseOwnerEpoch(ctx, anchor.KID, r.Epoch, now); {
+	case errors.Is(err, store.ErrEpochLower):
+		return ErrCertEpoch
+	case errors.Is(err, store.ErrEpochJump):
+		return ErrBadForm
+	default:
+		return err
+	}
 }

@@ -357,3 +357,27 @@ func TestAnUnreadableClearMarkIsPending(t *testing.T) {
 	require.NoError(t, r.e.db.Close())
 	assert.True(t, r.m.DeviceClearPending())
 }
+
+// Sign once (#21889): an enrollment never lists an anchor. The anchor comes only from the pairing path under the v4 MAC with the person's Allow, so anchor fields in an enrollment's pairing object list nothing.
+func TestAnEnrollmentCarryingAnAnchorListsNoAnchor(t *testing.T) {
+	for _, v4 := range []bool{false, true} {
+		r := pairingSetup(t, true)
+		anchor := newDevicePK(t)
+		ap, _ := b64u.DecodeString(anchor)
+		secret, _ := devicekey.ParsePairingSecret(r.secret)
+		mac := devicekey.PairMAC(secret, "ABCD-EFGH", "My Laptop", r.pk)
+		if v4 {
+			mac = devicekey.PairMACV4(secret, "ABCD-EFGH", "My Laptop", r.pk, ap, "Y3JlZA")
+		}
+		r.e.hub.pairing.Store(map[string]any{"v": 1, "kid": r.kid, "mac": b64u.EncodeToString(mac), "user_code": "ABCD-EFGH", "pk": b64u.EncodeToString(r.pk), "anchor_pk": anchor, "anchor_cred": "Y3JlZA"})
+		r.connect(t)
+		_, has, err := r.ss.OwnerAnchorRow(context.Background())
+		require.NoError(t, err)
+		assert.False(t, has, "v4=%v: an enrollment lists no anchor", v4)
+		if v4 {
+			assert.Empty(t, r.listed(t), "a v4 MAC is not an enrollment's MAC: nothing is paired")
+		} else {
+			assert.Len(t, r.listed(t), 1, "the paired key itself is listed as ever")
+		}
+	}
+}

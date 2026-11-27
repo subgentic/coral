@@ -298,12 +298,12 @@ func ParseRelayed(k Kind, raw []byte) (Relayed, error) {
 // signature, then authority) with the body hash after the signature: a body that is not the signed one is refused as body_hash and spends nothing. authorize is required: it is given the parsed message and the signer's row
 // from this computer's own list, before the nonce is spent, and decides what that signer may do for the kind (the per-kind checks, #20514); a refusal spends nothing.
 func (v *Verifier) HandleRelayedOn(ctx context.Context, arrivedLink, method, path string, k Kind, canonical, body []byte, sig string, now time.Time, authorize func(Relayed, store.DeviceKey) error) (Relayed, error) {
-	return v.handleRelayed(ctx, arrivedLink, method, path, k, canonical, body, sig, "", now, authorize)
+	return v.handleRelayed(ctx, arrivedLink, method, path, k, canonical, body, sig, "", "", now, authorize)
 }
 
 // handleRelayed is HandleRelayedOn with the Coral-Device-Cert header's value (empty when the request carried none). A signer that is not in the list but brought a certificate is a certified browser (sign once, #21889): its
 // certificate is checked cheap-first, its own request signature next, and the anchor's assertion last (cached); it then goes on through the same pair, body, nonce and authority rules, with its nonce in the anchor's own pool.
-func (v *Verifier) handleRelayed(ctx context.Context, arrivedLink, method, path string, k Kind, canonical, body []byte, sig, certHeader string, now time.Time, authorize func(Relayed, store.DeviceKey) error) (Relayed, error) {
+func (v *Verifier) handleRelayed(ctx context.Context, arrivedLink, method, path string, k Kind, canonical, body []byte, sig, certHeader, revokeHeader string, now time.Time, authorize func(Relayed, store.DeviceKey) error) (Relayed, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if authorize == nil {
@@ -368,6 +368,19 @@ func (v *Verifier) handleRelayed(ctx context.Context, arrivedLink, method, path 
 		}
 		if v.CertSeen != nil {
 			v.CertSeen(first, dev, signer.Mode)
+		}
+	}
+	if revokeHeader != "" { // an epoch statement signed by the anchor, applied only after the request's own signature held; it raises the epoch whatever happens to the request
+		if rerr := v.applyRevoke(ctx, revokeHeader, now); rerr != nil {
+			return Relayed{}, rerr
+		}
+		if cert != nil { // the statement may void the very certificate that carried it
+			if cur, eerr := v.Owner.OwnerEpoch(ctx, cert.Anchor.KID); eerr != nil || certV.Epoch < cur {
+				if eerr != nil {
+					return Relayed{}, eerr
+				}
+				return Relayed{}, ErrCertEpoch
+			}
 		}
 	}
 	// The signature is good, so what it covers is the signer's. The body must be exactly what it names, and the pair in it the signer's own.
