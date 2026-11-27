@@ -22,3 +22,19 @@ func TestAJoinsSSHFailureAndOrphanedKeyShowNoSecret(t *testing.T) {
 	assert.NotContains(t, note, "9f9f")
 	assert.Equal(t, "", orphanedKeyNote("not a key"))
 }
+
+// #21221 INFO from review: whatever the person pasted into the Add computer form, a join refusal's reason is never carrying that key: not the transport's, not the computer's own words,
+// and a key the computer echoed back in its error text is not repeated either.
+func TestAJoinRefusalReasonNeverHasThePastedKey(t *testing.T) {
+	key := "lrk_0a1b2c3d_" + strings.Repeat("9f", 16)
+	for name, reason := range map[string]string{
+		"the computer's error echoes it":  remoteSaid(403, map[string]any{"error": "unknown key " + key}),
+		"the computer's detail echoes it": remoteSaid(401, map[string]any{"detail": "bad credentials: " + key + "."}),
+		"the computer says nothing":       remoteSaid(502, map[string]any{}),
+		"unreachable":                     sshFailureText(errors.New("dial tcp: " + key)),
+	} {
+		assert.NotContains(t, reason, key, name)
+		assert.NotContains(t, reason, "lrk_", name)
+		assert.NotContains(t, reason, strings.Repeat("9f", 8), name)
+	}
+}

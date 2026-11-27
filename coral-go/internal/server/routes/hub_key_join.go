@@ -222,7 +222,7 @@ func remoteCall(ctx context.Context, t proxy.HTTPTarget, method, path string, bo
 func remoteSaid(code int, out map[string]any) string {
 	for _, k := range []string{"error", "detail"} {
 		if s, ok := out[k].(string); ok && strings.TrimSpace(s) != "" {
-			return "The computer said: " + cleanSavedField(s)
+			return "The computer said: " + sshSecretish.ReplaceAllString(cleanSavedField(s), "[hidden]") // a computer that echoes the pasted key back does not put it on this screen (#21221 INFO)
 		}
 	}
 	return "The computer answered " + http.StatusText(code)
