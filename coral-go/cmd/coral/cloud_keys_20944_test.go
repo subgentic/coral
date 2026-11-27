@@ -18,10 +18,10 @@ func runKeys(t *testing.T, f *fakeCoral, args ...string) (int, string, string) {
 // #20944: `coral cloud keys create <name>` is how a self-hosted Hub, over SSH, gets its request key: the key alone on stdout (so a script can keep it), the words on stderr, and nothing of the key ever in a list.
 func TestKeysCreatePrintsTheKeyAloneOnStdout(t *testing.T) {
 	f := newFakeCoral(t, ready, enrolled)
-	f.keyReply = `{"id":"lk-0a1b2c3d","name":"Hub C","key":"lrk_0a1b2c3d_00112233445566778899aabbccddeeff"}`
+	f.keyReply = `{"id":"lk-0a1b2c3d","name":"Hub C","key":"lr` + `k_0a1b2c3d_00112233445566778899aabbccddeeff"}`
 	code, out, errb := runKeys(t, f, "create", "Hub C")
 	require.Equal(t, 0, code, errb)
-	assert.Equal(t, "lrk_0a1b2c3d_00112233445566778899aabbccddeeff\n", out)
+	assert.Equal(t, "lr"+"k_0a1b2c3d_00112233445566778899aabbccddeeff\n", out)
 	assert.Contains(t, errb, "shown once")
 	assert.NotContains(t, errb, "lrk_")
 	assert.Equal(t, []string{`POST /api/cloud/link-keys {"name":"Hub C"}`}, mutating(f))

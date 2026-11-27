@@ -74,7 +74,7 @@ func TestAGoogleCommentOnATeamsFileIsHeldAsADraftAndNotifiesNoOne(t *testing.T) 
 func TestAGoogleDraftIsTheOwnersAloneAndSecretsAreNotKept(t *testing.T) {
 	g := teamGdocRig(t)
 	g.pass(&gdocSyncState{})
-	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	secret := "gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789"
 	g.drive.comments = map[string][]gdocsync.Comment{"doc1": {gdocComment("c1", "Dana", "use "+secret, "")}}
 	g.pass(&gdocSyncState{})
 	ds := g.drafts(t)

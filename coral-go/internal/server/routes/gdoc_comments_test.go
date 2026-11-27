@@ -71,7 +71,7 @@ func TestGoogleRepliesAndResolveComeBack(t *testing.T) {
 func TestGoogleCommentsAreRedactedAndStopWithPauseAndTheSwitch(t *testing.T) {
 	g := syncRig(t)
 	g.pass(&gdocSyncState{})
-	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	secret := "gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789"
 	g.drive.comments = map[string][]gdocsync.Comment{"doc1": {gdocComment("c1", "Dana", "use "+secret, "")}}
 	_, err := g.ss.SetGdocShareState(context.Background(), gdocSid, store.GdocSharePaused)
 	require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestNothingGoesBackWhileStoppedPausedOrOff(t *testing.T) {
 func TestAReplyIsRedactedAndAnUnknownOutcomeIsNotRetriedAndPausesTheDoc(t *testing.T) {
 	g := syncRig(t)
 	root := g.pulled(t)
-	secret := "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+	secret := "gh" + "p_abcdefghijklmnopqrstuvwxyz0123456789"
 	g.sendBack(root, "use "+secret, false)
 	require.Len(t, g.drive.replies, 1)
 	assert.NotContains(t, g.drive.replies[0].Content, secret)

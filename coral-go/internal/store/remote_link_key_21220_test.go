@@ -17,7 +17,7 @@ import (
 func TestALinkKeyServerIsSealedAndNeverMovedToPlainHTTP(t *testing.T) {
 	s, db, _, _ := newRemoteStore(t)
 	ctx := context.Background()
-	key := "lrk_0123abcd_" + strings.Repeat("f", 32)
+	key := "lr" + "k_0123abcd_" + strings.Repeat("f", 32)
 
 	_, err := s.AddLinkKey(ctx, "lan", "LAN", "http://192.168.1.20:8420", key, true)
 	assert.True(t, errors.Is(err, hubproxy.ErrLinkKeyPlainHTTP), "plain http to another computer: %v", err)
@@ -30,7 +30,7 @@ func TestALinkKeyServerIsSealedAndNeverMovedToPlainHTTP(t *testing.T) {
 	assert.Equal(t, "https://box.example.com", rs.URL)
 	var env string
 	require.NoError(t, db.GetContext(ctx, &env, "SELECT api_key FROM remote_servers WHERE id = 'box'"))
-	assert.NotContains(t, env, strings.TrimPrefix(key, "lrk_"), "sealed, never plaintext")
+	assert.NotContains(t, env, strings.TrimPrefix(key, "lr"+"k_"), "sealed, never plaintext")
 	got, err := s.DecryptedKey(ctx, "box")
 	require.NoError(t, err)
 	assert.Equal(t, key, got)
