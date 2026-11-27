@@ -13,7 +13,7 @@ const BASE = require('./test_base').BASE;
         // cli-check answers from window.__ready (flipped by the test); settings writes are kept in window.__puts.
         await ev(`(() => { const real = window.fetch; window.__ready = { claude: false, codex: false, agy: false }; window.__puts = [];
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.href), p = url.pathname;
-                if (p === '/api/system/cli-check') { const t = url.searchParams.get('type') || 'claude'; return Promise.resolve(Response.json({ agent_type: t, found: !!window.__ready[t], status: window.__ready[t] ? 'ok' : 'missing' })); }
+                if (p === '/api/system/cli-check') { const t = url.searchParams.get('type') || 'claude'; (window.__sources ||= []).push(url.searchParams.get('source') || ''); return Promise.resolve(Response.json({ agent_type: t, found: !!window.__ready[t], status: window.__ready[t] ? 'ok' : 'missing' })); }
                 if (p === '/api/board/projects') return Promise.resolve(Response.json([]));
                 if (p === '/api/settings' && o.method === 'PUT') { window.__puts.push(JSON.parse(o.body)); return Promise.resolve(Response.json({ ok: true })); }
                 return real(u, o); };
@@ -31,8 +31,10 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#setup-agent-modal .setup-agent-top button').click(); true`);
         assert.match(await ev(`document.querySelector('#setup-agent-modal .setup-agent-steps code').textContent`), /npm install -g @anthropic-ai\/claude-code/, 'Claude\'s own install line');
         // Codex gets installed: Check again says so, Continue ends it, the row goes and the default follows the agent that is ready.
-        await ev(`window.__ready.codex = true; [...document.querySelectorAll('#setup-agent-modal .modal-actions button')].find(b => b.textContent === 'Check again').click(); true`);
+        await ev(`window.__sources = []; window.__ready.codex = true; [...document.querySelectorAll('#setup-agent-modal .modal-actions button')].find(b => b.textContent === 'Check again').click(); true`);
         await waitFor(`/Codex is ready/.test(document.querySelector('#setup-agent-modal .setup-agent-result').textContent)`, 'Check again finds Codex');
+        // #582: the dialog's Check again is a re-check, so the server re-reads the Path Windows keeps (a CLI installed after Coral started is found without a restart).
+        assert.deepEqual(await ev(`window.__sources`), ['cli_recheck', 'cli_recheck', 'cli_recheck'], 'each of the three checks is sent as a re-check');
         await ev(`[...document.querySelectorAll('#setup-agent-modal .modal-actions button')].find(b => b.textContent === 'Continue').click(); true`);
         await waitFor(`!document.getElementById('setup-agent-modal') && ![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(h => /Get set up/.test(h.textContent))`, 'the dialog closes and the row is gone');
         const puts = await ev(`window.__puts`);

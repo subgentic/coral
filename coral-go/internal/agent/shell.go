@@ -375,17 +375,28 @@ func WrapWithBundlePath(cmd string) string {
 	return cmd
 }
 
-// windowsCommonDirs are the folders on Windows where a CLI is looked for when it is not on PATH: npm's global folders, and where Antigravity's installer puts agy.exe
-// (%LOCALAPPDATA%\agy\bin), so a Coral that was already running finds an agy installed after it started. A folder whose base variable is unset is left out.
+// windowsCommonDirs are the folders on Windows where a CLI is looked for when it is not on PATH: npm's global folders, where Antigravity's installer puts agy.exe
+// (%LOCALAPPDATA%\agy\bin), and where Codex's standalone installer puts codex.exe (%LOCALAPPDATA%\Programs\OpenAI\Codex\bin, #582), so a Coral that was already running
+// finds a CLI installed after it started. A folder whose base variable is unset is left out.
 func windowsCommonDirs(appData, localAppData string) []string {
 	var dirs []string
 	if appData != "" {
 		dirs = append(dirs, filepath.Join(appData, "npm"))
 	}
 	if localAppData != "" {
-		dirs = append(dirs, filepath.Join(localAppData, "npm"), filepath.Join(localAppData, "agy", "bin"))
+		dirs = append(dirs, filepath.Join(localAppData, "npm"), filepath.Join(localAppData, "agy", "bin"), filepath.Join(localAppData, "Programs", "OpenAI", "Codex", "bin"))
 	}
 	return dirs
+}
+
+// windowsCommonBases are the folders CommonPlaceCandidates searches on Windows, in order: windowsCommonDirs; %USERPROFILE%\.local\bin, where Claude Code's native Windows
+// installer puts claude.exe (the installer adds it to the user's Path, which a Coral that was already running does not see); the folder Codex's standalone installer's
+// bin junction leads to (%USERPROFILE%\.codex\packages\standalone\current\bin, #582); then the saved Path's folders that the last Check again found and this process's
+// PATH lacks (saved_path.go): any installer's folder, without a restart.
+func windowsCommonBases(home string) []string {
+	bases := append(windowsCommonDirs(os.Getenv("APPDATA"), os.Getenv("LOCALAPPDATA")),
+		filepath.Join(home, ".local", "bin"), filepath.Join(home, ".codex", "packages", "standalone", "current", "bin"))
+	return append(bases, savedPathDirsFound()...)
 }
 
 // systemCandidates are binary in each of the named system folders that CommonSystemBinDirs still lists (the order of the names is kept).
@@ -410,8 +421,8 @@ func FindCLIInCommonPaths(binary string) string {
 		if !shareAnswers(filepath.Dir(path)) { // as CommonPlaceLookup: a share that did not answer is skipped (#464)
 			continue
 		}
-		if _, err := os.Stat(path); err == nil {
-			return path
+		if real, err := RealCLIPath(path); err == nil { // through junctions Windows will not open: the program they lead to (#582)
+			return real
 		}
 	}
 	return ""
@@ -463,12 +474,7 @@ func CommonPlaceCandidates(binary string) []string {
 		}
 	case "windows":
 		exts := []string{"", ".exe", ".cmd", ".bat"}
-		// %USERPROFILE%\.local\bin is where Claude Code's native Windows installer puts claude.exe (the install the CLI check links to), as ~/.local/bin is on macOS and Linux. The
-		// installer adds it to the user's Path, which a Coral that was already running does not see: without it here, Check again kept saying "not found" until Coral restarted.
-		basePaths := append(windowsCommonDirs(os.Getenv("APPDATA"), os.Getenv("LOCALAPPDATA")), filepath.Join(home, ".local", "bin"))
-		// Then the saved Path's folders that the last Check again found and this process's PATH lacks (saved_path.go): any installer's folder, without a restart.
-		basePaths = append(basePaths, savedPathDirsFound()...)
-		for _, base := range basePaths {
+		for _, base := range windowsCommonBases(home) {
 			for _, ext := range exts {
 				candidates = append(candidates, filepath.Join(base, binary+ext))
 			}

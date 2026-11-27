@@ -74,6 +74,8 @@ func TestLaunchCLISaysWhenPathHoldsAnUntrustedMount(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("LOCALAPPDATA", t.TempDir()) // the common places (Codex's standalone folder is one, #582): not this machine's own install
+	t.Setenv("APPDATA", t.TempDir())
 	UntrustedMountDir = func(string) (string, bool) { return "X:\\Codex\\bin", true }
 	_, err := LaunchCLI(map[string]string{}, "codex")
 	var um *CLIUntrustedMountError

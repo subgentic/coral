@@ -224,7 +224,11 @@ func FindCLI(settings map[string]string, agentType string) (string, error) {
 // FindCLIForLaunch is FindCLI without the node check: an agent's launch line carries its own (NodePathPrefix), and the agent's shell may have a node Coral's process does not.
 func FindCLIForLaunch(settings map[string]string, agentType string) (string, error) {
 	if p := ResolveCLIPath(settings, agentType); p != "" {
-		resolved, err := exec.LookPath(p)
+		run := p
+		if real, rerr := RealCLIPath(p); rerr == nil { // a path through junctions Windows will not open: the program it leads to, found again at each launch (#582)
+			run = real
+		}
+		resolved, err := exec.LookPath(run)
 		if err == nil {
 			err = CheckRunnable(resolved)
 		}
@@ -244,6 +248,9 @@ func FindCLIForLaunch(settings map[string]string, agentType string) (string, err
 		return p, nil
 	}
 	if p := CommonPlaceCLI(bin, nil); p != "" {
+		return p, nil
+	}
+	if p, _, _ := CLIThroughUntrustedMount(bin); p != "" && !InTempFolder(p) { // on PATH only through junctions Windows will not open: the program they lead to (#582)
 		return p, nil
 	}
 	return "", fmt.Errorf("%s CLI %q not found: install it or set its path in Settings > Providers", agentType, bin)
@@ -277,8 +284,12 @@ func LaunchCLIScreened(settings map[string]string, agentType string, screen func
 	if found.Path != "" {
 		return found.Path, nil
 	}
-	// Not found on PATH because a PATH folder is an untrusted mount point (Windows): the launch line's bare name would fail in the agent's shell the same way, so say why now (#340).
-	if dir, bad := UntrustedMountDir(info.Binary); bad {
+	// Not found on PATH because a PATH folder is an untrusted mount point (Windows): the program its junctions lead to, followed by Coral (#582), screened as a common place is.
+	// When they lead to none, the launch line's bare name would fail in the agent's shell the same way, so say why now (#340).
+	if p, dir, bad := CLIThroughUntrustedMount(info.Binary); bad {
+		if p != "" && !InTempFolder(p) && (screen == nil || screen(p) == "") {
+			return p, nil
+		}
 		return "", &CLIUntrustedMountError{AgentType: agentType, Binary: info.Binary, Dir: dir}
 	}
 	return "", &CLINotFoundError{AgentType: agentType, Binary: info.Binary, InstallCommand: info.InstallCommand, InstallURL: info.InstallURL, Refused: found.Refused, RefusedPath: found.RefusedPath, ShareNotAnswered: ShareSkipped(info.Binary)}

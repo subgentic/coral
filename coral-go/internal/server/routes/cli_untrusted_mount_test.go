@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,6 +23,8 @@ func TestLaunchRefusesAnUntrustedMountPathWithTheFix(t *testing.T) {
 	t.Setenv("PATH", dir)
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("LOCALAPPDATA", t.TempDir()) // the common places (Codex's standalone folder is one, #582): not this machine's own install
+	t.Setenv("APPDATA", t.TempDir())
 
 	_, err := resolveLaunchCLI("codex", "")
 	var um *agent.CLIUntrustedMountError
@@ -73,4 +77,24 @@ func TestCLICheckDropsTheInstallCommandForAnUntrustedMount(t *testing.T) {
 	agent.UntrustedMountDir = func(string) (string, bool) { return "", false }
 	out = cliCheck(t, newSystemHandlerForTest(t), "type=codex")
 	assert.Contains(t, out, "install_command")
+}
+
+// #582: a CLI on PATH only through junctions Windows will not open is found when Coral can follow them to the program, and the check probes that program.
+func TestCLICheckFindsTheProgramAnUntrustedMountLeadsTo(t *testing.T) {
+	prevLook, prevCommon, prevThrough := cliLookPath, cliCommonPath, cliThroughUntrustedMount
+	t.Cleanup(func() { cliLookPath, cliCommonPath, cliThroughUntrustedMount = prevLook, prevCommon, prevThrough })
+	real := filepath.Join(t.TempDir(), "releases", "0.172.0", "bin", "codex.exe")
+	require.NoError(t, os.MkdirAll(filepath.Dir(real), 0o755))
+	require.NoError(t, os.WriteFile(real, []byte("not a program"), 0o755))
+	t.Setenv("TMP", t.TempDir()) // the real file is not in the temp folder a launch refuses
+	t.Setenv("TEMP", os.Getenv("TMP"))
+	cliLookPath = func(string) (string, error) { return "", assert.AnError }
+	cliCommonPath = func(string) string { return "" }
+	cliThroughUntrustedMount = func(string) (string, string, bool) { return real, `C:\Codex\bin`, true }
+	out := cliCheck(t, newSystemHandlerForTest(t), "type=codex")
+	assert.Equal(t, true, out["found"], "found through the junctions: %v", out)
+
+	cliThroughUntrustedMount = func(string) (string, string, bool) { return "", `C:\Codex\bin`, true }
+	out = cliCheck(t, newSystemHandlerForTest(t), "type=codex")
+	assert.Equal(t, false, out["found"], "junctions that lead nowhere: not found")
 }

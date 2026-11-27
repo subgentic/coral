@@ -8,19 +8,21 @@ const PROVIDERS = [['claude', 'Claude Code'], ['codex', 'Codex'], ['agy', 'Antig
 const FRESH_MS = 20000;
 let _last = null, _at = 0;
 
-async function cliFound(server, type) {
+// recheck: the person pressed Check again. The server then re-reads the Path Windows keeps for them (#457), so a CLI installed after Coral started is found without a restart;
+// without it this dialog's Check again never could find one (#582: Codex from its standalone installer, on a fresh install).
+async function cliFound(server, type, recheck = false) {
     try {
-        const r = await serverFetch(server, `/api/system/cli-check?type=${encodeURIComponent(type)}`, { cache: 'no-store' });
+        const r = await serverFetch(server, `/api/system/cli-check?type=${encodeURIComponent(type)}${recheck ? '&source=cli_recheck' : ''}`, { cache: 'no-store' });
         if (!r.ok) return null;
         const d = await r.json();
         return d.supported === false ? false : (typeof d.found === 'boolean' ? d.found : null);
     } catch { return null; }
 }
 
-/** { claude, codex, agy }: true found, false not found, null when the server could not say. Kept for 20 s; `force` asks again. */
+/** { claude, codex, agy }: true found, false not found, null when the server could not say. Kept for 20 s; `force` (the dialog's Check again) asks again, as a re-check. */
 export async function readyProviders(force = false, server = currentServer()) {
     if (!force && _last && Date.now() - _at < FRESH_MS) return _last;
-    const got = await Promise.all(PROVIDERS.map(([type]) => cliFound(server, type)));
+    const got = await Promise.all(PROVIDERS.map(([type]) => cliFound(server, type, force)));
     _last = Object.fromEntries(PROVIDERS.map(([type], i) => [type, got[i]])); _at = Date.now();
     return _last;
 }

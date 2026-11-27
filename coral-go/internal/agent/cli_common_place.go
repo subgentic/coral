@@ -34,9 +34,13 @@ func CommonPlaceLookup(binary string, screen func(path string) string) CommonLoo
 		if !shareAnswers(filepath.Dir(p)) { // a folder on a network share that did not answer in time: skipped, never waited on (share_probe.go, #464)
 			return false
 		}
-		if _, err := os.Stat(p); err != nil { // the link is followed here, at each use: an updater that moves its target is no stale path
+		// The link is followed here, at each use: an updater that moves its target is no stale path. Through junctions Windows will not open (an untrusted mount point),
+		// Coral follows them itself to the program (#582), and screens and runs that.
+		real, err := RealCLIPath(p)
+		if err != nil {
 			return false
 		}
+		p = real
 		res.Tried = append(res.Tried, p)
 		why := ""
 		switch {
