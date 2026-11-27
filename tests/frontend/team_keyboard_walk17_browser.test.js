@@ -18,12 +18,16 @@ const TEAM = `kbd17-${Date.now() % 100000}`;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM); await settle(400);
 
-        // the Board tab: the first Tab is the skip link
+        // The ninth tab can expose a strip navigation cue; the first content stop remains the skip link.
         await ev(`document.getElementById('team-tab-messages').click(); document.getElementById('team-tab-messages').focus(); true`);
         await waitFor(`(() => { const c = document.getElementById('mb-post-input'); return !!c && c.getClientRects().length > 0; })()`, 'the Board composer shows', 8000);
         await ev(`document.getElementById('team-tab-messages').focus(); true`);
         await key('Tab', 'Tab', 9);
-        assert.equal(await ev(`document.activeElement.textContent`), 'Skip to Message the team', 'the first Tab from the Board tab is a skip link to the composer');
+        if (await ev(`document.activeElement.id === 'team-tabs-next'`)) {
+            assert.equal(await ev(`document.activeElement.getAttribute('aria-label')`), 'Show more tabs', 'the extra stop only navigates the nine-tab strip');
+            await key('Tab', 'Tab', 9);
+        }
+        assert.equal(await ev(`document.activeElement.textContent`), 'Skip to Message the team', 'the first content stop after the Board tab and its strip cue is the skip link to the composer');
         await key('Enter', 'Enter', 13);
         assert.equal(await ev(`document.activeElement.id`), 'mb-post-input', 'Enter on it lands on Message the team');
         assert.equal(await ev(`document.activeElement.getAttribute('aria-label')`), 'Message the team');
