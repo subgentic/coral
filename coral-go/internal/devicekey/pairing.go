@@ -143,6 +143,20 @@ func CompletePairing(ctx context.Context, st PairingStore, secret []byte, userCo
 	return a.KID, nil
 }
 
+// AddPairedKey lists an already-verified browser key as a `pairing` device at mode, after the person at the computer said Allow (#21880): the pairing proof was checked by SecretHold.Check and the Allow is the local Operator's. A key already listed as bootstrap or noproof is promoted to pairing with its mode untouched. With CompletePairing, the only callers of the promotion.
+func AddPairedKey(ctx context.Context, st PairingStore, kid string, pk []byte, label, mode string, now time.Time) error {
+	added, err := st.AddDeviceKey(ctx, store.DeviceKey{KID: kid, PK: pk, Label: label, Mode: mode, Origin: store.DeviceOriginPairing, Kind: store.DeviceKindDevice, Link: store.PairOwner, HubUser: store.PairOwner}, now)
+	if err != nil {
+		return mapStoreErr(err)
+	}
+	if !added {
+		if _, err := st.PromoteDeviceOrigin(ctx, kid, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 const secretLife = 10 * time.Minute
 
 // SecretHold keeps one pairing secret in memory: single use, dead after ten minutes, at the first success or at the third failed check. A failed pk check counts like a failed MAC; an answer with no pk does not. The bytes are zeroed when it dies.

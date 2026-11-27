@@ -173,4 +173,5 @@ GET /ws/terminal/{name} redact
 POST /api/cloud/guide-revoked redact
 POST /api/device-keys/certificate redact
 POST /api/device-keys/message redact
+POST /api/device-keys/pair redact
 POST /api/scheduled/validate-cron redact

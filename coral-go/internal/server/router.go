@@ -605,6 +605,11 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Get("/api/cloud/status", s.cloudHandler.GetStatus)
 	r.Post("/api/cloud/connect", s.cloudHandler.Connect)
 	r.Post("/api/cloud/connect/cancel", s.cloudHandler.CancelConnect)
+	r.Get("/api/cloud/pair-browser", s.cloudHandler.PairBrowserState) // #21880: pair a browser to this connected computer; the person here only, never tunneled
+	r.Post("/api/cloud/pair-browser", s.cloudHandler.PairBrowserStart)
+	r.Delete("/api/cloud/pair-browser", s.cloudHandler.PairBrowserCancel)
+	r.Post("/api/cloud/pair-browser/allow", s.cloudHandler.PairBrowserAllow)
+	r.Post("/api/cloud/pair-browser/deny", s.cloudHandler.PairBrowserDeny)
 	// Dropbox sign-in (#14609): the Operator's, from this computer's dashboard only.
 	s.cloudHandler.SetDropbox(store.NewDropboxStore(s.db, store.NewRemoteServerStore(s.db, s.cfg.CoralDir())), s.cfg.CoralDir())
 	r.Get("/api/dropbox/status", s.cloudHandler.DropboxStatus)
@@ -712,6 +717,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	// Device keys, slice 7 (#19669): what a trusted browser signed, forwarded by the Hub unstamped. The signature is the only authority; these routes read no Hub user, owner or account header.
 	r.Post("/api/device-keys/message", s.cloudHandler.DeviceKeyMessage)
 	r.Post("/api/device-keys/certificate", s.cloudHandler.DeviceKeyCertificate)
+	r.Post("/api/device-keys/pair", s.cloudHandler.DeviceKeyPair)          // a browser's answer to a pairing the person started here (#21880): MAC-proved, unsigned, through the Hub
 	r.Get("/api/device-keys/list", s.cloudHandler.TunnelDevices)           // the owner's read-only display list through the Hub (#19971); owner only, Launch tier, in the tunnel table
 	r.Get("/api/device-keys/link", s.cloudHandler.TunnelLink)              // the link this request arrived on, for the Hub owner to name in a signed text (#20903); owner only, Launch tier, in the tunnel table
 	r.Put("/api/cloud/hub-relaunch", s.cloudHandler.SetHubRelaunch)        // #5280

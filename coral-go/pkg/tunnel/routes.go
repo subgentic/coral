@@ -422,7 +422,7 @@ var routeTable = cat(
 	// Coral Hub's word that a guide's grant ended (#11457): the Hub's own service stream (its stamp and the guide's board as the asker), never a person's, and View so a computer in any mode takes it: it only takes proposals back.
 	service(rules(http.MethodPost, TierView, "/api/cloud/guide-revoked")),
 	// The device-signed routes (#19669 slice 7, wire format draft 11): what a trusted browser signed, forwarded by the Hub unstamped. View, so a computer in any mode takes it, and neither owner nor service: the signature is the only authority, the verifier decides, and no Hub user, owner or account header is read.
-	rules(http.MethodPost, TierView, "/api/device-keys/message", "/api/device-keys/certificate"),
+	rules(http.MethodPost, TierView, "/api/device-keys/message", "/api/device-keys/certificate", "/api/device-keys/pair"),
 	// The trusted-device list for display (#19971, coral-hub #252527): the owner's alone through the Hub, read only, Launch. Fields kid, label, mode, origin, kind, created_at, last_used_at; no public key. Nothing listed grants anything: the signed message is the authority.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/device-keys/list")),
 	// The arrival link for the Hub owner (#20903, coral-hub #20897): {link: lnk-<8 hex>} from the connector's own stamp, read only, Launch, owner only. Nothing is stored; a local call gets 404.
