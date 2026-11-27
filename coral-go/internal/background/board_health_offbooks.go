@@ -154,7 +154,7 @@ func (m *BoardHealthMonitor) offBooksItems(ctx context.Context, project, orch st
 		at, _ := time.Parse("2006-01-02T15:04:05.000Z", p.At)
 		if p.Kind == board.OffBooksOperatorWait { // an agent's post that waits on the Operator: what to do is to have it put the question in their Needs you
 			items = append(items, teamhealth.Item{Rank: 2, Agent: teamhealth.Name(p.Agent), Problem: p.Detail,
-				Evidence: "Posted " + teamhealth.Age(now.Sub(at)) + " ago", Suggest: "its author was told; if it still waits, have it post the question with --ask to the Operator"})
+				Evidence: "Posted " + teamhealth.Age(now.Sub(at)) + " ago", Suggest: "its author was told; if it still waits: a question goes with coral-board post --ask \"@Operator ...\"; a report or file goes with coral-agent artifact review <link> --question \"...\" (or artifact upload <file> --tag \"for review\" --question \"...\")"})
 		} else {
 			items = append(items, teamhealth.Item{Rank: 2, Agent: teamhealth.Name(p.Agent), Problem: p.Detail,
 				Evidence: "Seen " + teamhealth.Age(now.Sub(at)) + " ago, off the board's tasks", Suggest: "ask what it is for, or put it on a task"})
