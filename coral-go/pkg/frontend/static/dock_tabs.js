@@ -18,13 +18,17 @@ export function fitWords() {
     if (crowded) row.removeAttribute('data-words');
 }
 
+let frame = 0;
+/** Measure on the next frame, once: fitWords changes what the ResizeObserver watches, so running it inside the observer's callback loops ("ResizeObserver loop completed with undelivered notifications"). */
+const fitSoon = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; fitWords(); }); };
+
 export function initDockTabs() {
     document.addEventListener('coral:dock-changed', fitWords); // a tab was switched
     const state = document.getElementById('agentic-state');
     if (state) new MutationObserver(fitWords).observe(state, { attributes: true, attributeFilter: ['class', 'data-page'] }); // a page, or the customizer's hidden tabs
     const row = strip();
     if (row) {
-        const ro = new ResizeObserver(fitWords);
+        const ro = new ResizeObserver(fitSoon);
         ro.observe(row);
         for (const b of row.children) ro.observe(b); // a larger text size or a new count widens the tabs, not the row (#9435)
         watchScrollCue(row);
