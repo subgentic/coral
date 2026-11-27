@@ -72,6 +72,8 @@ type agentUploadRecord struct {
 	PromotedBy string `json:"promoted_by,omitempty"`
 	// GoalID is the goal of the team's board a file the Operator added for it belongs to (#15317). It is the uploader's claim at the time, checked against the board's goals when the list is made.
 	GoalID int64 `json:"goal_id,omitempty"`
+	// ReceivedFrom is the board of the linked team a file came from, when this record is the team adopting a received file to send it for review (#21811). Absent on every upload.
+	ReceivedFrom string `json:"received_from,omitempty"`
 }
 
 // sourcePaste marks an upload record made from an image pasted or attached in the dashboard.
