@@ -41,10 +41,13 @@ const (
 	MakeLinkKey             Kind = "make-link-key"   // #20966: make a request key for a self-hosted Hub; the key goes back sealed
 	RevokeLinkKey           Kind = "revoke-link-key" // #20966
 	DenyLink                Kind = "deny-link"       // #20966: Deny a waiting join request, or cancel an allowed one that is not finished
+	// HubWrite is the one kind for every other write a Hub carries (#21883): signed only when this computer requires a trusted device. It is never a way round a named kind (MatchRoute refuses it on a
+	// named kind's route) and never for the routes of hubWriteExempt; the signer's mode must reach the route's tier.
+	HubWrite Kind = "hub-write"
 )
 
 // RelayedKinds is every relayed kind.
-var RelayedKinds = []Kind{GuideRoster, GrantMember, InputGrant, KeepFullAccess, HubAutoAccept, OrchestratorGrant, TrustPreview, DailyKnowledgeTeam, DailyKnowledgeAutoApply, DailyKnowledgeAccept, DailyKnowledgeRevert, SendToAgent, BoardPost, AllowLink, MakeLinkKey, RevokeLinkKey, DenyLink}
+var RelayedKinds = []Kind{GuideRoster, GrantMember, InputGrant, KeepFullAccess, HubAutoAccept, OrchestratorGrant, TrustPreview, DailyKnowledgeTeam, DailyKnowledgeAutoApply, DailyKnowledgeAccept, DailyKnowledgeRevert, SendToAgent, BoardPost, AllowLink, MakeLinkKey, RevokeLinkKey, DenyLink, HubWrite}
 
 // relayedLabel starts every v3 signing input, so a v3 signature is never a v2 one and the reverse.
 const relayedLabel = "coral-hub/device-keys/3/"

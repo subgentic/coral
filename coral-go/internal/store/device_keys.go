@@ -48,8 +48,8 @@ var (
 	ErrNonceForm        = errors.New("nonce is not 22 base64url characters of 16 bytes")
 	ErrNonceStoreFull   = errors.New("nonce store is full")
 	ErrClockBack        = errors.New("the computer's clock is behind the latest accepted time")
-	deviceNonceKidShare = 1000  // one signer may hold this many live nonces, so a stolen one cannot fill the cap
-	deviceNonceCap      = 10000 // a count cap: a new message is refused before a live nonce is dropped
+	deviceNonceKidShare = 3000  // one signer may hold this many live nonces (about 200 signed writes a minute: a nonce lives 15 minutes), so a stolen one cannot fill the cap
+	deviceNonceCap      = 50000 // a count cap: a new message is refused before a live nonce is dropped. It is above the most signers there can be (10 devices and 5 passkeys, 15) times the share (45000), so no set of signers can use the room another has: a full store is never one key's doing (#21883)
 )
 
 // TrustedDeviceOrigins is the one list of key origins "Require a trusted device for Hub actions" (#21883) trusts, both to be turned on by and to sign while it is on: a key made with the pairing code. A key added without proof, or by the

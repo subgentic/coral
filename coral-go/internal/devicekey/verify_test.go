@@ -445,8 +445,8 @@ func TestNonceStoreFullIsPerSigner(t *testing.T) {
 	r.add(target, "view", store.DeviceOriginPairing, store.DeviceKindDevice)
 	other := newSigner(t)
 	r.add(other, "interact", store.DeviceOriginPairing, store.DeviceKindDevice)
-	// one signer fills its share (1000 live nonces) directly in the store
-	for i := 0; i < 1000; i++ {
+	// one signer fills its share (3000 live nonces) directly in the store
+	for i := 0; i < 3000; i++ {
 		n := make([]byte, 16)
 		n[0], n[1], n[2] = byte(i), byte(i>>8), 0xAA
 		require.NoError(t, r.ss.RecordNonce(context.Background(), b64.EncodeToString(n), r.signer.kid, t0, 24*time.Hour))

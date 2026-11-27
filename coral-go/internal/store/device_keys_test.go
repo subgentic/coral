@@ -522,3 +522,12 @@ func TestDeviceKeysListedBeforeThePairExistedBecomeTheOwnersOnceOnly(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, [2]string{"", ""}, [2]string{got.Link, got.HubUser}, "the backfill runs once, when the columns are added")
 }
+
+// #21883, coral-hub Security on D10: a full nonce store is a lockout lever, so the total must sit above the most signers there can be (10 devices and 5 passkeys) times one signer's share: no set of
+// signers can use the room another has, and one signer at its share is refused alone.
+func TestNoSetOfSignersCanFillTheNonceStoreForTheRest(t *testing.T) {
+	total, share := store.NonceLimitsForTest()
+	const mostSigners = 10 + 5
+	assert.Greater(t, total, mostSigners*share, "the cap must leave every signer its room")
+	assert.GreaterOrEqual(t, share, 3000, "a page signing every write needs about 200 a minute")
+}

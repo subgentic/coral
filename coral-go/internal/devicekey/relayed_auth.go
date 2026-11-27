@@ -1,9 +1,11 @@
 package devicekey
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // What a relayed message may do beyond its signature (#20515, Security's conditions on #20513): the Hub person is the one the computer's own stamp names, an owner's key signs only as the owner its link confirmed, and a kind signs
@@ -43,6 +45,9 @@ func RoutePath(target string) string {
 // MatchRoute reports whether the kind may be signed for this method and request target, and returns the values of the pattern's {name} segments exactly as signed. A handler of a body-less kind acts only on these (and on the
 // query it was signed with), never on a field of its own request that the signature does not cover.
 func MatchRoute(k Kind, method, target string) (map[string]string, bool) {
+	if k == HubWrite {
+		return nil, IsHubWrite(method, target)
+	}
 	params, ok := matchPattern(k, method, target)
 	if !ok {
 		return nil, false
@@ -65,10 +70,56 @@ func MatchRoute(k Kind, method, target string) (map[string]string, bool) {
 	return params, true
 }
 
+// hubWriteExempt is the closed list of writes the hub-write kind is never signed for, each with the authority that admits it without a signature (the guard, routes/relayed_guard.go, checks that authority; a request
+// that does not have it is refused like any unsigned write, and a signature on it is wrong_request):
+//   - POST /api/device-keys/message and /certificate: the device signature in the body is the authority (they read no Hub header).
+//   - POST /api/cloud/guide-revoked: the Hub's own service stream (cloud.ServiceAsker), never a person.
+//   - POST .../external-messages and .../external-artifacts: another Coral's relay, authentic only with the connector's stamp, a source server and no Hub person; the board's cross_team_servers allowlist (local only) is its authority.
+//   - POST .../hub-notice: the Hub's fixed-template notice (the connector's stamp and the notice header), information only.
+var hubWriteExempt = []Route{
+	{"POST", "/api/device-keys/message"}, {"POST", "/api/device-keys/certificate"}, {"POST", "/api/cloud/guide-revoked"},
+	{"POST", "/api/board/{project}/external-messages"}, {"POST", "/api/board/{project}/external-artifacts"}, {"POST", "/api/board/{project}/hub-notice"},
+}
+
+// HubWriteExempt reports whether method and target are a route of hubWriteExempt.
+func HubWriteExempt(method, target string) bool {
+	return matchRoutes(hubWriteExempt, method, target) != nil
+}
+
+// IsHubWrite reports whether the hub-write kind may be signed for this request: a write (not GET, HEAD or OPTIONS) that is neither a named kind's route nor on the exempt list.
+func IsHubWrite(method, target string) bool {
+	switch method {
+	case "GET", "HEAD", "OPTIONS", "":
+		return false
+	}
+	if _, named := KindOfRoute(method, target); named {
+		return false
+	}
+	return !HubWriteExempt(method, target)
+}
+
+// HubWriteNeed is the tier the route needs (tunnel.Classify, with the query), never when the table does not list it.
+func HubWriteNeed(method, target string) tunnel.Tier {
+	path, query := target, ""
+	if i := strings.IndexByte(target, '?'); i >= 0 {
+		path, query = target[:i], target[i+1:]
+	}
+	if d, err := url.PathUnescape(path); err == nil {
+		path = d
+	}
+	return tunnel.Classify(method, path, query)
+}
+
 // matchPattern is MatchRoute without the query rule of hub-auto-accept: whether the method and the path are one of the kind's routes.
 func matchPattern(k Kind, method, target string) (map[string]string, bool) {
+	params := matchRoutes(KindRoutes[k], method, target)
+	return params, params != nil
+}
+
+// matchRoutes is the values of the {name} segments of the first of routes that is this method and path, or nil for none (an empty map for a route with no {name}).
+func matchRoutes(routes []Route, method, target string) map[string]string {
 	path := strings.Split(RoutePath(target), "/")
-	for _, r := range KindRoutes[k] {
+	for _, r := range routes {
 		if r.Method != method {
 			continue
 		}
@@ -90,10 +141,10 @@ func matchPattern(k Kind, method, target string) (map[string]string, bool) {
 			}
 		}
 		if ok {
-			return params, true
+			return params
 		}
 	}
-	return nil, false
+	return nil
 }
 
 // KindOfRoute is the relayed kind whose route (method and path) this request is, whatever its query: a route no kind lists is not a relayed one, and nothing about it is signed. A request on a kind's route with a query that kind
@@ -132,6 +183,12 @@ func RelayedAuthorizer(actor string, pin OwnerPinFunc) func(Relayed, store.Devic
 		}
 		if _, ok := MatchRoute(m.Kind, m.Method, m.Path); !ok {
 			return ErrWrongRequest
+		}
+		if m.Kind == HubWrite { // the signer's mode must reach the route's tier: a view key signs no write above view (#21883)
+			need := HubWriteNeed(m.Method, m.Path)
+			if mode, ok := tunnel.ParseMode(signer.Mode); need == tunnel.TierNever || !ok || mode < need {
+				return ErrAboveSigner
+			}
 		}
 		return nil
 	}
