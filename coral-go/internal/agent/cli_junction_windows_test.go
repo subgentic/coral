@@ -108,7 +108,11 @@ func TestTheStandaloneCodexIsFoundInItsCommonPlace(t *testing.T) {
 
 // A path Windows opens is used as it is: nothing is followed unless Windows refused it.
 func TestAPathWindowsOpensIsKeptAsItIs(t *testing.T) {
-	_, installerPath, _ := codexLayout(t, "0.172.0-x86_64-pc-windows-msvc")
+	_, installerPath, real := codexLayout(t, "0.172.0-x86_64-pc-windows-msvc")
+	// Windows opens it here: a stand-in answers as Windows does when it follows the junctions (some Windows builds refuse a chain under a temp folder, which is the case above).
+	prev := statCLI
+	t.Cleanup(func() { statCLI = prev })
+	statCLI = func(string) (os.FileInfo, error) { return os.Stat(real) }
 	got, err := RealCLIPath(installerPath)
 	require.NoError(t, err)
 	assert.Equal(t, installerPath, got)
