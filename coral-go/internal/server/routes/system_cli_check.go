@@ -79,7 +79,12 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 			}
 			if p := agent.ResolveCLIPath(settings, agentType); p != "" {
 				run, refused := p, ""
-				if real, rerr := cliRealPath(p); rerr == nil && real != p { // through junctions Windows will not open: the program they lead to, screened as launch screens it (#582)
+				real, rerr := cliRealPath(p)
+				var unfollowed *agent.UnfollowedChainError
+				// Junctions Coral would not follow are refused as a launch refuses them, never checked as typed; through junctions Windows will not open, the program they
+				// lead to is screened as a launch screens it (#582).
+				unfollowable := errors.As(rerr, &unfollowed)
+				if rerr == nil && real != p {
 					refused = agent.FollowedCLIRefusal(real, func(q string) string { return untrustedLocationOf(r.Context(), h.cfg, h.ss, q) })
 					run = real
 				}
@@ -95,7 +100,7 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 					}))
 					return
 				}
-				if err := configuredCLIRunnable(run, agentType); err != nil {
+				if unfollowable || configuredCLIRunnable(run, agentType) != nil {
 					writeJSON(w, http.StatusOK, hubCLIReply(r, map[string]any{
 						"found":      false,
 						"status":     tracking.PrereqMissing,

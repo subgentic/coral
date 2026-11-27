@@ -215,8 +215,11 @@ func TestAChainThatLeadsOutsideTheRootsIsRefused(t *testing.T) {
 			var unfollowed *UnfollowedChainError
 			require.ErrorAs(t, err, &unfollowed)
 			assert.ErrorContains(t, err, "leads outside your user folders or Program Files")
+			// A launch refuses it with that reason, never runs the path as typed (a Windows that opens it would run where the junctions lead).
 			_, err = FindCLIForLaunch(map[string]string{CLIPathSettingKey("codex"): installerPath}, "codex")
-			assert.Error(t, err, "a launch does not run it")
+			var pe *CLIPathError
+			require.ErrorAs(t, err, &pe, "a launch does not run it")
+			assert.ErrorContains(t, err, "leads outside your user folders or Program Files")
 		})
 	}
 }

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -123,6 +124,13 @@ func TestCLICheckScreensWhereAConfiguredPathsJunctionsLead(t *testing.T) {
 	msg, _ := out["message"].(string)
 	assert.Contains(t, msg, "leads through junctions to "+real)
 	assert.Contains(t, msg, "in a temporary folder")
+
+	cliRealPath = func(p string) (string, error) { // junctions Coral would not follow: refused, never checked as typed
+		return p, &agent.UnfollowedChainError{Path: p, Err: errors.New("it leads outside your user folders or Program Files")}
+	}
+	out = cliCheck(t, h, "type=codex")
+	assert.Equal(t, false, out["found"])
+	assert.Equal(t, true, out["configured"])
 
 	cliRealPath = func(p string) (string, error) { return p, nil } // Windows opens it: no screen, the usual check (here: no file)
 	out = cliCheck(t, h, "type=codex")
