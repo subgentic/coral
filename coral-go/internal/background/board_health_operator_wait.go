@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
@@ -75,7 +76,7 @@ func (m *BoardHealthMonitor) noteOperatorWaits(ctx context.Context, project, orc
 		id := strconv.FormatInt(msg.ID, 10)
 		detail := fmt.Sprintf("posted something that waits on the Operator (message #%s, %s ago) with no --ask to them and no \"for review\" file within %d minutes: it is not in their Needs you", id, teamhealth.Age(now.Sub(at)), ow.GraceMin)
 		if added, err := m.store.AddOffBooksOnce(ctx, project, board.OffBooksOperatorWait, msg.SubscriberID, id, detail, at); err == nil && added {
-			nudge := fmt.Sprintf("Your board message #%s waits on the Operator, but it is not in their Needs you. Post it again as `coral-board post --ask \"@Operator <the question>\"` (or tag the file \"for review\" and link it), so they see it.", id)
+			nudge := operatorWaitNudge("Your board message #"+id, msg.Content)
 			m.nudgeMember(ctx, project, orch, board.HealthSettings{}, msg.SubscriberID, "operator-wait:"+id+":", nudge, bySession, subs)
 		}
 	}
@@ -146,8 +147,18 @@ func (m *BoardHealthMonitor) noteChatOperatorWaits(ctx context.Context, project,
 		ref := "chat:" + a.SessionID + ":" + at.UTC().Format(time.RFC3339)
 		detail := fmt.Sprintf("said something in its chat that waits on the Operator (%s ago) with no --ask to them and no \"for review\" file within %d minutes: it is not in their Needs you", teamhealth.Age(age), ow.GraceMin)
 		if added, err := m.store.AddOffBooksOnce(ctx, project, board.OffBooksOperatorWait, sub.SubscriberID, ref, detail, at); err == nil && added {
-			nudge := "Your last chat reply waits on the Operator, but it is not in their Needs you. Post it as `coral-board post --ask \"@Operator <the question>\"` (or tag the file \"for review\" and link it), so they see it."
+			nudge := operatorWaitNudge("Your last chat reply", "")
 			m.nudgeMember(ctx, project, orch, board.HealthSettings{}, sub.SubscriberID, "operator-wait-chat:"+ref+":", nudge, bySession, subs)
 		}
 	}
+}
+
+// operatorWaitNudge is what an agent is told when its words wait on the Operator and are not in their Needs you (#21811). A post that links a report or another file is sent as that file: the report is the thing to
+// look at, so it goes for review (a file of the team that exists already, or one not uploaded yet), with its one-line question; a post with no file is posted again with --ask.
+func operatorWaitNudge(what, content string) string {
+	if strings.Contains(content, "coral://artifacts/") {
+		return what + " waits on the Operator and links a file, but it is not in their Needs you. Send the file for review instead of only asking: `coral-agent artifact review <the coral://artifacts link> --question \"<what they decide>\"` " +
+			"(a file you have not uploaded yet: `coral-agent artifact upload <file> --tag \"for review\" --question \"<what they decide>\"`; a goal's finished result: `coral-board goal close <id> --reason ... --result <file>`). A question with no file is `coral-board post --ask \"@Operator <the question>\"`."
+	}
+	return what + " waits on the Operator, but it is not in their Needs you. Post it again as `coral-board post --ask \"@Operator <the question>\"` (or tag the file \"for review\" and link it), so they see it."
 }

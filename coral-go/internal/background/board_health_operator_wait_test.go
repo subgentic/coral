@@ -179,3 +179,14 @@ func TestOperatorWaitSettingsSwitchGraceAndExemptAuthors(t *testing.T) {
 	assert.Len(t, ow.AuthorsExempt, 8)
 	assert.Equal(t, "Lead", ow.AuthorsExempt[0])
 }
+
+// #21811: a post that waits on the Operator and links a report is told to send the file for review, not only to post with --ask; a post with no file keeps the --ask words.
+func TestTheOperatorWaitNudgeSaysToSendALinkedFileForReview(t *testing.T) {
+	withFile := operatorWaitNudge("Your board message #7", "The report is ready, @Operator: coral://artifacts/"+strings.Repeat("ab", 32))
+	assert.Contains(t, withFile, "coral-agent artifact review")
+	assert.Contains(t, withFile, "--tag \"for review\"")
+	assert.Contains(t, withFile, "post --ask", "the ask stays for a question with no file")
+	plain := operatorWaitNudge("Your board message #7", "Waiting for your decision, @Operator")
+	assert.Contains(t, plain, "post --ask")
+	assert.NotContains(t, plain, "coral-agent artifact review")
+}
