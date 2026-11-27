@@ -81,8 +81,9 @@ func TestCLICheckDropsTheInstallCommandForAnUntrustedMount(t *testing.T) {
 
 // #582: a CLI on PATH only through junctions Windows will not open is found when Coral can follow them to the program, and the check probes that program.
 func TestCLICheckFindsTheProgramAnUntrustedMountLeadsTo(t *testing.T) {
-	prevLook, prevCommon, prevThrough := cliLookPath, cliCommonPath, cliThroughUntrustedMount
-	t.Cleanup(func() { cliLookPath, cliCommonPath, cliThroughUntrustedMount = prevLook, prevCommon, prevThrough })
+	prevLook, prevCommon, prevThrough, prevTemp := cliLookPath, cliCommonPath, cliThroughUntrustedMount, cliTempDirs
+	t.Cleanup(func() { cliLookPath, cliCommonPath, cliThroughUntrustedMount, cliTempDirs = prevLook, prevCommon, prevThrough, prevTemp })
+	cliTempDirs = func() []string { return nil } // the test's files are in a temp folder (/tmp on Linux); this is about the junctions
 	real := filepath.Join(t.TempDir(), "releases", "0.172.0", "bin", "codex.exe")
 	require.NoError(t, os.MkdirAll(filepath.Dir(real), 0o755))
 	require.NoError(t, os.WriteFile(real, []byte("not a program"), 0o755))
