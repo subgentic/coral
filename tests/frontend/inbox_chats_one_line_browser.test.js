@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length === ${n}`, at + 'the rows', 8000);
                 // a phone's row is a mail row (#9545): the agent and the chat's title on the line, the time at the right (.dt-mail-time)
                 const rows = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].map(r => { const v = e => !!e && e.getClientRects().length > 0, rect = e => { const b = e.getBoundingClientRect(); return { x: b.x, mid: b.y + b.height / 2 }; };
-                    const title = r.querySelector('button.dt-primary'), when = r.querySelector('.dt-time, .dt-mail-time'); const box = r.closest('.dt-box');
+                    const title = r.querySelector('button.dt-primary'), when = [...r.querySelectorAll('.dt-time, .dt-team-line, .dt-mail-time, .dt-mail-snippet')].find(v); const box = r.closest('.dt-box');
                     return { title: v(title) && rect(title), when: v(when) && rect(when), h: Math.round(r.getBoundingClientRect().height), snippet: !!r.querySelector('.dt-chat-snippet'), ran: [...r.children].some(c => c.dataset.key === 'ran' && v(c)), folded: box.classList.contains('dt-folded'), scrolls: box.scrollWidth - box.clientWidth, agentShown: [...r.children].some(c => c.dataset.key === 'agent' && v(c)) }; })`);
                 for (const r of rows) {
                     assert.ok(r.title && r.when, at + 'title and when are on the row: ' + JSON.stringify(r));
@@ -62,7 +62,7 @@ const { coralReady } = require('./helpers/wait');
                 }
                 if (folder === 'chats' && !mobile) assert.ok(chips.every(c => / \u00b7 Backend Dev$/.test(c.tip)), at + 'the row\'s hover names the agent: ' + JSON.stringify(chips));
                 if (!mobile) assert.deepEqual(cut.cut, [], at + 'no cell but the title (its ellipsis is the design) is cut by its box: ' + JSON.stringify(cut));
-                if (!mobile) assert.ok(cut.whenOff !== null && cut.whenOff <= 2, at + 'the When header is over its cell: ' + JSON.stringify(cut));
+                if (!mobile && folder !== 'chats-group') assert.ok(cut.whenOff !== null && cut.whenOff <= 2, at + 'the When header is over its cell: ' + JSON.stringify(cut));
                 const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out'));
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await setTheme(ev, theme); fs.writeFileSync(path.join(dir, `inbox-${folder}-one-line-${width}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
                 console.log(`PASS ${at}one line per chat`);

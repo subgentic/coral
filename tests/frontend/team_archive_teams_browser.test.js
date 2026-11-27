@@ -36,8 +36,23 @@ const sceneShots = require('./helpers/scene_shots');
             await open(w, mobile);
             await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr.dt-group')].some(r => /Archived teams/.test(r.textContent))`, `${at}the Archived teams divider`, 8000);
             const rows = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => r.classList.contains('dt-group') ? '== ' + r.textContent.replace(/\\s+/g, ' ').trim() : (r.querySelector('button.dt-primary') || r).textContent.replace(/\\s+/g, ' ').trim())`);
-            const last = rows.slice(-2).map(x => x.replace(/ now(Unread)?$/, ''));
-            assert.deepEqual(last, ['== Archived teams (1)', 'Docs Site'], `${at}the archived team lists last, under Archived teams: ${JSON.stringify(rows)}`);
+            const nm = x => x.replace(/ Team \u00b7 .*$/, '').replace(/ now(Unread)?$/, '');
+            // the Archived teams group (the mock): open on a computer, one line with a count on a phone until it is pressed
+            if (mobile) {
+                assert.equal(nm(rows.at(-1)), '== Archived teams (1)', `${at}the group is one line with a count on a phone: ${JSON.stringify(rows)}`);
+                assert.ok(!rows.some(x => nm(x) === 'Docs Site'), `${at}the archived team is not listed while the group is shut: ${JSON.stringify(rows)}`);
+                assert.equal(await ev(`document.querySelector('#group-table-view button.dt-group-toggle[data-group-key="archived-teams"]').getAttribute('aria-expanded')`), 'false', `${at}the heading says it is shut`);
+                await shot('teams-shut-' + w);
+                await ev(`document.querySelector('#group-table-view button.dt-group-toggle[data-group-key="archived-teams"]').click(); true`);
+                await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].some(r => /Docs Site/.test(r.textContent))`, `${at}pressing the heading lists the archived team`, 8000);
+            }
+            const rows2 = await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => r.classList.contains('dt-group') ? '== ' + r.textContent.replace(/\\s+/g, ' ').trim() : (r.querySelector('button.dt-primary') || r).textContent.replace(/\\s+/g, ' ').trim())`);
+            assert.deepEqual(rows2.slice(-2).map(nm), ['== Archived teams (1)', 'Docs Site'], `${at}the archived team lists last, under Archived teams: ${JSON.stringify(rows2)}`);
+            // each row's line as the mock draws it
+            const lines = await ev(`Object.fromEntries([...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].map(r => [(r.querySelector('.dt-primary') || r).textContent.replace(/\\s+/g, ' ').trim().replace(/ Team \u00b7 .*$/, '').replace(/ now(Unread)?$/, '').replace(/ \\d+:\\d+ [AP]M$/, ''), (r.querySelector('.dt-team-line, .dt-mail-snippet') || {}).textContent]))`);
+            assert.match(lines['Billing Revamp'] || '', /^Team \u00b7 (today|yesterday|\w+ \d+) \u00b7 (\d+ agents? running|no agent running)$/, `${at}a live team's line: ${JSON.stringify(lines)}`);
+            assert.match(lines['Docs Site'] || '', /^Team \u00b7 archived .+ \u00b7 \d+ agents?$/, `${at}an archived team's line: ${JSON.stringify(lines)}`);
+            assert.equal(await ev(`!!document.querySelector('#group-table-view thead th[data-key="when"]')`), false, `${at}no When column: the day is in the line`);
             assert.ok(rows.some(x => x.startsWith('Billing Revamp')) && rows.some(x => x.startsWith('Mobile Beta')), `${at}the live teams are listed: ${JSON.stringify(rows)}`);
             const nav = await ev(`document.body.innerText`);
             assert.ok(!/Board history/.test(nav), `${at}no "Board history" is left on the page`);
@@ -65,7 +80,7 @@ const sceneShots = require('./helpers/scene_shots');
             // Restore team: a button on a computer's archived row, the row's menu on a phone
             await ev(`window.__archiveCalls = []; true`);
             if (!mobile) await ev(`[...document.querySelectorAll('#group-table-view [data-team-action="Restore team"]')].pop().click(); true`);
-            else { await openMenu('Docs Site'); await pick('Restore team'); }
+            else { await openMenu('Docs Site'); assert.deepEqual(await items(), ['Restore team', 'Open team'], `${at}an archived team's row menu offers Restore team`); await pick('Restore team'); }
             await waitFor(`window.__archiveCalls.some(c => /^DELETE /.test(c))`, `${at}the restore call`, 8000);
             // The Archive team question from a team page's More menu (a team with no agent running can be archived too).
             await ev(`window.openTeamPage('mobile-beta').then(() => true)`);
