@@ -31,6 +31,7 @@ func (h *SessionsHandler) ArchiveTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	archived, slept := 0, 0
+	alreadyAway := h.bs.BoardArchived(ctx, project)
 	var archivedIDs []string // only these come back on Restore: an agent archived on its own stays archived
 	for _, sess := range sessions {
 		if sess.IsArchived == 1 {
@@ -54,7 +55,10 @@ func (h *SessionsHandler) ArchiveTeam(w http.ResponseWriter, r *http.Request) {
 		archived++
 		archivedIDs = append(archivedIDs, sess.SessionID)
 	}
-	if err := h.bs.SetBoardArchived(ctx, project, true); err != nil {
+	// A repeat (a Hub retry, two windows) must not forget which agents Archive archived, nor move the archived time: keep the stored list and add to it.
+	if alreadyAway {
+		archivedIDs = append(h.bs.BoardArchivedAgents(ctx, project), archivedIDs...)
+	} else if err := h.bs.SetBoardArchived(ctx, project, true); err != nil {
 		errInternalServer(w, err.Error())
 		return
 	}
