@@ -17,7 +17,7 @@ const sceneShots = require('./helpers/scene_shots');
         window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin), m = String((o && o.method) || 'GET').toUpperCase();
             if (url.pathname === '/api/sessions/history/counts') return json({ all: 0, group: 3, notes: 0, active: 0, starred: 0, archived: 0, by_agent_type: {}, tags: [] });
             if (url.pathname === '/api/sessions/history') return json({ sessions: url.searchParams.get('type') === 'group' ? sessions : [], total: url.searchParams.get('type') === 'group' ? 3 : 0, page: 1, page_size: 50 });
-            if (url.pathname === '/api/board/projects') return json(['docs-site', 'billing-revamp', 'mobile-beta'].map(p => ({ project: p, board_id: p, board_label: sessions.find(s => s.title === p).board_label, subscriber_count: 2, message_count: 4, goals_brief: { open: 1, seq: 1 }, archived: p === 'docs-site' && !window.__restored, archived_at: p === 'docs-site' && !window.__restored ? '2026-11-24T10:00:00Z' : undefined })));
+            if (url.pathname === '/api/board/projects') return json(['docs-site', 'billing-revamp', 'mobile-beta'].map(p => ({ project: p, board_id: p, board_label: sessions.find(s => s.title === p).board_label, subscriber_count: 2, message_count: 4, goals_brief: { open: 1, seq: 1 }, archived: p === 'docs-site' && !window.__restored, archived_at: p === 'docs-site' && !window.__restored ? '2026-11-24T10:00:00Z' : undefined, goals_kept: p === 'docs-site' && !window.__restored ? 12 : undefined })));
             const a = url.pathname.match(/^\\/api\\/board\\/([^/]+)\\/archive$/);
             if (a) { window.__archiveCalls.push(m + ' ' + a[1]); if (m === 'DELETE') window.__restored = true; return json({ ok: true, archived: m === 'POST' }); }
             return R(u, o); }; return true; })()`);
@@ -51,7 +51,7 @@ const sceneShots = require('./helpers/scene_shots');
             // each row's line as the mock draws it
             const lines = await ev(`Object.fromEntries([...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')].map(r => [(r.querySelector('.dt-primary') || r).textContent.replace(/\\s+/g, ' ').trim().replace(/ Team \u00b7 .*$/, '').replace(/ now(Unread)?$/, '').replace(/ \\d+:\\d+ [AP]M$/, ''), (r.querySelector('.dt-team-line, .dt-mail-snippet') || {}).textContent]))`);
             assert.match(lines['Billing Revamp'] || '', /^Team \u00b7 (today|yesterday|\w+ \d+) \u00b7 (\d+ agents? running|no agent running)$/, `${at}a live team's line: ${JSON.stringify(lines)}`);
-            assert.match(lines['Docs Site'] || '', /^Team \u00b7 archived .+ \u00b7 \d+ agents?$/, `${at}an archived team's line: ${JSON.stringify(lines)}`);
+            assert.match(lines['Docs Site'] || '', /^Team \u00b7 archived .+ \u00b7 \d+ agents? \u00b7 12 goals kept$/, `${at}an archived team's line: ${JSON.stringify(lines)}`);
             assert.equal(await ev(`!!document.querySelector('#group-table-view thead th[data-key="when"]')`), false, `${at}no When column: the day is in the line`);
             assert.ok(rows.some(x => x.startsWith('Billing Revamp')) && rows.some(x => x.startsWith('Mobile Beta')), `${at}the live teams are listed: ${JSON.stringify(rows)}`);
             const nav = await ev(`document.body.innerText`);
@@ -77,10 +77,9 @@ const sceneShots = require('./helpers/scene_shots');
             await ev(`[...document.querySelectorAll('#confirm-modal button')].find(b => /^archive team$/i.test(b.textContent.trim())).click(); true`);
             await waitFor(`window.__archiveCalls.some(c => /^POST /.test(c))`, `${at}the archive call`, 8000);
             await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ')).slice(-3).some(t => /Billing Revamp/.test(t))`, `${at}the archived team moves to the end`, 8000);
-            // Restore team: a button on a computer's archived row, the row's menu on a phone
+            // Restore team: from the archived row's menu, as a live row's actions are
             await ev(`window.__archiveCalls = []; true`);
-            if (!mobile) await ev(`[...document.querySelectorAll('#group-table-view [data-team-action="Restore team"]')].pop().click(); true`);
-            else { await openMenu('Docs Site'); assert.deepEqual(await items(), ['Restore team', 'Open team'], `${at}an archived team's row menu offers Restore team`); await pick('Restore team'); }
+            await openMenu('Docs Site'); assert.deepEqual(await items(), ['Restore team', 'Open team'], `${at}an archived team's row menu offers Restore team (a computer and a phone alike)`); await pick('Restore team');
             await waitFor(`window.__archiveCalls.some(c => /^DELETE /.test(c))`, `${at}the restore call`, 8000);
             // The Archive team question from a team page's More menu (a team with no agent running can be archived too).
             await ev(`window.openTeamPage('mobile-beta').then(() => true)`);

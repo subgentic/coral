@@ -160,6 +160,7 @@ type ProjectInfo struct {
 	Goals      *GoalsBrief `db:"-" json:"goals_brief"`
 	Archived   bool        `db:"-" json:"archived"`              // the team is put away (#21850): the dashboard leaves it out of the sidebar and lists it under Archived teams
 	ArchivedAt string      `db:"-" json:"archived_at,omitempty"` // when, RFC3339 UTC
+	GoalsKept  int         `db:"-" json:"goals_kept,omitempty"`  // an archived team's goals of every state, for its Teams row ("12 goals kept"); not read for a live team (#21924)
 	GoalsOpen  int         `db:"goals_open" json:"-"`
 	GoalsSeq   int64       `db:"goals_seq" json:"-"`
 }

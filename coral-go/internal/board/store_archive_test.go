@@ -101,3 +101,25 @@ func TestArchivedTeamLeavesTheAllBoardsTaskRead(t *testing.T) {
 	assert.Equal(t, []string{"billing"}, read(true), "an archived team's tasks are not in the all-boards list")
 	assert.ElementsMatch(t, []string{"billing", "docs-site"}, read(false), "a read that does not hide them still has them")
 }
+
+// An archived team's projects row carries how many goals it keeps, of every state (the Teams row says "12 goals kept", #21924); a live team's row has no count.
+func TestArchivedTeamRowSaysHowManyGoalsItKeeps(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, team := range []string{"docs-site", "billing"} {
+		_, err := s.Subscribe(ctx, team, "Lead", "Orchestrator", "", nil, "all")
+		require.NoError(t, err)
+		for i := 0; i < 3; i++ {
+			_, err = s.CreateGoal(ctx, team, GoalInput{Title: "a goal", Outcome: "o", DoneWhen: "d", CreatedBy: "Lead"})
+			require.NoError(t, err)
+		}
+	}
+	require.NoError(t, s.SetBoardArchived(ctx, "docs-site", true))
+	projects, err := s.ListProjects(ctx)
+	require.NoError(t, err)
+	kept := map[string]int{}
+	for _, p := range projects {
+		kept[p.Project] = p.GoalsKept
+	}
+	assert.Equal(t, map[string]int{"docs-site": 3, "billing": 0}, kept)
+}
