@@ -54,7 +54,7 @@
 //
 // --stress runs the selected suites --runs N times (default 3) on --shards shards (default 3 in this
 // mode) with every page's CPU throttled --cpu-throttle X times (default 4) through CDP
-// Emulation.setCPUThrottlingRate, without retries, and prints each suite's pass count (e.g. 2/3) so the
+// Emulation.setCPUThrottlingRate (--cpu-throttle works only with --stress: alone it exits 2 and says so), without retries, and prints each suite's pass count (e.g. 2/3) so the
 // flaky list is measurable. Exit status 1 unless every suite passed every run. A suite sees the rate as
 // CDP_CPU_THROTTLE (1 without --stress), for a wall-clock budget that should grow with it (comments_scale).
 //
@@ -150,6 +150,7 @@ const intArg = (name, def, min) => {
   return v;
 };
 const stress = flag('--stress');
+if (!stress && process.argv.includes('--cpu-throttle')) { console.error('--cpu-throttle only takes effect with --stress (it throttles the stress runs; without --stress it did nothing, #21927). Add --stress, e.g. node run_cdp_suites.mjs --stress --only <suite> --runs 30 --cpu-throttle 20'); process.exit(2); }
 const only = arg('--only', '');
 const timeoutS = intArg('--timeout', 180, 1);
 const localShards = localShardDefault({ cpus: os.availableParallelism(), ci: !!process.env.CI, narrowed: !!(only || flag('--sequences') || arg('--part', '')) });
