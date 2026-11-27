@@ -48,7 +48,7 @@ const { bindStartupWaits } = await importOnce('./team_startup_waits.js');
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
-export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals', initialTab = 'tasks', initialArtifact = null, initialFiles = {} }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
+export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals', initialTab = 'tasks', initialArtifact = null, initialFiles = {}, initialComments = null }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
     const root = host;
     const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', tab: ['tasks', 'artifacts', 'comments'].includes(initialTab) ? initialTab : 'tasks', creating: false };
     let current = goal, uncommittedBox = null;
@@ -384,7 +384,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     function drawTabs(g) {
         const wrap = el('div', 'goal-lists');
         const strip = el('div', 'tabs goal-tabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', `The tasks, artifacts and comments of ${g.title}`);
-        const tabs = [['tasks', 'Tasks', totalOf(g.rollup)], ['artifacts', 'Artifacts', artifacts.total], ['comments', 'Comments', comments.id === g.id ? comments.open : null]];
+        const tabs = [['tasks', 'Tasks', totalOf(g.rollup)], ['artifacts', 'Artifacts', artifacts.total], ['comments', 'Comments', comments.id === g.id && comments.open != null ? comments.open : initialComments]];
         if (!tabs.some(t => t[0] === model.tab)) model.tab = 'tasks';
         for (const [key, label, n] of tabs) {
             const b = btn('tab goal-tab', null, () => { if (model.tab === key) return; model.tab = key; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${key}`)?.focus({ preventScroll: true }); });

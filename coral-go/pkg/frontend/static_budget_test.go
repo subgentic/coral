@@ -41,7 +41,10 @@ const (
 	// #21185: private draft review UI brings the tree to about 8.118 MB; plus
 	// 64 KiB rounded up under standing policy. Startup caps are unchanged.
 	// v2.1.17 batch (workers, status sidebar, alerting automations, automation approval): tree 8,197,195, plus 64 KiB under the standing policy. Startup caps are unchanged.
-	staticBudget = 8_263_680
+	// #21846: the lazy goal decision ledger and inline review desk need room after
+	// the v2.1.22 rebase (4,990 bytes over). Keep 64 KiB above the measured tree;
+	// this does not increase the separately enforced startup JS/CSS budgets.
+	staticBudget = 8_334_336
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 	// budgetWarnRoom is the room under which the test warns, and budgetPolicyRoom the room a raise leaves.
