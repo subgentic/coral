@@ -477,8 +477,15 @@ func (e *Entry) join(runID string) {
 			return
 		}
 	}
+	if len(e.Runs) >= MaxRunsPerEntry {
+		e.Base = true // #21797: past the cap an extra run is folded into the plain claim, so one agent's many run ids cannot grow its entry; it is given back by a plain release or the lease
+		return
+	}
 	e.Runs = append(e.Runs, runID)
 }
+
+// MaxRunsPerEntry bounds the run ids one agent's entry remembers (#21797).
+const MaxRunsPerEntry = 32
 
 // ReleaseRun is Release for the end of one `claim --run` (#21790): the entry is given back only when no other run and no plain claim shares it. An agent holds one slot per resource, so a second claim joins the
 // first; before, the second run's end gave back the first run's slot while its job (on another machine, over ssh) went on unclaimed. A runID the entry does not know of releases it, as Release does.
