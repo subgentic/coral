@@ -4,33 +4,22 @@
 import { watchScrollCue } from './scroll_cue.js';
 
 const strip = () => document.querySelector('#agentic-block-top .agentic-state-tabs');
-const shown = b => getComputedStyle(b).display !== 'none'; // the page's rules and .tab-hidden say which tabs this page has
 
 /** The words fit when every tab of the row is on one line with them showing and none is clipped (measured, so a narrow panel, a large text size and an unusual word all fall back the same way); else icons alone. */
 export function fitWords() {
     const row = strip();
     if (!row) return;
-    const tabs = [...row.querySelectorAll('.agentic-tab')].filter(shown);
-    if (tabs.length === 0) return;
+    const tabs = [...row.querySelectorAll('.agentic-tab')].filter(b => getComputedStyle(b).display !== 'none'); // the page's rules and .tab-hidden say which tabs this page has
+    if (!tabs[0]) return;
     row.toggleAttribute('data-words', true); // on, to look (no write when already on)
     const top = tabs[0].offsetTop;
     const crowded = tabs.some(b => b.offsetTop !== top || b.scrollWidth > b.clientWidth + 1) || (row.scrollWidth > row.clientWidth && !row.closest('.mobile-panel-overlay'));
-    if (crowded) row.removeAttribute('data-words');
+    row.toggleAttribute('data-words', !crowded);
 }
-
-let frame = 0;
-/** Measure on the next frame, once: fitWords changes what the ResizeObserver watches, so running it inside the observer's callback loops ("ResizeObserver loop completed with undelivered notifications"). */
-const fitSoon = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; fitWords(); }); };
 
 export function initDockTabs() {
     document.addEventListener('coral:dock-changed', fitWords); // a tab was switched
-    const state = document.getElementById('agentic-state');
+    const state = document.getElementById('agentic-state'), row = strip();
     if (state) new MutationObserver(fitWords).observe(state, { attributes: true, attributeFilter: ['class', 'data-page'] }); // a page, or the customizer's hidden tabs
-    const row = strip();
-    if (row) {
-        const ro = new ResizeObserver(fitSoon);
-        ro.observe(row);
-        for (const b of row.children) ro.observe(b); // a larger text size or a new count widens the tabs, not the row (#9435)
-        watchScrollCue(row);
-    } // the strip scrolls sideways when the icons do not fit: a fade says which edge hides tabs
+    if (row) watchScrollCue(row, () => requestAnimationFrame(fitWords)); // fitWords runs on the next frame, not inside the observer: it changes what the observer watches ("ResizeObserver loop completed with undelivered notifications", #21804); // a larger text size or a new count widens the tabs, not the row (#9435); the strip scrolls sideways when the icons do not fit: a fade says which edge hides tabs
 }
