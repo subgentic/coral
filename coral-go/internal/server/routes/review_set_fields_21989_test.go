@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -129,4 +130,45 @@ func TestAFileWithChangesRequestedCarriesTheLatestNoteAndAnApprovedOneDoesNot(t 
 	code, out = c.changes(t, `{"decision":"approve"}`)
 	require.Equal(t, http.StatusOK, code, out)
 	assert.Nil(t, list()["review_note"], "an approved file carries none")
+}
+
+// #21992: a file that was decided still says what its upload asked, for the ledger's "Approved · <question>"; a file never sent for review has none.
+func artifactRow(t *testing.T, e *reviewEnv) map[string]any {
+	t.Helper()
+	r := chi.NewRouter()
+	r.Get("/api/board/{project}/artifacts", func(w http.ResponseWriter, req *http.Request) { e.h.ListTeamArtifacts(w, asPerson(req)) })
+	s := httptest.NewServer(r)
+	defer s.Close()
+	resp, err := http.Get(s.URL + "/api/board/alpha/artifacts")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var out struct {
+		Artifacts []map[string]any `json:"artifacts"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	for _, a := range out.Artifacts {
+		if a["id"] == e.id {
+			return a
+		}
+	}
+	t.Fatalf("artifact not listed")
+	return nil
+}
+
+func TestADecidedFileKeepsItsQuestionAndAFileNeverSentHasNone(t *testing.T) {
+	for _, decision := range []string{"approve", "changes"} {
+		c := newChangesEnv(t)
+		_, err := c.h.bs.SetArtifactQuestion(context.Background(), "alpha", c.id, "Is the batch size right?", "s1", time.Now())
+		require.NoError(t, err)
+		assert.Equal(t, "Is the batch size right?", artifactRow(t, c.reviewEnv)["review_question"], "waiting: as before")
+		body := `{"decision":"approve"}`
+		if decision == "changes" {
+			body = `{"decision":"changes","text":"Use 5,000."}`
+		}
+		code, out := c.changes(t, body)
+		require.Equal(t, http.StatusOK, code, out)
+		assert.Equal(t, "Is the batch size right?", artifactRow(t, c.reviewEnv)["review_question"], decision+": the question stays on the row")
+	}
+	e := newReviewEnv(t, true) // never sent for review
+	assert.Nil(t, artifactRow(t, e)["review_question"])
 }

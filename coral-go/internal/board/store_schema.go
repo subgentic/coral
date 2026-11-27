@@ -121,6 +121,9 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	if err := s.ensureArtifactQuestionsSchema(ctx); err != nil {
 		return err
 	}
+	if err := s.ensureArtifactDecidedQuestionsSchema(ctx); err != nil {
+		return err
+	}
 	if err := s.ensureArtifactNotesSchema(ctx); err != nil {
 		return err
 	}

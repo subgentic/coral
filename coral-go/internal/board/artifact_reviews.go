@@ -332,6 +332,11 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil { // the review is decided: what it asked is answered (#11555)
 		return ch, nil, err
 	}
+	if ch.prevQuestion != nil && ch.prevQuestion.Question != "" { // and the words are kept for the ledger (#21992)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_decided_questions (board_id, hex, question) VALUES (?, ?, ?) ON CONFLICT(board_id, hex) DO UPDATE SET question = excluded.question`, boardID, hex, ch.prevQuestion.Question); err != nil {
+			return ch, nil, err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_reviews (board_id, hex, state, at) VALUES (?, ?, ?, ?)
 		ON CONFLICT(board_id, hex) DO UPDATE SET state = excluded.state, at = excluded.at`, boardID, hex, state, now.UTC().Format(time.RFC3339)); err != nil {
 		return ch, nil, err
@@ -364,6 +369,9 @@ func (s *Store) UndoArtifactReview(ctx context.Context, ch ReviewChange) error {
 		}
 	}
 	if ch.prevQuestion != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_decided_questions WHERE board_id = ? AND hex = ?`, ch.board, ch.hex); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_questions (board_id, hex, question, session_id, asked_at) VALUES (?, ?, ?, ?, ?)
 			ON CONFLICT(board_id, hex) DO UPDATE SET question = excluded.question, session_id = excluded.session_id, asked_at = excluded.asked_at`,
 			ch.board, ch.hex, ch.prevQuestion.Question, ch.prevQuestion.Session, ch.prevQuestion.At); err != nil {
