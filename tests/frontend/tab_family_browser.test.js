@@ -36,11 +36,17 @@ const { coralReady } = require('./helpers/wait');
                 const team = [...document.querySelectorAll('#team-tabs .tab')].filter(t => t.getClientRects().length), goal = [...document.querySelectorAll('#team-panel-goals .goal-tabs .tab')]; if (!goal.length) return { teamOn: g(on(team)), teamOff: g(off(team)), counts: [...document.querySelectorAll('.team-tab .tab-count')].filter(c => c.getClientRects().length).map(c => { const cs = getComputedStyle(c); return { size: cs.fontSize, weight: cs.fontWeight, radius: cs.borderTopLeftRadius }; }), acc, teamStrip: getComputedStyle(document.getElementById('team-tabs')).borderBottomWidth };
                                 const counts = [...document.querySelectorAll('.team-tab .tab-count, .goal-tab .tab-count')].filter(c => c.getClientRects().length).map(c => { const cs = getComputedStyle(c); return { size: cs.fontSize, weight: cs.fontWeight, radius: cs.borderTopLeftRadius }; });
                 return { acc, teamOn: g(on(team)), teamOff: g(off(team)), goalOn: g(on(goal)), goalOff: g(off(goal)), counts, teamStrip: getComputedStyle(document.getElementById('team-tabs')).borderBottomWidth }; })()`);
-            if (mobile) { // #9377: at 200% text the team tabs are wider than the strip: it says which edge hides more, with the text size changed after the page loaded
+            if (mobile) { // #21788: approved phone tabs wrap; the tablet strip still proves #9377's overflow cue at 200% text.
                 await ev(`document.documentElement.style.fontSize = '32px'; true`); await new Promise(r => setTimeout(r, 500)); // sleep-ok: the observer draws the cue after the reflow
+                const phone = await ev(`(() => { const s = document.getElementById('team-tabs'), r = s.getBoundingClientRect(), tabs = [...s.querySelectorAll('[role=tab]')]; return { count: tabs.length, scrolls: s.scrollWidth > s.clientWidth + 1, whole: tabs.every(t => { const b = t.getBoundingClientRect(); return b.left >= r.left - 1 && b.right <= r.right + 1 && b.height >= 44; }) }; })()`);
+                assert.equal(phone.count, 9, 'all nine phone tabs remain present at 200% text');
+                assert.ok(!phone.scrolls && phone.whole, 'phone tabs wrap as whole touch targets at 200% text: ' + JSON.stringify(phone));
+                await Emulation.setDeviceMetricsOverride({ width: 820, height: h, deviceScaleFactor: 1, mobile });
+                await waitFor(`(() => { const s = document.getElementById('team-tabs'); return s.scrollWidth > s.clientWidth + 1 && !!s.getAttribute('data-more'); })()`, 'the tablet overflow cue after resizing', 5000);
                 const cue = await ev(`(() => { const s = document.getElementById('team-tabs'); return { scrolls: s.scrollWidth > s.clientWidth + 1, more: s.getAttribute('data-more') || '' }; })()`);
                 assert.ok(cue.scrolls && cue.more, 'the team tabs scroll at 200% text and fade the hidden edge: ' + JSON.stringify(cue));
                 await ev(`document.documentElement.style.fontSize = ''; true`);
+                await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             }
             if (mobile) {
                 await open(`/team/${B}/goals/${G}`); await waitFor(`!!document.querySelector('#team-panel-goals #goal-tab-tasks')`, 'the goal tabs', 20000);
