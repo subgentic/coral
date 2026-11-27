@@ -33,12 +33,12 @@ try {
     assert.ok(calls.includes('/api/board/projects'), 'the Boards group reads the project list the Board tab reads');
     // Goals: a mail row
     folderButtons().find(b => /Goals/.test(b.textContent)).click(); await settle(500);
-    const row = document.querySelector('#group-table-view .dt-mailed');
-    assert.ok(row, 'Goals is mail rows on a phone');
-    assert.equal(row.querySelector('.dt-mail-title').textContent, '#7 Ship the Hub');
-    assert.equal(row.querySelector('.dt-mail-ask'), null, 'the compact goal card omits the outcome preview (#15833)');
-    assert.match(row.querySelector('.dt-mail-time').textContent, /^Active \u00b7 1\/2 \u00b7 (?:Alpha team|alpha-team)$/, 'state and progress come before the team');
-    assert.equal(row.querySelector('.dt-mail-avatar').textContent, 'flag');
+    const row = document.querySelector('#group-table-view .goal-decision-card');
+    assert.ok(row, 'Goals is the approved decision ledger on a phone (#21846)');
+    assert.equal(row.querySelector('.goal-decision-title').textContent, 'Ship the Hub');
+    assert.equal(row.querySelector('.dt-mail-ask'), null, 'the decision ledger does not restore the old outcome preview');
+    assert.equal(row.querySelector('.goal-decision-state').textContent, 'Active');
+    assert.match(row.querySelector('.goal-decision-team').textContent, /Alpha team|alpha-team/);
     // the other two folders carry their rows' spec
     const sidebar = read('static/inbox_sidebar.js'), arts = read('static/team_artifacts_page.js');
     assert.match(sidebar, /mail: f => \(\{ lead: \{ text: f\.title \|\| f\.which, name: f\.title \|\| f\.which \}, title: f\.title \|\| f\.which, medium: true, snippet: f\.snip, time: f\.saved, data: \{ id: String\(f\.id\) \}, tip: multi && f\.serverName \? `\$\{f\.which\} \\u00b7 \$\{f\.serverName\}` : '' \}\)/, 'Saved: who it is from (a name, so medium), the message as its name cuts it, when it was saved, the computer on the hover, and its id on the button (Back finds the row again, #9783)');

@@ -12,7 +12,7 @@ document.addEventListener('coral:grant-notices', () => { updateInboxTab(); rende
 const { welcomeRows, runWelcome } = await importOnce('./welcome_items.js');
 import { incompleteNote, readGaps } from './needs_incomplete.js';
 import { loadPendingSkills, skillRows, skillLine, skillName, openSkill } from './needs_skills.js';
-import { doneGoals, looksDone, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, setClosedByAgentCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
+import { doneGoals, nextQuietEnd, quietEndsAt, hideGoalDone, setGoalDoneCount, setClosedByAgentCount, isGoalDoneRead, markGoalDoneRead, markGoalDoneUnread, SETTING as GOAL_DONE_SETTING } from './goal_done.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -76,11 +76,10 @@ const TV = await importOnce('./tasks_view.js'); // the one Tasks view
 const VL = await importOnce('./view_list.js'); // the mailbox's view list (#7785)
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar takes the page's toolbar line (mountSelection)
-const GC = await importOnce('./goal_columns.js');
 const GS = await importOnce('./goal_short.js'); // a goal's short name and #N (#15245)
-const GW = await importOnce('./goal_words.js'); // a goal's state word, said in a phone row's button name (#9747)
 const { mountGoal } = await importOnce('./goal_view.js');
 const { arrangeReviewRows, reviewGroupLookup } = await importOnce('./inbox_review_groups.js');
+const GoalDecisions = await importOnce('./goal_decisions.js'); // Goals ledger; Inbox itself is lazy (#21846)
 const { waitingOnAgent, needsReviewAttention, reviewChangeLabels, hasNewVersion, decidedWithNews, decidedWord, sentBackSince, sentBackChip, sentBackExcerpt, producerArchived } = await importOnce('./inbox_review_state.js');
 const { starControl } = await importOnce('./artifact_star.js');
 const { askSubjectLinks } = await importOnce('./ask_subject_links.js');
@@ -848,7 +847,6 @@ function unrecordedActions() {
 
 const dockSavedState = DT.tableState();
 const savedState = DT.tableState(); // one word set for a task's state (Queued, In progress, Blocked, In review, Done), here as everywhere
-const goalsState = DT.tableState();
 let taskFilters = { ...TF.EMPTY }, taskState = 'all', taskBar = null;
 const wh = { goals: new Set() }, noteWorkSearch = (k, q) => importOnce('./work_search.js').then(m => m.noteWork(wh, k, q, goals, () => renderInboxNav(true))); // work_search.js (#19237)
 const taskMatches = t => serverMatches(t, taskFilters) // the source query matches body text as well as the title (#17325, #19237)
@@ -924,19 +922,10 @@ async function refreshTasks(append = '') {
 let openAt = 0; // when the open goals were last read: with Done saved as the filter the FIRST read is of the open goals (the other pills' counts), and they are read again once a minute (#14663)
 const closedKnown = { done: false, dropped: false }; // the finished and the dropped goals are read only while their pill is picked: a count is not known before that (#14641, #16371; Security's one read per gap, #13389)
 let goals = []; // the open goals of every team (GET /api/goals): id, board_id, title, outcome, state, rollup, updated_at
-const goalKey = g => `${g.board_id}#${g.id}`;
-/** The phone's bulk action on selected goals of any team: Close as Done or Dropped with a reason, one request per goal on its own team (#12230). */
-const closeGoalsActions = () => [{ label: 'Close goals', danger: true,
-    choose: { label: 'Close as', options: () => [{ value: 'done', label: 'Done' }, { value: 'dropped', label: 'Dropped' }], text: { label: 'Reason for closing', maxLength: 300 } },
-    confirm: n => `Close ${n} goals? Any open tasks stay open.`,
-    run: async (picked, keys, as, reason) => { if (!reason) return;
-        const GW = await importOnce('./goal_write.js'); // previewed first when the Hub asks for it, one goal at a time and about 10 a minute then; the Hub's limit stops it with its own line (#13503); loaded on use: not in the start
-        const res = await GW.writeEach(picked, async g => { const r = await GW.goalWrite(g.board_id, 'goal_close', g.id, `/goals/${g.id}/close`, 'POST', { subscriber_id: OPERATOR_ID, state: as, reason }); if (r.ok) goalsState.selected.delete(goalKey(g)); return r; }, { say: t => showToast(t) });
-        showToast(res.stopped || `Closed ${res.done} goals${res.failed ? `; ${res.failed} failed and remain selected` : ''}`, !!(res.stopped || res.failed)); await refreshGoals(); renderInboxNav(true); } }];
 const goalTeam = g => teamLabel(g.board_id); // with its computer when a hub has more than one: two teams called alpha are two (#8774)
 let goalFilters = GF.loadFilters(), goalBar = null;
 let activityFilters = AF.loadFilters(), activityBar = null;
-const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, wh.goals.has(`${g.board_id}#${g.id}`) ? { ...goalFilters, q: '' } : goalFilters, goalTeam) && serverMatches(g, goalFilters)), goalFilters);
+const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, wh.goals.has(`${g.board_id}#${g.id}`) ? { ...goalFilters, q: '' } : goalFilters, goalTeam, { withDone: !goalFilters.state }) && serverMatches(g, goalFilters)), goalFilters);
 /** New goal at the right of the Goals toolbar (#11593, the operator): the existing New goal form (goals_view.js, lazy), on the team the Team filter names, else the first; with more than one team the form asks which. */
 function newGoalAction() {
     const b = DT.el('button', 'btn btn-primary goals-new', 'New goal'); b.type = 'button';
@@ -976,8 +965,8 @@ function inboxGoalsToolbar() {
         filters: goalFilters,
         options: { team: { values: teams, labels: Object.fromEntries(teams.map(t => [t, goalTeam({ board_id: t })])) }, driver: { values: drivers } },
         pills: { label: 'Show goals that are', current: goalFilters.state || 'all',
-            items: [{ key: 'all', label: 'Open', count: rows.filter(g => !GF.CLOSED.includes(String(g.state || '').toLowerCase())).length }, /* the open goals (active, blocked, proposed): the list this pill shows and the Goals folder's own number count them; Done and Dropped are the pills beside it (#16863, walk 36 C6) */ ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: GF.CLOSED.includes(key) && !closedKnown[key] ? undefined : counts[i] }))],
-            onPick: key => { const was = goalFilters.state; goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); if (was !== goalFilters.state && (GF.CLOSED.includes(was) || GF.CLOSED.includes(goalFilters.state))) refreshGoals(); /* the Done and Dropped pills read their own goals again (one read each) */ } },
+            items: [{ key: 'all', label: 'All', count: rows.length }, /* #21846: All includes closed goals through one existing multi-state read. */ ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: GF.CLOSED.includes(key) && !closedKnown[key] ? undefined : counts[i] }))],
+            onPick: key => { const was = goalFilters.state; goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); if (was !== goalFilters.state && (!goalFilters.state || GF.CLOSED.includes(was) || GF.CLOSED.includes(goalFilters.state))) refreshGoals(); /* the Done and Dropped pills read their own goals again (one read each) */ } },
         action: newGoalAction(),
     });
     return { node, signature: JSON.stringify([goalFilters, teams, drivers, counts, rows.length]) };
@@ -1044,11 +1033,12 @@ async function readGoals() {
         syncGoalDoneCount(); // the count moves with the rows it counts: they are drawn from closedGoals as soon as it is read, and the sync at the end of this read waits for the settings and the skills (#18067: goal_closed_row read the count between the two)
     }
     try {
-        const want = GF.CLOSED.includes(goalFilters.state) ? goalFilters.state : '', fresh = openAt > 0 && Date.now() - openAt < 60000, kind = want && fresh ? want : '', read = await listInboxGoals(kind || false, goalFilters.archived); ok = !goalsReadFailed();
-        if (ok && kind) closedKnown[kind] = true;
+        const want = group === 'goals' && !goalFilters.state ? 'all' : GF.CLOSED.includes(goalFilters.state) ? goalFilters.state : '', fresh = openAt > 0 && Date.now() - openAt < 60000, kind = want && fresh ? want : '', read = await listInboxGoals(kind || false, goalFilters.archived); ok = !goalsReadFailed();
+        if (ok && kind) { if (kind === 'all') { closedKnown.done = true; closedKnown.dropped = true; } else closedKnown[kind] = true; }
         if (ok && !kind) { openAt = Date.now(); followWithDone = !!want; } // a page opened on Done or Dropped read the open goals first: those follow at once
-        if (ok) { const isOf = k => g => String(g.state || '').toLowerCase() === k, isClosed = g => GF.CLOSED.includes(String(g.state || '').toLowerCase()); goals = kind ? [...goals.filter(g => !isOf(kind)(g)), ...read] : [...read, ...goals.filter(isClosed)]; } // one read per gap: the other kinds stay as the last read left them
+        if (ok) { const isOf = k => g => String(g.state || '').toLowerCase() === k, isClosed = g => GF.CLOSED.includes(String(g.state || '').toLowerCase()); goals = kind === 'all' ? read : kind ? [...goals.filter(g => !isOf(kind)(g)), ...read] : [...read, ...goals.filter(isClosed)]; } // one read per gap: the other kinds stay as the last read left them
         else if (!goals.length) goals = [];
+
     } catch { ok = false; } // a read that throws keeps the last open goals: the badge does not drop to 0 and come back (#16631)
     if (!isCloud() && Date.now() - goalSettingsAt >= 30000) try { // Local hidden state lives in this computer's settings; Hub goals carry per-computer done_state.
         goalSettingsAt = Date.now();
@@ -1746,25 +1736,18 @@ registerGroupSource('hub-inbox', {
         if (key === 'goals') {
             const rows = goalRows();
             const waitingGoals = goalProposals().length, waitingNote0 = waitingGoals ? `${waitingGoals} goal${waitingGoals === 1 ? '' : 's'} an agent proposed ${waitingGoals === 1 ? 'is' : 'are'} waiting for your approval in Needs you.` : '';
-            const waitingNote = [goalsUpdateNote(), waitingNote0, goalFilters.state === 'done' && doneGoalsCapped() ? 'Each computer shows up to 100 finished goals, oldest first. Newer goals may be missing when this limit is reached.' : ''].filter(Boolean).join(' ');
+            const waitingNote = [goalsUpdateNote(), waitingNote0, !goalFilters.state && doneGoalsCapped('all') ? 'Each computer shows up to 100 goals, oldest first. Newer goals may be missing when this limit is reached.' : '', goalFilters.state === 'done' && doneGoalsCapped() ? 'Each computer shows up to 100 finished goals, oldest first. Newer goals may be missing when this limit is reached.' : ''].filter(Boolean).join(' ');
             const hasDone = goals.some(g => String(g.state || '').toLowerCase() === 'done');
             const narrowed = GF.isFiltered({ ...goalFilters, state: goalFilters.state === 'active' ? '' : goalFilters.state }); // the list opens on Active (#16371): that chip alone is the default, not a narrowing
             const pendingGoals = goalInventoryPending() || (!!_goalsReading && !openAt && !goals.length);
             const emptyLine = pendingGoals ? 'Loading goals…' : goalsUpdateNote() || (narrowed ? 'No goal matches the search and filters.' : goalFilters.state === 'done' ? 'No finished goals.' : hasDone ? 'All goals are done.' : 'No open goals.');
             return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: emptyLine, hint: pendingGoals || goalsUpdateNote() ? undefined : waitingNote || (narrowed ? undefined : goalFilters.state === 'done' || hasDone ? undefined : "Press New goal to create one, or an Orchestrator can propose one too.") },
                 signature: JSON.stringify([pendingGoals, rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])]),
-                node: () => { const phone = isPhoneLayout(), mountBar = () => { const bar = document.querySelector('#group-table-view .gt-toolbar'); if (bar) { Toolbar.mountSelection(bar, goalsState.selected.size ? table.bar : null); if (phone) bar.querySelectorAll('.dt-select-toggle').forEach(b => b.remove()); } }; const table = DT.dataTable({ label: `Goals, ${rows.length}`, rows, rowKey: goalKey, state: goalsState, rowName: g => g.title,
-                    selectable: { contextKey: 'inbox-goals', canSelect: g => ['proposed', 'active', 'blocked'].includes(String(g.state || '').toLowerCase()), actions: closeGoalsActions(), onChange: () => mountBar(), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) }, // the tick column of the team page's Goals too (#16371); a phone: a long press selects, as in Needs you (#12230)
-                    open: g => {
-                        quietFocus($('inbox-view')); // same pointer-only heading focus rule as the team page
-                        goalOpener = { team: g.board_id, id: g.id };
-                        goalScroll = $('group-table-view')?.scrollTop || 0;
-                        note(folderRoute);
-                        go({ ...folderRoute, id: g.board_id, item: g.id });
-                    },
-                    oneLine: true, resize: true, sortBar: false,
-                    mail: g => ({ lead: { icon: 'flag', square: true, name: g.state }, title: `#${g.id} ${g.title}`, data: { goalId: String(g.id) }, state: GW.stateWord(g), time: `${GW.stateWord(g)}${looksDone(g) ? ', all tasks done' : ''}${GW.allTasksOf(g.rollup) ? ` \u00b7 ${(g.rollup || {}).done || 0}/${GW.allTasksOf(g.rollup)}` : ''}${g.new_comments > 0 ? ' \u00b7 New comments' : ''} \u00b7 ${goalTeam(g)}` }), // a phone's row (#9583): a flag, the goal, its outcome, when it moved; "all tasks done" when every task is done (#16635)
-                    columns: GC.goalColumns({ teamOf: goalTeam }, ['goal', 'state', 'team', 'progress', 'updated']).flatMap(c => c.key === 'team' ? [...serverColumns().map(x => ({ ...x, width: '8rem', dropAt: 52 })), c] : [c]) }); if (phone) setTimeout(mountBar, 0); return table.el; } };
+                node: () => GoalDecisions.goalTracker({ goals: rows, teamOf: goalTeam,
+                    openGoal: (g, tab) => { goalArtifactIntent = { team: g.board_id, id: g.id, tab }; goalOpener = { team: g.board_id, id: g.id }; goalScroll = $('group-table-view')?.scrollTop || 0; note(folderRoute); go({ ...folderRoute, id: g.board_id, item: g.id }); },
+                    openFile: (g, item, opener, files) => { goalArtifactIntent = { team: g.board_id, id: g.id, tab: 'artifacts', item, files }; goalOpener = { team: g.board_id, id: g.id }; goalScroll = $('group-table-view')?.scrollTop || 0; note(folderRoute); go({ ...folderRoute, id: g.board_id, item: g.id }); },
+                    closeGoal: g => { closeAfterOpen = { team: g.board_id, id: g.id }; go({ ...folderRoute, id: g.board_id, item: g.id }); },
+                }) };
         }
         if (key === 'artifacts') return IA.artifactsSpec();
         if (key === 'activity' && !AC) return loadingActivity();
@@ -2049,7 +2032,7 @@ function putBack(table, opener) {
 function restoreGoalList() {
     const table = $('group-table-view');
     if (!table || !goalOpener) return;
-    table.querySelector(`tr[data-key="${CSS.escape(goalOpener.team + '#' + goalOpener.id)}"] .dt-primary`)?.focus({ preventScroll: true });
+    table.querySelector(`.goal-decision-card[data-goal-key="${CSS.escape(JSON.stringify([goalOpener.team, goalOpener.id]))}"] .goal-decision-toggle`)?.focus({ preventScroll: true });
     table.scrollTop = goalScroll;
 }
 
@@ -2063,6 +2046,7 @@ export async function openGoalDoneNeed(team, id) {
 }
 
 /** The Inbox owns its goal address and Back; the shared component owns the goal. */
+let goalArtifactIntent = null;
 export async function openInboxGoal(team, id) {
     closePage(false);
     await showInbox({ folder: 'goals', quiet: true });
@@ -2077,7 +2061,8 @@ export async function openInboxGoal(team, id) {
     const view = el('div', 'goals-page goals-table-page goals-open');
     const body = el('div', 'goals-body'); view.append(body); host.append(view);
     const before = String(history.state?.prev || '');
-    goalMount = mountGoal(body, { team, id, status: sayLive,
+    const intent = goalArtifactIntent?.team === team && goalArtifactIntent?.id === id ? goalArtifactIntent : null; goalArtifactIntent = null;
+    goalMount = mountGoal(body, { team, id, status: sayLive, initialTab: intent?.tab, initialArtifact: intent?.item, initialFiles: intent?.files,
         teamLink: build(keyRoute('team', team, 'goals', id)), focusOnOpen: false, backLabel: backLabelFor('goal', before, openedFrom()),
         onTask: (task, g) => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: task.id }, { from: g && g.title }), // a task of the goal opens in the Inbox, never on the team page (#8861); its Back says the goal
         back: () => { if (backIs(folderRoute) || cameFromInbox()) history.back(); else go(folderRoute); }, // to the Inbox screen it was opened from (a task's Goal line), else the folder

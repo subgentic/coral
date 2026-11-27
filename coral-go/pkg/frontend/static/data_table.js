@@ -84,13 +84,13 @@ export function tag(text) { return el('span', 'chip chip-tag dt-tag', text); }
 // the eight colours are --avatar-1 .. --avatar-8 (variables.css): white 11/700 on each is 4.5:1 or more
 const hash = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) >>> 0; return h; };
 /** A person: a 20 px circle with the first letter, one fixed colour per name, then the name. */
-export function avatar(name, text) {
+export function avatar(name, text, opts = {}) {
     const w = el('span', 'dt-person');
     const n = String(name || '').trim();
     if (!n) { w.textContent = text || ''; return w; }
     const a = el('span', 'dt-avatar', [...n][0].toUpperCase()); a.setAttribute('aria-hidden', 'true'); a.style.background = `var(--avatar-${(hash(n.toLowerCase()) % 8) + 1})`;
     const nm = el('span', 'dt-person-name', text || n); w.append(a, nm); // text: what is said beside the circle when it is more than the name ("Done by Dev")
-    if (markAgent(a, n)) markAgent(nm, n); // a running agent's circle and name open its chat (#12197)
+    if (markAgent(a, n, opts)) markAgent(nm, n, opts); // a running agent's circle and name open its chat (#12197)
     return w;
 }
 /** People as a row of circles and nothing else (the Tasks table's Assigned to, #8492): the person responsible first, one solid circle; then reviewers as smaller outlined circles, at most two, then "+N". The whole cell is one image named by label
@@ -562,8 +562,8 @@ export function dataTable(cfg) {
         const list = sortedRows();
         const cols = columns.length + (sel ? 1 : 0);
         let lastGroup = null, lastParent = null;
-        const groupHead = g => { const gr = el('tr', g.level === 'task' ? 'dt-group dt-group-task' : 'dt-group'); gr.setAttribute('role', 'row'); const gh = el('th', null); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); // a group with onToggle (a task's items, #14441) is one button that opens and shuts them
-            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words', g.label); b.append(words); if (g.chip) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; b.dataset.groupControl = 'toggle'; groupActions.set(`${g.key}|toggle`, g.onToggle); if (!g.onStory) gh.append(b); else { const sb = el('button', 'btn btn-small btn-quiet dt-group-story', 'Story'); sb.type = 'button'; sb.setAttribute('aria-pressed', String(!!g.storyOpen)); sb.setAttribute('aria-label', `Story of ${String(g.label).split('\n')[0]}`); sb.dataset.groupKey = g.key; sb.dataset.groupControl = 'story'; groupActions.set(`${g.key}|story`, g.onStory); const bar = el('div', 'dt-group-pair'); bar.append(b, sb); gh.append(bar); } } else gh.textContent = g.label; // a heading with onStory has a second control, its own: the story of the task (#14444)
+        const groupHead = g => { const gr = el('tr', g.level === 'task' ? 'dt-group dt-group-task' : g.level === 'goal' ? 'dt-group dt-group-goal' : 'dt-group'); if (g.heading) gr.classList.add('dt-group-custom'); gr.setAttribute('role', 'row'); const gh = el('th', null); gh.colSpan = cols; gh.scope = 'rowgroup'; gh.setAttribute('role', 'rowheader'); // a group with onToggle (a task's items, #14441) is one button that opens and shuts them
+            if (g.onToggle) { const b = el('button', 'dt-group-toggle'); b.type = 'button'; b.setAttribute('aria-expanded', String(g.open !== false)); const words = el('span', 'dt-group-words'); if (g.heading) words.append(g.heading()); else words.textContent = g.label; b.append(words); if (g.chip && !g.heading) b.append(el('span', 'chip chip-tag dt-group-chip', g.chip)); b.dataset.groupKey = g.key; b.dataset.groupControl = 'toggle'; groupActions.set(`${g.key}|toggle`, g.onToggle); if (!g.onStory && !g.link) gh.append(b); else if (g.link) { const pair = el('div', 'dt-group-pair'), link = el('a', 'btn btn-small btn-quiet dt-group-link', g.link.label); link.href = g.link.href; pair.append(b, link); gh.append(pair); } else { const sb = el('button', 'btn btn-small btn-quiet dt-group-story', 'Story'); sb.type = 'button'; sb.setAttribute('aria-pressed', String(!!g.storyOpen)); sb.setAttribute('aria-label', `Story of ${String(g.label).split('\n')[0]}`); sb.dataset.groupKey = g.key; sb.dataset.groupControl = 'story'; groupActions.set(`${g.key}|story`, g.onStory); const bar = el('div', 'dt-group-pair'); bar.append(b, sb); gh.append(bar); } } else gh.textContent = g.label; // a heading with onStory has a second control, its own: the story of the task (#14444)
             gr.append(gh); tbody.append(gr);
             if (g.story && g.storyOpen) { const sr = el('tr', 'dt-story-row'); sr.setAttribute('role', 'row'); const sc = el('td', null); sc.colSpan = cols; sc.setAttribute('role', 'cell'); sc.append(g.story()); sr.append(sc); tbody.append(sr); } }; // the story is a second row under the heading, above the items, only while it is on
         const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)

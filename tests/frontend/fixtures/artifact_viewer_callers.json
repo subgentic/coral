@@ -5,9 +5,9 @@
     "note": "Call supplies the source computer, including local, from its own row/team"
   },
   "goal_artifacts.js": {
-    "calls": 1,
+    "calls": 2,
     "policy": "named",
-    "note": "Call supplies the source computer, including local, from its own row/team"
+    "note": "Call supplies the source computer, including local, from its own row/team; inline goal review opens a newer file with the same captured computer and board (#21846)"
   },
   "inbox_sidebar.js": {
     "calls": 5,
