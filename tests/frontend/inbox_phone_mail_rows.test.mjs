@@ -36,6 +36,7 @@ try {
     const row = document.querySelector('#group-table-view .goal-decision-card');
     assert.ok(row, 'Goals is the approved decision ledger on a phone (#21846)');
     assert.equal(row.querySelector('.goal-decision-title').textContent, 'Ship the Hub');
+    assert.equal(row.querySelector('.goal-decision-id').textContent, 'Goal #7');
     assert.equal(row.querySelector('.dt-mail-ask'), null, 'the decision ledger does not restore the old outcome preview');
     assert.equal(row.querySelector('.goal-decision-state').textContent, 'Active');
     assert.match(row.querySelector('.goal-decision-team').textContent, /Alpha team|alpha-team/);
