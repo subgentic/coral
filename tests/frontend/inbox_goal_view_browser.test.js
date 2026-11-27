@@ -21,7 +21,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(() => { const style = document.createElement('style'); style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(style); return true; })()`);
     };
     const clickGoal = async mount => {
-        const point = await ev(`(() => { const row = [...document.querySelectorAll('${mount} .dt-primary')].find(e=>(e.querySelector('.dt-mail-title')||e).textContent.replace(/^#\\d+\\s+/, '')==='Keep this goal in the Inbox'); const r = row.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        const point = await ev(`(() => { const card = [...document.querySelectorAll('${mount} .goal-decision-card')].find(e=>e.querySelector('.goal-decision-title')?.textContent==='Keep this goal in the Inbox'); const row = card ? [...card.querySelectorAll('.goal-decision-foot button')].find(b=>/^Tasks /.test(b.textContent)) : [...document.querySelectorAll('${mount} .dt-primary')].find(e=>(e.querySelector('.dt-mail-title')||e).textContent.replace(/^#\\d+\\s+/, '')==='Keep this goal in the Inbox'); const r = row.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
         await client.Input.dispatchMouseEvent({type:'mousePressed',...point,button:'left',clickCount:1});
         await client.Input.dispatchMouseEvent({type:'mouseReleased',...point,button:'left',clickCount:1});
     };
@@ -42,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
             await load('/');
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);
-            await waitFor(`[...document.querySelectorAll('#group-table-view .dt-primary')].some(e=>(e.querySelector('.dt-mail-title')||e).textContent.replace(/^#\\d+\\s+/, '')==='Keep this goal in the Inbox')`, 'Inbox goal row',15000);
+            await waitFor(`[...document.querySelectorAll('#group-table-view .goal-decision-title')].some(e=>e.textContent==='Keep this goal in the Inbox')`, 'Inbox goal card',15000);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('Keep this goal'))`);
             await clickGoal('#group-table-view');
             await detail('#inbox-page'); // fails before #8571: the row leaves Inbox for the team page
@@ -71,8 +71,8 @@ const { coralReady } = require('./helpers/wait');
             await client.Input.dispatchKeyEvent({type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
             assert.equal(await ev(`document.getElementById('inbox-view').hasAttribute('data-quiet-focus')`),false,'keyboard use restores visible focus');
             await ev(`document.querySelector('#inbox-page .goal-main .goals-back').click(); true`);
-            await waitFor(`!!document.querySelector('#group-table-view .dt-primary') && location.pathname==='/inbox/goals'`, 'Back to Goals folder');
-            assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .dt-primary')].every(e=>/Keep this goal/.test(e.textContent))`),'search retained');
+            await waitFor(`!!document.querySelector('#group-table-view .goal-decision-title') && location.pathname==='/inbox/goals'`, 'Back to Goals folder');
+            assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-title')].every(e=>/Keep this goal/.test(e.textContent))`),'search retained');
             await ev('history.forward(); true');
             await detail('#inbox-page');
             await load(url); await detail('#inbox-page');
