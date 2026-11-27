@@ -38,6 +38,7 @@ const HUB_OPERATOR_URL = '/api/system/hub-operator';
  const OFF_SHORT = "Only needed to use Coral Hub. Skip it otherwise.";
 const ENROLLED = ['connecting', 'connected', 'retrying', 'revoked', 'key_unreadable', 'upgrade_required'];
 const LIVE = ['enrolling', 'connecting', 'retrying'];
+const PAIRABLE = ['connected', 'retrying'];
 
 function post(method, url, body) {
     return fetch(url, {
@@ -270,6 +271,17 @@ class CloudPanel {
         if (enrolled !== this.enrolled) { this.enrolled = enrolled; this.loadHubOperator(); this.loadLinks(); }
         else if ((enrolled || this.hasLinks || (!this.linksAt && st.state !== 'off')) && Date.now() - (this.linksAt || 0) > 15000) this.loadLinks();
         this.syncMorePerms(st, enrolled);
+        const pairVisible = (PAIRABLE.includes(st.state) || this.hasLinks) && !this.qrPaused && this.root.offsetParent !== null;
+        if (!pairVisible) this.browserPair?.stop();
+        else if (this.browserPair) this.browserPair.resume();
+        else if (!this.browserPairImport) {
+            this.browserPairImport = importOnce('./cloud_pair_browser.js').then(({ pairBrowser }) => {
+                this.browserPairImport = null;
+                if (this.qrPaused || !this.root.isConnected || this.root.offsetParent === null || !(PAIRABLE.includes(this.lastSt?.state) || this.hasLinks)) return;
+                this.browserPair = pairBrowser(this.root);
+                this.browserPair.resume();
+            }).catch(() => { this.browserPairImport = null; });
+        }
         document.dispatchEvent(new CustomEvent('coral-cloud-state', { detail: { state: st.state } })); // the setup code is offered while a link is being made (setup_code_setting.js)
         this.restoreFocus(had, st);
         this.onState(st);
@@ -513,7 +525,7 @@ class CloudPanel {
 
     // Owner-only refusal: keep the local browser path and offer the existing SSH flow (#21557).
     elsewhere(body) {
-        this.qrGeneration = (this.qrGeneration || 0) + 1; this.qr?.stop();
+        this.qrGeneration = (this.qrGeneration || 0) + 1; this.qr?.stop(); this.browserPair?.stop();
         this.say(`${ELSEWHERE_TEXT} ${HEADLESS_TEXT}`);
         for (const role of ['code', 'connect', 'cancel', 'disconnect', 'mode-row', 'ask-row', 'auto-accept-row']) { const el = this.part(role); if (el) el.hidden = true; }
         const row = this.part('command-row');
@@ -647,7 +659,7 @@ class CloudPanel {
         this.say(msg);
     }
 
-    stop() { this.qrPaused = true; this.qrGeneration = (this.qrGeneration || 0) + 1; this.qr?.stop(); clearTimeout(this.timer); clearTimeout(this.ownerTimer); clearInterval(this.retryTick); }
+    stop() { this.qrPaused = true; this.qrGeneration = (this.qrGeneration || 0) + 1; this.qr?.stop(); this.browserPair?.stop(); clearTimeout(this.timer); clearTimeout(this.ownerTimer); clearInterval(this.retryTick); }
 }
 
 /** Mount the connect flow in `root` and load its status. Returns the panel (load(), stop()). */
@@ -671,7 +683,7 @@ export function initCloudConnect() {
             if (e.detail?.id !== document.getElementById('settings-pane-network')?.dataset.group) { panel?.stop(); return; }
             // Settings announces its pane before showing the dialog. Read a
             // waiting enrollment once that synchronous open has finished.
-            queueMicrotask(() => { if (panel?.lastSt?.state === 'enrolling' && panel.root.offsetParent !== null) loadCloudStatus().catch(() => {}); });
+            queueMicrotask(() => { if ((panel?.lastSt?.state === 'enrolling' || ENROLLED.includes(panel?.lastSt?.state)) && panel.root.offsetParent !== null) loadCloudStatus().catch(() => {}); });
         });
         settingsQRCloseBound = true;
     }

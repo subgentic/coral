@@ -7,7 +7,7 @@ import { rememberFocus } from './dom_morph.js';
 import { onArtifactsRev } from './artifacts_feed.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
 import { unrecordedItem, recordAllAgents } from './waiting.js';
-const GR = await importOnce('./relayed_grant_notices.js');
+const GR = await importOnce('./access_notices.js');
 document.addEventListener('coral:grant-notices', () => { updateInboxTab(); renderInboxNav(true); });
 const { welcomeRows, runWelcome } = await importOnce('./welcome_items.js');
 import { incompleteNote, readGaps } from './needs_incomplete.js';

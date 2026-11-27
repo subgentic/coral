@@ -3,7 +3,7 @@
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('enrollment_qr.css');
 
-export function enrollmentQR(root) {
+export function enrollmentQR(root, captionText = 'Scan with your phone to open Coral Hub. Check the code and computer key before approving.') {
     let generation = 0, key = '', figure = null, expiry = null;
     const clear = () => {
         generation++;
@@ -22,7 +22,7 @@ export function enrollmentQR(root) {
             const own = generation;
             figure = document.createElement('figure'); figure.dataset.cloud = 'qr'; figure.className = 'enrollment-qr'; figure.hidden = true;
             const image = document.createElement('img'); image.width = 256; image.height = 256; image.alt = 'QR code to connect from your phone';
-            const caption = document.createElement('figcaption'); caption.textContent = 'Scan with your phone to open Coral Hub. Check the code and computer key before approving.';
+            const caption = document.createElement('figcaption'); caption.textContent = captionText;
             const current = figure;
             image.onload = () => { if (own !== generation) return; if (current.isConnected && code.offsetParent !== null && root.offsetParent !== null && Date.now() < until) current.hidden = false; else clear(); };
             image.onerror = () => { if (own === generation) clear(); }; // link and code remain the fallback

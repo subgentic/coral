@@ -1,0 +1,7 @@
+.cloud-pair-browser { margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); min-width: 0; }
+.cloud-pair-browser p, .cloud-pair-browser a { overflow-wrap: anywhere; }
+.cloud-pair-key { font-family: var(--font-mono); }
+.cloud-pair-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cloud-pair-ask { margin-top: 16px; }
+.cloud-pair-ask select { max-width: 100%; }
+@media (max-width: 600px), (pointer: coarse) { .cloud-pair-browser button, .cloud-pair-browser select { min-height: 44px; } }
