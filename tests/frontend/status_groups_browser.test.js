@@ -8,11 +8,12 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
-const { settle, coralReady } = require('./helpers/wait');
+const { settle, coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect({ grouping: 'status' });
     const { Input } = client;
+    const { safePaused } = require('./helpers/paused');
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -57,8 +58,14 @@ const { settle, coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('#${hostId} fieldset[data-group-by] input[data-box="team"]')`, 'the Group by boxes', 6000);
             await ev(`(() => { const e = document.querySelector('#${hostId} fieldset[data-group-by] input[data-box="team"]'); if (e.checked !== ${value === 'team'}) e.click(); return true; })()`);
         };
-        const click = async sel => { // a real press on the element (after checking that it is what is under that point)
-            const box = JSON.parse(await ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return 'null'; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); const x = r.x + r.width / 2, y = r.y + r.height / 2; const hit = document.elementFromPoint(x, y); return JSON.stringify({ x, y, ok: hit === e || e.contains(hit) }); })()`));
+        const click = async sel => { // a real press on the element, once its rectangle is the same on two animation frames in a row (a list that is still moving would be pressed where the row was, #21921), and after checking that it is what is under that point
+            const box = JSON.parse(await ev(`(async () => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return 'null'; e.scrollIntoView({ block: 'center' });
+                const rect = () => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].join(','); };
+                let last = rect(), steady = false;
+                for (let i = 0; i < 40 && !steady; i++) { await ${framesJs(1)}; const now = rect(); steady = now === last; last = now; }
+                const r = e.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2, hit = document.elementFromPoint(x, y);
+                return JSON.stringify({ x, y, steady, ok: hit === e || e.contains(hit) }); })()`));
+            assert.ok(box && box.steady, `${sel} stops moving before the press (a late element is still pushing the page)`);
             assert.ok(box && box.ok, `${sel} is under its own point`);
             for (const type of ['mousePressed', 'mouseReleased']) await Input.dispatchMouseEvent({ type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
         };
@@ -153,8 +160,13 @@ const { settle, coralReady } = require('./helpers/wait');
 
         console.log('phone 390: one line counts the rest');
         await ev(`try { localStorage.removeItem('coral-status-more'); localStorage.removeItem('coral-status-folded'); } catch (e) {} true`);
+        // The launch notice's read answers late, as on a slow runner (#21921): it came about 70 ms after the list, between a press being aimed and made, and the press landed on a row. It is held here so that every run has that order.
+        await client.Fetch.enable({ patterns: [{ urlPattern: '*/api/launch-disclosure', requestStage: 'Request' }] });
+        safePaused(client, async e => { if (e.request.method === 'GET') await new Promise(r => setTimeout(r, 400)); await client.Fetch.continueRequest({ requestId: e.requestId }); }); // sleep-ok: simulated latency of one response, not a wait for the page
         await load({ width: 390, height: 844, mobile: true });
         await scene(); await waitFor(`!!document.querySelector('#mobile-agent-list .status-head')`, 'the phone groups', 6000);
+        // The launch notice (Auto mode) comes when the first local agent does, which here is the scene, a moment after the list is drawn, and moves the list down by its height: it is part of the page before anything is pressed (#21921)
+        await waitFor(`!!document.getElementById('launch-disclosure-banner')`, 'the launch notice, which comes with the first local agent', 6000);
         await shot('groupby-phone-390');
         p = await picture(true);
         assert.deepEqual(p.out.filter(x => x.row).map(x => x.row), ['ask-407', 'Orchestrator', 'work-409'], 'the agent that needs you and two that are working');
