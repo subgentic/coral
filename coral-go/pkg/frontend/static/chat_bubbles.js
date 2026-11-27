@@ -14,7 +14,7 @@ export function makeBubble(className, html) {
     labelCodeBlocks(div);
     if (div.querySelector('.message-text pre')) importOnce('./chat_code_blocks.js').then(m => m.addCodeCopyButtons(div)).catch(() => {});
     linkifyRefs(div);
-    if (/#\d{3}/.test(div.textContent)) importOnce('./chat_task_refs.js').then(m => m.linkTaskRefs(div)).catch(() => {}); // task and goal numbers become links (#21818)
+    if (/(task|goal)\s+#\d{3}/i.test(div.textContent)) importOnce('./chat_task_refs.js').then(m => m.linkTaskRefs(div)).catch(() => {}); // task and goal numbers become links (#21818)
     return div;
 }
 
