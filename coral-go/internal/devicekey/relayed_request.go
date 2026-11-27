@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 	"time"
+
+	"github.com/subgentic/coral/internal/store"
 )
 
 // A relayed request as this computer receives it (#20879, coral-hub's signer agreed at #267139). The Hub forwards the request unchanged beside four headers: Coral-Device-Key (the signer's kid, 43 characters),
@@ -16,6 +18,8 @@ type RelayedRequest struct {
 	Link, HubUser, Method, Target string
 	KID, Sig, Ts, Nonce           string
 	Body                          []byte
+	// RequireTrusted is the computer's switch (#21883), set by the guard: while on, only a signer whose origin is on store.TrustedDeviceOrigins signs (signer_no_proof for any other).
+	RequireTrusted bool
 }
 
 // HandleRelayedRequest finds the request's kind from KindRoutes (a route no kind lists is wrong_request), rebuilds the signed text from this computer's own state and the received bytes, and verifies it with
@@ -44,7 +48,7 @@ func (v *Verifier) HandleRelayedRequest(ctx context.Context, in RelayedRequest, 
 	if err != nil {
 		return Relayed{}, err
 	}
-	return v.HandleRelayedOn(ctx, in.Link, in.Method, in.Target, k, canon, in.Body, in.Sig, now, GrantMemberAuthorizer(in.HubUser, pin, in.Body))
+	return v.HandleRelayedOn(ctx, in.Link, in.Method, in.Target, k, canon, in.Body, in.Sig, now, trustedSigner(in.RequireTrusted, GrantMemberAuthorizer(in.HubUser, pin, in.Body)))
 }
 
 type relayedKey struct{}
@@ -58,4 +62,17 @@ func WithRelayed(ctx context.Context, m Relayed) context.Context {
 func RelayedFrom(ctx context.Context) (Relayed, bool) {
 	m, ok := ctx.Value(relayedKey{}).(Relayed)
 	return m, ok
+}
+
+// trustedSigner is authorize with, while the switch is on, the origin rule: a signer whose key was added without proof or by the bootstrap credential signs nothing (#21883).
+func trustedSigner(on bool, authorize func(Relayed, store.DeviceKey) error) func(Relayed, store.DeviceKey) error {
+	if !on {
+		return authorize
+	}
+	return func(m Relayed, signer store.DeviceKey) error {
+		if !store.IsTrustedDeviceOrigin(signer.Origin) {
+			return ErrSignerNoProof
+		}
+		return authorize(m, signer)
+	}
 }

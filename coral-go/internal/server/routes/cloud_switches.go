@@ -106,7 +106,7 @@ func (h *CloudHandler) SetHubRelaunch(w http.ResponseWriter, r *http.Request) {
 // SetHubRequireTrustedDevice: PUT /api/cloud/hub-require-trusted-device {"require": bool}. The person at this computer only: the dashboard or the signed command line, never through the tunnel and never an agent (its session token is refused). Turning it on is refused while this
 // computer has no active trusted device, since no Hub action could then pass (#21883). Every change is logged with who made it.
 func (h *CloudHandler) SetHubRequireTrustedDevice(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get(store.SessionTokenHeader) != "" {
+	if r.Header.Get(store.SessionTokenHeader) != "" || !humanInputCaller(r) { // a shell with no session token is not a person either: only the dashboard or the person's signed command line
 		errForbidden(w, "Only the person at this computer can change this")
 		return
 	}
@@ -128,7 +128,7 @@ func (h *CloudHandler) SetHubRequireTrustedDevice(w http.ResponseWriter, r *http
 		}
 		active := false
 		for _, k := range keys {
-			if k.RemovedAt == 0 && k.Kind == store.DeviceKindDevice && k.Origin == store.DeviceOriginPairing { // a key added without proof never counts: a broken-into Hub could have planted it
+			if k.RemovedAt == 0 && k.Kind == store.DeviceKindDevice && store.IsTrustedDeviceOrigin(k.Origin) { // a key added without proof never counts: a broken-into Hub could have planted it
 				active = true
 			}
 		}

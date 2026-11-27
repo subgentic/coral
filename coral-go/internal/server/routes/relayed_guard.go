@@ -43,7 +43,8 @@ func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.C
 			}
 			any, whole := relayedHeaders(r)
 			now := time.Now()
-			required := relayedRequired[kind] || (requireDevice != nil && requireDevice(r.Context())) // the local switch: every listed kind is required (#21883)
+			on := requireDevice != nil && requireDevice(r.Context())
+			required := relayedRequired[kind] || on // the local switch: every listed kind is required (#21883)
 			if !any && !required {
 				next.ServeHTTP(w, r)
 				return
@@ -88,7 +89,7 @@ func RelayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.C
 				return label, err == nil && label != ""
 			}
 			m, err := v.HandleRelayedRequest(r.Context(), devicekey.RelayedRequest{Link: via.LinkID, HubUser: via.HubUser, Method: r.Method, Target: target,
-				KID: kid, Sig: r.Header.Get(tunnel.DeviceSigHeader), Ts: r.Header.Get(tunnel.DeviceTsHeader), Nonce: r.Header.Get(tunnel.DeviceNonceHeader), Body: body}, pin, now)
+				KID: kid, Sig: r.Header.Get(tunnel.DeviceSigHeader), Ts: r.Header.Get(tunnel.DeviceTsHeader), Nonce: r.Header.Get(tunnel.DeviceNonceHeader), Body: body, RequireTrusted: on}, pin, now)
 			if err != nil {
 				refuse(key, err)
 				return

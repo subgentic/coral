@@ -54,6 +54,20 @@ var (
 	deviceNonceCap      = 10000 // a count cap: a new message is refused before a live nonce is dropped
 )
 
+// TrustedDeviceOrigins is the one list of key origins "Require a trusted device for Hub actions" (#21883) trusts, both to be turned on by and to sign while it is on: a key made with the pairing code. A key added without proof, or by the
+// bootstrap credential, is what a broken-into Hub could plant, so it is not on it. Keys a person approves at the computer (#21880) join this list, here and nowhere else.
+var TrustedDeviceOrigins = []string{DeviceOriginPairing}
+
+// IsTrustedDeviceOrigin reports whether origin is on TrustedDeviceOrigins.
+func IsTrustedDeviceOrigin(origin string) bool {
+	for _, o := range TrustedDeviceOrigins {
+		if o == origin {
+			return true
+		}
+	}
+	return false
+}
+
 // DeviceKey is one row of the device list.
 type DeviceKey struct {
 	KID           string
