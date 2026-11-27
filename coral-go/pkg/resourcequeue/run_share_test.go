@@ -111,3 +111,19 @@ func TestAPlainClaimOnTheEntryKeepsItWhenItsRunDies(t *testing.T) {
 	st, _ := q.Status("epoch")
 	assert.Len(t, st.Holders, 1)
 }
+
+// #21803: a run past the cap is folded into the plain claim and its id is not kept: its end must not give back the whole entry while tracked runs still go.
+func TestAFoldedRunsEndDoesNotReleaseTheEntry(t *testing.T) {
+	q, _ := fixture(t, Config{})
+	require.NoError(t, q.Define(Resource{Key: "epoch", Slots: 1}))
+	for i := 0; i < MaxRunsPerEntry+1; i++ {
+		_, err := q.Claim("epoch", Claimant{Agent: "Dev", RunID: fmt.Sprintf("run-%d", i)})
+		require.NoError(t, err)
+	}
+	require.NoError(t, q.ReleaseRun("epoch", "Dev", fmt.Sprintf("run-%d", MaxRunsPerEntry))) // the folded one ends
+	st, _ := q.Status("epoch")
+	assert.Len(t, st.Holders, 1, "32 tracked runs still go")
+	require.NoError(t, q.ReleaseRun("epoch", "Dev", "")) // a plain release gives it back
+	st, _ = q.Status("epoch")
+	assert.Len(t, st.Holders, 0)
+}
