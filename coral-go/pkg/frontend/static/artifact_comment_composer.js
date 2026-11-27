@@ -29,10 +29,10 @@ export function createComposer({ st, render, run, ownHex }) {
         ta.setAttribute('aria-label', editOf ? 'Edit your comment' : cm.parentId != null ? 'Your reply' : 'Your comment'); ta.placeholder = cm.parentId != null ? 'Write a reply…' : 'Add a comment…';
         const sends = /Mac/.test(navigator.platform) ? '⌘ Return' : 'Ctrl+Enter', words = () => `${ta.value.length} / ${BODY_MAX}`; // the count is only the count: the shortcut is said once, in the line under the box (#16399; it was said twice, in two spellings)
         const count = el('span', 'ac-counter', words());
-        ta.addEventListener('input', () => { count.textContent = words(); cm.draft = ta.value; if (automatic) { st.composing = ta.value.trim() ? cm : null; if (st.composing) delete box.dataset.idleWhole; else box.dataset.idleWhole = ''; } for (const b of box.closest('.artifact-viewer-content')?.querySelectorAll('.ac-draft-bar button, .ac-draft-card button') || []) b.disabled = !!st.composing; });
+        ta.addEventListener('input', () => { count.textContent = words(); cm.draft = ta.value; if (automatic) { st.composing = ta.value.trim() ? cm : null; if (st.composing) delete box.dataset.idleWhole; else box.dataset.idleWhole = ''; } syncButtons(); for (const b of box.closest('.artifact-viewer-content')?.querySelectorAll('.ac-draft-bar button, .ac-draft-card button') || []) b.disabled = !!st.composing; });
         const target = editOf ? (cm.pictureTarget || (cm.pictureTarget = { hex: ownHex(editOf), server: st.server, board: st.board })) : null;
         const tray = editOf ? (cm.tray || (cm.tray = createFieldPictures({ server: target.server, field: 'body', initial: editOf.images || [], hintWhenAdded: true, includeDraft: false, uploadPicture: (blob, versionOf) => api.uploadCommentImage(target.hex, target.server, blob, versionOf, target.board) }))) : (cm.tray || (cm.tray = imgs.createImageTray({ ...(review ? { hintText: 'Pictures are included when you send these draft comments.' } : {}), upload: (blob, versionOf) => api.uploadCommentImage(cm.hex || st.hex, st.server, blob, versionOf, st.board) }))); // a new comment or reply can carry pictures; an edit keeps the ones it has
-        const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.wholeComposer = null; st.error = ''; render(); });
+        const cancel = btn('ac-cancel', 'Cancel'); cancel.addEventListener('click', () => { if (tray) tray.destroy(); st.composing = null; st.wholeComposer = null; st.wholeComposerClosed = true; st.error = ''; render(); });
         const draft = !editOf && review;
         const send = btn(`${draft ? '' : 'btn-primary '}ac-send`, editOf ? 'Save' : review ? 'Save' : cm.parentId != null ? 'Reply' : 'Comment'); send.type = 'submit';
         const saveSend = draft ? btn('btn-primary ac-send ac-save-send', 'Send', 'Send comment') : null;
@@ -46,10 +46,22 @@ export function createComposer({ st, render, run, ownHex }) {
         row.append(count, ...(tray && !editOf ? [tray.picker()] : []), ...(actions ? [actions] : [cancel, send]));
         const hint = editOf || review ? '' : st.hint?.() || '', hintEl = hint ? el('p', 'ac-note ac-hint', hint) : null; // always drawn with its line; shown while the file waits for review (the review bar toggles it with the file's state, #15128)
         if (hintEl) { hintEl.id = `ac-hint-${++hintSeq}`; const on = !!st.hintOn?.(); hintEl.hidden = !on; if (on) ta.setAttribute('aria-describedby', `${hintEl.id} ${how.id}`); } // a screen reader hears it where the person types
-        const draftHint = draft ? el('p', 'ac-draft-save-hint', 'Saved as a draft. Send with Send comments or Send.') : null;
+        const draftHint = draft ? el('p', 'ac-draft-save-hint', 'Save keeps this private. Send comments or Send delivers it to the agent.') : null;
         if (draftHint) { draftHint.id = `ac-draft-hint-${++hintSeq}`; ta.setAttribute('aria-describedby', `${draftHint.id} ${how.id}`); }
         box.append(ta, ...(draftHint ? [draftHint] : []), ...(hintEl ? [hintEl] : []), how, ...(tray ? editOf ? [tray.node] : [tray.node, tray.hint()] : []), err, row);
-        const syncButtons = () => { const blocked = !!tray && (tray.busy() || tray.failed()); send.disabled = blocked; if (saveSend) saveSend.disabled = blocked || !review.snapshot().data?.can_send; };
+        const sendWhy = el('p', 'ac-note ac-composer-send-reason'); sendWhy.id = `ac-send-reason-${++hintSeq}`; sendWhy.hidden = true;
+        if (saveSend) { box.append(sendWhy); saveSend.setAttribute('aria-describedby', sendWhy.id); }
+        const syncButtons = () => {
+            const blocked = !!tray && (tray.busy() || tray.failed()); send.disabled = blocked;
+            if (!saveSend) return;
+            const { data, pending } = review.snapshot();
+            // Older computers report can_send=false without a reason until a draft exists.
+            // Save first, then use the refreshed server capability for the actual send.
+            const allowed = data?.can_send || (data?.can_write && !data.count && !data.reason);
+            const why = pending ? 'Check the pending send before sending another comment.' : !allowed ? ({ no_uploader: 'No agent is recorded as the uploader of this file.', ambiguous_uploader: 'More than one agent uploaded this file, so Coral cannot choose who should receive the review.', no_board: 'This file has no team available to receive the review.', no_agent: 'No agent is available to receive this review.', board_paused: 'The team is paused.', comments_locked: 'Comments are locked.' }[data?.reason] || 'Sending is not available here. You can save a draft.') : '';
+            sendWhy.textContent = why; sendWhy.hidden = !why;
+            saveSend.disabled = blocked || !!why || (!ta.value.trim() && !(tray?.hexes().length));
+        };
         if (tray) { tray.detach(); tray.attach(box, ta); tray.listen(() => { if (automatic) { st.composing = cm; delete box.dataset.idleWhole; } syncButtons(); }); } // Both actions wait for pictures still going up or failed.
         syncButtons();
         box.addEventListener('submit', (e) => {
@@ -63,6 +75,7 @@ export function createComposer({ st, render, run, ownHex }) {
             else if (review) run(async () => {
                 await review.create({ body: text, ...(cm.parentId != null ? { parent_id: cm.parentId } : { anchor: cm.anchor }), images: pictures });
                 if (tray) tray.destroy();
+                st.composing = null; st.wholeComposer = null; st.wholeComposerClosed = true;
                 if (alsoSend) {
                     // The draft is durable before delivery: on a send failure, show
                     // the saved card and existing send error, never a duplicate editor.

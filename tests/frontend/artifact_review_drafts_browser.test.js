@@ -86,9 +86,10 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
         await ev(framesJs(4));
     };
     const save = async text => {
+        if (!await ev(`!!document.querySelector('.ac-composer textarea')`)) await click('.ac-whole');
         await typeInto('.ac-composer textarea', text);
         await realButton('Save');
-        await waitFor(`document.querySelector('.ac-composer textarea')?.value === ''`, 'saved private draft', 5000);
+        await waitFor(`!document.querySelector('.ac-composer textarea')`, 'saved private draft', 5000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -182,7 +183,7 @@ const HEX = 'd'.repeat(64), OTHER = 'e'.repeat(64);
             await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
             assert.equal(await ev(`document.querySelector('.ac-draft-recipients').textContent`), 'To: Builder', 'recipient shown before sending');
             await shot(`draft-review-${width}-${theme}`);
-            await ev(`document.querySelector('.ac-panel > .ac-composer').scrollIntoView({ block: 'end' }); true`);
+            await ev(`document.querySelector('.ac-panel > .ac-whole').scrollIntoView({ block: 'end' }); true`);
             await shot(`draft-review-composer-${width}-${theme}`);
             const layout = await ev(`(() => { const p = document.querySelector('.ac-panel'), b = document.querySelector('.ac-draft-bar'); const r = b.getBoundingClientRect(); return { overflow: p.scrollWidth > p.clientWidth + 1, width: r.width, right: r.right, fullWidth: Math.abs(r.width - document.querySelector('.artifact-viewer-content').clientWidth) < 3, outside: !p.contains(b) }; })()`);
             assert.ok(layout.fullWidth && layout.outside, 'review bar spans the workspace outside the scrolling comments');
