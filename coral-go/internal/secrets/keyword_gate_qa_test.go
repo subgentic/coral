@@ -55,12 +55,72 @@ func TestKeywordGateOnOddRandomText(t *testing.T) {
 // stretch already scanned that was one scan to the end of the text per name (256 KiB of "token=" took 3.7 s; a Scanner gives the detector 16 KiB at a time,
 // so it showed as speed, not a hang).
 func TestKeywordGateIsLinearOnTextOfNames(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the time is not read under -race")
+	}
 	for _, unit := range []string{"token=", "key:", "token%3D", "api_key=v;", "--password=x"} {
-		text := strings.Repeat(unit, (256<<10)/len(unit))
-		start := time.Now()
-		keywordSpans(text)
-		if d := time.Since(start); !raceEnabled && d > 1500*time.Millisecond { // the time is not read under -race
-			t.Errorf("%q repeated, %d bytes: %v", unit, len(text), d)
+		if ratio, ok := growthRatio(func(text string) { keywordSpans(text) }, unit); ok && ratio > maxLinearGrowth {
+			t.Errorf("%q repeated: four times the text took %.1f times as long (linear is 4, quadratic 16)", unit, ratio)
 		}
+	}
+}
+
+// The check is relative, not a wall-clock budget (#21793: a loaded CI runner took 1.81 s against a fixed 1.5 s): the same run times a text and one four times as long and compares them, so a slow machine slows
+// both. Linear is a ratio of 4 and quadratic 16; the bound sits between them, generous for noise.
+const maxLinearGrowth = 9.0
+
+// growthRatio times run on n and 4n bytes of repeated unit (the best of three each, so one slow run does not decide) and returns big/small. ok is false when the small run is too quick to measure: nothing quadratic
+// is that quick at this size.
+func growthRatio(run func(string), unit string) (ratio float64, ok bool) {
+	best := func(size int) time.Duration {
+		text := strings.Repeat(unit, size/len(unit))
+		var min time.Duration
+		for i := 0; i < 3; i++ {
+			start := time.Now()
+			run(text)
+			if d := time.Since(start); i == 0 || d < min {
+				min = d
+			}
+		}
+		return min
+	}
+	small, big := best(64<<10), best(256<<10)
+	if small < 2*time.Millisecond {
+		return 0, false
+	}
+	return float64(big) / float64(small), true
+}
+
+// The mutant: a scan that goes back to the end of the text once per name (what the gate did before it remembered the stretch scanned) is quadratic, and the relative check says so.
+func TestTheGrowthCheckCatchesAQuadraticScan(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the time is not read under -race")
+	}
+	quadratic := func(text string) {
+		n := 0
+		for i := 0; i < len(text); i += 6 { // one name every six bytes
+			for j := i; j < len(text); j++ { // each scans to the end
+				if text[j] == '\x00' {
+					n++
+				}
+			}
+		}
+		_ = n
+	}
+	ratio, ok := growthRatio(quadratic, "token=")
+	if !ok || ratio <= maxLinearGrowth {
+		t.Fatalf("a quadratic scan was not caught: ratio %.1f ok=%v", ratio, ok)
+	}
+	linear := func(text string) {
+		n := 0
+		for j := 0; j < len(text); j++ {
+			if text[j] == '\x00' {
+				n++
+			}
+		}
+		_ = n
+	}
+	if ratio, ok := growthRatio(linear, "token="); ok && ratio > maxLinearGrowth {
+		t.Fatalf("a linear scan was called quadratic: ratio %.1f", ratio)
 	}
 }
