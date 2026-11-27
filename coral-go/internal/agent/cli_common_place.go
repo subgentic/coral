@@ -10,7 +10,8 @@ import (
 // A CLI found in a common install place (npm's global folders, %LOCALAPPDATA%\agy\bin, ~/.local/bin, ...) is started by the agent's launch line, so the place is screened
 // like a configured path (#353, Security's #3019): the file must be a program the system runs (CheckRunnable), must not sit in a temp folder, and must not be in a folder
 // the caller's screen refuses (the routes pass untrustedLocation: an agent's working folder, Coral's data folder). A CLI that fails is not picked up, as if the place were empty.
-// Coral never opens a place by walking a junction Windows refuses and never resolves a junction chain itself: FindCLIInCommonPaths only stats the fixed candidates.
+// A candidate Windows refuses because it goes through an untrusted mount point (Codex's installer junctions) is followed by Coral to the program it leads to (RealCLIPath, #582),
+// and the screen above runs on that program's real path, so a junction cannot lead a launch into a refused folder.
 
 // CommonLookup is what a search of the common install places found and why it stopped there: Path is the CLI to use ("" when none), Tried the places that held a file, Refused the reason the first
 // file that was found was not used (an agent's working folder, a temp folder, a program the system does not run) and RefusedPath where it was. A launch that finds nothing says all of it.
