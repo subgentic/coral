@@ -12,7 +12,7 @@ import (
 	"github.com/subgentic/coral/internal/cloud"
 )
 
-var taskQueryParamNames = map[string]bool{"fields": true, "status": true, "assigned_to": true, "board": true, "priority": true,
+var taskQueryParamNames = map[string]bool{"include_archived": true, "fields": true, "status": true, "assigned_to": true, "board": true, "priority": true,
 	"created_by": true, "verification": true, "parked": true, "created_since": true, "updated_since": true, "sort": true, "order": true, "limit": true, "cursor": true, "q": true, "id": true, "goal_id": true, "has_cost": true}
 
 // queryAllTasks is GET /api/board/tasks with a query (#4540), for clients such as Coral Hub that show their own filtered view:
@@ -20,6 +20,7 @@ var taskQueryParamNames = map[string]bool{"fields": true, "status": true, "assig
 //	?fields=a,b|summary&status=a&status=b&assigned_to=X&board=P&priority=high&created_by=X&verification=verified&parked=true
 //	&created_since=<RFC 3339>&updated_since=<RFC 3339>&q=<text>&sort=created_at|updated_at&order=asc|desc&limit=N&cursor=C
 //	&id=N&id=M (or id=N,M), at most 100 (#7247)
+//	&include_archived=1: an archived team's tasks too (they are left out of the all-boards list otherwise, #21915)
 //	&has_cost=true|false: only the tasks with a recorded cost (cost_usd above 0), or only those with none (#9100)
 //	&goal_id=N (or goal_id=none, or goal_id=N,none): the tasks that serve that goal of their board, and/or none (#7782)
 //
@@ -70,7 +71,7 @@ func (h *BoardHandler) queryAllTasks(w http.ResponseWriter, r *http.Request) boo
 		errInternalServer(w, err.Error())
 		return true
 	}
-	query.HideArchived = len(query.Boards) == 0 && len(query.IDs) == 0 // an archived team's tasks are left out of the all-boards list, not out of its own page or a task asked for by id (#21850)
+	query.HideArchived = len(query.Boards) == 0 && len(query.IDs) == 0 && q.Get("include_archived") != "1" // an archived team's tasks are left out of the all-boards list, not out of its own page or a task asked for by id (#21850)
 	// Through Coral Hub the reply is redacted after the filter has matched, so an exact match on a name a token makes up would confirm a
 	// guess of that token. A filter value the redactor would change cannot match anything the viewer can see: refuse it (a value
 	// without a secret in it matches only names without one).

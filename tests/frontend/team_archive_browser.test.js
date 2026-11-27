@@ -17,6 +17,8 @@ const BASE = require('./test_base').BASE;
             m.add('r-orch', 'O', 60, { sleeping: false, board_project: 'recipe' }); m.add('r-dev', 'D', 60, { sleeping: false, board_project: 'recipe' }); m.add('r-qa', 'Q', 60, { sleeping: false, board_project: 'recipe' });
             m.add('other-1', 'X', 60, { sleeping: false, board_project: 'other' });
             T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
+        // the server archives only a team it knows (a board with a post; an unknown name is a 404, #21915): the stand-in team has a board here
+        assert.equal(await ev(`fetch('/api/board/recipe/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'r-orch', content: 'kickoff', as: 'O' }) }).then(r => r.status)`), 200, 'the stand-in team has a board');
         // 1. the team's sidebar menu offers Archive team, and says what it does before it does it
         const labels = await ev(`(() => { const g = [...document.querySelectorAll('li.session-team-group')].find(l => /recipe/i.test(l.textContent)); return [...g.querySelectorAll('.group-kebab .overflow-menu-item')].map(b => b.textContent.replace(/\s+/g, ' ').trim()); })()`);
         assert.ok(labels.includes('Archive team'), 'the sidebar team menu offers Archive team: ' + JSON.stringify(labels));
@@ -43,5 +45,5 @@ const BASE = require('./test_base').BASE;
         const list = await ev(`({ archivedLine: !!document.querySelector('.archived-summary-row'), groups: [...document.querySelectorAll('li.session-team-group')].map(l => l.textContent.trim().slice(0, 30)) })`);
         assert.ok(!list.archivedLine && list.groups.some(g => /recipe/i.test(g)), 'the Archived line is gone and the team is back in the list: ' + JSON.stringify(list));
         console.log('PASS team_archive_browser: Archive team leaves the sidebar entirely, Restore team brings it back');
-    } finally { await client.close(); }
+    } finally { await ev(`fetch('/api/board/recipe', { method: 'DELETE' }).then(() => true)`).catch(() => {}); await client.close(); } // the stand-in team's board is removed: a suite leaves no row in the shared server
 })().catch(e => { console.error(e); process.exit(1); });

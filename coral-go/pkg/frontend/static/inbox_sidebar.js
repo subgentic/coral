@@ -957,10 +957,12 @@ function inboxGoalsToolbar() {
                 { type: 'select', key: 'team', id: 'inbox-goals-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
                 { type: 'select', key: 'driver', id: 'inbox-goals-driver', label: 'Driver', values: [], labels: {}, any: 'Any driver' },
                 { type: 'date', key: 'from', id: 'inbox-goals-from', label: 'Updated since' },
+                { type: 'check', key: 'archived', id: 'inbox-goals-archived', label: 'Include archived teams', wrapClass: 'list-bar-field list-bar-kept' },
             ],
             model: { EMPTY: GF.EMPTY, clean: GF.clean, chips: GF.chips, isFiltered: f => GF.isFiltered({ ...f, state: f.state === 'active' ? '' : f.state }), without: GF.without }, // Active is how the folder opens, not a filter the person set (#16371)
         }, next => {
-            goalFilters = next; GF.saveFilters(next); noteWorkSearch('goals', next.q);
+            const archivedChanged = next.archived !== goalFilters.archived;
+            goalFilters = next; GF.saveFilters(next); noteWorkSearch('goals', next.q); if (archivedChanged) { closedReadAt = 0; openAt = 0; refreshGoals(); } // the archived teams' goals come from their own read
             const input = $('inbox-search'); if (input && group === 'goals') input.value = next.q; // the sidebar's box shows the same words
             renderInboxNav(true);
         });
@@ -1038,11 +1040,11 @@ async function readGoals() {
     let ok = true, followWithDone = false;
     if (!isCloud() && Date.now() - closedReadAt > 60000) { // the goals an agent closed lately, for their row; its own read, before the main one so a failure here never marks that read failed
         closedReadAt = Date.now();
-        try { closedGoals = (await listInboxGoals(true)).filter(g => String(g.state || '').toLowerCase() === 'done' && g.closed_by); } catch { /* the rows stay as they were */ }
+        try { closedGoals = (await listInboxGoals(true, goalFilters.archived)).filter(g => String(g.state || '').toLowerCase() === 'done' && g.closed_by); } catch { /* the rows stay as they were */ }
         syncGoalDoneCount(); // the count moves with the rows it counts: they are drawn from closedGoals as soon as it is read, and the sync at the end of this read waits for the settings and the skills (#18067: goal_closed_row read the count between the two)
     }
     try {
-        const want = GF.CLOSED.includes(goalFilters.state) ? goalFilters.state : '', fresh = openAt > 0 && Date.now() - openAt < 60000, kind = want && fresh ? want : '', read = await listInboxGoals(kind || false); ok = !goalsReadFailed();
+        const want = GF.CLOSED.includes(goalFilters.state) ? goalFilters.state : '', fresh = openAt > 0 && Date.now() - openAt < 60000, kind = want && fresh ? want : '', read = await listInboxGoals(kind || false, goalFilters.archived); ok = !goalsReadFailed();
         if (ok && kind) closedKnown[kind] = true;
         if (ok && !kind) { openAt = Date.now(); followWithDone = !!want; } // a page opened on Done or Dropped read the open goals first: those follow at once
         if (ok) { const isOf = k => g => String(g.state || '').toLowerCase() === k, isClosed = g => GF.CLOSED.includes(String(g.state || '').toLowerCase()); goals = kind ? [...goals.filter(g => !isOf(kind)(g)), ...read] : [...read, ...goals.filter(isClosed)]; } // one read per gap: the other kinds stay as the last read left them

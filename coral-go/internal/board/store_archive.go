@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -11,6 +12,9 @@ const settingArchived = "archived"
 
 // settingArchivedAt is when the team was archived (RFC 3339, UTC): the Teams page says "Archived 24 Nov".
 const settingArchivedAt = "archived_at"
+
+// settingArchivedAgents lists (a JSON array of session ids) the agents Archive team archived: Restore team unarchives only those, so an agent the Operator archived on its own stays archived (#21915).
+const settingArchivedAgents = "archived_agents"
 
 // notArchivedSQL keeps only the rows of boards that are not archived: the all-boards goal and task reads leave an archived team out (#21850). A team's own page still reads its board whole.
 const notArchivedSQL = `board_id NOT IN (SELECT project FROM board_settings WHERE key = 'archived' AND value = 'true')`
@@ -22,7 +26,7 @@ func (s *Store) SetBoardArchived(ctx context.Context, project string, archived b
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM board_settings WHERE project = ? AND key IN (?, ?)`, project, settingArchived, settingArchivedAt); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM board_settings WHERE project = ? AND key IN (?, ?, ?)`, project, settingArchived, settingArchivedAt, settingArchivedAgents); err != nil {
 		return err
 	}
 	if archived {
@@ -62,4 +66,27 @@ func (s *Store) ArchivedBoards(ctx context.Context) (map[string]string, error) {
 		out[r.Project] = r.At
 	}
 	return out, nil
+}
+
+// SetBoardArchivedAgents records the agents Archive team archived (the team's own set: an agent already archived is not in it).
+func (s *Store) SetBoardArchivedAgents(ctx context.Context, project string, ids []string) error {
+	raw, err := json.Marshal(ids)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO board_settings (project, key, value) VALUES (?, ?, ?) ON CONFLICT(project, key) DO UPDATE SET value = excluded.value`, project, settingArchivedAgents, string(raw))
+	return err
+}
+
+// BoardArchivedAgents returns the agents Archive team archived, nil when none were recorded.
+func (s *Store) BoardArchivedAgents(ctx context.Context, project string) []string {
+	var v string
+	if err := s.db.GetContext(ctx, &v, `SELECT value FROM board_settings WHERE project = ? AND key = ?`, project, settingArchivedAgents); err != nil {
+		return nil
+	}
+	var ids []string
+	if json.Unmarshal([]byte(v), &ids) != nil {
+		return nil
+	}
+	return ids
 }

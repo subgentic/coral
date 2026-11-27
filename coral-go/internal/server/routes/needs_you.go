@@ -498,6 +498,9 @@ func (h *BoardHandler) needsYouItemsOf(r *http.Request, onlySkills bool) (items 
 	}
 	now := time.Now().UTC()
 	for _, p := range projects {
+		if p.Archived {
+			continue // a team that is put away asks nothing of anyone, its review files and questions included, until it is restored (#21850)
+		}
 		start, questionLinks, reviewFiles := len(items), map[int][]string{}, map[string]bool{} // a question that only links files the same team has in a review (for review, opened, decided, superseded) is those files, not a second item (#11998, #12096)
 		h.keepExpiredOperatorQuestions(ctx, p.Project)                                         // a wait that ran out is an ask from now on (#11919)
 		if asks, err := h.bs.OpenAsksOf(ctx, p.Project, board.OperatorName, now); err != nil {
@@ -602,6 +605,9 @@ func (h *BoardHandler) needsYouItemsOf(r *http.Request, onlySkills bool) (items 
 		goalNews, _ = h.commentNews(ctx)
 	}
 	for _, p := range projects {
+		if p.Archived {
+			continue
+		}
 		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals, readGoals, goalNews); err != nil {
 			unread = appendOnce(unread, "goals")
 		} else {

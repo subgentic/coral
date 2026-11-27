@@ -40,6 +40,7 @@ export function createTaskQueries(readTaskQuery) {
         else if (['Queued', 'In progress', 'Blocked'].includes(status)) q.set('parked', 'false');
         if (f.team) { const b = splitKey(f.team); q.set('board', b.name); servers = servers.filter(s => s === (b.server || 'local')); }
         if (f.q) q.set('q', f.q);
+        if (f.archived) q.set('include_archived', '1');
         if (f.priority) q.set('priority', f.priority);
         if (f.from) q.set('updated_since', new Date(f.from + 'T00:00:00').toISOString());
         const next = JSON.stringify([q.toString(), servers]);

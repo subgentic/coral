@@ -153,38 +153,20 @@ const MAIL_QUERY = '(max-width: 767px)';
 let rowMenus = 0;
 /** A phone mail row's ⋯ (#137104): a 44 px button at the row's right that opens the one menu (menu_button.js: arrow keys, Escape back to the button, Tab or a tap elsewhere closes) of the row's actions. `actions`: [{ label, title, run(button) }].
  *  The button is the row's own control, a sibling of the row's button (a button holds no button); a press on it never opens or selects the row. */
-function rowMore(actions, label) {
+export function rowMore(actions, label) {
     const id = `dt-mail-more-${++rowMenus}`, wrap = el('span', 'dt-mail-more');
     const toggle = el('button', 'btn btn-quiet btn-icon dt-mail-more-toggle'); toggle.type = 'button'; toggle.id = id;
     toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`); toggle.setAttribute('aria-label', `More actions for ${label}`);
     toggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg>'; // the phone agent bar's ⋯ (#11056)
     const menu = el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', `Actions for ${label}`);
-    for (const a of actions) {
-        const b = el('button', 'menu-item', a.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); if (a.title) b.title = a.title;
-        if (a.help) {
-            b.classList.add('menu-item-with-help'); b.setAttribute('aria-label', a.label);
-            const help = el('span', 'menu-item-state', a.help); help.id = `${id}-help-${menu.children.length}`;
-            b.setAttribute('aria-describedby', help.id); b.append(help);
-        }
-        if (a.off) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); } // an action that is off right now stays in the menu, said off (the first in a line cannot move up)
-        b.addEventListener('click', async e => {
-            e.stopPropagation();
-            if (a.confirm && !b.dataset.armed) { // an action that asks once more (Kick): the first press says so in the item's words and keeps the menu open, the second does it
-                b.dataset.armed = '1'; b.textContent = a.confirm; if (a.onArm) a.onArm(b);
-                setTimeout(() => { delete b.dataset.armed; b.textContent = a.label; }, 10000);
-                return;
-            }
-            (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); a.run(b);
-        });
-        menu.append(b);
-    }
     toggle.addEventListener('click', async e => {
         e.stopPropagation();
+        if (!menu.children.length) (await importOnce('./row_more_items.js')).fillMenu(menu, id, actions); // the items are built on the first open
         // The menu module loads on the first tap, and a redraw that lands meanwhile replaces this button with a new one (late data redraws the list): the tap opens the menu of the button that is there now, found by its row's key, and not of a detached one (#14757; the same class as #14631, which keeps an open menu across a redraw).
         const key = toggle.closest('tr[data-key]')?.dataset.key;
         const menus = await importOnce('./menu_button.js');
         const live = toggle.isConnected ? toggle : key ? [...document.querySelectorAll('#group-table-view tr[data-key]')].find(r => r.dataset.key === key)?.querySelector('.dt-mail-more-toggle') : null;
-        if (live) menus.toggleMenu(live);
+        if (live === toggle) menus.toggleMenu(live); else live?.click(); // a redraw replaced this button: the new one fills and opens its own menu
     });
     wrap.append(toggle, menu);
     return wrap;

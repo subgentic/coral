@@ -599,3 +599,33 @@ func TestTaskQueryFieldsGoalIDAndGoalTitle(t *testing.T) {
 	assert.Equal(t, 400, code)
 	assert.Contains(t, body, "goal_title", "the 400 lists the real names")
 }
+
+// #21915: the all-teams task list leaves an archived team's tasks out; include_archived=1 puts them back (the Tasks page's "Include archived teams" filter).
+func TestTaskQueryIncludeArchivedBringsBackAnArchivedTeamsTasks(t *testing.T) {
+	e := newTQEnv(t)
+	ctx := context.Background()
+	for _, b := range []string{"billing", "docs-site"} {
+		_, err := e.bs.CreateTask(ctx, b, "A task of "+b, "body", "medium", "Operator", "worker")
+		require.NoError(t, err)
+	}
+	require.NoError(t, e.bs.SetBoardArchived(ctx, "docs-site", true))
+	boards := func(query string) []string {
+		resp, err := http.Get(e.srv.URL + "/api/board/tasks?" + query)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var out struct {
+			Tasks []struct {
+				BoardID string `json:"board_id"`
+			} `json:"tasks"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		var got []string
+		for _, tk := range out.Tasks {
+			got = append(got, tk.BoardID)
+		}
+		return got
+	}
+	assert.Equal(t, []string{"billing"}, boards("limit=50&sort=created_at"), "an archived team's tasks are not in the list")
+	assert.ElementsMatch(t, []string{"billing", "docs-site"}, boards("limit=50&include_archived=1"), "asked for, they are")
+}

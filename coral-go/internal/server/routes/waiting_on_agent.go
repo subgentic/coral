@@ -143,6 +143,9 @@ func (h *BoardHandler) WaitingOnAgent(w http.ResponseWriter, r *http.Request) {
 	var cands []waitingCand
 	var answers []answeredCand
 	for _, p := range projects {
+		if p.Archived {
+			continue // a team that is put away is not waited on (#21850)
+		}
 		got, err := h.bs.AnsweredAsksOf(ctx, p.Project, board.OperatorName, now, waitingOnAgentMax)
 		if err != nil {
 			continue
