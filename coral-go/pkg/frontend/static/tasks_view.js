@@ -125,7 +125,7 @@ const TEAM_SPEC = {
     ],
 };
 
-// The dock's Tasks panel (#7924): the one top row (the search, the Filters icon, + Task), so the bar has a slot for the owner's button after the icon; Hide done is the owner's extra in the panel.
+// The dock's Tasks panel (#7924): the one top row (the search, the Filters icon, + Task), so the bar has a slot for the owner's button after the icon; Show done is the owner's extra in the panel.
 const DOCK_SPEC = {
     ...SPEC,
     headerSlots: true,

@@ -33,7 +33,7 @@ export function nextSort(sort, field) {
 /** The tasks to show: done ones dropped when hidden, in the order the sort object ({ field, asc, explicit }) chooses. */
 export function filterAndSortTasks(allTasks, sort, { querying = false, hideCompleted = false } = {}) {
     const isDone = t => t.status === 'completed' || t.status === 'skipped';
-    if (querying && !sort.explicit) return allTasks; // the server's order (a search is not cut by Hide done)
+    if (querying && !sort.explicit) return allTasks; // the server's order (a search is not cut by Show done)
     const tasks = allTasks.filter(t => {
         if (!querying && hideCompleted && (t.status === 'completed' || t.status === 'skipped')) return false;
         return true;

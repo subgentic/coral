@@ -37,8 +37,8 @@ const T = (id, status, extra = {}) => ({ id, status, created_at: `2026-10-0${id}
 const ids = (l) => l.map(t => t.id).join(',');
 const list = [T(1, 'completed'), T(2, 'pending'), T(3, 'in_progress'), T(4, 'skipped'), T(5, 'pending')];
 assert.equal(ids(filterAndSortTasks(list, defaultSort())), '5,3,2,4,1', 'default: open work newest first, then the finished, newest first');
-assert.equal(ids(filterAndSortTasks(list, defaultSort(), { hideCompleted: true })), '5,3,2', 'Hide done drops completed and skipped');
-assert.equal(ids(filterAndSortTasks(list, defaultSort(), { querying: true, hideCompleted: true })), '1,2,3,4,5', 'a search keeps the server order and is not cut by Hide done');
+assert.equal(ids(filterAndSortTasks(list, defaultSort(), { hideCompleted: true })), '5,3,2', 'Show done off drops completed and skipped (#21853)');
+assert.equal(ids(filterAndSortTasks(list, defaultSort(), { querying: true, hideCompleted: true })), '1,2,3,4,5', 'a search keeps the server order and still finds done tasks with Show done off (#21853)');
 const byId = nextSort(defaultSort(), 'id');
 assert.equal(ids(filterAndSortTasks(list, byId)), '5,4,3,2,1', 'a chosen column sorts the whole list, descending first');
 assert.equal(ids(filterAndSortTasks(list, nextSort(byId, 'id'))), '1,2,3,4,5', 'turned round');

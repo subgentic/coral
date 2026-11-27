@@ -1,6 +1,6 @@
 // The Tasks panel's search, filters and sort (#4744), against the real isolated server (no stubbed API; the task query and its q and total are #4745):
-//   - the bar sits above the table, says how many tasks the board has, and changes nothing about the default list (open first, Hide done);
-//   - a search or a filter asks the server and shows what matches of the whole board, not of the loaded rows: "k of N", chips, no Hide done, "Load more" for the next page;
+//   - the bar sits above the table, says how many tasks the board has, and defaults to open tasks (Show done off, #21853);
+//   - a search or a filter asks the server and shows what matches of the whole board, not of the loaded rows: "k of N", chips, no Show done, "Load more" for the next page;
 //   - status (open, blocked, done), priority and the order (open first, oldest) are the server's: only the matching tasks, and the open ones before the done ones;
 //   - nothing matching says so; Clear all and the x bring the default list back; the choice is kept for the board across a reload.
 //
@@ -67,21 +67,21 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await load();
         let s = await snap();
         check('the toolbar omits the count line', await ev(`document.querySelector('#board-task-bar .list-bar-count').hidden && document.querySelector('#board-task-bar .list-bar-count').getClientRects().length === 0`));
-        // ── The one top row (#7924): the search, the Filters icon and + Task on one line; Hide done and Sort only inside Filters ──
+        // ── The one top row (#7924): the search, the Filters icon and + Task on one line; Show done and Sort only inside Filters ──
         const top = await ev(`(() => { const bar = document.getElementById('board-task-bar'), mid = e => { const r = e.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }, vis = e => !!e && e.getClientRects().length > 0;
             const search = bar.querySelector('.list-bar-search'), tog = document.getElementById('tk-toggle'), add = bar.querySelector('.btn-create-task'), menu = document.getElementById('tk-menu');
             return { title: !!document.querySelector('.board-tasks-header'), has: [vis(search), vis(tog), vis(add)], mids: [mid(search), mid(tog), mid(add)], order: [search.getBoundingClientRect().left < tog.getBoundingClientRect().left, tog.getBoundingClientRect().left < add.getBoundingClientRect().left],
                 menuHidden: menu.hidden, hideInPanel: !!menu.querySelector('.board-task-hide-toggle'), hideOutside: [...document.querySelectorAll('.board-task-hide-toggle')].some(e => !menu.contains(e)), sortbar: [...document.querySelectorAll('#board-task-list .dt-sortbar')].some(e => !e.hidden && e.getClientRects().length),
                 sortInPanel: !!menu.querySelector('#tk-sort'), badge: !document.querySelector('#tk-toggle .display-badge').hidden }; })()`);
         check('no title row, no count: the search, the Filters icon and + Task are on one line, in that order', !top.title && top.has.every(Boolean) && Math.max(...top.mids) - Math.min(...top.mids) <= 6 && top.order.every(Boolean), JSON.stringify(top));
-        check('the Filters are closed to start with, and hold Hide done and the one sort; the list has no Sort by row', top.menuHidden && top.hideInPanel && !top.hideOutside && top.sortInPanel && !top.sortbar, JSON.stringify(top));
+        check('the Filters are closed to start with, and hold Show done and the one sort; the list has no Sort by row', top.menuHidden && top.hideInPanel && !top.hideOutside && top.sortInPanel && !top.sortbar, JSON.stringify(top));
         check('with nothing on, the Filters icon carries no dot', !top.badge, JSON.stringify(top));
         await ev(`document.querySelector('.board-task-hide-toggle input').click(); true`);
         await settle(`!document.querySelector('#tk-toggle .display-badge').hidden`, 'the badge');
         // Agent is a select of the dock's agents, as on the main Tasks tab (#8003)
         const agent = await ev(`(() => { const e = document.getElementById('tk-assignee'); return { tag: e.tagName, options: [...e.options].map(o => o.textContent), any: e.options[0].value === '' }; })()`);
         check('Agent is a select with Any agent first (not a text field with a datalist)', agent.tag === 'SELECT' && agent.options[0] === 'Any agent' && agent.any && (await ev(`!document.getElementById('tk-assignee-list')`)), JSON.stringify(agent));
-        check('Hide done on is a dot on the Filters icon, and the icon says so', await ev(`document.getElementById('tk-toggle').getAttribute('aria-label') === 'Filters and sort, 1 on' && document.getElementById('tk-toggle').classList.contains('active')`), await ev(`document.getElementById('tk-toggle').getAttribute('aria-label')`));
+        check('Show done on is a dot on the Filters icon, and the icon says so', await ev(`document.getElementById('tk-toggle').getAttribute('aria-label') === 'Filters and sort, 1 on' && document.getElementById('tk-toggle').classList.contains('active')`), await ev(`document.getElementById('tk-toggle').getAttribute('aria-label')`));
         await ev(`document.querySelector('.board-task-hide-toggle input').click(); true`);
         await settle(`document.querySelector('#tk-toggle .display-badge').hidden`, 'the badge gone');
         if (process.env.CORAL_SCREENSHOT_DIR) { // the review's shots: the dock at 680 and 420, the Filters shut and open, both themes
@@ -99,7 +99,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`delete document.documentElement.dataset.theme; document.getElementById('agentic-state').style.width = '680px'; true`);
         }
         check('the bar tracks the board count for search announcements (66 tasks)', s.shown && s.count === '66 tasks' && s.chips.length === 0, JSON.stringify([s.shown, s.count, s.chips]));
-        check('the default list is unchanged: open first, then the newest 50 done, Hide done offered', s.statuses.slice(0, 6).every(x => x !== 'Done') && s.statuses.filter(x => x === 'Done').length === 50 && s.hide && /Showing 56 of 66/.test(s.more || ''), JSON.stringify([s.statuses.length, s.hide, s.more]));
+        check('#21853 default: six open tasks, Show done offered, no done rows or paging', s.statuses.length === 6 && s.statuses.every(x => x !== 'Done') && s.hide && s.more === null, JSON.stringify([s.statuses.length, s.hide, s.more]));
 
         // ── A search asks the whole board ──
         await type('alpha');
@@ -107,7 +107,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await settle(`document.querySelector('#board-task-bar .list-bar-live').textContent === '2 of 66'`, 'the status region says the settled count, not the 0 drawn before the answer');
         s = await snap();
         check('"alpha" finds its two tasks of the whole board (2 of 66), with a chip', s.titles.length === 2 && s.titles.every(t => /alpha/.test(t)) && s.chips.join() === 'Search: alpha', JSON.stringify([s.count, s.titles, s.chips]));
-        check('a search has no Hide done and no Load more when everything is shown', !s.hide && s.more === null, JSON.stringify([s.hide, s.more]));
+        check('a search has no Show done and no Load more when everything is shown', !s.hide && s.more === null, JSON.stringify([s.hide, s.more]));
         await type('x-never');
         await settle(`document.querySelector('#board-task-list .empty-state.empty-state-tight')?.textContent === 'No tasks match this search.' && document.querySelector('#board-task-bar .list-bar-count').textContent === '0 of 66'`, 'the empty line and its count (the "Searching tasks..." placeholder is a .empty-state.empty-state-tight too)');
         s = await snap();
@@ -115,7 +115,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`document.querySelector('#board-task-bar .list-bar-clear-q').click(); true`);
         await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '66 tasks'`, 'the default list back');
         s = await snap();
-        check('the x brings the default list back (Hide done too)', s.hide && s.statuses.length >= 56 && s.chips.length === 0, JSON.stringify([s.count, s.statuses.length, s.hide]));
+        check('the x brings the default list back (Show done too)', s.hide && s.statuses.length === 6 && s.chips.length === 0, JSON.stringify([s.count, s.statuses.length, s.hide]));
 
         // ── The open tasks first, then the done ones, as pages of one list ──
         await ev(`window.__searchBeforePaging = document.getElementById('tk-search'); true`);
@@ -152,7 +152,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(`document.querySelector('#board-task-bar .list-bar-toggle').click(); document.querySelector('#board-task-bar .list-bar-clear-all').click(); true`);
         await settle(`document.querySelector('#board-task-bar .list-bar-count').textContent === '66 tasks'`, 'Clear all');
         s = await snap();
-        check('Clear all brings the default list back', s.chips.length === 0 && s.hide && s.statuses.length >= 56, JSON.stringify([s.count, s.hide]));
+        check('Clear all brings the default list back', s.chips.length === 0 && s.hide && s.statuses.length === 6, JSON.stringify([s.count, s.hide]));
 
         // ── The order ──
         await pick('tk-sort', 'oldest');

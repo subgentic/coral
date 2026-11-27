@@ -407,10 +407,10 @@ function _syncTaskBar(show, counts) {
         const board = _taskFiltersBoard;
         _taskBar = TV.tasksToolbar(agentTaskScope() ? 'agent' : 'agent-team', _setTaskFilters, { onPanel: open => savePanelOpen('tasks', board, open) });
         _taskBar.setOpen(loadPanelOpen('tasks', board)); // the panel is left as it was for this board (#5293)
-        // The one top row (#7924): the search, the Filters icon, then + Task; Hide done is a control of the Filters panel, not a title row
+        // The one top row (#7924): the search, the Filters icon, then + Task; Show done is a control of the Filters panel, not a title row
         _taskBar.setHeader(null, [TV.newTaskButton({ small: true })]);
         const hide = document.createElement('div');
-        hide.innerHTML = '<label class="board-task-hide-toggle"><input type="checkbox" class="check" data-on-change="task-hide-done"> <span class="board-task-hide-text">Hide done</span></label>';
+        hide.innerHTML = '<label class="board-task-hide-toggle"><input type="checkbox" class="check" data-on-change="task-hide-done"> <span class="board-task-hide-text">Show done</span></label>';
         _hideDoneEl = hide.firstElementChild;
         _taskBar.setExtras([_hideDoneEl]);
         _syncHideDone(_hideDoneLast.count, _hideDoneLast.hidden);
@@ -468,8 +468,9 @@ async function loadMoreBoardTasks() {
 }
 
 let _sort = defaultSort(); // the chosen column and its direction (task_list_data.js)
-let _hideCompleted = browserLocal.get('coral-hide-completed') === 'true';
-let _hideDoneEl = null; // the Filters panel's Hide done (a label with its checkbox), once the bar is built (#7924)
+// Keep the legacy key's meaning; a missing choice now hides done (#21853).
+let _hideCompleted = browserLocal.get('coral-hide-completed') !== 'false';
+let _hideDoneEl = null; // the Filters panel's Show done (a label with its checkbox), once the bar is built (#7924)
 
 export function _toggleTaskSort(field) {
     _sort = nextSort(_sort, field);
@@ -500,16 +501,16 @@ function _renderEmptyTaskList(container, section) {
     return;
 }
 
-/** Hide done in the Filters panel: offered when there are done tasks and no search runs (the status filter says what to show then); its count, its checkbox and the icon's badge follow. */
+/** Show done in the Filters panel: offered when there are done tasks and no search runs (the status filter says what to show then); its count, its checkbox and the icon's badge follow. */
 let _hideDoneLast = { count: 0, hidden: true }; // the last state asked for: a bar built after the list was drawn takes it
 function _syncHideDone(completedCount, hidden) {
     _hideDoneLast = { count: completedCount, hidden };
     if (!_hideDoneEl) return;
     _hideDoneEl.hidden = hidden;
-    const text = `Hide done (${completedCount})`, t = _hideDoneEl.querySelector('.board-task-hide-text'), box = _hideDoneEl.querySelector('input');
+    const text = `Show done (${completedCount})`, t = _hideDoneEl.querySelector('.board-task-hide-text'), box = _hideDoneEl.querySelector('input');
     if (t && t.textContent !== text) t.textContent = text;
-    if (box && box.checked !== _hideCompleted) box.checked = _hideCompleted;
-    if (_taskBar) _taskBar.setExtraOn(!hidden && _hideCompleted ? 1 : 0);
+    if (box && box.checked !== !_hideCompleted) box.checked = !_hideCompleted;
+    if (_taskBar) _taskBar.setExtraOn(!hidden && !_hideCompleted ? 1 : 0);
 }
 function _renderTaskListChrome(section, completedCount, querying = false) {
     _syncHideDone(completedCount, !(completedCount > 0 && !querying));
