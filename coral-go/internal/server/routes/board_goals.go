@@ -329,6 +329,7 @@ func (h *BoardHandler) ListGoals(w http.ResponseWriter, r *http.Request) {
 		made[i] = &page.Goals[i]
 	}
 	h.markMadeByOrchestrator(r.Context(), project, made...)
+	h.attachGoalThreads(r, made...) // the open comment threads of each (#21989)
 	h.attachGoalNews(r, made...)
 	h.attachGoalDoneState(r, made...)
 	writeJSON(w, http.StatusOK, page)
@@ -426,6 +427,7 @@ func (h *BoardHandler) ListAllGoals(w http.ResponseWriter, r *http.Request) {
 	for i := range page.Goals {
 		listed[i] = &page.Goals[i]
 	}
+	h.attachGoalThreads(r, listed...)   // and how many open comment threads each has (#21989)
 	h.attachGoalNews(r, listed...)      // the Operator's list of every board's goals (the Inbox's) says which have new comments (#12073)
 	h.attachGoalDoneState(r, listed...) // and what they did to each goal's "looks done" row (#14047)
 	writeJSON(w, http.StatusOK, page)

@@ -19,6 +19,9 @@ import (
 // changeWordsPrefix opens the comment's text, as the client's three-call path wrote it.
 const changeWordsPrefix = "Changes requested: "
 
+// ChangeWordsPrefix is changeWordsPrefix for the wiring (#21989).
+const ChangeWordsPrefix = changeWordsPrefix
+
 // changeWordsError is a failure of the words' half of the decision; the board handler undoes the decision and answers with it.
 type changeWordsError struct {
 	Status int

@@ -71,6 +71,55 @@ func (h *BoardHandler) attachGoalNews(r *http.Request, goals ...*board.Goal) {
 	}
 }
 
+// SetGoalThreads tells the board where to read the open comment threads per goal (#21989). nil: none.
+func (h *BoardHandler) SetGoalThreads(fn func(ctx context.Context) (map[string]int, error)) {
+	h.goalThreads = fn
+}
+
+// attachGoalThreads puts CommentsOpen on the goals of a list, from one read for all of them. It only reads: nothing is marked seen. The Operator's alone, as the Comments tab is (an agent's or a guest's read has none).
+func (h *BoardHandler) attachGoalThreads(r *http.Request, goals ...*board.Goal) {
+	if h.goalThreads == nil || len(goals) == 0 || !operatorOrKeyCaller(r) {
+		return
+	}
+	open, err := h.goalThreads(r.Context())
+	if err != nil || len(open) == 0 {
+		return
+	}
+	for _, g := range goals {
+		if g != nil {
+			g.CommentsOpen = open[goalSubject(g.BoardID, g.ID)]
+		}
+	}
+}
+
+// reviewNoteCap is the most characters of a request-changes note a list row carries (#21989).
+const reviewNoteCap = 500
+
+// SetReviewNotes tells the board where to read the latest Request-changes note per artifact id (#21989). nil: none.
+func (h *BoardHandler) SetReviewNotes(fn func(ctx context.Context) (map[string]string, error)) {
+	h.reviewNotes = fn
+}
+
+// attachReviewNotes puts ReviewNote on the rows of files that have changes requested, from one read for all of them. It only reads. The Operator's alone, as the comments are.
+func (h *BoardHandler) attachReviewNotes(r *http.Request, items []teamArtifact) bool {
+	if h.reviewNotes == nil || len(items) == 0 || !operatorOrKeyCaller(r) {
+		return false
+	}
+	notes, err := h.reviewNotes(r.Context())
+	if err != nil || len(notes) == 0 {
+		return false
+	}
+	for i := range items {
+		if n := notes[items[i].ID]; n != "" && hasTag(items[i].Tags, "changes requested") {
+			if rs := []rune(n); len(rs) > reviewNoteCap {
+				n = string(rs[:reviewNoteCap]) + "…"
+			}
+			items[i].ReviewNote = n
+		}
+	}
+	return true
+}
+
 // SetDraftCounts tells the board where to read the reviewer's draft comments, per artifact id (#21194): the file's row says how many are waiting to be sent. nil: none.
 func (h *BoardHandler) SetDraftCounts(fn func(r *http.Request) (map[string]int, error)) {
 	h.draftCounts = fn

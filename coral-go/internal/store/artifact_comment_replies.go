@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -131,4 +132,38 @@ func (s *SessionStore) MarkThreadsSeenChanged(ctx context.Context, artifactID st
 		return false, err
 	}
 	return true, nil
+}
+
+// OpenGoalThreads counts the open comment threads of every goal in one read: a thread is a top comment that is neither resolved nor deleted. The key is the subject (goal:<team>:<id>). It reads only: nothing is
+// marked seen (#21989).
+func (s *SessionStore) OpenGoalThreads(ctx context.Context) (map[string]int, error) {
+	var rows []struct {
+		ArtifactID string `db:"artifact_id"`
+		N          int    `db:"n"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT artifact_id, COUNT(*) AS n FROM artifact_comments WHERE substr(artifact_id, 1, 5) = 'goal:' AND parent_id IS NULL AND resolved_at IS NULL AND deleted_at IS NULL GROUP BY artifact_id`); err != nil {
+		return nil, err
+	}
+	out := make(map[string]int, len(rows))
+	for _, r := range rows {
+		out[r.ArtifactID] = r.N
+	}
+	return out, nil
+}
+
+// LatestChangeNotes answers, per artifact, the newest Request-changes note the owner left: the top comment whose text opens with prefix (the one the decision makes). One read for every file; nothing is marked seen
+// (#21989). The prefix is cut off the note.
+func (s *SessionStore) LatestChangeNotes(ctx context.Context, prefix string) (map[string]string, error) {
+	var rows []struct {
+		ArtifactID string `db:"artifact_id"`
+		Body       string `db:"body"`
+	}
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT artifact_id, body FROM artifact_comments WHERE parent_id IS NULL AND deleted_at IS NULL AND author_kind = 'owner' AND substr(body, 1, ?) = ? ORDER BY id`, len(prefix), prefix); err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, r := range rows { // ordered by id: the last one wins
+		out[r.ArtifactID] = strings.TrimSpace(strings.TrimPrefix(r.Body, prefix))
+	}
+	return out, nil
 }
