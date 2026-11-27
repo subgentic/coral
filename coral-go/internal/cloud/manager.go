@@ -88,15 +88,16 @@ type Options struct {
 
 // Status is the safe, secret-free view for the UI.
 type Status struct {
-	Configured      bool      `json:"configured"`
-	HubURL          string    `json:"hub_url,omitempty"`
-	State           string    `json:"state"`
-	UserCode        string    `json:"user_code,omitempty"`
-	VerificationURL string    `json:"verification_url,omitempty"`
-	ExpiresAt       time.Time `json:"expires_at,omitzero"`
-	Label           string    `json:"label,omitempty"`
-	ServerID        string    `json:"server_id,omitempty"`
-	LastError       string    `json:"last_error,omitempty"`
+	Configured            bool      `json:"configured"`
+	HubURL                string    `json:"hub_url,omitempty"`
+	State                 string    `json:"state"`
+	UserCode              string    `json:"user_code,omitempty"`
+	EnrollmentQRExpiresAt time.Time `json:"enroll_qr_expires_at,omitzero"`
+	VerificationURL       string    `json:"verification_url,omitempty"`
+	ExpiresAt             time.Time `json:"expires_at,omitzero"`
+	Label                 string    `json:"label,omitempty"`
+	ServerID              string    `json:"server_id,omitempty"`
+	LastError             string    `json:"last_error,omitempty"`
 	// LastErrorCode names the reason, for a UI that must not match on LastError's wording:
 	// code_expired, access_denied or rate_limited (#3285, coral-hub's contract).
 	LastErrorCode string `json:"last_error_code,omitempty"`
@@ -381,6 +382,7 @@ func (m *Manager) Status() Status {
 	s.HubMoved = m.hubMoved
 	s.HubAddressWarning = m.addrWarn
 	s.DevicePairing = m.pairNote()
+	s.EnrollmentQRExpiresAt = m.enrollmentQRExpiryLocked()
 	s.MaxMode = m.currentMode().String()
 	s.Loading = !m.isLoaded()
 	if s.State == StateIdle && (s.LastErrorCode == ErrCodeRateLimited || s.LastErrorCode == ErrCodeHubUnreachable) {

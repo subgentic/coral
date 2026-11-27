@@ -150,6 +150,8 @@ c GET /api/call-metrics/summary
 b GET /api/chief
 b GET /api/cloud/owner-label
 c GET /api/cloud/status
+# QR uses its own local-human 404, rather than the Operator table's 403.
+c GET /api/cloud/enroll-qr
 b GET /api/custom-models
 b GET /api/custom-modes
 c GET /api/filesystem/is-git

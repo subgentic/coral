@@ -167,6 +167,7 @@ GET /api/chief/checks/{checkID} never
 GET /api/chief/triggers never
 GET /api/cloud/devices never
 GET /api/cloud/devices/{kid}/signed-grants never
+GET /api/cloud/enroll-qr never
 GET /api/cloud/link-keys never
 GET /api/cloud/link-requests never
 GET /api/cloud/link-requests/{id} never
