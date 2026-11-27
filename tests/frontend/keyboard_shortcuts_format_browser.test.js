@@ -69,7 +69,7 @@ const GROUPS = ['Navigation', 'Chat', 'Search', 'Dialogs'];
             check(d.title === 'Keyboard shortcuts' && d.role === 'dialog' && d.labelled, `${tag}: a labelled dialog titled Keyboard shortcuts: ${d.title}`);
             check(JSON.stringify(d.headings) === JSON.stringify(GROUPS), `${tag}: the groups ${GROUPS} in order: ${JSON.stringify(d.headings)}`);
             check(d.groups === GROUPS.length, `${tag}: one list per group: ${d.groups}`);
-            check(d.rows.length === 15, `${tag}: 15 rows: ${d.rows.length}`);
+            check(d.rows.length === 16, `${tag}: 16 rows (15 plus the J or K row): ${d.rows.length}`);
             check(!d.overflowX && d.contentW <= d.viewW + 1, `${tag}: no sideways overflow (the dialog is ${d.contentW} of ${d.viewW})`);
             for (const r of d.rows) {
                 check(r.kbdCount >= 1 && r.dtOnlyKbd, `${tag}: "${r.what}" keys are <kbd> chips (${r.kbdCount})`);
