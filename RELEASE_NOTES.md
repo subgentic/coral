@@ -1,5 +1,59 @@
 # Release Notes
 
+## v2.1.21 — Group by Task, simpler document review, and a steadier task board for agent teams
+
+Task numbers in brackets. Built on v2.1.20. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### Sidebar
+
+- **Group by Task** (#21683, #21685): Group by in the Display panel is three boxes, Computer, Team and Task, all unticked until chosen; ticked ones nest computer, then team, then task. Task splits the list into On a task and No task, and an agent on a task shows its number and title under its name ("queued" when the task has not started). A browser that grouped by team or computer before keeps that choice as a ticked box.
+- **Workers fold button** (#21686): the button that folds a team's workers sits on the right of the Orchestrator row.
+- **The usage-limit summary can be dismissed** (#21676).
+
+#### Document review and comments
+
+- **Approve is one press** (#21751): on the latest version, Approve approves that version. The "1 of 2 files" wording and the second confirm are gone, and a double click sends one approval (#21770).
+- **Save and Send from the comment box** (#21688): the composer has Add image, Cancel, Save and Send; on a phone the review actions stay reachable.
+- **Only new comments are sent** (#21769): "Send N comments to an agent" counts only comments that were never sent, so earlier comments are not sent again after a reload, a reply or a new version.
+- **Review header** (#21678, #21777): the Close label, the file pager and the decision row line up; the document name keeps the row width on a phone; a save error shows in place, not over the comments. Edit and Delete on a comment are icons named for the comment's author.
+- **The comments column can be resized again** (#21814): drag the line between the document and the comments, or use the arrow keys on it; the width is kept. With no width set it stays at 44%. This broke in v2.1.14.
+
+#### Team page and agent panel
+
+- **Linked teams is a tab** (#21597), and the raw list of uncommitted files is gone from the team page.
+- **Agent panel tabs** (#21684, #21804): no More menu; tabs keep their place, shrink to icons, then scroll sideways, without a resize loop when the panel changes size.
+- **Needs you on a phone** (#21716, #21785): a live update no longer replaces an answer button under your finger, including the delayed click a phone sends after the tap.
+
+#### Codex
+
+- **Full Access confirmation** (#21677, #21689): when Codex asks "Enable full access?", the agent waits in Needs you with its two options. Coral never types into or answers it; the card says you can send 1 or 2 from Coral.
+
+#### Agent teams (coral-board)
+
+- **Claims expire after 72 hours** (#21700, #21742): a task in progress whose owner is asleep, gone or idle with no activity for 72 hours goes back to pending, still its owner's, and the health check says so once. This is on by default; set the team's `claim_expire_hours` to 0 to turn it off. Parked tasks, tasks marked waiting and a paused board are exempt.
+- **`task review --to` adds reviewers** (#21747): a second call adds names to the open round; `--replace` swaps them. Before, a second call replaced the reviewers.
+- **Waiting on someone** (#21697, #21704, #21726): `task wait-on` marks a task as waiting on a member, the health check shows it, and a `wait --from` ends when that member posts on the task.
+- **Health check** (#21702, #21705): every roster line and goal reminder has an ack id; an answer clears a waits-on-you line; remote members and seats with no session are not counted as agents.
+- **Backlog** (#21701, #21746): `task add --later` assigns a task without waking the agent.
+- **One task in progress per agent** (#21699): a second claim is refused and names the open task.
+- **`post --to` repeated** (#21703) keeps every name.
+
+### Test and gate fixes in this release
+
+- Two browser suites wait for the lazy Group by code before drawing the live list (#21767).
+- The team page suites follow the Linked teams tab (#21785).
+- The board composer fits at phone width and at 200% zoom, and the tab family test draws a fixed scene (#21788); in a window under 521 px tall it keeps the compact row (#21826).
+- The first-run CLI test waits for its own output (#21805).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption, the browser gate and windows-tests are green on the gated commit, and the Linux release smoke passes on amd64 and arm64.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+- A grouped sidebar may draw one frame before its styles load (follow-up).
+
 ## v2.1.20 — A limit for revoked Hub keys, clearer template errors and plain encryption notices
 
 Task numbers in brackets. Built on v2.1.19. A prerelease until the Operator promotes it.
