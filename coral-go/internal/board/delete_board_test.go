@@ -139,6 +139,8 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, s.SetFieldImages(ctx, project, FieldImagesTask, "1", "description", []GoalImage{{Hex: strings.Repeat("c", 64), Name: "shot.png", ContentType: "image/png"}})) // and the pictures of a task field (#20731)
 	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now())                                                                       // and what its upload asked (#11555)
 	require.NoError(t, err)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO artifact_decided_questions (board_id, hex, question) VALUES (?, ?, ?)`, project, strings.Repeat("a", 64), "Approve it?") // and what a decided file asked (#21992)
+	require.NoError(t, err)
 	_, err = s.SetArtifactKind(ctx, project, strings.Repeat("a", 64), KindRelease, "sess-1", time.Now()) // and the kind of its file (#12144)
 	require.NoError(t, err)
 	_, err = s.SaveWorker(ctx, project, "", Worker{Name: "Worker", AgentType: "claude"}, false) // the workers it approved (#21467)
