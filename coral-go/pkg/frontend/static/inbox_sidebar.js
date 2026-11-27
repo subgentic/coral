@@ -2016,6 +2016,7 @@ export async function openInboxGroup(name) {
     page = null;
     $('inbox-page') && ($('inbox-page').hidden = true);
     setGroup(name);
+    _wasShown = true; // a folder is already open: a late first show must not replace the person's choice with Needs you (#21839)
     noteFolder(name);
     openGroupTable('hub-inbox', name);
     markReady('inboxListDrawn');
