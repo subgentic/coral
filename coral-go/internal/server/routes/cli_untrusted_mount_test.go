@@ -86,8 +86,10 @@ func TestCLICheckFindsTheProgramAnUntrustedMountLeadsTo(t *testing.T) {
 	real := filepath.Join(t.TempDir(), "releases", "0.172.0", "bin", "codex.exe")
 	require.NoError(t, os.MkdirAll(filepath.Dir(real), 0o755))
 	require.NoError(t, os.WriteFile(real, []byte("not a program"), 0o755))
-	t.Setenv("TMP", t.TempDir()) // the real file is not in the temp folder a launch refuses
-	t.Setenv("TEMP", os.Getenv("TMP"))
+	tmp := t.TempDir() // the real file is not in the temp folder a launch refuses (os.TempDir: TMP or TEMP on Windows, TMPDIR elsewhere)
+	t.Setenv("TMP", tmp)
+	t.Setenv("TEMP", tmp)
+	t.Setenv("TMPDIR", tmp)
 	cliLookPath = func(string) (string, error) { return "", assert.AnError }
 	cliCommonPath = func(string) string { return "" }
 	cliThroughUntrustedMount = func(string) (string, string, bool) { return real, `C:\Codex\bin`, true }
