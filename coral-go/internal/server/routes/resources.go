@@ -261,6 +261,7 @@ type agentBody struct {
 	KeepPlace    bool   `json:"keep_place,omitempty"` // release: a wait that ended without a turn (the CLI's --timeout): the place in line is kept for a grace, not dropped (#13706)
 	PollEntry    int64  `json:"poll_entry,omitempty"` // a claim --wait looking again: the entry its first claim queued. If that entry is gone (released, kicked), the answer is "cancelled", not a new place in line (#20345)
 	RunID        string `json:"run_id,omitempty"`     // a claim --run: its own id, so two runs of one agent on one resource share its entry and each gives back only its share (#21790)
+	RunPID       int    `json:"run_pid,omitempty"`    // a claim --run: the coral-board process that runs the command; believed only from this computer, so a killed run frees its share (#21800)
 	ParentPID    int    `json:"parent_pid,omitempty"` // a claim by an agent: the shell that ran coral-board (a job in the background keeps the slot while it runs, #13718)
 }
 
@@ -295,7 +296,11 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusGone, "cancelled", "your place in line for "+cleanText(name, 80)+" was cancelled (released or removed): nothing was claimed")
 		return
 	}
-	res, err := h.M.ClaimRun(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200), cleanText(body.RunID, 64))
+	runPID := 0
+	if fromLoopback(r) {
+		runPID = body.RunPID
+	}
+	res, err := h.M.ClaimRun(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200), cleanText(body.RunID, 64), runPID)
 	if err != nil {
 		h.fail(w, err)
 		return

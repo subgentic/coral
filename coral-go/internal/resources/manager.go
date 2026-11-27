@@ -40,6 +40,7 @@ type Options struct {
 	Path        string                    // the state file ("" keeps the state in memory only)
 	Priorities  Priorities                // nil: every claim ranks 0
 	Alive       func(agent string) bool   // nil: every agent is alive
+	PidAlive    func(pid int) bool        // nil: a process on this computer is looked up (#21800)
 	Now         func() time.Time          // nil: time.Now
 	OnGrant     func(resourcequeue.Entry) // told when a waiting agent gets its slot
 	AgeStep     time.Duration             // see resourcequeue.Config
@@ -57,7 +58,7 @@ type Manager struct {
 
 // Open makes the Manager, loading the state file when there is one. A file that cannot be read is an error, never an empty queue: an agent holding the Mac would be forgotten.
 func Open(o Options) (*Manager, error) {
-	cfg := resourcequeue.Config{Now: o.Now, Alive: o.Alive, OnGrant: o.OnGrant, AgeStep: o.AgeStep, MaxPerAgent: o.MaxPerAgent, WaitStale: resourcequeue.WaitStale, Veto: o.Veto}
+	cfg := resourcequeue.Config{Now: o.Now, Alive: o.Alive, PidAlive: pidAliveOr(o.PidAlive), OnGrant: o.OnGrant, AgeStep: o.AgeStep, MaxPerAgent: o.MaxPerAgent, WaitStale: resourcequeue.WaitStale, Veto: o.Veto}
 	var hist *History
 	if o.HistoryPath != "" {
 		if h, err := OpenHistory(o.HistoryPath); err != nil {
@@ -92,8 +93,8 @@ func (m *Manager) ClaimPolling(ctx context.Context, resource, agent, note string
 }
 
 // ClaimRun is ClaimPolling for one `claim --run` (#21790): runID is that command's own, so a second run of the same agent shares the entry and the first one's end does not give it back.
-func (m *Manager) ClaimRun(ctx context.Context, resource, agent, note, runID string) (resourcequeue.Result, error) {
-	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note, Polls: true, RunID: runID})
+func (m *Manager) ClaimRun(ctx context.Context, resource, agent, note, runID string, runPID int) (resourcequeue.Result, error) {
+	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note, Polls: true, RunID: runID, RunPID: runPID})
 }
 
 // ClaimAuto is the shell hook's claim (#13645): the same as Claim, marked as the hook's own with the pattern that fired (the record keeps the pattern, never the command).
@@ -193,4 +194,11 @@ func (p filePersister) Save(st resourcequeue.State) error {
 		return err
 	}
 	return fsreplace.Rename(name, p.path) // a bare os.Rename over an existing file is refused on Windows while it is open elsewhere (TestNoBareRename, #9738)
+}
+
+func pidAliveOr(f func(int) bool) func(int) bool {
+	if f != nil {
+		return f
+	}
+	return processAlive
 }
