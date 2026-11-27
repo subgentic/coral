@@ -39,6 +39,39 @@ export function adoptDefault(pick) {
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
 
+/** "Installed somewhere else?" (#583): the path of the CLI, saved as cli_path_<type> through the server's own check (the one Settings > Providers uses, which follows Codex's
+ * installer junctions, #582), then checked again. A refusal is the server's sentence and what to do. `recheck` is the dialog's Check again; `settings` opens Settings > Providers. */
+function pathField(type, label, recheck, settings) {
+    const box = el('div', 'setup-agent-path'), lead = el('p', null, `3. Installed somewhere else? Enter the full path to ${label}:`);
+    const row = el('div'), input = el('input', 'settings-mono-input'), save = el('button', 'btn', 'Save path'), note = el('p', 'setup-agent-path-note');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center'; input.type = 'text'; input.style.flex = '1'; input.spellcheck = false; input.setAttribute('aria-label', `${label} CLI path`);
+    input.placeholder = /^Win/i.test((navigator.userAgentData?.platform || navigator.platform) || '') ? `C:\\...\\${type}.exe` : `/usr/local/bin/${type}`;
+    save.type = 'button'; note.setAttribute('role', 'status'); note.style.minHeight = '1.2em';
+    const open = el('a', null, 'Settings > Providers'); open.href = '#'; open.onclick = e => { e.preventDefault(); settings(); };
+    const more = el('p', 'text-secondary-sm'); more.append('Or set it in ', open, '.');
+    save.onclick = async () => {
+        const path = input.value.trim();
+        if (!path) { note.textContent = `Enter the full path to the ${label} program first.`; input.focus(); return; }
+        save.disabled = true; note.textContent = 'Saving…';
+        try {
+            const key = `cli_path_${type}`;
+            const r = await serverFetch(currentServer(), '/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: path }) });
+            if (!r.ok) {
+                let why = ''; try { const d = await r.json(); why = String(d.error || d.message || ''); } catch { /* said below */ }
+                note.textContent = `Not saved. ${why || `The server answered ${r.status}.`} Enter the full path to the ${label} program file, or set it in Settings > Providers.`;
+                return;
+            }
+            state.settings = { ...(state.settings || {}), [key]: path };
+            note.textContent = 'Saved. Checking…';
+            await recheck();
+            note.textContent = 'Saved.';
+        } catch { note.textContent = 'Not saved: the server could not be reached. Try again.'; } finally { save.disabled = false; }
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save.click(); } });
+    row.append(input, save); box.append(lead, row, note, more);
+    return box;
+}
+
 /** The dialog. `onReady` runs when the person continues with a provider that is ready (the launch they clicked, or nothing from the Inbox). */
 export async function openSetupDialog({ onReady, onSkip } = {}) {
     const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
@@ -61,7 +94,9 @@ export async function openSetupDialog({ onReady, onSkip } = {}) {
         line.append('1. Run this in a terminal: ', code, ' ', copy);
         const signin = el('p', null, `2. Run ${info.name || type} once and sign in.`), help = el('p');
         if (info.url) { const a = el('a', null, info.url.replace(/^https?:\/\//, '')); a.href = info.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; help.append('More: ', a); }
-        steps.append(line, signin, help);
+        steps.append(line);
+        if (type === 'codex') steps.append(el('p', null, 'Or use the standalone installer from github.com/openai/codex.')); // what the Operator used (#583): Coral finds that install too (#582)
+        steps.append(signin, help, pathField(type, label, () => run(true), () => { shut(); window.showSettingsModal?.('providers'); }));
         more.onclick = () => { steps.hidden = !steps.hidden; more.textContent = steps.hidden ? 'Show steps' : 'Hide steps'; };
         row.append(top, steps); body.append(row); rows[type] = { status, label };
     }
