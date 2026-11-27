@@ -78,7 +78,11 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if p := agent.ResolveCLIPath(settings, agentType); p != "" {
-				if err := configuredCLIRunnable(p, agentType); err != nil {
+				run := p
+				if real, rerr := agent.RealCLIPath(p); rerr == nil { // through junctions Windows will not open: the program they lead to, as launch runs it (#582)
+					run = real
+				}
+				if err := configuredCLIRunnable(run, agentType); err != nil {
 					writeJSON(w, http.StatusOK, hubCLIReply(r, map[string]any{
 						"found":      false,
 						"status":     tracking.PrereqMissing,
@@ -90,7 +94,7 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 					}))
 					return
 				}
-				binaryPath = p
+				binaryPath = run
 			}
 		}
 	}
@@ -128,6 +132,12 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 					refused = agent.CommonLookup{Refused: why, RefusedPath: found}
 					found = ""
 				}
+			}
+		}
+		if found == "" && refused.Refused == "" && agentType != "" && r.URL.Query().Get("binary") == "" {
+			// On PATH only through junctions Windows will not open: the program they lead to, as a launch follows them (#582), with the same screen.
+			if p, _, _ := cliThroughUntrustedMount(binaryPath); p != "" && !agent.InTempFolder(p) && untrustedLocationOf(r.Context(), h.cfg, h.ss, p) == "" {
+				found = p
 			}
 		}
 		if found != "" {
@@ -329,6 +339,8 @@ func cliShareNote(agentType, binaryPath string) string {
 var (
 	cliLookPath   = exec.LookPath
 	cliCommonPath = agent.FindCLIInCommonPaths
+	// cliThroughUntrustedMount is agent.CLIThroughUntrustedMount (a variable so a test stands in for Windows).
+	cliThroughUntrustedMount = agent.CLIThroughUntrustedMount
 	// cliRefreshSavedPath re-reads the Path the system keeps for the person (Windows: the registry), on a person's Check again only.
 	cliRefreshSavedPath = agent.RefreshSavedPath
 	// cliShareSkipped: a common place on a network share did not answer in time for this CLI (#464).
