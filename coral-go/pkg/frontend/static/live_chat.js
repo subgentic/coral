@@ -18,7 +18,6 @@ import './terminal_gone.js';
 import './overload.js';
 import './local_store.js';
 import { htmlToElement } from './chat_content.js';
-import { flashCopied } from './chat_bubbles.js';
 import './saved_marks.js';
 import './pasted_content.js';
 import './chat_page.js';
@@ -113,7 +112,7 @@ document.addEventListener("click", async (e) => {
         showToast("Could not copy", true);
         return;
     }
-    flashCopied(btn);
+    importOnce('./chat_code_blocks.js').then(m => m.flashCopied(btn)).catch(() => {}); // the check mark on the button (the code-copy buttons use it too)
 });
 
 // #16701: tap a reply bubble to reveal its copy button; tap elsewhere to hide it.

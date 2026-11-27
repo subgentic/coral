@@ -1,0 +1,10 @@
+/* A task or goal number in chat and board text (#21818): a link that reads as one, and is easy to hit on a phone. */
+.chat-task-ref {
+    color: var(--link-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+@media (pointer: coarse) {
+    .chat-task-ref { padding-block: 0.5em; margin-block: -0.5em; }
+}

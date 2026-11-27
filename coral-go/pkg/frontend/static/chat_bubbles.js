@@ -14,21 +14,8 @@ export function makeBubble(className, html) {
     labelCodeBlocks(div);
     if (div.querySelector('.message-text pre')) importOnce('./chat_code_blocks.js').then(m => m.addCodeCopyButtons(div)).catch(() => {});
     linkifyRefs(div);
+    if (/#\d{3}/.test(div.textContent)) importOnce('./chat_task_refs.js').then(m => m.linkTaskRefs(div)).catch(() => {}); // task and goal numbers become links (#21818)
     return div;
-}
-
-// Each code block gets its own copy button. The block scrolls sideways, so
-// the button sits on a wrapper around it rather than inside it.
-// Swap a copy button's icon to a check for a moment after copying.
-export function flashCopied(btn) {
-    const icon = btn.querySelector(".material-icons");
-    icon.textContent = "check";
-    btn.classList.add("copied");
-    clearTimeout(btn._copiedTimer);
-    btn._copiedTimer = setTimeout(() => {
-        icon.textContent = "content_copy";
-        btn.classList.remove("copied");
-    }, 1500);
 }
 
 // A path-looking inline code span: has a directory, a :line suffix, or a
@@ -88,9 +75,9 @@ export function linkifyRefs(root) {
         }
     }
     for (const a of root.querySelectorAll("a[href]")) {
-        if (parseCoralRef(a.getAttribute("href"))?.kind && parseCoralRef(a.getAttribute("href")).kind !== 'artifact') continue;
+        const href = a.getAttribute("href"), ref = parseCoralRef(href);
+        if (ref && ref.kind !== 'artifact') continue;
         if (a.hasAttribute("data-route")) continue; // a dashboard page link the router accepted
-        const href = a.getAttribute("href");
         const artifactHref = /^\/api\/artifacts\/([a-f0-9]{64})$/i.exec(href || '');
         if (/^coral:\/\/artifacts\/[a-f0-9]{64}$/i.test(href || '') || artifactHref) {
             a.dataset.fileRef = artifactHref ? `coral://artifacts/${artifactHref[1]}` : href;
@@ -109,95 +96,46 @@ export function linkifyRefs(root) {
             }
         }
     }
-    for (const code of root.querySelectorAll(":not(pre) > code")) {
-        if (code.closest("a")) continue;
-        const text = code.textContent.trim();
-        if (/^coral:\/\/artifacts\/[a-f0-9]{64}$/i.test(text)) {
-            code.dataset.fileRef = text;
-            code.classList.add("chat-file-ref");
-        } else if (looksLikeFileRef(text)) {
-            code.dataset.fileRef = normalizeFileRef(text);
-            code.classList.add("chat-file-ref");
-        }
+    // Inline code and fenced blocks: an exact artifact URI (a fenced one is returned so it can be copied reliably) or an inline path stays actionable.
+    for (const code of root.querySelectorAll("code")) {
+        const text = code.textContent.trim(), block = code.closest("pre");
+        if (!block && code.closest("a")) continue;
+        if (/^coral:\/\/artifacts\/[a-f0-9]{64}$/i.test(text)) code.dataset.fileRef = text;
+        else if (!block && looksLikeFileRef(text)) code.dataset.fileRef = normalizeFileRef(text);
+        else continue;
+        code.classList.add("chat-file-ref");
     }
-    // Artifact URIs are often returned in fenced code blocks so they can be
-    // copied reliably. Keep those exact values actionable as well.
-    for (const code of root.querySelectorAll("pre code")) {
-        const text = code.textContent.trim();
-        if (/^coral:\/\/artifacts\/[a-f0-9]{64}$/i.test(text)) {
-            code.dataset.fileRef = text;
-            code.classList.add("chat-file-ref");
-        }
-    }
-    // Plain-text artifact URIs (for example, a final response without
-    // Markdown link syntax) should use the same interaction menu.
-    const artifactWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-        acceptNode: n => n.parentElement.closest('a, code, pre, [data-file-ref]')
-            ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
-    });
-    const artifactNodes = [];
-    while (artifactWalker.nextNode()) {
-        if (/coral:\/\/artifacts\/[a-f0-9]{64}/i.test(artifactWalker.currentNode.nodeValue)) artifactNodes.push(artifactWalker.currentNode);
-    }
-    for (const node of artifactNodes) {
-        const frag = document.createDocumentFragment();
-        let last = 0;
-        for (const match of node.nodeValue.matchAll(/coral:\/\/artifacts\/[a-f0-9]{64}/gi)) {
-            frag.append(node.nodeValue.slice(last, match.index));
-            const span = document.createElement('span');
-            span.className = 'chat-file-ref chat-file-ref-bare';
-            span.dataset.fileRef = match[0];
-            span.textContent = match[0];
-            frag.append(span);
-            last = match.index + match[0].length;
-        }
-        frag.append(node.nodeValue.slice(last));
-        node.replaceWith(frag);
-    }
+    // Plain-text artifact URIs (for example, a final response without Markdown link syntax) use the same interaction menu.
+    wrapRefs(root, "a, code, pre, [data-file-ref]", /coral:\/\/artifacts/, /coral:\/\/artifacts\/[a-f0-9]{64}/gi, m => m);
     linkCoralSubjectRefsIn(root, { server: currentServer() });
-    linkifyBarePaths(root);
+    wrapRefs(root, "a, code, pre, .role-label, .pending-label", /\/[^/\s]*\.\w/, BARE_FILE_REF_RE, m => looksLikeFileRef(m) && normalizeFileRef(m));
 }
 
-function linkifyBarePaths(root) {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-        acceptNode: (n) => n.parentElement.closest("a, code, pre, .role-label, .pending-label")
-            ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
-    });
-    const nodes = [];
-    while (walker.nextNode()) {
-        if (/\/[^/\s]*\.\w/.test(walker.currentNode.nodeValue)) nodes.push(walker.currentNode);
-    }
+/** Wrap each match of `re` in the text nodes of root (outside `skip`) that pass `test` in a file reference span; `ref(match)` is its path, or falsy to leave the match as text. */
+function wrapRefs(root, skip, test, re, ref) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT }), nodes = [];
+    while (walker.nextNode()) if (test.test(walker.currentNode.nodeValue)) nodes.push(walker.currentNode);
     for (const node of nodes) {
-        const text = node.nodeValue;
-        const frag = document.createDocumentFragment();
+        const text = node.nodeValue, frag = document.createDocumentFragment();
         let last = 0;
-        for (const m of text.matchAll(BARE_FILE_REF_RE)) {
-            if (!looksLikeFileRef(m[0])) continue;
-            frag.append(text.slice(last, m.index));
+        for (const m of text.matchAll(re)) {
+            const path = ref(m[0]);
+            if (!path) continue;
             const span = document.createElement("span");
             span.className = "chat-file-ref chat-file-ref-bare";
-            span.dataset.fileRef = normalizeFileRef(m[0]);
+            span.dataset.fileRef = path;
             span.textContent = m[0];
-            frag.append(span);
+            frag.append(text.slice(last, m.index), span);
             last = m.index + m[0].length;
         }
-        if (last === 0) continue;
-        frag.append(text.slice(last));
-        node.replaceWith(frag);
+        if (last) { frag.append(text.slice(last)); node.replaceWith(frag); }
     }
 }
 
-// File options are used only after a person clicks a live-chat reference.
+// File options are used only after a person clicks a live-chat reference. Relative links in the history view have nowhere to go; keep them from navigating the dashboard away.
 document.addEventListener('click', e => {
-    const el = e.target.closest?.('#live-history-messages [data-file-ref]');
+    const el = e.target.closest?.('#live-history-messages [data-file-ref], #history-messages a[data-file-ref]');
     if (!el) return;
     e.preventDefault();
-    importOnce('./chat_file_menu.js', 'file options').then(m => m.showFileRefMenu(el)).catch(() => {});
-});
-
-// Relative links in the history view have nowhere to go; keep them from
-// navigating the dashboard away.
-document.addEventListener("click", (e) => {
-    const el = e.target.closest && e.target.closest("#history-messages a[data-file-ref]");
-    if (el) e.preventDefault();
+    if (el.closest('#live-history-messages')) importOnce('./chat_file_menu.js', 'file options').then(m => m.showFileRefMenu(el)).catch(() => {});
 });
