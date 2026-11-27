@@ -32,4 +32,10 @@ assert.match(bare.stderr, /did you mean --only inbox_group_tap\?/);
 assert.doesNotMatch(bare.stdout + bare.stderr, /running \d+ of/, 'no suite was started');
 const noValue = run('--only');
 assert.equal(noValue.status, 2); assert.match(noValue.stderr, /--only needs a value/);
+// --cpu-throttle works only inside --stress: alone it is refused, not accepted and ignored (#21927: earlier "--cpu-throttle 20" proofs ran with no throttle)
+const lone = run('--only', 'inbox_group_tap', '--cpu-throttle', '20');
+assert.equal(lone.status, 2, 'a lone --cpu-throttle exits 2: ' + lone.stdout + lone.stderr);
+assert.match(lone.stderr, /--cpu-throttle only takes effect with --stress/);
+assert.doesNotMatch(lone.stdout + lone.stderr, /running \d+ of/, 'no suite was started');
+assert.match(src, /if \(!stress && process\.argv\.includes\('--cpu-throttle'\)\)/, 'the refusal is in the runner, before the throttle is read');
 console.log('cdp_args: ok');
