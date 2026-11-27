@@ -11,7 +11,7 @@ const { safePaused } = require('./helpers/paused');
  try {
   await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
   // the page that meets the choice: Task ticked (the harness's old Team choice is taken off), three agents in the mocked list from the first read
-  await Page.addScriptToEvaluateOnNewDocument({ source: `try { localStorage.removeItem('coral-agent-grouping'); localStorage.setItem('coral-group-task', 'true'); } catch {} const Real = window.WebSocket; function Dead(u) { this.url = String(u); this.readyState = 0; } Dead.prototype.send = Dead.prototype.close = Dead.prototype.addEventListener = Dead.prototype.removeEventListener = function () {}; function W(u, p) { return /\\/ws\\/(coral|terminal)/.test(String(u)) ? new Dead(u) : p === undefined ? new Real(u) : new Real(u, p); } W.prototype = Real.prototype; W.CONNECTING = 0; W.OPEN = 1; W.CLOSING = 2; W.CLOSED = 3; window.WebSocket = W; // no feed: its first update would replace the mocked list with the test server's empty one
+  await Page.addScriptToEvaluateOnNewDocument({ source: `try { localStorage.removeItem('coral-agent-grouping'); localStorage.setItem('coral-group-task', 'true'); } catch {} const RealTimeout = window.setTimeout; window.setTimeout = function (f, ms, ...a) { return ms === 3000 ? 0 : RealTimeout.call(this, f, ms, ...a); }; /* lazy_styles' 3 s give-up never fires, so the held sheet stays held however slow the machine is */ const Real = window.WebSocket; function Dead(u) { this.url = String(u); this.readyState = 0; } Dead.prototype.send = Dead.prototype.close = Dead.prototype.addEventListener = Dead.prototype.removeEventListener = function () {}; function W(u, p) { return /\\/ws\\/(coral|terminal)/.test(String(u)) ? new Dead(u) : p === undefined ? new Real(u) : new Real(u, p); } W.prototype = Real.prototype; W.CONNECTING = 0; W.OPEN = 1; W.CLOSING = 2; W.CLOSED = 3; window.WebSocket = W; // no feed: its first update would replace the mocked list with the test server's empty one
   window.__qaSeed = ['a1', 'a2', 'a3'].map(n => ({ name: n, prefix: 'P', n: 3, sleeping: false, display_name: n }));` });
   let held = null; const seen = [];
   safePaused(client, e => { seen.push(e.request.url); held = e.requestId; }); // the one request stays paused until the test lets it go
@@ -20,7 +20,6 @@ const { safePaused } = require('./helpers/paused');
   await waitFor(`!!window.__liveListServed`, 'the page has read its list');
   for (let i = 0; i < 400 && !held; i++) await ev(framesJs(1)); // the sheet's request is out (the page asked for it)
   await ev(framesJs(6)); // and a few frames pass with it held
-  assert.ok(await ev(`performance.now() < 2500`), 'the check is made inside the sheet\'s 3 s patience (lazy_styles GIVE_UP_MS)');
   assert.ok(held, 'the page asked for group_by.css: ' + JSON.stringify(seen));
   assert.equal(await ev(`!!document.querySelector('#live-sessions-list .status-sub')`), false, 'no task split is drawn while its sheet is still out');
   assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-item').length`), 0, 'nor any unstyled row of the grouped list');
