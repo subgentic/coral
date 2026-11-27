@@ -1976,8 +1976,8 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
         CH.loadChatCounts(() => renderInboxNav(true));
         refreshBoards();
         liveGoals();
-        IA.refreshArtifactCount(() => renderFolderCounts());
     };
+    IA.refreshArtifactCount(() => renderFolderCounts()); // independent artifact query: start beside attention reads, not after their answers (#21825)
     const attentionReads = [];
     if (!nativeInbox()) {
         refreshTasks(); refreshRuns(true);
@@ -1986,7 +1986,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     }
     if (!nativeInbox() || nativeNeeds()) attentionReads.push(GR.refresh(true), refreshOperatorAsks(true), refreshReviews(true, { reuse: true }), refreshProposals(true));
     if (attentionFirst) {
-        // Let attention rows paint before folder counts take the computer's six request lanes.
+        // Let attention rows paint before the remaining folder counts take the computer's six request lanes.
         Promise.allSettled(attentionReads).then(() => requestAnimationFrame(() => setTimeout(secondaryCounts, 0)));
     } else secondaryCounts();
     if (quiet || (folder && state.currentSession && state.currentSession.type === 'history')) return; // a chat is on screen, or being opened (a saved message, a link to a chat): the Inbox is drawn under it, for the way back
