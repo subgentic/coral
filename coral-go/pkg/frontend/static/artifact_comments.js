@@ -330,7 +330,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         const sendable = list.map(t => t.c).filter(c => canAsk(c) && !d.locked && unsent(c)); // a recorded send stays sent after reload, reply or expiry (#21769)
         if (st.bulkSent) { const b = st.bulkSent, who = b.agents.join(', '); const done = el('p', 'ac-send-done', `Sent ${plural(b.total, 'open comment')}${b.of > b.total ? ` of ${b.of}` : ''} to ${who}${b.queued ? ` (delivers when ${b.agents.length === 1 ? who : 'the agent'} is free)` : b.messages > 1 ? `, in ${b.messages} messages because of the size limit of one` : ', in one message'}. Each comment says where it stands.`); done.setAttribute('role', 'status'); panel.append(done); }
         if (!st.reviewDrafts?.snapshot().data?.drafts_supported && sendable.length) { const sendAll = btn('ac-send-open', `Send ${sendable.length === 1 ? '1 comment' : plural(sendable.length, st.bulkSent ? 'remaining open comment' : 'open comment')} to an agent`); sendAll.addEventListener('click', () => openMany(sendable)); panel.append(sendAll); }
-        if (draftDocument && st.error && !st.composing) { const error = el('p', 'ac-error', st.error); error.setAttribute('role', 'alert'); panel.append(error); }
+        if (draftDocument && st.error && !st.composing && st.wholeComposerClosed) { const error = el('p', 'ac-error', st.error); error.setAttribute('role', 'alert'); panel.append(error); }
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (draftDocument && opts.inlineWhole && !st.wholeComposerClosed && d.canComment && !d.locked && !opts.compact) {
             st.wholeComposer ||= { anchor: { whole: true } };
