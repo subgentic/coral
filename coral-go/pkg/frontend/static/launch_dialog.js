@@ -19,6 +19,7 @@ import { reportLaunchDialogOpened } from './dashboard_analytics.js';
 import { sectionFocus } from './section_dialog.js';
 import { loadStyles } from './lazy_styles.js';
 import { showTeamAddress } from './team_form.js';
+import { startingAgentType } from './launch_default_type.js';
 import { agentForm as folderForm, setAgentNameMode } from './agent_form.js';
 const { checkNewAgentFolder } = await importOnce('./agent_new_folder.js');
 const { _syncACFModelField, getAgentConfig, renderAgentConfigForm, cliWarningOf } = await importOnce('./agent_config_form.js');
@@ -137,7 +138,7 @@ function _selectLaunchType(type) {
             wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
             adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
             adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
-            value: launch.member ? launch.member.value : { prompt: launch.welcomePrompt?.kind === 'agent' ? launch.welcomePrompt.text : '', agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
+            value: launch.member ? launch.member.value : { prompt: launch.welcomePrompt?.kind === 'agent' ? launch.welcomePrompt.text : '', agentType: startingAgentType(_settingsFor(_effectiveServer(launch.server)).default_agent_type, state.liveSessions, _effectiveServer(launch.server)) }, // a member's own values (#7861); a new agent starts on the default, else the newest agent's type (#596)
         });
         launch.reminders = null;
         { const host = document.querySelector('#launch-agent-acf .launch-rem-host'); if (host) importOnce('./launch_reminders.js').then(m => {

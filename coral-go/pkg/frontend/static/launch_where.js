@@ -18,8 +18,9 @@ const randomName = () => `work-${Math.random().toString(16).slice(2, 6)}`;
 
 let seq = 0;
 const panels = {};
-// the computer or the agent type changed: every open panel asks again (the folder is another computer's folder now)
-if (typeof document !== 'undefined') document.addEventListener('change', e => { if (['launch-server', 'launch-type', 'team-agent-type'].includes(e.target?.id)) setTimeout(() => { for (const p of Object.values(panels)) if (p.host.isConnected) p.refresh(); }, 150); });
+const AGENT_TYPE = '#launch-agent-acf .acf-agent-type'; // New agent's type: its agent form's select (#596)
+// the computer or the agent type changed: every open panel asks again (the folder is another computer's folder now). New agent's type is its form's own select, on step 3 (#596)
+if (typeof document !== 'undefined') document.addEventListener('change', e => { if (['launch-server', 'team-agent-type'].includes(e.target?.id) || e.target?.matches?.(AGENT_TYPE)) setTimeout(() => { for (const p of Object.values(panels)) if (p.host.isConnected) p.refresh(); }, 150); });
 
 /** Words for the state of a folder: clean, changed, ahead, behind. */
 export function stateTags(w) {
@@ -91,6 +92,8 @@ async function refresh(p) {
     let cli = null;
     if (type) { try { cli = await ask(server, '/api/system/cli-check', { type, signin: '1' }); } catch { cli = null; } }
     if (p.seq !== mine) return;
+    const others = cli && cli.found === false && cli.supported !== false ? await installedOthers(server, p.kind, type) : []; // a way out: the agents that computer has (#596)
+    if (p.seq !== mine) return;
     // the server's own checks for what was chosen: the branch exists and is free, the worktree's folder is free, the folder is trusted
     let checks = null;
     if (where.is_repo) {
@@ -101,14 +104,38 @@ async function refresh(p) {
         if (p.choice !== 'new' || p.name) { try { checks = await ask(server, '/api/launch/check', q); } catch { checks = null; } }
     }
     if (p.seq !== mine) return;
-    draw(p, where, recents.map((path, i) => ({ path, where: states[i] })), cli, type, checks);
+    draw(p, where, recents.map((path, i) => ({ path, where: states[i] })), cli, type, checks, others);
 }
 
-/** The agent type this launch will run, when it runs one (a terminal runs none). */
+/** The agent type this launch will run, when it runs one (a terminal runs none): New team's own select; New agent's is its agent form's (step 3), which starts on the default and moves to
+ *  an installed agent (#596: this read a #launch-type that no longer exists, so New agent always checked Claude). */
+const typeSelect = kind => kind === 'terminal' ? null : kind === 'team' ? document.getElementById('team-agent-type') : document.querySelector(AGENT_TYPE);
 function kindType(kind) {
     if (kind === 'terminal') return '';
-    const sel = document.getElementById(kind === 'team' ? 'team-agent-type' : 'launch-type');
-    return sel?.value || 'claude';
+    return typeSelect(kind)?.value || 'claude';
+}
+
+const TYPE_NAMES = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', pi: 'Pi', opencode: 'OpenCode', hermes: 'Hermes' };
+const ALIAS = { gemini: 'agy', antigravity: 'agy' };
+/** The other agent types that computer has and the launch's select offers: what a person can pick instead of a missing CLI (#596). */
+async function installedOthers(server, kind, type) {
+    const sel = typeSelect(kind), mine = ALIAS[type] || type;
+    const offered = Object.keys(TYPE_NAMES).filter(t => t !== mine && sel && [...sel.options].some(o => o.value === t));
+    const late = new Promise(r => setTimeout(() => r(null), 2500));
+    const found = await Promise.all(offered.map(t => Promise.race([ask(server, '/api/system/cli-check', { type: t }).catch(() => null), late])));
+    return offered.filter((t, i) => found[i]?.found === true);
+}
+/** Pick that agent type in the launch's own select, as a person would: the form, the provider cards and this check follow its change. */
+function pickType(kind, t) {
+    const sel = typeSelect(kind); if (!sel) return;
+    sel.value = t; sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+/** Settings > Providers, where a CLI's path is set; the check runs again when Settings closes. */
+async function openProviders(p) {
+    await window.showSettingsModal?.('providers');
+    const modal = document.getElementById('settings-modal'); if (!modal) return;
+    const watch = new MutationObserver(() => { if (getComputedStyle(modal).display !== 'none') return; watch.disconnect(); refresh(p); });
+    watch.observe(modal, { attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
 }
 
 const pickFolder = (p, path) => { p.input.value = path; p.input.dispatchEvent(new Event('input', { bubbles: true })); p.choice = 'here'; p.existing = ''; p.folderEdited = false; p.folder = ''; refresh(p); };
@@ -205,7 +232,7 @@ function drawBranch(p, where, here) {
 }
 
 /** The items of the setup check, from what was read: { tone: 'ok' | 'warn' | 'fail' | 'info' | 'unknown', title, detail, fix: { label, run, primary } }. */
-function checkItems(p, where, cli, type, checks) {
+function checkItems(p, where, cli, type, checks, others = []) {
     const here = computerName(), items = [];
     if (!where.exists) return [{ tone: 'warn', title: 'This folder does not exist yet', detail: 'Coral can create it when you launch.' }];
     if (!where.is_repo) {
@@ -232,7 +259,14 @@ function checkItems(p, where, cli, type, checks) {
     if (type && cli) {
         const name = type.charAt(0).toUpperCase() + type.slice(1);
         if (cli.supported === false) items.push({ tone: 'fail', title: `${name} is not offered on ${here}`, detail: cli.message || '' });
-        else if (cli.found === false) items.push({ tone: 'fail', title: `${name} is not installed on ${here}`, detail: 'Install it there, then check again.' });
+        else if (cli.found === false) { // the way out (#596): an agent that computer has, or the CLI's path in Settings > Providers
+            const local = isLocalServer(_effectiveServer(launch.server)) && !isCloud();
+            const fixes = others.map(t => ({ label: `Use ${TYPE_NAMES[t]}`, run: () => pickType(p.kind, t) }));
+            if (local) fixes.push({ label: 'Settings > Providers', run: () => openProviders(p) });
+            items.push({ tone: 'fail', title: `${name} is not installed on ${here}`, fixes,
+                detail: others.length ? `Install it there, or use an agent ${here} has.` : local ? 'Install it there, or set its path in Settings > Providers, then check again.' : 'Install it there, then check again.',
+                why: others.length ? `use ${TYPE_NAMES[others[0]]}, which ${here} has, or install ${name}` : local ? `install ${name} on ${here}, or set its path in Settings > Providers` : '' });
+        }
         else if (cli.signed_in === false) { const server = _effectiveServer(launch.server); items.push({ tone: 'fail', title: `${name} is installed but not signed in on ${here}`, detail: isLocalServer(server) && !isCloud() ? 'Launching now would stop at the CLI’s sign-in.' : `Sign in on ${here} itself, then check again: launching now would stop at the CLI’s sign-in.`, fix: isLocalServer(server) && !isCloud() ? { label: `Sign in on ${here}`, primary: true, signin: type } : null }); }
         else if (cli.signed_in === true) items.push({ tone: 'ok', title: `${name} is installed and signed in`, detail: cli.version ? `version ${cli.version} on ${here}` : `on ${here}` });
         else items.push({ tone: 'unknown', title: `${name} sign-in: not checked`, detail: cli.signin_timeout ? 'Its sign-in did not answer: not checked, and it does not block.' : `${name} cannot be asked. If it needs you to sign in, it says so in its terminal and the agent waits there.` });
@@ -244,7 +278,7 @@ function checkItems(p, where, cli, type, checks) {
 
 const MARK = { ok: '✓', fail: '✕', warn: '!', info: 'i', unknown: '?' };
 
-function draw(p, where, recents, cli, type, checks) {
+function draw(p, where, recents, cli, type, checks, others) {
     const host = p.host; host.replaceChildren();
     const here = computerName();
     p.blockers = [];
@@ -252,7 +286,7 @@ function draw(p, where, recents, cli, type, checks) {
     const rec = drawRecents(p, where, recents, here); if (rec) host.append(rec);
     if (where.is_repo && p.kind !== 'team') host.append(drawBranch(p, where, here));
 
-    const items = checkItems(p, where, cli, type, checks);
+    const items = checkItems(p, where, cli, type, checks, others);
     p.blockers = items.filter(i => i.tone === 'fail');
     if (items.length) {
         const sec = node('div', 'launch-where-sec launch-where-check'); sec.setAttribute('role', 'group'); sec.setAttribute('aria-label', 'Setup check');
