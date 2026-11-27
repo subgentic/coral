@@ -24,10 +24,11 @@ const (
 // app's timers far longer than a minute (App Nap), which would reload a healthy page and lose what the person was typing.
 var rendererWatchOn = runtime.GOOS == "windows"
 
-// aliveScript reports every 5 s that the page is alive, with the page it shows (path, query and hash), so the app can reopen it.
+// aliveScript reports every 5 s that the page is alive, with the page it shows (path and query; loginlink.ValidPage refuses a hash),
+// so the app can reopen it.
 // _coralAlive exists only on the dashboard's origin (apptoken.ShimScript): an error page or another site never reports.
 const aliveScript = `(function(){
-	function beat() { try { if (window._coralAlive) window._coralAlive(location.pathname + location.search + location.hash); } catch (e) {} }
+	function beat() { try { if (window._coralAlive) window._coralAlive(location.pathname + location.search); } catch (e) {} }
 	beat();
 	setInterval(beat, 5000);
 })();`

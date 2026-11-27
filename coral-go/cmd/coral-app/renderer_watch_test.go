@@ -18,12 +18,12 @@ func TestRendererWatch_NeverBeforeTheFirstReport(t *testing.T) {
 func TestRendererWatch_DueAfterSilenceWithTheLastPage(t *testing.T) {
 	var r rendererWatch
 	t0 := time.Unix(1_000_000, 0)
-	r.alive(t0, "/agents?x=1#y")
+	r.alive(t0, "/agents?x=1")
 	if ok, _ := r.due(t0.Add(rendererStale - time.Second)); ok {
 		t.Fatal("due before rendererStale")
 	}
 	ok, page := r.due(t0.Add(rendererStale))
-	if !ok || page != "/agents?x=1#y" {
+	if !ok || page != "/agents?x=1" {
 		t.Fatalf("due = %v, %q; want true, the last page", ok, page)
 	}
 	// The clock restarts: a page that does not come back is reopened at most once every rendererStale.
@@ -85,5 +85,11 @@ func TestRendererWatch_SleepIsNotSilence(t *testing.T) {
 func TestAliveScript_UsesOnlyTheGuardedFunction(t *testing.T) {
 	if !strings.Contains(aliveScript, "window._coralAlive") || strings.Contains(aliveScript, "__coralNative") {
 		t.Fatal("aliveScript must call the page-facing _coralAlive (dashboard origin only), never the native binding")
+	}
+}
+
+func TestAliveScript_SendsNoHash(t *testing.T) {
+	if strings.Contains(aliveScript, "location.hash") {
+		t.Fatal("aliveScript must not send the hash: loginlink.ValidPage refuses it, so the reopen would land on / instead")
 	}
 }
