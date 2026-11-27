@@ -8,7 +8,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect({ grouping: 'status' });
@@ -38,6 +38,8 @@ const { settle } = require('./helpers/wait');
         const load = async view => {
             await Emulation.setDeviceMetricsOverride({ width: view.width, height: view.height, deviceScaleFactor: 1, mobile: view.mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+            // The page's own first live-list read has to be finished before scene() takes over what the mocked server answers (#21921): a read still in flight answers with the bare rows and lands on the scene after it is drawn (it is the 'every agent' wait that timed out on a starved CI runner)
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded');
             await ev(`try { localStorage.setItem('coral-show-model', 'false'); } catch (e) {} true`);
         };
         const picture = phone => ev(`(() => {
