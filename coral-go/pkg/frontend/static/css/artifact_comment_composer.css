@@ -8,9 +8,9 @@
     .ac-composer:has(.ac-draft-actions) .ac-composer-row .btn { min-height: var(--control-touch-height, 44px); }
 }
 
-/* A tall review composer must scroll with its header: opposing sticky edges
-   overlap at enlarged phone text sizes when both exceed the sheet's height. */
+/* At enlarged text sizes the full review composer scrolls with its header.
+   The keyboard layout hides help text and retains its compact sticky controls. */
 @media (max-width: 767px) {
-    .ac-panel:has(.ac-draft-actions) > :is(.ac-head, .ac-composer) { position: static; }
-    .ac-panel:has(.ac-draft-actions) > .ac-composer { margin-bottom: 0; }
+    body:not(.keyboard-open) .ac-panel:has(.ac-draft-actions) > :is(.ac-head, .ac-composer) { position: static; }
+    body:not(.keyboard-open) .ac-panel:has(.ac-draft-actions) > .ac-composer { margin-bottom: 0; }
 }
