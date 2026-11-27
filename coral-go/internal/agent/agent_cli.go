@@ -223,9 +223,19 @@ func FindCLI(settings map[string]string, agentType string) (string, error) {
 
 // FindCLIForLaunch is FindCLI without the node check: an agent's launch line carries its own (NodePathPrefix), and the agent's shell may have a node Coral's process does not.
 func FindCLIForLaunch(settings map[string]string, agentType string) (string, error) {
+	return FindCLIForLaunchScreened(settings, agentType, nil)
+}
+
+// FindCLIForLaunchScreened is FindCLIForLaunch with the screen a CLI on PATH or in a common place gets (the routes pass the check that refuses an agent's working folder and
+// Coral's data folder): a configured path through junctions Windows will not open runs the program they lead to (#582), and that program is screened the same way, so a
+// junction cannot lead a launch into a temp folder or a refused folder. A configured path Windows opens as it is is not screened, as before.
+func FindCLIForLaunchScreened(settings map[string]string, agentType string, screen func(path string) string) (string, error) {
 	if p := ResolveCLIPath(settings, agentType); p != "" {
 		run := p
-		if real, rerr := RealCLIPath(p); rerr == nil { // a path through junctions Windows will not open: the program it leads to, found again at each launch (#582)
+		if real, rerr := RealCLIPath(p); rerr == nil && real != p { // a path through junctions Windows will not open: the program it leads to, found again at each launch (#582)
+			if why := FollowedCLIRefusal(real, screen); why != "" {
+				return "", &CLIPathError{AgentType: agentType, Path: p, Err: fmt.Errorf("its junctions lead to %s, which is %s", real, why)}
+			}
 			run = real
 		}
 		resolved, err := exec.LookPath(run)
@@ -273,7 +283,7 @@ func LaunchCLIScreened(settings map[string]string, agentType string, screen func
 		return ResolveCLIPath(settings, agentType), nil
 	}
 	if ResolveCLIPath(settings, agentType) != "" {
-		return FindCLIForLaunch(settings, agentType)
+		return FindCLIForLaunchScreened(settings, agentType, screen)
 	}
 	if p, err := exec.LookPath(info.Binary); err == nil {
 		if abs, aerr := filepath.Abs(p); aerr == nil {
@@ -287,7 +297,7 @@ func LaunchCLIScreened(settings map[string]string, agentType string, screen func
 	// Not found on PATH because a PATH folder is an untrusted mount point (Windows): the program its junctions lead to, followed by Coral (#582), screened as a common place is.
 	// When they lead to none, the launch line's bare name would fail in the agent's shell the same way, so say why now (#340).
 	if p, dir, bad := CLIThroughUntrustedMount(info.Binary); bad {
-		if p != "" && !InTempFolder(p) && (screen == nil || screen(p) == "") {
+		if p != "" && FollowedCLIRefusal(p, screen) == "" {
 			return p, nil
 		}
 		return "", &CLIUntrustedMountError{AgentType: agentType, Binary: info.Binary, Dir: dir}
