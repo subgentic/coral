@@ -121,6 +121,12 @@ A successful launch means the agent process started; check its Terminal if it st
 
 A new Claude agent starts in Claude's **Auto** permission mode: it runs without most prompts, and Claude's own background safety checks stay on. Coral no longer bypasses every prompt by default. Pick another mode in the launch form's **Permissions** section, or set your own default in **Settings > Agents > Default permission mode**; a mode you saved or chose stays as you set it, for every agent type. An agent started from Coral Hub gets Auto only when this computer allows Coral Hub to turn on auto-accept; otherwise it asks as Claude does by default. Codex's Auto is a workspace sandbox that never asks, with Coral reachable per launch. Antigravity and Gemini start in agy's own auto mode (`--mode auto`) when your agy offers it, and ask as usual when it does not. Hermes and opencode start with no prompts (Hermes by the Operator's decision, with no sandbox of any kind), and Pi has no permission modes: it never asks.
 
+### Codex Full Access confirmation
+
+When Codex opens its **Enable full access?** confirmation in the terminal (confirming Full Access with no sandbox and no approvals), the agent waits in **Inbox > Needs you** and in Chat with its two options (**1. Yes, continue anyway** and **2. Cancel**). Coral never types into or answers the dialog for you; answer it in the agent's terminal, or send `1` or `2` from Coral.
+
+![Codex asks: Enable full access? 1. Yes, continue anyway 2. Cancel](assets/codex-full-access-dialog.png)
+
 ## Auto-accept permission prompts
 
 For an agent you trust with its task, you can let Coral answer its permission prompts for you: open the agent's menu (⋮) and turn on **Auto-accept prompts**. Coral warns you first, because the agent will then run commands, edit and delete files and use tools without asking, and that can include risky actions; use it only for trusted tasks, ideally in a sandbox or a disposable worktree. You can give it a time limit.
