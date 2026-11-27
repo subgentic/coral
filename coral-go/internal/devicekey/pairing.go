@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // Pairing refusals. They are what Coral tells the person; none carries a key, a MAC or the secret.
@@ -120,6 +121,8 @@ func DisplayFingerprint(computerPub []byte) string {
 type PairingStore interface {
 	AddDeviceKey(ctx context.Context, k store.DeviceKey, now time.Time) (bool, error)
 	PromoteDeviceOrigin(ctx context.Context, kid string, now time.Time) (bool, error)
+	ActiveDeviceKey(ctx context.Context, kid string, now time.Time) (store.DeviceKey, error)
+	SetDeviceMode(ctx context.Context, kid, mode, by string, now time.Time) error
 }
 
 // CompletePairing checks the Hub's pairing answer and, only when it passes, adds the browser's key as a `pairing` device at mode (the web setting). A key already listed as bootstrap or noproof is promoted to pairing, the one upward step; its mode is not touched. It is the only caller of the promotion.
@@ -149,10 +152,25 @@ func AddPairedKey(ctx context.Context, st PairingStore, kid string, pk []byte, l
 	if err != nil {
 		return mapStoreErr(err)
 	}
+	final := mode
 	if !added {
 		if _, err := st.PromoteDeviceOrigin(ctx, kid, now); err != nil {
 			return err
 		}
+		// A promoted key becomes trusted (#21883): it never keeps a mode above the one the person just chose. Capped, never raised.
+		k, err := st.ActiveDeviceKey(ctx, kid, now)
+		if err != nil {
+			return mapStoreErr(err)
+		}
+		have, ok := tunnel.ParseMode(k.Mode)
+		want, wok := tunnel.ParseMode(mode)
+		if ok && wok && have <= want {
+			final = k.Mode
+		}
+	}
+	// The mark the Needs you notice reads: the person at this computer allowed this key at this mode (and it stamps the time of the change).
+	if err := st.SetDeviceMode(ctx, kid, final, store.PairBrowserBy, now); err != nil {
+		return mapStoreErr(err)
 	}
 	return nil
 }

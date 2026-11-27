@@ -22,6 +22,8 @@ const (
 
 	// PairOwner is the explicit marker, in both columns of the pair, of a key made at this computer by its owner (#20513). A pair that is empty or half a marker fails closed everywhere: nothing is assumed to be the owner's.
 	PairOwner = "(owner)"
+	// PairBrowserBy is the raised_by mark of a key the person allowed at this computer through the pair-a-browser flow (#21880): the Needs you notice reads it ("<label> can now act on this computer as <mode>").
+	PairBrowserBy = "pair-browser"
 
 	DeviceRemoved = "removed"
 	DeviceExpired = "expired"
