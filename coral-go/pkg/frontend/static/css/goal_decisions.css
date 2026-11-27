@@ -33,3 +33,5 @@
 @media(max-width:900px){.goal-review-desk.goal-split-open .goal-main{flex:none;min-width:0;overflow:visible;border-right:0}.goal-review-desk-head{padding:12px 16px 0}.goal-file-filters button{min-height:44px}.goal-review-desk{flex-direction:column;overflow-y:auto}.goal-review-desk.goal-split-open .goal-detail-pane{position:static;flex:none;overflow:visible;min-height:70vh;border-top:1px solid var(--border)}.goal-review-desk .goal-detail-pane .pane-body{flex:none;overflow:visible}}
 
 .goal-decision-toggle .state-word,.goal-review-desk-title .state-word{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
+
+.goal-decision-task{margin-left:6px;border:1px solid var(--border);background:var(--bg-primary)}

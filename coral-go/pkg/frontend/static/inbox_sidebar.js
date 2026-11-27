@@ -2062,7 +2062,7 @@ export async function openInboxGoal(team, id) {
     const body = el('div', 'goals-body'); view.append(body); host.append(view);
     const before = String(history.state?.prev || '');
     const intent = goalArtifactIntent?.team === team && goalArtifactIntent?.id === id ? goalArtifactIntent : null; goalArtifactIntent = null;
-    goalMount = mountGoal(body, { team, id, status: sayLive, initialTab: intent?.tab, initialArtifact: intent?.item, initialFiles: intent?.files,
+    goalMount = mountGoal(body, { team, id, status: sayLive, initialTab: intent?.tab, initialArtifact: intent?.item, initialFiles: intent?.files, initialComments: goals.find(g => g.board_id === team && g.id === id)?.comments_open,
         teamLink: build(keyRoute('team', team, 'goals', id)), focusOnOpen: false, backLabel: backLabelFor('goal', before, openedFrom()),
         onTask: (task, g) => go({ view: 'inbox-tasks', sub: 'tasks', id: team, item: task.id }, { from: g && g.title }), // a task of the goal opens in the Inbox, never on the team page (#8861); its Back says the goal
         back: () => { if (backIs(folderRoute) || cameFromInbox()) history.back(); else go(folderRoute); }, // to the Inbox screen it was opened from (a task's Goal line), else the folder
