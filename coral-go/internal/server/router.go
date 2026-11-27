@@ -83,10 +83,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 		return m.NewDeviceVerifier(store.NewSessionStore(s.db))
 	}
 	relayedOwner, _ := routes.LinkOwnerSources(linkStamps)
-	requireDevice := func(ctx context.Context) bool { // read on each request
-		s, err := store.NewSessionStore(s.db).GetSettings(ctx)
-		return err != nil && routes.HubRequireTrustedDevice(nil) || err == nil && routes.HubRequireTrustedDevice(s)
-	}
+	requireDevice := routes.RequireTrustedDeviceReader(store.NewSessionStore(s.db).GetSettings) // read on each request; an unreadable store keeps the last value, or is on (#21931)
 	r.Use(routes.RelayedGuard(relayedVerifier, relayedOwner, requireDevice))
 	routes.SetRelayedSignerMode(func(ctx context.Context, kid string) (string, bool, bool) { // #20966: the mode of the device that signed a relayed join request, and whether it is the owner's, from this computer's own list
 		v := relayedVerifier()
