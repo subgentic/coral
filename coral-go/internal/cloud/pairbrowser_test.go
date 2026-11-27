@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	qrcode "github.com/skip2/go-qrcode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -246,4 +247,33 @@ func TestNoPairingStartsWithoutAConnectionOrAComputerKey(t *testing.T) {
 	r2 := pairingSetup(t, false)
 	_, err = r2.m.StartPairBrowser(context.Background())
 	assert.ErrorIs(t, err, ErrPairBrowserNoKey)
+}
+
+// #21908: the shared image route renders the additional-browser hold, then loses
+// access immediately when the person decides, without waiting for the Hub poll.
+func TestAdditionalBrowserQRStopsAtLocalDecision(t *testing.T) {
+	for _, allow := range []bool{true, false} {
+		t.Run(map[bool]string{true: "allow", false: "deny"}[allow], func(t *testing.T) {
+			r := connectedRig(t)
+			v, link := startPair(t, r)
+			want, err := qrcode.Encode(v.Link, qrcode.Medium, 256)
+			require.NoError(t, err)
+			require.Equal(t, want, r.m.EnrollmentQRPNG(), "the PNG carries this pairing link and its own fragment")
+			b := answerFor(t, v, "My phone", nil)
+			_, err = b.ask(r.m, link)
+			require.NoError(t, err)
+			require.NotEmpty(t, r.m.EnrollmentQRPNG())
+			if allow {
+				require.NoError(t, r.m.AllowPairBrowser(context.Background(), "view"))
+			} else {
+				require.NoError(t, r.m.DenyPairBrowser())
+			}
+			require.Empty(t, r.m.EnrollmentQRPNG())
+			require.Empty(t, r.m.PairBrowserState().Link, "a wiped hold's link must leave the local view too")
+		})
+	}
+	r := connectedRig(t)
+	startPair(t, r)
+	r.m.CancelPairBrowser()
+	require.Empty(t, r.m.EnrollmentQRPNG())
 }

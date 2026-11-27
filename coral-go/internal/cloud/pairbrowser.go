@@ -160,7 +160,10 @@ func (m *Manager) pairBrowserViewLocked(now time.Time) PairBrowserView {
 		return v
 	}
 	v.Last = pb.last
-	v.Active, v.Code, v.Link, v.Fingerprint = true, pb.code, pb.url, m.DisplayFingerprint()
+	v.Active, v.Code, v.Fingerprint = true, pb.code, m.DisplayFingerprint()
+	if !pb.hold.QRExpiresAt(now).IsZero() {
+		v.Link = pb.url
+	}
 	v.ExpiresAt = pb.started.Add(pairBrowserLife)
 	if p := pb.pend; p != nil && p.state == "waiting" {
 		v.Pending = &PairBrowserAsk{Label: p.label, Fingerprint: devicekey.DisplayFingerprint(p.pk), ExpiresAt: p.asked.Add(pairBrowserPending)}
