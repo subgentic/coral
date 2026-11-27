@@ -6,14 +6,18 @@ import { pollEvery } from './overload.js';
  * table) with a Team filter and column, and the document in a pane on the page's right: a click on a row opens it there and the list stays. The server merges the teams (GET /api/team-artifacts);
  * this file is the folder: its count for the sidebar, its page, and the search the sidebar's box feeds. Lazy: inbox_sidebar.js imports it. */
 import { importOnce } from './import_once.js';
-const DT = await importOnce('./data_table.js');
-const { createArtifactsList } = await importOnce('./team_artifacts_page.js');
-const { inboxBarSpec } = await importOnce('./team_artifact_bar.js');
-const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on the shared list bar (#8596)
-const PH = await importOnce('./page_header.js'); // the shared page header: title and count in row 1, the search and the filter icon in row 2 (#15834, design guidelines 4.2)
+import { el } from './dom_el.js';
+import { refreshGroupTable } from './sidebar_groups.js';
+let DT, IT, PH, inboxBarSpec, list = null, pageLoading = null, pageError = false;
+function ensurePage() {
+    if (list || pageLoading || pageError) return;
+    pageLoading = Promise.all([importOnce('./data_table.js'), importOnce('./team_artifacts_page.js'), importOnce('./team_artifact_bar.js'), importOnce('./inbox_toolbar.js'), importOnce('./page_header.js')]).then(([dt, page, bar, it, ph]) => {
+        DT = dt; IT = it; PH = ph; inboxBarSpec = bar.inboxBarSpec; list = page.createArtifactsList({ inbox: true });
+        refreshGroupTable('hub-inbox');
+    }).catch(() => { pageLoading = null; pageError = true; refreshGroupTable('hub-inbox'); });
+}
 
 const KEY = '@inbox'; // the key the folder keeps its filters under, beside the teams' own (the team page's showArtifacts takes it as its project)
-const list = createArtifactsList({ inbox: true });
 let count = null; // every artifact of every team (the unfiltered total), or null until the first answer
 let countAt = 0;  // when it was read or last told by the list; a screen switch does not ask again within COUNT_FRESH_MS (#9251: every Inbox screen re-asked a count-sized read, 36 to 74 ms)
 let counting = null; // the read in flight: a second ask waits for it
@@ -68,6 +72,7 @@ const hooks = () => ({ onShown: (shown, total, more) => { shownCount = `${shown}
 let folderBar = null;
 /** The folder's toolbar (the shared one every Inbox folder has): the search, the Filters icon beside it (Team, Type, Origin, Uploaded by, Kept only, dates, Sort), the chips of what is on. The list uses this bar as its own. */
 export function artifactsToolbar(redraw) {
+    if (!list) { ensurePage(); return null; }
     if (!folderBar) {
         folderBar = IT.folderToolbar(inboxBarSpec(), next => list.setFilters(next));
         list.useBar(folderBar.bar, KEY);
@@ -87,6 +92,14 @@ export function artifactsToolbar(redraw) {
 
 /** The folder's page for the group table: the list and the detail pane; its title and count are the first thing of the toolbar's row (folderHead), like every folder's (#15834). */
 export function artifactsSpec() {
+    if (!list) {
+        ensurePage();
+        return { title: 'Artifacts', rows: [], signature: 'artifacts-loading-' + pageError, node: () => {
+            const node = el('div', 'empty-state'); node.append(el('p', '', pageError ? 'Artifacts could not be loaded.' : 'Loading Artifacts…'));
+            if (pageError) { const retry = el('button', 'btn', 'Retry'); retry.type = 'button'; retry.addEventListener('click', () => { pageError = false; ensurePage(); refreshGroupTable('hub-inbox'); }); node.append(retry); }
+            return node;
+        } };
+    }
     return { title: 'Artifacts', noun: ['artifact', 'artifacts'], get count() { return shownCount || count; }, rows: [], signature: 'artifacts', node: () => {
         const row = DT.el('div', 'inbox-artifacts-row');
         const main = DT.el('div', 'inbox-artifacts-main');
