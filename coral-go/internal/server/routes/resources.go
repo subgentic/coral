@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"errors"
+	"github.com/subgentic/coral/pkg/tunnel"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -296,10 +297,7 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusGone, "cancelled", "your place in line for "+cleanText(name, 80)+" was cancelled (released or removed): nothing was claimed")
 		return
 	}
-	runPID := 0
-	if fromLoopback(r) {
-		runPID = body.RunPID
-	}
+	runPID := localRunPID(r, body.RunPID)
 	res, err := h.M.ClaimRun(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200), cleanText(body.RunID, 64), runPID)
 	if err != nil {
 		h.fail(w, err)
@@ -579,4 +577,12 @@ func (h *ResourcesHandler) addStats(views []resourceView) {
 			views[i].Stats = h.Stats.Get(views[i].Machine, views[i].Where)
 		}
 	}
+}
+
+// localRunPID is a claim's run_pid only when it can be a process of this computer: from loopback and not carried by the Hub's tunnel (#21803: a tunnelled claim's pid is the remote machine's).
+func localRunPID(r *http.Request, pid int) int {
+	if r.Header.Get(tunnel.ViaHeader) != "" || !fromLoopback(r) {
+		return 0
+	}
+	return pid
 }

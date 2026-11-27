@@ -79,6 +79,7 @@ type Entry struct {
 	Polled   time.Time      // #14170: when the agent last asked about this place (a waiting claim asks every few seconds); an entry nobody has asked about for WaitStale is not waited on: its command ended
 	Runs     []string       // #21790: the ids of the `claim --run` commands that share this entry (an agent holds one slot per resource, so a second run joins the first); it is given back when the last of them ends
 	RunPIDs  map[string]int // #21800: run id -> its process, for the runs whose process is known
+	Folded   bool           // #21803: runs past MaxRunsPerEntry were folded into Base: their ids are unknown, so no run's end gives the entry back
 	Base     bool           // #21790: a claim that is not a run (by hand, or the hook's) is on the entry too: a run ending does not end it
 	Away     time.Time      // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
 }
@@ -482,7 +483,7 @@ func (e *Entry) join(runID string, pid int) {
 		}
 	}
 	if len(e.Runs) >= MaxRunsPerEntry {
-		e.Base = true // #21797: past the cap an extra run is folded into the plain claim, so one agent's many run ids cannot grow its entry; it is given back by a plain release or the lease
+		e.Base, e.Folded = true, true // #21797: past the cap an extra run is folded into the plain claim, so one agent's many run ids cannot grow its entry; it is given back by a plain release or the lease
 		return
 	}
 	e.Runs = append(e.Runs, runID)
@@ -542,6 +543,11 @@ func (q *Queue) ReleaseRun(key, agent, runID string) error {
 					return err // another claim still stands on the entry
 				}
 				break
+			}
+			if e.Folded { // an id the entry never kept: a folded run's (#21803); it is given back by a plain release or the lease
+				err := q.save()
+				q.unlockEmit()
+				return err
 			}
 		}
 		q.unlockEmit()
