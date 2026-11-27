@@ -81,7 +81,7 @@ const HEX='d'.repeat(64), OTHER='e'.repeat(64);
    await open(width);
    assert.ok(await ev(`(()=>{const a=document.querySelector('.ac-composer .ac-send').getBoundingClientRect(),b=document.querySelector('.ac-save-send').getBoundingClientRect();return Math.abs(a.y-b.y)<1 && b.right<=innerWidth;})()`),'Save draft and Save and send stay adjacent and fit');
    const labels=await ev(`[...document.querySelectorAll('.ac-composer-row button')].map(b=>b.getAttribute('aria-label') || b.textContent)`);
-   assert.deepEqual(labels,['Add image','Cancel','Save','Send']);
+   assert.deepEqual(labels,['Add image','Cancel','Save','Send comment']);
    assert.ok(await ev(`!document.querySelector('.ac-composer .ac-send').classList.contains('btn-primary') && document.querySelector('.ac-save-send').classList.contains('btn-primary')`));
    assert.match(await ev(`document.querySelector('.ac-draft-save-hint').textContent`),/Send comments.*Send/);
    assert.ok(await ev(`(()=>{const buttons=[...document.querySelectorAll('.ac-composer-row button')],r=buttons.map(b=>b.getBoundingClientRect()),field=document.querySelector('.ac-composer textarea').getBoundingClientRect();return buttons.every(b=>getComputedStyle(b).fontSize===getComputedStyle(buttons[0]).fontSize)&&r.every(b=>Math.abs(b.y-r[0].y)<1&&Math.abs(b.height-r[0].height)<1)&&Math.abs(r[0].left-field.left)<1&&Math.abs(r.at(-1).right-field.right)<1;})()`),'text actions share one baseline, size, and field edges');
