@@ -3,6 +3,9 @@
 import { splitKey, identityKey } from './server_base.js';
 
 const at = new Map(); // team key -> when it was archived ('' when unknown)
+const kept = new Map(); // team key -> how many goals the archived team keeps (the projects list says it, #21924)
+
+export const goalsKept = key => kept.get(String(key ?? '')) || 0;
 
 export const isArchived = key => at.has(String(key ?? ''));
 
@@ -18,6 +21,7 @@ export function noteArchivedRows(rows, server = null) {
     for (const p of Array.isArray(rows) ? rows : []) {
         if (!p || !p.project) continue;
         const key = server && server !== 'local' ? identityKey(server, splitKey(p.project).name) : String(p.project);
+        if (p.archived && p.goals_kept) kept.set(key, p.goals_kept); else kept.delete(key);
         setArchived(key, !!p.archived, p.archived_at || '');
     }
 }

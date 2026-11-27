@@ -112,6 +112,7 @@ func (s *Store) ListProjects(ctx context.Context) ([]ProjectInfo, error) {
 			projects[i].BoardID = projects[i].Project
 			if at, ok := archived[projects[i].Project]; ok {
 				projects[i].Archived, projects[i].ArchivedAt = true, at
+				_ = s.reader().GetContext(ctx, &projects[i].GoalsKept, `SELECT COUNT(*) FROM board_goals WHERE board_id = ?`, projects[i].Project) // a failed read leaves 0: the row says no count
 			}
 			projects[i].Goals = &GoalsBrief{Open: projects[i].GoalsOpen, Seq: projects[i].GoalsSeq}
 		}

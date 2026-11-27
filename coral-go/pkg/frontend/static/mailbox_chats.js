@@ -240,7 +240,7 @@ const teamActions = (g, ctx) => {
 /** A team row's one line as the approved mock draws it (#21915): "Team · today · 3 agents running", "Team · 23 Nov · no agent running", an archived team's "Team · archived 24 Nov · 4 agents". */
 const teamLine = g => {
     const k = groupKey(g), mine = (state.liveSessions || []).filter(a => a.board_project === k), up = mine.filter(a => !a.archived && !a.sleeping).length, d = dayOf(stampOf(g)), day = /^[A-Z][a-z]+$/.test(d) && d !== 'Today' && d !== 'Yesterday' ? d : d.toLowerCase(), n = (c, w) => `${c} ${w}${c === 1 ? '' : 's'}`;
-    return teamArchived(g) ? `Team \u00b7 archived ${day} \u00b7 ${n(mine.length, 'agent')}` : `Team \u00b7 ${day} \u00b7 ${up ? n(up, 'agent') + ' running' : 'no agent running'}`;
+    return teamArchived(g) ? `Team \u00b7 archived ${day} \u00b7 ${n(mine.length, 'agent')}${AT.goalsKept(teamKey(g)) ? ` \u00b7 ${n(AT.goalsKept(teamKey(g)), 'goal')} kept` : ''}` : `Team \u00b7 ${day} \u00b7 ${up ? n(up, 'agent') + ' running' : 'no agent running'}`;
 };
 let archivedOpen = null; // the Archived teams group: open on a computer, shut on a phone (the mock) until it is pressed
 const archivedIsOpen = () => (archivedOpen === null ? !window.matchMedia?.('(max-width: 767px)').matches : archivedOpen);
@@ -330,7 +330,7 @@ function chatFolderSpec(key, ctx) {
                     if (isCloud() || (s.server && s.server !== 'local') || s.openAgent || s.run_state) return ''; // a row with no chat has nothing to star or archive here
                     const w = DT.el('span', 'dt-chat-flags');
                     const teamButtons = g => { // a team's row: Restore team once archived, else the row's ⋯ menu as the mock draws it (#21850, #21915)
-                        if (teamArchived(g)) { const b = DT.el('button', 'btn btn-quiet btn-xs', 'Restore team'); b.type = 'button'; b.dataset.teamAction = 'Restore team'; b.setAttribute('aria-label', `Restore team: ${name(g)}`); b.addEventListener('click', e => { e.stopPropagation(); window.toggleTeamSleep?.(teamKey(g), 'restore'); }); return [b]; }
+                        // an archived team's row has the same ⋯ menu: Restore team and Open team (#21924)
                         return [DT.rowMore(teamActions(g, ctx), name(g) || 'team')];
                     };
                     // icon buttons that show on the row's hover or focus (the star stays drawn when set); a phone has them in the opened chat
