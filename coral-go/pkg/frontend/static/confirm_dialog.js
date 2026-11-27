@@ -16,7 +16,7 @@ export function showConfirmModal(title, message, onConfirm, onCancel, opts = {})
     const newBtn = yesBtn.cloneNode(true);
     newBtn.textContent = opts.label || 'Confirm'; // every caller names the action (confirm_census); the fallback is not a Yes
     newBtn.className = opts.danger === true ? 'btn btn-danger' : 'btn btn-primary'; // set on every call: the template's class is not kept
-    const noBtn = document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)'); if (noBtn) noBtn.textContent = opts.cancelLabel || 'Cancel'; // the stay button's words, put back to Cancel for every other question
+    const noBtn = yesBtn.previousElementSibling; if (noBtn) noBtn.textContent = opts.cancelLabel || 'Cancel'; // the stay button's words, put back to Cancel for every other question
     yesBtn.parentNode.replaceChild(newBtn, yesBtn);
     let ack = null;
     if (opts.acknowledge) {
@@ -50,6 +50,7 @@ export function showConfirmModal(title, message, onConfirm, onCancel, opts = {})
     });
     _confirmCancel = onCancel || null;
     document.getElementById("confirm-modal").style.display = "flex";
+    noBtn?.focus({ preventScroll: true }); // the safe answer owns focus before the visible dialog can take a key
 }
 
 function _dismissConfirm() {
