@@ -77,7 +77,7 @@ const DATA = process.env.CORAL_TEST_DATA_DIR || '';
         check('deleting it is refused with the reason, even for the owner', del.status === 403 && /your own/.test(del.body.error), JSON.stringify(del.body));
         await open();
         await waitFor(`document.querySelectorAll('.ac-panel .ac-card').length >= 2`, 'both threads', 6000);
-        const buttons = await ev(`[...document.querySelectorAll('.ac-panel .ac-card')].map(li => ({ text: li.querySelector('.ac-body') && li.querySelector('.ac-body').textContent, actions: [...li.querySelectorAll('.ac-entry:first-of-type button, :scope > .ac-replybox')].map(b => /^(Edit|Delete) comment$/.test(b.getAttribute('aria-label') || '') ? b.getAttribute('aria-label').replace(' comment', '') : b.textContent) }))`);
+        const buttons = await ev(`[...document.querySelectorAll('.ac-panel .ac-card')].map(li => ({ text: li.querySelector('.ac-body') && li.querySelector('.ac-body').textContent, actions: [...li.querySelectorAll('.ac-entry:first-of-type button, :scope > .ac-replybox')].map(b => /^(Edit|Delete) comment by /.test(b.getAttribute('aria-label') || '') ? b.getAttribute('aria-label').split(' comment by ')[0] : b.textContent) }))`);
         const o = buttons.find(b => b.text === 'From someone else.');
         check('the panel offers the reply box and Resolve on it, and no Edit and no Delete', o && o.actions.includes('Reply…') && o.actions.includes('Resolve') && !o.actions.includes('Edit') && !o.actions.includes('Delete'), JSON.stringify(o));
         check('and Edit and Delete on the owner\'s own', buttons.some(b => b.text === 'Try 5,000 rows a batch.' && b.actions.includes('Edit') && b.actions.includes('Delete')), JSON.stringify(buttons));

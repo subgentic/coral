@@ -78,25 +78,26 @@ const HEX='d'.repeat(64), OTHER='e'.repeat(64);
    await click('.ac-draft-bar button.btn-primary');
    await waitFor(`document.querySelector('.ac-error:not([hidden])')?.textContent.includes('Agent unavailable')`,'inline send failure');
    await ev(`document.querySelector('.ac-error:not([hidden])').scrollIntoView({block:'center'});true`);await ev(framesJs(3));await shot('failed-'+width);
-   results.push(await ev(`(()=>{const r=s=>document.querySelector(s).getBoundingClientRect(),close=r('.artifact-review-close'),changes=r('.artifact-review-changes'),approve=r('.artifact-review-approve'),title=r('.artifact-viewer-title'),more=r('.artifact-viewer-more'),buttons=[...document.querySelectorAll('.ac-draft-card .ac-comment-icon')];return {width:innerWidth,headerAligned:Math.abs(close.y-changes.y)<1&&Math.abs(close.y-approve.y)<1,titleAligned:Math.abs((title.top+title.bottom)/2-(more.top+more.bottom)/2)<2,icons:buttons.map(b=>({name:b.getAttribute('aria-label'),title:b.title,hidden:b.querySelector('.material-icons')?.getAttribute('aria-hidden'),height:b.getBoundingClientRect().height,width:b.getBoundingClientRect().width})),duplicateToast:[...document.querySelectorAll('#toast-host .toast')].some(t=>t.textContent.includes('Agent unavailable')),drafts:window.__drafts.length};})()`));
+   results.push(await ev(`(()=>{const r=s=>document.querySelector(s).getBoundingClientRect(),close=r('.artifact-review-close'),changes=r('.artifact-review-changes'),approve=r('.artifact-review-approve'),title=r('.artifact-viewer-title'),more=r('.artifact-viewer-more'),buttons=[...document.querySelectorAll('.ac-draft-card .ac-comment-icon')];return {width:innerWidth,titleWidth:title.width,headerAligned:Math.abs(close.y-changes.y)<1&&Math.abs(close.y-approve.y)<1,titleAligned:Math.abs((title.top+title.bottom)/2-(more.top+more.bottom)/2)<2,icons:buttons.map(b=>({name:b.getAttribute('aria-label'),title:b.title,hidden:b.querySelector('.material-icons')?.getAttribute('aria-hidden'),height:b.getBoundingClientRect().height,width:b.getBoundingClientRect().width})),duplicateToast:[...document.querySelectorAll('#toast-host .toast')].some(t=>t.textContent.includes('Agent unavailable')),drafts:window.__drafts.length};})()`));
   }
   for(const r of results){
-   assert.deepEqual(r.icons.map(b=>b.name),['Edit comment','Delete comment'],'draft actions are accessible icons at '+r.width);
-   assert.ok(r.icons.every(b=>b.title===b.name&&b.hidden==='true'&&(r.width!==390||(b.height>=44&&b.width>=44))),'icon names and touch targets at '+r.width);
-   if(r.width===390)assert.ok(r.headerAligned&&r.titleAligned,'phone title row and single aligned decision row');
+   assert.deepEqual(r.icons.map(b=>b.name),['Edit comment by You','Delete comment by You'],'draft actions are accessible icons at '+r.width);
+   assert.ok(r.icons.every(b=>b.title===b.name.split(' by ')[0]&&b.hidden==='true'&&(r.width!==390||(b.height>=44&&b.width>=44))),'icon names and touch targets at '+r.width);
+   if(r.width===390){assert.ok(r.titleWidth>=250,'phone document name keeps the row width beside the menu: '+r.titleWidth);assert.ok(r.headerAligned&&r.titleAligned,'phone title row and single aligned decision row');}
    assert.equal(r.duplicateToast,false,'review error stays inline without a floating duplicate');assert.equal(r.drafts,1,'failed send retains saved draft');
   }
   // The existing draft editor and delete action still work by real pointer clicks.
-  await click('.ac-draft-card [aria-label="Edit comment"]');
+  await click('.ac-draft-card [aria-label^="Edit comment by "]');
   await waitFor(`!!document.querySelector('.ac-draft-card textarea')`,'draft editor');
   await click('.ac-draft-card textarea');await ev(`document.querySelector('.ac-draft-card textarea').select();true`);await Input.insertText({text:'Confirm the rollback owner.'});
   await ev(`document.querySelector('.ac-draft-card button').click();true`);
-  await waitFor(`window.__drafts[0].body==='Confirm the rollback owner.' && !!document.querySelector('.ac-draft-card [aria-label="Delete comment"]:not(:disabled)')`,'draft edit saved');
-  await click('.ac-draft-card [aria-label="Delete comment"]');await waitFor('window.__drafts.length===0','private draft removed');assert.equal(await ev('window.__batches.length'),0);
+  await waitFor(`window.__drafts[0].body==='Confirm the rollback owner.' && !!document.querySelector('.ac-draft-card [aria-label^="Delete comment by "]:not(:disabled)')`,'draft edit saved');
+  await click('.ac-draft-card [aria-label^="Delete comment by "]');await waitFor('window.__drafts.length===0','private draft removed');assert.equal(await ev('window.__batches.length'),0);
   // Published owner comments use the same accessible icon pair.
   await ev(`window.__published=[{id:77,body:'Keep a rollback plan.',parent_id:null,anchor:{whole:true},author:{kind:'owner',subject:'Operator'},created_at:new Date().toISOString(),can:{edit:true,delete:true}}];true`);
   await ev(`import(${S}+'artifact_viewer.js').then(m=>m.openArtifactViewer('${HEX}',{filename:'Release plan',board:'draft-test'}))`);
-  await waitFor(`!!document.querySelector('.ac-card [aria-label="Edit comment"]') && !!document.querySelector('.ac-card [aria-label="Delete comment"]')`,'published comment icon pair');
+  await waitFor(`!!document.querySelector('.ac-card [aria-label^="Edit comment by "]') && !!document.querySelector('.ac-card [aria-label^="Delete comment by "]')`,'published comment icon pair');
+  assert.deepEqual(await ev(`[...document.querySelectorAll('.ac-card .ac-comment-icon')].map(b=>b.getAttribute('aria-label'))`),['Edit comment by Operator','Delete comment by Operator'],'published actions identify the author');
   console.log('PASS review header actions: aligned phone header, inline errors, retained drafts, named icon actions and private edit/delete at 1280/390');
  }finally{await client.close();}
 })().catch(e=>{console.error(e);process.exit(1);});
