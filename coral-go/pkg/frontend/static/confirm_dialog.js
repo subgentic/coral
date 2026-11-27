@@ -15,9 +15,9 @@ export function showConfirmModal(title, message, onConfirm, onCancel, opts = {})
     const yesBtn = document.getElementById("confirm-modal-yes");
     const newBtn = yesBtn.cloneNode(true);
     newBtn.textContent = opts.label || 'Confirm'; // every caller names the action (confirm_census); the fallback is not a Yes
-    newBtn.className = opts.danger === true ? 'btn btn-danger' : 'btn btn-primary'; // set on every call: the template's class is not kept
+    newBtn.className = 'btn btn-' + (opts.danger === true ? 'danger' : 'primary'); // set on every call: the template's class is not kept
     const noBtn = yesBtn.previousElementSibling; if (noBtn) noBtn.textContent = opts.cancelLabel || 'Cancel'; // the stay button's words, put back to Cancel for every other question
-    yesBtn.parentNode.replaceChild(newBtn, yesBtn);
+    yesBtn.replaceWith(newBtn);
     let ack = null;
     if (opts.acknowledge) {
         const label = document.createElement('label');
@@ -39,7 +39,7 @@ export function showConfirmModal(title, message, onConfirm, onCancel, opts = {})
         choice.type = 'checkbox';
         choice.checked = !!opts.choice.checked;
         label.append(choice, ' ', String(opts.choice.label));
-        (document.getElementById("confirm-modal-ack") || msg).after(label);
+        (ack?.parentElement || msg).after(label);
     }
     newBtn.addEventListener("click", () => {
         if (ack && !ack.checked) return;
@@ -49,8 +49,10 @@ export function showConfirmModal(title, message, onConfirm, onCancel, opts = {})
         onConfirm(!!(ack && ack.checked), chose);
     });
     _confirmCancel = onCancel || null;
-    document.getElementById("confirm-modal").style.display = "flex";
-    noBtn?.focus({ preventScroll: true }); // the safe answer owns focus before the visible dialog can take a key
+    const modal = document.getElementById("confirm-modal");
+    if (!modal.contains(document.activeElement)) modal._focusOpener = document.activeElement; // capture before focus moves inside
+    modal.style.display = "flex";
+    noBtn.focus(); // the safe answer owns focus before the visible dialog can take a key
 }
 
 function _dismissConfirm() {
