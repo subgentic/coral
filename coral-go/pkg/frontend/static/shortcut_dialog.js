@@ -19,7 +19,7 @@ const keyChips = (keys, mac = onMac()) => {
 
 /** The dialog's body: a heading and a list for each group, a row being the keys (<dt>, one <kbd> chip a key) beside what they do (<dd>). */
 function buildShortcuts(mac = onMac()) {
-    const frag = document.createDocumentFragment(), rows = shortcutList(mac);
+    const frag = document.createDocumentFragment(), rows = [...shortcutList(mac), ['J or K', 'Next or previous Inbox item (while a review is open)', 'Navigation']]; // #21852: named here, in the lazy dialog, so the start bundle does not grow
     for (const group of SHORTCUT_GROUPS) {
         const sec = el('section', 'kbd-group'), h = el('h4', 'group-head', group), dl = el('dl', 'kbd-list');
         for (const [keys, what, g] of rows) {

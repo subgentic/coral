@@ -307,3 +307,9 @@
 @media (max-width: 767px), (pointer: coarse) {
     .ac-panel .ac-comment-icon { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); }
 }
+
+/* #21852: a document review has no item arrows (they read as versions): J / K move between Inbox items, said in Details and in the shortcuts list. Phone and desktop. */
+.artifact-viewer[data-document-review] .artifact-file-navigation, .artifact-viewer[data-document-review] .artifact-file-prev-item, .artifact-viewer[data-document-review] .artifact-file-next-item { display: none !important; }
+.artifact-file-keys { margin: 0 0 6px; color: var(--text-secondary); font-size: var(--fs-sm); }
+.artifact-file-note { position: fixed; inset-inline: 16px; bottom: 76px; margin: 0 auto; width: max-content; max-width: calc(100% - 32px); padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-elevated, var(--bg-secondary)); color: var(--text-primary); font-size: var(--fs-sm); z-index: 5; }
+.artifact-file-note:empty { display: none; }
