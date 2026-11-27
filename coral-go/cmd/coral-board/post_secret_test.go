@@ -63,7 +63,8 @@ func TestEveryTextMembersReadRefusesASignInLink(t *testing.T) {
 		"goal add --outcome":           {"goal", "add", "a goal", "--outcome", tok},
 		"goal add --done-when":         {"goal", "add", "a goal", "--done-when", tok},
 		"goal update --title":          {"goal", "update", "3", "--title", tok},
-		"goal close --reason":          {"goal", "close", "3", "--reason", tok},
+		"goal close --reason":          {"goal", "close", "3", "--reason", tok, "--no-result", "none"},
+		"goal close --no-result":       {"goal", "close", "3", "--reason", "r", "--no-result", tok},
 		"goal request --ask":           {"goal", "request", "3", "--to", "other", "--ask", tok},
 		"post --assign --title":        {"post", "--assign", "Dev A", "--goal", "1", "--title", tok, "a plain body"},
 	} {

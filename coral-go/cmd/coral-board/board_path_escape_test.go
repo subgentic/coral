@@ -79,7 +79,7 @@ func TestEveryBoardCommandEscapesTheBoardName(t *testing.T) {
 		{"goal", "list"},
 		{"goal", "show", "1"},
 		{"goal", "update", "1", "--title", "t"},
-		{"goal", "close", "1", "--reason", "r"},
+		{"goal", "close", "1", "--reason", "r", "--no-result", "none"},
 		{"leave"},
 	} {
 		mu.Lock()

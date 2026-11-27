@@ -28,7 +28,9 @@ Subcommands:
   update <id> [--title T] [--outcome T] [--done-when T] [--state proposed|active|blocked] [--driver NAME | --driver ""]
               [--blocked-on "the reason"]
                                    A goal that is blocked needs --blocked-on, a plain reason (a goal does not wait on a person: a task or an agent does)
-  close <id> --reason "why" [--state done|dropped]   Close a goal (done by default); its open tasks are left as they are and counted
+  close <id> --reason "why" (--result <file|coral://artifacts link> | --no-result "why") [--state done|dropped]
+                                   Close a goal (done by default); its open tasks are left as they are and counted. --result sends the finished result to the Operator's Needs you
+                                   (a file is uploaded as the goal's result; a link is a file your team has, sent for review); --no-result says why there is none. Neither: refused
   request <goal> --to <team> --ask "what is asked"   Ask another team on this computer to create a task for this goal (the team must take goal requests)
   requests [--status pending|accepted|declined|expired] [--json]   The goal requests other teams sent this board (default: all)
   request-decline <id> --reason "why"   Decline a request another team sent (accept one with: task add "title" --goal-from <id>)
@@ -334,13 +336,35 @@ func cmdGoalClose(st *boardState, args []string) {
 	fs := flag.NewFlagSet("goal-close", flag.ContinueOnError)
 	reason := fs.String("reason", "", "Why it is closed")
 	state := fs.String("state", "", "done (default) or dropped")
+	result := fs.String("result", "", "The finished result: a file, or a coral://artifacts link; it goes to the Operator's Needs you")
+	noResult := fs.String("no-result", "", "Why there is no result file to send")
 	clihelp.ParseFlags(fs, args[1:], func() string { return goalUsageText })
 	*reason = flagText(*reason, "close reason")
 	if strings.TrimSpace(*reason) == "" {
-		fmt.Fprintln(os.Stderr, `Usage: coral-board goal close <id> --reason "why" [--state done|dropped]`)
+		fmt.Fprintln(os.Stderr, `Usage: coral-board goal close <id> --reason "why" (--result <file|link> | --no-result "why") [--state done|dropped]`)
+		clierr.Exit1()
+	}
+	*noResult = flagText(*noResult, "no-result reason")
+	switch {
+	case strings.TrimSpace(*result) == "" && strings.TrimSpace(*noResult) == "":
+		fmt.Fprintln(os.Stderr, "Error: "+goalResultWords+". Nothing was closed.")
+		clierr.Exit1()
+	case strings.TrimSpace(*result) != "" && strings.TrimSpace(*noResult) != "":
+		fmt.Fprintln(os.Stderr, "Error: give --result or --no-result, not both. Nothing was closed.")
 		clierr.Exit1()
 	}
 	body := map[string]any{"reason": *reason, "subscriber_id": resolveSubscriberID()}
+	if strings.TrimSpace(*noResult) != "" {
+		body["no_result"] = strings.TrimSpace(*noResult)
+	} else {
+		digest, err := sendGoalResult(id, *result)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v. The goal was not closed.\n", err)
+			clierr.Exit1()
+		}
+		body["result"] = "coral://artifacts/" + digest
+		fmt.Printf("Sent the result to the Operator's Needs you: coral://artifacts/%s\n", digest)
+	}
 	if *state != "" {
 		body["state"] = *state
 	}
