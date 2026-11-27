@@ -154,7 +154,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     // spec.doneButton (#7883): a phone's panel has a Done button that shuts it (the filters apply as they are chosen, so there is nothing to confirm); a desktop's panel stays beside the list and has no use for it
     const done = collapsible && spec.doneButton ? make('button', 'list-bar-done btn', 'Done') : null;
     if (done) done.type = 'button';
-    // extras (#7924): controls the panel's owner keeps (the dock's Hide done: a preference of its own, not a filter of the query) go in the panel after the fields and the sort, and count toward the icon's badge (setExtraOn)
+    // extras (#7924): controls the panel's owner keeps (the dock's Show done: a preference of its own, not a filter of the query) go in the panel after the fields and the sort, and count toward the icon's badge (setExtraOn)
     const extras = make('div', 'list-bar-extras'); extras.hidden = true;
     menu.append(...fields.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), extras, clearAll, ...(done ? [done] : []));
     if (!inline && !collapsible) menu.classList.add('menu', 'menu-panel'); // the filters as a popup: the one menu's surface, with its fields laid out in rows; the inline and collapsible forms are not a popup and draw none

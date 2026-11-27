@@ -31,6 +31,8 @@ const SUBAGENTS = [{ id: 'a1', description: 'Search the repo', subagent_type: 'E
     const out = {};
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // #21853: this all-status render fixture deliberately shows done; the new default and legacy views are covered by task_show_done_browser.
+        await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-hide-completed', 'false');` });
         await Emulation.setTimezoneOverride({ timezoneId: 'UTC' }); await Emulation.setLocaleOverride({ locale: 'en-US' });
         await Emulation.setTimezoneOverride({ timezoneId: 'UTC' });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });

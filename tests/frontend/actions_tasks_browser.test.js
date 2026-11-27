@@ -1,6 +1,6 @@
 // CSP stage 2, slice 4b (#3645): the board's tasks on delegated data-on-* actions, against real
 // tasks on a real board. Each moved action still does what its inline handler did:
-//  - the list: sort headers (only a known sort), Hide done, a row opens its task's page (#7644);
+//  - the list: sort headers (only a known sort), Show done (off by default, #21853), a row opens its task's page (#7644);
 //  - the task page's bar: Edit then Cancel or Save, Cancel task through its question (Keep task, and
 //    Cancel task), Complete through its form (and Back), Publish a draft, Nudge / Remind / Stop
 //    reminders on a claimed task, a dependency link opening that task;
