@@ -3,6 +3,7 @@
 package agent
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -232,7 +233,12 @@ func FindCLIForLaunch(settings map[string]string, agentType string) (string, err
 func FindCLIForLaunchScreened(settings map[string]string, agentType string, screen func(path string) string) (string, error) {
 	if p := ResolveCLIPath(settings, agentType); p != "" {
 		run := p
-		if real, rerr := RealCLIPath(p); rerr == nil && real != p { // a path through junctions Windows will not open: the program it leads to, found again at each launch (#582)
+		real, rerr := RealCLIPath(p)
+		var unfollowed *UnfollowedChainError
+		if errors.As(rerr, &unfollowed) { // junctions Coral would not follow (outside the roots, a share, a loop): refused, never run as typed
+			return "", &CLIPathError{AgentType: agentType, Path: p, Err: rerr}
+		}
+		if rerr == nil && real != p { // a path through junctions Windows will not open: the program it leads to, found again at each launch (#582)
 			if why := FollowedCLIRefusal(real, screen); why != "" {
 				return "", &CLIPathError{AgentType: agentType, Path: p, Err: fmt.Errorf("its junctions lead to %s, which is %s", real, why)}
 			}
