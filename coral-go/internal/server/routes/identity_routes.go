@@ -177,30 +177,36 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/system/terminal-backend/end-leftover": "end agents left in Coral's old tmux server",
 	"POST /api/system/terminal-backend/notice-seen":  "dismiss the line that agents now stop when Coral quits",
 	"PUT /api/cloud/max-mode":                        "change what Coral Hub may do",
-	"GET /api/cloud/devices":                         "list the browsers and passkeys Coral Hub's owner trusts on this computer",  // #19669
-	"PUT /api/cloud/device-web-mode":                 "change the access a newly paired browser starts with",                      // #19669
-	"PUT /api/cloud/devices/{kid}/mode":              "change one paired device's access",                                         // #19669
-	"GET /api/cloud/link-requests":                   "list the Hubs waiting to join this computer",                               // #20936
-	"GET /api/cloud/link-requests/{id}":              "check a join request (its Hub, with its secret)",                           // #20936
-	"POST /api/cloud/link-requests":                  "a Hub asks to join this computer",                                          // #20936
-	"POST /api/cloud/link-requests/{id}/allow":       "allow a Hub to join this computer",                                         // #20936
-	"POST /api/cloud/link-requests/{id}/deny":        "deny a Hub joining this computer",                                          // #20936
-	"POST /api/cloud/link-requests/{id}/finish":      "finish a Hub's join with the code",                                         // #20936
-	"DELETE /api/cloud/link-keys/{id}":               "revoke a Hub's request key",                                                // #20944
-	"GET /api/cloud/link-keys":                       "list the request keys (never the key)",                                     // #20944
-	"POST /api/cloud/link-keys":                      "make a request key for a Hub",                                              // #20944
-	"GET /api/cloud/links":                           "list the Coral Hubs this computer is linked to",                            // #20346
-	"POST /api/cloud/links":                          "add a Coral Hub link",                                                      // #20346
-	"POST /api/cloud/links/cancel":                   "cancel adding a Coral Hub",                                                 // #20385
-	"POST /api/cloud/links/confirm-owner":            "confirm the owner of an added Coral Hub",                                   // #20407
-	"PUT /api/cloud/links/{id}/cap":                  "change what one linked Coral Hub may do",                                   // #20346
-	"GET /api/cloud/links/{id}/asks":                 "read which asks a linked Coral Hub may answer",                             // #20413
-	"PUT /api/cloud/links/{id}/asks":                 "change which asks a linked Coral Hub may answer",                           // #20413
-	"DELETE /api/cloud/links/{id}":                   "remove one Coral Hub link",                                                 // #20346
-	"DELETE /api/cloud/devices/{kid}":                "remove one paired device",                                                  // #19669
-	"GET /api/cloud/devices/{kid}/signed-grants":     "count the access one paired device gave, for removing it",                  // #20899
-	"POST /api/cloud/devices/clear-clock":            "reset the clock mark for signed device messages",                           // #19669
-	"POST /api/device-keys/message":                  "send a signed device message (only a Hub-forwarded browser does)",          // #19669
+	"GET /api/cloud/devices":                         "list the browsers and passkeys Coral Hub's owner trusts on this computer", // #19669
+	"PUT /api/cloud/device-web-mode":                 "change the access a newly paired browser starts with",                     // #19669
+	"PUT /api/cloud/devices/{kid}/mode":              "change one paired device's access",                                        // #19669
+	"GET /api/cloud/link-requests":                   "list the Hubs waiting to join this computer",                              // #20936
+	"GET /api/cloud/link-requests/{id}":              "check a join request (its Hub, with its secret)",                          // #20936
+	"POST /api/cloud/link-requests":                  "a Hub asks to join this computer",                                         // #20936
+	"POST /api/cloud/link-requests/{id}/allow":       "allow a Hub to join this computer",                                        // #20936
+	"POST /api/cloud/link-requests/{id}/deny":        "deny a Hub joining this computer",                                         // #20936
+	"POST /api/cloud/link-requests/{id}/finish":      "finish a Hub's join with the code",                                        // #20936
+	"DELETE /api/cloud/link-keys/{id}":               "revoke a Hub's request key",                                               // #20944
+	"GET /api/cloud/link-keys":                       "list the request keys (never the key)",                                    // #20944
+	"POST /api/cloud/link-keys":                      "make a request key for a Hub",                                             // #20944
+	"GET /api/cloud/links":                           "list the Coral Hubs this computer is linked to",                           // #20346
+	"POST /api/cloud/links":                          "add a Coral Hub link",                                                     // #20346
+	"POST /api/cloud/links/cancel":                   "cancel adding a Coral Hub",                                                // #20385
+	"POST /api/cloud/links/confirm-owner":            "confirm the owner of an added Coral Hub",                                  // #20407
+	"PUT /api/cloud/links/{id}/cap":                  "change what one linked Coral Hub may do",                                  // #20346
+	"GET /api/cloud/links/{id}/asks":                 "read which asks a linked Coral Hub may answer",                            // #20413
+	"PUT /api/cloud/links/{id}/asks":                 "change which asks a linked Coral Hub may answer",                          // #20413
+	"DELETE /api/cloud/links/{id}":                   "remove one Coral Hub link",                                                // #20346
+	"DELETE /api/cloud/devices/{kid}":                "remove one paired device",                                                 // #19669
+	"GET /api/cloud/devices/{kid}/signed-grants":     "count the access one paired device gave, for removing it",                 // #20899
+	"POST /api/cloud/devices/clear-clock":            "reset the clock mark for signed device messages",                          // #19669
+	"POST /api/device-keys/message":                  "send a signed device message (only a Hub-forwarded browser does)",         // #19669
+	"POST /api/device-keys/pair":                     "answer a browser's pairing code (a Hub-forwarded browser; the person at this computer allows it)",
+	"GET /api/cloud/pair-browser":                    "read the state of pairing a browser (at this computer)",
+	"POST /api/cloud/pair-browser":                   "start pairing a browser to this connected computer",
+	"DELETE /api/cloud/pair-browser":                 "cancel pairing a browser",
+	"POST /api/cloud/pair-browser/allow":             "allow the browser that answered the pairing code, at a chosen mode",
+	"POST /api/cloud/pair-browser/deny":              "deny the browser that answered the pairing code",
 	"POST /api/device-keys/certificate":              "send a passkey certificate for a new device",                               // #19669
 	"GET /api/device-keys/list":                      "list the trusted browsers and passkeys for the Hub's owner (display only)", // #19971
 	"GET /api/device-keys/link":                      "read which Hub link this request arrived on (only a Hub-forwarded owner)",  // #20903

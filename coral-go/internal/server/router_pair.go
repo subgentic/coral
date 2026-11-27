@@ -7,6 +7,7 @@ import "github.com/subgentic/coral/internal/server/routes"
 var pairRecordedRoutes = routes.PairRecorded{
 	"POST /api/device-keys/certificate": true,
 	"POST /api/device-keys/message":     true,
+	"POST /api/device-keys/pair":        true,
 	"POST /api/cloud/cross-team-links":  true,
 	"POST /api/system/update/check-hub": true,
 	"POST /api/system/update/relaunch":  true,

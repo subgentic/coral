@@ -166,6 +166,7 @@ type Manager struct {
 	keyRoot             atomic.Pointer[context.Context] // RunKeyLinks's context: key links run with or without a hosted Hub
 
 	pair pairingState
+	pb   pairBrowser // pairing a browser to this connected computer (#21880)
 
 	devicePK atomic.Pointer[string] // the device public key this Coral redeemed with (#16726); memory only, public
 

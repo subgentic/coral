@@ -603,6 +603,12 @@ b DELETE /api/cloud/links/{id}
 b POST /api/cloud/devices/clear-clock
 b POST /api/device-keys/message
 b POST /api/device-keys/certificate
+b POST /api/device-keys/pair
+b GET /api/cloud/pair-browser
+b POST /api/cloud/pair-browser
+b DELETE /api/cloud/pair-browser
+b POST /api/cloud/pair-browser/allow
+b POST /api/cloud/pair-browser/deny
 b GET /api/device-keys/link
 b GET /api/device-keys/list
 b PUT /api/custom-models
