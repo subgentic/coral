@@ -1,6 +1,17 @@
 // Code controls load with the first code block; their behavior is unchanged.
 import { copyText, showToast } from './utils.js';
-import { flashCopied } from './chat_bubbles.js';
+
+// Swap a copy button's icon to a check for a moment after copying.
+export function flashCopied(btn) {
+    const icon = btn.querySelector(".material-icons");
+    icon.textContent = "check";
+    btn.classList.add("copied");
+    clearTimeout(btn._copiedTimer);
+    btn._copiedTimer = setTimeout(() => {
+        icon.textContent = "content_copy";
+        btn.classList.remove("copied");
+    }, 1500);
+}
 
 export function addCodeCopyButtons(root) {
     for (const pre of root.querySelectorAll(".message-text pre")) {

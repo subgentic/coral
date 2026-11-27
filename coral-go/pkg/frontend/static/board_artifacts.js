@@ -94,6 +94,7 @@ export function resolveBoardArtifacts(root, server, board = '') {
         }
     }
     linkCoralSubjectRefsIn(root, { server });
+    if (/#\d{3}/.test(root.textContent)) importOnce('./chat_task_refs.js').then(m => m.linkBoardRefs(root, board, server)).catch(() => {}); // task and goal numbers in a message become links (#21818)
     // a shortened link in an older message becomes a link once the server says which artifact it is (#9841); the links it makes are bound by this same pass
     importOnce('./short_artifact_refs.js').then(m => m.upgradeShortArtifactRefs(root, server, r => resolveBoardArtifacts(r, server, board), board)).catch(() => {}); // loaded on first use, not at start (#10218): a post that names no short ref never asks
 }
