@@ -15,6 +15,7 @@ import (
 type RelayedRequest struct {
 	Link, HubUser, Method, Target string
 	KID, Sig, Ts, Nonce           string
+	Revoke                        string // the Coral-Device-Revoke header (an anchor epoch statement); "" when the request carried none
 	Cert                          string // the Coral-Device-Cert header (sign once, #21889); "" when the request carried none
 	Body                          []byte
 }
@@ -45,7 +46,7 @@ func (v *Verifier) HandleRelayedRequest(ctx context.Context, in RelayedRequest, 
 	if err != nil {
 		return Relayed{}, err
 	}
-	return v.handleRelayed(ctx, in.Link, in.Method, in.Target, k, canon, in.Body, in.Sig, in.Cert, now, GrantMemberAuthorizer(in.HubUser, pin, in.Body))
+	return v.handleRelayed(ctx, in.Link, in.Method, in.Target, k, canon, in.Body, in.Sig, in.Cert, in.Revoke, now, GrantMemberAuthorizer(in.HubUser, pin, in.Body))
 }
 
 type relayedKey struct{}

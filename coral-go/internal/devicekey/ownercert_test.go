@@ -30,6 +30,7 @@ type ocRig struct {
 	capMode tunnel.Mode
 	capOn   bool
 	seen    []bool
+	revoke  string // the Coral-Device-Revoke header the next send carries
 }
 
 // newOCRig is a computer that knows the anchor (as the pairing made it) and accepts certified devices up to launch.
@@ -94,7 +95,7 @@ func (o *ocRig) send(dev signer, cert string, k devicekey.Kind, method, target s
 	c, err := m.Canonical()
 	require.NoError(o.t, err)
 	return o.v.HandleRelayedRequest(context.Background(), devicekey.RelayedRequest{Link: "lnk_1", HubUser: ocHubUser, Method: method, Target: target, KID: dev.kid,
-		Sig: dev.signRelayed(o.t, k, c), Ts: itoa(m.Ts), Nonce: m.Nonce, Cert: cert, Body: body}, func(string) (string, bool) { return ocHubUser, true }, now)
+		Sig: dev.signRelayed(o.t, k, c), Ts: itoa(m.Ts), Nonce: m.Nonce, Cert: cert, Revoke: o.revoke, Body: body}, func(string) (string, bool) { return ocHubUser, true }, now)
 }
 
 func itoa(n int64) string { b, _ := json.Marshal(n); return string(b) }
@@ -325,4 +326,127 @@ func TestACertificateHeaderIsParsedStrictly(t *testing.T) {
 	dup := b64.EncodeToString([]byte(`{"owner_kid":"a","owner_kid":"b"}`))
 	_, err = devicekey.ParseOwnerCert(dup)
 	assert.ErrorIs(t, err, devicekey.ErrBadForm)
+}
+
+// revokeHeader is the Coral-Device-Revoke value the anchor's passkey would produce for epoch.
+func (o *ocRig) revokeHeader(epoch int64, signWith *ecdsa.PrivateKey) string {
+	o.t.Helper()
+	r := devicekey.OwnerRevoke{OwnerKID: o.anchor.kid, Epoch: epoch}
+	rp := sha256.Sum256([]byte("app.coralhub.dev"))
+	ad := append(append([]byte{}, rp[:]...), 0x05, 0, 0, 0, 1)
+	cd, err := json.Marshal(map[string]any{"type": "webauthn.get", "challenge": b64.EncodeToString(devicekey.OwnerRevokeChallenge(r)), "origin": hubOrigin})
+	require.NoError(o.t, err)
+	cdh := sha256.Sum256(cd)
+	h := sha256.Sum256(append(append([]byte{}, ad...), cdh[:]...))
+	if signWith == nil {
+		signWith = o.anchor.priv
+	}
+	rr, ss, err := ecdsa.Sign(rand.Reader, signWith, h[:])
+	require.NoError(o.t, err)
+	der, err := asn1.Marshal(struct{ R, S *big.Int }{rr, ss})
+	require.NoError(o.t, err)
+	body, err := json.Marshal(map[string]any{"owner_kid": r.OwnerKID, "epoch": epoch, "authenticator_data": b64.EncodeToString(ad), "client_data_json": b64.EncodeToString(cd), "signature": b64.EncodeToString(der)})
+	require.NoError(o.t, err)
+	return b64.EncodeToString(body)
+}
+
+// seeAndKeep lets the computer see dev's certificate (refused until Keep) and then presses Keep.
+func (o *ocRig) seeAndKeep(dev signer, mode string) {
+	o.t.Helper()
+	_, err := o.sendToAgent(dev, o.certHeader(dev, ocOpts{}))
+	require.ErrorIs(o.t, err, devicekey.ErrCertNotAllowed)
+	o.keep(dev, mode)
+}
+
+func (o *ocRig) epoch() int64 {
+	o.t.Helper()
+	e, err := o.ss.OwnerEpoch(context.Background(), o.anchor.kid)
+	require.NoError(o.t, err)
+	return e
+}
+
+func TestAnEpochStatementVoidsEveryOlderCertificateAndANewOneStillWorks(t *testing.T) {
+	o := newOCRig(t, newSigner(t))
+	dev := newSigner(t)
+	o.seeAndKeep(dev, "interact")
+	_, err := o.sendToAgent(dev, o.certHeader(dev, ocOpts{}))
+	require.NoError(t, err, "the epoch-1 certificate works before the statement")
+	o.revoke = o.revokeHeader(2, nil)
+	_, err = o.sendToAgent(dev, o.certHeader(dev, ocOpts{}))
+	assert.ErrorIs(t, err, devicekey.ErrCertEpoch, "the statement voids the very certificate that carried it")
+	assert.EqualValues(t, 2, o.epoch())
+	o.revoke = ""
+	_, err = o.sendToAgent(dev, o.certHeader(dev, ocOpts{}))
+	assert.ErrorIs(t, err, devicekey.ErrCertEpoch, "and every later use of it")
+	_, err = o.sendToAgent(dev, o.certHeader(dev, ocOpts{mut: func(c *devicekey.OwnerCert) { c.Epoch = 2 }}))
+	assert.NoError(t, err, "a certificate at the new epoch works")
+}
+
+func TestAnEpochStatementMayRaiseByAtMostTheStepCapAndNeverLowers(t *testing.T) {
+	o := newOCRig(t, newSigner(t))
+	dev := newSigner(t)
+	o.seeAndKeep(dev, "interact")
+	cert := o.certHeader(dev, ocOpts{mut: func(c *devicekey.OwnerCert) { c.Epoch = 5000 }})
+	o.revoke = o.revokeHeader(store.EpochStepCap+1, nil)
+	_, err := o.sendToAgent(dev, cert)
+	assert.ErrorIs(t, err, devicekey.ErrBadForm, "one above the cap is refused")
+	assert.EqualValues(t, 0, o.epoch(), "and stores nothing")
+	o.revoke = o.revokeHeader(store.EpochStepCap, nil)
+	_, err = o.sendToAgent(dev, cert)
+	assert.NoError(t, err)
+	assert.EqualValues(t, store.EpochStepCap, o.epoch())
+	o.revoke = o.revokeHeader(store.EpochStepCap-1, nil)
+	_, err = o.sendToAgent(dev, cert)
+	assert.ErrorIs(t, err, devicekey.ErrCertEpoch, "a lower statement is refused")
+	o.revoke = o.revokeHeader(store.EpochStepCap, nil)
+	_, err = o.sendToAgent(dev, cert)
+	assert.NoError(t, err, "an equal one is nothing to do")
+	assert.EqualValues(t, store.EpochStepCap, o.epoch())
+}
+
+func TestAnEpochStatementNotSignedByTheAnchorIsBadSignatureAndChangesNothing(t *testing.T) {
+	o := newOCRig(t, newSigner(t))
+	dev := newSigner(t)
+	other := newSigner(t)
+	o.seeAndKeep(dev, "interact")
+	cert := o.certHeader(dev, ocOpts{})
+	o.revoke = o.revokeHeader(3, other.priv)
+	_, err := o.sendToAgent(dev, cert)
+	assert.ErrorIs(t, err, devicekey.ErrBadSignature)
+	assert.EqualValues(t, 0, o.epoch())
+	o.revoke = "not-a-statement"
+	_, err = o.sendToAgent(dev, cert)
+	assert.ErrorIs(t, err, devicekey.ErrBadForm)
+	// the same statement for another epoch than it was signed for is a different challenge
+	good := o.revokeHeader(3, nil)
+	raw, _ := b64.DecodeString(good)
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(raw, &m))
+	m["epoch"] = 4
+	tam, _ := json.Marshal(m)
+	o.revoke = b64.EncodeToString(tam)
+	_, err = o.sendToAgent(dev, cert)
+	assert.ErrorIs(t, err, devicekey.ErrBadSignature)
+	assert.EqualValues(t, 0, o.epoch())
+}
+
+func TestAnEpochStatementOnARequestWhoseOwnSignatureFailsIsNeverRead(t *testing.T) {
+	o := newOCRig(t, newSigner(t))
+	stranger := newSigner(t) // not listed, no certificate
+	o.revoke = o.revokeHeader(2, nil)
+	_, err := o.sendToAgent(stranger, "")
+	assert.ErrorIs(t, err, devicekey.ErrUnknownSigner)
+	assert.EqualValues(t, 0, o.epoch())
+}
+
+func TestAnEpochStatementOnARequestRefusedBeforeItsSignatureIsNeverRead(t *testing.T) {
+	o := newOCRig(t, newSigner(t))
+	dev := newSigner(t)
+	o.seeAndKeep(dev, "interact")
+	cert := o.certHeader(dev, ocOpts{})
+	o.revoke = o.revokeHeader(2, nil)
+	o.capOn = false
+	_, err := o.sendToAgent(dev, cert)
+	assert.ErrorIs(t, err, devicekey.ErrCertNotAllowed, "the setting is off, so no certificate is read at all")
+	assert.EqualValues(t, 0, o.epoch(), "the statement rides a request that was refused before it, so it is not read")
 }
