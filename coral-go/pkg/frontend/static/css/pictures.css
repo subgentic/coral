@@ -99,9 +99,12 @@ body.keyboard-open .ac-composer-row .ac-counter { display: none; }
 }
 
 /* The empty board composer shares the space left below wrapped team tabs. Let
-   its textarea shrink and scroll, keeping Add image and Send in the viewport. */
+   its textarea shrink and scroll, keeping Add image and Send in the viewport.
+   Short windows retain the compact row layout above. */
+@media (min-height: 521px) {
 .mb-post-form:not(:has(.ac-thumb)) { display: flex; flex-direction: column; }
 .mb-post-form:not(:has(.ac-thumb)) .mb-post-card { flex: 1; min-height: 0; }
 .mb-post-form:not(:has(.ac-thumb)) .field-pictures { align-self: stretch; display: flex; flex-direction: column; min-height: 0; }
 .mb-post-form:not(:has(.ac-thumb)) .mb-post-input { flex: 1 1 auto; }
 .mb-post-form:not(:has(.ac-thumb)) .ac-picker { flex: none; }
+}
