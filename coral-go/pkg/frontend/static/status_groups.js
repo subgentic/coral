@@ -168,7 +168,7 @@ export function lay(regular, limits, archived, renderRow, wrap) {
     if (limits) limits.sleeping = []; // drawn here, with the rest: render.js has none left to draw under the Team groups
     const all = [...regular, ...sleeping, ...archived.filter(doneToday)];
     const rows = list => list.map(s => withTaskLine(rowHtml(s, renderRow), s)).join('');
-    const view = own => (g.task ? taskSplit([...own].sort((a, b) => age(a) - age(b)), '*', rows) : renderStatusGroups(own, renderRow));
+    const view = own => (g.task ? rows(own.filter(isOrch)) + taskSplit(own.filter(s => !isOrch(s)).sort((a, b) => age(a) - age(b)), '*', rows) : renderStatusGroups(own, renderRow)); // the Task box without Team: the orchestrators are the first rows of the list (or of their computer), above the split and in neither group
     return { h: wrap(all, view), a: archived.filter(s => !doneToday(s)) };
 }
 
@@ -178,16 +178,21 @@ const withTaskRows = (html, list) => { const by = new Map(list.map(s => [escapeA
 /** The Team view's orchestrator card (the mock's "under the orchestrator"): the orchestrator's row with one "5 workers" button and a chevron at its right (#21686); folded, the line under it says "3 working · 1 needs you · 1 ready";
  * open, the workers follow and end with "6 done today", which opens the team's archived workers. saved: the team's agents in their saved order; draw: draws some of them as the card always did; row: draws one agent's row (an archived agent has no place in draw's lists).
  * A small team (under WORKERS_MIN workers) is drawn whole. */
+const isOrch = s => /orchestrator/i.test(s.display_name || s.board_job_title || '');
 export function teamList(saved, board, draw, row) {
-    if (groupBy().task) return taskSplit(saved.filter(s => !s.sleeping), board, list => withTaskRows(draw(list), list)) + draw(saved.filter(s => s.sleeping)); // the Task box: each team's agents split On a task / No task (sleeping ones keep the list's own "N sleeping" row)
-    const isOrch = s => /orchestrator/i.test(s.display_name || s.board_job_title || '');
-    const all = [...saved.filter(isOrch), ...saved.filter(s => !isOrch(s))]; // the saved order, the orchestrator pinned to the top
+    const task = groupBy().task, all = [...saved.filter(isOrch), ...saved.filter(s => !isOrch(s))]; // the saved order, the orchestrator pinned to the top
     const [orch, ...rest] = all, workers = rest.filter(s => !s.sleeping), asleep = rest.filter(s => s.sleeping); // sleeping ones keep the list's own "N sleeping" row
-    if (!isOrch(orch) || workers.length < WORKERS_MIN) return draw(all);
-    const key = 'w:' + board, folded = isFolded(key), n = g => workers.filter(s => groupOf(s) === g).length;
+    const split = list => taskSplit(list, board, l => withTaskRows(draw(l), l)); // the Task box: the team's workers split On a task / No task
+    if (task && !isOrch(orch)) return split(saved.filter(s => !s.sleeping)) + draw(saved.filter(s => s.sleeping));
+    if (!task && (!isOrch(orch) || workers.length < WORKERS_MIN)) return draw(all);
+    const fold = workers.length >= WORKERS_MIN; // a small team has no fold button (with the Task box its workers are split under the orchestrator all the same)
+    const key = 'w:' + board, folded = task ? !!foldedMap()[key] : isFolded(key), // with the Task box the split is the point: the workers start open (the button still folds them)
+         n = g => workers.filter(s => groupOf(s) === g).length;
     const sum = [`${n('working')} working`, n('needs') ? `<span class="status-shape st-needs" aria-hidden="true"></span>${Number(n('needs'))} needs you` : '', `${n('idle')} ready`].filter(x => x && !x.startsWith('0 ')).join(' · ');
     const nw = Number(workers.length), toggle = `<button type="button" class="btn btn-quiet status-workers-toggle" data-on-click="status-fold" data-group="${escapeAttr(key)}" aria-expanded="${escapeAttr(String(!folded))}" aria-label="${escapeAttr((folded ? 'Show ' : 'Hide ') + nw + ' workers')}"><span class="status-workers-n">${Number(workers.length)} workers</span><span class="material-icons" aria-hidden="true">expand_more</span></button>`; // one button at the right of the row, before its menu: the name still opens the agent (#21686)
-    let html = draw([orch]).replace('<span class="session-name-spacer"></span>', `<span class="session-name-spacer"></span>${toggle}`);
+    let html = (task ? withTaskRows(draw([orch]), [orch]) : draw([orch])); // the orchestrator is the team's first row, whatever the grouping (with the Task box it keeps its task line, and is in neither split group)
+    if (!task || fold) html = html.replace('<span class="session-name-spacer"></span>', `<span class="session-name-spacer"></span>${toggle}`);
+    if (task && !(fold && folded)) return html + split(workers) + draw(asleep);
     if (folded) return html + `<li class="status-workers-sum">${sum}</li>` + draw(asleep);
     const done = arch.filter(x => x.board_project === board && doneToday(x)), dkey = 'd:' + board, dOpen = !isFolded(dkey);
     html += draw(workers);

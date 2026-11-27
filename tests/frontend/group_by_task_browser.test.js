@@ -60,18 +60,18 @@ const { connect } = require('./agent_view_harness');
    await waitFor(`document.querySelectorAll('${root} .session-team-group .status-sub').length >= 3`, 'the teams split by task');
    const alpha = `${root} .session-team-group:has([data-group-name$="/alpha"])`, beta = `${root} .session-team-group:has([data-group-name$="/beta"])`;
    if (!mobile) {
-    assert.deepEqual(await heads(alpha), ['On a task 3', 'No task 2'], 'alpha: three on a task, two without');
+    assert.deepEqual(await heads(alpha), ['On a task 3', 'No task 1'], 'alpha: three on a task, one without (its Orchestrator is the first row, in neither group, #21838)');
     assert.deepEqual(await heads(beta), ['On a task 1', 'No task 1'], 'beta');
     assert.ok((await text(`${alpha} .session-task-line`)).includes('#21685Sidebar: Group by Task'), 'a row says #number and title');
     assert.deepEqual(await text(`${beta} .status-queued`), ['queued'], 'a task that has not started says queued');
     assert.equal((await text(`${alpha} .status-queued`)).length, 0, 'an in-progress task does not');
    } else {
     // the phone: two rows of On a task, one line for the rest, one line for the agents without a task
-    assert.deepEqual(await text(`${alpha} .status-more-toggle`), ['1 more on a task', '2 without a task'], 'the phone counts the rest on one line each');
+    assert.deepEqual(await text(`${alpha} .status-more-toggle`), ['1 more on a task', '1 without a task'], 'the phone counts the rest on one line each');
     await ev(`document.querySelector('${alpha} .status-more-toggle').click(); true`);
     await waitFor(`document.querySelectorAll('${alpha} .session-group-item').length === 5`, 'the lines open the rest');
     await ev(`document.querySelector('${alpha} .status-more-toggle').click(); true`);
-    await waitFor(`document.querySelectorAll('${alpha} .session-group-item').length === 2`, 'and fold again');
+    await waitFor(`document.querySelectorAll('${alpha} .session-group-item').length === 3`, 'and fold again (the Orchestrator and two on a task)');
    }
    await shot('group-by-team-task'); await listShot('group-by-team-task');
 
@@ -87,12 +87,12 @@ const { connect } = require('./agent_view_harness');
    await waitFor(`document.querySelectorAll('${root} .session-team-group').length === 0 && document.querySelectorAll('${root} .status-sub').length === 4`, 'each computer splits by task');
    await tick('server');
    await waitFor(`document.querySelectorAll('${root} li.server-group-header').length === 0 && document.querySelectorAll('${root} .status-sub').length === 2`, 'the whole list splits by task');
-   assert.deepEqual(await heads(root), ['On a task 4', 'No task 4']);
+   assert.deepEqual(await heads(root), ['On a task 4', 'No task 3'] /* the Orchestrator heads the list, in neither group (#21838) */);
 
    // 6. A task assigned, completed or reassigned moves the agent at once (the next read of the live list carries it).
    await ev(`window.__tasks['Security'] = ${JSON.stringify(task(21770, 'Review the grouping'))}; delete window.__tasks['Backend Dev']; true`);
    await ev(`window._coralLoadLiveSessions().then(() => true)`);
-   await waitFor(`(() => { const h = [...document.querySelectorAll('${root} .status-sub')].map(x => x.textContent.replace(/\\s+/g, ' ').trim()); return h[0] === 'On a task4' && h[1] === 'No task4'; })()`, 'the counts follow a task assigned and one finished');
+   await waitFor(`(() => { const h = [...document.querySelectorAll('${root} .status-sub')].map(x => x.textContent.replace(/\\s+/g, ' ').trim()); return h[0] === 'On a task4' && h[1] === 'No task3'; })()`, 'the counts follow a task assigned and one finished');
    if (!mobile) {
    const onTask = await ev(`(() => { const heads = [...document.querySelectorAll('${root} .status-sub')]; const first = heads[0]; const names = []; for (let e = first.nextElementSibling; e && !e.classList.contains('status-sub'); e = e.nextElementSibling) { const n = e.querySelector('.session-label-name'); if (n) names.push(n.textContent.trim()); } return names.sort(); })()`);
    assert.ok(onTask.includes('Security') && !onTask.includes('Backend Dev'), 'Security is on a task now and Backend Dev is not: ' + onTask);
