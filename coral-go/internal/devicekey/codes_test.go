@@ -18,7 +18,7 @@ var errNameRe = regexp.MustCompile(`Err\w+\s*=\s*errors\.New\("([a-z_]+)"\)`)
 
 func TestEveryVerifierCodeIsInTheClosedReplyListOrFolded(t *testing.T) {
 	seen := map[string]bool{}
-	for _, f := range []string{"verify.go", "message.go", "passkey.go", "relayed.go"} { // the signed-message path; pairing.go's codes are the pairing's own
+	for _, f := range []string{"verify.go", "message.go", "passkey.go", "relayed.go", "ownercert.go"} { // the signed-message path; pairing.go's codes are the pairing's own
 		b, err := os.ReadFile(f)
 		require.NoError(t, err)
 		for _, m := range errNameRe.FindAllStringSubmatch(string(b), -1) {

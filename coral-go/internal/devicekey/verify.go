@@ -81,6 +81,13 @@ type Verifier struct {
 	// AuditCert, when set, is called after a passkey certificate added a device: the passkey's kid, the new device's kid and its mode (never a label or key bytes).
 	AuditCert func(passkeyKID, deviceKID, mode string)
 
+	// Owner, CertCap and CertSeen are sign once (#21889). Owner is the anchor, epoch and certified-browser store (nil: no certificate is accepted). CertCap is the person's own setting "accept owner-certified devices up to <mode>": on false it
+	// is off (the default) and every certificate is refused. CertSeen, when set, is called after a certified browser's request verified, with whether this computer saw it for the first time, for the audit line and the notice.
+	Owner    OwnerStore
+	CertCap  func() (tunnel.Mode, bool)
+	CertSeen func(first bool, dev store.CertifiedDevice, mode string)
+	certs    certCache
+
 	mu sync.Mutex // one message at a time: the nonce check and the apply are not racing each other
 }
 

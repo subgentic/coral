@@ -100,3 +100,46 @@ func TestDeviceKeyNoticesTellABrowserAllowedThroughPairing(t *testing.T) {
 	assert.Contains(t, items[0].Line, "\"Phone\" can now act on this computer as view")
 	assert.Contains(t, items[0].Line, devicekey.DisplayFingerprint(k.PK))
 }
+
+// #21889: an owner-certified browser nobody Kept or Removed waits in Needs you by its fingerprint only (its label is the Hub page's word), and a recently learned anchor is told once; both are read from this computer's own state.
+func TestDeviceKeyNoticesTellACertifiedBrowserWaitingForKeepAndANewAnchor(t *testing.T) {
+	db, err := storetest.Open(t, t.TempDir()+"/s.db")
+	require.NoError(t, err)
+	ss := store.NewSessionStore(db)
+	ctx := context.Background()
+	t0 := time.Unix(1_800_000_000, 0)
+	pk := func() []byte {
+		k, err := ecdh.P256().GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		return k.PublicKey().Bytes()
+	}
+	anchor := pk()
+	_, err = ss.SetOwnerAnchor(ctx, anchor, "Y3JlZA", false, t0.Add(-time.Hour))
+	require.NoError(t, err)
+	_, _, err = ss.SeenCertifiedDevice(ctx, "dev-waiting", store.AnchorKID(anchor), "Evil label", t0.Add(-time.Minute))
+	require.NoError(t, err)
+	_, _, err = ss.SeenCertifiedDevice(ctx, "dev-kept", store.AnchorKID(anchor), "Kept one", t0.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NoError(t, ss.KeepCertifiedDevice(ctx, "dev-kept", "interact", t0))
+	_, _, err = ss.SeenCertifiedDevice(ctx, "dev-removed", store.AnchorKID(anchor), "Gone", t0.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NoError(t, ss.DenyCertifiedDevice(ctx, "dev-removed", "Gone", t0))
+	items, err := DeviceKeyNoticeItems(ss, func() time.Time { return t0 })(ctx)
+	require.NoError(t, err)
+	var waiting, anch int
+	for _, it := range items {
+		assert.NotContains(t, it.Line, "Evil label", "the Hub page's word is not in a notice")
+		switch {
+		case strings.HasPrefix(it.ID, "certified:dev-waiting"):
+			waiting++
+			assert.Contains(t, it.Line, "Keep or Remove")
+		case strings.HasPrefix(it.ID, "certified:"):
+			t.Errorf("a Kept or Removed browser is not waiting: %s", it.ID)
+		case strings.HasPrefix(it.ID, "anchor:"):
+			anch++
+			assert.Contains(t, it.Line, devicekey.FingerprintOfKID(store.AnchorKID(anchor)))
+		}
+	}
+	assert.Equal(t, 1, waiting)
+	assert.Equal(t, 1, anch)
+}

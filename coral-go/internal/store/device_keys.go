@@ -327,6 +327,22 @@ func checkClock(ctx context.Context, q deviceQuerier, now time.Time) error {
 
 // RecordNonce accepts a message's nonce in one transaction: the clock check, the repeat check, the count cap, then the insert and the high-water mark. It is kept for the message's window plus twice the 5 minute skew. A refused call writes nothing.
 func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now time.Time, window time.Duration) error {
+	return s.recordNonce(ctx, nonce, kid, "", deviceNonceKidShare, 0, now, window)
+}
+
+// Sign once (#21889, Security): a certified browser draws from its own pool, one per anchor, so many certified browsers cannot crowd out the owner's own device keys. 200 live nonces per certified browser and 1000 per anchor; a full pool refuses the new message and never drops a live nonce.
+const (
+	CertNonceKidShare  = 200
+	CertNoncePoolShare = 1000
+)
+
+// RecordCertNonce is RecordNonce for a certified browser: the nonce is counted under the anchor's pool and the browser's own share.
+func (s *SessionStore) RecordCertNonce(ctx context.Context, nonce, anchorKID, deviceKID string, now time.Time, window time.Duration) error {
+	pool := "cert:" + anchorKID + ":"
+	return s.recordNonce(ctx, nonce, pool+deviceKID, pool, CertNonceKidShare, CertNoncePoolShare, now, window)
+}
+
+func (s *SessionStore) recordNonce(ctx context.Context, nonce, kid, pool string, kidShare, poolShare int, now time.Time, window time.Duration) error {
 	if b, err := base64.RawURLEncoding.Strict().DecodeString(nonce); err != nil || len(nonce) != deviceNonceLen || len(b) != 16 {
 		return ErrNonceForm
 	}
@@ -359,8 +375,17 @@ func (s *SessionStore) RecordNonce(ctx context.Context, nonce, kid string, now t
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM device_nonces WHERE kid = ? AND expires_at >= ?`, kid, now.Unix()).Scan(&mine); err != nil {
 		return err
 	}
-	if mine >= deviceNonceKidShare {
+	if mine >= kidShare {
 		return ErrNonceStoreFull
+	}
+	if pool != "" {
+		var inPool int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM device_nonces WHERE substr(kid, 1, ?) = ? AND expires_at >= ?`, len(pool), pool, now.Unix()).Scan(&inPool); err != nil {
+			return err
+		}
+		if inPool >= poolShare {
+			return ErrNonceStoreFull
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO device_nonces (nonce, kid, accepted_at, expires_at) VALUES (?, ?, ?, ?)`, nonce, kid, now.Unix(), now.Add(window+2*deviceNonceSkew).Unix()); err != nil {
 		return err
@@ -399,6 +424,9 @@ func (s *SessionStore) PruneNonces(ctx context.Context, now time.Time) (int, err
 func (s *SessionStore) RemoveAllDeviceKeys(ctx context.Context, now time.Time) (int, error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE device_keys SET removed_at = ?, removed_reason = 'removed' WHERE removed_at IS NULL`, now.Unix())
 	if err != nil {
+		return 0, err
+	}
+	if err := s.ClearOwnerCerts(ctx); err != nil { // a new account starts with no anchor, no epoch and no certified browser
 		return 0, err
 	}
 	n, _ := res.RowsAffected()

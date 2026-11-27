@@ -499,7 +499,7 @@ var forwardToConnector = map[string]bool{
 	// The client's request id, only on the six routes that take it (#5841), see below.
 	tunnel.IdempotencyKeyHeader: true,
 	// The device key's signature headers (#16654): only on the owner routes' writes, see below.
-	tunnel.DeviceKeyHeader: true, tunnel.DeviceSigHeader: true, tunnel.DeviceTsHeader: true, tunnel.DeviceNonceHeader: true,
+	tunnel.DeviceKeyHeader: true, tunnel.DeviceSigHeader: true, tunnel.DeviceTsHeader: true, tunnel.DeviceNonceHeader: true, tunnel.DeviceCertHeader: true, tunnel.DeviceRevokeHeader: true,
 }
 
 // allowlistHeaders keeps the allowlisted headers of a request to method and the

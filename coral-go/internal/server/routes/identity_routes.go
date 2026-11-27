@@ -201,6 +201,11 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/cloud/devices/{kid}/signed-grants":     "count the access one paired device gave, for removing it",                 // #20899
 	"POST /api/cloud/devices/clear-clock":            "reset the clock mark for signed device messages",                          // #19669
 	"POST /api/device-keys/message":                  "send a signed device message (only a Hub-forwarded browser does)",         // #19669
+	"GET /api/cloud/owner-cert":                      "read the owner-certified browsers waiting here, the anchor and the setting (at this computer)",
+	"PUT /api/cloud/owner-cert/accept":               "set how far an owner-certified browser may act here (off by default)",
+	"POST /api/cloud/owner-cert/devices/{kid}/keep":  "Keep an owner-certified browser at a mode",
+	"DELETE /api/cloud/owner-cert/devices/{kid}":     "Remove an owner-certified browser here",
+	"DELETE /api/cloud/owner-cert/anchor":            "remove the owner anchor passkey",
 	"POST /api/device-keys/pair":                     "answer a browser's pairing code (a Hub-forwarded browser; the person at this computer allows it)",
 	"GET /api/cloud/pair-browser":                    "read the state of pairing a browser (at this computer)",
 	"POST /api/cloud/pair-browser":                   "start pairing a browser to this connected computer",

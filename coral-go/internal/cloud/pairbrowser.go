@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -36,10 +37,13 @@ type pendingBrowser struct {
 	kid      string
 	mac      string
 	pk       []byte
+	anchorPK []byte // the passkey the browser offers as this computer's anchor (#21889); nil when it offered none
+	anchorCr string
 	asked    time.Time
 	state    string // "waiting" | "allowed" | "denied"
 	reply    []byte
 	mode     string
+	anchor   string // after Allow: "listed" or "not_listed" when an anchor was offered
 }
 
 type pairBrowser struct {
@@ -68,8 +72,18 @@ type PairBrowserView struct {
 // PairBrowserAsk is the browser waiting for Allow: its label and the fingerprint of its own key, so the person can compare it with what the browser shows.
 type PairBrowserAsk struct {
 	Label       string    `json:"label"`
+	NamedBy     string    `json:"named_by"` // always "browser": the name is the browser page's word, shown beside the fingerprint and never used to decide anything
 	Fingerprint string    `json:"fingerprint"`
 	ExpiresAt   time.Time `json:"expires_at"`
+	// Anchor is set when the browser also offers a passkey as this computer's anchor (sign once, #21889). The card says what it grants: "This passkey can certify browsers that may send to agents here, after you Keep them".
+	Anchor *PairBrowserAnchor `json:"anchor,omitempty"`
+}
+
+// PairBrowserAnchor is the passkey a pairing offers: its fingerprint, and when this computer already has another anchor, that one's fingerprint and that listing the new one needs Replace (which drops every Keep).
+type PairBrowserAnchor struct {
+	Fingerprint  string `json:"fingerprint"`
+	Existing     string `json:"existing_fingerprint,omitempty"`
+	NeedsReplace bool   `json:"needs_replace,omitempty"`
 }
 
 // PairAnswerResult is what the Hub-relayed route replies to the browser.
@@ -77,6 +91,7 @@ type PairAnswerResult struct {
 	State    string // "pending" | "ok" | "refused"
 	Reply    []byte // the reply MAC, on "ok"
 	Computer string // this computer's key id, on "ok"
+	Anchor   string // on "ok" when the browser offered an anchor: "listed" or "not_listed" (the person kept the old one)
 }
 
 func (pb *pairBrowser) endLocked(why string) {
@@ -166,7 +181,16 @@ func (m *Manager) pairBrowserViewLocked(now time.Time) PairBrowserView {
 	}
 	v.ExpiresAt = pb.started.Add(pairBrowserLife)
 	if p := pb.pend; p != nil && p.state == "waiting" {
-		v.Pending = &PairBrowserAsk{Label: p.label, Fingerprint: devicekey.DisplayFingerprint(p.pk), ExpiresAt: p.asked.Add(pairBrowserPending)}
+		v.Pending = &PairBrowserAsk{Label: p.label, NamedBy: "browser", Fingerprint: devicekey.DisplayFingerprint(p.pk), ExpiresAt: p.asked.Add(pairBrowserPending)}
+		if p.anchorPK != nil {
+			a := &PairBrowserAnchor{Fingerprint: devicekey.DisplayFingerprint(p.anchorPK)}
+			if m.o.Devices != nil {
+				if cur, has, err := m.o.Devices.OwnerAnchorRow(context.Background()); err == nil && has && !bytes.Equal(cur.PK, p.anchorPK) {
+					a.Existing, a.NeedsReplace = devicekey.DisplayFingerprint(cur.PK), true
+				}
+			}
+			v.Pending.Anchor = a
+		}
 	}
 	return v
 }
@@ -195,12 +219,12 @@ func (m *Manager) AnswerPairBrowser(arrivedLink, userCode, label string, a devic
 		}
 		res := PairAnswerResult{State: "refused"}
 		if p.state == "allowed" {
-			res = PairAnswerResult{State: "ok", Reply: p.reply, Computer: m.ComputerID()}
+			res = PairAnswerResult{State: "ok", Reply: p.reply, Computer: m.ComputerID(), Anchor: p.anchor}
 		}
 		pb.endLocked("") // read once: the pairing is over
 		return res, nil
 	}
-	pk, err := pb.hold.Check(userCode, label, a, now)
+	pk, anchorPK, anchorCred, err := pb.hold.CheckAnchor(userCode, label, a, now)
 	if err != nil {
 		if !pb.hold.Alive(now) {
 			pb.endLocked("Pairing ended after wrong answers. Start it again.")
@@ -213,7 +237,7 @@ func (m *Manager) AnswerPairBrowser(arrivedLink, userCode, label string, a devic
 		}
 		return PairAnswerResult{State: "pending"}, nil
 	}
-	pb.pend = &pendingBrowser{userCode: userCode, label: label, kid: a.KID, mac: a.MAC, pk: pk, asked: now, state: "waiting"}
+	pb.pend = &pendingBrowser{userCode: userCode, label: label, kid: a.KID, mac: a.MAC, pk: pk, anchorPK: anchorPK, anchorCr: anchorCred, asked: now, state: "waiting"}
 	m.o.Logger.Info("cloud: a browser asked to be trusted", "link", arrivedLink, "kid", short(a.KID), "label", label, "fingerprint", devicekey.DisplayFingerprint(pk))
 	return PairAnswerResult{State: "pending"}, nil
 }
@@ -227,7 +251,7 @@ func short(s string) string {
 
 // AllowPairBrowser is the person at this computer trusting the waiting browser at mode ("" is view; never above this computer's own cap). The key is listed as a `pairing` device, owner pair, and a key already listed as bootstrap
 // or noproof is promoted without a change of mode. The secret is wiped and the reply is kept for the browser's next ask.
-func (m *Manager) AllowPairBrowser(ctx context.Context, mode string) error {
+func (m *Manager) AllowPairBrowser(ctx context.Context, mode string, replaceAnchor bool) error {
 	pb := &m.pb
 	pb.mu.Lock()
 	defer pb.mu.Unlock()
@@ -255,6 +279,17 @@ func (m *Manager) AllowPairBrowser(ctx context.Context, mode string) error {
 	}
 	if err := devicekey.AddPairedKey(ctx, m.o.Devices, p.kid, p.pk, p.label, md.String(), now); err != nil {
 		return err
+	}
+	if p.anchorPK != nil { // Allow is consent to the whole card, including what the anchor grants; a second anchor is listed only when the person also pressed Replace (which drops every Keep)
+		listed, err := m.o.Devices.SetOwnerAnchor(ctx, p.anchorPK, p.anchorCr, replaceAnchor, now)
+		if err != nil {
+			return err
+		}
+		p.anchor = "not_listed"
+		if listed {
+			p.anchor = "listed"
+		}
+		m.o.Logger.Info("cloud: an owner anchor was offered here", "link", pb.link, "fingerprint", devicekey.DisplayFingerprint(p.anchorPK), "result", p.anchor)
 	}
 	p.state, p.reply, p.mode = "allowed", reply, md.String()
 	pb.hold.Wipe() // the secret is not needed any more: the reply is made

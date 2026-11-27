@@ -44,7 +44,7 @@ var forwardRequestHeaders = map[string]bool{
 	// The client's request id for the six routes that start something (#5841): forwarded only on those routes (scrub).
 	"Idempotency-Key": true,
 	// The device key's signature headers (#16654): evidence for a later step, forwarded only on the owner routes' writes, all four or none (devicekey.go).
-	DeviceKeyHeader: true, DeviceSigHeader: true, DeviceTsHeader: true, DeviceNonceHeader: true,
+	DeviceKeyHeader: true, DeviceSigHeader: true, DeviceTsHeader: true, DeviceNonceHeader: true, DeviceCertHeader: true, DeviceRevokeHeader: true,
 }
 
 // HubUserHeader names the Coral Hub user behind a tunnel board write: the sender of a

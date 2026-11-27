@@ -90,13 +90,14 @@ func (h *CloudHandler) PairBrowserAllow(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var body struct {
-		Mode string `json:"mode"`
+		Mode          string `json:"mode"`
+		ReplaceAnchor bool   `json:"replace_anchor"` // sign once (#21889): list the offered passkey although another is this computer's anchor; drops every Keep
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "the body must be a JSON object")
 		return
 	}
-	if err := m.AllowPairBrowser(r.Context(), body.Mode); err != nil {
+	if err := m.AllowPairBrowser(r.Context(), body.Mode, body.ReplaceAnchor); err != nil {
 		pairBrowserErr(w, err)
 		return
 	}
@@ -133,6 +134,9 @@ func (h *CloudHandler) DeviceKeyPair(w http.ResponseWriter, r *http.Request) {
 		KID      string `json:"kid"`
 		PK       string `json:"pk"`
 		MAC      string `json:"mac"`
+		// AnchorPK and AnchorCred offer a passkey as this computer's anchor (#21889): covered by the v4 MAC.
+		AnchorPK   string `json:"anchor_pk"`
+		AnchorCred string `json:"anchor_cred"`
 	}
 	if err := readDeviceBody(w, r, &req); err != nil {
 		deviceMsgLimiter.failed("pair", time.Now())
@@ -143,7 +147,7 @@ func (h *CloudHandler) DeviceKeyPair(w http.ResponseWriter, r *http.Request) {
 		pairRefused(w)
 		return
 	}
-	res, err := m.AnswerPairBrowser(arrivalLink(r), req.UserCode, req.Label, devicekey.PairingAnswer{V: 1, KID: req.KID, MAC: req.MAC, PK: req.PK})
+	res, err := m.AnswerPairBrowser(arrivalLink(r), req.UserCode, req.Label, devicekey.PairingAnswer{V: 1, KID: req.KID, MAC: req.MAC, PK: req.PK, AnchorPK: req.AnchorPK, AnchorCred: req.AnchorCred})
 	if err != nil {
 		deviceMsgLimiter.failed("pair", time.Now())
 		pairRefused(w)
@@ -153,7 +157,11 @@ func (h *CloudHandler) DeviceKeyPair(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	switch res.State {
 	case "ok":
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "reply_mac": base64.RawURLEncoding.EncodeToString(res.Reply), "computer": res.Computer})
+		out := map[string]string{"status": "ok", "reply_mac": base64.RawURLEncoding.EncodeToString(res.Reply), "computer": res.Computer}
+		if res.Anchor != "" {
+			out["anchor"] = res.Anchor // "listed" or "not_listed", only when the answer offered one
+		}
+		writeJSON(w, http.StatusOK, out)
 	case "refused":
 		writeJSON(w, http.StatusOK, map[string]string{"status": "refused"})
 	default:

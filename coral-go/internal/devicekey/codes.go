@@ -11,6 +11,7 @@ var ReplyCodes = []string{
 	"signer_bootstrap", "signer_no_proof", "nonce_repeat", "nonce_store_full", "list_unavailable", "key_limit",
 	"ts_window", "before_start", "clock_back",
 	"body_hash", "body_too_large", "wrong_request", "wrong_link", "outside_pair", // the relayed (v3) kinds, relayed.go (#20563)
+	"cert_expired", "cert_epoch", "cert_not_allowed", // sign once (#21889)
 	CodeInternal,
 }
 
@@ -34,7 +35,7 @@ func InReplyCodes(code string) bool {
 func ReplyCode(err error) string {
 	for _, e := range []error{ErrBadForm, ErrBadSignature, ErrBadMode, ErrTopMode, ErrAboveSigner, ErrSelfTarget, ErrUnknownTarget, ErrTargetBootstrap,
 		ErrSignerBootstrap, ErrSignerNoProof, ErrNonceRepeat, ErrNonceStoreFull, ErrListUnavailable, ErrKeyLimit, ErrTsWindow, ErrBeforeStart, ErrClockBack,
-		ErrBodyHash, ErrBodyTooLarge, ErrWrongRequest, ErrWrongLink, ErrOutsidePair} {
+		ErrBodyHash, ErrBodyTooLarge, ErrWrongRequest, ErrWrongLink, ErrOutsidePair, ErrCertExpired, ErrCertEpoch, ErrCertNotAllowed} {
 		if errors.Is(err, e) {
 			return e.Error()
 		}

@@ -14,12 +14,25 @@ const (
 	DeviceTsHeader    = "Coral-Device-Ts"
 	DeviceNonceHeader = "Coral-Device-Nonce"
 
+	// DeviceCertHeader and DeviceRevokeHeader are the two optional headers of sign once (#21889): an owner certificate and the latest revocation statement. Each is one value, never empty, at most DeviceCertHeaderMax bytes, and only beside
+	// the four above (a request whose four are not whole loses them too). A computer says it understands them with the capability owner_cert/1 (CapOwnerCert).
+	DeviceCertHeader   = "Coral-Device-Cert"
+	DeviceRevokeHeader = "Coral-Device-Revoke"
+	// DeviceCertHeaderMax is the most bytes of either optional header (design v4).
+	DeviceCertHeaderMax = 6144
+
 	// DeviceHeaderMaxValue is the longest value of one of the four (a base64 key or signature is under 100 bytes): a longer one is not a device header, and the four go together or not at all.
 	DeviceHeaderMaxValue = 256
 )
 
 // DeviceHeaders are the four names, in canonical form.
 var DeviceHeaders = [4]string{DeviceKeyHeader, DeviceSigHeader, DeviceTsHeader, DeviceNonceHeader}
+
+// DeviceOptionalHeaders are the two sign-once names, in canonical form.
+var DeviceOptionalHeaders = [2]string{DeviceCertHeader, DeviceRevokeHeader}
+
+// CapOwnerCert is the capability "owner_cert/1" in Hello.Capabilities: this Coral understands Coral-Device-Cert and Coral-Device-Revoke (#21889). The Hub sends them only to a computer that said it.
+const CapOwnerCert = "owner_cert/1"
 
 // ForwardsDeviceHeaders reports whether the device headers are forwarded for a request: a write (not GET or HEAD) to an owner route of the table, the routes the Hub stamps the owner on, or to a route of a relayed
 // signed kind (RelayedRoutes, #20879), and nothing else (scoped as Idempotency-Key is). The hub (pkg/hubproxy) and the connector apply the same rule.
@@ -97,6 +110,11 @@ func IsDeviceHeader(key string) bool {
 			return true
 		}
 	}
+	for _, n := range DeviceOptionalHeaders {
+		if c == n {
+			return true
+		}
+	}
 	return false
 }
 
@@ -117,6 +135,12 @@ func keepWholeDeviceSet(h http.Header) {
 		if len(vs) != 1 || vs[0] == "" || len(vs[0]) > DeviceHeaderMaxValue {
 			StripDeviceHeaders(h)
 			return
+		}
+	}
+	// The two optional headers stay only as one non-empty value of at most DeviceCertHeaderMax bytes; a repeated, empty or oversized one is dropped, so a smuggled second certificate never reaches the verifier (#21889).
+	for _, n := range DeviceOptionalHeaders {
+		if vs, has := h[n]; has && (len(vs) != 1 || vs[0] == "" || len(vs[0]) > DeviceCertHeaderMax) {
+			delete(h, n)
 		}
 	}
 }

@@ -80,7 +80,7 @@ func TestAPairedBrowserIsListedOnlyAfterTheLocalAllowAndGetsOneReply(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, "pending", res.State)
 
-	require.NoError(t, r.m.AllowPairBrowser(context.Background(), ""))
+	require.NoError(t, r.m.AllowPairBrowser(context.Background(), "", false))
 	l := r.listed(t)
 	require.Len(t, l, 1)
 	assert.Equal(t, devicekey.KIDOf(b.pk), l[0].KID)
@@ -105,10 +105,10 @@ func TestTheModeIsThePersonsChoiceAndNeverAboveTheCap(t *testing.T) {
 	b := answerFor(t, v, "Tablet", nil)
 	_, err := b.ask(r.m, link)
 	require.NoError(t, err)
-	assert.ErrorIs(t, r.m.AllowPairBrowser(context.Background(), "launch"), ErrPairBrowserModeAbove)
-	assert.ErrorIs(t, r.m.AllowPairBrowser(context.Background(), "root"), ErrPairBrowserBadMode)
+	assert.ErrorIs(t, r.m.AllowPairBrowser(context.Background(), "launch", false), ErrPairBrowserModeAbove)
+	assert.ErrorIs(t, r.m.AllowPairBrowser(context.Background(), "root", false), ErrPairBrowserBadMode)
 	assert.Empty(t, r.listed(t))
-	require.NoError(t, r.m.AllowPairBrowser(context.Background(), "interact"))
+	require.NoError(t, r.m.AllowPairBrowser(context.Background(), "interact", false))
 	assert.Equal(t, "interact", r.listed(t)[0].Mode)
 }
 
@@ -172,7 +172,7 @@ func TestAnAnswerNobodyAllowsExpiresAfterTwoMinutes(t *testing.T) {
 	_, err := b.ask(r.m, link)
 	require.NoError(t, err)
 	now = now.Add(pairBrowserPending + time.Second)
-	assert.ErrorIs(t, r.m.AllowPairBrowser(context.Background(), ""), ErrPairBrowserNothing)
+	assert.ErrorIs(t, r.m.AllowPairBrowser(context.Background(), "", false), ErrPairBrowserNothing)
 	assert.Empty(t, r.listed(t))
 	now = now.Add(pairBrowserLife)
 	assert.False(t, r.m.PairBrowserState().Active, "the secret itself is gone after ten minutes")
@@ -205,7 +205,7 @@ func TestAKeyAlreadyListedAsBootstrapIsPromotedWithoutChangingItsMode(t *testing
 	b := answerFor(t, v, "Phone", pk)
 	_, err = b.ask(r.m, link)
 	require.NoError(t, err)
-	require.NoError(t, r.m.AllowPairBrowser(context.Background(), "launch"))
+	require.NoError(t, r.m.AllowPairBrowser(context.Background(), "launch", false))
 	l := r.listed(t)
 	require.Len(t, l, 1)
 	assert.Equal(t, store.DeviceOriginPairing, l[0].Origin)
@@ -231,7 +231,7 @@ func TestAPromotedKeyIsCappedToTheModeThePersonChose(t *testing.T) {
 			b := answerFor(t, v, "Phone", pk)
 			_, err = b.ask(r.m, link)
 			require.NoError(t, err)
-			require.NoError(t, r.m.AllowPairBrowser(context.Background(), c.allow))
+			require.NoError(t, r.m.AllowPairBrowser(context.Background(), c.allow, false))
 			l := r.listed(t)
 			require.Len(t, l, 1)
 			assert.Equal(t, store.DeviceOriginPairing, l[0].Origin)
@@ -264,7 +264,7 @@ func TestAdditionalBrowserQRStopsAtLocalDecision(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, r.m.EnrollmentQRPNG())
 			if allow {
-				require.NoError(t, r.m.AllowPairBrowser(context.Background(), "view"))
+				require.NoError(t, r.m.AllowPairBrowser(context.Background(), "view", false))
 			} else {
 				require.NoError(t, r.m.DenyPairBrowser())
 			}
@@ -276,4 +276,82 @@ func TestAdditionalBrowserQRStopsAtLocalDecision(t *testing.T) {
 	startPair(t, r)
 	r.m.CancelPairBrowser()
 	require.Empty(t, r.m.EnrollmentQRPNG())
+}
+
+// withAnchor is the answer a browser makes when it also offers a passkey as this computer's anchor (#21889): the v4 pair MAC covers it.
+func (b browserAnswer) withAnchor(t *testing.T, anchorPK []byte, cred string) browserAnswer {
+	t.Helper()
+	mac := devicekey.PairMACV4(b.secret, b.code, b.label, b.pk, anchorPK, cred)
+	b.a.MAC, b.a.AnchorPK, b.a.AnchorCred = b64u.EncodeToString(mac), b64u.EncodeToString(anchorPK), cred
+	return b
+}
+
+func TestAnAnchorOfferedAtPairingIsListedOnlyByTheAllowAndTheCardShowsIt(t *testing.T) {
+	r := connectedRig(t)
+	v, link := startPair(t, r)
+	anchor, _ := b64u.DecodeString(newDevicePK(t))
+	b := answerFor(t, v, "Phone", nil).withAnchor(t, anchor, "Y3JlZA")
+	_, err := b.ask(r.m, link)
+	require.NoError(t, err)
+	_, has, _ := r.ss.OwnerAnchorRow(context.Background())
+	assert.False(t, has, "an offer lists nothing before the person's Allow")
+	st := r.m.PairBrowserState()
+	require.NotNil(t, st.Pending.Anchor)
+	assert.Equal(t, devicekey.DisplayFingerprint(anchor), st.Pending.Anchor.Fingerprint)
+	assert.False(t, st.Pending.Anchor.NeedsReplace)
+	require.NoError(t, r.m.AllowPairBrowser(context.Background(), "view", false))
+	row, has, _ := r.ss.OwnerAnchorRow(context.Background())
+	require.True(t, has)
+	assert.Equal(t, anchor, row.PK)
+	res, err := b.ask(r.m, link)
+	require.NoError(t, err)
+	assert.Equal(t, "listed", res.Anchor)
+}
+
+func TestASecondAnchorNeedsReplaceAndOtherwiseOnlyThePairedKeyIsListed(t *testing.T) {
+	r := connectedRig(t)
+	first, _ := b64u.DecodeString(newDevicePK(t))
+	_, err := r.ss.SetOwnerAnchor(context.Background(), first, "Zmlyc3Q", false, time.Now())
+	require.NoError(t, err)
+	v, link := startPair(t, r)
+	second, _ := b64u.DecodeString(newDevicePK(t))
+	b := answerFor(t, v, "Phone", nil).withAnchor(t, second, "c2Vjb25k")
+	_, err = b.ask(r.m, link)
+	require.NoError(t, err)
+	st := r.m.PairBrowserState()
+	require.NotNil(t, st.Pending.Anchor)
+	assert.True(t, st.Pending.Anchor.NeedsReplace)
+	assert.Equal(t, devicekey.DisplayFingerprint(first), st.Pending.Anchor.Existing)
+	require.NoError(t, r.m.AllowPairBrowser(context.Background(), "view", false))
+	row, _, _ := r.ss.OwnerAnchorRow(context.Background())
+	assert.Equal(t, first, row.PK, "without Replace the old anchor stays")
+	assert.Len(t, r.listed(t), 1, "the browser's own key is still paired")
+	res, _ := b.ask(r.m, link)
+	assert.Equal(t, "not_listed", res.Anchor)
+	// with Replace the new one is the anchor
+	v2, link2 := startPair(t, r)
+	third, _ := b64u.DecodeString(newDevicePK(t))
+	b2 := answerFor(t, v2, "Tablet", nil).withAnchor(t, third, "dGhpcmQ")
+	_, err = b2.ask(r.m, link2)
+	require.NoError(t, err)
+	require.NoError(t, r.m.AllowPairBrowser(context.Background(), "view", true))
+	row, _, _ = r.ss.OwnerAnchorRow(context.Background())
+	assert.Equal(t, third, row.PK)
+}
+
+func TestAnAnchorCannotBeAddedToAnAnswerThatWasMadeWithoutOne(t *testing.T) {
+	r := connectedRig(t)
+	v, link := startPair(t, r)
+	anchor, _ := b64u.DecodeString(newDevicePK(t))
+	b := answerFor(t, v, "Phone", nil)                                   // the v1 MAC, made without an anchor
+	b.a.AnchorPK, b.a.AnchorCred = b64u.EncodeToString(anchor), "Y3JlZA" // the Hub adds one
+	_, err := b.ask(r.m, link)
+	assert.ErrorIs(t, err, devicekey.ErrPairingMAC)
+	// and a v4 answer with its anchor swapped is refused too
+	v2, link2 := startPair(t, r)
+	good := answerFor(t, v2, "Phone", nil).withAnchor(t, anchor, "Y3JlZA")
+	other, _ := b64u.DecodeString(newDevicePK(t))
+	good.a.AnchorPK = b64u.EncodeToString(other)
+	_, err = good.ask(r.m, link2)
+	assert.ErrorIs(t, err, devicekey.ErrPairingMAC)
 }

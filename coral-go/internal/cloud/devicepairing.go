@@ -16,6 +16,9 @@ var b64u = base64.RawURLEncoding
 // DeviceKeys is the part of the device list the manager writes: the pairing, the bootstrap row and the clearing when the link changes.
 type DeviceKeys interface {
 	devicekey.PairingStore
+	// SetOwnerAnchor and OwnerAnchorRow are sign once (#21889): the anchor passkey a pairing offered, listed only by the person's Allow.
+	SetOwnerAnchor(ctx context.Context, pk []byte, cred string, replace bool, now time.Time) (bool, error)
+	OwnerAnchorRow(ctx context.Context) (store.OwnerAnchor, bool, error)
 	RemoveAllDeviceKeys(ctx context.Context, now time.Time) (int, error)
 	// SetDeviceClearPending and DeviceClearPending keep "a clear is pending" in the store, so a restart cannot end it.
 	SetDeviceClearPending(ctx context.Context, pending bool) error
