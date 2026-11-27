@@ -95,36 +95,42 @@ func growthRatio(run func(string), unit string, small, big, reps int) (ratio flo
 	return float64(best[1]) / float64(best[0]), true
 }
 
+// standInSink takes the stand-ins' result so the compiler cannot drop their loops (on Windows the old loops read as 0 ns, so the check had nothing to compare: #21920).
+var standInSink int
+
+// scanFrom is the work the stand-ins do per byte: each step depends on the one before, so it is neither dropped nor vectorised and costs about a nanosecond.
+func scanFrom(text string, from int) int {
+	n := from
+	for j := from; j < len(text); j++ {
+		n = n*31 + int(text[j])
+	}
+	return n
+}
+
 // The mutant: a scan that goes back to the end of the text once per name (what the gate did before it remembered the stretch scanned) is quadratic, and the relative check says so.
+// Its small run must be measurable (ok), and not being measurable fails the test: a check that cannot measure must never pass for one that caught the mutant.
 func TestTheGrowthCheckCatchesAQuadraticScan(t *testing.T) {
 	if raceEnabled {
 		t.Skip("the time is not read under -race")
 	}
 	quadratic := func(text string) {
 		n := 0
-		for i := 0; i < len(text); i += 6 { // one name every six bytes
-			for j := i; j < len(text); j++ { // each scans to the end
-				if text[j] == '\x00' {
-					n++
-				}
-			}
+		for i := 0; i < len(text); i += 12 { // one name every twelve bytes
+			n += scanFrom(text, i) // each scans to the end
 		}
-		_ = n
+		standInSink = n
 	}
-	ratio, ok := growthRatio(quadratic, "token=", 8<<10, 128<<10, 2) // smaller texts than the real check: the stand-in is quadratic and must stay quick
+	ratio, ok := growthRatio(quadratic, "token=", 8<<10, 128<<10, 2) // smaller texts than the real check: the stand-in is quadratic and must stay quick (about a second for the long one)
 	if !ok || ratio <= maxLinearGrowth {
-		t.Fatalf("a quadratic scan was not caught: ratio %.1f ok=%v", ratio, ok)
+		t.Fatalf("a quadratic scan was not caught: ratio %.1f measurable=%v", ratio, ok)
 	}
-	linear := func(text string) {
-		n := 0
-		for j := 0; j < len(text); j++ {
-			if text[j] == '\x00' {
-				n++
-			}
-		}
-		_ = n
+	linear := func(text string) { standInSink = scanFrom(text, 0) }
+	// Sizes where one pass is several milliseconds, far above any clock's step, so the ratio is always read.
+	ratio, ok = growthRatio(linear, "token=", 4<<20, 64<<20, 5)
+	if !ok {
+		t.Fatalf("the linear stand-in was too quick to measure: ratio %.1f", ratio)
 	}
-	if ratio, ok := growthRatio(linear, "token=", growthSmall, growthBig, growthRuns); ok && ratio > maxLinearGrowth {
+	if ratio > maxLinearGrowth {
 		t.Fatalf("a linear scan was called quadratic: ratio %.1f", ratio)
 	}
 }
