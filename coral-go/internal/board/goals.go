@@ -121,8 +121,8 @@ type Goal struct {
 	FollowUpsOpen int `db:"-" json:"follow_ups_open,omitempty"`
 	// NewComments: how many replies agents left in the Operator's comment threads on this goal since they last opened them (#12073); set on the way out for the Operator's own read, never stored.
 	NewComments int `db:"-" json:"new_comments,omitempty"`
-	// CommentsOpen: how many open comment threads the goal has (#21989), the number its Comments tab shows; set on the way out for the Operator's own read, never stored. Absent for none; only in a list.
-	CommentsOpen int `db:"-" json:"comments_open,omitempty"`
+	// CommentsOpen: how many open comment threads the goal has (#21989), the number its Comments tab shows; set on the way out for the Operator's own read, never stored. Always serialized, 0 included, so a missing field means an older Coral, not zero; only the Operator's list fills it.
+	CommentsOpen int `db:"-" json:"comments_open"`
 	// DoneState is what the Operator did to this goal's "looks done" row in Needs you (#14047): hidden by Not yet or Dismiss, or opened (read). Set on the way out for the Operator's own read only, never stored here (the
 	// entries live in the settings lists goal_done_hidden and goal_done_read) and absent when nothing applies now.
 	DoneState *GoalDoneState `db:"-" json:"done_state,omitempty"`
