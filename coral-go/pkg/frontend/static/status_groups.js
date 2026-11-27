@@ -194,3 +194,6 @@ export function teamList(saved, board, draw, row) {
     if (done.length) html += `<li class="status-workers-done"><button type="button" class="btn btn-quiet status-head-toggle" data-on-click="status-fold" data-group="${escapeAttr(dkey)}" aria-expanded="${escapeAttr(String(dOpen))}"><span class="status-shape st-done" aria-hidden="true"></span><span class="status-name">${Number(done.length)} done today</span></button></li>` + (dOpen ? done.map(row).join('') : '');
     return html + draw(asleep);
 }
+
+// A browser that opens with Task ticked (the one box whose rows need the sheet; Computer and Team draw with the start sheet) holds this module (so the list's first grouped draw) until the sheet is in: no unstyled first frame (#21784). With none ticked there is nothing to wait for and the start has the bundle's sheet only.
+if (groupBy().task) await groupByStyles();
