@@ -91,6 +91,11 @@ func (m *Manager) ClaimPolling(ctx context.Context, resource, agent, note string
 	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note, Polls: true})
 }
 
+// ClaimRun is ClaimPolling for one `claim --run` (#21790): runID is that command's own, so a second run of the same agent shares the entry and the first one's end does not give it back.
+func (m *Manager) ClaimRun(ctx context.Context, resource, agent, note, runID string) (resourcequeue.Result, error) {
+	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: note, Polls: true, RunID: runID})
+}
+
 // ClaimAuto is the shell hook's claim (#13645): the same as Claim, marked as the hook's own with the pattern that fired (the record keeps the pattern, never the command).
 func (m *Manager) ClaimAuto(ctx context.Context, resource, agent, pattern string) (resourcequeue.Result, error) {
 	return m.claim(ctx, resource, resourcequeue.Claimant{Agent: agent, Note: "auto: " + pattern, Via: "hook", Pattern: pattern})
