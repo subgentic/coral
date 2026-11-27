@@ -61,6 +61,7 @@ type Claimant struct {
 	Polls    bool     // #14170: the claim came from a command that keeps asking about its place (the CLI, every 3 s); only such a place can be taken for abandoned
 	Pattern  string   // for a hook claim, the resource's match pattern that fired (never the command)
 	Needs    []string // what the member that takes this claim must have (a pool's Needs, copied when the claim is made); empty: any member
+	RunID    string   // #21790: the id of one `claim --run` (its own, made by the CLI): a second ask from the same agent joins the entry, and the run that ends gives back only its own share of it. "": a plain claim
 }
 
 // Entry is one agent's place in a resource's line, or its hold of a slot.
@@ -75,6 +76,8 @@ type Entry struct {
 	Pin      int       // a person's override: bigger is nearer the front among the waiting (set by Move)
 	Renews   int       // #14222: how many times the lease was renewed while held, told once in the hold's end event (a row per renewal buried the record: 46,260 in 31 hours)
 	Polled   time.Time // #14170: when the agent last asked about this place (a waiting claim asks every few seconds); an entry nobody has asked about for WaitStale is not waited on: its command ended
+	Runs     []string  // #21790: the ids of the `claim --run` commands that share this entry (an agent holds one slot per resource, so a second run joins the first); it is given back when the last of them ends
+	Base     bool      // #21790: a claim that is not a run (by hand, or the hook's) is on the entry too: a run ending does not end it
 	Away     time.Time // #13706: the agent's wait ended without a turn (its --timeout, its tool call) and its place is kept until this time; a claim from it again clears it. Zero: present
 }
 
@@ -420,6 +423,7 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		return Result{}, ErrNotAllowed
 	}
 	if e := q.entryFor(key, who.Agent); e != nil {
+		e.join(who.RunID)
 		if e.Waiting() {
 			e.Polled = q.now()
 		}
@@ -450,6 +454,8 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 		return Result{}, ErrQueueFull
 	}
 	e := &Entry{ID: q.nextID, Resource: key, Claimant: who, Enqueued: q.now(), Polled: q.now()}
+	e.Claimant.RunID = ""
+	e.join(who.RunID)
 	q.nextID++
 	q.entries = append(q.entries, e)
 	q.note("enqueued", e)
@@ -458,6 +464,48 @@ func (q *Queue) Claim(key string, who Claimant) (Result, error) {
 	err := q.save()
 	q.unlockEmit()
 	return res, err
+}
+
+// join records one more ask on the entry: a run (RunID) shares it, a plain claim is its base.
+func (e *Entry) join(runID string) {
+	if runID == "" {
+		e.Base = true
+		return
+	}
+	for _, r := range e.Runs {
+		if r == runID {
+			return
+		}
+	}
+	e.Runs = append(e.Runs, runID)
+}
+
+// ReleaseRun is Release for the end of one `claim --run` (#21790): the entry is given back only when no other run and no plain claim shares it. An agent holds one slot per resource, so a second claim joins the
+// first; before, the second run's end gave back the first run's slot while its job (on another machine, over ssh) went on unclaimed. A runID the entry does not know of releases it, as Release does.
+func (q *Queue) ReleaseRun(key, agent, runID string) error {
+	if runID != "" {
+		q.mu.Lock()
+		if _, ok := q.res[key]; !ok {
+			q.unlockEmit()
+			return ErrNoResource
+		}
+		if e := q.entryFor(key, agent); e != nil {
+			for i, r := range e.Runs {
+				if r != runID {
+					continue
+				}
+				e.Runs = append(append([]string(nil), e.Runs[:i]...), e.Runs[i+1:]...)
+				if e.Base || len(e.Runs) > 0 {
+					err := q.save()
+					q.unlockEmit()
+					return err // another claim still stands on the entry
+				}
+				break
+			}
+		}
+		q.unlockEmit()
+	}
+	return q.Release(key, agent)
 }
 
 // Renew extends the holder's lease to a full lease from now.

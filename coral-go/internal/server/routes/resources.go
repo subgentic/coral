@@ -260,6 +260,7 @@ type agentBody struct {
 	Note         string `json:"note"`
 	KeepPlace    bool   `json:"keep_place,omitempty"` // release: a wait that ended without a turn (the CLI's --timeout): the place in line is kept for a grace, not dropped (#13706)
 	PollEntry    int64  `json:"poll_entry,omitempty"` // a claim --wait looking again: the entry its first claim queued. If that entry is gone (released, kicked), the answer is "cancelled", not a new place in line (#20345)
+	RunID        string `json:"run_id,omitempty"`     // a claim --run: its own id, so two runs of one agent on one resource share its entry and each gives back only its share (#21790)
 	ParentPID    int    `json:"parent_pid,omitempty"` // a claim by an agent: the shell that ran coral-board (a job in the background keeps the slot while it runs, #13718)
 }
 
@@ -294,7 +295,7 @@ func (h *ResourcesHandler) Claim(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusGone, "cancelled", "your place in line for "+cleanText(name, 80)+" was cancelled (released or removed): nothing was claimed")
 		return
 	}
-	res, err := h.M.ClaimPolling(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200))
+	res, err := h.M.ClaimRun(resources.WithSession(r.Context(), callerActor(r).Session), name, who, cleanText(body.Note, 200), cleanText(body.RunID, 64))
 	if err != nil {
 		h.fail(w, err)
 		return
@@ -333,7 +334,8 @@ func (h *ResourcesHandler) Release(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.reap()
-	release := h.M.Queue().Release
+	runID := cleanText(body.RunID, 64)
+	release := func(key, agent string) error { return h.M.Queue().ReleaseRun(key, agent, runID) }
 	if body.KeepPlace {
 		release = func(key, agent string) error { return h.M.Queue().Leave(key, agent, resourcequeue.DefaultAwayGrace) }
 	}

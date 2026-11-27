@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -353,6 +355,11 @@ func resourceClaim(rest []string) {
 	}
 	me := resolveSubscriberID()
 	body := map[string]any{"subscriber_id": me, "note": flagText(*note, "note"), "parent_pid": os.Getppid()} // the shell that runs this command: a job in the background keeps the slot while it runs
+	runID := ""
+	if *run {
+		runID = newRunID() // this run's own: a second run of the same agent on the resource shares the slot, and this one's end gives back only its share (#21790)
+		body["run_id"] = runID
+	}
 	data, status, err := resourceCall("POST", "/"+name+"/claim", body)
 	if err != nil || (status != http.StatusOK && status != http.StatusAccepted) {
 		resourceFail("Could not claim "+rest[0], err, status, data)
@@ -374,7 +381,7 @@ func resourceClaim(rest []string) {
 		fmt.Printf("You hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
 		claimHowTo(name)
 		if *run {
-			runUnderClaim(name, me, cmdArgs, res.Entry.LeaseUntil, res.Entry.Where, res.Entry.Machine)
+			runUnderClaim(name, me, runID, cmdArgs, res.Entry.LeaseUntil, res.Entry.Where, res.Entry.Machine)
 		}
 		return
 	}
@@ -411,7 +418,7 @@ func resourceClaim(rest []string) {
 			fmt.Printf("Your turn: you hold a slot of %s%s. As an agent, it goes back when THIS command (tool call) ends: claim and run the work in the same command. Release early with: coral-board resource release %s\n", rest[0], onWords(res.Entry.Machine, res.Entry.Member), rest[0])
 			claimHowTo(name)
 			if *run {
-				runUnderClaim(name, me, cmdArgs, res.Entry.LeaseUntil, res.Entry.Where, res.Entry.Machine)
+				runUnderClaim(name, me, runID, cmdArgs, res.Entry.LeaseUntil, res.Entry.Where, res.Entry.Machine)
 			}
 			return
 		}
@@ -431,7 +438,7 @@ func resourceClaim(rest []string) {
 // runUnderClaim runs the command of `resource claim --run -- <command>` here, after the slot is granted, and ties the slot to the run itself (#18488): it renews the lease while the command runs (a run longer than the
 // lease keeps its slot), stops the command if the slot is lost (kicked, or the lease ran out), and gives the slot back when the command ends, whatever started this process: the shell that launched it ending, a
 // background script or a tool call finishing does not matter, because this process is the one the claim follows. The exit code is the command's own (1 when the slot was lost).
-func runUnderClaim(name, me string, args []string, leaseUntil, where, machine string) {
+func runUnderClaim(name, me, runID string, args []string, leaseUntil, where, machine string) {
 	command := heavyCommand(args)
 	if where == "" { // the claim's answer said nothing of where: the resource's own definition does (an older server, #14262)
 		var rv struct {
@@ -447,7 +454,7 @@ func runUnderClaim(name, me string, args []string, leaseUntil, where, machine st
 	}
 	remote := where == resourcequeue.WhereRemote // a resource defined remote sends the run there, as heavy run does (#20221); one that says here, or nothing, runs here as before
 	if remote && heavyMacOnly.MatchString(command) {
-		_, _, _ = resourceCall("POST", "/"+name+"/release", map[string]any{"subscriber_id": me})
+		_, _, _ = resourceCall("POST", "/"+name+"/release", map[string]any{"subscriber_id": me, "run_id": runID})
 		fmt.Printf("%s is on another machine (%s) and this command is for this machine only (it names ~/.coral or port 8420): nothing was run and the slot is given back. Run it here, with a resource of this machine.\n", plainText(name), plainText(machine))
 		exitFn(2)
 		return
@@ -495,7 +502,7 @@ func runUnderClaim(name, me string, args []string, leaseUntil, where, machine st
 	default:
 	}
 	code = heavyFinalCode(code, wasLost)
-	_, _, _ = resourceCall("POST", "/"+name+"/release", map[string]any{"subscriber_id": me})
+	_, _, _ = resourceCall("POST", "/"+name+"/release", map[string]any{"subscriber_id": me, "run_id": runID})
 	fmt.Printf("%s given back (exit %d)\n", plainText(name), code)
 	if code != 0 {
 		exitFn(code)
@@ -663,4 +670,13 @@ func onWords(machine, member string) string {
 		return " on " + plainText(member)
 	}
 	return ""
+}
+
+// newRunID is one `claim --run`'s own id (#21790): random, so no two runs share it.
+func newRunID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("run-%d-%d", os.Getpid(), time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
 }
