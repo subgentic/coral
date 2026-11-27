@@ -1,5 +1,51 @@
 # Release Notes
 
+## v2.1.22 — A faster first load through Coral Hub, joining a second Hub, and task links in chat
+
+Task numbers in brackets. Built on v2.1.21. A prerelease until the Operator promotes it.
+
+### Changes
+
+#### Coral Hub
+
+- **The first load through a Hub is faster** (#21824, #21825, #21839): the Inbox fetches its code in parallel, counts files alongside the other Inbox reads, and loads the Artifacts page only when it is opened. On the coral-hub test page the first load went from 10.6 s to 3.6 s. A folder you open in the Inbox stays open through the first draw.
+- **Join a second Hub from Add computer** (#21221, #21819): the join is a dialog drawn as the approved mock, with its waiting steps and a plain Not connected state; Advanced keeps the address and key form. A refusal's reason never repeats the pasted key.
+
+#### Chat and board
+
+- **Task and goal links** (#21818): "task #N" in chat and board text links to the task and "goal #N" to the goal. A bare #N is not a link.
+
+#### Sidebar
+
+- **Group by draws grouped from the first frame** (#21784): a page that opens with Task ticked waits for the Group by styles before drawing the list.
+
+#### Agent teams (coral-board)
+
+- **Finished results** (#21811): `goal close --result` sends the finished result to Needs you, and `--no-result` says why there is none. `--kind done` attaches a file to a completed task, or with `--goal N` to a goal, open or closed. A file a linked team sent can be sent for review, and the health check reminds a post that links a file to send it for review.
+- **Resource queue** (#21790, #21797, #21800, #21803): two `claim --run` of one agent share the slot, and the first keeps it when the second ends; one entry remembers at most 32 run ids; a run whose process is gone is dropped on the next check.
+
+#### Docs
+
+- Getting Started shows Codex's "Enable full access?" dialog (#21820).
+
+### Test and gate fixes in this release
+
+- The secrets linearity test compares a text with one sixteen times as long, alternating them over seven rounds, instead of a fixed time (#21793, #21894).
+- The file-path join census lists the two joins the finished-results code added, each reviewed (#21879).
+- The phone words suite waits for the New agent dialog's team step to be on screen, now that the Inbox loads its code in parallel (#21896).
+- The privacy test ignores the proxy warning that stays on screen (#21909).
+- The secrets growth check's stand-in scans feed a result the compiler cannot drop, and a run too quick to measure fails instead of passing; it failed on Windows (#21920).
+- The Group by phone test waits for the launch notice and presses a button only once it has stopped moving; it failed 17 of 30 times on Windows under load (#21921).
+- The delete-a-board test checks that the team page's More menu and view exist before measuring them; it failed once on Windows when the menu came a moment late (#21984).
+- The Group by first-frame test holds a fixed give-up instead of reading the clock (#21784).
+- Gate: go-tests, go-race, gofmt, cross-build, Encryption, the browser gate and windows-tests are green on the gated commit, and the Linux release smoke passes on amd64 and arm64.
+
+### Known issues
+
+- Share to Google is still experimental and off by default.
+- The Hub sharing switches and Coral Live stay off.
+- On a phone, the launch notice can push the agent list down just after the page loads, so a quick tap may land on the row below (#21962).
+
 ## v2.1.21 — Group by Task, simpler document review, and a steadier task board for agent teams
 
 Task numbers in brackets. Built on v2.1.20. A prerelease until the Operator promotes it.
