@@ -39,7 +39,7 @@ export function draftPanel({ review, run, refresh, server, composing, bar }) {
             const tools = el('span', 'ac-comment-tools');
             tools.append(commentIcon(button('Edit', () => {
             editors.set(review, { id: draft.id, body: draft.body }); editForm().focus();
-            }), 'Edit'), commentIcon(button('Delete', () => run(() => review.remove(draft.id), 'Draft deleted')), 'Delete'));
+            }), 'Edit', draft.source === 'gdoc' ? (draft.source_name || 'Someone') : 'You'), commentIcon(button('Delete', () => run(() => review.remove(draft.id), 'Draft deleted')), 'Delete', draft.source === 'gdoc' ? (draft.source_name || 'Someone') : 'You'));
             author.append(tools);
         }
         host.append(card);
