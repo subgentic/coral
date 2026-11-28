@@ -46,7 +46,7 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length===1&&document.querySelector('#group-table-view .goal-decision-title').textContent==='Plan the notes'`,'search narrows by goal title');
             await ev(`document.querySelector('#group-table-view .goal-decision-head-right button').click();true`);
             await waitFor(`document.querySelector('#inbox-page #goals-detail-title')?.textContent.includes('Plan the notes')`,'explicit goal open reaches the shared Inbox goal');
-            await ev(`document.querySelector('#inbox-page .goal-review-desk-head .goals-back').click();true`);
+            await ev(`document.querySelector('#inbox-page .goals-back').click();true`);
             await waitFor(`!!document.querySelector('#group-table-view .goal-decision-card')`,'Back returns to filtered ledger');
             await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox(''))`);
             await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=3`,'clear search restores every goal');
