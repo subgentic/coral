@@ -957,7 +957,7 @@ function inboxGoalsToolbar() {
                 { type: 'select', key: 'team', id: 'inbox-goals-team', label: 'Team', values: [], labels: {}, any: 'Any team' },
                 { type: 'select', key: 'driver', id: 'inbox-goals-driver', label: 'Driver', values: [], labels: {}, any: 'Any driver' },
                 { type: 'date', key: 'from', id: 'inbox-goals-from', label: 'Updated since' },
-                { type: 'check', key: 'archived', id: 'inbox-goals-archived', label: 'Include archived teams', wrapClass: 'list-bar-field list-bar-kept' },
+                { type: 'check', key: 'archived', id: 'inbox-goals-archived', label: 'Include archived teams', wrapClass: 'list-bar-kept list-bar-foot' },
             ],
             model: { EMPTY: GF.EMPTY, clean: GF.clean, chips: GF.chips, isFiltered: f => GF.isFiltered({ ...f, state: f.state === 'active' ? '' : f.state }), without: GF.without }, // Active is how the folder opens, not a filter the person set (#16371)
         }, next => {
