@@ -123,6 +123,7 @@ export function needsLedger(cfg) {
         const when = el('time', 'nl-when', cfg.when(row)); when.dateTime = row.waiting_since || ''; side.append(when);
         if (!row.review) { const hover = el('span', 'nl-hover-actions'); for (const entry of extraActions.filter(x => !isQuestion || x.label === 'Dismiss')) hover.append(button(entry.label, 'btn btn-small btn-quiet', entry.run)); side.prepend(hover); more(side, extraActions, title); }
         else {
+            cfg.dragFile?.(r, row); // a file row dragged onto Saved is saved (#11641)
             const entries = cfg.decidedFile(row) ? extraActions.filter(x => x.label === 'Dismiss') : [], save = cfg.saveLater?.(row), hover = el('span', 'nl-hover-actions nl-save-hover');
             if (save) {
                 const run = () => saveFile(row, save), mark = button('', 'btn btn-small btn-quiet btn-icon nl-save-later', run);
