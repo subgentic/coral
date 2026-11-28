@@ -196,11 +196,14 @@ const savedSpec = () => ({
     model: savedModel({ convLabel }),
 });
 
+/** The dock's Saved tab: the Search box alone (#22072). Type, From and Sort are only on the main Saved page, whose filters this list still follows. */
+const dockSpec = () => ({ ...savedSpec(), label: 'Search saved messages', collapsible: false, sorts: null, fields: [] });
+
 /** The bar above the list, told the filters, the conversations there are and how many of the tab's messages match (the tab's own total, which a search does not change). */
 function syncBar(shownCount) {
     const host = $('saved-bar');
     if (host) {
-        if (!bar) { bar = buildListBar(savedSpec(), next => { setFilters(cleanSaved(next)); refilterOrRefresh(); }); host.append(bar.node); }
+        if (!bar) { bar = buildListBar(dockSpec(), next => { setFilters(cleanSaved(next)); refilterOrRefresh(); }); host.append(bar.node); }
         syncOneBar(bar, shownCount);
     }
     if (inboxBar) syncOneBar(inboxBar, shownCount);

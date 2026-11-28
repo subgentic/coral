@@ -92,12 +92,12 @@ async function run() {
             await ev(`document.getElementById('inbox-search').value = ''; document.getElementById('inbox-search').dispatchEvent(new Event('input', { bubbles: true })); true`);
             await settle(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, 'the plain list again');
 
-            await pick('sv-kind', 'board');
+            await pick('svi-kind', 'board');
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-chip-text')?.textContent === 'Type: Board message' && document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'the board filter');
             s = await snap();
             check(`${dev}: Type: board message leaves the two open board messages`, s.titles.length === 2 && s.titles.every(t => /team-x/.test(t)) && s.chips.join() === 'Type: Board message', JSON.stringify([s.titles, s.chips]));
-            await pick('sv-kind', '');
-            const convState = await pickOption('sv-conv', 'sv-a-1');
+            await pick('svi-kind', '');
+            const convState = await pickOption('svi-conv', 'sv-a-1');
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-chip-text')?.textContent === 'From: Frontend Dev' && document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'From a conversation')
                 .catch(async e => { throw new Error(`${e.message} | case: the option existed but the pick had no effect | ${JSON.stringify(await convState())}`); });
             // The board filter and this conversation both match two rows. The chip updates before the fetch, so its count alone can still describe the previous answer.
@@ -109,7 +109,7 @@ async function run() {
 
             // a slow answer to an old filter must not overwrite the newer one's list (#7945): the board filter's read is held back 700 ms, the filter is cleared at once
             await ev(`window.__realFetch = window.__realFetch || window.fetch; window.fetch = (u, o) => { const p = window.__realFetch(u, o); return /\\/api\\/saved\\?.*kind=board/.test(String(u)) ? p.then(r => new Promise(res => setTimeout(() => res(r), 700))) : p; }; true`);
-            await pick('sv-kind', 'board'); await pick('sv-kind', '');
+            await pick('svi-kind', 'board'); await pick('svi-kind', '');
             await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the held answer has to have arrived before the list is read
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '4 messages'`, 'the old read did not win');
             s = await snap();
