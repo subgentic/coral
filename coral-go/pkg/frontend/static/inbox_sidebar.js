@@ -79,7 +79,7 @@ const Toolbar = await importOnce('./team_toolbar.js'); // the selection bar take
 const GS = await importOnce('./goal_short.js'); // a goal's short name and #N (#15245)
 const { mountGoal } = await importOnce('./goal_view.js');
 const { arrangeReviewRows, reviewGroupLookup } = await importOnce('./inbox_review_groups.js');
-const { needsLedger } = await importOnce('./needs_ledger.js');
+const { needsLedger, needsGroupButton } = await importOnce('./needs_ledger.js');
 const { questionWasRead, markQuestionRead, isQuestionItem } = await importOnce('./needs_question_read.js');
 const GoalDecisions = await importOnce('./goal_decisions.js'); // Goals ledger; Inbox itself is lazy (#21846)
 const { waitingOnAgent, needsReviewAttention, reviewChangeLabels, hasNewVersion, decidedWithNews, decidedWord, sentBackSince, sentBackChip, sentBackExcerpt, producerArchived } = await importOnce('./inbox_review_state.js');
@@ -507,7 +507,7 @@ function inboxNeedsToolbar() {
     if (groupToggle && needsTab === 'agent') groupToggle.hidden = true; // that tab has its own Group by
     else if (groupToggle) groupToggle.hidden = (!!needsFilters.kind && needsFilters.kind !== 'review') || (!reviewItems().length && needsFilters.kind !== 'review');
     node.querySelector('.nl-visible-group')?.remove();
-    if (needsTab === 'you' && !activeNeedsTeam) { if (groupToggle) groupToggle.hidden = true; const visible = groupModeField('inbox-needs-visible-group-mode', 'nl-visible-group'); const mode = visible.querySelector('select'); mode.querySelector('option[value=task]')?.remove(); if (groupMode === 'task') mode.value = 'goal'; (node.querySelector('.list-bar-search-row') || node).append(visible); const box = node.querySelector('input[type=search]'); if (box) { box.placeholder = 'Search Needs you'; box.setAttribute('aria-label', 'Search Needs you'); } }
+    if (needsTab === 'you' && !activeNeedsTeam) { if (groupToggle) groupToggle.hidden = true; const visible = needsGroupButton(groupMode === 'none' ? 'none' : 'goal', setGroupMode); (node.querySelector('.list-bar-search-row') || node).append(visible); const box = node.querySelector('input[type=search]'); if (box) { box.placeholder = 'Search Needs you'; box.setAttribute('aria-label', 'Search Needs you'); } }
     node.querySelectorAll('.skip-link, .inbox-filter-note').forEach(e => e.remove()); /* the bar is kept between draws: what was added to it last time goes first */
     const skip = DT.el('a', 'skip-link', 'Skip to the list'); skip.href = '#'; skip.addEventListener('click', e => { e.preventDefault(); document.querySelector('#group-table-view .nl-row, #group-table-view tbody tr:not(.dt-group) button, #group-table-view tbody tr:not(.dt-group) a')?.focus(); }); node.prepend(skip); // a keyboard user passes the search and filters (walk 7 M3)
     node.querySelectorAll('.inbox-needs-tabs').forEach(e => e.remove());
@@ -1597,19 +1597,19 @@ function newNeedsList(rows) {
     const open = s => { markQuestionRead(s); openNeedsItem(s); };
     const link = (label, route) => { const a = DT.el('a', '', markHidden(label, { strict: true })); a.href = build(route); a.dataset.route = ''; return a; };
     return needsLedger({ rows, state: needsState, grouped: groupReviews, keyOf: s => `${sessionServer(s)}:${s.session_id}`, about: needsAbout, unread: needsUnread, name: needsName, source: reviewSourceLabel,
-        words: s => s.operatorAsk ? askOpened(s.operatorAsk) : askOf(s) || s.waiting_summary || '', fileQuestion: s => s.review && decidedWithNews(s.review) ? `${decidedWord(s.review)} · ${Number(s.review.new_comments)} new comments` : questionOf(s), contextNote: s => s.operatorAsk ? questionContextNote(s.operatorAsk) : '',
+        words: s => s.operatorAsk ? askOpened(s.operatorAsk) : askOf(s) || s.waiting_summary || '', quoteFileQuestion: s => !!s.review && !decidedWithNews(s.review), fileQuestion: s => s.review && decidedWithNews(s.review) ? `${decidedWord(s.review)} · ${Number(s.review.new_comments)} new comments` : questionOf(s), contextNote: s => s.operatorAsk ? questionContextNote(s.operatorAsk) : '',
         questionBox: (box, s, text) => { const raw = s.operatorAsk ? askOpened(s.operatorAsk, { code: true }) : text; NF.openQuestion(box, /^```/.test(raw) ? raw : raw.split('\n').slice(1).join('\n'), text); },
         when: s => { const text = shortWait(s.waiting_since); return text ? `${text} ago` : ''; },
         eligible: s => !!(s.waitItem || s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal || s.goalDone || promptCanSelect(s)),
         onFoldChange: () => document.querySelector('.inbox-fold-all')?.sync(), kindIcon: NF.kindIcon, open, openTerminal: s => { markQuestionRead(s); openInAgents(s); }, readQuestion: markQuestionRead, bulkActions: needsBulkActions(), dismissPrompt: s => promptCanSelect(s) ? promptDismiss(s).catch(e => showToast(e.message || 'Not dismissed', true)) : undefined,
-        agentLink: s => agentLink(markHidden(needsAgentName(s), { strict: true }), { board: needsAbout(s).team, session: s.session_id }),
+        agentLink: s => agentLink(markHidden(needsAgentName(s), { strict: true }), { board: needsAbout(s).team, session: s.operatorAsk ? s.operatorAsk.session_id || '' : s.session_id }),
         teamLink: s => { const team = needsAbout(s).team; return splitKey(team).name ? teamLabelLink(team) : DT.el('span', '', teamOf(s)); },
         goalLink: a => link(`#${a.goalId} ${a.goalTitle}`, { ...folderRoute, id: a.team, item: a.goalId }),
         taskLink: a => link(`task #${a.taskId}${a.taskTitle ? ' '+a.taskTitle : ''}`, { view: 'inbox-tasks', sub: 'tasks', id: a.team, item: a.taskId }),
         openGoal: a => go({ view: 'inbox-goals', sub: 'goals', id: a.team, item: a.goalId }),
         goalProgress: a => { const g = goals.find(g => g.board_id === a.team && Number(g.id) === a.goalId); if (!g?.rollup) return ''; const all = Number(g.rollup.total) || ['done','active','blocked','queued'].reduce((n,k) => n+(Number(g.rollup[k]) || 0),0); return `${Number(g.rollup.done) || 0} of ${all} tasks done`; },
         fileAgent: s => { const a = needsAbout(s), who = needsAgentName(s), person = DT.avatar(who, markHidden(who, { strict: true }), { board: a.team, session: s.review?.session_id || '' }), link = agentLink(who, { board: a.team, session: s.review?.session_id || '' }); const icon = person.querySelector('.dt-avatar'); link.replaceChildren(...(icon ? [icon] : [])); link.classList.add('goal-decision-agent-icon'); link.title = markHidden(who, { strict: true }); if (link.tagName !== 'BUTTON') { link.setAttribute('role', 'img'); link.setAttribute('aria-label', markHidden(who, { strict: true })); } return link; },
-        actions: s => s.waitItem ? waitItemActions(s) : s.proposal ? proposalActions(s.proposal) : s.skillReview ? skillActions(s.skillReview) : s.goalDone ? goalDoneActions(s.goalDone) : s.review ? document.createElement('span') : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.welcome ? welcomeActions(s.welcome) : s.unrecorded ? unrecordedActions() : promptCell(s, answerCell, moreMenu, needsName, isPhoneLayout()) });
+        actions: s => s.waitItem ? waitItemActions(s) : s.proposal ? proposalActions(s.proposal) : s.skillReview ? skillActions(s.skillReview) : s.goalDone ? goalDoneActions(s.goalDone) : s.review ? document.createElement('span') : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.welcome ? welcomeActions(s.welcome) : s.unrecorded ? unrecordedActions() : s.waiting_kind === 'permission' ? answerCell(s, { dismiss: false, omitCommandQuestion: true }) : promptCell(s, answerCell, moreMenu, needsName, isPhoneLayout()) });
 }
 
 /** The shared Needs you table specification; team-page mounting reuses these exact rows and actions. */
@@ -1988,7 +1988,7 @@ function mountInbox() {
     new MutationObserver(() => { if (document.body.getAttribute('data-nav-tab') !== 'hub-inbox') { _wasShown = false; needsOrder = null; needsState.shown = null; if (needsFilters.kind) { needsFilters = { ...needsFilters, kind: '' }; persistNeedsFilters(); } } }).observe(document.body, { attributes: true, attributeFilter: ['data-nav-tab'] });
     $('inbox-view').addEventListener('click', () => quietFocus($('inbox-view')), true);
     if (nativeInbox()) $('inbox-search')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; /* a held Enter is one search */ filterInbox(e.target.value); } }); // a chat search runs when it is asked for, not on each key (coral-hub's rate condition)
-    onInboxHooks({ extra: () => HJ.joinCount() + (liveAttention?.liveAttentionCount() || 0) - everyNeed().filter(questionWasRead).length, goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; liveAttention?.refreshLiveAttention(); renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
+    onInboxHooks({ extra: () => HJ.joinCount() + (liveAttention?.liveAttentionCount() || 0), goals: liveGoals, needs: () => { if ($('inbox-local')?.hidden) return; liveAttention?.refreshLiveAttention(); renderInboxNav(); }, counts: () => { if (!$('inbox-local')?.hidden) renderInboxNav(); } });
     saved.onSavedRender(() => { if (!$('inbox-local')?.hidden) renderInboxNav(true); });
     saved.mountInboxSavedBar($('inbox-saved-bar'));
 }

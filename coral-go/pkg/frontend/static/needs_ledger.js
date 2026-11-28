@@ -2,6 +2,8 @@
  * this view only groups, lays out and selects the rows already read by Inbox. */
 import { el } from './dom_el.js';
 import { markHidden } from './visible_marks.js';
+import { importOnce } from './import_once.js';
+const { moreMenu: sharedMenu } = await importOnce('./more_menu.js');
 import { menuMove } from './menu_keys.js';
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('needs_ledger.css');
@@ -13,10 +15,15 @@ const icon = (name, label) => { const i = el('span', 'material-icons nl-icon', n
 const timeOf = r => Date.parse(r.waiting_since || r.operatorAsk?.at || r.review?.created_at || '') || 0;
 const question = r => !!r.operatorAsk || r.waiting_kind === 'ask' || r.waiting_kind === 'question';
 const permission = r => r.waiting_kind === 'permission';
+export function needsGroupButton(value, change) {
+    const box = sharedMenu('needs-group-by', ['goal', 'none'].map(mode => ({ label: mode === 'goal' ? 'Goal' : 'None', pressed: value === mode, run: () => change(mode) })), { label: 'Group by', wrapClass: 'task-more nl-visible-group' });
+    const b = box.querySelector('button'); b.replaceChildren(document.createTextNode('Group by: '), el('b', '', value === 'none' ? 'None' : 'Goal'), icon('expand_more')); b.setAttribute('aria-label', b.textContent.replace('expand_more', '').trim()); return box;
+}
 export function needsLedger(cfg) {
     const { rows, state, keyOf, about, unread, name, source, actions, open, agentLink, teamLink, goalLink, taskLink, bulkActions, eligible } = cfg;
     const root = el('section', 'needs-ledger'); root.setAttribute('aria-label', 'Needs you');
     const summary = el('div', 'nl-summary'), lists = el('div', 'nl-lists'); root.append(summary, lists);
+    const phoneHeader = document.getElementById('top-phone-bar'), phoneSummary = el('span', 'nl-phone-summary'); phoneHeader?.querySelector('.nl-phone-summary')?.remove(); phoneHeader?.append(phoneSummary);
     let selecting = state.select || state.selected.size > 0;
     const checks = [], groups = [], controllers = [];
     const here = new Set(rows.map(keyOf)); for (const key of state.rowCache?.keys() || []) if (!here.has(key) && !state.selected.has(key)) state.rowCache.delete(key);
@@ -29,9 +36,11 @@ export function needsLedger(cfg) {
         hit.addEventListener('click', e => e.stopPropagation()); checks.push({ input, items }); return hit;
     }
     function sync() {
-        const selected = chosen(); root.classList.toggle('nl-selection-active', selecting || !!selected.length); state.select = selecting;
+        const selected = chosen(); root.classList.toggle('nl-has-selection', !!selected.length); root.classList.toggle('nl-selection-active', selecting || !!selected.length); state.select = selecting;
         for (const { input, items } of checks) { const available = items.filter(eligible), n = available.filter(r => state.selected.has(keyOf(r))).length; input.checked = n > 0 && n === available.length; input.indeterminate = n > 0 && n < available.length; input.disabled = !available.length; }
         root.querySelectorAll('[data-needs-key]').forEach(n => n.classList.toggle('nl-is-selected', state.selected.has(n.dataset.needsKey)));
+        phoneSummary.replaceChildren(el('strong', 'nl-phone-title', 'Needs you'), button(`${rows.length} · ${rows.filter(unread).length} new`, 'btn btn-quiet nl-phone-count', () => { root.classList.toggle('nl-tools-open'); phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-expanded', String(root.classList.contains('nl-tools-open'))); }), button(selecting || selected.length ? 'Cancel' : 'Select', 'btn btn-quiet nl-phone-select', () => { if (selecting || state.selected.size) api.clear(); else { selecting = true; sync(); } }));
+        phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-label', 'Show Needs you search and filters');
         summary.replaceChildren(checkboxTop, el('strong', '', selected.length ? `${selected.length} selected` : `${rows.length} items`));
         if (!selected.length) { summary.append(el('span', 'nl-summary-new', `· ${rows.filter(unread).length} new`)); const select = button(selecting ? 'Cancel' : 'Select', 'btn btn-small btn-quiet nl-selection-mode', () => { if (selecting) api.clear(); else { selecting = true; sync(); } }); summary.append(select); }
         else {
@@ -64,23 +73,22 @@ export function needsLedger(cfg) {
         const kindIcon = row.review ? (/image\//.test(row.review.media_type || '') ? 'image' : /html/.test(row.review.media_type || '') ? 'code' : 'description') : isPermission ? 'lock' : isQuestion ? 'waving_hand' : 'inbox';
         r.append(!row.review && !isPermission && !isQuestion ? cfg.kindIcon(row) : icon(kindIcon, row.review ? 'File for review' : isPermission ? 'Permission prompt' : 'Question'), body, side);
         const words = safe(cfg.words(row)).replace(/^\s*@Operator\s*:?\s*/i, ''), lines = words.split('\n').filter(Boolean);
-        const title = row.review ? safe(row.review.name) : isPermission ? `${safe(name(row))} ${/^Wants to run:/i.test(words) ? 'wants to run a command' : 'needs permission'}` : isQuestion ? lines[0] || 'Question' : safe(name(row));
+        const title = row.review ? safe(row.review.name) : isPermission ? `${safe(name(row))} ${/^Wants to edit a file outside/i.test(words) ? 'wants to edit a file outside its folder' : /^Wants to run:/i.test(words) ? 'wants to run a command' : 'needs permission'}` : isQuestion ? lines[0] || 'Question' : safe(name(row));
         const heading = el('div', 'nl-title', isQuestion && title.length > 160 ? title.slice(0,159)+'…' : title); r.setAttribute('aria-label', title);
-        if (row.review) { const fileButton = button(title, 'nl-file-open', () => open(row)); heading.replaceChildren(fileButton); if (Number(row.review.version) > 1) heading.append(el('span', 'nl-version', `version ${row.review.version}`)); }
+        if (row.review) { const fileButton = button(title, 'nl-file-open', () => open(row)); heading.replaceChildren(fileButton); if (Number(row.review.version) > 1) fileButton.append(el('span', 'nl-version', `version ${row.review.version}`)); }
         body.append(heading);
-        if (row.review) { const note = cfg.fileQuestion(row); if (note) body.append(el('div', 'nl-meta', safe(note))); }
+        if (row.review) { const note = cfg.fileQuestion(row); if (note) heading.querySelector('.nl-file-open').append(el('span', 'nl-meta', safe(cfg.quoteFileQuestion(row) ? `"${note}"` : note))); }
         else body.append(meta(row, flat));
         const contextNote = cfg.contextNote(row); if (contextNote) body.append(el('div', 'nl-meta', safe(contextNote)));
         if (!row.review && !isQuestion && !isPermission && words) body.append(el('div', 'nl-other-text', words));
         if (isQuestion && (lines.length > 1 || title.length > 160)) { const box = el('div', 'nl-question-box'), text = title.length > 160 ? words : lines.slice(1).join('\n'); cfg.questionBox(box, row, text); body.append(box); }
-        if (isPermission) body.append(el('code', 'nl-command', words.replace(/^Wants to run:\s*/i, '')));
+        if (isPermission) body.append(el('code', 'nl-command', words.replace(/^Wants to (?:run|edit a file outside its folder):\s*/i, '')));
         let actionNode = actions(row);
         const extras = [{ label: row.review ? 'Open file' : isPermission ? 'Open terminal' : isQuestion ? 'Open question' : 'Open', run: () => isPermission ? cfg.openTerminal(row) : open(row) }];
-        if (isPermission && eligible(row)) extras.push({ label: 'Dismiss', run: () => cfg.dismissPrompt(row) });
         if (actionNode instanceof Node) {
             actionNode.classList.add('nl-actions');
             for (const b of actionNode.querySelectorAll('button')) {
-                if (b.textContent.trim() === 'Dismiss') { extras.push({ label: 'Dismiss', run: () => b.click() }); b.hidden = true; }
+                if (b.textContent.trim() === 'Dismiss') { if (!isPermission) extras.push({ label: 'Dismiss', run: () => b.click() }); b.hidden = true; }
                 if (isQuestion && ['Answer', 'Custom answer'].includes(b.textContent.trim())) b.textContent = 'Write an answer';
             }
             if (isQuestion) actionNode.addEventListener('click', e => { const b = e.target.closest('button'); if (b?.textContent.trim() === 'Write an answer') cfg.readQuestion(row); }, { capture: true });
@@ -109,7 +117,7 @@ export function needsLedger(cfg) {
             for (const g of groups) {
                 const questions = ordered(g.rows.filter(question)), files = ordered(g.rows.filter(r => r.review)), other = ordered(g.rows.filter(r => !question(r) && !r.review));
                 const openNow = folds.has(g.key) ? folds.get(g.key) : questions.length > 0, head = el('div', 'nl-group-head'), groupBody = el('div', 'nl-group-body');
-                head.classList.toggle('nl-goal', !!g.a.goalId); head.append(checkbox(g.rows, `Select ${safe(g.a.goalTitle || 'Not tied to a goal')}`), icon(g.a.goalId ? 'flag' : 'radio_button_unchecked', g.a.goalId ? 'Goal' : 'Not tied to a goal'));
+                head.classList.toggle('nl-goal', !!g.a.goalId); if (g.a.goalId) head.append(checkbox(g.rows, `Select ${safe(g.a.goalTitle || 'Goal')}`)); else { const select = checkbox(g.rows, 'Select items not tied to a goal'); select.classList.add('nl-direct-check'); head.append(select); } head.append(icon(g.a.goalId ? 'flag' : 'radio_button_unchecked', g.a.goalId ? 'Goal' : 'Not tied to a goal')); if (!g.a.goalId) head.lastChild.classList.add('nl-direct-icon');
                 const main = el('div', 'nl-body'), toggle = button('', 'nl-group-toggle', () => { keepFold(g.key, groupBody.hidden); groupBody.hidden = !groupBody.hidden; toggle.setAttribute('aria-expanded', String(!groupBody.hidden)); head.classList.toggle('nl-open', !groupBody.hidden); });
                 toggle.setAttribute('aria-expanded', String(openNow)); const title = el('span', 'nl-title'); if (g.a.goalId) title.append(el('span', 'nl-goal-id', `#${g.a.goalId}`), document.createTextNode(' '+safe(g.a.goalTitle || 'Goal'))); else title.textContent = 'Not tied to a goal'; toggle.append(title); main.append(toggle);
                 const counts = [questions.length ? `${questions.length} ${questions.length === 1 ? 'question' : 'questions'}` : '', files.length ? `${files.length} to review` : '', other.length ? `${other.length} other items` : ''].filter(Boolean).join(' · '), detail = el('div', 'nl-meta'); detail.append(el('strong', '', counts));
