@@ -14,6 +14,8 @@ const BASE = require('./test_base').BASE;
     try {
         await Promise.all([Page.enable(), Runtime.enable()]);
         await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
+        // #21853: this all-status fixture explicitly shows done tasks; task_show_done_browser covers the fresh default.
+        await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-hide-completed', 'false');` });
         await Page.navigate({ url: BASE }); await Page.loadEventFired();
         await ev(`(async () => {
             const {state} = await import((window.__coralStatic||'/static/')+'state.js');
