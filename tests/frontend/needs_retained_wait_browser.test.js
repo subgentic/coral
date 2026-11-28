@@ -22,8 +22,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
    await waitFor(`!!document.querySelector('#group-table-view .inbox-open-agent')`,'Open agent remains available');
    assert.equal(await ev(`document.querySelectorAll('#group-table-view .inbox-answer, #group-table-view .inbox-dismiss').length`),0,'no stale answers or repeat Dismiss');
    if(width===390){
-    await waitFor(`!!document.querySelector('#group-table-view tr[data-key="local:retained-agent-id"].dt-mailed')`,'retained row uses phone layout');
-    assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tr[data-key="local:retained-agent-id"] [role="menuitem"]')].map(item=>item.textContent.trim()).filter(text=>text==='Dismiss')`),[],'phone row menu cannot dismiss an already still-waiting request again');
+    await waitFor(`!!document.querySelector('#group-table-view .nl-row[data-needs-key="local:retained-agent-id"]')`,'retained row uses phone layout');
+    assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .nl-row[data-needs-key="local:retained-agent-id"] [role="menuitem"]')].map(item=>item.textContent.trim()).filter(text=>text==='Dismiss')`),[],'phone row menu cannot dismiss an already still-waiting request again');
    }
    // #17625 item 3 (the Orchestrator's decision on #18820): the team header shows the Needs you number, so the retained wait the Inbox counts is the one the header counts, with no grace period and no 'Checking' stretch.
    await ev(`window.openTeamPage(${JSON.stringify(team)})`);
@@ -38,7 +38,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
    await waitFor(`document.querySelector('#team-page-health')?.textContent.includes('1 needs attention')`,'team status counts the same retained wait');
    await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
    await waitFor(`!!document.querySelector('#group-table-view .inbox-open-agent')`,'return to retained row');
-   await ev(`document.querySelector('#group-table-view tr[data-key="local:retained-agent-id"] .inbox-open-agent').click();true`);
+   await ev(`document.querySelector('#group-table-view .nl-row[data-needs-key="local:retained-agent-id"] .inbox-open-agent').click();true`);
    assert.deepEqual((await ev(`window.__opened`)).slice(0,3),['retained-agent','claude','retained-agent-id']);
    assert.deepEqual(await ev(`window.__waitWrites.filter(p=>['send','keys','input','answer-prompt'].includes(p.split('/').pop()))`),[],'opening the agent sends no answer');
    await ev(`window.__retained.waiting_for_input=false;window.T.render.renderLiveSessions(window.T.state.liveSessions);true`);

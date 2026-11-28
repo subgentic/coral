@@ -1,3 +1,4 @@
+// #22094: skill ledger selectors and opening folded groups; publisher sanitization, source reads, Review navigation and no-scripts approval confirm retained.
 // A skill waiting for approval is an item of the Inbox's Needs you (#12139, goal #191): one row for each with who published it, counted in the Inbox tab's badge, a pill for the kind, and Review opens the Skills tab at
 // that skill. The Skills Store's list is stood in at GET /api/skills?status=pending. 1440 px, isolated dev server.
 const assert = require('node:assert/strict');
@@ -27,12 +28,13 @@ const PENDING = [
                 return real(u, o); };
             return true; })()`);
         await ev(`window.switchNavTab('hub-inbox', { folder: 'needs' }); true`);
-        await waitFor(`/Skill to approve: db-review version 1/.test(document.getElementById('group-table-view').innerText)`, 'the skill rows in Needs you', 10000);
+        await waitFor(`/Skill to approve: db-review version 1/.test(document.getElementById('group-table-view').textContent)`, 'the skill rows in Needs you', 10000);
+        await ev(`document.querySelectorAll('.nl-group-toggle[aria-expanded=false]').forEach(b=>b.click());true`);
         const text = await ev(`document.getElementById('group-table-view').innerText`);
         assert.match(text, /Skill to approve: pdf-forms version 2/);
         assert.match(text, /Published by Backend Dev · alpha/, 'who published it, from the session');
         // a name or a publisher with a control, zero-width or reordering character comes out clean: none of those characters is in what is drawn (they are dropped or written out, never passed to the page)
-        const row = await ev(`(() => { const r = Array.from(document.querySelectorAll('#group-table-view tr.dt-row')).find(x => /clean/.test(x.textContent)); return r ? { text: r.textContent, html: r.innerHTML, title: r.getAttribute('aria-label') || '' } : null; })()`);
+        const row = await ev(`(() => { const r = Array.from(document.querySelectorAll('#group-table-view .nl-row')).find(x => /clean/.test(x.textContent)); return r ? { text: r.textContent, html: r.innerHTML, title: r.getAttribute('aria-label') || '' } : null; })()`);
         assert.ok(row, 'the row of the skill with hostile characters is there');
         const bad = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/;
         assert.equal(bad.test(row.text), false, 'no control, zero-width or reordering character in the row text: ' + JSON.stringify(row.text));
@@ -51,11 +53,11 @@ const PENDING = [
         assert.match(phoneView.rows, /clean<U\+0007>-up<U\+200B>-skill<U\+202E>/, 'the words that are words are there, the rest written out');
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await ev(`window.switchNavTab('hub-inbox', { folder: 'needs' }); true`);
-        await waitFor(`/Skill to approve: db-review version 1/.test(document.getElementById('group-table-view').innerText)`, 'the desktop rows again', 10000);
+        await waitFor(`/Skill to approve: db-review version 1/.test(document.getElementById('group-table-view').textContent)`, 'the desktop rows again', 10000);
         assert.match(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), /^[2-9]\d*$/, 'the Inbox tab counts them');
         assert.match(await ev(`Array.from(document.querySelectorAll('#group-table-view button')).map(b => b.textContent.trim()).join('|')`), /Review/, 'a Review button on the row');
         // Review opens the Skills tab at that skill
-        await ev(`Array.from(document.querySelectorAll('#group-table-view tr.dt-row')).find(r => /db-review/.test(r.textContent)).querySelector('button[aria-label="Review the skill db-review"]').click(); true`);
+        await ev(`Array.from(document.querySelectorAll('#group-table-view .nl-row')).find(r => /db-review/.test(r.textContent)).querySelector('button[aria-label="Review the skill db-review"]').click(); true`);
         await waitFor(`location.pathname === '/skills/${PENDING[0].id}'`, 'the Skills tab at that skill', 8000);
         console.log('PASS a skill waiting for approval is an item of Needs you');
     } finally { await client.close(); }
