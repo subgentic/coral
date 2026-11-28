@@ -8,7 +8,7 @@ import { markHidden } from './visible_marks.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { onArtifactsRev } from './artifacts_feed.js';
-import { isParked } from './goal_words.js';
+import { isParked, allTasksOf } from './goal_words.js';
 const { needsReviewAttention } = await importOnce('./inbox_review_state.js');
 const { el } = await importOnce('./dom_el.js');
 const { foldAllButton } = await importOnce('./fold_all_button.js');
@@ -99,12 +99,12 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, ques
         if (!folds.has(key)) { if (folds.size >= 200) folds.delete(folds.keys().next().value); folds.set(key, index < 2); }
         const bar = el('div', 'goal-decision-head'), toggle = button('goal-decision-toggle', '', () => { folds.set(key, !folds.get(key)); paint(); if (folds.get(key)) load(false); syncFoldButtons(); });
         toggle.dataset.goalId = String(g.id);
-        toggle.append(el('span', 'goal-decision-chevron', '▾'), (() => { const s = chip(safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown'), `goal-state-${g.state || 'unknown'}`); s.classList.remove('dt-chip'); s.classList.add('goal-decision-state'); return s; })(), el('span', 'goal-decision-id', `Goal #${g.id}`), el('span', 'goal-decision-title', safe(g.title)));
-        const right = el('div', 'goal-decision-head-right'), summary = el('span', 'goal-decision-summary'), teamLabel = el('span', 'goal-decision-team', safe(teamOf(g)));
+        toggle.append(el('span', 'goal-decision-chevron', '▾'), (() => { const label = safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown'), s = chip('', `goal-state-${g.state || 'unknown'}`); s.title = label; s.setAttribute('aria-label', label); s.setAttribute('role', 'img'); s.classList.remove('dt-chip'); s.classList.add('goal-decision-state'); return s; })(), el('span', 'goal-decision-id', `#${g.id}`), el('span', 'goal-decision-title', safe(g.title)));
+        const right = el('div', 'goal-decision-head-right'), summary = el('span', 'goal-decision-summary'), taskProgress = el('span', 'goal-decision-task-progress', `${Number(g.rollup?.done) || 0} of ${allTasksOf(g.rollup || {})} tasks done`), teamLabel = el('span', 'goal-decision-team', safe(teamOf(g)));
         if (Number(g.new_comments) > 0) right.append(chip('New comments', 'goal-new-comments'));
-        const openArtifacts = button('btn btn-small btn-quiet goal-artifacts-open', '↗', () => openGoal(g, 'artifacts'));
-        openArtifacts.title = 'Open goal artifacts'; openArtifacts.setAttribute('aria-label', 'Open goal artifacts');
-        right.append(summary, teamLabel, openArtifacts); bar.append(toggle, right);
+        const openArtifacts = button('btn btn-small btn-quiet goal-artifacts-open', '↗', () => openGoal(g, 'tasks'));
+        openArtifacts.title = 'Open goal tasks'; openArtifacts.setAttribute('aria-label', 'Open goal tasks');
+        right.append(taskProgress, summary, teamLabel, openArtifacts); bar.append(toggle, right);
         const body = el('div', 'goal-decision-body'); card.append(bar, body); root.append(card);
         function paint() {
             const open = folds.get(key); toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} Goal #${g.id} ${safe(g.title)}, ${safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown')}`); card.classList.toggle('is-collapsed', !open); body.hidden = !open;
