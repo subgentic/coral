@@ -828,10 +828,18 @@
 .nl-file:is(:hover,:focus-within) .nl-side:has(> .nl-save-hover)>.goal-decision-agent-icon { display: none; }
 @media (pointer:coarse) { .nl-file:is(:hover,:focus-within) .nl-side:has(> .nl-save-hover)>.goal-decision-agent-icon { display: inline-flex; } }
 @media (max-width:767px) { .nl-file:is(:hover,:focus-within) .nl-side:has(> .nl-save-hover)>.goal-decision-agent-icon { display: inline-flex; } }
-/* #22132 on a phone: the file row's ⋯ (Save for later) shares the agent's line, so the row is no taller than before. */
+/* #22132: the agent's link is 44 px tall at rest, so the side keeps that height while the 30 px button stands in for it: the row does not change height on hover. */
+.nl-file .nl-side:has(> .nl-save-hover) { min-height: 44px; }
+@media (min-width:768px) and (pointer:fine) { /* the filled bookmark stays while the save is on its way, even when the pointer has left (a phone shows no icon) */
+    .nl-file.nl-saving .nl-save-hover { display: inline-flex; }
+    .nl-file.nl-saving .nl-side:has(> .nl-save-hover)>:is(.goal-decision-agent-icon,.nl-when) { display: none; }
+}
+/* #22132 on a phone: two lines at the right, as the question rows: New, the agent and the ⋯ (Save for later) on the first, the time under them. */
 @media(max-width:767px),(pointer:coarse) {
-    .nl-file .nl-side:has(> .nl-more) { display: grid; grid-template-columns: auto auto; justify-items: end; align-items: center; column-gap: 4px; }
+    .nl-file .nl-side:has(> .nl-more) { display: grid; grid-template-columns: repeat(3, auto); justify-content: end; justify-items: end; align-items: center; column-gap: 4px; row-gap: 0; max-width: none; } /* wider than the phone side's 90 px: the name and its question wrap beside it, never under it */
     .nl-file .nl-side:has(> .nl-more) > * { grid-column: 1 / -1; }
-    .nl-file .nl-side:has(> .nl-more) > .goal-decision-agent-icon { grid-column: 1; grid-row: 1; }
-    .nl-file .nl-side:has(> .nl-more) > .nl-more { grid-column: 2; grid-row: 1; }
+    .nl-file .nl-side:has(> .nl-more) > .nl-new { grid-column: 1; grid-row: 1; }
+    .nl-file .nl-side:has(> .nl-more) > .goal-decision-agent-icon { grid-column: 2; grid-row: 1; }
+    .nl-file .nl-side:has(> .nl-more) > .nl-more { grid-column: 3; grid-row: 1; }
+    .nl-file .nl-side:has(> .nl-more) > .nl-when { grid-row: 2; }
 }
