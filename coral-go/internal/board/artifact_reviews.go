@@ -297,8 +297,7 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 		delete(next, tagForReview)
 		delete(next, tagRead)
 		delete(next, ReviewChangesRequested)
-		delete(next, tagSaved)
-		delete(next, tagReviewed)
+		delete(next, tagReviewed) // "saved" stays (#22133): a saved file that is decided is kept in Saved, listed under Done, as the approved Saved mock shows
 		next[ReviewApproved] = true
 	case ReviewChangesRequested:
 		next[tagForReview] = true
@@ -309,8 +308,7 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 		delete(next, tagForReview)
 		delete(next, tagRead)
 		delete(next, ReviewChangesRequested)
-		delete(next, tagSaved)
-		delete(next, tagReviewed)
+		delete(next, tagReviewed) // "saved" stays, as for an approval (#22133)
 		next[ReviewDenied] = true
 	}
 	if len(next) > MaxArtifactTags {

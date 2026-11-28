@@ -11,13 +11,14 @@ import (
 const tagNewComments = "new comments"
 
 // needsYouFile says whether a file waits for the Operator: one tagged for review counts until they open it (read), and again while agents have replied in their comment thread and they have not opened it; a file they
-// already decided (approved or denied) is out of Needs you until such a reply brings it back as its own row, marked and counted once (#12026). Saved, ignored and superseded files are never counted.
+// already decided (approved or denied) is out of Needs you until such a reply brings it back as its own row, marked and counted once (#12026). Ignored and superseded files are never counted, nor a saved file still
+// waiting; a saved file that is decided (it keeps "saved" since #22133, to stay in Saved under Done) comes back for a reply like any decided file.
 func needsYouFile(tags []string, news int) bool { return needsYouFileV(tags, news, false) }
 
 // needsYouFileV is needsYouFile for the person who is asking, version-aware (#13959): a file tagged for review and read still waits for them while a NEWER version than the one they last opened exists (newVersion, from
 // their own opened_version, #13910). A file with changes requested stays the agent's turn: only a reply counts, whatever versions came.
 func needsYouFileV(tags []string, news int, newVersion bool) bool {
-	if hasTag(tags, "saved") || hasTag(tags, "ignored") || hasTag(tags, "superseded") {
+	if hasTag(tags, "ignored") || hasTag(tags, "superseded") || (hasTag(tags, "saved") && hasTag(tags, "for review")) {
 		return false
 	}
 	if hasTag(tags, "for review") {

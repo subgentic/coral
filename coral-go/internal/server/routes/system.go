@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"github.com/subgentic/coral/internal/board"
 	"net/http"
 	"sync"
 	"time"
@@ -57,8 +58,9 @@ type SystemHandler struct {
 	savedAgentText func(ctx context.Context, sessionID, agentType, key string) (text string, found, reachable bool)
 	// savedBoardHas and savedAgentHas say, for the list (#5802), which of a board's message ids exist (one query per board) and which of an agent's message keys are in its
 	// transcript (one read per agent), so the client asks nothing per bookmark.
-	savedBoardHas func(ctx context.Context, project string, ids []int64) (map[int64]bool, error)
-	savedAgentHas func(ctx context.Context, sessionID, agentType string, keys []string) (found map[string]bool, reachable, known bool)
+	savedBoardHas   func(ctx context.Context, project string, ids []int64) (map[int64]bool, error)
+	savedBoardGoals func(ctx context.Context, project string, ids []int64) (map[int64]board.MessageGoal, error) // a saved board message's goal, by one query per board (#22133)
+	savedAgentHas   func(ctx context.Context, sessionID, agentType string, keys []string) (found map[string]bool, reachable, known bool)
 
 	generateJobs   map[string]*generateJob
 	generateJobsMu sync.Mutex
