@@ -569,8 +569,8 @@ function changesIcon() { return svgIcon('M2.5 3h11v7.5H7L4 13.5v-3H2.5z'); }
 function bookmarkIcon() { return svgIcon('M4 2.5h8v11L8 10.5l-4 3z', { 'stroke-linecap': 'round' }); }
 
 /** A row's less used actions in one menu behind a three-dot button (menu_button.js: arrow keys, Escape back to the button, Tab or a tap elsewhere closes). items: [{ label, title, run(button) }]. */
-function moreMenu(items, label) {
-    if (items.length === 1) {
+function moreMenu(items, label, { menu: asMenu = false } = {}) {
+    if (items.length === 1 && !asMenu) { // one action is its own button, unless the caller wants the menu (the Saved list's More, #22108)
         const it = items[0], wrap = DT.el('span', 'inbox-row-more inbox-single-action'), button = DT.el('button', `btn btn-quiet btn-small${it.danger ? ' inbox-deny' : ''}`, it.label);
         button.type = 'button'; if (it.label === 'Dismiss') button.classList.add('inbox-dismiss'); button.setAttribute('aria-label', `${it.label}: ${label}`); if (it.title) button.title = it.title;
         button.addEventListener('click', e => { e.stopPropagation(); it.run(button); }); wrap.append(button); return wrap;
@@ -1348,8 +1348,7 @@ function savedListSpec(where = '') {
                     return b; } },
             ] }).el };
     if (dock) return spec;
-    const done = v.tab === 'done', decided = a => !!a.tags && ['approved', 'changes requested', 'denied'].some(t => a.tags.includes(t));
-    const tabFiles = files.filter(a => decided(a) === done); // Open lists the files still to decide, Done the ones with a verdict, with it as the tag (#22108)
+    const tabFiles = v.tab === 'done' ? [] : files; // a saved file is still to decide: a verdict takes "saved" off it (artifact_reviews.go), so Done holds the messages marked done (#22108)
     const entries = [...tabFiles.map(a => ({ kind: 'file', a, at: Date.parse(a.saved_at || a.updated_at || a.created_at || '') || 0, server: serverOf(a), team: reviewSourceLabel(a.team), when: saved.ago(a.saved_at || a.updated_at || a.created_at || '') })), ...v.shown.map(it => ({ kind: 'message', it, f: saved.savedItemFacts(it), at: Date.parse(it.saved_at || '') || 0, server: serverOf(it), team: String(it.team || ''), when: saved.savedItemFacts(it).saved }))].sort((x, y) => (saved.savedFiltersNow().sort === 'oldest' ? -1 : 1) * (y.at - x.at)); // one list, newest saved first, or oldest when the toolbar says so (#20508): a file's saved_at (#20519) orders it, and an older server's list has none, so its newest version's time stands in
     const loadingMore = savedReviewPages().some(p => p.has_more || p.error || (p.loading && !p.loaded) || p.truncated);
     const order = saved.savedFiltersNow().sort === 'oldest' ? 'oldest saved first' : 'newest saved first';
@@ -1357,17 +1356,17 @@ function savedListSpec(where = '') {
         const wrap = DT.el('div', 'saved-files-wrap saved-ledger-wrap'), host = DT.el('div', 'saved-ledger-host');
         if (entries.length) { const line = DT.el('p', 'saved-ledger-count'); line.append(DT.el('b', '', `${entries.length} saved`), ` \u00b7 ${tabFiles.length} file${tabFiles.length === 1 ? '' : 's'}, ${rows.length} message${rows.length === 1 ? '' : 's'} \u00b7 ${order}`); wrap.append(line); }
         wrap.append(host); appendReviewPaging(wrap, true);
-        if (entries.length) importOnce('./saved_ledger.js').then(m => m.fillSavedLedger(host, entries.map(savedLedgerRow), { phone: isPhoneLayout(), moreMenu })).catch(e => console.error('saved list', e));
+        if (entries.length) importOnce('./saved_ledger.js').then(m => m.fillSavedLedger(host, entries.map(savedLedgerRow), { phone: isPhoneLayout(), moreMenu: (items, label) => moreMenu(items, label, { menu: true }) })).catch(e => console.error('saved list', e));
         return wrap; } };
 }
 /** A saved file's or message's facts and actions for the Saved page's row (saved_ledger.js, #22108). */
-const SAVED_TAGS = [['for review', 'To review', 'blue'], ['approved', 'Approved', 'green'], ['changes requested', 'Asked for changes', 'amber'], ['denied', 'Denied', 'grey']];
+const SAVED_TAGS = [['for review', 'To review', 'blue']];
 function savedLedgerRow(e) {
     if (e.kind === 'file') {
         const a = e.a, name = markHidden(a.name, { strict: true }), server = splitKey(a.team).server, canAct = !isCloud() && !decisionNeedsPerson(server), version = (/^version (\d+)/.exec(a.version_line || '') || [])[1] || (a.earlier?.length ? String(a.earlier.length + 1) : ''); // the server's version line, else the versions this row stands for
         const tag = a.new_comments > 0 ? [null, 'New comments', 'blue'] : (SAVED_TAGS.find(([t]) => a.tags?.includes(t)) || []); // agents replied in its thread: that is the news, as Needs you says it
         const failed = error => showToast(error?.message || `Couldn't change ${name}.`, true);
-        return { key: `file:${a.reviewKey}`, kind: 'file', name, version, open: () => openReview(a),
+        return { key: `file:${a.reviewKey}`, kind: 'file', name, media: a.media_type || '', version, open: () => openReview(a),
             team: { text: multipleServers() ? e.team : splitKey(a.team).name, open: () => go(keyRoute('team', a.team)) }, // "This computer" is left out when there is one
             goal: a.goal_id && a.goal_title ? { text: `#${Number(a.goal_id)} ${markHidden(String(a.goal_title), { strict: true })}`, open: () => go({ ...folderRoute, id: a.team, item: Number(a.goal_id) }) } : null,
             agent: { text: markHidden(a.produced_by || '', { strict: true }) }, text: questionOf({ review: a }), starred: !!a.starred, tag: tag.length ? { text: tag[1], tone: tag[2] } : null, time: e.when,
@@ -1926,8 +1925,10 @@ function focusCameFrom(was) {
     if (!was) return;
     const root = $('group-table-view');
     const id = CSS.escape(String(was.id));
-    const row = root && (root.querySelector(`.dt-primary[data-id="${id}"]`) || (was.kind === 'saved' ? root.querySelector(`tr[data-key="msg:${id}"] .dt-primary`) : null)); // the one Saved list keys its rows (#20508)
-    if (row) row.focus({ preventScroll: true }); else $('group-table-title')?.focus({ preventScroll: true });
+    const pick = () => root && (root.querySelector(`.dt-primary[data-id="${id}"]`) || (was.kind === 'saved' ? root.querySelector(`tr[data-key="msg:${id}"] .dt-primary, .sl-row[data-key="msg:${id}"] .sl-name`) : null)); // the one Saved list keys its rows (#20508, #22108)
+    const to = row => (row || $('group-table-title'))?.focus({ preventScroll: true });
+    const row = pick();
+    if (row || was.kind !== 'saved') to(row); else requestAnimationFrame(() => requestAnimationFrame(() => to(pick()))); // the Saved list is drawn by its lazy module, a frame after the table
 }
 
 function sayLive(text) { const live = $('inbox-live'); if (live) { const s = document.createElement('span'); s.textContent = text; live.replaceChildren(s); } }

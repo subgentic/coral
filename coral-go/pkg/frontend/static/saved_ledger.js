@@ -11,6 +11,8 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const icon = (name, cls = '') => { const i = el('span', `material-icons ${cls}`.trim(), name); i.setAttribute('aria-hidden', 'true'); return i; };
 const linkButton = (text, label, run, cls = '') => { const b = el('button', `sl-link ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('aria-label', label); b.addEventListener('click', e => { e.stopPropagation(); run(); }); return b; };
 const AVATARS = ['sl-av-1', 'sl-av-2', 'sl-av-3', 'sl-av-4', 'sl-av-5', 'sl-av-6', 'sl-av-7', 'sl-av-8'];
+/** A file's kind as a grey glyph (the mock: a page, a picture, code, a web page); a document is a page. */
+const fileGlyph = (media = '', name = '') => /^image\//.test(media) ? 'image' : /html/.test(media) || /\.html?$/i.test(name) ? 'web' : /json|javascript|x-|yaml|xml|csv/.test(media) || /\.(js|ts|go|py|json|ya?ml|sh|css|sql|rs|java|c|h|csv)$/i.test(name) ? 'code' : 'description';
 const dot = () => { const s = el('span', 'sl-sep', '·'); s.setAttribute('aria-hidden', 'true'); return s; };
 
 /** The agent as a round icon with its first letter; its name is the title and the spoken name. */
@@ -23,10 +25,10 @@ function avatar(name) {
 }
 
 /** One row. r: { key, kind: 'file'|'message', name, version, team: { text, open }, goal: { text, open } | null, agent: { text, open? }, text, starred, tag: { text, tone } | null, time,
- *  label (the spoken name, when it is not the name), open(), remove: { label, run } | null, star: { on, run } | null, more: [{ label, title?, danger?, run }] }. x: { phone, moreMenu(items, label) }. */
+ *  media (a file's media type, for its icon), label (the spoken name, when it is not the name), open(), remove: { label, run } | null, star: { on, run } | null, more: [{ label, title?, danger?, run }] }. x: { phone, moreMenu(items, label) } (a wider touch screen gets the phone's menu). */
 function row(r, x) {
-    const li = el('li', `list-row sl-row sl-${r.kind}`); // the list row's look (layout.css): its hover and focus ring li.dataset.key = r.key;
-    li.append(icon(r.kind === 'file' ? 'description' : 'chat_bubble_outline', 'sl-icon'));
+    const li = el('li', `list-row sl-row sl-${r.kind}`); li.dataset.key = r.key; // the list row's look (layout.css): its hover and focus ring
+    li.append(icon(r.kind === 'file' ? fileGlyph(r.media, r.name) : 'chat_bubble_outline', 'sl-icon'));
     const main = el('div', 'sl-main'), one = el('div', 'sl-line1'), two = el('div', 'sl-line2');
     const name = el('button', 'sl-name', r.name); name.type = 'button'; const said = r.label || r.name; name.setAttribute('aria-label', `Open ${said}${r.version ? `, version ${r.version}` : ''}`); // a message is spoken by its whole words, numbered apart when two start alike (#6541)
     name.addEventListener('click', e => { e.stopPropagation(); r.open(); });
@@ -48,7 +50,7 @@ function row(r, x) {
     const items = [];
     if (r.remove) items.push({ label: r.remove.label || 'Remove from Saved', title: r.remove.title, run: r.remove.run });
     if (r.star) items.push({ label: r.star.on ? 'Remove star' : 'Star', run: r.star.run });
-    if (x.phone) {
+    if (x.phone || x.touch) { // a phone, or a touch screen with no hover: every action in the row's "..." menu, beside the right side
         const acts = el('div', 'sl-actions sl-actions-phone');
         acts.append(x.moreMenu([{ label: 'Open', run: () => r.open() }, ...items, ...r.more], said));
         li.append(acts);
@@ -65,6 +67,7 @@ function row(r, x) {
 /** Fill host with the rows, in the order given. */
 export function fillSavedLedger(host, rows, x) {
     const list = el('ul', `saved-ledger${x.phone ? ' saved-ledger-phone' : ''}`); list.setAttribute('aria-label', `Saved, ${rows.length}`);
-    for (const r of rows) list.append(row(r, x));
+    const touch = !x.phone && typeof matchMedia === 'function' && matchMedia('(hover: none)').matches;
+    for (const r of rows) list.append(row(r, { ...x, touch }));
     host.replaceChildren(list);
 }

@@ -157,7 +157,7 @@ const AGENTS = (waiting) => waiting ? [
             // the search follows the title in the one header row (#8700), so its left edge is the title's right edge and moves with the title's width, not with the group
             const gap = await ev(`(() => { const row = document.querySelector('#group-table-view .inbox-folder-toolbar .list-bar-search-row'), h = row.querySelector('.inbox-folder-head').getBoundingClientRect(), q = row.querySelector('input[type=search]').getBoundingClientRect(); return Math.round(q.left - h.right); })()`);
             assert.ok(gap >= 0 && gap <= 24, at + `the search box follows the title in the one row: ${gap}px after it`);
-            assert.deepEqual([savedBar.chipsOnLine, savedBar.chipsInHead, savedBar.label], [2, 0, 'Search saved messages'], at + 'Saved\'s Open and Done chips are on the toolbar line, not a row under the title (QA finding 3), and the page\'s field says what it searches');
+            assert.deepEqual([savedBar.chipsOnLine, savedBar.chipsInHead, savedBar.label], [2, 0, 'Search saved'], at + 'Saved\'s Open and Done chips are on the toolbar line, not a row under the title (QA finding 3), and the page\'s field says what it searches');
             // a row as the Saved mock draws it (#22108): a kind icon, the name (14/600) on line 1, the agent as an icon at the right; no buttons at rest, Remove from Saved and More on the row's hover or keyboard focus
             await mouseTo(2, 2);
             const ROW = '#group-table-view .saved-ledger .sl-row';
