@@ -798,7 +798,8 @@ let closeAfterOpen = null;
 function openGoalDone(g, close = false, rowKey = '') {
     markGoalDoneRead(goalTeamHere(g), g).then(() => { syncGoalDoneCount(); renderInboxNav(true); }).catch(error => sayLive(`Not marked read: ${error && error.message ? error.message : 'try again'}.`)); // opening it is reading it (#11983)
     closeAfterOpen = close ? { team: g.board_id, id: g.id } : null;
-    const row = rowKey || document.activeElement?.closest?.('tr[data-key]')?.dataset.key || '', place = $('group-table-view')?.scrollTop || 0; // read before the focus moves off the row (#11964)
+    const focusedRow = document.activeElement?.closest?.('tr[data-key], .nl-row[data-needs-key]');
+    const row = rowKey || focusedRow?.dataset.key || focusedRow?.dataset.needsKey || '', place = $('group-table-view')?.scrollTop || 0; // read before the focus moves off the row (#11964)
     quietFocus($('inbox-view'));
     itemOpeners.set('needs', { key: row, scroll: place }); // Back returns to Needs you as it was (its place), not to the Goals tab (#11950)
     go({ ...folderRoute, id: g.board_id, item: g.id });
@@ -1596,8 +1597,8 @@ function needsAbout(s) {
 function newNeedsList(rows) {
     const open = s => { markQuestionRead(s); openNeedsItem(s); };
     const link = (label, route) => { const a = DT.el('a', '', markHidden(label, { strict: true })); a.href = build(route); a.dataset.route = ''; return a; };
-    return needsLedger({ rows, state: needsState, grouped: groupReviews, keyOf: s => `${sessionServer(s)}:${s.session_id}`, about: needsAbout, unread: needsUnread, name: needsName, source: reviewSourceLabel,
-        words: s => s.operatorAsk ? askOpened(s.operatorAsk) : askOf(s) || s.waiting_summary || '', quoteFileQuestion: s => !!s.review && !decidedWithNews(s.review), fileQuestion: s => s.review && decidedWithNews(s.review) ? `${decidedWord(s.review)} · ${Number(s.review.new_comments)} new comments` : questionOf(s), contextNote: s => s.operatorAsk ? questionContextNote(s.operatorAsk) : '',
+    return needsLedger({ rows, state: needsState, grouped: groupReviews, searching: !!queries.needs.trim(), decidedFile: s => !!s.review && decidedWithNews(s.review), keyOf: s => `${sessionServer(s)}:${s.session_id}`, about: needsAbout, unread: needsUnread, name: s => s.goalDone?.title || needsName(s), source: reviewSourceLabel,
+        words: s => s.operatorAsk ? askOpened(s.operatorAsk) : askOf(s) || s.waiting_summary || '', quoteFileQuestion: s => !!s.review && !decidedWithNews(s.review), fileQuestion: s => s.review && decidedWithNews(s.review) ? `${decidedWord(s.review)} · ${Number(s.review.new_comments)} new comments` : [questionOf(s), Number(s.review?.new_comments) > 0 ? `${Number(s.review.new_comments)} new comments` : ''].filter(Boolean).join(' · '), contextNote: s => s.operatorAsk ? questionContextNote(s.operatorAsk) : '',
         questionExtra: s => agentAskExtra(s), questionBox: (box, s, text) => { const raw = s.operatorAsk ? askOpened(s.operatorAsk, { code: true }) : text; NF.openQuestion(box, /^```/.test(raw) ? raw : raw.split('\n').slice(1).join('\n'), text); },
         when: s => { const text = shortWait(s.waiting_since); return text ? `${text} ago` : ''; },
         eligible: s => !!(s.waitItem || s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal || s.goalDone || promptCanSelect(s)),
@@ -2072,7 +2073,7 @@ function putBack(table, opener) {
     for (const t of ['wheel', 'touchstart', 'keydown', 'pointerdown']) table.addEventListener(t, off, { capture: true, once: true, passive: true });
     const step = () => {
         if (stop || !table.isConnected || --frames < 0 || steady >= 12) { off(); return; }
-        const tr = opener.key && table.querySelector(`tr[data-key="${CSS.escape(opener.key)}"]`), row = tr && (tr.querySelector('.dt-primary') || (tr.hasAttribute('tabindex') || tr.setAttribute('tabindex', '-1'), tr)); // a row with no link of its own takes the focus itself, so Tab goes on to its buttons and Enter does nothing
+        const tr = opener.key && table.querySelector(`tr[data-key="${CSS.escape(opener.key)}"], .nl-row[data-needs-key="${CSS.escape(opener.key)}"]`), row = tr && (tr.querySelector('.dt-primary') || (tr.hasAttribute('tabindex') || tr.setAttribute('tabindex', '-1'), tr)); // a row with no link of its own takes the focus itself, so Tab goes on to its buttons and Enter does nothing
         const a = document.activeElement, lost = row && !tr.contains(a) && !(a && a.closest && a.closest('input, textarea, select, dialog, [contenteditable]')); // the draw (or the Inbox's own focus reset) moved it off the row
         if (lost) { row.focus({ preventScroll: true }); steady = 0; }
         if (tr || !opener.key) { if (Math.abs(table.scrollTop - opener.scroll) > 1) { table.scrollTop = opener.scroll; steady = 0; } else steady++; }
