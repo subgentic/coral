@@ -80,7 +80,7 @@ const inGroup = (GROUP, x) => GROUP === 'all' || (GROUP === 'shape' ? !x.live : 
 module.exports.run = GROUP => (async () => {
     if (MODE === 'off') { console.log('PASS pending (#11943): set CORAL_TABLE_RULES=report or enforce to run the table rules check'); return; }
     const guard = await require('./settings_guard').guardSettings();
-    const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
     const mouse = (type, x, y) => Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 }); // as data_table_browser drives a handle
     const violations = [], seen = new Set(), report = { surfaces: {}, checked: 0 };
@@ -160,7 +160,7 @@ module.exports.run = GROUP => (async () => {
             for (let i = 0; i < 60 && !(await ev(`!!document.querySelector('#server-row-lan')`)); i++) await settle(250);
             return true; } });
         surfaces.push({ name: 'tasks (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'tasks'); await rowsOn(3); return true; } });
-        surfaces.push({ name: 'goals (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'goals'); await rowsOn(3); return true; } });
+        surfaces.push({ ledger: true, name: 'goals (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'goals'); await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length >= 3`, 'three goal ledger cards', 8000); return true; } });
         const NONE = { folded: true, panelW: 0, tableW: 0, boxOver: 0, tableOver: 0, pageOver: 0, vw: 0, rows: 0, cols: [] };
         let measuring = '';
         const measure = async (root) => { const m = await ev(`window.__measure(${JSON.stringify(root)})`); if (m) return m; note(measuring || root, 'no table', ['R7: no table was drawn there (the surface did not open or has no rows)']); return NONE; };
@@ -168,6 +168,32 @@ module.exports.run = GROUP => (async () => {
         const only = (process.env.CORAL_TABLE_ONLY || '').split('|').filter(Boolean); // CORAL_TABLE_ONLY='tasks (live Inbox)|files': just those surfaces
         for (const S of surfaces.filter(x => inGroup(GROUP, x) && (!only.length || only.some(o => (o.startsWith('=') ? x.name === o.slice(1) : x.name.includes(o)))))) {
             const kind = S.name, root = S.root, fixedAt = {}; measuring = S.name;
+            // #21846 replaced the Inbox Goals table with a decision ledger. Audit its
+            // real controls and responsive bounds; never wait for obsolete table rows.
+            if (S.ledger) {
+                for (const w of [1440, 1280, 1024, 900, 390]) for (const text of [100, 200]) {
+                    await S.mount('mixed', w);
+                    await ev(`document.documentElement.style.fontSize = '${text === 200 ? '32px' : ''}'; true`);
+                    const sample = await ev(`(() => {
+                        const cards = [...document.querySelectorAll('#group-table-view .goal-decision-card')];
+                        return { overflow: document.documentElement.scrollWidth - innerWidth, cards: cards.map(c => {
+                            const t = c.querySelector('.goal-decision-title'), b = c.getBoundingClientRect(), r = t.getBoundingClientRect(), toggle = c.querySelector('.goal-decision-toggle'), hit = toggle.getBoundingClientRect();
+                            return { title: t.textContent, id: c.querySelector('.goal-decision-id')?.textContent, state: c.querySelector('.goal-decision-state')?.textContent, source: c.querySelector('.goal-decision-team')?.textContent, bounded: r.left >= b.left - 1 && r.right <= b.right + 1 && b.left >= -1 && b.right <= innerWidth + 1, hit: { width: hit.width, height: hit.height }, expanded: toggle.getAttribute('aria-expanded') };
+                        }) };
+                    })()`);
+                    assert.equal(sample.cards.length, 3, 'all three seeded goals remain visible');
+                    assert.ok(sample.cards.every(c => c.id?.startsWith('Goal #') && c.title && c.state && c.source?.includes(B)), 'goal identity, state and source remain explicit');
+                    assert.ok(sample.overflow <= 1 && sample.cards.every(c => c.bounded), `ledger at ${w}px / ${text}% fits: ` + JSON.stringify(sample));
+                    if (w === 390) assert.ok(sample.cards.every(c => c.hit.width >= 44 && c.hit.height >= 44), 'phone heading controls are at least 44x44: ' + JSON.stringify(sample));
+                    const expanded = sample.cards[0].expanded;
+                    await ev(`document.querySelector('#group-table-view .goal-decision-toggle').click(); true`);
+                    assert.notEqual(await ev(`document.querySelector('#group-table-view .goal-decision-toggle').getAttribute('aria-expanded')`), expanded, 'heading still collapses and expands');
+                    report.checked++; (report.samples ||= {})[kind + ' ' + w + '/' + text] = sample;
+                    await ev(`document.documentElement.style.fontSize = ''; true`);
+                }
+                continue;
+            }
+
             const handleCenter = key => ev(`(() => { const h = [...document.querySelectorAll('${root} th.dt-th[data-key=${JSON.stringify(key)}] .dt-resize')].find(x => x.getClientRects().length); if (!h) return null; const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             const wipe = async () => { await clear(); if (S.live) await ev(`document.documentElement.style.fontSize = ''; true`); };
             for (const w of [1440, 1280, 1024, 900]) {
