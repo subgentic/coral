@@ -13,6 +13,9 @@ badge
 bedtime
 block
 bolt
+bookmark
+bookmark_border
+bookmark_outline
 build
 cancel
 chat
