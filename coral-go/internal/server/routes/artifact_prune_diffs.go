@@ -57,6 +57,11 @@ func taskDiffDirs(taskDir string) []taskDiffDir {
 	return out
 }
 
+// pruneReadPage is how many rows one read of the prune's task and session lists takes. Each page is its own query, so the prune gives its read-pool connection back between pages and a chat or status
+// read is never left waiting for one while a large prune scans (#22160, coral-hub #286989). pruneAfterPage is a test hook run after each page.
+var pruneReadPage = 500
+var pruneAfterPage = func() {}
+
 // closedDiffs lists the stored task and session diffs whose task is completed or skipped, or
 // whose session is stopped; olderThan 0 lists all of them (shrink).
 func (h *SessionsHandler) closedDiffs(ctx context.Context, o pruneOptions) ([]diffCandidate, error) {
@@ -71,12 +76,20 @@ func (h *SessionsHandler) closedDiffs(ctx context.Context, o pruneOptions) ([]di
 	}
 	tasks := map[string]taskRow{}
 	if h.bs != nil {
-		var rows []taskRow
-		if err := h.bs.Reader().SelectContext(ctx, &rows, "SELECT id, status, board_id, completed_at FROM board_tasks"); err != nil {
-			return nil, err
-		}
-		for _, t := range rows {
-			tasks[strconv.FormatInt(t.ID, 10)] = t
+		var after int64
+		for {
+			var rows []taskRow
+			if err := h.bs.Reader().SelectContext(ctx, &rows, "SELECT id, status, board_id, completed_at FROM board_tasks WHERE id > ? ORDER BY id LIMIT ?", after, pruneReadPage); err != nil {
+				return nil, err
+			}
+			for _, t := range rows {
+				tasks[strconv.FormatInt(t.ID, 10)] = t
+				after = t.ID
+			}
+			pruneAfterPage()
+			if len(rows) < pruneReadPage {
+				break
+			}
 		}
 	}
 	taskDir := filepath.Join(coralDir, "artifacts", "tasks")
@@ -116,12 +129,20 @@ func (h *SessionsHandler) closedDiffs(ctx context.Context, o pruneOptions) ([]di
 	}
 	sessions := map[string]sessRow{}
 	if h.db != nil {
-		var rows []sessRow
-		if err := h.db.Reader().SelectContext(ctx, &rows, "SELECT session_id, status, is_sleeping, stopped_at, board_name FROM live_sessions"); err != nil {
-			return nil, err
-		}
-		for _, s := range rows {
-			sessions[s.SessionID] = s
+		after := ""
+		for {
+			var rows []sessRow
+			if err := h.db.Reader().SelectContext(ctx, &rows, "SELECT session_id, status, is_sleeping, stopped_at, board_name FROM live_sessions WHERE session_id > ? ORDER BY session_id LIMIT ?", after, pruneReadPage); err != nil {
+				return nil, err
+			}
+			for _, s := range rows {
+				sessions[s.SessionID] = s
+				after = s.SessionID
+			}
+			pruneAfterPage()
+			if len(rows) < pruneReadPage {
+				break
+			}
 		}
 	}
 	sessDir := filepath.Join(coralDir, "artifacts", "sessions")
