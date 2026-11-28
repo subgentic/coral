@@ -235,13 +235,34 @@ func (b *StatsBoard) remoteStats(machine string) Stats {
 	out, err := run(ctx, alias, statsScript)
 	var re *RemoteExit
 	if err != nil && !errors.As(err, &re) {
-		return Stats{State: "unreachable"}
+		// ssh exits 255 when it cannot connect, but a remote command can exit 255 too: Windows' cmd.exe does on the script's POSIX redirects ("The system cannot find the path specified"), which marked
+		// a Windows box that is up unreachable and closed it to pool runs (#22128). Unless the read timed out, one fixed command every shell runs the same way (cmd, PowerShell, sh) tells the two apart.
+		if ctx.Err() != nil || !b.connects(alias) {
+			return Stats{State: "unreachable"}
+		}
+		return Stats{State: NoStats}
 	}
 	st := ParseRemoteStats(out)
 	if st.State != "ok" && re != nil {
 		return Stats{State: NoStats} // connected, but the box could not run the Unix command (a Windows machine's cmd.exe)
 	}
 	return st
+}
+
+// connectProbe is the command that only answers whether ssh connects: "exit 0" exits 0 in cmd.exe, PowerShell and sh alike.
+const connectProbe = "exit 0"
+
+// connects reports whether ssh reaches alias and runs a command there: the probe exits 0, or exits non-zero after ssh connected (a RemoteExit).
+func (b *StatsBoard) connects(alias string) bool {
+	run := b.Run
+	if run == nil {
+		run = realSSH
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	_, err := run(ctx, alias, connectProbe)
+	var re *RemoteExit
+	return err == nil || errors.As(err, &re)
 }
 
 func localStats() Stats {
