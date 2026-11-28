@@ -87,6 +87,7 @@
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more) { flex-wrap: wrap; row-gap: 8px; }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more) > .inbox-folder-head { order: 0; flex: 1 1 calc(100% - 5rem); max-width: none; }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more) > .needs-more { order: 1; flex: none; margin-left: auto; }
+.inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more) > .needs-more + .needs-more { margin-left: 8px; } /* the expand-all icon sits beside the robot (#22056) */
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more) > :not(.inbox-folder-head, .needs-more) { order: 2; }
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more) > .team-tb-pills { flex: 0 1 auto; min-width: 0; flex-wrap: wrap; overflow: visible; }
 @media (max-width: 639px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { #group-table-view[data-group^="hub-inbox"] .inbox-folder-toolbar .list-bar-search-row.gt-toolbar:has(> .needs-more):has(> .inbox-folder-head) > .inbox-folder-head { flex: 1 1 calc(100% - 5rem); } } /* the phone rule above gives the title the whole row: keep More beside it */

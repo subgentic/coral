@@ -83,5 +83,7 @@ export function reviewGroupLookup(rows, grouped, isRead, sourceLabel, tasks = nu
         }
         labels.set(key, entry);
     }
-    return row => labels.get(keyOf(row)) || null;
+    const lookup = row => labels.get(keyOf(row)) || null;
+    lookup.folds = [...labels.values()].filter(e => e.onToggle).map(e => [e.key, e.open]); // the headings that fold, with their state: the toolbar's expand-all / collapse-all (#22056)
+    return lookup;
 }

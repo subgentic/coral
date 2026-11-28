@@ -16,13 +16,23 @@ const DT = await importOnce('./data_table.js');
 const { avatar, chip } = DT;
 
 const { readGoalJSON } = await importOnce('./goal_view.js');
+const { foldAllButton } = await importOnce('./fold_all_button.js');
 const { agentLink, liveAgentOf } = await importOnce('./agent_link.js');
 const { readableName, itemKey, managedHex } = await importOnce('./artifact_item.js');
 const { fileContext } = await importOnce('./artifact_file_context.js');
 await loadStyles('goal_decisions.css');
 const safe = t => markHidden(String(t || ''), { strict: true });
 const button = (cls, text, run) => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', run); return b; };
-const entries = new Map(), folds = new Map();
+const entries = new Map(), folds = new Map(), foldButtons = new Set();
+const cardsOf = () => mounted?.cards || [];
+const allOpen = () => (cardsOf().length ? cardsOf().every(c => folds.get(c.key)) : null); // the goals' own state for the toolbar's expand-all / collapse-all (#22056)
+const syncFoldButtons = () => { for (const b of foldButtons) { if (b.isConnected) b.dataset.live = '1'; else if (b.dataset.live) { foldButtons.delete(b); continue; } b.sync(); } };
+/** The toolbar's expand-all / collapse-all for the goals on the page. */
+export function goalFoldButton() {
+    const b = foldAllButton('goals', { isOpen: allOpen, setAll: open => { for (const c of cardsOf()) { folds.set(c.key, open); c.paint(); if (open) c.load(); } syncFoldButtons(); } });
+    b.classList.add('goals-fold-all'); foldButtons.add(b);
+    return b;
+}
 let mounted = null, reading = 0; const readQueue = [];
 async function limitedRead(run) { if (reading < 3) reading++; else await new Promise(resolve => readQueue.push(resolve)); try { return await run(); } finally { const next = readQueue.shift(); if (next) next(); else reading--; } }
 export function decisionState(a) {
@@ -80,13 +90,14 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, ques
     mounted?.dispose();
     const root = el('div', 'goal-decision-tracker'), refreshers = [], visibleReads = new Map();
     const observer = typeof IntersectionObserver === 'function' ? new IntersectionObserver(items => { for (const item of items) if (item.isIntersecting && item.target.isConnected) { observer.unobserve(item.target); visibleReads.get(item.target)?.(); } }, { rootMargin: '200px' }) : null;
-    mounted = { root, refresh: () => refreshers.forEach(run => run()), dispose: () => observer?.disconnect() };
+    const cards = []; // each goal's key, paint and read, for the toolbar's expand-all / collapse-all
+    mounted = { root, cards, refresh: () => refreshers.forEach(run => run()), dispose: () => observer?.disconnect() };
     for (const [index, g] of goals.entries()) {
         const team = g.board_id, key = JSON.stringify([team, g.id]);
         if (!entries.has(key)) { if (entries.size >= 200) entries.delete(entries.keys().next().value); entries.set(key, { items: [], tasks: [], taskState: DT.tableState(), at: 0, loaded: false, busy: false, error: '', cursor: '', waiters: [] }); }
         const st = entries.get(key), card = el('section', 'goal-decision-card'); card.dataset.goalKey = key;
         if (!folds.has(key)) { if (folds.size >= 200) folds.delete(folds.keys().next().value); folds.set(key, index < 2); }
-        const bar = el('div', 'goal-decision-head'), toggle = button('goal-decision-toggle', '', () => { folds.set(key, !folds.get(key)); paint(); if (folds.get(key)) load(false); });
+        const bar = el('div', 'goal-decision-head'), toggle = button('goal-decision-toggle', '', () => { folds.set(key, !folds.get(key)); paint(); if (folds.get(key)) load(false); syncFoldButtons(); });
         toggle.dataset.goalId = String(g.id);
         toggle.append(el('span', 'goal-decision-chevron', '▾'), (() => { const s = chip(safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown'), `goal-state-${g.state || 'unknown'}`); s.classList.remove('dt-chip'); s.classList.add('goal-decision-state'); return s; })(), el('span', 'goal-decision-id', `Goal #${g.id}`), el('span', 'goal-decision-title', safe(g.title)));
         const right = el('div', 'goal-decision-head-right'), summary = el('span', 'goal-decision-summary'), teamLabel = el('span', 'goal-decision-team', safe(teamOf(g)));
@@ -168,10 +179,11 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, ques
             st.busy = true;
             try { if (!more) st.tasks = await readTasks(); const response = await limitedRead(() => boardFetch(team, `/artifacts?goal=${encodeURIComponent(g.id)}&tag=for%20review&tag=approved&tag=changes%20requested&tag=denied&versions=newest&sort=name&limit=50${more && st.cursor ? `&cursor=${encodeURIComponent(st.cursor)}` : ''}`)); if (response.status === 403 || response.status === 404) { st.items = []; st.tasks = []; st.loaded = false; } if (!response.ok) throw Error(response.status === 403 ? 'Artifacts are only available to the account this computer is linked to.' : `Decisions could not be read (HTTP ${response.status}).`); const data = await response.json(); if (!Array.isArray(data.artifacts)) throw Error('Decisions could not be read.'); const merged = new Map((more ? st.items : []).map(a => [itemKey(a), a])); for (const a of data.artifacts) if (decisionState(a) !== 'shared') merged.set(itemKey(a), a); st.items = decisionOrder([...merged.values()]); st.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : ''; st.loaded = true; st.at = Date.now(); st.error = ''; } catch (e) { if ([403, 404].includes(e.status)) { st.items = []; st.tasks = []; st.loaded = false; } st.error = e.message || 'Decisions could not be read.'; } finally { st.busy = false; if (card.isConnected) paint(); for (const run of st.waiters.splice(0)) run(); }
         }
-        refreshers.push(() => { if (folds.get(key)) load(false); });
+        refreshers.push(() => { if (folds.get(key)) load(false); }); cards.push({ key, paint, load: () => load(false) });
         visibleReads.set(card, () => load(false)); observer?.observe(card);
         paint(); if (folds.get(key)) queueMicrotask(() => { if (card.isConnected) load(false); });
     }
+    syncFoldButtons();
     return root;
 }
 // Existing decisions notify every ledger. Invalidate rather than inventing local review state.

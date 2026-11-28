@@ -96,6 +96,17 @@ const { quietLaunchNotice, restoreLaunchNotice } = require('./helpers/launch_not
                 check(await oneTap(11, 'story', replace), `${at}and another turns it off (${replace})`);
             }
             check(await ev(`document.querySelectorAll('.dt-group-task').length`) === 2 && await state(11, 'toggle') === 'true', `${at}the table is whole and Task #11 is open at the end`);
+            { // #22056: the expand-all / collapse-all icon beside the robot folds and opens every heading, named for what it does next
+                const fold = () => ev(`(() => { const b = document.querySelector('.inbox-fold-all'), r = b && b.getBoundingClientRect(); return b && { hidden: b.hidden, label: b.getAttribute('aria-label'), icon: b.querySelector('.material-icons').textContent, open: [...document.querySelectorAll('.dt-group-toggle')].map(t => t.getAttribute('aria-expanded')), w: Math.round(r.width), h: Math.round(r.height), robot: !!document.querySelector('.inbox-copy-for-agent'), next: b.previousElementSibling && b.previousElementSibling.classList.contains('inbox-copy-for-agent') }; })()`);
+                const press = async open => { await ev(`document.querySelector('.inbox-fold-all').click(); true`); await waitFor(`[...document.querySelectorAll('.dt-group-toggle')].length > 0 && [...document.querySelectorAll('.dt-group-toggle')].every(t => t.getAttribute('aria-expanded') === '${open}')`, `${at}every heading ${open ? 'open' : 'shut'}`, 8000); };
+                let f = await fold();
+                check(!!f && !f.hidden && f.robot && f.next, `${at}the robot and the fold icon are in the toolbar, the icon right after the robot ${JSON.stringify(f)}`);
+                if (mobile) check(f.w >= 44 && f.h >= 44, `${at}a 44 px target ${f.w + "x" + f.h}`);
+                if (f.label === 'Expand all goal groups') await press(true);
+                f = await fold(); check(f.label === 'Collapse all goal groups' && f.icon === 'unfold_less', `${at}everything is open: the icon says Collapse all goal groups (unfold_less) ${JSON.stringify(f)}`);
+                await press(false); f = await fold(); check(f.label === 'Expand all goal groups' && f.icon === 'unfold_more', `${at}one press folds every heading and the icon says Expand all goal groups (unfold_more) ${JSON.stringify(f)}`);
+                await press(true); f = await fold(); check(f.label === 'Collapse all goal groups' && f.open.every(x => x === 'true'), `${at}one press opens every heading again ${JSON.stringify(f)}`);
+            }
             // 2b) QA's two guards: a tap is a press and a lift on the SAME control, within the tap distance. A lift over another group's control, or after a drag past the distance, toggles nothing.
             const moveTo = async q => { if (mobile) await client.Input.dispatchTouchEvent({ type: 'touchMove', touchPoints: [{ x: q.x, y: q.y }] }); else await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: q.x, y: q.y, button: 'left', buttons: 1 }); };
             const swapTable = () => ev(`(() => { const w = document.querySelector('.inbox-needs-results'); w.replaceWith(w.cloneNode(true)); return true; })()`);
