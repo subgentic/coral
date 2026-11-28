@@ -48,6 +48,13 @@ const { bindStartupWaits } = await importOnce('./team_startup_waits.js');
 const PAGE = 50;
 
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
+/** Shared JSON reader for this goal's page and its expanded ledger contents. */
+export async function readGoalJSON(project, path, failure = r => new Error(`Goal contents could not be read (HTTP ${r.status}).`)) {
+    const response = await boardFetch(project, path);
+    if (!response.ok) throw await failure(response);
+    return response.json();
+}
+
 export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals', initialTab = 'tasks', initialArtifact = null, initialFiles = {}, initialComments = null }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
     const root = host;
     const model = { project: team, openId: id, tasks: new Map(), followUps: new Map(), followKey: new Map(), taskSearch: '', tab: ['tasks', 'artifacts', 'comments'].includes(initialTab) ? initialTab : 'tasks', creating: false };
@@ -75,9 +82,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     }
 
     async function readJson(path) {
-        const r = await boardFetch(model.project, path);
-        if (!r.ok) throw await failure(r);
-        return r.json();
+        return readGoalJSON(model.project, path, failure);
     }
 
     async function loadTasks(id) {

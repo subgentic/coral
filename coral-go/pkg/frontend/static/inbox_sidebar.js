@@ -1751,6 +1751,8 @@ registerGroupSource('hub-inbox', {
             return { title: 'Goals', noun: ['goal', 'goals'], rows, ...(waitingNote ? { note: waitingNote } : {}), empty: { line: emptyLine, hint: pendingGoals || goalsUpdateNote() ? undefined : waitingNote || (narrowed ? undefined : goalFilters.state === 'done' || hasDone ? undefined : "Press New goal to create one, or an Orchestrator can propose one too.") },
                 signature: JSON.stringify([pendingGoals, rows.map(g => [g.board_id, g.id, g.title, g.outcome, g.state, g.updated_at, g.rollup])]),
                 node: () => GoalDecisions.goalTracker({ goals: rows, teamOf: goalTeam,
+                    questions: g => operatorAsks().filter(a => identityKey(a.server, a.board) === g.board_id && Number(a.goal_id) === g.id),
+                    openQuestion: a => openAskDialog(a, undefined, askRunners),
                     openGoal: (g, tab) => { goalArtifactIntent = { team: g.board_id, id: g.id, tab }; goalOpener = { team: g.board_id, id: g.id }; goalScroll = $('group-table-view')?.scrollTop || 0; note(folderRoute); go({ ...folderRoute, id: g.board_id, item: g.id }); },
                     openFile: (g, item, opener, files) => { goalArtifactIntent = { team: g.board_id, id: g.id, tab: 'artifacts', item, files }; goalOpener = { team: g.board_id, id: g.id }; goalScroll = $('group-table-view')?.scrollTop || 0; note(folderRoute); go({ ...folderRoute, id: g.board_id, item: g.id }); },
                     closeGoal: g => { closeAfterOpen = { team: g.board_id, id: g.id }; go({ ...folderRoute, id: g.board_id, item: g.id }); },
