@@ -14,6 +14,7 @@ const { launch } = await importOnce('./launch_state.js');
 const { _effectiveServer, _loadServerSettings, _serverSettings, _settingsFor } = await importOnce('./launch_models.js');
 const { defaultPermissionMode, syncDefaultPermissionMode, _normalizePermFlagsForAgent, _updatePermModeDescription, _hasPermFlag } = await importOnce('./permission_flags.js');
 const { _checkAgentCLI } = await importOnce('./cli_check.js');
+const { startingAgentType } = await importOnce('./launch_default_type.js');
 const { checkTmuxForLaunch } = await importOnce('./prerequisites.js');
 import { reportLaunchDialogOpened } from './dashboard_analytics.js';
 import { sectionFocus } from './section_dialog.js';
@@ -137,7 +138,7 @@ function _selectLaunchType(type) {
             wizard: true, // the persona page for step 2 and three panes for step 3 (#7391)
             adopt: { persona: 'launch-persona-top', agent: 'launch-agent-provider', advanced: 'launch-advanced-extra' },
             adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
-            value: launch.member ? launch.member.value : { prompt: launch.welcomePrompt?.kind === 'agent' ? launch.welcomePrompt.text : '', agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
+            value: launch.member ? launch.member.value : { prompt: launch.welcomePrompt?.kind === 'agent' ? launch.welcomePrompt.text : '', agentType: startingAgentType(_settingsFor(_effectiveServer(launch.server)).default_agent_type, state.liveSessions, _effectiveServer(launch.server)) }, // a member's own values (#7861); a new agent starts on the default, else the newest agent's type (#596)
         });
         launch.reminders = null;
         { const host = document.querySelector('#launch-agent-acf .launch-rem-host'); if (host) importOnce('./launch_reminders.js').then(m => {
