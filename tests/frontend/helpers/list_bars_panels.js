@@ -50,7 +50,7 @@ PANELS.push({
         if (phone) { await ctx.ev(`window.switchNavTab('hub-inbox'); true`); } else await ctx.ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         await ctx.ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
         await ctx.settle(`document.querySelectorAll('#group-table-view tbody tr').length >= 4 && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Inbox');
-        await pick(ctx, '#sv-kind', 'board'); // a Type chip
+        await ctx.ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.setSavedFilters({ ...m.savedFiltersNow(), kind: 'board' })).then(() => true)`); // a Type chip (set as the Type field does; the dock's Saved tab, whose #sv-kind this used, has no Type since #22072)
         await ctx.settle(`!!document.querySelector('#inbox-saved-bar .list-bar-chip')`, 'a chip');
         await ctx.ev(`(() => { const b = document.querySelector('.sidebar-pane[data-pane="hub-inbox"] [data-display-button]'); if (b && b.getClientRects().length) b.click(); return true; })()`); // a phone's table hides the list and its Display options
         await openMenu(ctx, '#inbox-saved-bar');
@@ -85,10 +85,10 @@ PANELS.push({
         // the dock's own Saved tab (the Inbox's Saved folder is everything's since #4905), the way the toast's link opens it
         await ctx.ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`);
         await ctx.settle(`document.getElementById('saved-ui').getAttribute('aria-label') === 'Saved: QA Alpha' && document.querySelectorAll('#saved-table tbody tr').length > 0`, 'the scoped list');
-        await pick(ctx, '#sv-kind', 'agent');
+        // #22072: the dock's Saved tab is the Search box alone (no Filters panel); a filter set on the main Saved page shows here as its chip
+        await ctx.ev(`import((window.__coralStatic || '/static/') + 'saved.js').then(m => m.setSavedFilters({ ...m.savedFiltersNow(), kind: 'agent' })).then(() => true)`);
         await ctx.settle(`!!document.querySelector('#saved-bar .list-bar-chip')`, 'a chip');
-        await openMenu(ctx, '#saved-bar');
-        return { roots: ['#agentic-panel-saved'], focus: ['#sv-search', '#saved-bar .list-bar-toggle'] };
+        return { roots: ['#agentic-panel-saved'], focus: ['#sv-search', '#saved-bar .list-bar-chip'] };
     },
 });
 
