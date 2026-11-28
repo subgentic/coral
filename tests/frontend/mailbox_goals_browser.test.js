@@ -34,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
         // #21846 replaces the old table/mail layouts with the same goal ledger at both widths.
         for(const width of [1280,1024,390]){
             await open(width,844,width===390);
-            const rows=await ev(`(()=>{return [...document.querySelectorAll('#group-table-view .goal-decision-card')].map(c=>({title:c.querySelector('.goal-decision-title').textContent,team:c.querySelector('.goal-decision-team').textContent,state:c.querySelector('.goal-decision-state').textContent,body:c.textContent}));})()`);
+            const rows=await ev(`(()=>{return [...document.querySelectorAll('#group-table-view .goal-decision-card')].map(c=>({title:c.querySelector('.goal-decision-title').textContent,team:c.querySelector('.goal-decision-team').textContent,state:c.querySelector('.goal-decision-state').getAttribute('aria-label'),body:c.textContent}));})()`);
             const mine=rows.filter(r=>[A,B].some(t=>r.team.includes(t)));
             assert.deepEqual(mine.map(r=>r.title).sort(),['Explore goals','Plan the notes','Ship the mailbox'],'goals of both teams remain listed');
             assert.ok(mine.every(r=>r.state==='Active'),'goal state stays explicit');
