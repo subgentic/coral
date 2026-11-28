@@ -141,7 +141,7 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.querySelectorAll('${H} tr[data-key]').length >= 2`, 'team Needs you rows', 12000);
                 await ev(`document.querySelector('${H} .dt-select-toggle')?.click(); [...document.querySelectorAll('${H} tr[data-key]')].filter(r => /Phone review [23]\\.txt/.test(r.textContent)).forEach(r => r.querySelector('.dt-check input')?.click()); window.__calls = []; true`);
                 await waitFor(`/2 selected/.test(document.querySelector('.team-needs-toolbar').textContent + document.querySelector('${H}').textContent)`, 'team has two selected files', 5000);
-                const pressTeam = label => ev(`[...document.querySelectorAll('.team-needs-toolbar button, ${H} .dt-bar button')].filter(b => b.textContent.trim() === ${JSON.stringify(label)}).pop().click(); true`);
+                const pressTeam = label => ev(`[...document.querySelectorAll('.team-needs-toolbar button, ${H} .dt-bar button')].filter(b => (b.getAttribute('aria-label') || b.textContent).trim() === ${JSON.stringify(label)}).pop().click(); true`);
                 await pressTeam('Approve');
                 await waitFor(`/Approve 2 files\\?/.test(document.querySelector('.dt-bar').textContent)`, 'team unopened files ask before approval', 5000);
                 assert.equal(await ev('window.__calls.length'), 0, 'team confirm sends nothing before an answer');
