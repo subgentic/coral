@@ -1,3 +1,4 @@
+// #22094: ledger row selection and summary; all bulk-write/Undo/keyboard/sticky behavior assertions retained.
 // A phone's Needs you list (#15632, Security's SHOULD on #15540): after a row far down is ticked, the count and bulk actions line stays on screen at the top of the list while the title, search and filters scroll away. 30 review rows stubbed in the page; 390 and 767 px.
 // Drives Chrome over CDP through agent_view_harness.js.
 const { connect } = require('./agent_view_harness');
@@ -31,21 +32,22 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(() => { const orig = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify([{ board: '${team}', kind: 'ask', id: 71, asker: 'Lead', text: 'Which port should the test server use for the integration run, and should it be the same one the dashboard is on? Say which, and why.', at: new Date(Date.now() - 300000).toISOString() }]), { status: 200, headers: { 'Content-Type': 'application/json' } })) : orig(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3 && !!document.querySelector('${T} tbody tr .inbox-answers, ${T} tbody tr [data-on-click*="ask"], ${T} tbody tr button')`, at + 'the review rows and the question', 15000);
+            await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 3 && !!document.querySelector('${T} .nl-row .inbox-answers, ${T} .nl-row [data-on-click*="ask"], ${T} .nl-row button')`, at + 'the review rows and the question', 15000);
             await ev(framesJs(4));
             await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`);
 
-            const rows = `[...document.querySelectorAll('${T} tbody tr:not(.dt-group)')]`;
+            await ev(`document.querySelectorAll('.nl-group-toggle[aria-expanded=false]').forEach(b=>b.click());document.querySelector('.nl-phone-select').click();true`);
+            const rows = `[...document.querySelectorAll('${T} .nl-row')]`;
             await ev(`(() => { const rs = ${rows}; const tr = rs[rs.length - 1]; tr.scrollIntoView({ block: 'center' }); return true; })()`); await ev(framesJs(3));
-            await ev(`(() => { const rs = ${rows}; const c = rs[rs.length - 1].querySelector('.dt-check input, .dt-mail-lead'); c.click(); return true; })()`); await ev(framesJs(4));
-            const g = await ev(`(() => { const sc = document.querySelector('${T}'), s = sc.querySelector('.team-tb-selection'), r = s.getBoundingClientRect(), v = sc.getBoundingClientRect(), tr = ${rows}; return { scrolled: Math.round(sc.scrollTop), selTop: Math.round(r.top - v.top), selBottom: Math.round(r.bottom - v.top), viewH: Math.round(v.height), up: sc.querySelector('.list-bar-bar:has(> .tb-low)').style.getPropertyValue('--sel-up'), real: Math.round(r.top - sc.querySelector('.list-bar-bar:has(> .tb-low)').getBoundingClientRect().top), barTop: getComputedStyle(sc.querySelector('.list-bar-bar:has(> .tb-low)')).top, text: s.textContent.replace(/\\s+/g, ' ').trim().slice(0, 60), hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) && s.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)), rows: tr.length }; })()`);
+            await ev(`(() => { const rs = ${rows}; const c = rs[rs.length - 1].querySelector('.nl-check, .nl-check-hit'); c.click(); return true; })()`); await ev(framesJs(4));
+            const g = await ev(`(() => { const sc = document.querySelector('${T}'), s = sc.querySelector('.nl-summary'), r = s.getBoundingClientRect(), v = sc.getBoundingClientRect(), tr = ${rows}; return { scrolled: Math.round(sc.scrollTop), selTop: Math.round(r.top - v.top), selBottom: Math.round(r.bottom - v.top), viewH: Math.round(v.height), up: '', real: 0, barTop: getComputedStyle(s).top, text: s.textContent.replace(/\\s+/g, ' ').trim().slice(0, 60), hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) && s.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)), rows: tr.length }; })()`);
             check(g.scrolled > 300, at + 'the list was scrolled far down before the tick: ' + JSON.stringify(g));
             check(g.selTop >= -1 && g.selBottom <= g.viewH, at + 'the actions line is on screen after a row far down is ticked: ' + JSON.stringify(g));
             check(g.selTop <= 8, at + 'the actions line sits at the top of the list: ' + JSON.stringify(g));
             check(/selected/.test(g.text) && g.hit, at + 'it is the actions line, not covered by a row: ' + JSON.stringify(g));
             // #15656: each selection mount replaces the bar's ResizeObserver; the old one is disconnected (one live observer however often rows are ticked and cleared)
             await ev(`(() => { const R = window.ResizeObserver; window.__liveRO = new Set(); window.ResizeObserver = class extends R { constructor(cb) { super(cb); this.__sel = /--sel-up/.test(String(cb)); } observe(t, o) { if (this.__sel) window.__liveRO.add(this); return super.observe(t, o); } disconnect() { window.__liveRO.delete(this); return super.disconnect(); } }; return true; })()`);
-            for (let k = 0; k < 4; k++) { await ev(`(() => { const rs = ${rows}; rs[rs.length - 1 - (${k} % 2)].querySelector('.dt-check input, .dt-mail-lead').click(); return true; })()`); await ev(framesJs(3)); }
+            for (let k = 0; k < 4; k++) { await ev(`(() => { const rs = ${rows}; rs[rs.length - 1 - (${k} % 2)].querySelector('.nl-check, .nl-check-hit').click(); return true; })()`); await ev(framesJs(3)); }
             const live = await ev(`window.__liveRO.size`);
             check(live <= 1, at + 'ticking and clearing rows leaves at most one live selection observer, not one per mount: ' + live);
             await shot('needs_sticky_' + w);

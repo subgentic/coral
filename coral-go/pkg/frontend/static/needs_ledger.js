@@ -32,6 +32,12 @@ export function needsLedger(cfg) {
     const api = { el: root, state, foldState: () => controllers.length ? controllers.every(c => !c.body.hidden) : null, setAll: open => { for (const c of controllers) c.set(open); cfg.onFoldChange?.(); }, selection: () => new Set(state.selected), clear: () => { state.selected.clear(); selecting = false; sync(); } };
     function checkbox(items, label) {
         const hit = el('label', 'nl-check-hit'), input = el('input', 'check nl-check'); input.type = 'checkbox'; input.setAttribute('aria-label', label); hit.append(input);
+        input.addEventListener('click', e => {
+            if (items.length !== 1) return;
+            const key = keyOf(items[0]), visible = [...root.querySelectorAll('.nl-row')].filter(n => n.getClientRects().length).map(n => n.dataset.needsKey), from = visible.indexOf(state.anchor), to = visible.indexOf(key);
+            if (e.shiftKey && from >= 0 && to >= 0) for (const k of visible.slice(Math.min(from, to), Math.max(from, to) + 1)) { const row = state.rowCache?.get(k); if (row && eligible(row)) (input.checked ? state.selected.add(k) : state.selected.delete(k)); }
+            state.anchor = key;
+        });
         input.addEventListener('change', () => { for (const r of items.filter(eligible)) (input.checked ? state.selected.add(keyOf(r)) : state.selected.delete(keyOf(r))); sync(); });
         hit.addEventListener('click', e => e.stopPropagation()); checks.push({ input, items }); return hit;
     }
