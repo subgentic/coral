@@ -861,3 +861,5 @@
 .needs-ledger .nl-row > .nl-icon { height:20px; }
 
 @media(max-width:767px) { .needs-ledger-toolbar .nl-visible-group > button { max-width:100%; white-space:normal; } }
+
+@media(max-width:767px) { .needs-ledger .nl-menu { left:auto!important; right:8px!important; max-width:calc(100vw - 16px); box-sizing:border-box; } }
