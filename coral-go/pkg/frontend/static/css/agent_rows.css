@@ -16,8 +16,7 @@
 :is(#live-sessions-list, #mobile-session-list) .session-label-split .sln-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
 :is(#live-sessions-list, #mobile-session-list) .session-label-split .sln-tail { flex: none; white-space: nowrap; }
 :is(#live-sessions-list, #mobile-session-list) .session-label:not(.session-label-split) .session-label-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; } /* a name with no space ends in an ellipsis inside its row (mobile_text_sizes at 320 px) */
-#live-sessions-list { container-type: inline-size; }
-@container (max-width: 240px) { #live-sessions-list .session-group-item { padding-left: 28px !important; } } /* a sidebar dragged in to 200 px: the mock's 49 px indent left the name 59 px, too little for its last word (#4624) */
+#live-sessions-list .session-group-item { padding-left: clamp(28px, 100% - 186px, 49px) !important; } /* the mock's 49 px indent down to 28 px in a sidebar dragged in to 200 px, so a name keeps its last word (#4624); a % padding reads the list's width: no container-type, which would hold the fixed row menus (fixed_containing_block_census) */
 /* the mark: always there, in the same place */
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-dot[class*="mk-"] { display: block; position: absolute; left: 30px; top: 12px; width: 9px; height: 9px; margin: 0; border: 0; border-radius: 50%; box-sizing: border-box; background: transparent; box-shadow: none; animation: none; opacity: 1; visibility: visible; }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-dot[class*="mk-"]::before { content: none; }
