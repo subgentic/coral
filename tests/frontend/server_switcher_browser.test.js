@@ -289,7 +289,7 @@ const SETTINGS_PRELOAD = `(() => {
             await ev(`localStorage.setItem('coral-group-computer', '${grouped}'); T.render.renderLiveSessions(T.state.liveSessions); true`);
             const ic = await icons();
             assert.ok(ic.n >= 3 && ic.withIcon === ic.n, `${grouped ? 'grouped' : 'ungrouped'}: every folder group has the named folder icon (${JSON.stringify(ic)})`);
-            assert.ok(ic.teamX.length > 0 && ic.folderX.every(x => Math.abs(x - ic.teamX[0]) <= 1), `${grouped ? 'grouped' : 'ungrouped'}: aligned with the team icons (${JSON.stringify(ic)})`);
+            assert.ok(ic.teamX.length === 0 && ic.folderX.every(x => Math.abs(x - ic.folderX[0]) <= 1), `${grouped ? 'grouped' : 'ungrouped'}: the folder icons line up, and a team line has no icon (#22105, the approved sidebar mock) (${JSON.stringify(ic)})`);
         }
         // #3507 v4: the header row is the button (aria-expanded, Enter or Space); a team header opens the team and its chevron button collapses (#5989).
         await ev(`localStorage.setItem('coral-group-computer', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);

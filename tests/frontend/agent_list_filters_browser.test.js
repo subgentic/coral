@@ -223,9 +223,9 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         const big = await ev(`(() => { const r = e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
             const btn = document.querySelector('.sidebar-header [data-display-button]'); const icon = btn.querySelector('.material-icons'); const dot = btn.querySelector('[data-display-badge]');
             const a = r(icon), d = r(dot); const ow = Math.max(0, Math.min(a.r, d.r) - Math.max(a.l, d.l)), oh = Math.max(0, Math.min(a.b, d.b) - Math.max(a.t, d.t));
-            return { dotShown: !dot.hidden && d.r > d.l, overlap: Math.round(ow * oh) / Math.round((a.r - a.l) * (a.b - a.t)), name: btn.getAttribute('aria-label') }; })()`);
+            return { dotShown: !dot.hidden && d.r > d.l, overlap: Math.round(ow * oh) / Math.round((a.r - a.l) * (a.b - a.t)), name: dot.getAttribute('aria-label') }; })()`); // the button's name is its words (#22105): the dot names the filters
         assert.ok(big.dotShown, 'the count dot is shown'); assert.ok(big.overlap < 0.15, 'and does not cover the icon: ' + big.overlap);
-        assert.equal(big.name, 'Display options, 2 filters on', 'the button names how many filters are on');
+        assert.equal(big.name, '2 filters on', 'the dot names how many filters are on');
         await toggleBtn();
         const stacked = await ev(`(() => [...document.querySelectorAll('#agent-list-bar .list-bar-field')].filter(f => f.getClientRects().length).map(f => { const l = f.querySelector('.list-bar-field-label').getBoundingClientRect(), s = f.querySelector('select').getBoundingClientRect(), p = document.querySelector('.sidebar-header [data-display-panel]').getBoundingClientRect();
             return { under: s.top >= l.bottom - 1 || s.left >= l.right - 1, wide: s.width, inside: s.left >= p.left - 1 && s.right <= p.right + 1 }; }))()`);

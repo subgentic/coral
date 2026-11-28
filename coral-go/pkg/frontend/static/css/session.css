@@ -1634,6 +1634,11 @@ button.server-update-badge { background: transparent; font: inherit; cursor: poi
 /* Keep the search box usable: it gives up width down to 8em (the whole "Search agents" placeholder still shows, #10050) and only a very narrow sidebar wraps the header (#3085, #4062); at 200% text the buttons stay on the search box's row (UI/UX's #7562 point). */
 .sidebar-header { flex-wrap: wrap; }
 .sidebar-header .sidebar-search { flex: 1 1 0; min-width: 5em; container-type: inline-size; } /* the controls share one line on every tab (#22105: Group by's words beside it) */
+/* the agent list's Group by beside it (#22105): the family's .btn, its words cut before the search box is */
+.sidebar-header[data-header="agents"] { justify-content: flex-start; }
+.sidebar-groupby-btn { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; margin: 0; min-width: 0; overflow: hidden; }
+.sidebar-groupby-btn b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-strong); margin-inline-start: 2px; }
+.sidebar-groupby-btn .material-icons { font-size: var(--fs-xl); }
 /* In a box that narrow (at 200% text the header's buttons leave it 8em) the magnifier goes and the placeholder takes its room: the whole placeholder is shown, and the box's name is the same. */
 @container (max-width: 8rem) { .sidebar-search-icon { display: none; } .sidebar-search-input.field-search { padding-left: 0.625rem; padding-right: 0.25rem; } }
 /* Status text for screen readers only (the dot carries it visually). */
