@@ -120,3 +120,30 @@ func TestTaskList_OlderServerFullList(t *testing.T) {
 	assert.Contains(t, lines[1], "first")
 	assert.Contains(t, lines[2], "review_requested")
 }
+
+// #22048: a backlog task lists as "backlog" (not pending), with how to claim it by number.
+func TestTaskList_ShowsBacklogAndHowToClaimIt(t *testing.T) {
+	isolateBoardEnv(t)
+	ctx := context.Background()
+	bs, err := board.NewStoreWithKey(t.TempDir()+"/board.db", "")
+	require.NoError(t, err)
+	defer bs.Close()
+	later, err := bs.CreateTask(ctx, "team", "for later", "body", "medium", "lead", "worker")
+	require.NoError(t, err)
+	_, err = bs.SetBacklog(ctx, "team", later.ID)
+	require.NoError(t, err)
+	_, err = bs.CreateTask(ctx, "team", "do now", "body", "medium", "lead", "worker")
+	require.NoError(t, err)
+
+	h := routes.NewBoardHandler(bs)
+	r := chi.NewRouter()
+	r.Get("/api/board/{project}/tasks", h.ListTasks)
+	srv := httptest.NewServer(r)
+	defer srv.Close()
+	serverURL = srv.URL
+
+	got := captureTaskListStdout(t, &boardState{Project: "team"})
+	assert.Regexp(t, `#1\s+backlog\s+medium\s+worker\s+for later`, got)
+	assert.Regexp(t, `#2\s+pending\s+medium\s+worker\s+do now`, got)
+	assert.Contains(t, got, "task claim N", "how to claim a backlog task")
+}

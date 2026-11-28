@@ -19,6 +19,11 @@ import (
 // parkedSQL is true for a parked task: a reason, and no end or an end still to come.
 const parkedSQL = `(parked_reason IS NOT NULL AND (parked_until IS NULL OR parked_until > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))`
 
+// parkedSQLOf is parkedSQL for a query that aliases board_tasks (alias "t" gives t.parked_reason): the same test, its columns qualified.
+func parkedSQLOf(alias string) string {
+	return "(" + alias + ".parked_reason IS NOT NULL AND (" + alias + ".parked_until IS NULL OR " + alias + ".parked_until > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')))"
+}
+
 // The most parked tasks one agent may hold is the team's park_limit setting (DefaultParkLimit, #15362; first a fixed 2, #11660 the Operator's rule): parking is for work that waits on something outside the agent's hands, not a place to put work it will not do now
 // (that is ReleaseTask). Parks made before a cap or over it are left as they are and reported; only a new park is refused, and --force parks anyway.
 

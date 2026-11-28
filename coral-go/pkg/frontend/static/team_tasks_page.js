@@ -7,6 +7,7 @@ import { pollEvery } from './overload.js';
 import { whenText } from './when_text.js';
 import { importOnce } from './import_once.js';
 const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy: its failure is retried
+const { statusWord, isBacklog } = await importOnce('./backlog_word.js'); // Backlog (#22048): lazy, the start bundle stays net zero
 const DT = await importOnce('./data_table.js'); // the one table (#7743)
 const { agentLink } = await importOnce('./agent_link.js'); // an agent's name is one shared helper (#12182)
 const { agentCopyButton } = await importOnce('./agent_copy_button.js'); // the robot (#15063)
@@ -16,7 +17,7 @@ const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the
 import { loadStyles } from './lazy_styles.js';
 await loadStyles('phone_lists.css'); // the phone form of a team list (#12230); not at start (page_weight)
 import { goalTitle, refreshGoalTitles, readGoal, readGoalChoices, noGoalLabel } from './task_goals.js';
-import { taskStatusWord, statusClass, isParked } from './goal_words.js';
+import { statusClass } from './goal_words.js';
 import { state } from './state.js';
 const { jumpTarget } = await importOnce('./task_jump.js'); // lazy: its failure is retried (#14565)
 const { needsReview } = await importOnce('./review_pool.js');
@@ -45,7 +46,7 @@ const startFilter = () => (browserLocal.get(HIDE_KEY) === 'false' ? 'all' : 'ope
 const model = { dt: DT.tableState(), choices: null, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, extraPages: 0, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
-const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested, isParked(t)); return { 'Queued': 'queued', 'Waiting': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
+const bucket = (t) => { const w = statusWord(t, t.review_requested); return { 'Queued': 'queued', 'Waiting': 'queued', 'Backlog': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
 async function readJson(path) {
@@ -265,7 +266,7 @@ function draw() {
             if (byGoal && !model.dt.sort) shown.sort((a, b) => (Number(a.goal_id || 1e12) - Number(b.goal_id || 1e12)));
             const t = TV.tasksTable('team', shown, { ctx: rowCtx(), label: `Tasks, ${shown.length}`, tweak: cols => cols.map(c => c.key === 'goal' ? { ...c, cell: task => { const l = c.cell(task); if (l.dataset) l.textContent = `#${task.goal_id} ${l.textContent}`; return l; } } : c), // the number first: goals named alike differ when the name is cut (walk 18 M8, #15364)
                 ...(byGoal ? { groupBy: task => ({ key: goalKey(task), label: task.goal_id ? goalTitle(model.project, task.goal_id) || `Goal ${task.goal_id}` : noGoalLabel }) } : {}), open: (task) => hooks.openTask?.(task), state: model.dt,
-                ...(phone ? { bare: true, sortBar: false, mail: task => ({ lead: { icon: 'checklist', square: true, name: bucket(task) }, title: task.title, ask: [task.assigned_to, task.goal_id ? goalTitle(model.project, task.goal_id) : ''].filter(Boolean).join(' \u00b7 '), state: taskStatusWord(task.status, task.review_requested, isParked(task)), time: taskStatusWord(task.status, task.review_requested, isParked(task)), data: { taskId: String(task.id) } }) } : {}), // a phone: the shared form, edge-to-edge two-line rows (#12230)
+                ...(phone ? { bare: true, sortBar: false, mail: task => ({ lead: { icon: 'checklist', square: true, name: bucket(task) }, title: task.title, ask: [task.assigned_to, task.goal_id ? goalTitle(model.project, task.goal_id) : ''].filter(Boolean).join(' \u00b7 '), state: statusWord(task, task.review_requested), time: statusWord(task, task.review_requested), data: { taskId: String(task.id) } }) } : {}), // a phone: the shared form, edge-to-edge two-line rows (#12230)
                 selectable: { contextKey: model.project, actions: TB.taskBulkActions(model.project, () => { model.dt.selected.clear(); loadTasks(); }), onChange: (keys) => Toolbar.mountSelection(row, keys.size ? t.bar : null), ...(phone ? { longPress: true, iconBar: true, clearLabel: 'Cancel' } : {}) } }); // the selection bar takes the toolbar's line while tasks are selected
             Toolbar.mountSelection(row, model.dt.selected.size ? t.bar : null);
             row.querySelectorAll('.dt-select-toggle').forEach(b => b.remove());
@@ -413,11 +414,12 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const page = el('div', 'goals-page goals-table-page team-task-page');
     const h = el('h2', 'goals-detail-title', `#${task.id} ${task.title}`); h.tabIndex = -1; h.id = 'team-task-title';
     if (task.version > 1) { const edited = el('span', 'text-muted-sm', ` edited, v${task.version}`); h.append(edited); }
- const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review), isParked(task));
+ const word = statusWord(task, task.review_requested || (task.workflow && task.workflow.completion_review));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
     // what a queued task waits on, until it is claimed (#10200): the tasks it depends on while any is open, else the agent it is for (#10222)
     const openBlockers = (Array.isArray(task.blocked_by) ? task.blocked_by : []).filter(d => d && d.satisfied === false).map(d => (d.board_id && ctx.project && d.board_id !== ctx.project ? `${keyLabel(String(d.board_id))} #${Number(d.task_id)}` : `#${Number(d.task_id)}`)); // a blocker on another board names it (#10287)
     if ((task.status === 'pending' || task.status === 'blocked') && openBlockers.length) line.append(el('span', 'text-muted-sm', ` Waiting on ${openBlockers.join(', ')}.`));
+    else if (task.status === 'pending' && task.assigned_to && isBacklog(task)) line.append(el('span', 'text-muted-sm', ' In the backlog: the assignee claims it by number.'));
     else if (task.status === 'pending' && task.assigned_to) { const w = el('span', 'text-muted-sm', ' Waiting for '); w.append(agentLink(task.assigned_to, { board: task.board_id || task.project || '' }), ' to pick it up.'); line.append(w); } // the assignee opens its chat (#12182)
     line.append(agentCopyButton('task', () => `Task #${task.id} (${String(task.title || '').replace(/\s+/g, ' ').trim().slice(0, 80)}): run coral-board task detail ${task.id}`));
     if (ctx.teamLink) {
