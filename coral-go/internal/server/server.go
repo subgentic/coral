@@ -1215,7 +1215,7 @@ func (s *Server) launchNoticeUnseen(r *http.Request) bool {
 	}
 	// The notice is drawn only for a person with a local agent, and only while the saved default is Auto (launch_disclosure.js says the same): a page is told to reserve its row only
 	// when the notice will draw into it, so a row is never reserved and then given back (#22033).
-	if mode := strings.TrimSpace(st["default_permission_mode"]); mode != "" && mode != "auto" {
+	if mode := setreg.Enum(st, "default_permission_mode"); mode != "" && mode != "auto" {
 		return false
 	}
 	if config.TestHooksEnvHonoured && os.Getenv("CORAL_TEST_HOOKS") == "1" && r.URL.Query().Get("test_agent") == "1" {
