@@ -41,3 +41,5 @@ The Orchestrator's 2026-11-28 08:52 ruling makes v19 authoritative and permits r
 | inbox_phone_cards: long press on Goal chip | Header Select → file checkbox → one selected → Clear, in the same suite; v19 explicitly uses Select and has no file goal chip. |
 
 Selectors alone changed in count, paging, filter-empty, live-announcement, alerts, bulk Undo, bulk partial-selection and welcome Dismiss/Undo/Restore suites; their existing behavior assertions remain. No waiver of the combined 68-suite run, census/golden, current static checks or reviewer verdict is implied.
+
+- `needs_full_width`: Orchestrator ruling 2026-11-28 09:05: approved v19 supersedes #18358; assert the 880px cap at all three desktop widths.

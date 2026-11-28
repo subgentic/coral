@@ -135,6 +135,24 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`document.querySelector('#top-phone-bar .nl-phone-select').textContent`), 'Cancel', at + 'the title bar\'s Select is Cancel while selecting');
             await tapAt(`document.querySelector('#top-phone-bar .nl-phone-select')`);
             assert.equal(await bar(), null, at + 'Cancel leaves selection'); assert.deepEqual(await selected(), [], at + 'nothing is selected'); assert.equal(await ev('window.__calls.length'), 0, at + 'and nothing was sent');
+            // The team page still owns bulk review decisions: keep its unopened-file confirm proof.
+            if (w === 390 && touchEmu) {
+                await ev(`import((window.__coralStatic || '/static/') + 'nav.js').then(async n => { const r = await import((window.__coralStatic || '/static/') + 'routes.js'); await n.go(r.parse('/team/${team}/needs')); return true; })`);
+                const H = '.team-needs-body';
+                await waitFor(`document.querySelectorAll('${H} tr[data-key]').length >= 2`, 'team Needs you rows', 12000);
+                await ev(`document.querySelector('${H} .dt-select-toggle')?.click(); [...document.querySelectorAll('${H} tr[data-key]')].filter(r => /Phone review [23]\\.txt/.test(r.textContent)).forEach(r => r.querySelector('.dt-check input')?.click()); window.__calls = []; true`);
+                await waitFor(`/2 selected/.test(document.querySelector('.team-needs-toolbar').textContent + document.querySelector('${H}').textContent)`, 'team has two selected files', 5000);
+                const pressTeam = label => ev(`[...document.querySelectorAll('.team-needs-toolbar button, ${H} .dt-bar button')].filter(b => b.textContent.trim() === ${JSON.stringify(label)}).pop().click(); true`);
+                await pressTeam('Approve');
+                await waitFor(`/Approve 2 files\\?/.test(document.querySelector('.dt-bar').textContent)`, 'team unopened files ask before approval', 5000);
+                assert.equal(await ev('window.__calls.length'), 0, 'team confirm sends nothing before an answer');
+                await pressTeam('Keep');
+                assert.equal(await ev('window.__calls.length'), 0, 'declining the team confirm writes nothing');
+                await pressTeam('Approve');
+                await waitFor(`/Approve 2 files\\?/.test(document.querySelector('.dt-bar').textContent)`, 'team can ask again', 5000);
+                await pressTeam('Approve');
+                await waitFor(`window.__calls.filter(c => c.decision === 'approve').length === 2`, 'team confirms one approval per selected file', 8000);
+            }
             await removeBoards(ev, [team]).catch(() => {});
         }
         // Desktop nested controls retain their action even when the table has a selection.

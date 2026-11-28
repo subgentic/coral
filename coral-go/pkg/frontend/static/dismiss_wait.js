@@ -38,12 +38,12 @@ function saidDismiss(text, session) {
 /** The keyboard stays in the list (#17226): called before the write, it notes the row beside the one this button is in (the next, or the previous at the end); the function it returns, called after the list is drawn again, puts the
  *  focus on that row's first control. Only for the keyboard that was on the button; a pointer's press moves nothing. */
 function keepNeighbour(button) {
-    const tr = button && button.closest('tr'), kb = tr && tr.contains(document.activeElement), near = kb && (tr.nextElementSibling || tr.previousElementSibling), key = near && near.dataset.key; // the keyboard was on the button or in its row's menu
+    const tr = button && button.closest('tr, .nl-row'), kb = tr && tr.contains(document.activeElement), near = kb && (tr.nextElementSibling || tr.previousElementSibling), key = near && (near.dataset.key || near.dataset.needsKey); // the keyboard was on the button or in its row's menu
     return async () => {
         if (!key) return;
         for (let i = 0; i < 90 && tr.isConnected; i++) await new Promise(r => requestAnimationFrame(r));
         if (tr.isConnected) return; // the row is still there (a redraw that kept it): the keyboard stays where it is
-        const row = document.getElementById('group-table-view')?.querySelector(`tr[data-key="${CSS.escape(key)}"]`);
+        const row = document.getElementById('group-table-view')?.querySelector(`tr[data-key="${CSS.escape(key)}"], .nl-row[data-needs-key="${CSS.escape(key)}"]`);
         [...(row?.querySelectorAll('button, .dt-primary') || [])].find(b => b.getBoundingClientRect().width && !b.classList.contains('dt-star'))?.focus({ preventScroll: true });
     };
 }
