@@ -145,7 +145,7 @@ export function reviewGroups(rows) {
 function reviewRowOf(a, team, seen, mutedOut = null) {
     if (splitKey(team).name === '~no-team' && a.board_id !== '~no-team') return null; // the No team list also holds files of teams with a board: only the ones with no board are its own
     const decidedWithNews = a.new_comments > 0 && (a.tags?.includes('approved') || a.tags?.includes('denied')) && !a.tags.includes('for review'); // a file the Operator decided that agents replied about in their thread: the server puts it in this list (#12097), marked and counted once
-    if (!(a.tags?.includes('for review') || decidedWithNews) || a.tags.includes('saved') || a.tags.includes('ignored') || a.tags.includes('superseded') || !a.available || seen.has(a.id)) return null; // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026)
+    if (!(a.tags?.includes('for review') || decidedWithNews) || (a.tags.includes('saved') && a.tags.includes('for review')) || a.tags.includes('ignored') || a.tags.includes('superseded') || !a.available || seen.has(a.id)) return null; // a decided saved file with news comes back like any decided file (#22133) // changes requested without news is the agent's turn (needsYouFile's rule, #11985, #12026)
     const hex = /(?:sha256:|coral:\/\/artifacts\/)?([a-f0-9]{64})$/i.exec(a.uri || a.digest || a.id || '')?.[1];
     if (!hex) return null;
     seen.add(a.id);
@@ -360,7 +360,7 @@ export function countSavedReviews() {
         if (page.loaded && !page.error && !page.truncated && Number.isSafeInteger(n) && n >= 0) value += n;
         else { unknown.add(page.server); complete = false; }
     }
-    if (unknown.size) for (const row of savedFiles()) if (unknown.has(splitKey(row.team).server)) value++;
+    if (unknown.size) for (const row of savedFiles()) if (row.tags?.includes('for review') && unknown.has(splitKey(row.team).server)) value++; // a decided one is under Done: not counted
     return { value, complete };
 }
 /** Query totals and tags describe the server query, not its attention policy. */
@@ -388,13 +388,13 @@ function publishPages() {
         if (source.error) failed.push(`${source.server} review artifacts could not be refreshed: ${source.error}`);
         for (const a of source.artifacts) {
             const tags = a.tags || [], decidedWithNews = a.new_comments > 0 && (tags.includes('approved') || tags.includes('denied')) && !tags.includes('for review');
-            if (!(tags.includes('for review') || decidedWithNews) || tags.includes('saved') || tags.includes('ignored') || tags.includes('superseded') || !a.available) continue;
+            if (!(tags.includes('for review') || decidedWithNews) || (tags.includes('saved') && tags.includes('for review')) || tags.includes('ignored') || tags.includes('superseded') || !a.available) continue;
             (a.muted === true ? nextMuted : next).push(a);
         }
     }
     for (const source of savedPager.snapshot()) {
         if (source.error) failed.push(`${source.server} saved review artifacts could not be refreshed: ${source.error}`);
-        for (const a of source.artifacts) if (a.tags?.includes('saved') && a.tags.includes('for review') && a.available) nextSaved.push(a);
+        for (const a of source.artifacts) if (a.tags?.includes('saved') && ['for review', 'approved', 'denied'].some(t => a.tags.includes(t)) && a.available) nextSaved.push(a); // a decided file keeps 'saved' (#22133): Saved lists it under Done
     }
     items = next.sort(byAge); saved = nextSaved.sort(byAge); muted = nextMuted.sort(byAge); errors = failed;
     changed({ countsUnchanged: !pagesPublished }); // initial page publication is not an edit: the independent startup summary is already reading

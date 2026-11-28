@@ -1336,7 +1336,7 @@ function savedListSpec(where = '') {
                     return b; } },
             ] }).el };
     if (dock) return spec;
-    const tabFiles = v.tab === 'done' ? [] : files; // a saved file is still to decide: a verdict takes "saved" off it (artifact_reviews.go), so Done holds the messages marked done (#22108)
+    const tabFiles = files.filter(a => (v.tab === 'done') === !a.tags?.includes('for review')); // a file still to decide is Open; one approved or denied keeps "saved" and is Done (#22133)
     const entries = [...tabFiles.map(a => ({ kind: 'file', a, at: Date.parse(a.saved_at || a.updated_at || a.created_at || '') || 0, server: serverOf(a), team: reviewSourceLabel(a.team), when: saved.ago(a.saved_at || a.updated_at || a.created_at || '') })), ...v.shown.map(it => ({ kind: 'message', it, f: saved.savedItemFacts(it), at: Date.parse(it.saved_at || '') || 0, server: serverOf(it), team: String(it.team || ''), when: saved.savedItemFacts(it).saved }))].sort((x, y) => (saved.savedFiltersNow().sort === 'oldest' ? -1 : 1) * (y.at - x.at)); // one list, newest saved first, or oldest when the toolbar says so (#20508): a file's saved_at (#20519) orders it, and an older server's list has none, so its newest version's time stands in
     const loadingMore = savedReviewPages().some(p => p.has_more || p.error || (p.loading && !p.loaded) || p.truncated);
     const order = saved.savedFiltersNow().sort === 'oldest' ? 'oldest saved first' : 'newest saved first';
@@ -1348,24 +1348,24 @@ function savedListSpec(where = '') {
         return wrap; } };
 }
 /** A saved file's or message's facts and actions for the Saved page's row (saved_ledger.js, #22108). */
-const SAVED_TAGS = [['for review', 'To review', 'blue']];
+const SAVED_TAGS = [['for review', 'To review', 'blue'], ['approved', 'Approved', 'green'], ['denied', 'Denied', 'amber']]; // the verdict as the tag under Done (the mock)
 function savedLedgerRow(e) {
     if (e.kind === 'file') {
         const a = e.a, name = markHidden(a.name, { strict: true }), server = splitKey(a.team).server, canAct = !isCloud() && !decisionNeedsPerson(server), version = (/^version (\d+)/.exec(a.version_line || '') || [])[1] || (a.earlier?.length ? String(a.earlier.length + 1) : ''); // the server's version line, else the versions this row stands for
         const tag = a.new_comments > 0 ? [null, 'New comments', 'blue'] : (SAVED_TAGS.find(([t]) => a.tags?.includes(t)) || []); // agents replied in its thread: that is the news, as Needs you says it
-        const failed = error => showToast(error?.message || `Couldn't change ${name}.`, true);
+        const failed = error => showToast(error?.message || `Couldn't change ${name}.`, true), toDecide = !!a.tags?.includes('for review');
         return { key: `file:${a.reviewKey}`, kind: 'file', name, media: a.media_type || '', version, open: () => openReview(a),
             team: { text: multipleServers() ? e.team : splitKey(a.team).name, open: () => go(keyRoute('team', a.team)) }, // "This computer" is left out when there is one
             goal: a.goal_id && a.goal_title ? { text: `#${Number(a.goal_id)} ${markHidden(String(a.goal_title), { strict: true })}`, open: () => go({ ...folderRoute, id: a.team, item: Number(a.goal_id) }) } : null,
             agent: { text: markHidden(a.produced_by || '', { strict: true }) }, text: questionOf({ review: a }) ? `"${questionOf({ review: a })}"` : '', starred: !!a.starred, tag: tag.length ? { text: tag[1], tone: tag[2] } : null, time: e.when, // the agent's question in quote marks, as the mock and Needs you (#22094)
-            remove: canAct ? { label: 'Remove from Saved', title: 'Put it back in Needs you as it was', run: () => importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(a.team, a); sayLive(`${name} is back in Needs you.`); }).catch(failed) } : null,
+            remove: canAct ? { label: 'Remove from Saved', title: toDecide ? 'Put it back in Needs you as it was' : 'Take it out of Saved; its verdict stays', run: () => importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(a.team, a); sayLive(toDecide ? `${name} is back in Needs you.` : `${name} is out of Saved.`); }).catch(failed) } : null,
             star: canAct && a.hex ? { on: !!a.starred, run: () => starControl(a, { hex: a.hex, name, reviewPin: true, onChange: on => { reviewStarChanged(a, on); renderInboxNav(true); } })?.click() } : null,
             more: canAct ? [{ label: 'Copy version ID', title: 'The id of this version only', run: () => importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(a.id)).catch(failed) }, { label: 'Dismiss', title: 'Take it out of Saved; nobody is told', run: () => importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { const out = await ignoreRow(a.team, a); if (stillWaitingOnAgent(a)) WA.dismissArtifact(a.id); sayIgnored(a.team, a, out); sayLive(`Dismissed ${name}.`); }).catch(failed) }] : [] }; // the toast with Undo, as Dismiss in Needs you
     }
     const f = e.f, words = String(f.snip || '').trim(), cut = words.search(/[.!?\n](\s|$)/), head = (cut > 0 && cut < 90 ? words.slice(0, cut + 1) : words.slice(0, 90)) || f.title || f.which, rest = words.slice(head.length).trim();
     const it = () => saved.findSavedItem(f.id);
     return { key: `msg:${f.id}`, kind: 'message', name: head, label: f.which, version: '', open: () => openSavedPage(f.id),
-        team: f.team ? { text: f.team, open: () => go(keyRoute('team', boardTeamKey(e.it.server, f.team))) } : null, goal: null,
+        team: f.team ? { text: f.team, open: () => go(keyRoute('team', boardTeamKey(e.it.server, f.team))) } : null, goal: e.it.goal?.id && f.team ? { text: `#${Number(e.it.goal.id)} ${markHidden(String(e.it.goal.title || ''), { strict: true })}`.trim(), open: () => go({ ...folderRoute, id: boardTeamKey(e.it.server, f.team), item: Number(e.it.goal.id) }) } : null, // a board message's task goal, read live (#22133)
         agent: { text: f.title || '' }, text: rest, starred: false, tag: f.gone ? { text: 'Gone', tone: 'grey' } : null, time: e.when,
         remove: !f.gone && savedRouteOpen('remove') ? { label: 'Remove from Saved', run: async () => { const x = it(); if (x && await saved.savedRemove(x)) sayLive('Removed from saved'); } } : null, star: null,
         more: !f.gone && savedRouteOpen('done') ? [{ label: f.done ? 'Reopen' : 'Mark done', title: f.done ? 'Move it back to Open' : 'Move it to Done', run: async () => { const x = it(); if (!x) return; const d = !x.done_at; if (await saved.savedSetDone(x, d)) sayLive(d ? 'Marked done' : 'Moved back to Open'); } }] : [] };
