@@ -13,6 +13,7 @@ import (
 
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/devicekey"
+	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -117,12 +118,12 @@ func relayedGuard(verifier func() *devicekey.Verifier, ownerLabel func(context.C
 				case devicekey.HubWriteExempt(r.Method, target):
 					if !hubWriteExemptAuthority(r, via) {
 						deviceMsgLimiter.failed(via.LinkID+"|required", time.Now())
-						slog.Info("[device] an exempt Hub write without its own authority was refused: this computer requires a trusted device", "link", via.LinkID, "path", devicekey.RoutePath(target))
+						slog.Info("[device] an exempt Hub write without its own authority was refused: this computer requires a trusted device", "link", via.LinkID, "path", logsafe.Path(devicekey.RoutePath(target)))
 						deviceReply(w, devicekey.ErrDeviceRequired)
 						return
 					}
 					if isAuthenticRelay(r) {
-						slog.Info("[device] a cross-team relay was accepted while this computer requires a trusted device", "link", via.LinkID, "path", devicekey.RoutePath(target))
+						slog.Info("[device] a cross-team relay was accepted while this computer requires a trusted device", "link", via.LinkID, "path", logsafe.Path(devicekey.RoutePath(target)))
 					}
 				}
 			}
