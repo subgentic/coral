@@ -853,3 +853,7 @@
 @media(max-width:767px) {
     .needs-ledger-toolbar .nl-toolbar-actions .list-bar-toggle { margin:0; }
 }
+
+@media(max-width:767px),(pointer:coarse) {
+    .needs-ledger .nl-meta .agent-name { display:inline-flex; align-items:center; min-height:44px; min-width:44px; }
+}
