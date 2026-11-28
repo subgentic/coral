@@ -23,7 +23,7 @@ export function needsLedger(cfg) {
     const { rows, state, keyOf, about, unread, name, source, actions, open, agentLink, teamLink, goalLink, taskLink, bulkActions, eligible } = cfg;
     const root = el('section', 'needs-ledger'); root.setAttribute('aria-label', 'Needs you');
     const summary = el('div', 'nl-summary'), lists = el('div', 'nl-lists'); root.append(summary, lists);
-    const phoneHeader = document.getElementById('top-phone-bar'), phoneSummary = el('span', 'nl-phone-summary'); phoneHeader?.querySelector('.nl-phone-summary')?.remove(); phoneHeader?.append(phoneSummary);
+    const phoneHeader = document.getElementById('top-phone-bar'), phoneSummary = phoneHeader?.querySelector('.nl-phone-summary') || el('span', 'nl-phone-summary'); phoneHeader?.append(phoneSummary);
     let selecting = state.select || state.selected.size > 0;
     const checks = [], groups = [], controllers = [];
     const here = new Set(rows.map(keyOf)); for (const key of state.rowCache?.keys() || []) if (!here.has(key) && !state.selected.has(key)) state.rowCache.delete(key);
@@ -39,8 +39,10 @@ export function needsLedger(cfg) {
         const selected = chosen(); root.classList.toggle('nl-has-selection', !!selected.length); root.classList.toggle('nl-selection-active', selecting || !!selected.length); state.select = selecting;
         for (const { input, items } of checks) { const available = items.filter(eligible), n = available.filter(r => state.selected.has(keyOf(r))).length; input.checked = n > 0 && n === available.length; input.indeterminate = n > 0 && n < available.length; input.disabled = !available.length; }
         root.querySelectorAll('[data-needs-key]').forEach(n => n.classList.toggle('nl-is-selected', state.selected.has(n.dataset.needsKey)));
+        const phoneFocus = phoneSummary.contains(document.activeElement) ? (document.activeElement.classList.contains('nl-phone-count') ? '.nl-phone-count' : '.nl-phone-select') : '';
         phoneSummary.replaceChildren(el('strong', 'nl-phone-title', 'Needs you'), button(`${rows.length} · ${rows.filter(unread).length} new`, 'btn btn-quiet nl-phone-count', () => { root.classList.toggle('nl-tools-open'); phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-expanded', String(root.classList.contains('nl-tools-open'))); }), button(selecting || selected.length ? 'Cancel' : 'Select', 'btn btn-quiet nl-phone-select', () => { if (selecting || state.selected.size) api.clear(); else { selecting = true; sync(); } }));
         phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-label', 'Show Needs you search and filters');
+        if (phoneFocus) phoneSummary.querySelector(phoneFocus)?.focus({ preventScroll: true });
         summary.replaceChildren(checkboxTop, el('strong', '', selected.length ? `${selected.length} selected` : `${rows.length} items`));
         if (!selected.length) { summary.append(el('span', 'nl-summary-new', `· ${rows.filter(unread).length} new`)); const select = button(selecting ? 'Cancel' : 'Select', 'btn btn-small btn-quiet nl-selection-mode', () => { if (selecting) api.clear(); else { selecting = true; sync(); } }); summary.append(select); }
         else {
