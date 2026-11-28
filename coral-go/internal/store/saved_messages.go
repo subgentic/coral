@@ -28,6 +28,15 @@ type SavedMessage struct {
 	// Reason is set by the list route, not kept (#5802): "gone" when the message no longer exists, "not_reachable" when this computer holds no transcript of the agent that
 	// wrote it, "" otherwise (and for a bookmark that was not checked).
 	Reason string `db:"-" json:"reason"`
+	// Goal is set by the list route, not kept (#22133): the goal (id and title) of the task a saved board message is on, derived when the list is read; nil when it is on no task with a goal,
+	// for an agent's message, or when the board could not be asked.
+	Goal *SavedGoal `db:"-" json:"goal,omitempty"`
+}
+
+// SavedGoal is a saved message's goal on its board.
+type SavedGoal struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
 }
 
 // SavedScope narrows the list and the counts to where the Operator is looking (#4792): Team keeps the bookmarks of one team (its board's messages and its agents'), Agent one

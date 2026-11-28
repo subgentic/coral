@@ -78,9 +78,10 @@ func TestASavedFileIsNotCountedByNeedsYou(t *testing.T) {
 	assert.Equal(t, 1, e.waiting(t), "moved back: waiting again")
 }
 
-func TestADecisionOnASavedFileTakesTheSavedTagOff(t *testing.T) {
+// #22133: an approval or a denial keeps "saved" (the Saved page lists the file under Done, as the approved mock shows); changes requested and ignore still take it off.
+func TestADecisionOnASavedFileKeepsItSavedOnlyWhenItIsDone(t *testing.T) {
 	for _, tc := range []struct{ decision, want string }{
-		{"approve", `["approved"]`}, {"deny", `["denied"]`}, {"changes", `["changes requested","for review"]`}, {"ignore", `["ignored","read"]`},
+		{"approve", `["approved","saved"]`}, {"deny", `["denied","saved"]`}, {"changes", `["changes requested","for review"]`}, {"ignore", `["ignored","read"]`},
 	} {
 		t.Run(tc.decision, func(t *testing.T) {
 			e := newReviewEnv(t, true)
@@ -90,7 +91,7 @@ func TestADecisionOnASavedFileTakesTheSavedTagOff(t *testing.T) {
 			code, out = e.decide(t, `{"decision":"`+tc.decision+`"}`)
 			require.Equal(t, http.StatusOK, code, out)
 			b, _ := json.Marshal(out["tags"])
-			assert.JSONEq(t, tc.want, string(b), "no saved tag is left behind (and read goes where the decision takes it)")
+			assert.JSONEq(t, tc.want, string(b), "saved stays on a decided file only (and read goes where the decision takes it)")
 		})
 	}
 }

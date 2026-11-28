@@ -626,6 +626,43 @@ func (s *Store) ExistingMessageIDs(ctx context.Context, project string, ids []in
 	return have, nil
 }
 
+// MessageGoal is the goal of the task a board message is on (#22133).
+type MessageGoal struct {
+	ID    int64  `db:"goal_id" json:"id"`
+	Title string `db:"title" json:"title"`
+}
+
+// MessageGoals maps each of project's message ids that is on a task with a goal to that goal (#22133): the Saved list shows a saved message's goal, derived when it is read, so a task moved to
+// another goal shows the new one. A message on no task, or on a task with no goal, is left out.
+func (s *Store) MessageGoals(ctx context.Context, project string, ids []int64) (map[int64]MessageGoal, error) {
+	out := map[int64]MessageGoal{}
+	for len(ids) > 0 {
+		n := min(len(ids), 500) // SQLite's variable limit stays far away
+		chunk := ids[:n]
+		ids = ids[n:]
+		args := make([]any, 0, n+1)
+		args = append(args, project)
+		for _, id := range chunk {
+			args = append(args, id)
+		}
+		var rows []struct {
+			Msg int64 `db:"msg"`
+			MessageGoal
+		}
+		q := `SELECT m.id AS msg, g.id AS goal_id, g.title AS title FROM board_messages m
+			JOIN board_tasks t ON t.id = m.task_id AND t.board_id = m.project
+			JOIN board_goals g ON g.id = t.goal_id AND g.board_id = t.board_id
+			WHERE m.project = ? AND m.id IN (?` + strings.Repeat(",?", n-1) + ")"
+		if err := s.reader().SelectContext(ctx, &rows, q, args...); err != nil {
+			return nil, err
+		}
+		for _, r := range rows {
+			out[r.Msg] = r.MessageGoal
+		}
+	}
+	return out, nil
+}
+
 // SearchMessageHits returns bounded board messages containing query text. It
 // exposes the immutable message ID used by chat search navigation.
 func (s *Store) SearchMessageHits(ctx context.Context, query string, limit int) ([]Message, error) {

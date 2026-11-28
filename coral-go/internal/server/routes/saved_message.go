@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"github.com/subgentic/coral/internal/board"
 	"net/http"
 	"sort"
 	"strconv"
@@ -36,6 +37,46 @@ func (h *SystemHandler) SetSavedSources(board func(ctx context.Context, project 
 // SetSavedPresence injects how the list tells whether the bookmarked messages still exist (#5802).
 func (h *SystemHandler) SetSavedPresence(board func(ctx context.Context, project string, ids []int64) (map[int64]bool, error), agent func(ctx context.Context, sessionID, agentType string, keys []string) (map[string]bool, bool, bool)) {
 	h.savedBoardHas, h.savedAgentHas = board, agent
+}
+
+// SetSavedGoals injects how the list finds the goal of each saved board message (#22133).
+func (h *SystemHandler) SetSavedGoals(goals func(ctx context.Context, project string, ids []int64) (map[int64]board.MessageGoal, error)) {
+	h.savedBoardGoals = goals
+}
+
+// markSavedGoals sets the Goal of each listed board bookmark whose message is on a task with a goal (#22133), one query per board; a board that cannot be asked leaves its bookmarks without one.
+func (h *SystemHandler) markSavedGoals(ctx context.Context, items []store.SavedMessage) {
+	if h.savedBoardGoals == nil {
+		return
+	}
+	ids := map[string][]int64{}
+	for _, it := range items {
+		if it.Kind != "board" {
+			continue
+		}
+		if id, err := strconv.ParseInt(it.Key, 10, 64); err == nil {
+			ids[it.Ref] = append(ids[it.Ref], id)
+		}
+	}
+	goals := map[string]map[int64]board.MessageGoal{}
+	for project, list := range ids {
+		if got, err := h.savedBoardGoals(ctx, project, list); err == nil {
+			goals[project] = got
+		}
+	}
+	for i := range items {
+		it := &items[i]
+		if it.Kind != "board" {
+			continue
+		}
+		id, err := strconv.ParseInt(it.Key, 10, 64)
+		if err != nil {
+			continue
+		}
+		if g, ok := goals[it.Ref][id]; ok {
+			it.Goal = &store.SavedGoal{ID: g.ID, Title: g.Title}
+		}
+	}
 }
 
 // maxSavedAgentChecks bounds how many agents' transcripts one list reads: the rest are listed unchecked (reason "") and their Open finds out.
