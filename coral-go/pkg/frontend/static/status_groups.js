@@ -147,10 +147,20 @@ function taskSplit(list, scope, rows) {
 
 /** What the list draws when Team is not ticked: { h, a } (a: the archived ones left for the Archived section), or null when it is (render.js draws the teams, and teamList below splits each by task).
  *  wrap(agents, draw) puts a header per computer around draw's view when Computer is ticked (render.js). The view is the Status groups, or On a task / No task with the Task box. */
+// The search box's hint is "Search" when "Search agents" would be cut (a 288 px sidebar at 1024 showed "Search ager", task #22155); its aria-label keeps the full name.
+let fitSearch;
+function mountSearchFit() {
+    const i = document.getElementById('agent-search-input');
+    if (!i || fitSearch === i || typeof ResizeObserver !== 'function') return;
+    fitSearch = i;
+    const ctx = document.createElement('canvas').getContext('2d'), full = 'Search agents';
+    new ResizeObserver(() => { const cs = getComputedStyle(i, '::placeholder'), box = getComputedStyle(i); ctx.font = cs.font || box.font; const room = i.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight), p = !room || room >= ctx.measureText(full).width ? full : 'Search'; if (i.placeholder !== p) i.placeholder = p; }).observe(i);
+}
 let arch = []; // the archived agents of the last draw (a team's "done today" row reads them)
 export function lay(regular, limits, archived, renderRow, wrap) {
     arch = archived;
     mountGroupBy();
+    mountSearchFit();
     const g = groupBy();
     const on = BOXES.filter(([k]) => g[k]).map(([, l]) => l), words = on.length > 1 ? String(on.length) : on[0] || ''; for (const b of document.querySelectorAll('[data-group-by-label]')) { if (b.textContent !== words) b.textContent = words; const v = b.closest('[data-group-by-value]'); if (v && v.hidden !== !words) v.hidden = !words; } // the button says the grouping (#22105): none ticked just "Group by", one box its name, two or more how many (the Orchestrator's call 1, revised twice: the search box keeps its room)
     if (g.server || g.team || g.task) groupByStyles(); // a grouped view is drawing: its sheet (none ticked: only the bundle's)
