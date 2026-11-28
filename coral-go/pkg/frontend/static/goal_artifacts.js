@@ -102,7 +102,7 @@ export function mountGoalArtifactsList(host, { team, goalId, onOpen = () => {}, 
             return;
         }
         const approved = st.items.filter(a => Decisions.decisionState(a) === 'approved').length, review = st.items.filter(a => Decisions.decisionState(a) === 'review').length, sentback = st.items.filter(a => Decisions.decisionState(a) === 'sentback').length;
-        const summary = el('div', 'goal-file-summary'), text = el('div', 'goal-file-summary-counts', `${approved} of ${st.items.length} approved · ${review} to review · ${sentback} sent back${st.cursor ? ' (loaded files)' : ''}`);
+        const summary = el('div', 'goal-file-summary'), text = el('div', 'goal-file-summary-counts', `Showing ${st.items.length} of ${st.total} files · ${approved} of ${st.items.length} approved · ${review} to review · ${sentback} sent back${st.cursor ? ' (loaded files)' : ''}`);
         const progress = el('div', 'goal-decision-segments'); progress.setAttribute('role', 'img'); progress.setAttribute('aria-label', text.textContent);
         for (const [cls, n] of [['is-approved', approved], ['is-review', review], ['is-sentback', sentback]]) if (n) { const part = el('span', cls); part.style.flexGrow = String(n); progress.append(part); }
         const filters = el('div', 'goal-file-filters'); filters.setAttribute('role', 'group'); filters.setAttribute('aria-label', 'Filter goal decisions');
