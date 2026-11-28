@@ -724,7 +724,7 @@
     min-height: var(--needs-control-height);
     padding: 0 10px;
 }
-.nl-group-head .team-label-link {
+#group-table-view .needs-ledger .nl-group-head .team-label-link {
     color: inherit;
     text-decoration: underline;
     text-underline-offset: 2px;

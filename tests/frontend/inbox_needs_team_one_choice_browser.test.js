@@ -27,13 +27,13 @@ const BASE = require('./test_base').BASE;
             window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, waiting_for_input: true, waiting_kind: 'permission', waiting_since: ago(5) }));
             (await import(S + 'inbox_tab.js')).updateInboxTab(); return true; })()`);
         await ev(`document.querySelector('.view-list-item[data-key="needs"]').click(); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, 'two waiting agents', 10000);
+        await waitFor(`document.querySelectorAll('#group-table-view .nl-row').length >= 2`, 'two waiting agents', 10000);
         await ev(`(() => { const t = document.querySelector('.inbox-folder-toolbar .list-bar-toggle'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return true; })()`); await settle(300);
         await waitFor(`!!document.getElementById('inbox-needs-team')`, 'the Team filter', 6000);
         const choices = await ev(`[...document.querySelectorAll('#inbox-needs-team option')].map(o => [o.value, o.textContent.trim()]).filter(([v]) => v)`);
         check(!choices.some(([v]) => v === 'alpha') && choices.length === 2 && choices.every(([v]) => / · /.test(v)), 'the team is offered once per computer, never as a plain second choice: ' + JSON.stringify(choices));
         await ev(`(() => { const s = document.getElementById('inbox-needs-team'); s.value = [...s.options].find(o => /This computer/.test(o.value)).value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(600);
-        const rows = await ev(`document.querySelectorAll('#group-table-view tbody tr').length`);
+        const rows = await ev(`document.querySelectorAll('#group-table-view .nl-row').length`);
         check(rows >= 1, 'choosing the team keeps its waiting agent in the list: ' + rows);
         check((await ev('window.__teamQueries')).every(t => !/ · /.test(t)), 'the review query is asked for the team\'s name, not its label: ' + JSON.stringify(await ev('window.__teamQueries')));
     } finally { await client.close(); }

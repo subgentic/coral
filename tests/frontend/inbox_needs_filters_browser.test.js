@@ -20,13 +20,13 @@ const BASE = require('./test_base').BASE;
             await ev(`(async () => { window.__m.agents = {}; window.__m.add('perm-bot', 'A', 1, { sleeping: false, board_project: 'alpha-team' }); window.__m.add('ask-bot', 'B', 1, { sleeping: false, board_project: 'beta-team' }); const ws = await import(${S} + 'websocket.js'); const { state } = await import(${S} + 'state.js'); if (state.coralWs) { state.coralWs.onclose = null; state.coralWs.onmessage = null; try { state.coralWs.close(); } catch {} }
                 const sessions = Object.values(window.__m.agents).map(a => ({ ...window.__m.entry(a), waiting_for_input: true, waiting_kind: /perm/.test(a.name) ? 'permission' : 'question', waiting_summary: /perm/.test(a.name) ? 'Wants to use Bash' : 'Wants to know: Pick a color', waiting_since: new Date(Date.now() - 60000).toISOString() }));
                 ws.handleCoralMessage({ type: 'coral_update', servers: [], sessions }); return true; })()`);
-            const openNeeds = async () => { await ev(`window.switchNavTab('hub-inbox'); true`); await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await waitFor(`document.getElementById('group-table-view') && document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view tbody tr:not(.dt-group), #group-table-view .dt-mail-row, #group-table-view [data-row-key]').length >= 2`, `${w}: the two waiting agents`, 10000); };
+            const openNeeds = async () => { await ev(`window.switchNavTab('hub-inbox'); true`); await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await waitFor(`document.getElementById('group-table-view') && document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .nl-row').length >= 2`, `${w}: the two waiting agents`, 10000); };
             await openNeeds();
             { // #19919 (MUST-8, the approved mock): a search that matches nothing while Getting started rows remain shows the same card (line, hint, Show all) above them, not a bare '4 hidden by the filters' line
                 await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.settings = { ...state.settings, inbox_welcome: 'on' }; return true; })()`);
                 await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await settle(500);
                 await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'zzz-no-such-item'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(600);
-                const card = await ev(`(() => { const v = document.getElementById('group-table-view'), e = v.querySelector('.empty-state'); return { card: e ? e.textContent.replace(/\\s+/g, ' ').trim() : null, note: !!v.querySelector('.inbox-filter-hidden'), rows: v.querySelectorAll('tbody tr:not(.dt-group)').length, above: !!e && [...v.querySelectorAll('tbody tr')].every(r => e.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
+                const card = await ev(`(() => { const v = document.getElementById('group-table-view'), e = v.querySelector('.empty-state'); return { card: e ? e.textContent.replace(/\\s+/g, ' ').trim() : null, note: !!v.querySelector('.inbox-filter-hidden'), rows: v.querySelectorAll('.nl-row').length, above: !!e && [...v.querySelectorAll('.nl-row')].every(r => e.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
                 assert.ok(/Nothing waiting on you matches .+\./.test(card.card || "") && /Show all( \(\d+\))?/.test(card.card) && !card.note && card.rows >= 1 && card.above, `${w}: the filtered result is the card above the Getting started rows: ` + JSON.stringify(card));
                 { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { await ev(`document.querySelectorAll('.notification-toast').forEach(t => t.remove()); true`); require('node:fs').writeFileSync(`${d}/filtered-empty-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
                 await ev(`[...document.querySelectorAll('.empty-state button')].find(x => /^Show all( \\(\\d+\\))?$/.test(x.textContent.trim())).click(); true`); await settle(500);
@@ -46,20 +46,20 @@ const BASE = require('./test_base').BASE;
             assert.ok(n1 && n1.text === '1 hidden by the Question filter. Show all' && n1.link, `${w}: the hidden one is said: ` + JSON.stringify(n1));
             await ev(`document.querySelector('#group-table-view .inbox-filter-hidden button, #group-table-view .inbox-filter-hidden a').click(); true`); await settle(400);
             assert.equal(await note(), null, `${w}: Show all clears it`);
-            assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`), 2, `${w}: both rows are back`);
+            assert.equal(await ev(`document.querySelectorAll('#group-table-view .nl-row').length`), 2, `${w}: both rows are back`);
             // leaving the Inbox resets the pill to All
             await pill('Question'); await settle(300);
             await ev(`window.switchNavTab('agents'); true`); await settle(300);
             await openNeeds();
             assert.equal(await note(), null, `${w}: back from another tab the pill is All and nothing is hidden`);
-            assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`), 2, `${w}: both rows listed again`);
+            assert.equal(await ev(`document.querySelectorAll('#group-table-view .nl-row').length`), 2, `${w}: both rows listed again`);
             // 2. a search that matches nothing says so and has its own Show all (walk 52, #17160)
             await ev(`(() => { const i = document.getElementById('inbox-search'); i.value = 'zzz-no-such-item'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(500);
             const empty = () => ev(`(() => { const e = [...document.querySelectorAll('.empty-state')].find(x => /matches/.test(x.textContent)); const b = e && [...e.querySelectorAll('button')].find(x => /^Show all( \\(\\d+\\))?$/.test(x.textContent.trim())); return { text: e ? e.textContent.replace(/\\s+/g, ' ').trim() : null, button: !!b }; })()`);
             const e1 = await empty();
             assert.ok(/Nothing waiting on you matches .+\./.test(e1.text || '') && e1.button, `${w}: the empty result has a Show all: ` + JSON.stringify(e1));
             await ev(`[...document.querySelectorAll('.empty-state button')].find(x => /^Show all( \\(\\d+\\))?$/.test(x.textContent.trim())).click(); true`); await settle(500);
-            assert.equal(await ev(`document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)').length`), 2, `${w}: Show all brings both rows back`);
+            assert.equal(await ev(`document.querySelectorAll('#group-table-view .nl-row').length`), 2, `${w}: Show all brings both rows back`);
             assert.equal(await ev(`document.getElementById('inbox-search').value`), '', `${w}: and empties the search box`);
         }
         console.log('PASS Needs you says what a filter hides and names the teams');
