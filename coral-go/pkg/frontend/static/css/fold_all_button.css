@@ -1,0 +1,5 @@
+.fold-all[hidden] { display: none; }
+.fold-all .material-icons { font-size: var(--icon-size); }
+@media (pointer: coarse), (max-width: 767px) { .fold-all.btn-icon { width: 44px; min-height: 44px; } }
+.goals-fold-all { margin-left: auto; }
+.goals-fold-all + .team-tb-action { margin-left: 8px; }
