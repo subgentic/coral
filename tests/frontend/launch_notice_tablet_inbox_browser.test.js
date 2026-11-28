@@ -21,13 +21,13 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 700, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+        await Page.navigate({ url: BASE + '/?test_agent=1' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
         await ev(`fetch('/api/launch-disclosure/ack', { method: 'DELETE' }).then(r => r.ok)`);
         await ev(`try { localStorage.removeItem('coral-launch-notice'); } catch (e) {} true`);
         for (const pass of [1, 2]) {
             const ids = [HOLD, TRACK].map(source => Page.addScriptToEvaluateOnNewDocument({ source }));
             const idl = (await Promise.all(ids)).map(i => i.identifier);
-            await Page.navigate({ url: BASE + '/inbox/needs' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: BASE + '/inbox/needs?test_agent=1' }); await Page.loadEventFired(); await install();
             await waitFor(`!!document.getElementById('launch-disclosure-banner') && window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3`, `pass ${pass}: the notice on a cold 700 px load of /inbox/needs`, 15000);
             const j = await ev(`window.__jump`), spread = Math.max(...j.tops) - Math.min(...j.tops);
             const where = await ev(`(() => { const n = document.getElementById('launch-disclosure-banner'); return { inPane: n.parentElement.id === 'group-table-view', underBar: !!n.previousElementSibling && (n.previousElementSibling.id === 'local-auth-banner' || n.previousElementSibling.tagName === 'HEADER') }; })()`);

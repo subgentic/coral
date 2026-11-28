@@ -91,12 +91,6 @@ export function refreshDefaultNotice() {
     bannerEligible = hasLocalAgent(); readGeneration++;
     document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release();
 }
-const ROOM_GRACE_MS = 1500;
-let roomTimer = 0;
-function holdRoom() {
-    if (roomTimer || !document.getElementById('launch-notice-room')) return;
-    roomTimer = setTimeout(() => { roomTimer = 0; if (!hasLocalAgent() && !document.getElementById('launch-disclosure-banner')) { hint.clear(); hint.release(); } }, ROOM_GRACE_MS);
-}
 export async function refreshLaunchDisclosure() {
     if (isCloud() || document.body.classList.contains('popout-mode')) { hint.release(); return; }
     bannerEligible = hasLocalAgent();
@@ -114,8 +108,7 @@ export async function refreshLaunchDisclosure() {
         if (!defaultIsAuto()) { document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release(); return; } // the default is not Auto: nothing here is true to say; the launch-time confirm (409) is the server's and stays
         if (!hasLocalAgent()) { await liveListReady; if (generation !== readGeneration) return; } // the page's first list may not have landed yet: no agent in it is not 'no agent', and giving the reserved row back (and the hint) now would move the page when the notice comes a moment later
         const previous = document.getElementById('launch-disclosure-banner');
-        if (disclosure.seen === true) { previous?.remove(); shown = null; hint.clear(); hint.release(); return; }
-        if (!hasLocalAgent()) { previous?.remove(); shown = null; holdRoom(); return; } // unseen, and no agent in the list yet: the notice comes with the first local agent, a moment after the list (#21962), so the row is kept for ROOM_GRACE_MS and not given back at once; a person with no agent at all gets it back then (a held empty row would take room from a page that has no notice, #22005)
+        if (!hasLocalAgent() || disclosure.seen === true) { previous?.remove(); shown = null; hint.clear(); hint.release(); return; }
         if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
         if (disclosure.seen !== false) return;
         previous?.remove(); shown = null;

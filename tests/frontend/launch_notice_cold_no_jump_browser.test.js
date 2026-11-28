@@ -2,6 +2,9 @@
 // with no stored hint. A cold profile (no hint), the notice's read held 700 ms so it surely lands after first paint: what sits under the banners is at the same place before and after it appears (within 3 px: a typical height, not the exact one).
 // And a notice that is read reserves nothing on a cold load. 1280 and 390 px.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -13,6 +16,7 @@ const HOLD = `(() => { const f = window.fetch; window.fetch = (u, o) => /\\/api\
     const guard = await guardSettings();
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const problems = [];
+    let launched = null;
     const check = (ok, msg) => { if (!ok) problems.push(msg); };
     // the tracker runs from the start of every document: the element right under the sign-in banner (or the top bar), its top at every frame, and when the notice is on screen
     const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1, frames: 0, reserved: false };
@@ -26,6 +30,13 @@ const HOLD = `(() => { const f = window.fetch; window.fetch = (u, o) => /\\/api\
         requestAnimationFrame(tick); /* raf-ok: as above */ })();`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD + require('./helpers/launch_notice_agent').PRELOAD });
+        // The server says the notice is unseen only when it will draw: a local agent is on this computer (#22033). One real mock-agent is launched for it (no test hook: the real rule, end to end); the launch needs the notice read, so it is read, the agent launched, and the notice unread again (each pass below starts by taking the acknowledgement back).
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coral-cold-notice-'));
+        launched = await ev(`(async () => { const post = (u, b) => fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+            const d = await fetch('/api/launch-disclosure').then(r => r.json()); await post('/api/launch-disclosure/ack', { id: d.id });
+            const r = await post('/api/sessions/launch', { agent_type: 'claude', working_dir: ${JSON.stringify(dir)}, display_name: 'Cold notice agent' }); const j = await r.json().catch(() => ({})); return { status: r.status, session_name: j.session_name, session_id: j.session_id }; })()`);
+        assert.equal(launched.status, 200, 'the mock agent launched: ' + JSON.stringify(launched));
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -48,7 +59,10 @@ const HOLD = `(() => { const f = window.fetch; window.fetch = (u, o) => /\\/api\
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
             check(await ev(`!document.documentElement.hasAttribute('data-launch-notice') && !document.getElementById('launch-notice-room')`), `${at}once it is read a cold load reserves nothing`);
         }
-    } finally { await guard.restore().catch(() => {}); await client.close(); }
+    } finally {
+        if (launched && launched.session_name) await ev(`fetch('/api/sessions/live/' + encodeURIComponent(${JSON.stringify(launched.session_name)}) + '/kill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_type: 'claude', session_id: ${JSON.stringify(launched.session_id)} }) }).then(r => r.status)`).catch(() => {});
+        await guard.restore().catch(() => {}); await client.close();
+    }
     if (problems.length) { console.error('FAIL\n  ' + problems.join('\n  ')); process.exit(1); }
     console.log('launch_notice_cold_no_jump_browser: ok');
 })().catch(e => { console.error(e); process.exit(1); });

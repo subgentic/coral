@@ -1208,11 +1208,21 @@ func (s *Server) launchNoticeUnseen(r *http.Request) bool {
 	if cloud.Tunneled(r) || s.db == nil {
 		return false
 	}
-	st, err := store.NewSessionStore(s.db).GetSettings(r.Context())
-	if err != nil {
+	ss := store.NewSessionStore(s.db)
+	st, err := ss.GetSettings(r.Context())
+	if err != nil || routes.LaunchDisclosureSeen(st) {
 		return false
 	}
-	return !routes.LaunchDisclosureSeen(st)
+	// The notice is drawn only for a person with a local agent, and only while the saved default is Auto (launch_disclosure.js says the same): a page is told to reserve its row only
+	// when the notice will draw into it, so a row is never reserved and then given back (#22033).
+	if mode := strings.TrimSpace(st["default_permission_mode"]); mode != "" && mode != "auto" {
+		return false
+	}
+	if config.TestHooksEnvHonoured && os.Getenv("CORAL_TEST_HOOKS") == "1" && r.URL.Query().Get("test_agent") == "1" {
+		return true // a dev build's dashboard suites stand in for the live agent row with this (a release build never reads it: TestHooksEnvHonoured is a constant false there)
+	}
+	n, err := ss.CountLiveSessions(r.Context())
+	return err == nil && n > 0
 }
 
 // bootJSON is the page's boot data: the mode, the test hooks when they are on, and whether the first-launch notice is unseen.

@@ -29,7 +29,7 @@ const { guardSettings } = require('./helpers/settings_guard');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             if (trackId) await Page.removeScriptToEvaluateOnNewDocument({ identifier: trackId }); trackId = null;
             // 1. the first load: unseen, the hint is written when the notice is read
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+            await Page.navigate({ url: BASE + '/?test_agent=1' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
             await ev(`localStorage.removeItem('coral-launch-notice'); fetch('/api/launch-disclosure/ack', { method: 'DELETE' }).then(r => r.ok)`);
             await ev(`import((window.__coralStatic || '/static/') + 'launch_disclosure.js').then(m => m.refreshLaunchDisclosure())`);
             await waitFor(`!!document.getElementById('launch-disclosure-banner')`, `${at}the unseen notice`, 10000);
@@ -37,7 +37,7 @@ const { guardSettings } = require('./helpers/settings_guard');
             check(/^[pd]\|\d+$/.test(hint || ''), `${at}the notice leaves a hint of its kind of screen and its height: ${JSON.stringify(hint)}`);
             // 2. a later load while it is unseen: nothing under the banners moves when it arrives
             trackId = (await Page.addScriptToEvaluateOnNewDocument({ source: TRACK })).identifier;
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: BASE + '/?test_agent=1' }); await Page.loadEventFired(); await install();
             await waitFor(`!!document.getElementById('launch-disclosure-banner') && window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3`, `${at}the notice on a later load`, 15000);
             const j = await ev(`window.__jump`);
             const before = j.tops.slice(0, j.noticeAt), after = j.tops.slice(j.noticeAt);
@@ -48,7 +48,7 @@ const { guardSettings } = require('./helpers/settings_guard');
             await waitFor(`!document.getElementById('launch-disclosure-banner')`, `${at}the notice dismissed`, 8000);
             check(await ev(`localStorage.getItem('coral-launch-notice')`) === null, `${at}reading it removes the hint`);
             await Page.removeScriptToEvaluateOnNewDocument({ identifier: trackId }); trackId = null;
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+            await Page.navigate({ url: BASE + '/?test_agent=1' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
             check(await ev(`!document.documentElement.hasAttribute('data-launch-notice') && !document.getElementById('launch-notice-room')`), `${at}once it is read nothing is reserved on the next load`);
         }
     } finally { await guard.restore().catch(() => {}); await client.close(); }
