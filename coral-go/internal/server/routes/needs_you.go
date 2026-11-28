@@ -46,6 +46,8 @@ type NeedsYouItem struct {
 	TaskID    int64  `json:"task_id,omitempty"`
 	GoalTitle string `json:"goal_title,omitempty"`
 	TaskTitle string `json:"task_title,omitempty"`
+	// Section: where the redesigned Needs you page files the item (#22093): "permission" for an agent at a permission prompt (still kind agent), else "goal" when it has a GoalID, else "direct".
+	Section string `json:"section,omitempty"`
 	// NewComments: on a review item, how many replies agents left in the Operator's comment threads on the file since the Operator opened them (#12026). The file's row is unread again and counted once, as itself.
 	NewComments int `json:"new_comments,omitempty"`
 	// StillWaiting: on an agent item, the Operator dismissed this request but the agent is still waiting in its terminal (#14203): Dismiss marks it ignored, it does not resolve it, so the row stays, flagged,
@@ -93,6 +95,62 @@ type needsYouAnswer struct {
 	Muted       map[string]int    `json:"muted,omitempty"`          // files the Operator's settings keep out of the count, by kind (#12144): never in Count, Counts or Items, never pushed
 	Machines    []NeedsYouMachine `json:"machines,omitempty"`       // a Hub's merged read: the computers it covers and whether each was read (#15380)
 	Unread      []string          `json:"unread_sources,omitempty"` // a source that could not be read this time: its things are missing from the count, not zero
+	Groups      []NeedsYouGroup   `json:"groups,omitempty"`         // the groups of the whole list with the time of each one's newest item (#22093)
+}
+
+// NeedsYouGroup is one group of the Needs you page over the whole list, not the page of it: Key is "permission", "goal:<team>:<id>" or "direct"; NewestAt is the newest item's At.
+type NeedsYouGroup struct {
+	Key      string `json:"key"`
+	Section  string `json:"section"`
+	GoalID   int64  `json:"goal_id,omitempty"`
+	Team     string `json:"team,omitempty"`
+	Count    int    `json:"count"`
+	NewestAt string `json:"newest_at"`
+}
+
+// needsYouSection is the section an item belongs to (#22093).
+func needsYouSection(it NeedsYouItem) string {
+	switch {
+	case it.Kind == "agent" && it.Permission:
+		return "permission"
+	case it.GoalID > 0:
+		return "goal"
+	}
+	return "direct"
+}
+
+// needsYouGroups sets every item's Section and returns the groups: permission prompts first, then by the newest item, newest first.
+func needsYouGroups(items []NeedsYouItem) []NeedsYouGroup {
+	idx := map[string]int{}
+	var out []NeedsYouGroup
+	for i := range items {
+		it := &items[i]
+		it.Section = needsYouSection(*it)
+		g := NeedsYouGroup{Key: it.Section, Section: it.Section}
+		if it.Section == "goal" {
+			g.Key, g.GoalID, g.Team = "goal:"+it.Team+":"+strconv.FormatInt(it.GoalID, 10), it.GoalID, it.Team
+			if it.Server != "" { // a Hub's merged read: the same team name and goal number on two computers are two groups
+				g.Key = "goal:" + it.Server + "/" + it.Team + ":" + strconv.FormatInt(it.GoalID, 10)
+			}
+		}
+		j, ok := idx[g.Key]
+		if !ok {
+			j = len(out)
+			idx[g.Key] = j
+			out = append(out, g)
+		}
+		out[j].Count++
+		if it.At > out[j].NewestAt {
+			out[j].NewestAt = it.At
+		}
+	}
+	sort.SliceStable(out, func(a, b int) bool {
+		if pa, pb := out[a].Section == "permission", out[b].Section == "permission"; pa != pb {
+			return pa
+		}
+		return out[a].NewestAt > out[b].NewestAt
+	})
+	return out
 }
 
 // SetNeedsYouMemberFull tells the board how to list the live Full grants of Hub people, so the owner sees each one as long as it is live. Nil: none.
@@ -170,7 +228,22 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 			at = now.UTC().Format(time.RFC3339Nano)
 		}
 		kind, _ := row["waiting_kind"].(string)
-		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid, Dialog: !wait, Permission: wait && kind == "permission"})
+		it := NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid, Dialog: !wait, Permission: wait && kind == "permission"}
+		if bt, _ := row["board_task"].(map[string]any); bt != nil && bt["status"] == "in_progress" { // the task the agent has claimed (#22093), not one that only waits in its queue
+			if id, ok := bt["id"].(int64); ok {
+				it.TaskID = id
+			}
+			if id, ok := bt["goal_id"].(int64); ok {
+				it.GoalID = id
+			}
+			if t, ok := bt["title"].(string); ok {
+				it.TaskTitle = needsYouLine(t)
+			}
+			if t, ok := bt["goal_title"].(string); ok {
+				it.GoalTitle = needsYouLine(t)
+			}
+		}
+		out = append(out, it)
 	}
 	return out
 }
@@ -312,6 +385,7 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 			ans.NotIncluded = append(ans.NotIncluded, "unreachable_machines")
 		}
 	}
+	ans.Groups = needsYouGroups(items) // over the whole list, before it is paged
 	// the order is (time, id): items recorded to the same second are told apart by id, so a cursor is a place in a total order
 	sort.SliceStable(items, func(i, j int) bool { return needsYouBefore(items[i], items[j]) })
 	if !cur.set {

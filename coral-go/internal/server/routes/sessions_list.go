@@ -901,7 +901,11 @@ func (d *listData) currentTaskOf(sub *board.Subscriber) any {
 			continue
 		}
 		if t, ok := d.currentTasks[board.CurrentTaskKey(sub.Project, who)]; ok {
-			return map[string]any{"id": t.ID, "title": t.Title, "status": t.Status}
+			m := map[string]any{"id": t.ID, "title": t.Title, "status": t.Status}
+			if t.GoalID > 0 { // additive (#22093): the goal the task belongs to, for Needs you
+				m["goal_id"], m["goal_title"] = t.GoalID, t.GoalTitle
+			}
+			return m
 		}
 	}
 	return nil
