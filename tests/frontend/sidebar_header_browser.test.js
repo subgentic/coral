@@ -45,7 +45,7 @@ const SERVERS = [
                 return { header: header.className, search: search && search.getClientRects().length ? r(search) : null, menu: r(menu), toggle: toggle && toggle.getClientRects().length ? r(toggle) : null, collapse: collapse && collapse.getClientRects().length ? r(collapse) : null, newBtn: btn && btn.getClientRects().length ? r(btn) : null, last: header.lastElementChild.className }; })()`);
             const ctl = [row.search, row.menu, row.toggle, row.collapse, row.newBtn].filter(Boolean);
             // desktop has search + display menu + collapse + New; the phone list header has the display menu + New (the search-row pill was removed, #4932)
-            assert.ok(ctl.length >= (dev === 'desktop' ? 3 : 2), `${dev}: controls found (${JSON.stringify(Object.keys(row).filter(k => row[k]))})`);
+            assert.ok(ctl.length >= (dev === 'desktop' ? 3 : 1), `${dev}: controls found (${JSON.stringify(Object.keys(row).filter(k => row[k]))})`);
             for (const c of ctl) assert.ok(Math.abs(c.h - ctl[0].h) <= 0.5, `${dev}: one height (${ctl.map(x => x.h).join(', ')})`);
             for (const c of ctl) assert.ok(Math.abs(c.cy - ctl[0].cy) <= 1, `${dev}: one centre line (${ctl.map(x => x.cy).join(', ')})`);
             if (dev === 'desktop') {

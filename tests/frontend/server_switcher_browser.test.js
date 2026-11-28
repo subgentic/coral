@@ -275,7 +275,7 @@ const SETTINGS_PRELOAD = `(() => {
         assert.deepEqual(hier.w, [600, 600, 600, 600], `weights: server, team, folder, agent (the agent name is 600 in the approved sidebar mock, #22105; 700 is only for the 20 and 32 px titles, Goal #84) (${JSON.stringify(hier)})`);
         assert.equal(hier.serverColor, hier.primary, 'the server header is the brightest text');
         assert.equal(hier.folder, hier.team, 'folders match teams (no accent blue)'); assert.equal(hier.team, col.neutral);
-        assert.equal(hier.agent, hier.secondary, 'agent names are muted (no light blue)');
+        assert.equal(hier.agent, hier.primary, 'agent names in the primary text, no light blue (#22105, the approved sidebar mock: the name leads)');
         // #3507 v4: folder groups have a folder icon, named for screen readers and aligned with the
         // team rows' people icon, in both views.
         const icons = () => ev(`(() => {

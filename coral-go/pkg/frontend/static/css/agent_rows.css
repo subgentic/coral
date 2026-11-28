@@ -50,7 +50,7 @@
 /* Group by beside the search box */
 .sidebar-header[data-header="agents"] { justify-content: flex-start; }
 :is(#live-sessions-list, #mobile-session-list) .board-card-agents .status-workers-sum { padding-inline-start: 36px; } /* the folded workers' line starts under the orchestrator's mark */
-.sidebar-groupby-btn { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; margin: 0; min-width: 0; overflow: hidden; } /* the family's .btn (its height, border and type); only its place here */
+.sidebar-groupby-btn { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; margin: 0; min-width: 0; overflow: hidden; } /* the family's .btn (its height, border and type); only its place here */
 .sidebar-groupby-btn b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-strong); margin-inline-start: 2px; } /* a narrow sidebar cuts the words, never the search box */
 .sidebar-groupby-btn .material-icons { font-size: var(--fs-xl); }
 /* a phone: nothing behind a hover. Every row keeps its time and has its "⋯" (44 by 44); rows are at least 48 high */
