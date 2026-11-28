@@ -1,20 +1,21 @@
-// Needs you row icons say what is asked (#13819, the Operator: an arrow into a box on a question reads as "input", not "someone is asking you"): a question put to the Operator is a question mark, a file for review is a
-// document, a proposal is a checklist, a wait for typed input is a note being written. Real rows (a question, a yes/no question, a file, a proposal) at 390 and 1280, light and dark; agent/proposal icons use the icon font and files reuse the shared SVG type artwork
-// (never its name as text), keeps its screen-reader name, and a question is not called "Needs input". The artifacts, the question and the proposal are stubbed. Isolated dev server.
+// Needs you row icons say what is asked (#13819, the Operator: an arrow into a box on a question reads as "input", not "someone is asking you"; the approved list of #22094 draws them): a question put to the Operator (a plain one and a
+// yes/no one) is a waving hand, a file for review is its type's mark (code for an HTML file), a proposal is a checklist. Real rows (article.nl-row) at 390 and 1280, light and dark; every icon is a glyph of the icon font (the list's own
+// span.material-icons.nl-icon, whose only text is its glyph's name, or the kind icon .inbox-kind-icon drawn by CSS with no text), keeps its screen-reader name, and a question is not called "Needs input". The artifacts, the question and the
+// proposal are stubbed. Isolated dev server. (The shared SVG file-type artwork the old table used for a file is gone by design: the approved list draws a file's type as a glyph, needs_ledger_browser.)
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
 
-const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_outline', 'Question'], 'Plan 1': ['file-type', 'For review'], 'Fix the login': ['checklist', 'To approve'] };
+const WANT = { 'Which hub': ['waving_hand', 'Question'], 'Ship batch': ['waving_hand', 'Question'], 'Plan 1': ['code', 'File for review'], 'Fix the login': ['checklist', 'To approve'] };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [], T = '#group-table-view', team = 'nki-' + Date.now().toString(36);
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const icon = needle => ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(needle)})); const i = tr && tr.querySelector('.inbox-kind-icon'); if (!i) return null; const cs = getComputedStyle(i), b = i.getBoundingClientRect();
-        const svg=i.querySelector('.artifact-thumbnail > svg'); return { svg:svg?.outerHTML||'',svgHidden:svg?.getAttribute('aria-hidden'),glyph: getComputedStyle(i, '::before').content.replace(/"/g, ''), label: i.getAttribute('aria-label'), role: i.getAttribute('role'), text: i.textContent, font: cs.fontFamily, w: Math.round(b.width), color: cs.color, bg: cs.backgroundColor }; })()`);
+    const icon = needle => ev(`(() => { const tr = [...document.querySelectorAll('${T} .nl-row')].find(r => r.textContent.includes(${JSON.stringify(needle)})); const i = tr && tr.querySelector(':scope > .nl-icon, :scope > .inbox-kind-icon'); if (!i) return null; const cs = getComputedStyle(i), b = i.getBoundingClientRect(), before = getComputedStyle(i, '::before').content.replace(/"/g, '');
+        return { own: i.matches('.nl-icon'), glyph: i.matches('.nl-icon') ? i.textContent : before, before, label: i.getAttribute('aria-label'), role: i.getAttribute('role'), text: i.textContent, font: cs.fontFamily, w: Math.round(b.width), h: Math.round(b.height), shown: !!i.getClientRects().length, color: cs.color, bg: cs.backgroundColor }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 820, false]]) {
@@ -36,19 +37,17 @@ const WANT = { 'Which hub': ['help_outline', 'Question'], 'Ship batch': ['help_o
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`Object.keys(${JSON.stringify(WANT)}).every(n => [...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes(n)))`, at + 'the four rows', 15000);
+            try { await waitFor(`Object.keys(${JSON.stringify(WANT)}).every(n => [...document.querySelectorAll('${T} .nl-row')].some(r => r.getClientRects().length && r.textContent.includes(n)))`, at + 'the four rows', 15000); } catch (e) { throw new Error(e.message + ' ' + await ev(`JSON.stringify([...document.querySelectorAll('${T} .nl-row, ${T} .nl-group-toggle')].map(r => [r.className, r.getClientRects().length, r.textContent.slice(0, 60)]))`)); }
             for (const theme of ['light', 'dark']) {
                 await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`); await ev(framesJs(2));
                 for (const [needle, [glyph, label]] of Object.entries(WANT)) {
                     const i = await icon(needle), what = `${at}${theme} ${needle}`;
                     check(!!i, what + ': the row has its icon');
                     if (!i) continue;
-                    if (glyph === 'file-type') {
-                        const expected=await ev(`import((window.__coralStatic||'/static/')+'file_icons.js').then(m=>m.fileIconHtml('Plan 1 - review the release notes.html','text/html'))`);
-                        check(i.glyph === 'none' && i.svg === expected && i.svgHidden === 'true', `${what}: shared decorative HTML type icon replaces the generic review glyph: ${JSON.stringify(i)}`);
-                    } else check(i.glyph === glyph, `${what}: the glyph is ${glyph}: ${JSON.stringify(i)}`);
-                    check(i.label === label && i.role === 'img' && i.text === '', `${what}: named "${label}" for a screen reader, no text of its own: ${JSON.stringify(i)}`);
-                    check((glyph === 'file-type' ? !!i.svg : /Material Icons/.test(i.font)) && i.w >= 24, `${what}: drawn by the icon font in its tile: ${JSON.stringify(i)}`);
+                    check(i.glyph === glyph, `${what}: the glyph is ${glyph}: ${JSON.stringify(i)}`);
+                    check(i.label === label && i.role === 'img' && (i.own ? i.text === glyph && i.before === 'none' : i.text === ''), `${what}: named "${label}" for a screen reader, no text of its own but its glyph's name: ${JSON.stringify(i)}`);
+                    check(i.label !== 'Needs input', `${what}: not called "Needs input"`);
+                    check(/Material Icons/.test(i.font) && i.shown && i.w >= 18 && i.h >= 18, `${what}: drawn by the icon font in its 18 px column: ${JSON.stringify(i)}`);
                 }
                 await shot(`needs-icons-${w}-${theme}`);
             }

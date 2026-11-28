@@ -1,7 +1,7 @@
 // A permission card opens over the Inbox (#11837, moment 3): the first thing every new agent asks is "Do you trust the files in this folder?", and its Needs you row used to send the person to the Agents tab. Open now
 // shows the card in a dialog: what it asks, the lines it wants to run, and its own choices as buttons, including the one that lasts ("Yes, I trust this folder": the row never offers that one). A choice is answered through
 // the chat card's route with the ask's id; a card that changed between the dialog and the click sends nothing; a request that can only be rejected offers the No form alone; a card with no single choice says so.
-// The agent's chat and answer-prompt routes are page stubs. 1280 and 390 px.
+// The row is the Needs you list's permission row (article.nl-row.nl-permission under "Permission prompts", #22094): a click on its title opens the card. The agent's chat and answer-prompt routes are page stubs. 1280 and 390 px.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -10,14 +10,14 @@ const { coralReady, framesJs } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const failures = [], T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
+    const failures = [], T = '#group-table-view .needs-ledger', S = `(window.__coralStatic || '/static/')`;
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const AGENT = { name: 'be', session_id: '00000001-0000-4000-8000-000000000001', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Backend Dev', working_directory: '/repo/be', waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Do you trust the files in this folder?', waiting_since: new Date(Date.now() - 120000).toISOString() };
     const TRUST = { title: 'Do you trust the files in this folder?', question: 'Do you trust the files in this folder?\nOnly continue for a folder you made or got from someone you trust.', target: '/home/me/Coral/team-a', unnumbered: true, ask_id: 'ask1', options: [{ n: 1, label: 'Yes, I trust this folder', action: 'select' }, { n: 2, label: 'No, exit', action: 'select' }] };
     const setCard = po => ev(`window.__card = ${JSON.stringify(po)}; window.__reads = 0; window.__posts = []; true`);
     const dialog = () => ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog[open]'); return d ? { title: d.querySelector('#inbox-card-title').textContent, text: d.textContent.replace(/\\s+/g, ' '), buttons: [...d.querySelectorAll('.inbox-ask-offers-list button')].map(b => b.textContent), err: (d.querySelector('.inbox-ask-error') || {}).textContent || '' } : null; })()`);
-    const openRow = async () => { await ev(`document.querySelector('${T} tbody tr .dt-primary').click(); true`); await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-card-body > *')`, 'the card dialog', 8000); };
+    const openRow = async () => { await ev(`document.querySelector('${T} .nl-permission .nl-title').click(); true`); await waitFor(`!!document.querySelector('dialog.inbox-ask-dialog[open] .inbox-card-body > *')`, 'the card dialog', 8000); };
     const closeDialog = () => ev(`[...document.querySelectorAll('dialog.inbox-ask-dialog[open] .inbox-ask-buttons button')].find(b => b.textContent === 'Close')?.click(); true`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -35,9 +35,9 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 return true; })()`);
             await setCard(TRUST);
             await ev(`(async () => { const { state } = await import(${S} + 'state.js'); const m = await import(${S} + 'inbox_tab.js'); state.liveSessions = [${JSON.stringify(AGENT)}]; m.updateInboxTab(); window.switchNavTab('hub-inbox'); await m.selectInboxTab('needs'); return true; })()`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 1`, at + 'the permission row', 15000); await ev(framesJs(6));
+            await waitFor(`document.querySelectorAll('${T} .nl-permission').length >= 1`, at + 'the permission row', 15000); await ev(framesJs(6));
             // the row offers no trust button; Open stays in the Inbox and shows the whole card
-            check(!(await ev(`[...document.querySelectorAll('${T} tbody tr .inbox-answer')].some(b => /trust/i.test(b.textContent))`)), at + 'the row itself never offers "trust this folder"');
+            check(!(await ev(`[...document.querySelectorAll('${T} .nl-permission button')].some(b => /trust/i.test(b.textContent))`)), at + 'the row itself never offers "trust this folder"');
             await openRow();
             let d = await dialog();
             check(await ev(`document.body.dataset.navTab`) === 'hub-inbox', at + 'Open leaves you in the Inbox');
