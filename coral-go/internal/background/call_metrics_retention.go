@@ -90,14 +90,33 @@ func (j *CallMetricsRetention) RunOnce(ctx context.Context) int64 {
 	if !capped {
 		rolledHours, rolledRows = j.rollup(ctx)
 	}
-	hourly, err := j.db.PruneCallMetricsHourly(ctx, cutoff)
-	if err != nil && ctx.Err() == nil {
-		j.logger.Warn("call metrics retention: deleting old hourly rows failed", "error", err)
-	}
+	hourly := j.pruneHourly(ctx, cutoff)
 	if total > 0 || capped || rolledHours > 0 || hourly > 0 {
 		j.logger.Info("call metrics retention", "deleted", total, "keep_days", days,
 			"rolled_up_hours", rolledHours, "rolled_up_rows", rolledRows, "hourly_deleted", hourly,
 			"took_ms", j.now().Sub(started).Milliseconds(), "more_next_run", capped || rolledHours >= j.RollupHours)
+	}
+	return total
+}
+
+// pruneHourly deletes the hourly rows past the window in short batches with Pause between them, as the raw prune does: one long delete would hold the database's one writer (#22013).
+func (j *CallMetricsRetention) pruneHourly(ctx context.Context, cutoff time.Time) (total int64) {
+	for ctx.Err() == nil {
+		n, err := j.db.PruneCallMetricsHourlyBatch(ctx, cutoff, j.BatchSize)
+		if err != nil {
+			if ctx.Err() == nil {
+				j.logger.Warn("call metrics retention: deleting old hourly rows failed", "error", err)
+			}
+			break
+		}
+		total += n
+		if n < int64(j.BatchSize) {
+			break
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(j.Pause):
+		}
 	}
 	return total
 }

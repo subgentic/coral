@@ -142,11 +142,25 @@ func (d *DB) rollupHour(ctx context.Context, hour string) (int64, error) {
 	return res.RowsAffected()
 }
 
-// PruneCallMetricsHourly deletes hourly rollups for hours before cutoff (the retention window).
-func (d *DB) PruneCallMetricsHourly(ctx context.Context, cutoff time.Time) (int64, error) {
-	res, err := d.ExecContext(ctx, `DELETE FROM call_metrics_hourly WHERE hour < ?`, hourPrefix(cutoff))
+// PruneCallMetricsHourlyBatch deletes at most batch hourly rollups for hours before cutoff (the retention window), oldest first, in one short statement, and reports how many it deleted. The database has one
+// writer: a caller that wants everything gone calls it again with a pause between, so a request's write is never held behind one long delete (#22013).
+func (d *DB) PruneCallMetricsHourlyBatch(ctx context.Context, cutoff time.Time, batch int) (int64, error) {
+	res, err := d.ExecContext(ctx, `DELETE FROM call_metrics_hourly WHERE rowid IN (
+		SELECT rowid FROM call_metrics_hourly WHERE hour < ? ORDER BY hour LIMIT ?)`, hourPrefix(cutoff), batch)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+// PruneCallMetricsHourly deletes every hourly rollup before cutoff, in batches with no pause (a test or a one-off; the job pauses between batches).
+func (d *DB) PruneCallMetricsHourly(ctx context.Context, cutoff time.Time) (int64, error) {
+	var total int64
+	for {
+		n, err := d.PruneCallMetricsHourlyBatch(ctx, cutoff, 5000)
+		total += n
+		if err != nil || n < 5000 {
+			return total, err
+		}
+	}
 }

@@ -18,12 +18,14 @@ type GoalEventsPrune struct {
 	logger *slog.Logger
 
 	Keep               int
+	BatchSize          int           // rows one delete takes at most
+	Pause              time.Duration // between batches: the board database is free for requests
 	FirstRun, Interval time.Duration
 }
 
 // NewGoalEventsPrune returns the job for the board store.
 func NewGoalEventsPrune(bs *board.Store) *GoalEventsPrune {
-	return &GoalEventsPrune{bs: bs, logger: slog.Default(), Keep: GoalEventsKeep, FirstRun: 5 * time.Minute, Interval: time.Hour}
+	return &GoalEventsPrune{bs: bs, logger: slog.Default(), Keep: GoalEventsKeep, BatchSize: 2000, Pause: 50 * time.Millisecond, FirstRun: 5 * time.Minute, Interval: time.Hour}
 }
 
 // Run prunes FirstRun after startup, then every Interval, until ctx is done.
@@ -31,15 +33,28 @@ func (j *GoalEventsPrune) Run(ctx context.Context) error {
 	return runEvery(ctx, j.FirstRun, j.Interval, func() { j.RunOnce(ctx) })
 }
 
-// RunOnce deletes the events past the newest Keep of each board and reports how many.
+// RunOnce deletes the events past the newest Keep of each board, in short batches with Pause between them (#22013), and reports how many.
 func (j *GoalEventsPrune) RunOnce(ctx context.Context) int64 {
-	n, err := j.bs.PruneGoalEvents(ctx, j.Keep)
-	if err != nil {
-		j.logger.Warn("goal events: could not prune", "error", err)
-		return 0
+	var total int64
+	for ctx.Err() == nil {
+		n, err := j.bs.PruneGoalEventsBatch(ctx, j.Keep, j.BatchSize)
+		if err != nil {
+			if ctx.Err() == nil {
+				j.logger.Warn("goal events: could not prune", "error", err)
+			}
+			break
+		}
+		total += n
+		if n < int64(j.BatchSize) {
+			break
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(j.Pause):
+		}
 	}
-	if n > 0 {
-		j.logger.Info("goal events: pruned", "rows", n)
+	if total > 0 {
+		j.logger.Info("goal events: pruned", "rows", total)
 	}
-	return n
+	return total
 }
