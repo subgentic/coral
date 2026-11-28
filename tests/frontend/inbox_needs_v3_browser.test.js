@@ -1,3 +1,5 @@
+// #22094 replaces the two-row phone toolbar with a count-triggered tools row and one compact title.
+// Retain robot identity/44px, numeric counts, no-primary rule, and clipping checks on the new strip.
 // Needs you, guidelines v3 section 4.14 (#17450): counts are numbers (N1), the header is two rows (N2), one Default button per row (N4), a cut list says "Showing 8 of N" (N8). 1440, 1280, 390.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -22,16 +24,18 @@ const BASE = require('./test_base').BASE;
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3`, 'the folders', 10000);
             if (mobile) await ev(`document.querySelector('#group-table-view .view-list-item[data-key="needs"]')?.click(); true`); else await ev(`document.querySelector('.view-list-item[data-key="needs"]').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary, #group-table-view button.dt-person').length >= 5`, 'the five rows', 8000); await settle(400);
+            await waitFor(`document.querySelectorAll('#group-table-view .nl-row').length === 5`, 'the five rows', 8000); await settle(400);
             await shot(`needs-${w}`);
-            const g = await ev(`(() => { const r = e => e && e.getBoundingClientRect(), vis = e => e && r(e).width > 0, row = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'), head = row && row.querySelector('.inbox-needs-tabs, .inbox-folder-head'), more = document.querySelector('.inbox-copy-for-agent'), parts = row ? [...row.querySelectorAll(':scope > .list-bar-search-wrap, :scope > .team-tb-pills, :scope > .list-bar-toggle')].filter(vis) : [], pills = row && row.querySelector(':scope > .team-tb-pills');
-                return { tabs: !!(head && head.classList.contains('inbox-needs-tabs')), headTop: head && Math.round(r(head).top), headBottom: head && Math.round(r(head).bottom), moreTop: more && Math.round(r(more).top), moreBottom: more && Math.round(r(more).bottom), moreText: more && more.textContent, moreRight: more && Math.round(r(more).right), partsTop: parts.map(e => Math.round(r(e).top)), partsRight: parts.map(e => Math.round(r(e).right)), robot: !!(row && row.querySelector('.agent-copy')), pillsCut: pills && vis(pills) ? pills.scrollWidth - pills.clientWidth : 0, primary: document.querySelectorAll('#group-table-view tbody .btn-primary').length, atLeast: /at least/i.test(document.getElementById('group-table-view').textContent), vw: innerWidth }; })()`);
+            if (mobile) await ev(`document.querySelector('.nl-phone-count').click(); true`);
+            const g = await ev(`(() => { const visible = e => !!e && e.getClientRects().length > 0, toolbar = document.querySelector('.needs-ledger-toolbar'), rect = toolbar.getBoundingClientRect(), pills = toolbar.querySelector('.team-tb-pills'); return { pills: [...pills.querySelectorAll('button')].map(b => b.textContent.trim()), clipped: pills.scrollWidth > pills.clientWidth + 1, over: rect.right > innerWidth + 1, primary: document.querySelectorAll('.needs-ledger .btn-primary').length, atLeast: /at least/i.test(document.querySelector('.needs-ledger').textContent), phoneTitle: visible(document.querySelector('.nl-phone-title')), phoneSelect: visible(document.querySelector('.nl-phone-select')) }; })()`);
             const robot = await ev(`(() => { const b = document.querySelector('.inbox-copy-for-agent'), r = b && b.getBoundingClientRect(); return b && { icon: b.querySelector('.material-icons')?.textContent, label: b.getAttribute('aria-label'), title: b.title, text: b.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height), popup: b.hasAttribute('aria-haspopup') }; })()`);
             assert.deepEqual({ icon: robot.icon, label: robot.label, title: robot.title, popup: robot.popup }, { icon: 'smart_toy', label: 'Copy Needs you for an agent', title: 'Copy for an agent', popup: false }, `${w}: #22056 Copy for an agent is the robot icon only, a plain header action: ${JSON.stringify(robot)}`); assert.equal(robot.text, 'smart_toy', `${w}: the robot has no words of its own`); if (mobile) assert.ok(robot.w >= 44 && robot.h >= 44, `${w}: a 44 px target: ${robot.w}x${robot.h}`);
-            if (g.tabs) assert.ok(g.moreTop >= g.headBottom - 1, `${w}: with the two tabs, More joins the filters under the tabs (mock v3, #19904) (${g.moreTop} vs ${g.headBottom})`); else assert.ok(g.headTop >= g.moreTop - 1 && g.headTop <= g.moreBottom, `${w}: title and More share row one (${g.headTop} vs ${g.moreTop})`);
-            assert.ok(g.partsTop.length >= 1 && g.partsTop.every(t => t >= g.headBottom), `${w}: search, strip and Filters are on row two, under the title (${g.partsTop} vs ${g.headBottom})`);
-            assert.ok(g.partsRight.every(x => x <= g.vw) && g.moreRight <= g.vw, `${w}: nothing runs off the right edge`); assert.equal(g.pillsCut, 0, `${w}: the strip is never cut`);
-            assert.equal(g.primary, 0, `${w}: no blue Primary button in the list`); assert.equal(g.atLeast, false, `${w}: no "at least" on the page`);
+            assert.deepEqual(g.pills, ['All','Unread','Questions'], w + ': the approved strip replaces the old kinds strip');
+            assert.ok(!g.clipped && !g.over, w + ': toolbar and pills fit without clipping');
+            if (mobile) assert.ok(g.phoneTitle && g.phoneSelect, w + ': title and Select remain in the single phone header');
+            assert.equal(g.primary, 0, w + ': no blue decision button in the list');
+            assert.equal(g.atLeast, false, w + ': counts stay numeric');
+
         }
         await client.close(); process.exit(0);
     } catch (e) { console.error('FAIL', e && e.stack || e); await client.close().catch(() => {}); process.exit(1); }

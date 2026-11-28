@@ -1,3 +1,5 @@
+// #22094: quick views replace the old kind strip; Kind retains permission/other filtering.
+// Retain source/team/time facets, persisted filters, clear-all and sidebar stability; compact phone tools open through the count.
 // The Inbox's Needs you folder has the shared list toolbar (#8604, goal #62; UI/UX #8589 section 9): the search box, the kind pills (All, Permission, Question, Needs input) and the Filters icon in one row (the icon to the
 // right of the search), and in the Filters panel Team, Agent, Goal, Waiting longer than and Sort; chips, "N on" on the icon, the filters kept in the browser, the folder list (the sidebar) not touched, the longest-waiting
 // agent first by default. At 1280 and at 390, where the pills are one select and the search keeps at least 10rem. Four agents are made to wait through the live list. Drives Chrome over CDP against the isolated dev server.
@@ -11,16 +13,20 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
     const S = `(window.__coralStatic || '/static/')`;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const names = () => ev(`[...document.querySelectorAll('#group-table-view button.dt-primary, #group-table-view button.dt-person')].filter(b => b.getClientRects().length).map(b => (b.querySelector('.dt-mail-title') || b).textContent.trim())`); // a phone's row is a mail row (#9545): its button holds the name, the ask and the time; the name is the title
+    const names = () => ev(`[...document.querySelectorAll('#group-table-view .nl-row .nl-meta > .agent-link')].filter(b => b.getClientRects().length).map(b => (b.querySelector('.dt-mail-title') || b).textContent.trim())`); // a phone's row is a mail row (#9545): its button holds the name, the ask and the time; the name is the title
     const folders = () => ev(`${FOLDER_ROWS}.join('|')`);
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
         return { qName: q.getAttribute('aria-label'), sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 6, right: b.left >= a.right - 1, searchW: Math.round(a.width), pills: vis(r.querySelector('.team-tb-pills')), select: vis(r.querySelector('.team-tb-select')), toggleName: t.getAttribute('aria-label'), over: document.documentElement.scrollWidth - innerWidth }; })()`);
-    const pick = key => ev(`(() => { const s = document.querySelector('.inbox-folder-toolbar .team-tb-select'); if (s && s.getClientRects().length) { s.value = ${JSON.stringify(key)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; }
-        const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.dataset.filter === ${JSON.stringify(key)}); b.click(); return true; })()`);
+    const pick = async key => {
+        await ev(`(() => { if (innerWidth < 768 && !document.querySelector('.nl-tools-open')) document.querySelector('.nl-phone-count').click(); document.querySelector('#inbox-kind').click(); return true; })()`);
+        await waitFor(`document.querySelector('#inbox-kind-menu') && !document.querySelector('#inbox-kind-menu').hidden`, 'Kind menu opens');
+        const label = {permission:'Permission',other:'Needs input',all:'All',question:'Question'}[key];
+        await ev(`[...document.querySelectorAll('#inbox-kind-menu button')].find(b => b.textContent.trim().startsWith(${JSON.stringify(label)})).click(); true`);
+    };
     const setField = (id, value) => ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     const chipText = () => ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`);
-    const waitNames = (n, what) => waitFor(`[...document.querySelectorAll('#group-table-view button.dt-primary, #group-table-view button.dt-person')].filter(b => b.getClientRects().length).length === ${n}`, what, 8000);
+    const waitNames = (n, what) => waitFor(`[...document.querySelectorAll('#group-table-view .nl-row .nl-meta > .agent-link')].filter(b => b.getClientRects().length).length === ${n}`, what, 8000);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
@@ -40,12 +46,12 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
             else await ev(`document.querySelector('.view-list-item[data-key="needs"]').click(); true`);
             await waitNames(4, 'the four waiting agents'); await settle(300);
             const before = await folders();
+            if (mobile) await ev(`document.querySelector('.nl-phone-count').click(); true`);
 
             check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box"}`, await ev(`(() => { const a = document.activeElement; return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : "!!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar')"}; })()`));
             const g = await geometry();
-            check(`${label}: the Needs you page has a search box named "Search waiting on you" and the Filters icon in the same row, to its right`, g && g.qName === 'Search waiting on you' && (mobile ? g.searchW === 0 : g.sameRow && g.right) && /Filters/.test(g.toggleName), JSON.stringify(g));
-            if (mobile) check(`${label}: the pills are not in the row (one select in the Filters sheet since #8700), the page's box is not drawn (the top pill is the search, #13591), nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW === 0 && g.over <= 0, JSON.stringify(g));
-            else check(`${label}: the mock kinds lead, followed by nonempty Needs input, with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'All 4|Permission 1|Question 1|Needs input 2');
+            check(`${label}: tools retain the named search and fit the screen`, g && g.qName === 'Search Needs you' && g.searchW >= 160 && g.over <= 0, JSON.stringify(g));
+            check(`${label}: All, Unread and Questions are the quick views`, (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'All|Unread|Questions');
             check(`${label}: the agent waiting least is first (newest first is the default, #11552)`, (await names())[0] === 'Frontend Dev', JSON.stringify(await names()));
 
             await pick('permission'); await waitNames(1, 'the permission pill');
@@ -56,7 +62,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
 
             await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`); await settle(200);
             const labels = await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-field-label')].filter(e => e.getClientRects().length).map(e => e.textContent.trim()).join('|')`);
-            check(`${label}: the Filters panel has Team, Agent, Goal (#8917), Waiting longer than and Sort`, labels.replace(/^Show\|/, '') === 'Team|Agent|Goal|Waiting longer than|Sort', labels);
+            check(`${label}: the Filters panel has Team, Agent, Goal (#8917), Waiting longer than and Sort`, labels.replace(/^Show\|/, '') === 'Team|Agent|Goal|Waiting longer than', labels);
             await setField('inbox-needs-team', 'team-b'); await waitNames(2, 'team-b');
             check(`${label}: a Team filter shows only that team's agents, as a chip, and the icon says one is on`, (await chipText()) === 'Team: team-b' && /1 on/.test(await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').getAttribute('aria-label')`)), await chipText());
             await setField('inbox-needs-longer', '60'); await waitNames(1, 'waiting more than an hour');

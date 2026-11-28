@@ -16,7 +16,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    min-height: var(--needs-control-height);
+    min-height: max(calc(var(--needs-control-height) + 2px), calc(1.5em + 10px));
     margin-bottom: 14px;
     padding-left: 14px;
     flex-wrap: wrap;
@@ -380,7 +380,6 @@
 }
 
 .nl-group-head:not(.nl-goal)>.nl-icon {
-    font-size: 0;
 }
 
 .nl-goal-id {
@@ -740,7 +739,6 @@
     opacity: 1;
 }
 .nl-direct-icon {
-    font-size: 0;
     border: 1px dashed var(--text-muted);
     border-radius: var(--radius-xl);
     width: 10px;
@@ -786,3 +784,8 @@
 .nl-phone-title { font-size: var(--fs-xl); color: var(--text-primary); }
 
 .nl-file-open .nl-meta { display: block; font-weight: var(--fw-regular); }
+
+/* The supplementary designer check: shared count alignment and short Direct titles. */
+.nl-summary > .nl-check-hit { align-self: center; margin-top: 0; }
+#group-table-view:has(.needs-ledger) .inbox-filter-hidden { padding-left: 14px; }
+@media (max-width: 767px) { .nl-group-head:not(.nl-goal) .nl-group-toggle { display: flex; align-items: flex-end; } }

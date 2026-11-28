@@ -82,6 +82,7 @@ export function needsLedger(cfg) {
         const contextNote = cfg.contextNote(row); if (contextNote) body.append(el('div', 'nl-meta', safe(contextNote)));
         if (!row.review && !isQuestion && !isPermission && words) body.append(el('div', 'nl-other-text', words));
         if (isQuestion && (lines.length > 1 || title.length > 160)) { const box = el('div', 'nl-question-box'), text = title.length > 160 ? words : lines.slice(1).join('\n'); cfg.questionBox(box, row, text); body.append(box); }
+        if (isQuestion) { const extra = cfg.questionExtra?.(row); if (extra) body.append(extra); }
         if (isPermission) body.append(el('code', 'nl-command', words.replace(/^Wants to (?:run|edit a file outside its folder):\s*/i, '')));
         let actionNode = actions(row);
         const extras = [{ label: row.review ? 'Open file' : isPermission ? 'Open terminal' : isQuestion ? 'Open question' : 'Open', run: () => isPermission ? cfg.openTerminal(row) : open(row) }];
@@ -117,7 +118,7 @@ export function needsLedger(cfg) {
             for (const g of groups) {
                 const questions = ordered(g.rows.filter(question)), files = ordered(g.rows.filter(r => r.review)), other = ordered(g.rows.filter(r => !question(r) && !r.review));
                 const openNow = folds.has(g.key) ? folds.get(g.key) : questions.length > 0, head = el('div', 'nl-group-head'), groupBody = el('div', 'nl-group-body');
-                head.classList.toggle('nl-goal', !!g.a.goalId); if (g.a.goalId) head.append(checkbox(g.rows, `Select ${safe(g.a.goalTitle || 'Goal')}`)); else { const select = checkbox(g.rows, 'Select items not tied to a goal'); select.classList.add('nl-direct-check'); head.append(select); } head.append(icon(g.a.goalId ? 'flag' : 'radio_button_unchecked', g.a.goalId ? 'Goal' : 'Not tied to a goal')); if (!g.a.goalId) head.lastChild.classList.add('nl-direct-icon');
+                head.classList.toggle('nl-goal', !!g.a.goalId); if (g.a.goalId) head.append(checkbox(g.rows, `Select ${safe(g.a.goalTitle || 'Goal')}`)); else { const select = checkbox(g.rows, 'Select items not tied to a goal'); select.classList.add('nl-direct-check'); head.append(select); } head.append(icon(g.a.goalId ? 'flag' : 'radio_button_unchecked', g.a.goalId ? 'Goal' : 'Not tied to a goal')); if (!g.a.goalId) { head.lastChild.classList.add('nl-direct-icon'); head.lastChild.replaceChildren(); }
                 const main = el('div', 'nl-body'), toggle = button('', 'nl-group-toggle', () => { keepFold(g.key, groupBody.hidden); groupBody.hidden = !groupBody.hidden; toggle.setAttribute('aria-expanded', String(!groupBody.hidden)); head.classList.toggle('nl-open', !groupBody.hidden); });
                 toggle.setAttribute('aria-expanded', String(openNow)); const title = el('span', 'nl-title'); if (g.a.goalId) title.append(el('span', 'nl-goal-id', `#${g.a.goalId}`), document.createTextNode(' '+safe(g.a.goalTitle || 'Goal'))); else title.textContent = 'Not tied to a goal'; toggle.append(title); main.append(toggle);
                 const counts = [questions.length ? `${questions.length} ${questions.length === 1 ? 'question' : 'questions'}` : '', files.length ? `${files.length} to review` : '', other.length ? `${other.length} other items` : ''].filter(Boolean).join(' · '), detail = el('div', 'nl-meta'); detail.append(el('strong', '', counts));

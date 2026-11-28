@@ -24,12 +24,12 @@ const { coralReady } = require('./helpers/wait');
                 return window.__realFetch(u, o); };
                 T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '', inbox_welcome_dismissed: '' }; T.state.liveSessions = []; T.state.servers = []; true`);
             const open = () => ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            const names = () => ev(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length`);
+            const names = () => ev(`document.querySelectorAll('#group-table-view .nl-row[data-needs-key*="welcome:"]').length`);
             const toast = () => ev(`(() => { const t = [...document.querySelectorAll('.toast')].find(x => /Dismissed:/.test(x.textContent)); return t ? { text: t.textContent.replace(/\\s+/g, ' ').trim(), undo: !!t.querySelector('button') } : null; })()`);
             await open();
-            await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, `${tag}: five welcome items`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view .nl-row[data-needs-key*="welcome:"]').length === 5`, `${tag}: five welcome items`, 8000);
             // Dismiss on the second item (Start your first agent)
-            await ev(`[...document.querySelectorAll('#group-table-view button')].find(b => b.getAttribute('aria-label') === 'Dismiss: Start your first agent' || (b.textContent === 'Dismiss' && b.closest('tr') && /Start your first agent/.test(b.closest('tr').textContent))).click(); true`);
+            await ev(`[...document.querySelectorAll('#group-table-view button')].find(b => b.getAttribute('aria-label') === 'Dismiss: Start your first agent' || (b.textContent === 'Dismiss' && b.closest('.nl-row') && /Start your first agent/.test(b.closest('.nl-row').textContent))).click(); true`);
             await waitFor(`!/Start your first agent/.test(document.getElementById('group-table-view').textContent)`, `${tag}: Dismiss puts the item away`, 6000);
             await waitFor(`[...document.querySelectorAll('.toast')].some(x => /Dismissed:/.test(x.textContent))`, `${tag}: a toast says it was dismissed`, 4000);
             const t = await toast();
@@ -42,7 +42,7 @@ const { coralReady } = require('./helpers/wait');
             check(await names() === 5, `${tag}: five items again`);
             check(await ev(`window.__puts.some(p => p.inbox_welcome_dismissed === '' && p.inbox_welcome === 'on')`), `${tag}: Undo takes it off the dismissed list`);
             // Dismiss again, then Settings > Inbox lists it with Restore
-            await ev(`document.querySelectorAll('.toast').forEach(x => x.remove()); [...document.querySelectorAll('#group-table-view button')].find(b => b.getAttribute('aria-label') === 'Dismiss: Start your first agent' || (b.textContent === 'Dismiss' && b.closest('tr') && /Start your first agent/.test(b.closest('tr').textContent))).click(); true`);
+            await ev(`document.querySelectorAll('.toast').forEach(x => x.remove()); [...document.querySelectorAll('#group-table-view button')].find(b => b.getAttribute('aria-label') === 'Dismiss: Start your first agent' || (b.textContent === 'Dismiss' && b.closest('.nl-row') && /Start your first agent/.test(b.closest('.nl-row').textContent))).click(); true`);
             await waitFor(`!/Start your first agent/.test(document.getElementById('group-table-view').textContent)`, `${tag}: dismissed again`, 6000);
             await ev(`(async () => { await window.showSettingsModal(); await import(${S} + 'settings_nav.js').then(m => m.openSettingsGroup('needs-you')); await import(${S} + 'settings_inbox.js').then(m => m.drawDismissed()); return true; })()`);
             await waitFor(`!!document.getElementById('settings-inbox-dismissed') && !document.getElementById('settings-inbox-dismissed').hidden`, `${tag}: Settings > Inbox lists the dismissed items`, 5000);
