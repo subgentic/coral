@@ -70,6 +70,9 @@ func (j *CallMetricsRetention) RunOnce(ctx context.Context) int64 {
 		}
 		t0 := time.Now()
 		n, err := j.db.PruneCallMetrics(ctx, cutoff, batch)
+		if err == nil && n > 0 {
+			j.checkpoint(ctx)
+		}
 		pause := tune.Took(time.Since(t0))
 		if err != nil {
 			if ctx.Err() == nil {
@@ -109,6 +112,9 @@ func (j *CallMetricsRetention) pruneHourly(ctx context.Context, cutoff time.Time
 		batch := tune.Size()
 		t0 := time.Now()
 		n, err := j.db.PruneCallMetricsHourlyBatch(ctx, cutoff, batch)
+		if err == nil && n > 0 {
+			j.checkpoint(ctx)
+		}
 		pause := tune.Took(time.Since(t0))
 		if err != nil {
 			if ctx.Err() == nil {
@@ -126,6 +132,13 @@ func (j *CallMetricsRetention) pruneHourly(ctx context.Context, cutoff time.Time
 		}
 	}
 	return total
+}
+
+// checkpoint copies the batch just deleted out of the WAL, timed with the batch (#22119): the tuner then sizes the batch by what it costs the writer in all, and no later write copies megabytes of WAL.
+func (j *CallMetricsRetention) checkpoint(ctx context.Context) {
+	if err := j.db.CheckpointPassive(ctx); err != nil && ctx.Err() == nil {
+		j.logger.Debug("call metrics retention: checkpoint", "error", err)
+	}
 }
 
 // rollup rolls raw rows older than store.CallMetricsRawHours into hourly rows, one hour per

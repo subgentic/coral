@@ -90,3 +90,9 @@ func (s *Store) PruneGoalEvents(ctx context.Context, keep int) (int64, error) {
 		}
 	}
 }
+
+// CheckpointPassive copies the board database's WAL into its file without waiting on readers or writers: a prune calls it after each batch so no one write copies and syncs megabytes of WAL (#22119).
+func (s *Store) CheckpointPassive(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `PRAGMA wal_checkpoint(PASSIVE)`)
+	return err
+}

@@ -41,6 +41,11 @@ func (j *GoalEventsPrune) RunOnce(ctx context.Context) int64 {
 		batch := tune.Size()
 		t0 := time.Now()
 		n, err := j.bs.PruneGoalEventsBatch(ctx, j.Keep, batch)
+		if err == nil && n > 0 {
+			if cerr := j.bs.CheckpointPassive(ctx); cerr != nil && ctx.Err() == nil { // the batch's pages out of the WAL, timed with it (#22119)
+				j.logger.Debug("goal events: checkpoint", "error", cerr)
+			}
+		}
 		pause := tune.Took(time.Since(t0))
 		if err != nil {
 			if ctx.Err() == nil {
