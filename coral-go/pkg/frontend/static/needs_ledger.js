@@ -23,7 +23,7 @@ export function needsLedger(cfg) {
     const { rows, state, keyOf, about, unread, name, source, actions, open, agentLink, teamLink, goalLink, taskLink, bulkActions, eligible } = cfg;
     const root = el('section', 'needs-ledger'); root.setAttribute('aria-label', 'Needs you'); root.classList.toggle('nl-tools-open', !!state.toolsOpen);
     const summary = el('div', 'nl-summary'), lists = el('div', 'nl-lists'); root.append(summary, lists);
-    const phoneHeader = document.getElementById('top-phone-bar'), phoneSummary = phoneHeader?.querySelector('.nl-phone-summary') || el('span', 'nl-phone-summary'); phoneHeader?.append(phoneSummary);
+    const phoneHeader = document.getElementById('top-phone-bar'), phoneSummary = phoneHeader?.querySelector('.nl-phone-summary') || el('span', 'nl-phone-summary'); if (phoneSummary.parentElement !== phoneHeader) phoneHeader?.append(phoneSummary);
     let selecting = state.select || state.selected.size > 0;
     const checks = [], groups = [], controllers = [];
     const here = new Set(rows.map(keyOf)); for (const key of state.rowCache?.keys() || []) if (!here.has(key) && !state.selected.has(key)) state.rowCache.delete(key);
