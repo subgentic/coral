@@ -800,7 +800,7 @@
 @media(max-width:767px) {
     .nl-has-selection .nl-summary {
         position: sticky;
-        top: 0;
+        top: calc(-1 * var(--space-2xl));
         z-index: 6;
         background: var(--bg-primary);
         flex-wrap: nowrap;
