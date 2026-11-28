@@ -1,3 +1,5 @@
+// #22094: goal context moves to its group header; task context remains a link under the question title.
+// Retires 20px chip/Question-word placement checks in favor of grouped goal identity/action, real task links and row containment.
 // #19812 (the approved Inbox list, which replaces #19425's placement): a question's "Goal #N · Task #N" links are chips in the meta line UNDER the question, after the word "Question", left-aligned with the question's text.
 // A computer at 1440 and 1280: the chips are under the question, inside the row, after "Question", the same left edge on every row, and 20px high.
 const { connect } = require('./agent_view_harness');
@@ -28,7 +30,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return json({ project: 'qn', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); }; return true; })()`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 4`, 'the review rows and the questions', 20000);
+        await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 4`, 'the review rows and the questions', 20000);
 
         await ev(`(() => { for (let i = 0; i < 2; i++) window.__m.add('Agent ' + i, String.fromCharCode(65 + i), 4, { sleeping: false, board_project: 'qn', session_id: 'sid-' + i }); return true; })()`);
         await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length >= 2`, 'agents', 8000);
@@ -36,12 +38,17 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(framesJs(10));
         for (const w of [1440, 1280]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 1300, deviceScaleFactor: 1, mobile: false }); await ev(framesJs(10));
-            const r = await ev(`(() => [...document.querySelectorAll('${T} tr.inbox-card-tr:has(.inbox-ask-subject-links)')].map(tr => { const l = tr.querySelector('.inbox-ask-subject-links').getBoundingClientRect(), m = tr.querySelector('.inbox-meta').getBoundingClientRect(), k = tr.querySelector('.inbox-meta .inbox-kind').getBoundingClientRect(), t = tr.getBoundingClientRect(), n = tr.querySelector('.inbox-ask-name').getBoundingClientRect(), c = tr.querySelector('a.inbox-ask-subject-link').getBoundingClientRect(), a = [...tr.querySelectorAll('a.inbox-ask-subject-link')].map(x => x.textContent); return { above: l.bottom <= n.top + 1, inside: l.top >= t.top && l.bottom <= t.bottom, after: l.left >= k.right - 1, kind: tr.querySelector('.inbox-meta .inbox-kind').textContent, aligned: Math.abs(m.left - n.left) <= 2, chipH: Math.round(c.height), edge: Math.round(m.left), a }; }))()`);
-            check(r.length === 2, w + ': two questions name a goal and a task: ' + JSON.stringify(r));
-            for (const x of r) { check(x.above, w + ': metadata links are above the question box (#20203): ' + JSON.stringify(x)); check(x.inside, w + ': the links are inside the row: ' + JSON.stringify(x)); check(x.after && x.kind === 'Question', w + ': the word Question, then the links: ' + JSON.stringify(x)); check(x.aligned, w + ': the meta line starts where the question does: ' + JSON.stringify(x)); check(x.chipH === 20, w + ': each link is a 20px chip: ' + JSON.stringify(x)); check(x.a.length === 2 && /^Goal #38$/.test(x.a[0]) && /^Task #\d+$/.test(x.a[1]), w + ': a Goal link then a Task link: ' + JSON.stringify(x)); }
-            check(r.length === 2 && r[0].edge === r[1].edge, w + ': every row has its meta line at the same left edge: ' + JSON.stringify(r.map(x => x.edge)));
+            const r = await ev(`(() => [...document.querySelectorAll('${T} .nl-question')].filter(row => /May I rename|Before I rename/.test(row.querySelector('.nl-title').textContent)).map(row => { const meta = row.querySelector('.nl-meta'), title = row.querySelector('.nl-title'), task = [...meta.querySelectorAll('a')].find(a => /task #/.test(a.textContent)), group = row.closest('.nl-group-body').previousElementSibling, m = meta.getBoundingClientRect(), t = row.getBoundingClientRect(), n = title.getBoundingClientRect(); return { inside: m.top >= t.top && m.bottom <= t.bottom, below: m.top >= n.bottom - 1, aligned: Math.abs(m.left - n.left) <= 2, edge: Math.round(m.left), task: task?.textContent, href: task?.getAttribute('href'), goal: group.querySelector('.nl-title').textContent, openGoal: !![...group.querySelectorAll('button')].find(b => b.textContent === 'Open goal') }; }))()`);
+            check(r.length === 2, w + ': both board questions retain goal/task context: ' + JSON.stringify(r));
+            for (const x of r) {
+                check(x.inside && x.below && x.aligned, w + ': task metadata stays inside and aligned beneath its question title: ' + JSON.stringify(x));
+                check(/#38.*Databricks pipeline/.test(x.goal) && x.openGoal, w + ': parent goal keeps its number, title and Open goal action: ' + JSON.stringify(x));
+                check(/^task #(294|296)/.test(x.task) && /tasks.*(294|296)/.test(x.href), w + ': task number remains an actual task link: ' + JSON.stringify(x));
+            }
+            check(r.length === 2 && r[0].edge === r[1].edge, w + ': both question rows align their metadata: ' + JSON.stringify(r));
+
         }
-        console.log(failures.length ? 'FAIL ' + failures.join('; ') : 'PASS a question\'s Goal and Task links are chips under the question, after the word Question, the same left edge on every row (1440, 1280)');
+        console.log(failures.length ? 'FAIL ' + failures.join('; ') : 'PASS question goal/task context stays linked and aligned at 1440 and 1280');
         if (failures.length) process.exitCode = 1;
     } finally { await client.close(); await removeBoards(ev, ['qn']).catch(() => {}); }
 })().catch(e => { console.error(e.message); process.exitCode = 1; });

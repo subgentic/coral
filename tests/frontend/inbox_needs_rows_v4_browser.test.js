@@ -1,3 +1,5 @@
+// #22094 moves goal context to its parent group and task context to row metadata.
+// Replace old two-line clipping/grey single-line checks with linked goal/task identity and containment; retain choice collapsing and actual task navigation.
 // #19247 N3: a row's goal and task are one grey line, its text two lines at most. Fixtures from #13144 (UI Accessibility's gap on the icon fix): the kind icon sets no row height on ANY kind of Needs you row, not only the agent's: a file for review (with a question and without) and an operator's question, on a
 // computer, at 100% text and at real 200% text (root 32 px). For each row, its height with the icon and with the icon hidden must be the same, and the icon must be inside its row, in front of the words, not over them.
 const { connect } = require('./agent_view_harness');
@@ -29,7 +31,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return json({ project: 'qn', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); }; return true; })()`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 4`, 'the review rows and the questions', 20000);
+        await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 4`, 'the review rows and the questions', 20000);
 
         await ev(`(() => { for (let i = 0; i < 2; i++) window.__m.add('Agent ' + i, String.fromCharCode(65 + i), 4, { sleeping: false, board_project: 'qn', session_id: 'sid-' + i }); return true; })()`);
         await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length >= 2`, 'agents', 8000);
@@ -37,18 +39,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await ev(framesJs(10));
         for (const w of [1440, 1280]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile: false }); await ev(framesJs(10));
-            const r = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(t => t.textContent.includes('Agent 1')); const gt = tr && tr.querySelector('.inbox-goal-task'); const links = gt ? [...gt.querySelectorAll('.dt-link')] : [];
-                const sub = [...document.querySelectorAll('${T} .dt-subtitle')][0], q = [...document.querySelectorAll('${T} tbody tr')].find(t => t.textContent.includes('rename the folder and move')), qs = q && q.querySelector('.dt-subtitle, .dt-primary');
-                return { has: !!gt, links: links.map(a => a.textContent + '|' + a.getAttribute('aria-label')), color: gt && getComputedStyle(gt).color, tert: getComputedStyle(document.documentElement).getPropertyValue('--text-tertiary').trim(), lines: sub ? getComputedStyle(sub).webkitLineClamp : null, one: links.length > 0 && links.every(a => a.getBoundingClientRect().height < 24 && a.getBoundingClientRect().top === links[0].getBoundingClientRect().top), h: links.map(a => { const b = a.getBoundingClientRect(), c = getComputedStyle(a); return Math.round(b.top) + '/' + Math.round(b.height) + '/' + c.display + '/' + c.minHeight; }).join(' ') }; })()`);
-            check(r.has, `${w}: the agent with a goal and a task has one grey goal-and-task line`);
-            check(r.links.length === 2 && r.links[0].startsWith('Ship the release notes|Goal:') && r.links[1].startsWith('Draft the notes|Task:'), `${w}: the line has the goal link then the task link (${JSON.stringify(r.links)})`);
-            check(r.one, `${w}: the goal and task are one line (${r.h})`);
-            check(r.lines === '2', `${w}: the row's text is at most two lines (${r.lines})`);
-            const pk = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(t => t.textContent.includes('Agent 1')); return tr ? { btns: [...tr.querySelectorAll('button')].map(b => b.textContent.trim()), more: !!tr.querySelector('.inbox-more-choices') } : null; })()`);
+            const r = await ev(`(() => { const row = [...document.querySelectorAll('${T} .nl-question')].find(t => t.textContent.includes('Agent 1')), meta = row.querySelector('.nl-meta'), task = [...meta.querySelectorAll('a')].find(a => /task #9/.test(a.textContent)), group = row.closest('.nl-group-body').previousElementSibling; return { goal: group.querySelector('.nl-title').textContent, task: task?.textContent, taskHref: task?.getAttribute('href'), contained: meta.getBoundingClientRect().right <= row.getBoundingClientRect().right + 1 }; })()`);
+            check(/#4.*Ship the release notes/.test(r.goal), w + ': the parent group retains the goal number and title');
+            check(/task #9.*Draft the notes/.test(r.task) && /tasks.*9/.test(r.taskHref), w + ': the task remains an actual task link: ' + JSON.stringify(r));
+            check(r.contained, w + ': task metadata stays inside the row');
+            const pk = await ev(`(() => { const tr = [...document.querySelectorAll('${T} .nl-row')].find(t => t.textContent.includes('Agent 1')); return tr ? { btns: [...tr.querySelectorAll('button')].map(b => b.textContent.trim()), more: !!tr.querySelector('.inbox-more-choices') } : null; })()`);
             check(pk && pk.more && pk.btns.filter(x => ['Postgres', 'MySQL'].includes(x)).length === 2 && !pk.btns.includes('SQLite') && !pk.btns.includes('DuckDB'), `${w}: four choices show the first two and More choices (${JSON.stringify(pk)})`);
-            await ev(`document.querySelector('${T} .inbox-goal-task .dt-link[data-task-id]').click(); true`);
-            check(await waitFor(`!document.querySelector('${T} .inbox-goal-task')`, 'the task page', 8000).then(() => true, () => false), `${w}: the task link leaves the list for the task in the Inbox`);
-            await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs'))`); await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 4`, 'back to Needs you', 20000);
+            await ev(`[...document.querySelectorAll('${T} .nl-question .nl-meta a')].find(a => /task #9/.test(a.textContent)).click(); true`);
+            check(await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 8000).then(() => true, () => false), `${w}: the task link leaves the list for the task in the Inbox`);
+            await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs'))`); await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 4`, 'back to Needs you', 20000);
         }
     } finally { await client.close(); await removeBoards(ev, ['qn']).catch(() => {}); if (failures.length) { console.error(failures.join('\n')); process.exitCode = 1; } else console.log('ok'); }
 })().catch(e => { console.error(e.message); process.exitCode = 1; });

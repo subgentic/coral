@@ -9,13 +9,14 @@ export function mount(node, pills) {
     node.querySelector('.inbox-kind-control')?.remove();
     const row = node.querySelector('.list-bar-search-row'), group = row.querySelector('.team-tb-pills');
     if (!group || !pills) return;
-    const menu = moreMenu('inbox-kind', pills.items.map(it => ({ label: `${it.label}${it.count == null ? '' : ' '+it.count}`, pressed: it.key === pills.current, run: () => pills.onPick(it.key) })), { label: 'Kind', wrapClass: 'inbox-kind-control task-more' });
+    const menu = moreMenu('inbox-kind', (pills.menuItems || pills.items).map(it => ({ label: `${it.label}${it.count == null ? '' : ' '+it.count}`, pressed: it.key === pills.current, run: () => pills.onPick(it.key) })), { label: 'Kind', wrapClass: 'inbox-kind-control task-more' });
     const button = menu.querySelector('button');
-    button.textContent = 'Kind'; button.setAttribute('aria-label', `Kind: ${pills.items.find(it => it.key === pills.current)?.label || 'All'}`);
+    button.textContent = 'Kind'; button.setAttribute('aria-label', `Kind: ${(pills.menuItems || pills.items).find(it => it.key === pills.current)?.label || 'All'}`);
     row.insertBefore(menu, row.querySelector('.list-bar-toggle'));
     group.classList.add('inbox-kind-strip');
     const fit = () => {
         if (!node.isConnected) { node._kindObserver?.disconnect(); return; }
+        if (pills.menuItems) { setHidden(group, false); setHidden(menu, false); return; } // quick views and Kind are distinct controls in the ledger
         // Measure the unwrapped strip against its search row, excluding the title, the two tabs (their own line) and bulk-action rows.
         setHidden(group, false); setHidden(menu, true);
         const others = [...row.children].filter(e => e !== group && e !== menu && !e.matches('.inbox-folder-head,.inbox-needs-tabs,.needs-more,.team-tb-selection') && e.getClientRects().length);

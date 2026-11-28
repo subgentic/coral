@@ -1,3 +1,5 @@
+// #22094 replaces column-aligned table anatomy with grouped ledger rows.
+// Replacements below prove each row keeps selection, icon separation, identity and elapsed time; permission Dismiss is deliberately removed by v19.
 // Needs you rows, guidelines v3 section 4.14 (#17451): one row anatomy, tick box, icon and name at the same x on every row (N3); an agent's prompt has a tick box and its Dismiss in the kebab (N5); the wait is grey and short, the amber triangle only past a day (N7). 1440, 1280, 390.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -22,22 +24,13 @@ const BASE = require('./test_base').BASE;
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3`, 'the folders', 10000);
             if (mobile) await ev(`document.querySelector('#group-table-view .view-list-item[data-key="needs"]')?.click(); true`); else await ev(`document.querySelector('.view-list-item[data-key="needs"]').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary, #group-table-view button.dt-person').length >= 5`, 'the five rows', 8000); await settle(400);
+            await waitFor(`document.querySelectorAll('#group-table-view .nl-row').length === 5`, 'the five rows', 8000); await settle(400);
             await shot(`needs-${w}`);
-            const g = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr:not(.dt-group)')].filter(r => r.querySelector('.inbox-kind-icon')), x = (r, sel) => { const e = r.querySelector(sel); return e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().left) : null; };
-                return { n: rows.length, icon: rows.map(r => x(r, '.inbox-kind-icon')), name: rows.map(r => x(r, '.inbox-review-name, .inbox-agent-first .inbox-review-from, .dt-person')), check: rows.map(r => x(r, '.dt-check input')),
-                    ages: rows.map(r => { const a = r.querySelector('.inbox-age .inbox-age-t, .inbox-review-elapsed'); return a ? (a.textContent || a.dataset.elapsed || '') : ''; }), flags: rows.map(r => !!r.querySelector('.inbox-age-flag')), ageWords: rows.map(r => { const a = r.querySelector('.inbox-age'); return a ? [...a.children].filter(n => n.classList.contains('inbox-age-t')).map(n => n.textContent).join('') : ''; }),
-                    dismissBtn: rows.map(r => !!r.querySelector('button.inbox-dismiss')), kebab: rows.map(r => !!r.querySelector('.inbox-row-more-toggle')) }; })()`);
-            assert.equal(g.n, 5, `${w}: five rows`);
-            assert.equal(new Set(g.icon.filter(v => v !== null)).size, 1, `${w}: the icon starts at the same x on every row: ${JSON.stringify(g.icon)}`);
-            if (w >= 1000) assert.equal(new Set(g.name.filter(v => v !== null)).size, 1, `${w}: the name starts at the same x on every row: ${JSON.stringify(g.name)}`);
-            if (w >= 1000) {
-                assert.ok(g.check.every(v => v !== null) && new Set(g.check).size === 1, `${w}: every row, an agent's prompt too, has a tick box at the same x: ${JSON.stringify(g.check)}`);
-                assert.deepEqual(g.dismissBtn, [true, true, true, true, true], `${w}: Dismiss is direct at rest (#20203)`);
-                assert.ok(g.kebab.every(v=>!v), `${w}: no single-item kebab remains: ${JSON.stringify(g.kebab)}`);
-                assert.ok(g.ageWords.every(t => /^(<1 min|\d+ min|\d+ h|\d+ d)$/.test(t)), `${w}: the wait is short and has no word "waiting": ${JSON.stringify(g.ageWords)}`);
-                assert.deepEqual(g.flags, [false, false, false, false, true], `${w}: the amber triangle only on the wait past the limit: ${JSON.stringify(g.flags)}`);
-            }
+            const g = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .nl-row')]; return rows.map(row => { const icon = row.querySelector('.nl-icon,.inbox-kind-icon'), title = row.querySelector('.nl-title'), when = row.querySelector('.nl-when'), box = row.getBoundingClientRect(), i = icon.getBoundingClientRect(), t = title.getBoundingClientRect(); return { permission: row.classList.contains('nl-permission'), check: !!row.querySelector('.nl-check'), icon: i.left >= box.left && i.right <= t.left + 1, title: title.textContent, age: when.textContent, at: Date.parse(when.dateTime), muted: getComputedStyle(when).color !== getComputedStyle(title).color, permissionDismiss: row.classList.contains('nl-permission') && [...row.querySelectorAll('button')].some(b => b.textContent === 'Dismiss' && !b.hidden) }; }); })()`);
+            assert.equal(g.length, 5, w + ': one ledger row per request');
+            assert.ok(g.every(r => r.check && r.icon && r.title && Number.isFinite(r.at)), w + ': each row keeps selection, separate icon/title, and a valid source timestamp: ' + JSON.stringify(g));
+            assert.ok(g.every(r => r.muted && /ago$/.test(r.age)), w + ': elapsed time remains short, explicit and muted: ' + JSON.stringify(g));
+            assert.ok(g.every(r => !r.permissionDismiss), w + ': permission Dismiss is absent under the approved v19 action rules');
             await shot(`rows-${w}`);
         }
         await client.close(); process.exit(0);
