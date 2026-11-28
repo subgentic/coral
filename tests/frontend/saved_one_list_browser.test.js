@@ -24,11 +24,11 @@ const { setTheme } = require('./helpers/contrast');
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Plan Writer', job_title: 'Writer' }) }).then(r => r.status)`);
             await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 const hex = n => n.toString(16).padStart(64, '0');
-                const item = i => ({ id: hex(i), name: 'plan-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'saved'], uploader: 'Plan Writer', produced_by: 'Plan Writer', review_question: 'Ship plan ' + i + '?', ...(i === 1 ? { saved_at: new Date(Date.now() - 60000).toISOString() } : {}) }); // plan-1 was saved later though plan-2 is the newer file
+                const item = i => ({ id: hex(i), name: 'plan-' + i + '.md', media_type: 'text/markdown', size: 30, created_at: new Date(Date.now() - (9 - i) * 60000).toISOString(), source: 'upload', available: true, tags: ['for review', 'saved'], uploader: 'Plan Writer', produced_by: 'Plan Writer', review_question: 'Ship plan ' + i + '?', ...(i === 2 ? { starred: true, version_line: 'version 3 of plan-2.md', goal_id: 47, goal_title: 'Faster order imports', review_question: 'Approve this queue design: named presets only, one heavy job a machine, the light ones beside it, and the old runner kept for a week?' } : {}), ...(i === 1 ? { saved_at: new Date(Date.now() - 60000).toISOString() } : {}) }); // plan-1 was saved later though plan-2 is the newer file
                 window.__items = [1, 2].map(item); window.__calls = [];
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin), method = (opts.method || 'GET').toUpperCase(), m = u.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts(?:\\/([0-9a-f]{64})\\/(review|tags))?$/);
                     if (method !== 'GET' && /^\\/api\\/board\\//.test(u.pathname)) window.__calls.push({ method, path: u.pathname.replace('/api/board/${team}', ''), body: opts.body ? JSON.parse(opts.body) : null });
-                    if (u.pathname === '/api/saved' && method === 'GET') return json({ open: 2, done: 0, items: [{ id: 11, kind: 'board', ref: 'team-x', key: '5', title: 'Backend Dev', snippet: 'the retry budget is per request', team: 'team-x', saved_at: new Date(Date.now() - 30000).toISOString() }, { id: 12, kind: 'board', ref: 'team-x', key: '6', title: 'Orchestrator', snippet: 'ship it when green', team: 'team-x', saved_at: new Date(Date.now() - 86400000).toISOString() }] });
+                    if (u.pathname === '/api/saved' && method === 'GET') return json({ open: 2, done: 1, items: [{ id: 13, kind: 'board', ref: 'team-x', key: '7', title: 'Release Bot', snippet: 'v2.1.22 is out. The notes are on the release page.', team: 'team-x', saved_at: new Date(Date.now() - 2 * 86400000).toISOString(), done_at: new Date(Date.now() - 3600000).toISOString() }, { id: 11, kind: 'board', ref: 'team-x', key: '5', title: 'Backend Dev', snippet: 'the retry budget is per request. Each call gets three tries and a jittered back-off, and the limit is read from the team settings so it can be tuned without a release.', team: 'team-x', saved_at: new Date(Date.now() - 30000).toISOString() }, { id: 12, kind: 'board', ref: 'team-x', key: '6', title: 'Orchestrator', snippet: 'ship it when green', team: 'team-x', saved_at: new Date(Date.now() - 86400000).toISOString() }] });
                     if (u.pathname === '/api/team-artifacts') return new Promise(done => setTimeout(() => done(json(window.__reviewFixturePage(u,location.href,{'${team}':window.__items}))), window.__ntDelay || 0)); // the Inbox also reads the no-team list (#13574): this suite's files are all on its one team
                     if (!m) return original(url, opts);
                     if (!m[1]) return json({ project: '${team}', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false });
@@ -55,6 +55,38 @@ const { setTheme } = require('./helpers/contrast');
             check(JSON.stringify(shape.tags) === JSON.stringify(['', 'To review', 'To review', '']) && shape.approve === 0, at + 'a file still to decide says To review, a message has no tag, and no row has Approve: ' + JSON.stringify([shape.tags, shape.approve]));
             if (!mobile) check(/^4 saved · 2 files, 2 messages · newest saved first$/.test(shape.count.replace(/\s+/g, ' ').trim()) && shape.heads === 0, at + 'the count is said once, above the list: ' + JSON.stringify([shape.count, shape.heads]));
             for (const theme of ['light', 'dark']) { await setTheme(ev, theme); await ev(framesJs(3)); await shot(`saved-one-list-${w}-${theme}`); }
+            // the states the first picture has not (the designer's point 10): the pointer on a row, a starred file with its version, goal and long question; then the open phone menu; then the Done tab
+            for (const theme of ['light', 'dark']) {
+                await setTheme(ev, theme); await ev(framesJs(3));
+                if (!mobile) {
+                    const p = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-1/.test(x.textContent)).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+                    await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await ev(framesJs(2));
+                    const hov = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-1/.test(x.textContent)); const vis = e => !!e && e.getClientRects().length > 0; return { acts: vis(r.querySelector('.sl-actions')), right: vis(r.querySelector('.sl-right')) }; })()`);
+                    check(hov.acts && !hov.right, at + theme + ': the pointer on a row shows its buttons in place of the right side: ' + JSON.stringify(hov));
+                    await shot(`saved-states-${w}-hover-${theme}`);
+                    await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 790 });
+                } else {
+                    await ev(`document.querySelector('.saved-ledger button[aria-label="More actions for plan-2.md"]').click(); true`);
+                    await waitFor(`!!document.querySelector('.menu-item[aria-label^="Remove from Saved"]')`, at + 'the row\'s menu opens', 5000);
+                    await shot(`saved-states-${w}-menu-${theme}`);
+                    await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.body.click(); true`); await ev(framesJs(2));
+                }
+            }
+            const star = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-2/.test(x.textContent)); return { star: !!r.querySelector('.sl-star-on'), ver: (r.querySelector('.sl-ver') || {}).textContent || '', goal: (r.querySelector('.sl-goal') || {}).textContent || '' }; })()`);
+            check(star.star && star.ver === '(version 3)' && (mobile || /#47 Faster order imports/.test(star.goal)), at + 'a starred file shows its star, its version in brackets and its goal: ' + JSON.stringify(star));
+            await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].find(c => /^Done/.test(c.textContent.trim())).click(); true`);
+            await waitFor(`!!document.querySelector('.saved-ledger') && /v2\\.1\\.22 is out/.test(document.querySelector('.saved-ledger').textContent)`, at + 'the Done tab lists the message marked done', 8000);
+            check(await ev(`!/plan-\\d/.test(document.querySelector('.saved-ledger').textContent)`), at + 'the Done tab has no saved file: a verdict takes it out of Saved');
+            for (const theme of ['light', 'dark']) { await setTheme(ev, theme); await ev(framesJs(3)); await shot(`saved-states-${w}-done-${theme}`); }
+            if (mobile) await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].find(c => /^Open/.test(c.textContent.trim())).click(); true`);
+            if (!mobile) { // a touch screen wider than a phone has no hover: the buttons and the right side show together, on one line (the designer's point 7)
+                await Emulation.setDeviceMetricsOverride({ width: 1024, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 }); await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].find(c => /^Open/.test(c.textContent.trim())).click(); true`); // the list is drawn again with no hover
+                await waitFor(`!!document.querySelector('.saved-ledger') && /plan-1/.test(document.querySelector('.saved-ledger').textContent)`, at + 'Open again', 8000); await ev(framesJs(3));
+                const touch = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-2/.test(x.textContent)); const a = r.querySelector('.sl-actions').getBoundingClientRect(), g = r.querySelector('.sl-right').getBoundingClientRect(), m = r.querySelector('.sl-main').getBoundingClientRect(); return { acts: a.width > 0, right: g.width > 0, oneLine: Math.abs((a.top + a.bottom) / 2 - (g.top + g.bottom) / 2) < 4, rowH: Math.round(r.getBoundingClientRect().height), mainH: Math.round(m.height), apart: a.left >= g.right - 1, only: [...r.querySelectorAll('.sl-actions button')].filter(x => !x.closest('[role=menu]')).map(x => x.getAttribute('aria-label')) }; })()`);
+                check(touch.acts && touch.right && touch.oneLine && touch.apart && touch.rowH < touch.mainH + 40 && touch.only.length === 1 && /^More actions for /.test(touch.only[0]), at + 'wide touch: the phone\'s "..." menu beside the right side, on the row\'s one line: ' + JSON.stringify(touch));
+                await setTheme(ev, 'light'); await ev(framesJs(3)); await shot('saved-states-1024-touch-light');
+                await Emulation.setTouchEmulationEnabled({ enabled: false });
+            }
             await removeBoards(ev, [team]).catch(() => {});
         }
     } finally { await client.close(); }

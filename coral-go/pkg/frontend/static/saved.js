@@ -460,7 +460,7 @@ export function savedOpen(it) { if (isCloud()) return; return openSavedLink(it);
 export const savedFiltersNow = () => ({ ...filters });
 export function setSavedFilters(next) { setFilters(cleanSaved(next)); return refilterOrRefresh(); }
 export const savedPageSpec = () => ({
-    ...savedSpec(), idp: 'inbox-saved', placeholder: 'Search saved messages',
+    ...savedSpec(), idp: 'inbox-saved', placeholder: 'Search saved', searchLabel: 'Search saved', // the page's list holds files and messages (the Saved mock): the phone's top bar says these words too
     fields: [
         { type: 'select', key: 'kind', id: 'inbox-saved-kind', label: 'Type', values: KINDS, labels: KIND_LABEL, any: 'Any type' },
         { type: 'select', key: 'team', id: 'inbox-saved-team', label: 'Team', values: [], labels: {}, any: 'Any team' },

@@ -83,14 +83,14 @@ const AGENTS = (waiting) => waiting ? [
                 await escape(); await settle(500);
                 const a = await active(); assert.equal(a.data.taskId, '13', 'Escape (' + JSON.stringify(a) + ')');
             });
-            if (!mobile) await step('a saved message page starts at its title; Escape goes back to the Saved table with the focus on that message, not to another tab', async () => {
+            if (!mobile) await step('a saved message page starts at its title; Escape goes back to the Saved list with the focus on that message, not to another tab', async () => {
                 await ev(`window.switchNavTab('hub-inbox'); true`); await click('Saved', `${pane} .view-list-item[data-key="saved"]`); await settle(400);
-                const key = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key^="msg:"]')][1].dataset.key`); // the one Saved list keys a message row msg:<id>
-                await click('the message', `#group-table-view tr[data-key="${key}"] .dt-primary`); await settle(500);
+                const key = await ev(`[...document.querySelectorAll('#group-table-view .saved-ledger .sl-row[data-key^="msg:"]')][1].dataset.key`); // the one Saved list keys a message row msg:<id> (#22108)
+                await click('the message', `#group-table-view .sl-row[data-key="${key}"] .sl-name`); await settle(500);
                 assert.equal((await active()).cls.includes('wf-item-title'), true, 'a message page starts at its title');
                 await escape(); await settle(500);
-                assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Saved', 'back at the Saved table');
-                const a = await active(); assert.equal(await ev(`document.activeElement.closest('tr')?.dataset.key`), key, 'with the focus on that message (' + JSON.stringify(a) + ')');
+                assert.equal(await ev(`document.querySelector('#group-table-title').textContent`), 'Saved', 'back at the Saved list');
+                const a = await active(); assert.equal(await ev(`document.activeElement.closest('.sl-row, tr')?.dataset.key`), key, 'with the focus on that message (' + JSON.stringify(a) + ')');
                 assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`), 'hub-inbox', 'still in the Inbox');
             });
             if (mobile) await step('the phone: a task opens at its Back link (not a ring round the title) and Back puts the focus on its row in the table', async () => {
@@ -102,12 +102,12 @@ const AGENTS = (waiting) => waiting ? [
                 await waitFor(`(document.activeElement && String(document.activeElement.className) || '').includes('dt-primary')`, 'the task row has the focus again', 10000);
                 const a = await active(); assert.ok(a.cls.includes('dt-primary') && a.data.taskId, 'the task row in the table has the focus (' + JSON.stringify(a) + ')');
             });
-            if (mobile) await step('the Saved list on a phone is mail rows (#9583): the message and its time on the row, the whole row on screen, nothing behind a sideways scroll, and a tap opens the message (Done is on its page)', async () => {
+            if (mobile) await step('the Saved list on a phone (#22108): the message and its menu on the row, the whole row on screen, nothing behind a sideways scroll, and it is a list', async () => {
                 await ev(`window.switchNavTab('hub-inbox'); document.querySelector('${pane} .view-list-item[data-key="saved"]').click(); true`); await settle(500);
-                const r = await ev(`(() => { const tb = document.querySelector('#group-table-view .dt-table'); const row = tb.querySelector('tbody tr'); const rb = row.getBoundingClientRect(); const sc = document.querySelector('#group-table-view .dt-box'); const btn = row.querySelector('button.dt-mail-open'), time = row.querySelector('.dt-mail-time'); const bb = btn && btn.getBoundingClientRect(), tbx = time && time.getBoundingClientRect();
-                    return { mail: row.classList.contains('dt-mailed'), h: Math.round(rb.height), btnIn: !!bb && bb.left >= -1 && bb.right <= innerWidth + 1, timeIn: !!tbx && tbx.right <= innerWidth - 11, text: btn ? btn.textContent.length : 0, over: sc.scrollWidth - sc.clientWidth, role: tb.getAttribute('role'), cells: [...row.children].map(t => t.getAttribute('role')) }; })()`);
-                assert.ok(r.mail && r.h >= 56, 'a mail row: ' + JSON.stringify(r)); assert.ok(r.btnIn && r.timeIn && r.text > 0, 'the row and its time are on screen: ' + JSON.stringify(r)); assert.ok(r.over <= 1, 'no sideways scroll: ' + JSON.stringify(r));
-                assert.equal(r.role, 'table'); assert.ok(r.cells.every(c => c === 'cell'), 'cells keep their role');
+                const r = await ev(`(() => { const list = document.querySelector('#group-table-view .saved-ledger'); const row = list.querySelector('.sl-row'); const rb = row.getBoundingClientRect(); const v = document.querySelector('#group-table-view'); const btn = row.querySelector('.sl-name'), more = row.querySelector('.sl-actions button'); const bb = btn && btn.getBoundingClientRect(), mb = more && more.getBoundingClientRect();
+                    return { h: Math.round(rb.height), btnIn: !!bb && bb.left >= -1 && bb.right <= innerWidth + 1, moreIn: !!mb && mb.right <= innerWidth + 1 && mb.width >= 43, text: btn ? btn.textContent.length : 0, over: v.scrollWidth - v.clientWidth, tag: list.tagName, items: [...list.children].every(c => c.tagName === 'LI') }; })()`);
+                assert.ok(r.h >= 44, 'a row: ' + JSON.stringify(r)); assert.ok(r.btnIn && r.moreIn && r.text > 0, 'the row and its menu are on screen: ' + JSON.stringify(r)); assert.ok(r.over <= 1, 'no sideways scroll: ' + JSON.stringify(r));
+                assert.equal(r.tag, 'UL'); assert.ok(r.items, 'every row is a list item');
             });
         }
     } finally { await client.close(); }

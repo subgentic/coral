@@ -2,7 +2,7 @@
    A row wears .list-row (its hover and focus ring); the tag wears .chip; the agent icon takes the table avatar's colours. */
 .saved-ledger-count { margin: 0 0 var(--space-md); font-size: var(--fs-md); color: var(--text-secondary); max-width: 880px; }
 .saved-ledger-count b { color: var(--text-primary); font-weight: var(--fw-strong); }
-.saved-ledger { list-style: none; margin: 0; padding: 0; max-width: 880px; overflow: hidden; border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-secondary); }
+.saved-ledger { list-style: none; margin: 0; padding: 0; max-width: 880px; overflow: hidden; border: var(--card-border); border-radius: var(--card-radius); background: var(--card-fill); }
 .saved-ledger .sl-row { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-lg); padding: var(--space-md) var(--space-lg); color: var(--text-primary); }
 .saved-ledger .sl-row + .sl-row { border-top: 1px solid var(--border); }
 .sl-icon { font-size: var(--fs-xl); color: var(--text-muted); align-self: start; margin-top: 2px; }
@@ -35,7 +35,7 @@
 .sl-actions { display: none; align-items: center; gap: var(--space-sm); }
 .sl-row:hover .sl-actions, .sl-row:focus-within .sl-actions { display: flex; }
 .sl-row:hover .sl-right, .sl-row:focus-within .sl-right { display: none; }
-@media (hover: none) { .saved-ledger:not(.saved-ledger-phone) .sl-actions { display: flex; } }
+@media (hover: none) { .saved-ledger:not(.saved-ledger-phone) .sl-row { grid-template-columns: 1.25rem minmax(0, 1fr) auto auto; } .saved-ledger:not(.saved-ledger-phone) .sl-actions { display: flex; } .saved-ledger:not(.saved-ledger-phone) .sl-row:is(:hover, :focus-within) .sl-right { display: grid; } } /* a touch screen wider than a phone: the buttons in a fourth column beside the right side, on one line */
 .sl-act { white-space: nowrap; }
 /* A phone: the "..." menu on every row, 44 by 44; the time, the agent icon and the text are left out. */
 .saved-ledger-phone .sl-row { grid-template-columns: 1.125rem minmax(0, 1fr) auto auto; column-gap: var(--space-md); padding: var(--space-md); align-items: start; }
