@@ -34,8 +34,8 @@ function row(r, x) {
     name.addEventListener('click', e => { e.stopPropagation(); r.open(); });
     one.append(name); if (r.version) one.append(el('span', 'sl-ver', `(version ${r.version})`));
     const parts = [];
-    if (x.phone && r.agent?.text) parts.push(r.agent.open ? linkButton(r.agent.text, `Open ${r.agent.text}`, r.agent.open, 'sl-agent-link') : el('span', 'sl-agent-name', r.agent.text));
-    if (r.team?.text) parts.push(r.team.open ? linkButton(r.team.text, `Open team ${r.team.text}`, r.team.open) : el('span', 'sl-team', r.team.text));
+    if (x.phone && r.agent?.text) parts.push(el('span', 'sl-agent-name', r.agent.text)); // a phone: line 2 is words, not 20 px targets; the row and its "..." are the targets (44 px, phone_targets)
+    if (r.team?.text) parts.push(r.team.open && !x.phone ? linkButton(r.team.text, `Open team ${r.team.text}`, r.team.open) : el('span', 'sl-team', r.team.text));
     if (!x.phone && r.goal) { const g = linkButton('', `Open goal ${r.goal.text}`, r.goal.open, 'sl-goal'); g.append(icon('flag', 'sl-flag'), document.createTextNode(r.goal.text)); parts.push(g); }
     if (!x.phone && r.text) parts.push(el('span', 'sl-text', r.text));
     parts.forEach((p, i) => { if (i) two.append(dot()); two.append(p); });

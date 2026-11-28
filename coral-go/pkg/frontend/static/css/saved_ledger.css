@@ -15,7 +15,7 @@
 .sl-line2 { display: flex; align-items: baseline; gap: var(--space-xs); min-width: 0; font-size: var(--fs-base); color: var(--text-secondary); white-space: nowrap; overflow: hidden; }
 .sl-link { all: unset; cursor: pointer; color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; flex: none; }
 .sl-link:hover { color: var(--text-primary); }
-.sl-agent-link, .sl-agent-name { color: var(--text-primary); font-weight: var(--fw-strong); }
+.sl-agent-name { color: var(--text-primary); font-weight: var(--fw-strong); }
 .sl-goal { display: inline-flex; align-items: baseline; gap: 2px; }
 .sl-flag { font-size: var(--fs-base); color: var(--avatar-6); align-self: center; text-decoration: none; }
 .sl-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
@@ -51,7 +51,7 @@
 .saved-ledger-phone .sl-right { grid-template-columns: auto auto; }
 .saved-ledger-phone .sl-actions { display: flex; }
 .saved-ledger-phone .sl-line1 { flex-wrap: wrap; }
-.saved-ledger-phone .sl-name { white-space: normal; overflow-wrap: anywhere; }
+.saved-ledger-phone .sl-name { white-space: normal; overflow-wrap: anywhere; padding-block: 12px; margin-block: -12px; min-inline-size: 44px; } /* a 44 px tap target with the row's look unchanged (phone_targets) */
 .saved-ledger-phone .sl-actions .inbox-row-more-toggle { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); margin: -10px -10px -10px 0; }
 @media (forced-colors: active) { .sl-avatar { border: 1px solid CanvasText; } }
 @media (max-width: 767px) { .saved-ledger-count { display: none; } } /* a phone says the count once, beside the title */

@@ -274,13 +274,8 @@ if (typeof document !== 'undefined') {
     document.addEventListener('coral:action-start', e => { if (e.detail && open) e.detail.table = open; }); // the table on screen when the action began
     document.addEventListener('coral:action-result', e => { const t = e.detail && e.detail.table; if (!t || t !== open) return; actedRefresh = true; try { refreshGroupTable(t.kind); } finally { actedRefresh = false; } }); // only that table, still on screen
 }
-function showHeldNote(n) {
-    const host = document.getElementById('group-table-view');
-    let p = host.querySelector('.group-table-held');
-    if (!p) { p = document.createElement('p'); p.className = 'item-meta group-table-held'; p.setAttribute('role', 'status'); host.append(p); }
-    const b = document.createElement('button'); b.className = 'btn btn-small btn-quiet'; b.textContent = 'Show';
-    b.onclick = () => { const k = deferredKind; deferredKind = null; hoverHeldSince = null; p.remove(); actedRefresh = true; try { refreshGroupTable(k); } finally { actedRefresh = false; } };
-    p.replaceChildren(`${n || 'Some'} new waiting. `, b);
+function showHeldNote(n) { // its drawing is lazy (group_held_note.js): it is only needed while a redraw is held
+    importOnce('./group_held_note.js').then(m => { if (deferredKind !== null) m.drawHeldNote(n, p => { const k = deferredKind; deferredKind = null; hoverHeldSince = null; p.remove(); actedRefresh = true; try { refreshGroupTable(k); } finally { actedRefresh = false; } }); }, () => {});
 }
 function leaveList() { hoverOver = false; const k = deferredKind, had = hoverHeldSince !== null; hoverHeldSince = null; document.querySelectorAll('.group-table-held').forEach(n => n.remove()); if (k && had && !holding()) { deferredKind = null; setTimeout(() => refreshGroupTable(k), 0); } }
 if (typeof document !== 'undefined') {

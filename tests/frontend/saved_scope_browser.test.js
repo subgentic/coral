@@ -29,7 +29,7 @@ const hex = i => i.toString(16).padStart(20, '0');
     const SNAP = `(() => { const t = document.getElementById('group-table-view'), inbox = !!t && t.getClientRects().length > 0 && t.dataset.group === 'hub-inbox:saved', n = c => c && c.textContent !== '0' ? '(' + c.textContent + ')' : '';
         return {
         heading: inbox ? 'All saved' : (document.getElementById('saved-ui')?.getAttribute('aria-label') || ''),
-        rows: inbox ? [...t.querySelectorAll('tbody .dt-primary')].map(r => (r.dataset.rowName || r.textContent).replace(/^[^,]*, /, '')).sort() : [...document.querySelectorAll('#saved-table tbody .dt-primary')].map(r => (r.dataset.rowName || r.textContent).replace(/^[^,]*, /, '')).sort(),
+        rows: inbox ? [...t.querySelectorAll('.saved-ledger .sl-name')].map(r => r.textContent.trim()).sort() : [...document.querySelectorAll('#saved-table tbody .dt-primary')].map(r => (r.dataset.rowName || r.textContent).replace(/^[^,]*, /, '')).sort(),
         empty: (document.querySelector(inbox ? '#group-table-view .empty-state-line' : '#saved-table .empty-state-line') || {}).textContent || null,
         tabs: inbox ? [...t.querySelectorAll('.team-tb-pills .goals-chip')].map(b => { const m = b.textContent.match(/\\d+/); return m && m[0] !== '0' ? '(' + m[0] + ')' : ''; }) : [...document.querySelectorAll('#saved-table .group-chip .group-chip-count')].map(c => n(c)),
         badge: (document.getElementById('saved-tab-count') || {}).textContent || '',
@@ -37,11 +37,11 @@ const hex = i => i.toString(16).padStart(20, '0');
         headingFits: (() => { const h = document.getElementById('saved-ui'); return h ? h.scrollWidth <= h.clientWidth + 1 : false; })(),
     }; })()`;
     const snap = () => ev(SNAP);
-    const rowsAre = async (heading, rows, tabs, label) => {
+    const rowsAre = async (heading, rows, tabs, label, badgeN = tabs[0].replace(/[()]/g, '')) => { // the Inbox's Open | Done has no numbers (the Saved mock, #22108): its badge is given apart
         await settle(`(() => { const s = ${SNAP}; return s.heading === ${JSON.stringify(heading)} && ${JSON.stringify(rows)}.join('|') === s.rows.join('|') && s.tabs[0] === ${JSON.stringify(tabs[0])}; })()`, label)
             .catch(async e => { throw new Error(e.message + ' | ' + JSON.stringify(await snap()) + ' | ' + JSON.stringify(await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved_marks.js'); const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const d = await import((window.__coralStatic || '/static/') + 'dock_page.js'); return { showing: m.savedShowing(), scope: m.currentScope(), cur: state.currentSession && { n: state.currentSession.name, t: state.currentSession.type, bp: state.currentSession.board_project }, dock: d.dockKind(), ev: window.__rc }; })()`))); });
         const s = await snap();
-        const openN = tabs[0].replace(/[()]/g, '');
+        const openN = badgeN;
         await settle(`document.getElementById('saved-tab-count').textContent === ${JSON.stringify(openN)}`, 'the dock badge of the scope').catch(() => {});
         const b = await snap();
         check(label + ' (badge ' + openN + ')', s.heading === heading && JSON.stringify(s.rows) === JSON.stringify(rows) && s.tabs.join() === tabs.join() && b.badge === openN, JSON.stringify([s.heading, s.rows, s.tabs, b.badge]));
@@ -90,7 +90,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             await open(w, mobile);
             // home: everything
             await openSaved();
-            let s = await rowsAre('All saved', ['fe-a chat', 'qa-a chat', 'qa-b chat', 'team-a board, by the Orchestrator', 'team-a board, by the QA Engineer', 'team-b board, by the QA Engineer'], ['(6)', '(1)'], `${dev}: home shows everything, headed All saved (6 open, 1 done)`);
+            let s = await rowsAre('All saved', ['fe-a chat', 'qa-a chat', 'qa-b chat', 'team-a board, by the Orchestrator', 'team-a board, by the QA Engineer', 'team-b board, by the QA Engineer'], ['', ''], `${dev}: home shows everything, headed All saved (6 open, 1 done)`, '6');
             await shotSaved(`saved-scope-all-${dev}`);
             // an agent
             await select(QA_A);
@@ -125,7 +125,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             await rowsAre('Saved: QA Beta', ['qa-b chat', 'team-b board, by the QA Engineer'], ['(2)', ''], `${dev}: leaving the team, the agent underneath is the scope again`);
             await ev(`window.selectLiveSession('', '', '', 'local'); true`).catch(() => {});
             await openSaved(); // nothing is chosen, so the scope is everything's and the list is the Inbox's: the bookmark opens it
-            await rowsAre('All saved', ['fe-a chat', 'qa-a chat', 'qa-b chat', 'team-a board, by the Orchestrator', 'team-a board, by the QA Engineer', 'team-b board, by the QA Engineer'], ['(6)', '(1)'], `${dev}: home again shows everything`);
+            await rowsAre('All saved', ['fe-a chat', 'qa-a chat', 'qa-b chat', 'team-a board, by the Orchestrator', 'team-a board, by the QA Engineer', 'team-b board, by the QA Engineer'], ['', ''], `${dev}: home again shows everything`, '6');
         }
 
         // An agent with nothing saved can finish its first scoped read before the startup all-scope read.
