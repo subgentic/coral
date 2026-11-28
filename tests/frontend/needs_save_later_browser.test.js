@@ -1,5 +1,5 @@
 // Save for later on a Needs you review row (#11641, the operator): the row's three dots have "Save for later" (and a row can be dragged onto Saved): the file leaves Needs you and its count, a toast offers Undo, Saved lists it
-// under "Files for review" with Approve, Changes and Deny still there and "Move to Needs you" in its dots, which brings it back as it was. Each is one decision on the review route ('save', 'unsave') and nothing else is posted
+// under Saved as a calm row (#22108: no verdict buttons, "To review" as its tag), and "Remove from Saved" brings it back as it was. Each is one decision on the review route ('save', 'unsave') and nothing else is posted
 // (nothing is sent to the agent). The server's tags are modelled in the page. 1440 and 390. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -55,23 +55,26 @@ const { removeBoards } = require('./helpers/board_cleanup');
             let calls = await ev(`window.__calls`);
             check(calls.length === 1 && calls[0].path.endsWith('/review') && calls[0].body.decision === 'save', at + 'one decision, "save", and nothing else was posted: ' + JSON.stringify(calls));
             check(await ev(`[...document.querySelectorAll('.toast')].some(t => /Saved for later: plan-1\\.md/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`), at + 'a toast says it, with Undo');
-            // Saved lists it, with its decisions
+            // Saved lists it as a calm row (#22108): no Approve or Request changes on the row, the verdict is given in the file; "To review" says one is still owed
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
-            await waitFor(`!!document.querySelector('.saved-files') && document.querySelector('.saved-files').textContent.includes('plan-1.md')`, at + 'Saved lists the file under "Files for review"', 10000);
-            check(await ev(`/Ship plan 1\\? .{1,3} from Plan Writer/.test(document.querySelector('.saved-files').textContent.replace(/\\s+/g, ' '))`), at + 'the file\'s question and sender are shown, read from review_question and produced_by as Needs you does');
-            const sec = await ev(`(() => { const s = document.querySelector('.saved-files'); const names = [...s.querySelectorAll('button')].map(b => (b.getAttribute('aria-label') || b.textContent).trim()); return { title: (document.querySelector('.inbox-saved-card .inbox-card-head') || {}).firstChild?.textContent, names }; })()`);
-            check(sec.title === 'Saved', at + 'the list is headed "Saved", one list of files and messages (#20508): ' + JSON.stringify(sec.title));
-            check(sec.names.includes('Approve: plan-1.md') && (sec.names.includes('Comment: plan-1.md') || sec.names.includes('Request changes: plan-1.md')) && sec.names.some(n => /^(Deny: plan-1\.md|More actions for plan-1\.md)$/.test(n)), at + 'Approve, Changes and Deny are still there: ' + JSON.stringify(sec.names));
-            // the folder page's header is one row, the title and its count (a1a3310bb): the first h2 on a phone is a hidden list title, so the header is read
-            const counts = await ev(`({ title: (document.querySelector('.inbox-folder-head') || document.querySelector('.group-table-title, .inbox-group-title, h2') || {}).textContent, pill: [...document.querySelectorAll('button')].filter(b => /^Open \\d/.test(b.textContent.trim())).map(b => b.textContent.trim()), side: (document.querySelector('.view-list-item[data-key="saved"]') || {}).textContent })`);
-            check(!mobile ? /^Open 1$/.test((counts.pill || [])[0] || '') : true, at + 'the Open pill counts the saved file: ' + JSON.stringify(counts));
-            check(/Saved\s*1/.test(String(counts.title).replace(/\s+/g, ' ')) || !!(await ev(`/Saved\\s*1\\b/.test(document.querySelector('#inbox-page, #group-table-view')?.closest('main, section, div')?.textContent.slice(0, 400) || document.body.textContent.slice(0, 600))`)), at + 'the title count includes the saved file: ' + JSON.stringify(counts));
+            await waitFor(`!!document.querySelector('.saved-ledger') && document.querySelector('.saved-ledger').textContent.includes('plan-1.md')`, at + 'Saved lists the file', 10000);
+            const row = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(e => e.textContent.includes('plan-1.md')); if (!r) return null; return { text: r.textContent.replace(/\\s+/g, ' '), tag: (r.querySelector('.sl-tag') || {}).textContent || '', agent: (r.querySelector('.sl-avatar') || {}).title || r.textContent, names: [...r.querySelectorAll('button')].map(b => (b.getAttribute('aria-label') || b.textContent).trim()) }; })()`);
+            check(!!row, at + 'the saved file has a row');
+            if (row) {
+                check(mobile || /Ship plan 1\?/.test(row.text), at + 'the file\'s question is on line 2, read from review_question as Needs you does: ' + row.text);
+                check(/Plan Writer/.test(row.agent), at + 'the sender is the row\'s agent, read from produced_by: ' + JSON.stringify(row.agent));
+                check(row.tag === 'To review', at + 'the tag says "To review": ' + JSON.stringify(row.tag));
+                check(!row.names.some(n => /^(Approve|Request changes|Deny|Comment):/.test(n)), at + 'no verdict buttons on the row: ' + JSON.stringify(row.names));
+            }
+            // the count is said once: the title on a phone, the line above the list on a desktop; the Open pill has no number
+            const counts = await ev(`({ line: (document.querySelector('.saved-ledger-count') || {}).textContent || '', title: (document.querySelector('.inbox-folder-head') || {}).textContent || '', pill: [...document.querySelectorAll('button')].filter(b => /^Open\\b/.test(b.textContent.trim()) && b.closest('.inbox-folder-toolbar')).map(b => b.textContent.trim()) })`);
+            check(!mobile ? /^1 saved\b/.test(counts.line.trim()) : /1/.test(counts.title), at + 'the count includes the saved file: ' + JSON.stringify(counts));
+            check(counts.pill.every(p => p === 'Open'), at + 'the Open pill carries no number: ' + JSON.stringify(counts.pill));
             await shot(`saved-files-${w}`);
-            // Move to Needs you
-            await ev(`document.querySelector('.saved-files button[aria-label="More actions for plan-1.md"]').click(); true`);
-            await waitFor(`!!document.querySelector('.saved-files .menu-item[aria-label="Move to Needs you: plan-1.md"]')`, at + 'the dots have "Move to Needs you"', 5000);
-            await ev(`document.querySelector('.saved-files .menu-item[aria-label="Move to Needs you: plan-1.md"]').click(); true`);
-            await waitFor(`!document.querySelector('.saved-files') || !document.querySelector('.saved-files').textContent.includes('plan-1.md')`, at + 'it leaves Saved', 8000);
+            // Remove from Saved: back to Needs you (on a desktop the row's button, on a phone the row's "..." menu)
+            if (!mobile) await ev(`document.querySelector('.saved-ledger button[aria-label="Remove from Saved: plan-1.md"]').click(); true`);
+            else { await ev(`document.querySelector('.saved-ledger button[aria-label="More actions for plan-1.md"]').click(); true`); await waitFor(`!!document.querySelector('.menu-item[aria-label="Remove from Saved: plan-1.md"]')`, at + 'the menu has "Remove from Saved"', 5000); await ev(`document.querySelector('.menu-item[aria-label="Remove from Saved: plan-1.md"]').click(); true`); }
+            await waitFor(`!document.querySelector('.saved-ledger') || !document.querySelector('.saved-ledger').textContent.includes('plan-1.md')`, at + 'it leaves Saved', 8000);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'it is back in Needs you', 10000);
             calls = await ev(`window.__calls`);

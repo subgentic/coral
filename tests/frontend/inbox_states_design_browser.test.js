@@ -73,11 +73,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await shot('inbox-footer-1280-dark');
         // the Saved folder: a saved file and saved messages in one card
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
-        await waitFor(`!!document.querySelector('.inbox-saved-card .inbox-saved-message-row')`, 'the saved messages', 15000);
+        await waitFor(`!!document.querySelector('.saved-ledger .sl-message')`, 'the saved messages', 15000);
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the saved files fill in after the messages
         await ev(`window.scrollTo(0, 0); true`); await ev(framesJs(10));
-        const sv = await ev(`(() => { const on = document.querySelector('.inbox-folder-toolbar .goals-chip[aria-pressed="true"]'), cs = on && getComputedStyle(on); return { head: (document.querySelector('.inbox-folder-head .session-group-count') || {}).textContent, pill: on && on.textContent, bg: cs && cs.backgroundColor, border: cs && cs.borderTopWidth, tile: !!document.querySelector('.inbox-saved-card .inbox-kind-icon') }; })()`);
-        check(/^1 file \u00b7 \d+ messages?$/.test(sv.head || '') && /^Open/.test(sv.pill || '') && sv.border === '1px' && sv.tile, `the Saved page says what it holds and Open is an outlined pill: ${JSON.stringify(sv)}`);
+        const sv = await ev(`(() => { const on = document.querySelector('.inbox-folder-toolbar .goals-chip[aria-pressed="true"]'), cs = on && getComputedStyle(on); return { head: (document.querySelector('.inbox-folder-head .session-group-count') || {}).textContent, pill: on && on.textContent, bg: cs && cs.backgroundColor, border: cs && cs.borderTopWidth, tile: !!document.querySelector('.saved-ledger .sl-icon') }; })()`);
+        check(/^\d+ saved$/.test(sv.head || '') && sv.pill === 'Open' && sv.border === '1px' && sv.tile, `the Saved page says what it holds, and Open is the picked half of the switch with no number (#22108): ${JSON.stringify(sv)}`);
         await shot('inbox-saved-1280-dark');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`document.querySelectorAll('${T} tbody tr.inbox-card-tr').length >= 6`, 'the rows again', 15000);

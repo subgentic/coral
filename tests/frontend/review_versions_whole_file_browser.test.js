@@ -66,14 +66,14 @@ const id = n => n.toString(16).padStart(64, '0');
         await refresh();
         assert.deepEqual(await needs(), [], 'no earlier version comes up as the row');
         await openSaved(); await refresh();
-        await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 1`, 'Saved lists the file once', 8000);
-        const saved = await ev(`[...document.querySelectorAll('.saved-files tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
-        assert.ok(saved.length === 1 && /2 earlier versions/.test(saved[0]), 'one Saved row, the newest with its earlier versions: ' + JSON.stringify(saved));
+        await waitFor(`document.querySelectorAll('.saved-ledger .sl-row').length === 1`, 'Saved lists the file once', 8000);
+        const saved = await ev(`[...document.querySelectorAll('.saved-ledger .sl-row')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
+        assert.ok(saved.length === 1 && /\(version 3\)/.test(saved[0]), 'one Saved row, the newest, with its version in brackets (#22108): ' + JSON.stringify(saved));
 
-        // Move to Needs you: back as one row
-        await ev(`window.__decisions.length = 0; const r = document.querySelector('.saved-files tbody tr'); r.querySelector('[data-slot=dots] button, button[aria-haspopup=menu]').click(); true`);
-        await waitFor(`!![...document.querySelectorAll('.saved-files .menu-item')].find(b => /Move to Needs you/.test(b.textContent))`, 'the menu', 4000);
-        await ev(`[...document.querySelectorAll('.saved-files .menu-item')].find(b => /Move to Needs you/.test(b.textContent)).click(); true`);
+        // Remove from Saved: back to Needs you as one row
+        await ev(`window.__decisions.length = 0; const r = document.querySelector('.saved-ledger .sl-row'); r.querySelector('button[aria-haspopup=menu]').click(); true`);
+        await waitFor(`!![...document.querySelectorAll('.saved-ledger .menu-item')].find(b => /Remove from Saved/.test(b.textContent))`, 'the menu', 4000);
+        await ev(`[...document.querySelectorAll('.saved-ledger .menu-item')].find(b => /Remove from Saved/.test(b.textContent)).click(); true`);
         await waitFor(`window.__decisions.length >= 3`, 'unsave went to every version', 8000);
         assert.deepEqual((await decisions()).sort(), ['unsave:1', 'unsave:2', 'unsave:3']);
         await openNeeds(); await refresh();
@@ -100,9 +100,9 @@ const id = n => n.toString(16).padStart(64, '0');
         // a Saved list that already holds two versions saved on their own (as the Operator's did) is one row
         await ev(`window.__decisions.length = 0; window.__items.forEach(a => { a.tags = ['for review', 'internal']; }); window.__items[0].tags.push('saved'); window.__items[1].tags.push('saved'); window.__items.pop(); true`); await refresh();
         await openSaved(); await refresh();
-        await waitFor(`document.querySelectorAll('.saved-files tbody tr').length >= 1`, 'the saved files', 8000);
-        const legacy = await ev(`[...document.querySelectorAll('.saved-files tbody tr')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
-        assert.ok(legacy.length === 1 && /1 earlier version(?!s)/.test(legacy[0]), 'two saved versions are one Saved row with "1 earlier version": ' + JSON.stringify(legacy));
+        await waitFor(`document.querySelectorAll('.saved-ledger .sl-row').length >= 1`, 'the saved files', 8000);
+        const legacy = await ev(`[...document.querySelectorAll('.saved-ledger .sl-row')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
+        assert.ok(legacy.length === 1 && /\(version 2\)/.test(legacy[0]), 'two saved versions are one Saved row, version 2: ' + JSON.stringify(legacy));
         console.log('PASS a file with several versions: Save, Dismiss and Move to Needs you apply to the whole file; Saved is one row per file');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

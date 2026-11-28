@@ -109,8 +109,8 @@ const { coralReady } = require('./helpers/wait');
                 // a saved file's row says it too, and it is not counted (the Orchestrator's decision, #12026)
                 const before = await badge();
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('saved')).then(()=>true)`);
-                await waitFor(`[...document.querySelectorAll('.saved-files tbody tr')].some(r => /Saved file\\.txt/.test(r.textContent))`, 'the saved file listed', 10000);
-                assert.ok(await ev(`[...document.querySelectorAll('.saved-files tbody tr')].find(r => /Saved file\\.txt/.test(r.textContent)).textContent.includes('New comments')`), 'the saved file says New comments');
+                await waitFor(`[...document.querySelectorAll('.saved-ledger .sl-row')].some(r => /Saved file\\.txt/.test(r.textContent))`, 'the saved file listed', 10000);
+                assert.ok(await ev(`[...document.querySelectorAll('.saved-ledger .sl-row')].find(r => /Saved file\\.txt/.test(r.textContent)).textContent.includes('New comments')`), 'the saved file says New comments');
                 assert.equal(await badge(), before, 'and it is not counted');
                 console.log('PASS new comments marker ' + width);
             } catch (error) { failures.push(width + ': ' + error.message); console.error(failures.at(-1)); }

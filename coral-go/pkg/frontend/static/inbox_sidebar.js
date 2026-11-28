@@ -1103,7 +1103,7 @@ function inboxSavedToolbar() {
     }
     const v = saved.savedView(), filters = saved.savedFiltersNow(), options = saved.savedPageOptions();
     const node = savedBar.draw({ filters, options,
-        pills: { label: 'Show', current: v.tab, items: [{ key: 'open', label: 'Open', count: `${v.totals.open + countSavedReviews().value}${countSavedReviews().complete && savedKnown() ? '' : '+'}` }, { key: 'done', label: 'Done', count: v.totals.done }], onPick: key => saved.setSavedTab(key) } });
+        pills: { label: 'Show', current: v.tab, items: [{ key: 'open', label: 'Open' }, { key: 'done', label: 'Done' }], onPick: key => saved.setSavedTab(key) } }); // a two-part switch with no numbers: the count is said once, above the list (#22108)
     if (!node.querySelector('.agent-copy')) (node.querySelector(':scope > .list-bar-search-row') || node).append(agentCopyButton('saved_messages', 'The Operator\u2019s Saved list (Inbox, Saved): messages kept for later.')); // on the header row, like Needs you (#18802)
     return { node, signature: JSON.stringify([filters, v.tab, v.totals, options, countSavedReviews()]) };
 }
@@ -1312,31 +1312,8 @@ function appendReviewPaging(host, savedPage = false) {
 
 // ── The tables ───────────────────────────────────────────────────────────
 /** Saved uses the same columns in the Inbox and dock; only its opener and table state differ. */
-/** A section head of a folder's card (#19833): its mark, its name, and a quiet note at the right. */
 /** The Saved page's head words, as the approved list draws them: "1 file · 3 messages" (#19841). */
 const savedHeadWords = (files, messages) => `${files} file${files === 1 ? '' : 's'} \u00b7 ${messages} message${messages === 1 ? '' : 's'}`;
-const folderHead = (title, note, mark) => { const h = DT.el('h3', `saved-files-title inbox-card-head inbox-card-head-${mark}`, title); h.append(DT.el('span', 'inbox-card-head-note', note)); return h; };
-/** A saved file's Star, between its Saved mark and the dots, as a Needs you row has it (#20508). */
-function addFileStar(a, tr) {
-    const bar = tr.querySelector('.inbox-review-actions'); if (!bar) return;
-    const star = starControl(a, { labelled: !isPhoneLayout(), hex: a.hex, name: markHidden(a.name, { strict: true }), reviewPin: true, onChange: on => { reviewStarChanged(a, on); renderInboxNav(true); } });
-    if (!star) return;
-    star.classList.add('inbox-review-star'); const dots = bar.querySelector('[data-slot="dots"]'); if (dots) dots.before(star); else bar.append(star);
-    const common = DT.el('span', 'inbox-common-actions'), controls = [...bar.children].filter(n => n.matches('.inbox-bookmark, .inbox-review-star, .inbox-row-more')); if (controls.length) { controls[0].before(common); common.append(...controls); }
-}
-/** A saved message's buttons, under its words like a file's decisions: Done or Reopen (a Hub list is read-only). */
-function savedMessageActions(f) {
-    const box = DT.el('div', 'inbox-review-actions inbox-slots');
-    if (f.gone) return box;
-    const b = DT.el('button', 'btn btn-small dt-quiet inbox-saved-done', f.done ? 'Reopen' : 'Done'); b.type = 'button'; b.setAttribute('data-slot', 'done'); b.setAttribute('aria-label', `${f.done ? 'Reopen, move back to Open' : 'Mark done'}: ${f.which}`);
-    b.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (!it) return; const done = !it.done_at; if (await saved.savedSetDone(it, done)) sayLive(done ? 'Marked done' : 'Moved back to Open'); });
-    const mark = DT.el('button', 'btn btn-quiet btn-small inbox-bookmark inbox-bookmark-saved', 'Saved'); mark.type = 'button'; mark.setAttribute('data-slot', 'save'); mark.setAttribute('aria-pressed', 'true'); mark.setAttribute('aria-label', `Saved for later: ${f.which}. Remove from saved`); mark.title = 'Saved for later: press to remove it from Saved'; // the right-hand Save, pressed (#20508)
-    if (isPhoneLayout()) { mark.className = 'btn btn-quiet btn-icon inbox-bookmark inbox-bookmark-saved'; mark.textContent = ''; mark.append(bookmarkIcon()); }
-    mark.addEventListener('click', async () => { const it = saved.findSavedItem(f.id); if (it && await saved.savedRemove(it)) sayLive('Removed from saved'); });
-    if (savedRouteOpen('done')) box.append(b); // through the Hub a write is offered only for the routes it reports open (#20437): Done by its done route, Saved (remove) by its remove route
-    if (savedRouteOpen('remove')) { const common = DT.el('span', 'inbox-common-actions'); common.append(mark); box.append(common); }
-    return box;
-}
 function savedListSpec(where = '') {
     activateSavedReviews();
     const v = saved.savedView();
@@ -1371,9 +1348,40 @@ function savedListSpec(where = '') {
                     return b; } },
             ] }).el };
     if (dock) return spec;
-    const entries = [...files.map(a => ({ kind: 'file', a, at: Date.parse(a.saved_at || a.updated_at || a.created_at || '') || 0, server: serverOf(a), team: reviewSourceLabel(a.team), when: saved.ago(a.saved_at || a.updated_at || a.created_at || '') })), ...v.shown.map(it => ({ kind: 'message', f: saved.savedItemFacts(it), at: Date.parse(it.saved_at || '') || 0, server: serverOf(it), team: String(it.team || ''), when: saved.savedItemFacts(it).saved }))].sort((x, y) => (saved.savedFiltersNow().sort === 'oldest' ? -1 : 1) * (y.at - x.at)); // one list, newest saved first, or oldest when the toolbar says so (#20508): a file's saved_at (#20519) orders it, and an older server's list has none, so its newest version's time stands in
+    const done = v.tab === 'done', decided = a => !!a.tags && ['approved', 'changes requested', 'denied'].some(t => a.tags.includes(t));
+    const tabFiles = files.filter(a => decided(a) === done); // Open lists the files still to decide, Done the ones with a verdict, with it as the tag (#22108)
+    const entries = [...tabFiles.map(a => ({ kind: 'file', a, at: Date.parse(a.saved_at || a.updated_at || a.created_at || '') || 0, server: serverOf(a), team: reviewSourceLabel(a.team), when: saved.ago(a.saved_at || a.updated_at || a.created_at || '') })), ...v.shown.map(it => ({ kind: 'message', it, f: saved.savedItemFacts(it), at: Date.parse(it.saved_at || '') || 0, server: serverOf(it), team: String(it.team || ''), when: saved.savedItemFacts(it).saved }))].sort((x, y) => (saved.savedFiltersNow().sort === 'oldest' ? -1 : 1) * (y.at - x.at)); // one list, newest saved first, or oldest when the toolbar says so (#20508): a file's saved_at (#20519) orders it, and an older server's list has none, so its newest version's time stands in
     const loadingMore = savedReviewPages().some(p => p.has_more || p.error || (p.loading && !p.loaded) || p.truncated);
-    return { ...spec, count: savedHeadWords(files.length, rows.length), empty: entries.length || loadingMore ? null : spec.empty, signature: JSON.stringify([spec.signature, reviewPagingSignature(), loadingEmpty(), files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap inbox-needs-results'), host = DT.el('div', 'inbox-saved-card'); wrap.append(host); appendReviewPaging(wrap, true); if (entries.length) { host.append(folderHead('Saved', `${files.length} file${files.length === 1 ? '' : 's'} \u00b7 ${rows.length} message${rows.length === 1 ? '' : 's'} \u00b7 newest saved first`, 'saved')); const list = DT.el('div', 'saved-files'); host.append(list); importOnce('./saved_list.js').then(m => m.fillSavedList(list, entries, { DT, serverCols: isPhoneLayout() ? [] : serverColumns().map(c => ({ ...c, line: 1, width: 'content', tone: 'tertiary' })), decorateMessage, decorateKindRow: NF.decorateKindRow, fileTile: a => NF.fileTile(a, splitKey(a.team).server), messageTile: () => { const i = DT.el('span', 'material-icons inbox-kind-icon'); i.dataset.kind = 'saved_message'; i.setAttribute('role', 'img'); i.setAttribute('aria-label', 'Saved message'); return i; }, fileActions: a => (isCloud() ? '' : hoverWrap(a, reviewActions(a, true))), addStar: addFileStar, messageActions: savedMessageActions, openFile: openReview, openMessage: id => openSavedPage(id), fileFrom: a => DT.el('span', 'inbox-review-from', markHidden(a.produced_by || 'sender unknown', { strict: true })), fileWords: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true), shown: a => markHidden(a.name, { strict: true }) })).catch(e => console.error('saved list', e)); } return wrap; } };
+    const order = saved.savedFiltersNow().sort === 'oldest' ? 'oldest saved first' : 'newest saved first';
+    return { ...spec, count: `${entries.length} saved`, empty: entries.length || loadingMore ? null : spec.empty, signature: JSON.stringify([spec.signature, v.tab, reviewPagingSignature(), loadingEmpty(), tabFiles.map(a => [a.reviewKey, a.name, a.starred, a.tags])]), node: () => {
+        const wrap = DT.el('div', 'saved-files-wrap saved-ledger-wrap'), host = DT.el('div', 'saved-ledger-host');
+        if (entries.length) { const line = DT.el('p', 'saved-ledger-count'); line.append(DT.el('b', '', `${entries.length} saved`), ` \u00b7 ${tabFiles.length} file${tabFiles.length === 1 ? '' : 's'}, ${rows.length} message${rows.length === 1 ? '' : 's'} \u00b7 ${order}`); wrap.append(line); }
+        wrap.append(host); appendReviewPaging(wrap, true);
+        if (entries.length) importOnce('./saved_ledger.js').then(m => m.fillSavedLedger(host, entries.map(savedLedgerRow), { phone: isPhoneLayout(), moreMenu })).catch(e => console.error('saved list', e));
+        return wrap; } };
+}
+/** A saved file's or message's facts and actions for the Saved page's row (saved_ledger.js, #22108). */
+const SAVED_TAGS = [['for review', 'To review', 'blue'], ['approved', 'Approved', 'green'], ['changes requested', 'Asked for changes', 'amber'], ['denied', 'Denied', 'grey']];
+function savedLedgerRow(e) {
+    if (e.kind === 'file') {
+        const a = e.a, name = markHidden(a.name, { strict: true }), server = splitKey(a.team).server, canAct = !isCloud() && !decisionNeedsPerson(server), version = (/^version (\d+)/.exec(a.version_line || '') || [])[1] || (a.earlier?.length ? String(a.earlier.length + 1) : ''); // the server's version line, else the versions this row stands for
+        const tag = a.new_comments > 0 ? [null, 'New comments', 'blue'] : (SAVED_TAGS.find(([t]) => a.tags?.includes(t)) || []); // agents replied in its thread: that is the news, as Needs you says it
+        const failed = error => showToast(error?.message || `Couldn't change ${name}.`, true);
+        return { key: `file:${a.reviewKey}`, kind: 'file', name, version, open: () => openReview(a),
+            team: { text: multipleServers() ? e.team : splitKey(a.team).name, open: () => go(keyRoute('team', a.team)) }, // "This computer" is left out when there is one
+            goal: a.goal_id && a.goal_title ? { text: `#${Number(a.goal_id)} ${markHidden(String(a.goal_title), { strict: true })}`, open: () => go({ ...folderRoute, id: a.team, item: Number(a.goal_id) }) } : null,
+            agent: { text: markHidden(a.produced_by || '', { strict: true }) }, text: questionOf({ review: a }), starred: !!a.starred, tag: tag.length ? { text: tag[1], tone: tag[2] } : null, time: e.when,
+            remove: canAct ? { label: 'Remove from Saved', title: 'Put it back in Needs you as it was', run: () => importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(a.team, a); sayLive(`${name} is back in Needs you.`); }).catch(failed) } : null,
+            star: canAct && a.hex ? { on: !!a.starred, run: () => starControl(a, { hex: a.hex, name, reviewPin: true, onChange: on => { reviewStarChanged(a, on); renderInboxNav(true); } })?.click() } : null,
+            more: canAct ? [{ label: 'Copy version ID', title: 'The id of this version only', run: () => importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(a.id)).catch(failed) }, { label: 'Dismiss', title: 'Take it out of Saved; nobody is told', run: () => importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { const out = await ignoreRow(a.team, a); if (stillWaitingOnAgent(a)) WA.dismissArtifact(a.id); sayIgnored(a.team, a, out); sayLive(`Dismissed ${name}.`); }).catch(failed) }] : [] }; // the toast with Undo, as Dismiss in Needs you
+    }
+    const f = e.f, words = String(f.snip || '').trim(), cut = words.search(/[.!?\n](\s|$)/), head = (cut > 0 && cut < 90 ? words.slice(0, cut + 1) : words.slice(0, 90)) || f.title || f.which, rest = words.slice(head.length).trim();
+    const it = () => saved.findSavedItem(f.id);
+    return { key: `msg:${f.id}`, kind: 'message', name: head, label: f.which, version: '', open: () => openSavedPage(f.id),
+        team: f.team ? { text: f.team, open: () => go(keyRoute('team', boardTeamKey(e.it.server, f.team))) } : null, goal: null,
+        agent: { text: f.title || '' }, text: rest, starred: false, tag: f.gone ? { text: 'Gone', tone: 'grey' } : null, time: e.when,
+        remove: !f.gone && savedRouteOpen('remove') ? { label: 'Remove from Saved', run: async () => { const x = it(); if (x && await saved.savedRemove(x)) sayLive('Removed from saved'); } } : null, star: null,
+        more: !f.gone && savedRouteOpen('done') ? [{ label: f.done ? 'Reopen' : 'Mark done', title: f.done ? 'Move it back to Open' : 'Move it to Done', run: async () => { const x = it(); if (!x) return; const d = !x.done_at; if (await saved.savedSetDone(x, d)) sayLive(d ? 'Marked done' : 'Moved back to Open'); } }] : [] };
 }
 
 /** A message of the agent's Saved tab, as a sheet over the dock panel (the pane the Artifacts tab uses, detail_pane.js): what the Inbox's page holds (the text, why it cannot be opened, Read the whole message) with Open (the chat) and Remove from saved in its bar. Back, the close button and Escape return to the Saved table, the focus on the row. */

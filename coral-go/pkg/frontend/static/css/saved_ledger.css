@@ -1,0 +1,50 @@
+/* The Saved page as a calm list (#22108, saved_ledger.js): lazy, loaded with the list. One bordered card, rows split by a hairline, no buttons at rest; the list is 880 wide at most.
+   A row wears .list-row (its hover and focus ring); the tag wears .chip; the agent icon takes the table avatar's colours. */
+.saved-ledger-count { margin: 0 0 var(--space-md); font-size: var(--fs-md); color: var(--text-secondary); max-width: 880px; }
+.saved-ledger-count b { color: var(--text-primary); font-weight: var(--fw-strong); }
+.saved-ledger { list-style: none; margin: 0; padding: 0; max-width: 880px; overflow: hidden; border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-secondary); }
+.saved-ledger .sl-row { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-lg); padding: var(--space-md) var(--space-lg); color: var(--text-primary); }
+.saved-ledger .sl-row + .sl-row { border-top: 1px solid var(--border); }
+.sl-icon { font-size: var(--fs-xl); color: var(--text-muted); align-self: start; margin-top: 2px; }
+.sl-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sl-line1 { display: flex; align-items: baseline; gap: var(--space-sm); min-width: 0; }
+.sl-name { all: unset; cursor: pointer; font-size: var(--fs-lg); font-weight: var(--fw-strong); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sl-name:hover { text-decoration: underline; text-underline-offset: 2px; }
+.sl-name:focus-visible, .sl-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.sl-ver { font-size: var(--fs-lg); color: var(--text-secondary); white-space: nowrap; flex: none; }
+.sl-line2 { display: flex; align-items: baseline; gap: var(--space-xs); min-width: 0; font-size: var(--fs-base); color: var(--text-secondary); white-space: nowrap; overflow: hidden; }
+.sl-link { all: unset; cursor: pointer; color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; flex: none; }
+.sl-link:hover { color: var(--text-primary); }
+.sl-agent-link, .sl-agent-name { color: var(--text-primary); font-weight: var(--fw-strong); }
+.sl-goal { display: inline-flex; align-items: baseline; gap: 2px; }
+.sl-flag { font-size: var(--fs-base); color: var(--avatar-6); align-self: center; text-decoration: none; }
+.sl-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
+.sl-sep { flex: none; }
+.sl-right { display: grid; grid-template-columns: 1rem auto 1.375rem 4rem; align-items: center; column-gap: var(--space-md); justify-items: end; }
+.sl-col { display: inline-flex; align-items: center; }
+.sl-star-on { font-size: var(--fs-title); color: var(--text-secondary); }
+.sl-tag { background: var(--bg-tertiary); color: var(--text-secondary); white-space: nowrap; }
+.sl-tag-blue { color: var(--accent); background: rgba(var(--accent-rgb), 0.16); }
+.sl-tag-green { color: var(--success-text); background: rgba(var(--success-rgb), 0.16); }
+.sl-tag-amber { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.16); }
+.sl-avatar, .sl-av-1 { display: inline-flex; align-items: center; justify-content: center; width: 1.375rem; height: 1.375rem; border-radius: 50%; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--on-avatar); background: var(--avatar-1); }
+.sl-av-2 { background: var(--avatar-2); } .sl-av-3 { background: var(--avatar-3); } .sl-av-4 { background: var(--avatar-4); }
+.sl-av-5 { background: var(--avatar-5); } .sl-av-6 { background: var(--avatar-6); } .sl-av-7 { background: var(--avatar-7); } .sl-av-8 { background: var(--avatar-8); }
+.sl-time { font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
+/* The row's actions take the right side's place on hover and keyboard focus; a screen with no hover shows them. */
+.sl-actions { display: none; align-items: center; gap: var(--space-sm); }
+.sl-row:hover .sl-actions, .sl-row:focus-within .sl-actions { display: flex; }
+.sl-row:hover .sl-right, .sl-row:focus-within .sl-right { display: none; }
+@media (hover: none) { .saved-ledger:not(.saved-ledger-phone) .sl-actions { display: flex; } }
+.sl-act { white-space: nowrap; }
+/* A phone: the "..." menu on every row, 44 by 44; the time, the agent icon and the text are left out. */
+.saved-ledger-phone .sl-row { grid-template-columns: 1.125rem minmax(0, 1fr) auto auto; column-gap: var(--space-md); padding: var(--space-md); align-items: start; }
+.saved-ledger-phone .sl-row:hover .sl-right, .saved-ledger-phone .sl-row:focus-within .sl-right { display: grid; }
+.saved-ledger-phone .sl-right { grid-template-columns: auto auto; }
+.saved-ledger-phone .sl-actions { display: flex; }
+.saved-ledger-phone .sl-line1 { flex-wrap: wrap; }
+.saved-ledger-phone .sl-name { white-space: normal; overflow-wrap: anywhere; }
+.saved-ledger-phone .sl-actions .inbox-row-more-toggle { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); margin: -10px -10px -10px 0; }
+@media (forced-colors: active) { .sl-avatar { border: 1px solid CanvasText; } }
+@media (max-width: 767px) { .saved-ledger-count { display: none; } } /* a phone says the count once, beside the title */
+#group-table-view .inbox-folder-toolbar.list-bar-bar:has(+ .saved-ledger-wrap) { padding-bottom: var(--space-md); } /* the list has no selection, so the bar keeps no room for an actions line (inbox_review_groups.css) */
