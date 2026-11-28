@@ -70,7 +70,7 @@ button.al-title:focus-visible, .al-link:focus-visible { outline: 2px solid var(-
 .al-ynote, .al-cmd { margin-top: var(--space-md); max-width: 68ch; }
 .al-ynote { max-width: 37.5rem; font-size: var(--fs-lg); padding: var(--space-md) var(--space-lg); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); overflow-wrap: anywhere; }
 .al-ynote > span { color: var(--text-secondary); }
-.al-cmd { display: inline-block; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-cmd { display: block; width: fit-content; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; } /* the whole command, wrapped: what was asked is never hidden behind an ellipsis */
 .al-side { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-xs); margin-left: auto; }
 .al-when { font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; min-width: 64px; text-align: right; }
 /* The buttons show where the pointer is, or the keyboard (the title is the focus stop); a phone has the one menu instead. No (hover: none) query hides anything (#6137). */

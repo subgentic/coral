@@ -90,7 +90,7 @@ const link = (cls, text, run, label) => { const b = el('button', `al-link ${cls 
 /** One row. `x`: { parts(r) -> { did, on, detail, about }, opens(r), openRow(r), openLabel(r), teamWords(r), teamNode?(r, words), fromWords(r), keyOf(r), openGoal?(r), openTask?(r) }. The approved Activity mock: a kind mark, the name, one line of what you did and where, the clock time at the right; the buttons show on hover or focus, and a phone has one menu. */
 export function ledgerRow(r, x) {
     const perm = r.action === 'prompt_allow' || r.action === 'prompt_reject', p0 = x.parts(r);
-    const p = perm ? { ...p0, did: r.action === 'prompt_reject' ? 'Denied' : 'Allowed', on: `${(x.agentName && x.agentName(r)) || r.item_id || 'An agent'} asked for permission`, detail: '' } : p0; // the mock and Needs you say Denied; the record keeps no command yet (task #22144), so the title names the agent
+    const p = perm ? { ...p0, did: r.action === 'prompt_reject' ? 'Denied' : 'Allowed', on: `${(x.agentName && x.agentName(r)) || r.item_id || 'An agent'} ${r.command ? 'wanted to run a command' : 'asked for permission'}`, detail: '' } : p0; // the mock and Needs you say Denied; the record keeps no command yet (task #22144), so the title names the agent
     const v = verdictOf(r), open = x.opens(r), kind = tileKind(r);
     const li = el('li', `al-row${r.action === 'wait_send' ? ' is-noise' : ''}`); li.dataset.key = x.keyOf(r); li.dataset.kind = kind || 'other';
     const lead = el('span', `al-lead al-lead-${kind || 'other'}`); lead.append(svgNode(KIND_SVG[kindMark(r)] || KIND_SVG.other));
@@ -118,7 +118,7 @@ export function ledgerRow(r, x) {
     parts.forEach((seg, i) => { if (i < parts.length - 1) glueDot(seg); sub.append(seg); if (i < parts.length - 1) sub.append(' '); }); // one run of words: a line may break after a dot, never before one
     sub.append(el('span', 'al-sr', `. You did this from ${x.doneFrom(r)}.`)); // who and where, for a screen reader: the mock shows neither
     main.append(sub);
-    if (perm) { if (r.command) main.append(el('div', 'al-cmd', String(r.command))); } // the command, once the record keeps it (task #22144)
+    if (perm) { if (r.command) main.append(el('div', 'al-cmd', String(r.command))); } // the command as text only (textContent): the record already redacted and cut it (task #22144); a cut one ends in an ellipsis
     else if (said && r.item_kind !== 'question') { // the person's own words: a plain box, as an agent's words are in Needs you
         const note = el('div', 'al-ynote'); note.append(el('span', '', r.item_kind === 'file' ? 'Your note:' : 'Note:'), document.createTextNode(` ${said}`)); main.append(note);
     }
