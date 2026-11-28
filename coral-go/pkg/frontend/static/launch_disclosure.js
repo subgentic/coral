@@ -108,8 +108,7 @@ export async function refreshLaunchDisclosure() {
         if (!defaultIsAuto()) { document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release(); return; } // the default is not Auto: nothing here is true to say; the launch-time confirm (409) is the server's and stays
         if (!hasLocalAgent()) { await liveListReady; if (generation !== readGeneration) return; } // the page's first list may not have landed yet: no agent in it is not 'no agent', and giving the reserved row back (and the hint) now would move the page when the notice comes a moment later
         const previous = document.getElementById('launch-disclosure-banner');
-        if (disclosure.seen === true) { previous?.remove(); shown = null; hint.clear(); hint.release(); return; }
-        if (!hasLocalAgent()) { previous?.remove(); shown = null; return; } // unseen, and no agent yet: the room stays until the notice's own decision is made (it comes with the first local agent, and giving the row back now would move the list when it does, #21962); the agents arriving re-run this (coral:live-list-rendered)
+        if (!hasLocalAgent() || disclosure.seen === true) { previous?.remove(); shown = null; hint.clear(); hint.release(); return; }
         if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
         if (disclosure.seen !== false) return;
         previous?.remove(); shown = null;
