@@ -76,6 +76,7 @@ const { setTheme } = require('./helpers/contrast');
     const box = await mouseTo(R('Designer'));
     for (const type of ['mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
     await waitFor(`!!${R('Designer')}?.classList.contains('active')`, '1280: a click selects the agent (the light tint)', 5000);
+    assert.deepEqual(await ev(`['Designer', 'Writer'].map(n => [...document.querySelectorAll('${root} .session-group-item')].find(r => r.querySelector('.session-label').textContent.trim() === n)).map(r => [getComputedStyle(r.querySelector('.session-task-line')).fontWeight, getComputedStyle(r.querySelector('.session-time')).fontWeight])`).then(([a, b]) => JSON.stringify(a) === JSON.stringify(b)), true, '1280: the selected row changes its tint only; its task line and time keep the regular weight');
    }
    await ev(`document.querySelector('${root} .archived-summary-row .row-btn').click(); true`);
    await waitFor(`document.querySelector('${root}').textContent.includes('Old Dev')`, `${width}: the Archived fold opens`);
