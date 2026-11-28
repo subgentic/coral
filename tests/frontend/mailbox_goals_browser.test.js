@@ -54,9 +54,10 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent==='Ship the mailbox').querySelector('.goal-decision-task-progress').textContent.includes('of 3 tasks done')`),'task rollup survives in the goal metadata');
             await waitFor(`(()=>{const c=document.querySelector('#group-table-view .goal-decision-card:has([data-goal-id="${g1}"])');return c && !c.querySelector('.gl-waits')})()`, 'plain task-result files contribute no approval counters');
             if(width===390){
-                const targets=await ev(`(()=>{return [...document.querySelectorAll('#group-table-view .goal-decision-toggle')].map(t=>{const r=t.getBoundingClientRect();return {name:t.getAttribute('aria-label'),height:r.height,width:r.width}})})()`);
-                assert.ok(targets.length>=3 && targets.every(t=>t.height>=44&&t.width>=44),'every phone goal heading has a 44px tap target: '+JSON.stringify(targets));
+                const targets=await ev(`(()=>{return [...document.querySelectorAll('#group-table-view .goal-decision-toggle')].map(t=>{const r=t.closest('.goal-decision-head').getBoundingClientRect();return {name:t.getAttribute('aria-label'),height:r.height,width:r.width}})})()`);
+                assert.ok(targets.length>=3 && targets.every(t=>t.height>=44&&t.width>=44),'every phone goal background has a 44px fold tap target: '+JSON.stringify(targets));
             }
+            if(width===390)assert.equal(await ev(`(()=>{const h=document.querySelector('#group-table-view .goal-decision-head'),t=h.querySelector('.goal-decision-toggle'),before=t.getAttribute('aria-expanded');h.click();const changed=t.getAttribute('aria-expanded')!==before;h.click();return changed&&t.getAttribute('aria-expanded')===before})()`),true,'phone goal background folds and expands around compact arrow');
             const ax=await axName(client,'#group-table-view .goal-decision-toggle[data-goal-id="'+g1+'"]');assert.ok(ax?.name.includes('Ship the mailbox')&&ax.name.includes('Active'),'goal heading has title and state in its accessible name: '+JSON.stringify({width,ax}));
         }
         console.log('PASS Inbox goal ledger: source teams, rollup, search, navigation, accessibility and responsive bounds');
