@@ -28,7 +28,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         await until(`!!${row(qa.session_id)}`, 'QA Engineer in the list');
         assert.ok((await sidebar()).main.includes(qa.session_id), 'QA Engineer is listed before it is archived');
         // The shard's server is shared: suites before this one leave chats and archived agents behind, so nothing here is an absolute count; it is what THIS archive changes (#11000: 'the agent is not an All chats row  1 !== 0' in CI, a row an earlier suite left).
-        const base = { counts: (await api('GET', '/api/sessions/history/counts')).data || {}, archivedInSidebar: Number(/Archived \((\d+)\)/.exec((await sidebar()).summary || '')?.[1] || 0) };
+        const base = { counts: (await api('GET', '/api/sessions/history/counts')).data || {}, archivedInSidebar: Number(/Archived (\d+)/.exec((await sidebar()).summary || '')?.[1] || 0) };
 
         // Archive from the row's menu, then the confirmation
         // (a team agent's Stop is the archive, #19674: team_stop_archives_browser drives the menu; these agents are terminals, which Stop still kills, so the archive is the route's own call)
@@ -36,7 +36,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         await until(`(() => { let inA = false; for (const li of document.querySelectorAll('#live-sessions-list li')) { if (li.classList.contains('archived-summary-row')) { inA = true; continue; } if (!inA && li.dataset.sessionId === ${JSON.stringify(qa.session_id)}) return false; } return true; })()`, 'QA Engineer to leave the main list');
         const after = await sidebar();
         assert.ok(!after.main.includes(qa.session_id), 'QA Engineer left the main list: ' + JSON.stringify(after));
-        assert.ok(Number(/Archived \((\d+)\)/.exec(after.summary || '')?.[1] || 0) >= base.archivedInSidebar + 1, `the sidebar says Archived (${base.archivedInSidebar + 1}) or more, one more than before at least (a suite beside this may archive too, #13389): ` + JSON.stringify(after));
+        assert.ok(Number(/Archived (\d+)/.exec(after.summary || '')?.[1] || 0) >= base.archivedInSidebar + 1, `the sidebar says Archived (${base.archivedInSidebar + 1}) or more, one more than before at least (a suite beside this may archive too, #13389): ` + JSON.stringify(after));
         await ev(`document.querySelector('#live-sessions-list .archived-summary-row .row-btn').click(); true`); // the section opens
         await until(`!!document.querySelector('#live-sessions-list [data-session-id="${qa.session_id}"]') && [...document.querySelectorAll('#live-sessions-list .archived-summary-row ~ li')].some(li => li.dataset.sessionId === ${JSON.stringify(qa.session_id)})`, 'QA Engineer under Archived once the section is open');
 

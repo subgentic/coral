@@ -1,5 +1,5 @@
 // A sleeping agent is a normal row (#10062, the desktop tester: after a restart the asleep Orchestrator was an italic "1 sleeping agent" line, not an agent): up to three asleep in a team stay rows, after the awake ones, with
-// the row's one quiet chip, Sleeping, and a Wake button that takes the chip's place at a hover or the keyboard (always on touch; its name says whom it wakes). Four or more in one team fold into "N sleeping agents" as
+// the Asleep mark (a Sleeping chip until #22105), and a Wake button at a hover or the keyboard (always on touch; its name says whom it wakes). Four or more in one team fold into "N sleeping agents" as
 // before, so a team of nineteen asleep is not a wall of rows. 1280 px, a desktop sidebar.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -15,7 +15,7 @@ const row = (n, o) => Object.assign({ name: 'ag-' + n, session_id: uid(n), agent
     const check = (ok, msg) => { if (!ok) found.push(msg); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const show = async sessions => { await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(sessions)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: the list is drawn */ };
-    const list = () => ev(`(() => ({ order: [...document.querySelectorAll('#live-sessions-list .session-group-item')].map(li => ({ name: li.querySelector('.session-label-name')?.textContent.trim(), asleep: li.classList.contains('sleeping'), chip: [...li.querySelectorAll('.chip')].map(c => c.textContent.trim()), wake: (() => { const b = li.querySelector('.session-name-row > .btn[data-mode="wake"]'); return b ? { name: b.getAttribute('aria-label'), display: getComputedStyle(b).display } : null; })() })), summary: [...document.querySelectorAll('#live-sessions-list .sleeping-summary-row')].map(e => e.textContent.replace(/\\s+/g, ' ').trim()) }))()`);
+    const list = () => ev(`(() => ({ order: [...document.querySelectorAll('#live-sessions-list .session-group-item')].map(li => ({ name: li.querySelector('.session-label-name')?.textContent.trim(), asleep: li.classList.contains('sleeping'), chip: [...li.querySelectorAll('.chip')].map(c => c.textContent.trim()), mark: li.querySelector('.session-dot')?.getAttribute('aria-label'), wake: (() => { const b = li.querySelector('.session-name-row > .btn[data-mode="wake"]'); return b ? { name: b.getAttribute('aria-label'), display: getComputedStyle(b).display } : null; })() })), summary: [...document.querySelectorAll('#live-sessions-list .sleeping-summary-row')].map(e => e.textContent.replace(/\\s+/g, ' ').trim()) }))()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -26,13 +26,13 @@ const row = (n, o) => Object.assign({ name: 'ag-' + n, session_id: uid(n), agent
         check(l.summary.length === 0, 'no folded "sleeping agents" line for two: ' + JSON.stringify(l.summary));
         check(l.order.map(x => x.name).join() === 'Agent 2,Agent 1,Agent 3', 'the awake agent first, then the sleeping ones in their order: ' + JSON.stringify(l.order.map(x => x.name)));
         const asleep = l.order.filter(x => x.asleep);
-        check(asleep.length === 2 && asleep.every(x => x.chip.join() === 'Sleeping'), 'each asleep row has the one chip, Sleeping: ' + JSON.stringify(asleep));
+        check(asleep.length === 2 && asleep.every(x => x.chip.join() === '' && x.mark === 'Asleep'), 'each asleep row has the Asleep mark and no chip (#22105, the approved sidebar mock): ' + JSON.stringify(asleep));
         check(asleep.every(x => x.wake && /^Wake Agent \d/.test(x.wake.name) && x.wake.display === 'none'), 'and a Wake button named for the agent, in the chip\'s place only at a hover or the keyboard: ' + JSON.stringify(asleep.map(x => x.wake)));
         check(l.order.filter(x => !x.asleep).every(x => x.wake === null), 'an awake agent has no Wake button');
         await ev(`window.__woke = []; window.toggleAgentSleep = (...a) => { window.__woke.push(a.slice(0, 4)); return Promise.resolve(); }; true`);
         await ev(`document.querySelector('#live-sessions-list .session-group-item.sleeping').focus(); true`); await new Promise(r => setTimeout(r, 100)); // sleep-ok: focus-within applies
-        const focused = await ev(`(() => { const li = document.querySelector('#live-sessions-list .session-group-item.sleeping'); const w = li.querySelector('.session-name-row > .btn[data-mode="wake"]'), c = li.querySelector('.session-name-row > .chip'); return [getComputedStyle(w).display, getComputedStyle(c).display]; })()`);
-        check(focused[0] !== 'none' && focused[1] === 'none', 'the keyboard on the row shows Wake in the chip\'s place: ' + JSON.stringify(focused));
+        const focused = await ev(`(() => { const li = document.querySelector('#live-sessions-list .session-group-item.sleeping'); const w = li.querySelector('.session-name-row > .btn[data-mode="wake"]'), return [getComputedStyle(w).display]; })()`);
+        check(focused[0] !== 'none', 'the keyboard on the row shows Wake: ' + JSON.stringify(focused));
         await shot('sleeping-rows-two');
         await ev(`document.querySelector('#live-sessions-list .session-group-item.sleeping .session-name-row > .btn[data-mode="wake"]').click(); true`); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the click's handlers run
         const woke = await ev(`window.__woke`);

@@ -328,7 +328,9 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         + (unreadCount > 0 ? `, ${unreadCount} unread` : '')
         + (heldChip ? ', message held' : ''); // the row's one chip says it in words: the name says it too (QA Engineer, #9723)
     const stuckClass = stateInfo.key === 'stuck' || stateInfo.key === 'blocked' ? ' is-stuck' : '';
-    const [markClass, markWord] = s.sleeping ? MARK.sleep : stateInfo.attention ? MARK.need : /^(working|compacting)$/.test(stateInfo.key) ? MARK.work : MARK.idle;
+    const asking = !s.sleeping && !!loadedModule('./operator_asks.js')?.operatorAsks().some(a => a.board === s.board_project && a.asker === (s.board_subscriber_id || s.name)); // a question of this agent's waits in Needs you (#22093's items): amber too
+    const [markClass, markWord0] = s.sleeping ? MARK.sleep : stateInfo.attention || asking ? MARK.need : /^(working|compacting)$/.test(stateInfo.key) ? MARK.work : MARK.idle;
+    const markWord = s.sleeping && s.sleep_reason === 'coral_stopped' ? 'Asleep since Coral restarted' : markWord0; // what the Sleeping chip's title said (#10057)
     return `<li class="session-group-item list-row${isActive ? ' active list-row-current' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
         draggable="${stale ? 'false' : 'true'}"${stale ? ` aria-disabled="true" title="${escapeAttr(staleReason(s))}"` : ''}
         data-state="${escapeAttr(stateInfo.key)}"

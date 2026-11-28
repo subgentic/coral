@@ -170,7 +170,7 @@ const SETTINGS_PRELOAD = `(() => {
         assert.ok(lay.headerLeft < lay.rowMin, `server headers sit left of every team and agent row (icon ${lay.headerLeft} < rows ${lay.rowMin})`);
         assert.ok(lay.m3.down && lay.m3.op < lay.m2op && lay.m3.opName < 1, `the offline server is dimmed (${JSON.stringify(lay.m3)})`);
         assert.equal(lay.m3.title, 'Old Laptop: Unreachable'); assert.match(lay.m3.aria, /^Computer Old Laptop: Unreachable, 2 agents$/); // aria-expanded says open or collapsed; the name does not repeat it (#4272)
-        assert.ok(lay.agents.length >= 4 && lay.agents.every(a => a.dot && !a.title && /^.+, .+/.test(a.label)), `agent state dots kept under server headers: the dot has no native title any more (#9822), the row's name says the state (${JSON.stringify(lay.agents)})`);
+        assert.ok(lay.agents.length >= 4 && lay.agents.every(a => a.dot && ['Working', 'Awake, waiting', 'Needs you', 'Asleep'].includes(a.title) && /^.+, .+/.test(a.label)), `agent state marks kept under server headers: the mark's word is its tooltip (#22105, the approved sidebar mock; it had none since #9822), the row's name says the state (${JSON.stringify(lay.agents)})`);
         console.log(`   ✓ grouped: headers outermost (icon at ${lay.headerLeft}px, rows from ${lay.rowMin}px), computer icon, no dots, offline dimmed + tooltip + aria; ${lay.agents.length} agent rows keep their state dot`);
         const m2rows = ['solo-m2-id', 'team-m2-id'];
         assert.ok(m2rows.every(id => v.rows.includes(id)), 'm2 agents listed while expanded');

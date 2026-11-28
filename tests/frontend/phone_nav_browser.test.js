@@ -27,9 +27,9 @@ const { coralReady } = require('./helpers/wait');
         for (const [fs, theme] of [[16, 'light'], [16, 'dark'], [32, 'light']]) {
             await open(390, fs, theme);
             const tag = `390@${fs} ${theme}`;
-            // B: the preview
-            const pv = await ev(`Object.fromEntries([...document.querySelectorAll('#mobile-session-list .session-group-item')].map(li => [li.querySelector('.session-label').textContent.trim(), li.querySelector('.session-preview').textContent.trim()]))`);
-            assert.deepEqual(pv, { Ada: 'You: please ship it today', Bo: 'Bo: Done: the suite passes', Cy: 'No messages yet', Di: 'Fix the cold start' }, `${tag}: the preview: ` + JSON.stringify(pv));
+            // B: the row is the sidebar's (#22105, the approved sidebar mock): no avatar and no preview card, the time at the right
+            const pv = await ev(`[...document.querySelectorAll('#mobile-session-list .session-group-item')].map(li => [li.querySelector('.session-label').textContent.trim(), !!li.querySelector('.session-avatar, .session-preview'), getComputedStyle(li.querySelector('.session-time')).display !== 'none'])`);
+            assert.ok(pv.length === 4 && pv.every(([, card, time]) => !card && time), `${tag}: phone rows with no card parts, each with its time: ` + JSON.stringify(pv));
             // C: the pill and the +
             const items = await ev(`[...document.querySelectorAll('#phone-nav .phone-nav-slot')].map(b => [b.getAttribute('aria-label'), b.getBoundingClientRect().width, b.getBoundingClientRect().height])`);
             assert.deepEqual(items.map(i => i[0]), ['Agents page', 'Inbox page', 'Automations page', 'Analytics page'], `${tag}: Agents, Inbox, Automations, Analytics (#11535: the operator's four tabs, no More slot)`);
@@ -84,11 +84,11 @@ const { coralReady } = require('./helpers/wait');
         // desktop is as it was (the Orchestrator's check on slice A): the card parts are in the row at every width and drawn by the phone's styles only
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await waitFor(`getComputedStyle(document.getElementById('phone-nav')).display === 'none' && !!document.querySelector('#live-sessions-list .session-group-item')`, '1280: the sidebar', 8000);
-        const d = await ev(`[...document.querySelectorAll('#live-sessions-list .session-group-item')].slice(0, 4).map(li => ({ avatar: getComputedStyle(li.querySelector('.session-avatar')).display, time: getComputedStyle(li.querySelector('.session-time')).display, preview: getComputedStyle(li.querySelector('.session-preview')).display, h: Math.round(li.getBoundingClientRect().height), hidden: li.querySelector('.session-avatar').getAttribute('aria-hidden') + li.querySelector('.session-preview').getAttribute('aria-hidden') }))`);
-        assert.ok(d.length >= 3 && d.every(r => r.avatar === 'none' && r.time === 'none' && r.preview === 'none' && r.hidden === 'truetrue'), '1280: the sidebar rows draw no avatar, time or preview (their 36 px height is agent_row_one_line\'s): ' + JSON.stringify(d));
+        const d = await ev(`[...document.querySelectorAll('#live-sessions-list .session-group-item')].slice(0, 4).map(li => ({ card: !!li.querySelector('.session-avatar, .session-preview'), time: getComputedStyle(li.querySelector('.session-time')).display }))`);
+        assert.ok(d.length >= 3 && d.every(r => !r.card && r.time !== 'none'), '1280: the sidebar rows have no avatar or preview, and show their time (#22105): ' + JSON.stringify(d));
         assert.deepEqual(await ev(`['phone-nav', 'phone-fab'].map(i => getComputedStyle(document.getElementById(i)).display)`), ['none', 'none'], '1280: no floating nav and no +');
         await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: true });
         await waitFor(`getComputedStyle(document.getElementById('phone-nav')).display === 'none'`, '700 px: no floating nav', 6000);
-        console.log('PASS the phone nav, the + and the preview');
+        console.log('PASS the phone nav, the + and the sidebar\'s row on a phone');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

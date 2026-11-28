@@ -80,7 +80,7 @@ const SLEEPING_PLACEHOLDER = '';
         const archivedIds = ['t1-arch-a-id', 't1-arch-b-id', 't2-arch-id', 'solo-arch-id', 'remote-arch-id'];
         assert.ok(archivedIds.every(id => !sb.main.includes(id)), `no archived agent in the main list (${JSON.stringify(sb.main)})`);
         assert.ok(['t1-lead-id', 'solo-awake-id'].every(id => sb.main.includes(id)), 'awake agents still listed');
-        assert.match(sb.summary || '', /^Archived \(5\) · team-one, team-two$/, `one 'Archived (5)' row naming its teams (#17491) (got ${sb.summary})`);
+        assert.match(sb.summary || '', /^Archived\s*5\s*▾$/, `one quiet 'Archived 5' fold (#22105, the approved sidebar mock; its teams are named when it opens) (got ${sb.summary})`);
         assert.equal(sb.expanded, 'false', 'collapsed by default');
         assert.equal(sb.archived.length, 0, 'no archived rows while collapsed');
         assert.equal(sb.sleepingSummaries.length, 0, `team-one's one sleeper is a row, not a folded line (#10062): ${JSON.stringify(sb.sleepingSummaries)}`);
@@ -104,7 +104,7 @@ const SLEEPING_PLACEHOLDER = '';
 
         await ev(`window.filterLiveAgents('arch-a')`);
         sb = await sidebar();
-        assert.match(sb.summary || '', /^Archived \(1\)(?: · .*)?$/, `search narrows the archived count (got ${sb.summary})`);
+        assert.match(sb.summary || '', /^Archived\s*1\s*▾$/, `search narrows the archived count (got ${sb.summary})`);
         assert.deepEqual(sb.archived.map(x => x.sid), ['t1-arch-a-id']);
         await ev(`window.filterLiveAgents('zzz-nothing')`);
         assert.equal((await sidebar()).summary, null, 'no archived section when nothing archived matches');

@@ -27,6 +27,7 @@
 /* the task line: #N grey and underlined (the one link), the title cut at the row's edge */
 :is(#live-sessions-list, #mobile-session-list) .session-task-line { display: block; padding: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--fs-md); line-height: 18px; color: var(--text-secondary); }
 :is(#live-sessions-list, #mobile-session-list) .task-id-link { display: inline; margin: 0 5px 0 0; padding: 0; border: 0; background: none; font: inherit; color: var(--text-muted); cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+:is(#live-sessions-list, #mobile-session-list) .session-group-item :is(.session-line2, .session-model) { margin: 0; padding: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--fs-md); color: var(--text-secondary); } /* Show summary and Show model start under the name, like the task line */
 :is(#live-sessions-list, #mobile-session-list) .task-id-link:hover { color: var(--accent); text-decoration-color: currentColor; }
 :is(#live-sessions-list, #mobile-session-list) .task-id-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--radius-sm); }
 /* group headings like the other pages: "On a task 7", the count beside the words */
@@ -47,8 +48,8 @@
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .sleeping-summary-label { font-style: normal; }
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .archived-n { color: var(--text-muted); }
 /* Group by beside the search box */
-.sidebar-header[data-header="agents"] { flex-wrap: nowrap; justify-content: flex-start; gap: 6px; }
-.sidebar-header[data-header="agents"] .sidebar-search { flex: 1 1 auto; min-width: 5em; }
+.sidebar-header[data-header="agents"] { justify-content: flex-start; }
+.sidebar-header[data-header="agents"] .sidebar-search { flex: 1 1 0; min-width: 5em; } /* the controls share one line; the Display panel (100%) wraps under them */
 .sidebar-groupby-btn { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; margin: 0; min-width: 0; overflow: hidden; } /* the family's .btn (its height, border and type); only its place here */
 .sidebar-groupby-btn b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-strong); margin-inline-start: 2px; } /* a narrow sidebar cuts the words, never the search box */
 .sidebar-groupby-btn .material-icons { font-size: var(--fs-xl); }
