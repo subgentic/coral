@@ -53,7 +53,7 @@ const PLAN = 'Plan for the Reading List app (task #1) — OK to proceed? 1) Scop
 
             // Board questions now show their complete body immediately. There is no
             // Show all/less control to hide words; keyboard folding belongs to the group.
-            const askRow = who => `[...document.querySelectorAll('#group-table-view .nl-question')].find(row => row.querySelector('.nl-meta > .agent-link')?.textContent.trim() === ${JSON.stringify(who)})`;
+            const askRow = who => `[...document.querySelectorAll('#group-table-view .nl-question')].find(row => row.querySelector('.nl-meta > .agent-link, .nl-meta > .agent-name')?.textContent.trim() === ${JSON.stringify(who)})`;
             const words = who => ev(`(() => { const row = ${askRow(who)}; return (row.querySelector('.nl-question-box') || row.querySelector('.nl-title')).textContent; })()`);
             const designer = await words('Designer'), tester = await words('Tester');
             assert.equal(designer.replace(/\s+/g,' ').trim(), PLAN.repeat(2).replace(/\s+/g,' ').trim(), w + ': every word is already available in the long question');

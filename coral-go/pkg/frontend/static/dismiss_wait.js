@@ -44,6 +44,7 @@ function keepNeighbour(button) {
         for (let i = 0; i < 90 && tr.isConnected; i++) await new Promise(r => requestAnimationFrame(r));
         if (tr.isConnected) return; // the row is still there (a redraw that kept it): the keyboard stays where it is
         const row = document.getElementById('group-table-view')?.querySelector(`tr[data-key="${CSS.escape(key)}"], .nl-row[data-needs-key="${CSS.escape(key)}"]`);
+        if (row?.matches('.nl-row')) { row.focus({ preventScroll: true }); return; }
         [...(row?.querySelectorAll('button, .dt-primary') || [])].find(b => b.getBoundingClientRect().width && !b.classList.contains('dt-star'))?.focus({ preventScroll: true });
     };
 }
