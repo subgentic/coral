@@ -1,6 +1,7 @@
 // The select box's 44 px label (#9576) must keep the table's range selection: a click on the label selects its row without opening it, and a shift-click on another row's label selects every row between
 // (the checkbox's own shift-click did, #7743). Real mouse events, 1280 px, the Inbox's Tasks folder over the census world (three tasks), isolated dev server.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
@@ -18,7 +19,7 @@ const { coralReady } = require('./helpers/wait');
     };
     const selected = () => ev(`[...document.querySelectorAll('${T} tr.dt-row')].map(tr => tr.classList.contains('dt-selected'))`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(INBOX_WORLD);

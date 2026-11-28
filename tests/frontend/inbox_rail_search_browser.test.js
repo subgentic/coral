@@ -1,6 +1,7 @@
 // #15912 (the Operator: "We lost the search in our sidebar for the inbox"): the Inbox sidebar shows its search box again on a desktop (hidden above each tab since #11859), shared with the page's box, and the rail's search opens it; a phone keeps the one box. (Needs you, Tasks, Goals, Saved, Artifacts, Activity...) with its count badge, a tooltip and an
 // Through agent_view_harness.js against the isolated dev server.
 const fs = require('node:fs');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
@@ -15,6 +16,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`localStorage.setItem('coral-alerts-offered', '1'); localStorage.setItem('coral-alerts-reoffered', '1'); true`);
         await ev(INBOX_WORLD);

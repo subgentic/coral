@@ -1,6 +1,7 @@
 // A shared table's title (the row's primary button) is 13 px at weight 400 on every screen that uses the table (the operator's ask for 2.0.1; the primary colour keeps it apart from the other cells): the team page's Tasks tab and
 // Artifacts tab, and the Inbox Tasks list, at 1280 and 390, dark and light, with shots. A real board with tasks and an artifact on the isolated dev server (removed again).
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -16,6 +17,7 @@ const { coralReady } = require('./helpers/wait');
     const titles = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(e => e.getClientRects().length).map(e => { const c = getComputedStyle(e); return c.fontSize + ' ' + c.fontWeight; })`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator' })).status < 300);
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'be', job_title: 'Backend Dev' })).status < 300);

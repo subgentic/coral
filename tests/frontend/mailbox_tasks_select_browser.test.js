@@ -1,6 +1,7 @@
 // Selecting tasks in the Inbox's Tasks folder (#7776, #7743): the table's checkboxes, the selection bar in the toolbar's place ("N selected", Mark done, Clear), and Mark done calling each task's own Complete. Real board, tasks
 // assigned to the Operator, on the isolated dev server (removed again).
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -15,6 +16,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'o-s' })).status, 200);

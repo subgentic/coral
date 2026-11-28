@@ -1,6 +1,7 @@
 // The Inbox's Tasks and Saved rows by keyboard alone (#9783, the v2.0.2 keyboard pass): Enter on a row opens the item and puts focus inside it (Back on a task, the heading on a saved message), and Escape returns to the list with focus on THAT row's button,
 // at a mouse and on a phone (the mail rows). The Saved phone row lost its place: Escape landed on the hidden "Saved" heading because its button carried no data-id. 1280 and 390 px, the Inbox's census world.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const { axName } = require('./helpers/ax_tree');
@@ -15,7 +16,7 @@ const { coralReady, waitStable } = require('./helpers/wait');
     const key = async k => { const [code, name] = KEYS[k]; const text = k === 'Enter' ? '\r' : undefined; await client.Input.dispatchKeyEvent({ type: text ? 'keyDown' : 'rawKeyDown', key: k, code: name, windowsVirtualKeyCode: code, text }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: k, code: name, windowsVirtualKeyCode: code }); await new Promise(r => setTimeout(r, 150)); }; // sleep-ok: the key's handlers run
     const active = () => ev(`(() => { const e = document.activeElement; if (!e) return null; const r = e.getBoundingClientRect(); return { cls: String(e.className || ''), id: e.id || '', text: (e.getAttribute('aria-label') || e.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60), visible: r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden' }; })()`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [tag, w, mobile] of [['1280', 1280, false], ['390', 390, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(INBOX_WORLD);

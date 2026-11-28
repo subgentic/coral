@@ -3,6 +3,7 @@
 // an Orchestrator, on the real page (agent_view_harness answers the lists with stand-ins). 1280 px, isolated dev server.
 'use strict';
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -16,6 +17,7 @@ const BOARD = `qa-forme-${Date.now() % 100000}`;
     const { waitFor, coralReady } = require('./helpers/wait').bind(ev);
     try {
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady();
         const call = (method, path, body) => ev(`fetch('/api/board/${BOARD}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, data: await r.json().catch(() => null) }))`);
         assert.equal((await call('POST', '/subscribe', { subscriber_id: 'Orchestrator', job_title: 'Orchestrator' })).status, 200, 'the Orchestrator joined the board');

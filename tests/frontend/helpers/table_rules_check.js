@@ -5,6 +5,7 @@
 // with widths kept over-wide in storage, with a drag and a keyboard resize of every resizable column, and at 390 px. It FAILS TODAY BY DESIGN (#11943 makes data_table.js keep the rules); the report says which
 // rule broke where, and tests/frontend/table_inventory.json says every table the app has and whether this check reaches it. Set CORAL_TABLE_REPORT=<file> for the JSON report.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./tasks_tab');
 const fs = require('node:fs');
 const { connect } = require('../agent_view_harness');
 const BASE = require('../test_base').BASE;
@@ -89,7 +90,7 @@ module.exports.run = GROUP => (async () => {
     const size = async (w, mobile = false) => { await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile }); await settle(200); };
     const panelOf = w => Math.max(320, w - 320); // beside the sidebar and its margins
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await size(1440);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(SPECS);

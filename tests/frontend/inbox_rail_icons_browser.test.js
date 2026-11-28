@@ -1,6 +1,7 @@
 // #15347 (the Operator: "Collapsing the inbox can still show the icons"): a collapsed Inbox sidebar keeps one icon per folder (Needs you, Tasks, Goals, Saved, Artifacts, Activity...) with its count badge, a tooltip and an
 // accessible name; a click opens that folder with the rail still collapsed; expanded, the rail has no folder icons. 1280 px, through agent_view_harness.js against the isolated dev server.
 const fs = require('node:fs');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
@@ -15,6 +16,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`localStorage.setItem('coral-alerts-offered', '1'); localStorage.setItem('coral-alerts-reoffered', '1'); true`);
         await ev(INBOX_WORLD);

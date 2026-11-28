@@ -2,6 +2,7 @@
 // edge to edge (no gutter, no panel fill); the heading stays in the page for a screen reader, clipped to 1 px. A desktop draws its heading and keeps its gutter. The stubbed two-computer Hub of helpers/hub_world.js (native boot); the frame's address is the Hub's page, which this test
 // server does not serve: only the frame's place is tested. Shots with CORAL_SCREENSHOT_DIR.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { framesJs } = require('./helpers/wait');
@@ -15,6 +16,7 @@ const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved' };
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); await settle(300); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const open = async (w, h, mobile, group) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard');
         await coralReady('startup', 'liveList', 'settings');

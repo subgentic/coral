@@ -3,10 +3,12 @@ const assert=require('node:assert/strict');
 const {connect}=require('./agent_view_harness');
 const {setupHubWorld,BASE}=require('./helpers/hub_world');
 const {coralReady}=require('./helpers/wait');
+const {showTasksTab}=require('./helpers/tasks_tab.js');
 (async()=>{
  const {client,Page,Emulation,ev,waitFor}=await connect();
  try{
   await setupHubWorld({client,Page,Emulation,width:1280,height:900,mobile:false,inbox:'native',needs:true,hubPages:true});
+  await showTasksTab(Page);
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    for(const account of [{},{tasks_native:true},{saved_native:true},{tasks_native:true,saved_native:true},{tasks_native:false,saved_native:false},{tasks_native:'true',saved_native:1},'offline']){

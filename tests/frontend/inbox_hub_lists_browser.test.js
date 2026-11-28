@@ -1,5 +1,6 @@
 // #8694: self-hosted hub Inbox folders list remote goals/tasks and open on origin.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -9,6 +10,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
         for(const width of [1280,390]){
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(async()=>{

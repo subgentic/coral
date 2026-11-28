@@ -1,6 +1,7 @@
 // A goal opened off Needs you remembers the list's place and the row's focus so Back can restore them (#11950, #11964); that note is spent once Back has restored it (#12319, the review's INFO on #11964): a LATER fresh open of Needs you
 // (a notification link, or the tab opened again) must not jump to the old scroll offset or give an old row the focus for a second. Real board and goals on the isolated dev server (as needs_goal_back_browser), 1280 and 390 px.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { guardSettings } = require('./helpers/settings_guard');
@@ -22,7 +23,7 @@ const B = 'needs-opener-spent-' + Date.now().toString(36);
         await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'a Goal looks done row', 20000);
     };
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status < 300);

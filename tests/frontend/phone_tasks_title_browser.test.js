@@ -1,6 +1,7 @@
 // The phone menu opens the Tasks table, whose visible page title says Tasks. The top pill searches the open folder (#13591, #13596).
 // The bar lights Tasks there (it lit Inbox). Inbox says Inbox again, and Tasks again says Tasks. 390 px, the isolated dev server.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -13,6 +14,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const tap = id => ev(`document.querySelector('[data-phone-nav="${id}"]').click(); true`);
         const drawerFolder = async label => { await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(b => b.getClientRects().length).click(); true`); await waitFor(`!!document.querySelector('#nav-more-menu.nav-drawer:not([hidden]) .nav-drawer-folder')`, 'the drawer opens', 6000); await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(b => b.querySelector('.nav-drawer-label').textContent === ${JSON.stringify(label)}).click(); true`); }; // Tasks is a row of the drawer now (#11535), the bar has none

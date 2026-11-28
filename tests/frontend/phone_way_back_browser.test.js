@@ -2,6 +2,7 @@
 // colour), named for where it goes ("<- Inbox", "<- Workflows", "<- Jobs", "<- Docs", "<- Analytics"), on the title's line, and over the title only when the title would not fit beside it. 390 px with touch,
 // isolated dev server, the census worlds' inbox, workflows, jobs and analytics, and the real docs. One scene per page; every failure of every page is reported together.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { DATA_WORLD } = require('./helpers/census_world');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -18,6 +19,7 @@ const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back
     const scene = async (name, to, view, setup) => {
         if (process.env.QA_ONLY && !name.includes(process.env.QA_ONLY)) return;
         try {
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
             await setup();
             await waitFor(`(() => { const v = document.querySelector(${JSON.stringify(view)}); return !!v && v.getClientRects().length > 0; })()`, 'the page on screen', 8000).catch(() => {}); // a page drawn into a hidden container is shown a task later: on a loaded runner the way back was measured before it was laid out (0x0, #11203); a page that never shows is still reported below

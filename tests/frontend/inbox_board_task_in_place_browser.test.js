@@ -1,6 +1,7 @@
 // A task referenced in an Inbox Teams message opens in the Inbox (#8861, Goal #73 step 2): the `#N` link of a message in /inbox/boards/<team> opens /inbox/tasks/<team>/<id> in the shared task screen, never the
 // team page; Back returns to the board. At 1280 and 390. Real board, task and message on the isolated dev server (removed again).
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -12,6 +13,7 @@ const { coralReady } = require('./helpers/wait');
     const B = 'bt-' + Date.now().toString(36), TASK = 'Referenced from the board';
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     const shot = require('./helpers/scene_shots')(Page); // the gate's uploaded output in CI, CORAL_SCREENSHOT_DIR locally
+    await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
     const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

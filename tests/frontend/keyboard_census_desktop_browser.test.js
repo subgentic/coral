@@ -3,6 +3,7 @@
 // that it has focus, the order has no tabindex above 0, and each dialog takes focus in, keeps Tab and Shift+Tab inside, closes on Escape and gives focus back to what opened it. The scenes are the desktop
 // contrast census's; ALLOW_KEYBOARD is empty. KEYBOARD_REPORT=<file> writes the findings to that file instead of failing.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { teamDir } = require('./helpers/team_dir');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), { execFileSync } = require('./helpers/child_process');
 const { connect } = require('./agent_view_harness');
@@ -45,6 +46,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         }
     };
     const tap = sel => tapSel(ev, sel);
+    await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
     const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings'); };
     try {
         // The agent's folder is the Files list of the terminal view, and that list is the git changes of the folder's repository. The runner's tmp dir can sit inside a repository (epoch's does): Chrome's profile files and coral.log are then

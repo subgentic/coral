@@ -1,5 +1,6 @@
 // #20440: the Hub's explicit minimum version reaches each page, with its source.
 const assert=require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs=require('node:fs');
 const {connect}=require('./agent_view_harness');
 const {setupHubWorld,BASE}=require('./helpers/hub_world');
@@ -30,6 +31,7 @@ const {setupHubWorld,BASE}=require('./helpers/hub_world');
   for(const width of [1280,390])for(const [name,tab,path,selector,folder] of pages){
    await Emulation.setDeviceMetricsOverride({width,height:844,deviceScaleFactor:1,mobile:width===390});
    await Emulation.setTouchEmulationEnabled({enabled:width===390});
+   await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();
    await waitFor(`typeof window.switchNavTab==='function'&&import((window.__coralStatic||'/static/')+'state.js').then(m=>m.state.serversKnown)`, 'Hub inventory',15000);
    await ev(`window.__refusePath=${JSON.stringify(path)};window.switchNavTab(${JSON.stringify(tab)});true`);

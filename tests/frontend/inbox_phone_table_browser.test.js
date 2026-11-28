@@ -1,6 +1,7 @@
 // The Inbox's tables on a phone (#7722, the #7720 audit's finding 4): the Tasks table fits 390 px without a sideways scroll (each row is the one task row's two lines: the task, then its state and a High priority, #7737; Saved's table
 // does), and the folders' drawer button (#7785, #9545) is on top of the table, 44 px, in place of a way back. 390 px with touch, isolated dev server, the Inbox's census world.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const { axName } = require('./helpers/ax_tree');
@@ -12,6 +13,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(INBOX_WORLD);
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);

@@ -2,6 +2,7 @@
 // and at 390 px with 200% text, in the dark and the light theme. In each: the page does not scroll sideways, no control is cut off or hidden by an edge, no text is clipped without an ellipsis, no word is broken across lines
 // (a word wider than its own box), and on a touch screen every control is 44 px. 200% text is the root font doubled, as the text200 suites do it. The lists are the real renderers given stubbed data. Isolated dev server.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { SCAN } = require('./helpers/phone_scan');
 const { setTheme } = require('./helpers/contrast');
@@ -54,6 +55,7 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             let safe = 0; // a phone's safe area under the page (the home bar): emulated where Chrome can, the bar must leave it free
             try { await Emulation.setSafeAreaInsetsOverride({ insets: { bottom: mobile ? 34 : 0 } }); safe = mobile ? 34 : 0; } catch { safe = 0; }
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
             await setTheme(ev, theme);
             await ev(`document.documentElement.style.fontSize = '${font}px'; true`);

@@ -2,6 +2,7 @@
 // field, named for the open tab ("Search waiting on you", "Search tasks", ...), and the box under the tabs is not drawn; the Filters icon stays in the page, and the hamburger still opens the views.
 // What is typed there filters the page as the old box did. At 1280 nothing changes: the page keeps its own box and the top bar has no search field. Drives Chrome over CDP on the isolated dev server.
 const { connect } = require('./agent_view_harness');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 const FOLDERS = [['needs', 'Search waiting on you'], ['tasks', 'Search tasks'], ['goals', 'Search goals']];
@@ -19,6 +20,7 @@ const FOLDERS = [['needs', 'Search waiting on you'], ['tasks', 'Search tasks'], 
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['390', 390, 844, true], ['432', 432, 700, true], ['620', 620, 800, true], ['700', 700, 800, true], ['1280', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev);
             await ev(`(() => { window.__m.add('Frontend Dev', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'fe-id' }); window.__m.add('Backend Dev', 'B', 4, { sleeping: false, board_project: 'team-a', session_id: 'be-id' }); return true; })()`);

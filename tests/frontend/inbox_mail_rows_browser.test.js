@@ -2,6 +2,7 @@
 // (Needs you, a list of agents: the agent and what it asks on one line, 56 px, the title bold, an amber dot; one line since #9986, it was a second line at 64 px). Tasks: a state glyph in a square, the title, the state. No unread marker anywhere else (a read state exists only for Needs you).
 // A desktop keeps its table. 390 and 412 px with touch, isolated dev server, the Inbox's census world and two waiting agents.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const { axName } = require('./helpers/ax_tree');
 const path = require('node:path');
@@ -27,7 +28,7 @@ const AGENTS = [
         return { h: Math.round(box.height), lead: Math.round(r(q('.dt-mail-lead')).height), leadW: Math.round(r(q('.dt-mail-lead')).width), avatar: Math.round(r(q('.dt-mail-avatar')).width), title: q('.dt-mail-title').textContent, snippet: q('.dt-mail-snippet').textContent, ask: q('.dt-mail-ask') && q('.dt-mail-ask').textContent,
             dismiss:!!q('.inbox-single-action .inbox-dismiss'),footerBelow:!!q('.inbox-mail-footer')&&r(q('.inbox-mail-footer')).top>=r(q('.dt-mail-title')).bottom,more: !!q('.dt-mail-more'), time: q('.dt-mail-time').textContent, bold: getComputedStyle(q('.dt-mail-title')).fontWeight, dot: !!q('.dt-mail-dot'), sameLine: Math.abs(r(q('.dt-mail-title')).top - r(q('.dt-mail-snippet')).top) < 4, timeRight: Math.round(box.right - r(q('.dt-mail-time')).right), open: !!q('button.dt-mail-open') }; }); })()`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true], [360, 780, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });

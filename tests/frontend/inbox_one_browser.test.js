@@ -5,6 +5,7 @@
 // back, a bar pinned at the foot (More with Remove, Open as the primary; the whole message is in the page, #7660); one empty line per group; both themes and 200% text; a phone's list is the page and an item the screen after
 // it. Drives Chrome over CDP through agent_view_harness.js with the tasks, the saved list and the waiting agents stubbed.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -65,8 +66,9 @@ const AGENTS = (waiting) => waiting ? [
         for (const [w, h, mobile] of [[1280, 820, false], [1024, 768, false], [390, 844, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await ev(`localStorage.clear(); localStorage.setItem('coral-test-tasks-tab', '1'); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await setAgents(true);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${attn}').length === 4`, at + 'the Inbox pane', 10000);

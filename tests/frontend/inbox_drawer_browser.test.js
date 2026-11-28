@@ -1,5 +1,6 @@
 // The phone Inbox's folders were a drawer (#9545) and are now the ONE tab strip (#11236, #11239 slice A): a strip of 44 px text tabs, the open folder underlined with its count, Right and Left moving between tabs, a tap opening a folder. A desktop keeps its column and shows no tab strip. Isolated dev server, the Inbox's census world.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -17,7 +18,7 @@ const { coralReady } = require('./helpers/wait');
             nav: shown(nav) && { w: Math.round(r(nav).width), left: Math.round(r(nav).left), items: [...nav.querySelectorAll('.view-list-item')].map(b => Math.round(r(b).height)), current: [...nav.querySelectorAll('[aria-current]')].map(b => b.dataset.key) },
             scrim: shown(scrim), focus: document.activeElement === tr ? 'trigger' : nav.contains(document.activeElement) ? 'nav' : document.activeElement.tagName, title: (document.querySelector('#group-table-title') || {}).textContent, win: innerWidth }; })()`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });

@@ -1,6 +1,7 @@
 // The Inbox's read marker (#9687): a task or chat changed after the browser first used the marker is unread (an accent dot named Unread, the name at 600, a read name 500, the snippet and time unchanged);
 // opening it makes it read, and that survives a reload. Desktop and phone rows. Only opening marks (nothing on hover or scroll). The seeded `since` is long ago; the census world's tasks are newer.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -14,7 +15,7 @@ const { coralReady } = require('./helpers/wait');
     const T = '#group-table-view';
     const KEY = 'coral.inbox.read.v1';
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });

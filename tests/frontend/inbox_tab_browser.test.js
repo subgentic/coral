@@ -12,6 +12,7 @@
 // Expects CORAL_TEST_URL + CDP_PORT from the runner. Exit 0 / 1.
 'use strict';
 const fs = require('node:fs');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const path = require('node:path');
 const CDP = require('chrome-remote-interface');
 process.env.CORAL_KEEP_START = '1'; // this suite is about the start page: the harness does not move a bare / to /agents (#11594)
@@ -68,6 +69,7 @@ const { settle } = require('./helpers/wait');
         const open = async (w, h) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: w < 700 ? 2 : 1, mobile: w < 700 });
             await Emulation.setTouchEmulationEnabled({ enabled: w < 700 });
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await settle(ev, 2500); // sleep-ok: the page and its first lists arrive from requests; there is no completion event for them
             check(`the page is served as the ${cloud ? 'hub' : 'local Coral'}`, (await ev(`document.body.classList.contains('cloud-mode')`)) === cloud);

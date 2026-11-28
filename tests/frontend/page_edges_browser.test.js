@@ -5,6 +5,7 @@
 //  - at 390 a toast covers no control (it sits under the app bar, the list's title and its filter box, #10052 and #10458)
 // PAGE_EDGES_SHOTS=<dir> writes a picture of each screen there (the before/after of the review). Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 // PAGE_EDGES_NO_ASSERT=1 only reports what would fail (to take the pictures of a tree that does not pass yet)
 const ok = (cond, message) => { if (!cond) { if (process.env.PAGE_EDGES_NO_ASSERT) console.log('would fail: ' + message); else assert.fail(message); } };
 const fs = require('node:fs');
@@ -22,6 +23,7 @@ const EMPTY = `(() => { const vis = e => e && e.getClientRects().length && getCo
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
     const shots = process.env.PAGE_EDGES_SHOTS;
     const shot = async name => { if (shots) { fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(`${shots}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } };
+    await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
     const open = async (path, ready) => { await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await waitFor(ready || `(${TITLE}) !== null`, 'the screen ' + path, 15000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
