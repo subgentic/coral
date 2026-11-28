@@ -1958,8 +1958,7 @@ body.panel-dragging .agentic-state {
 .list-bar-menu-grid .list-bar-field > .list-bar-field-label { flex: 0 0 5.75rem; }
 .list-bar-menu-inline .list-bar-kept > .list-bar-field-label, .list-bar-menu-grid .list-bar-kept > .list-bar-field-label { flex: 0 1 auto; } /* Kept only: the words sit next to their box, not in a label column of their own (#8617) */
 .list-bar-kept, .list-bar-menu-inline .list-bar-kept, .list-bar-menu-grid .list-bar-kept { gap: 0.5rem; justify-content: flex-start; }
-.list-bar-foot { display: flex; align-items: center; font-size: var(--fs-base); color: var(--text-secondary); }
-.list-bar-menu-foot > .list-bar-clear-all { grid-column: 1; justify-self: start; }
+.list-bar-kept:not(.list-bar-field) { display: flex; align-items: center; font-size: var(--fs-base); color: var(--text-secondary); order: 1; } /* Include archived teams (#22004): after the fields and the sort, before Clear filters and Done, where the Inbox panel puts it (team_page.css) */
 .list-bar-kept > input[type="checkbox"] { flex: none; }
 @media (max-width: 767px) { .list-bar-menu-grid { grid-template-columns: minmax(0, 1fr); } .list-bar-done { display: block; width: 100%; min-height: var(--control-touch-height, 44px); margin: 0; } }
 /* The activity bars' panel (#7653): the tool-group boxes go two to a line in it as they did in the dropdown; the other fields, the count and Clear filters are a line each. */

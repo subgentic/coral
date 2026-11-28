@@ -156,10 +156,7 @@ export function buildListBar(spec, onChange, hooks = {}) {
     if (done) done.type = 'button';
     // extras (#7924): controls the panel's owner keeps (the dock's Show done: a preference of its own, not a filter of the query) go in the panel after the fields and the sort, and count toward the icon's badge (setExtraOn)
     const extras = make('div', 'list-bar-extras'); extras.hidden = true;
-    // a check with the class list-bar-foot (Include archived teams, #22004) sits on Clear filters' line, after it, not in a cell of the fields: the panel is as tall as before and the box has its words beside it
-    const foot = fields.filter(x => x.wrap.classList.contains('list-bar-foot')), body = fields.filter(x => !foot.includes(x));
-    menu.append(...body.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), extras, clearAll, ...foot.map(x => x.wrap), ...(done ? [done] : []));
-    if (foot.length) menu.classList.add('list-bar-menu-foot');
+    menu.append(...fields.map(x => x.wrap), ...((inline || collapsible) && sort ? [sort.wrap] : []), ...(inline ? [count] : []), extras, clearAll, ...(done ? [done] : []));
     if (!inline && !collapsible) menu.classList.add('menu', 'menu-panel'); // the filters as a popup: the one menu's surface, with its fields laid out in rows; the inline and collapsible forms are not a popup and draw none
     if (inline) { menu.hidden = false; menu.classList.add('list-bar-menu-inline'); clearAll.textContent = 'Clear filters'; }
     if (collapsible) { menu.classList.add('list-bar-menu-inline', 'list-bar-panel'); clearAll.textContent = 'Clear filters'; menu.setAttribute('aria-label', panelName); }
