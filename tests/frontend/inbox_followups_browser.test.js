@@ -2,6 +2,7 @@
 // sidebar search's placeholder is "Search" (its name stays whole) so it is not cut at 200% text; the phone's Saved table stacks its rows (the message over its date, state and action: nothing behind a sideways scroll);
 // Escape on a message's page is one level back, to the Saved table with the focus on that message's row. Drives Chrome over CDP with the tasks, the saved list and the waiting agents stubbed. Isolated dev server.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -48,8 +49,9 @@ const AGENTS = (waiting) => waiting ? [
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         for (const [label, w, h, mobile, font] of [['1280', 1280, 820, false, 16], ['1280 at 200% text', 1280, 820, false, 32], ['390', 390, 844, true, 16], ['390 at 200% text', 390, 844, true, 32]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings'); document.documentElement.style.fontSize = '${font}px'; true`);
+            await ev(`localStorage.clear(); localStorage.setItem('coral-test-tasks-tab', '1'); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings'); document.documentElement.style.fontSize = '${font}px'; true`);
             await setAgents(false);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`!document.querySelector('${pane}').hidden && document.querySelectorAll('${pane} .view-list-item:is([data-key="needs"], [data-key="tasks"], [data-key="goals"], [data-key="saved"])').length === 4`, `${label}: the Inbox pane`, 10000);

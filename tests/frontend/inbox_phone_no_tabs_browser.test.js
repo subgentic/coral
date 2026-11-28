@@ -1,4 +1,5 @@
 const { POPULATED_CHAT_COUNTS } = require('./helpers/populated_chat_counts');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 // The phone's Inbox has no tab row (#13596, the Operator: "we just want to use the menu at the top left"): under 600 px no strip of Needs you, Tasks, Goals, Saved, no scroll arrow; the ☰ drawer lists every
 // folder of the Inbox with its count (Needs you says "0 of 3" style words when some are read) and marks the open one (aria-current); choosing one opens it, the pill's search says which; the page's title
 // and count are visible as the open folder's name. At 1280 the sidebar's folder list is as it was. Drives Chrome over CDP on the isolated dev server.
@@ -20,6 +21,7 @@ const fs = require('node:fs');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['390', 390, 844, true], ['620', 620, 800, true], ['700', 700, 800, true], ['1280', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev); await ev(POPULATED_CHAT_COUNTS);
             await ev(`(() => { window.__m.add('Frontend Dev', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'fe-id' }); window.__m.add('Backend Dev', 'B', 4, { sleeping: false, board_project: 'team-a', session_id: 'be-id' }); return true; })()`);

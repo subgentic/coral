@@ -2,6 +2,7 @@
 // High chip and the number of high ones on the tab; the reply box says the task stays open and "Open the task" is a button; the same "the transcript is gone" sentence is said once for a list, not on every
 // row; and the top bar has no Saved button to repeat the Inbox's own count (#9929). Drives Chrome over CDP through agent_view_harness.js against the isolated dev server (its rows are removed again).
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -14,7 +15,7 @@ const { coralReady } = require('./helpers/wait');
     const B = 'inbox-fixes-' + Date.now().toString(36);
     const savedIds = [];
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');

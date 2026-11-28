@@ -1,5 +1,6 @@
 // #16615: one lasting folder decision, with fresh checks for every member.
 const assert=require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs=require('node:fs');
 const {connect}=require('./agent_view_harness');
 const {coralReady}=require('./helpers/wait');
@@ -9,7 +10,7 @@ const MENU={ask_id:'trust-ask',unnumbered:true,question:'Quick safety check',tru
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  try{
-  await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+  await Page.enable(); await showTasksTab(Page);await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
   for(const theme of ['light','dark'])for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);
    await ev(`(()=>{document.documentElement.setAttribute('data-theme',${JSON.stringify(theme)});window.__trustMenus={a:${JSON.stringify(MENU)},b:${JSON.stringify({...MENU,ask_id:'trust-b'})},c:${JSON.stringify({...MENU,ask_id:'trust-c'})}};window.__trustPosts=[];const real=window.fetch;window.fetch=(u,o={})=>{const p=new URL(String(u),location.href).pathname;const json=b=>Promise.resolve(Response.json(b));if(p.endsWith('/chat')){const name=decodeURIComponent(p.split('/').at(-2));const body={messages:[],prompt_options:window.__trustMenus[name]};return window.__trustGate?window.__trustGate.then(()=>json(body)):json(body)}if(p.endsWith('/answer-prompt')&&o.method==='POST'){window.__trustPosts.push(JSON.parse(o.body));return json({ok:true})}return real(u,o)};const entry=window.__m.entry.bind(window.__m);window.__m.entry=a=>({...entry(a),working_directory:${JSON.stringify(FOLDER)},waiting_for_input:true,waiting_kind:'permission',waiting_summary:'Quick safety check',waiting_since:'group-'+${JSON.stringify(theme+width)}});for(const name of ['a','b','c'])window.__m.add(name,name,4,{sleeping:false,agent_type:'claude',board_project:'team-group',session_id:name});window.switchNavTab('hub-inbox');return true})()`);

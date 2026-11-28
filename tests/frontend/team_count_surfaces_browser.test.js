@@ -1,5 +1,6 @@
 // #17625: each reported surface agrees with its filtered rows or confirmed action.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady, framesJs } = require('./helpers/wait');
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
     const check = (ok, name, value) => { if (!ok) problems.push(`${name}: ${JSON.stringify(value)}`); };
     const shot = async name => { if (!process.env.CORAL_SCREENSHOT_DIR) return; await ev(framesJs(3)); fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const width of [1280, 390]) {
             const team = 'counts17625-' + width + '-' + Date.now().toString(36); boards.push(team);
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });

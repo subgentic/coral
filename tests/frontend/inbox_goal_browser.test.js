@@ -3,6 +3,7 @@
 // an opened task shows the same link when the row carries goal_id and goal_title (goal_id and goal_title come from the route's own answer, #7345). Real board over the API for the goal.
 // Drives Chrome over CDP against the isolated dev server (its rows are removed again).
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -16,6 +17,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' })).status, 200);
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Ship the new installer' }); assert.equal(g.status, 201, JSON.stringify(g));

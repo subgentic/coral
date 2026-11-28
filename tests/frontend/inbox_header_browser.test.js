@@ -3,6 +3,7 @@
 // select above, so its row is the search and the icon and the title is for screen readers. Real isolated board with one goal and one task; the Needs you, Saved and chat folders are empty and keep the same header.
 // 1280, 900 and 390. Drives Chrome over CDP against the dev server.
 const { connect } = require('./agent_view_harness');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
 const fs = require('node:fs');
@@ -17,6 +18,7 @@ const FOLDERS = [['needs', '/inbox/needs', 'Needs you'], ['tasks', '/inbox/tasks
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const board = 'inbox-header-' + Date.now().toString(36);
     const api = (method, url, body) => ev(`fetch(${JSON.stringify(url)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json() }))`);
+    await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
     const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings'); };
     const shot = async (name, theme) => { // the review shots, when a folder is given (CORAL_SCREENSHOT_DIR)
         const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out')); if (!dir) return;

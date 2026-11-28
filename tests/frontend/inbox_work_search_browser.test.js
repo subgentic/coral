@@ -2,6 +2,7 @@
 // priority and state; a goal's title), so a word only in the body or the outcome found nothing, while 'coral-board search' finds it. The dashboard now asks the same search (GET /api/board/{team}/search) and lists
 // what it found beside its own matches. Real board over the API; drives Chrome over CDP against the isolated dev server (its rows are removed again).
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -15,7 +16,7 @@ const { coralReady } = require('./helpers/wait');
     const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => tr.textContent.replace(/\\s+/g, ' ').trim())`);
     const search = text => ev(`import(${S} + 'inbox_sidebar.js').then(m => { m.filterInbox(${JSON.stringify(text)}); return true; })`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' })).status, 200);

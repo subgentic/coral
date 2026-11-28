@@ -1,5 +1,5 @@
 // #13256 (the operator, through coral-hub: 'the coral hub inbox has a different layout than the coral local'): the Hub-served Inbox's sidebar used its own list: Artifacts under NEEDS ATTENTION, no FILES or HISTORY group,
-// 'Saved for later' for Saved. It now uses local Coral's groups, order and words: one group, Your work (Needs you, Activity, Saved, Goals, Tasks, Artifacts; #21325, was NEEDS ATTENTION, FILES and HISTORY) on the Hub as well as a computer (#20394).
+// 'Saved for later' for Saved. It now uses local Coral's groups, order and words: one group, Your work (Needs you, Activity, Saved, Goals, Artifacts; #21325; Tasks out for now, #22109, was NEEDS ATTENTION, FILES and HISTORY) on the Hub as well as a computer (#20394).
 // Local first (the plain dev server), then the stubbed Hub of helpers/hub_world.js (native boot). 1280 px.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -27,10 +27,10 @@ const { coralReady, framesJs } = require('./helpers/wait');
     };
     try {
         await Page.enable();
-        console.log('1. Local: Your work (Needs you, Activity, Saved, Goals, Tasks, Artifacts)');
+        console.log('1. Local: Your work (Needs you, Activity, Saved, Goals, Artifacts; Tasks is out for now, #22109)');
         await open();
         const local = await sidebar();
-        assert.deepEqual(local, ['Your work', 'Needs you', 'Activity', 'Saved', 'Goals', 'Tasks', 'Artifacts'], JSON.stringify(local));
+        assert.deepEqual(local, ['Your work', 'Needs you', 'Activity', 'Saved', 'Goals', 'Artifacts'], JSON.stringify(local));
         await shot('hub-inbox-sidebar-local');
         console.log('   ✓');
 
@@ -39,7 +39,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await open();
         const hub = await sidebar();
         await shot('hub-inbox-sidebar-hub');
-        assert.deepEqual(hub, ['Your work', 'Needs you', 'Activity', 'Saved', 'Goals', 'Tasks', 'Artifacts'], JSON.stringify(hub));
+        assert.deepEqual(hub, ['Your work', 'Needs you', 'Activity', 'Saved', 'Goals', 'Artifacts'], JSON.stringify(hub));
         assert.ok(!hub.includes('Saved for later'), 'the word is Saved, as on a computer');
         console.log('   ✓');
 

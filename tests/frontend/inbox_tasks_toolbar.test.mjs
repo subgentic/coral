@@ -1,7 +1,7 @@
 // #8411: the Inbox Tasks folder uses the shared Tasks toolbar, once, with person-scoped controls.
 import assert from 'node:assert/strict';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
-installDom({ mode: 'local' });
+installDom({ mode: 'local', boot: { testHooks: true } }); localStorage.setItem('coral-test-tasks-tab', '1'); // the Inbox's Tasks tab is out for now; a dev build with test hooks shows it again for this check of the kept folder (#22109)
 const inbox = await importUi('inbox_sidebar');
 await inbox.openInboxGroup('tasks');
 const host = document.getElementById('group-table-view');

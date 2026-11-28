@@ -1,5 +1,6 @@
 // #8411: the real Inbox Tasks toolbar at desktop and phone widths; seed the person-scoped read only.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -35,6 +36,7 @@ const { coralReady } = require('./helpers/wait');
         }; })();` });
         for (const width of [1280, 390]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
+            await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('hub-inbox'); true`);

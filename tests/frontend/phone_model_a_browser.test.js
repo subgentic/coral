@@ -47,7 +47,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);
             await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]) .nav-drawer-folder[aria-current="true"]')`, `${tag}: current folder in menu`, 6000);
             const folders = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].map(b => ({ name: b.querySelector('.nav-drawer-label').textContent, current: b.getAttribute('aria-current') === 'true', height: b.getBoundingClientRect().height }))`);
-            assert.ok(['Needs you', 'Tasks', 'Goals', 'Saved', 'Artifacts', 'Activity', 'All chats'].every(n => folders.some(f => f.name === n)) && folders.filter(f => f.current).length === 1 && folders.every(f => f.height >= 44), `${tag}: all folders reachable with one current item and 44 px targets: ${JSON.stringify(folders)}`);
+            assert.ok(['Needs you', 'Goals', 'Saved', 'Artifacts', 'Activity', 'All chats'].every(n => folders.some(f => f.name === n)) && folders.filter(f => f.current).length === 1 && folders.every(f => f.height >= 44), `${tag}: all folders reachable with one current item and 44 px targets: ${JSON.stringify(folders)}`);
             await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder')].find(b => b.querySelector('.nav-drawer-label').textContent === 'Goals').click(); true`);
             await waitFor(`document.getElementById('group-table-title')?.textContent === 'Goals'`, `${tag}: menu opens Goals`, 8000);
             await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length).click(); true`);

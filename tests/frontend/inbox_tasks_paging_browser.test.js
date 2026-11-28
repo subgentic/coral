@@ -1,12 +1,13 @@
 // #17325: older Operator tasks remain reachable; state/search query the source, not its loaded window.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const {connect}=require('./agent_view_harness');
 const {coralReady}=require('./helpers/wait');
 const BASE=require('./test_base').BASE;
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  try {
-  await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+  await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
   await Page.addScriptToEvaluateOnNewDocument({source:`(()=>{const R=window.fetch; window.__taskQueries=[];
    const all=Array.from({length:130},(_,i)=>({id:i+1,board_id:'tasks-team',title:'Done '+i,status:'completed',assigned_to:'Operator',updated_at:'2026-11-16T12:00:00Z'})).concat(
     Array.from({length:110},(_,i)=>({id:i+200,board_id:'tasks-team',title:'Open '+i,status:'pending',priority:'medium',assigned_to:'Operator',updated_at:'2026-11-15T12:00:00Z'})),

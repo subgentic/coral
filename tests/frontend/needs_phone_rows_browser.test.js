@@ -2,6 +2,7 @@
 // a swipe to the left ignores it (with Undo), and a bar that takes the toolbar's line acts on the selection: Approve, Changes, Dismiss, Save for later, Mark read or unread, Cancel, one request per item through the same
 // routes as a row's own buttons. A selection that does not fit an action turns it off (a question cannot be approved, Changes is for one file). Welcome, review and question rows at 390 and 360 px, real touch through CDP.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
@@ -13,7 +14,7 @@ const { coralReady } = require('./helpers/wait');
     const team = 'phone-rows-' + Date.now().toString(36);
     const T = '#group-table-view';
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         // [width, touch emulation]: the third pass is a phone-sized window whose pointer is not reported coarse (a driver that sets only the screen size, #11765): a swipe must work there too
         for (const [w, touchEmu] of [[390, true], [360, true], [390, false]]) {
             const at = `${w} px${touchEmu ? '' : ', pointer not coarse'}: `;

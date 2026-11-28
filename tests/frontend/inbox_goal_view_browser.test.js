@@ -1,5 +1,6 @@
 // #8571: the same goal detail mounts in Inbox and Team, with local Back and durable URLs.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -16,6 +17,7 @@ const { coralReady } = require('./helpers/wait');
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
     };
+    await showTasksTab(Page); // the Tasks tab is shown again for this suite (#22109)
     const load = async url => { await Page.navigate({url: BASE + url}); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         // Review captures show the final theme, never an intermediate color in its transition.
         await ev(`(() => { const style = document.createElement('style'); style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(style); return true; })()`);

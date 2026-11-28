@@ -1,6 +1,7 @@
 // The Inbox's phone toolbar at 200% text (#9658): the search field, the Filters icon and the Select button fit a 390 px screen, the Select button whole (its words, not "Sele"), by wrapping to a second line
 // when the line is full. Tasks folder over the census world, touch, isolated dev server.
 const assert = require('node:assert/strict');
+const { showTasksTab } = require('./helpers/tasks_tab.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
@@ -13,7 +14,7 @@ const { coralReady } = require('./helpers/wait');
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const T = '#group-table-view';
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(INBOX_WORLD);

@@ -20,23 +20,23 @@ const BASE = require('./test_base').BASE;
             const refresh = () => ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
             const open = async () => { await ev(`window.switchNavTab('hub-inbox'); true`); await settle(900); };
             const leave = async () => { await ev(`window.switchNavTab('agents'); true`); await settle(400); };
-            // Tasks was the last folder; nothing waits: the Inbox reopens on Tasks
-            await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`); await settle(700);
-            assert.equal(await group(), 'hub-inbox:tasks', `${label}: Tasks is open`);
+            // Goals was the last folder; nothing waits: the Inbox reopens on Goals
+            await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => true)`); await settle(700);
+            assert.equal(await group(), 'hub-inbox:goals', `${label}: Goals is open`);
             await leave(); await open();
-            assert.equal(await group(), 'hub-inbox:tasks', `${label}: nothing waits, so the remembered folder (Tasks) is where it reopens`);
+            assert.equal(await group(), 'hub-inbox:goals', `${label}: nothing waits, so the remembered folder (Goals) is where it reopens`);
             // an agent waits: leaving and coming back lands on Needs you
             await leave(); await ev(`window.__waiting = ['qa-a-id']; true`); await refresh(); await settle(300);
             await open();
-            assert.equal(await group(), 'hub-inbox:needs', `${label}: something waits for the person: the Inbox reopens on Needs you, not on Tasks`);
+            assert.equal(await group(), 'hub-inbox:needs', `${label}: something waits for the person: the Inbox reopens on Needs you, not on Goals`);
             // nothing waits again: the folder from before Needs you was opened for the person comes back (Needs you was chosen for them, not by them)
             await leave(); await ev(`window.__waiting = []; true`); await refresh(); await settle(300);
-            assert.equal(await ev(`localStorage.getItem('coral.inbox.tab')`), 'tasks', `${label}: Needs you opened for the person is not the remembered folder`);
+            assert.equal(await ev(`localStorage.getItem('coral.inbox.tab')`), 'goals', `${label}: Needs you opened for the person is not the remembered folder`);
             await open();
-            assert.equal(await group(), 'hub-inbox:tasks', `${label}: nothing waits again: the Inbox reopens on Tasks, not on an empty Needs you`);
+            assert.equal(await group(), 'hub-inbox:goals', `${label}: nothing waits again: the Inbox reopens on Goals, not on an empty Needs you`);
             // a link to a folder still opens that folder
-            await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`); await settle(500);
-            assert.equal(await group(), 'hub-inbox:tasks', `${label}: a chosen folder opens`);
+            await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => true)`); await settle(500);
+            assert.equal(await group(), 'hub-inbox:goals', `${label}: a chosen folder opens`);
             console.log(`ok ${label}`);
         }
         console.log('PASS the Inbox reopens on Needs you when something waits, and on the remembered folder when nothing does');

@@ -9,6 +9,7 @@
 const assert = require('node:assert/strict');
 const { teamDir } = require('./team_dir');
 const { connect } = require('../agent_view_harness');
+const { showTasksTab } = require('./tasks_tab');
 const { launchStandIn } = require('./stand_in_agent');
 const { guardSettings } = require('./settings_guard');
 const { GOALS_STUB, SHOW_ALL_GOALS } = require('./goals_stub');
@@ -37,7 +38,8 @@ module.exports = part => (async () => {
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });
         for (const m of ['Please check the release notes.', 'Then post the summary.']) await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: m });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: CENSUS_LIVE }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
+        await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); // the Inbox's Tasks tab is shown again for its scenes (#22109)
+        await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: CENSUS_LIVE }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await load();
         if (part === 'a') {
