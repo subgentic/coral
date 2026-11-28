@@ -259,7 +259,7 @@ function fill(s, cell, withDismiss = true, primaryOpen = false) {
         cell.replaceChildren();
         if (hookNote) { const n = document.createElement('span'); n.className = 'inbox-answer-step inbox-hook-note'; n.textContent = hookNote; cell.append(n); } // Codex's hook review: whose hooks these are not, and where they likely come from (#21209)
         const said = norm => String(norm || '').replace(/[?:\s]+$/, ''); // 'Pick a color:' is the row's 'Pick a color' (#19962)
-        const words = step || (question && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
+        const words = step || (question && !(cell.dataset.omitCommandQuestion === 'true' && question.trim() === 'Run the command?') && (later || !said(s.waiting_summary).includes(said(question))) ? question : ''); // the question is named when the row's own words do not carry it (a later step's never does)
         if (lines && lines.length) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; if (stepFull && stepFull !== words) t.title = stepFull; lines.forEach(l => { const ln = document.createElement('span'); ln.className = 'inbox-answer-step-line'; ln.textContent = l.length > 240 ? `${l.slice(0, 239)}…` : l; t.append(ln, ' '); }); cell.append(t); } else if (words) { const t = document.createElement('span'); t.className = 'inbox-answer-step'; t.textContent = words.length > 240 ? `${words.slice(0, 239)}…` : words; if (stepFull && stepFull !== words) t.title = stepFull; else if (words.length > 240) t.title = words; cell.append(t); } // text only; a cut line (a field or the whole) says so and keeps the uncut text as its hover; the review's lines have a space between them: one run of words for a screen reader
         { const title = cell.closest('tr')?.querySelector('td[data-key="agent"] > .inbox-row-words:not(.inbox-row-command)'); // the row's own title says what the card is about, in the DOM (#19941): the agent's 'Claude needs your permission' says nothing; not 'bash': a Codex shell or an MCP tool has a command too
             if (title) { if (title.dataset.was === undefined && /needs your permission/i.test(title.textContent)) title.dataset.was = title.textContent; if (title.dataset.was !== undefined) title.textContent = target && target.trim() ? `Wants to run ${tool ? `${/^[aeiou]/i.test(tool) ? 'an' : 'a'} ${tool.toLowerCase()}` : 'a'} command` : title.dataset.was; }
@@ -376,7 +376,7 @@ export function rowActions(s) {
 }
 
 /** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. `dismiss: false` leaves the Dismiss to the row's ⋯ menu (a phone's). */
-export function answerCell(s, { dismiss = true, primaryOpen = false } = {}) {
+export function answerCell(s, { dismiss = true, primaryOpen = false, omitCommandQuestion = false } = {}) {
     if (s.waiting_for_input && waitIgnored(s) && !s.sleeping && !s.archived) {
         const cell = document.createElement('span'); cell.className = 'inbox-answers';
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small inbox-open-agent'; button.textContent = 'Open agent';
@@ -409,6 +409,7 @@ export function answerCell(s, { dismiss = true, primaryOpen = false } = {}) {
     }
     const cell = document.createElement('span');
     cell.className = 'inbox-answers';
+    if (omitCommandQuestion) cell.dataset.omitCommandQuestion = 'true';
     fill(s, cell, dismiss, primaryOpen);
     return cell;
 }
