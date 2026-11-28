@@ -1,5 +1,8 @@
 // Touch census of the Needs you list on a tablet (walk 80 item 10, #17694): at 820 x 1180 with a coarse pointer every visible button, link or field in the list is 44 x 44 CSS px (the compact card's 32 px file name and its 40 and 35 px Save for later and Star buttons were for a mouse).
-// Three Needs you files are listed with the Inbox's own table at that size; the list is measured once its names and Save for later and Star buttons are all drawn.
+// Three Needs you files are listed with the Inbox's own list at that size; the list is measured once its names and Save for later and Star buttons are all drawn.
+// On the ledger (#22094): the files are article.nl-row.nl-file rows (Group by None, so none is folded away). With a coarse pointer a file row's Save for later is in its More menu (summary.nl-more-toggle),
+// so the census waits for the three file names and the three More buttons. Retired: the row's Star button. The ledger's file row has no star (approved v19 mock; the Orchestrator retired star
+// placement on 2026-11-28 09:33). The Save for later controls' size is still measured here and in needs_save_later_icon.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -33,7 +36,7 @@ const UNDERSIZED = `(() => {
     const guard = await guardSettings(); // the bulk Dismiss on the phone saves inbox_welcome_done to the server: put back at the end (#15755)
     const S = `(window.__coralStatic || '/static/')`, team = 'one-number-' + Date.now().toString(36), problems = [];
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-group-mode', 'none'); localStorage.setItem('coral-inbox-group-review-goal', 'false');` });
         for (const w of [820]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 1180, deviceScaleFactor: 2, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
@@ -42,8 +45,8 @@ const UNDERSIZED = `(() => {
                 window.__rows = [1, 2, 3].map(i => ({ id: hex(i), name: 'file-' + i + '.md', uri: 'coral://artifacts/' + hex(i), produced_by: 'Dev', session_id: 'p' + i, created_at: new Date(Date.now() - i * 60000).toISOString(), media_type: 'text/markdown', available: true, tags: ['for review'], starred: false, series_id: 'series-' + i, version: 1 }));
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.href); if (u.pathname === '/api/team-artifacts') return json(window.__reviewFixturePage(u, location.href, { '${team}': window.__rows })); if (u.pathname === '/api/board/${team}/artifacts') return json({ artifacts: window.__rows, has_more: false }); if (opts.method === 'PUT' && /\\/artifacts\\/[0-9a-f]{64}\\/tags$/.test(u.pathname)) { const row = window.__rows.find(r => u.pathname.includes(r.id)); if (row) row.tags = JSON.parse(opts.body).tags; return json({ ok: true, tags: row ? row.tags : [] }); } if (opts.method === 'POST' && /\\/artifacts\\/[0-9a-f]{64}\\/review$/.test(u.pathname)) { const i = window.__rows.findIndex(r => u.pathname.includes(r.id)); if (i >= 0) window.__rows.splice(i, 1); return json({ ok: true }); } return original(url, opts); }; return true; })()`);
             await ev(`T.state.settings = { ...T.state.settings, inbox_welcome: 'off', inbox_welcome_done: '' }; window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, `${w}: the rows`, 15000);
-            await waitFor(`document.querySelectorAll('#group-table-view .inbox-review-name').length === 3 && document.querySelectorAll('#group-table-view .inbox-bookmark').length === 3 && document.querySelectorAll('#group-table-view .inbox-star').length === 3`, `${w}: the names, Save for later and Star of the three files are drawn`, 8000);
+            await waitFor(`document.querySelectorAll('#group-table-view .nl-row.nl-file').length === 3`, `${w}: the rows`, 15000);
+            await waitFor(`(() => { const shown = s => [...document.querySelectorAll('#group-table-view .nl-row.nl-file ' + s)].filter(e => e.getClientRects().length).length; return shown('.nl-file-open') === 3 && shown('.nl-more-toggle') === 3; })()`, `${w}: the names and the More (Save for later) of the three files are drawn`, 8000);
             const l = await ev(UNDERSIZED); if (l.length) problems.push('controls under 44 px (' + l.length + '): ' + l.join(' | '));
         }
     } finally { await ev(`fetch('/api/board/${team}', { method: 'DELETE' })`).catch(() => {}); await client.close(); await guard.restore(); }

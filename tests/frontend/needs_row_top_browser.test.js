@@ -1,5 +1,8 @@
 // Needs you rows (#15540, the Operator's screenshot): the checkbox, the kind icon and the star sit in the same place at the top of every row, whatever its height, and the selection actions are one row BELOW the title, the search and the filters. (Fixture of needs_bulk_steady, #15339, walk 23 H3): ticking a row does not move the list (it moved 84 px at 1280, 4 px at 1920, so the next click landed on another row), and unticking it puts everything back.
 // Review rows stubbed in the page. 1920 and 1280 px with a mouse. Drives Chrome over CDP through agent_view_harness.js.
+// On the ledger (#22094): the rows are article.nl-row (the select box .nl-check, the kind icon the row's own .nl-icon), and the selection actions are the list's summary bar (.nl-summary:
+// "N selected", Dismiss, Mark as read, Clear), which must sit below the toolbar's title, search and filters. Retired: the star on the row's top line. The ledger row has no star (approved
+// v19 mock; the Orchestrator retired star placement on 2026-11-28 09:33).
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
@@ -31,31 +34,30 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(() => { const orig = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify([{ board: '${team}', kind: 'ask', id: 71, asker: 'Lead', text: 'Which port should the test server use for the integration run, and should it be the same one the dashboard is on? Say which, and why.', at: new Date(Date.now() - 300000).toISOString() }]), { status: 200, headers: { 'Content-Type': 'application/json' } })) : orig(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3 && !!document.querySelector('${T} tbody tr .inbox-answers, ${T} tbody tr [data-on-click*="ask"], ${T} tbody tr button')`, at + 'the review rows and the question', 15000);
+            await waitFor(`document.querySelectorAll('${T} .nl-row.nl-file').length >= 3 && !!document.querySelector('${T} .nl-row.nl-question')`, at + 'the review rows and the question', 15000);
             await ev(framesJs(4));
             await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`);
 
             const vis = () => ev(`(() => { const r = e => !!(e && e.getClientRects().length); const row = document.querySelector('${T} .list-bar-search-row, ${T} .gt-toolbar'); return { head: r(row && row.querySelector('.inbox-folder-head')), search: r(row && row.querySelector('.list-bar-search-wrap')), pills: r(row && row.querySelector('.team-tb-pills, .goals-chips, .list-bar-chips')) }; })()`);
             const idle = await vis();
-            await ev(`document.querySelector('${T} tbody tr .dt-check input, ${T} tbody tr .dt-mail-lead')?.click(); true`); await ev(framesJs(4));
-            const geo = await ev(`(() => { const r = e => e && e.getClientRects().length ? e.getBoundingClientRect() : null; return [...document.querySelectorAll('${T} tbody tr:not(.dt-group)')].map(tr => { const rb = tr.getBoundingClientRect(), c = x => x ? Math.round(x.top - rb.top + x.height / 2) : null;
-                return { h: Math.round(rb.height), check: c(r(tr.querySelector('.dt-check input, .dt-mail-lead'))), icon: c(r(tr.querySelector('.inbox-kind-icon'))), star: c(r(tr.querySelector('.inbox-review-star'))) }; }); })()`);
+            await ev(`document.querySelector('${T} .nl-row .nl-check')?.click(); true`); await ev(framesJs(4));
+            const geo = await ev(`(() => { const r = e => e && e.getClientRects().length ? e.getBoundingClientRect() : null; return [...document.querySelectorAll('${T} .nl-row')].filter(tr => tr.getClientRects().length).map(tr => { const rb = tr.getBoundingClientRect(), c = x => x ? Math.round(x.top - rb.top + x.height / 2) : null;
+                return { h: Math.round(rb.height), check: c(r(tr.querySelector(':scope > .nl-check-hit .nl-check'))), icon: c(r(tr.querySelector(':scope > .nl-icon, :scope > .nl-check-hit + *'))) }; }); })()`);
             check(geo.length >= 4, at + 'four rows: ' + JSON.stringify(geo));
             const heights = new Set(geo.map(g => g.h));
             for (const g of geo) {
                 for (const k of ['check', 'icon']) if (g[k] != null) check(g[k] <= 40, at + `the ${k} is in the row's top band (centre ${g[k]} px below its top, row ${g.h} px): ` + JSON.stringify(g));
                 const ys = ['check', 'icon'].map(k => g[k]).filter(v => v != null);
-                check(Math.max(...ys) - Math.min(...ys) <= 4, at + 'the checkbox, icon and star share one line: ' + JSON.stringify(g));
+                check(Math.max(...ys) - Math.min(...ys) <= 4, at + 'the checkbox and icon share one line: ' + JSON.stringify(g));
             }
             const icons = geo.map(g => g.icon).filter(v => v != null);
             check(Math.max(...icons) - Math.min(...icons) <= 1, at + 'the icon is at the same place on rows of different heights (' + [...heights].join(', ') + '): ' + JSON.stringify(geo));
-            const stars = w >= 768 ? geo.map(g => g.star).filter(v => v != null) : []; // a phone card keeps its star at the end of the button row (#15658)
-            check(stars.length === 0 || Math.max(...stars) - Math.min(...stars) <= 1, at + 'the star is at the same place on every row: ' + JSON.stringify(geo));
+            // (the star's place on every row: retired on the ledger, see the header)
             // the selection actions: one row below the title, the search and the filters
-            const lay = await ev(`(() => { const r = e => e && e.getClientRects().length ? e.getBoundingClientRect() : null; const row = document.querySelector('${T} .list-bar-search-row, ${T} .gt-toolbar'); const sel = row && row.querySelector('.team-tb-selection'); const kids = row ? [...row.children].filter(r) : [];
+            const lay = await ev(`(() => { const r = e => e && e.getClientRects().length ? e.getBoundingClientRect() : null; const row = document.querySelector('${T} .list-bar-search-row, ${T} .gt-toolbar'); const sel = document.querySelector('${T} .needs-ledger .nl-summary');
                 const bar = r(sel), head = r(row && row.querySelector('.inbox-folder-head')), search = r(row && row.querySelector('.list-bar-search-wrap')), pills = r(row && row.querySelector('.team-tb-pills, .goals-chips, .list-bar-chips'));
                 const btns = sel ? [...sel.querySelectorAll('button')].filter(r).map(b => Math.round(r(b).top)) : [];
-                return { bar: bar && [Math.round(bar.top), Math.round(bar.height)], head: head && Math.round(head.bottom), search: search && Math.round(search.bottom), pills: pills && Math.round(pills.bottom), btnTops: [...new Set(btns)], count: sel && (sel.firstElementChild ? sel.firstElementChild.textContent : '') }; })()`);
+                return { bar: bar && [Math.round(bar.top), Math.round(bar.height)], head: head && Math.round(head.bottom), search: search && Math.round(search.bottom), pills: pills && Math.round(pills.bottom), btnTops: [...new Set(btns)], count: sel && ([...sel.children].find(e => r(e) && !e.matches('label')) || {}).textContent || '' }; })()`);
             check(!!lay.bar, at + 'the selection bar is on screen: ' + JSON.stringify(lay));
             if (lay.bar) {
                 for (const k of ['head', 'search', 'pills']) if (idle[k]) check(lay[k] != null, at + `the ${k} is still on screen while rows are selected: ` + JSON.stringify({ idle, lay }));
