@@ -786,3 +786,17 @@
 .nl-phone-title { font-size: var(--fs-xl); color: var(--text-primary); }
 
 .nl-file-open .nl-meta { display: block; font-weight: var(--fw-regular); }
+
+/* #22132: a file row's Save for later, a square outlined icon button that takes the agent's and the time's place on hover or focus. */
+.nl-hover-actions .btn.nl-save-later { width: var(--needs-control-height); min-width: var(--needs-control-height); height: var(--needs-control-height); padding: 0; justify-content: center; color: var(--text-secondary); }
+.nl-save-later .nl-icon { flex: none; width: auto; height: auto; line-height: 1; }
+.nl-file:is(:hover,:focus-within) .nl-side:has(> .nl-save-hover)>.goal-decision-agent-icon { display: none; }
+@media (pointer:coarse) { .nl-file:is(:hover,:focus-within) .nl-side:has(> .nl-save-hover)>.goal-decision-agent-icon { display: inline-flex; } }
+@media (max-width:767px) { .nl-file:is(:hover,:focus-within) .nl-side:has(> .nl-save-hover)>.goal-decision-agent-icon { display: inline-flex; } }
+/* #22132 on a phone: the file row's ⋯ (Save for later) shares the agent's line, so the row is no taller than before. */
+@media(max-width:767px),(pointer:coarse) {
+    .nl-file .nl-side:has(> .nl-more) { display: grid; grid-template-columns: auto auto; justify-items: end; align-items: center; column-gap: 4px; }
+    .nl-file .nl-side:has(> .nl-more) > * { grid-column: 1 / -1; }
+    .nl-file .nl-side:has(> .nl-more) > .goal-decision-agent-icon { grid-column: 1; grid-row: 1; }
+    .nl-file .nl-side:has(> .nl-more) > .nl-more { grid-column: 2; grid-row: 1; }
+}
