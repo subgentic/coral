@@ -115,7 +115,7 @@ export function needsLedger(cfg) {
         if (actionNode instanceof Node) {
             actionNode.classList.add('nl-actions');
             for (const b of actionNode.querySelectorAll('button')) {
-                if (b.textContent.trim() === 'Dismiss') { if (!isPermission) extras.push({ label: 'Dismiss', run: () => b.click() }); b.hidden = true; }
+                if (b.textContent.trim() === 'Dismiss') { extras.push({ label: 'Dismiss', run: () => b.click() }); b.hidden = true; }
                 if (isQuestion && ['Answer', 'Custom answer'].includes(b.textContent.trim())) b.textContent = 'Write an answer';
             }
             if (isQuestion) actionNode.addEventListener('click', e => { const b = e.target.closest('button'); if (b?.textContent.trim() === 'Write an answer') cfg.readQuestion(row); }, { capture: true });
@@ -123,11 +123,12 @@ export function needsLedger(cfg) {
             body.append(actionNode);
         }
         if (row.review && cfg.decidedFile(row)) { const dismiss = bulkActions.find(a => a.label === 'Dismiss'); if (dismiss && !dismiss.hidden?.([row]) && !dismiss.disabled?.([row])) extras.push({ label: 'Dismiss', run: () => dismiss.run([row]) }); }
+        extras.push(...(cfg.secondaryActions?.(row) || []));
         const extraActions = [...new Map(extras.map(entry => [entry.label, entry])).values()];
         if (row.review) side.append(cfg.fileAgent(row));
         if (unread(row)) side.append(el('span', 'nl-new', 'New'));
         const when = el('time', 'nl-when', cfg.when(row)); when.dateTime = row.waiting_since || ''; side.append(when);
-        if (!row.review) { const hover = el('span', 'nl-hover-actions'); for (const entry of extraActions.filter(x => !isQuestion || x.label === 'Dismiss')) hover.append(button(entry.label, 'btn btn-small btn-quiet', entry.run)); side.prepend(hover); more(side, extraActions, title); }
+        if (!row.review) { const hover = el('span', 'nl-hover-actions'); for (const entry of extraActions.filter(x => !isQuestion || ['Dismiss', 'Remove from Needs you'].includes(x.label))) hover.append(button(entry.label, 'btn btn-small btn-quiet', entry.run)); side.prepend(hover); more(side, extraActions, title); }
         else {
             cfg.dragFile?.(r, row); // a file row dragged onto Saved is saved (#11641)
             const entries = cfg.decidedFile(row) ? extraActions.filter(x => x.label === 'Dismiss') : [], save = cfg.saveLater?.(row), hover = el('span', 'nl-hover-actions nl-save-hover');
