@@ -70,6 +70,20 @@ const { setTheme } = require('./helpers/contrast');
     await setTheme(ev, theme); await ev(framesJs(4));
     if (shots) { fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
    }
+   // 7. the states the design review asked to see (UI/UX on task #22105): a hovered row, the Archived fold open, the Group by menu open
+   await ev(`document.querySelector('${root} .archived-summary-row .row-btn').click(); true`);
+   await waitFor(`document.querySelector('${root}').textContent.includes('Old Dev')`, `${width}: the Archived fold opens`);
+   if (!mobile) { const box = await ev(`(() => { const b = ${R('Writer')}.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`); await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: box.x, y: box.y }); }
+   for (const theme of ['dark', 'light']) {
+    await setTheme(ev, theme); await ev(framesJs(4));
+    if (shots) fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}-states.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+   }
+   await ev(`[...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length).closest('button').click(); true`);
+   await waitFor(`[...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length).closest('button').getAttribute('aria-expanded') === 'true'`, `${width}: Group by opens its menu`);
+   for (const theme of ['dark', 'light']) {
+    await setTheme(ev, theme); await ev(framesJs(4));
+    if (shots) fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}-groupby.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
+   }
   }
   console.log('PASS agent sidebar (#22105): four marks, #N the one link, queued at the right, the time/⋯ swap, quiet headings and team line, one Archived fold, Group by named; 1280 and 390, light and dark');
  } finally { await client.close(); }
