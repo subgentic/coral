@@ -321,7 +321,7 @@ func (h *BoardHandler) answeredOperatorAsks(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusOK, out) // an unknown or put-away team has none, as the open list leaves it out
 		return
 	}
-	answered, more, err := h.bs.AnsweredAsksForGoal(ctx, boardID, board.OperatorName, goalID, limit, before)
+	answered, next, err := h.bs.AnsweredAsksForGoal(ctx, boardID, board.OperatorName, goalID, limit, before)
 	if err != nil {
 		errInternalServer(w, "could not read the questions")
 		return
@@ -339,10 +339,10 @@ func (h *BoardHandler) answeredOperatorAsks(w http.ResponseWriter, r *http.Reque
 		rows = append(rows, row)
 	}
 	out["asks"] = rows
-	if more && len(answered) > 0 {
+	if next > 0 { // a full page, or a cut scan (even one that found nothing): the cursor goes on from there
 		raw, _ := json.Marshal(struct {
 			ID int64 `json:"i"`
-		}{answered[len(answered)-1].MessageID})
+		}{next})
 		out["has_more"], out["next_cursor"] = true, base64.RawURLEncoding.EncodeToString(raw)
 	}
 	writeJSON(w, http.StatusOK, out)
