@@ -90,10 +90,10 @@ button.al-title:focus-visible, .al-link:focus-visible { outline: 2px solid var(-
     .al-side { flex-direction: column; align-items: flex-end; gap: 0; }
     .al-hov, .al-row:hover .al-hov, .al-row:focus-within .al-hov { display: none; }
     .al-row:hover .al-hov ~ .al-when, .al-row:focus-within .al-hov ~ .al-when { display: inline; }
-    .al-dots { display: block; position: static; }
+    .al-dots { display: block; position: relative; }
     .al-when { min-width: 0; }
-    .al-dots .al-pop { left: var(--space-md); right: var(--space-md); display: flex; flex-direction: column; padding: var(--space-xs) 0; } /* a list, one action per line, as the mock's phone menu */
-    .al-dots .al-pop > .btn { width: 100%; min-height: var(--control-touch-height); margin: 0; padding: 0 var(--space-lg); border: 0; border-radius: 0; background: none; color: var(--text-primary); font-weight: var(--fw-regular); }
+    .al-dots .al-pop { left: auto; right: 0; width: max-content; min-width: 12rem; max-width: calc(100vw - 2 * var(--space-xl)); display: flex; flex-direction: column; padding: var(--space-xs) 0; } /* a narrow list hung from the ⋯, one action per line, words at the left: the mock's phone menu and the app's own menu shape */
+    .al-dots .al-pop > .btn { width: 100%; justify-content: flex-start; text-align: left; min-height: var(--control-touch-height); margin: 0; padding: 0 var(--space-lg); border: 0; border-radius: 0; background: none; color: var(--text-primary); font-weight: var(--fw-regular); }
 }
 
 .activity-folder { --al-goal: var(--color-tool-agent); --al-card: var(--bg-elevated); }

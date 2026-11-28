@@ -78,7 +78,7 @@ const [ra, rb] = [...r3.querySelectorAll('.al-row')];
 assert.equal(ra.querySelector('.al-ynote').textContent, 'Your note: Fix the title');
 assert.equal(ra.querySelector('.al-v').textContent, '\u21a9 Asked for changes');
 assert.equal(rb.querySelector('.al-cmd').textContent, 'npm install x');
-assert.equal(rb.querySelector('.al-title').textContent, 'a asked for permission'); // the agent's name; the box holds the recorded command only (task #22144 records it)
+assert.equal(rb.querySelector('.al-title').textContent, 'a asked for permission'); // a recorded command: the title says so, the box holds it
 assert.ok(!rb.querySelector('.al-sub').textContent.includes('(Yes)'), 'a bare Yes is not repeated after Allowed');
 // the phone's one menu holds what the hover buttons hold
 const dots = ul.querySelector('.al-row[data-key="3"] details.al-dots');
