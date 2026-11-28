@@ -1,4 +1,4 @@
-// One line a row (Goal #79, #8960; QA Reviewer 2's #8935 audit items 1, 5, 6): the Inbox Goals, the team Goals, the Inbox Needs you and the team Agents tables keep every row on one line at 1280 and at 390: the
+// One line a row (Goal #79, #8960; the Inbox Goals are decision cards since #21846, read as cards below; QA Reviewer 2's #8935 audit items 1, 5, 6): the Inbox Goals, the team Goals, the Inbox Needs you and the team Agents tables keep every row on one line at 1280 and at 390: the
 // goal's outcome and the agent's ask are the row's tooltip or its preview, not a second line, and a narrow list drops columns (dropAt) instead of folding. Each row is at most one 48 px line.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -45,13 +45,17 @@ const GOALS = [
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)} }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             if (mobile) await ev(`(() => { const b = document.querySelector('.view-list-item[data-key="goals"]'); if (b) b.click(); return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
-            await settle(1800); await one(label, 'Inbox Goals', '#group-table-view tr', 2, phone ? 150 : undefined); /* a phone Goal row is the title (two lines), the outcome (two lines) and the state under them since #15343 */ await shot(`${label}-goals`); // a phone's Goals are two-line rows now (the goal, then its outcome; #12230, the operator)
+            /* #21846 replaced the Inbox Goals table with the approved decision ledger: a card per goal whose heading wraps by design, so it is read as cards, not one-line table rows */
+            await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=2`,label+': Inbox Goals cards',10000);
+            const goalCards = await ev(`(() => ({ over: document.documentElement.scrollWidth - innerWidth, cards: [...document.querySelectorAll('#group-table-view .goal-decision-card')].filter(c=>c.getClientRects().length).map(c=>{const b=c.getBoundingClientRect(),t=c.querySelector('.goal-decision-title'),r=t?.getBoundingClientRect(),head=c.querySelector('.goal-decision-head')?.getBoundingClientRect();return{title:t?.textContent||'',id:c.querySelector('.goal-decision-id')?.textContent||'',inside:!!r&&r.left>=b.left-1&&r.right<=b.right+1&&b.left>=-1&&b.right<=innerWidth+1,head:head?Math.round(head.height):0}}) }))()`);
+            assert.ok(goalCards.cards.length>=2&&goalCards.cards.every(c=>c.title&&c.id.startsWith('Goal #')&&c.inside&&c.head>0)&&goalCards.over<=1,label+': Inbox Goals: a card per goal, its number and title inside the card, the page fits: '+JSON.stringify(goalCards));
+            await shot(`${label}-goals`); // a phone's Goals are two-line rows now (the goal, then its outcome; #12230, the operator)
             // team goals + agents
             for (const tab of ['goals', 'agents']) {
                 await Page.navigate({ url: BASE + `/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings'); await settle(2000);
                 await one(label, 'team ' + tab, '.team-panel tr', 2, phone && /goals/i.test(tab) ? 150 /* #15343: the title, the outcome and the state */ : phone && /tasks|artifacts/i.test(tab) ? 64 : undefined); await shot(`${label}-team-${tab}`); // a phone's team lists are two-line rows (#12230)
             }
         }
-        console.log('PASS one line rows: the Inbox Goals and Needs you and the team Goals and Agents keep every row on one line at 1280 and 390');
+        console.log('PASS one line rows: the team Goals and Agents keep every row on one line at 1280 and 390; Needs you and the Inbox Goals (cards since #20264 and #21846) fit');
     } finally { await removeBoards(ev, [B]); await client.close(); } // the suite's board goes with it (#9869: it left rows behind on a Windows run)
 })().catch(e => { console.error(e); process.exitCode = 1; });

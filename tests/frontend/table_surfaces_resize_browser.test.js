@@ -1,4 +1,4 @@
-// #12754: every opted-in production table uses the same drag, reload and keyboard behavior. Activity is not one: since #15774 (the Operator's mockup v3) it is a list of cards on every width (fold 'always'), with no header and no column edge to drag (#15927).
+// #12754: every opted-in production table uses the same drag, reload and keyboard behavior. Activity is not one: since #15774 (the Operator's mockup v3) it is a list of cards on every width (fold 'always'), with no header and no column edge to drag (#15927). Nor is the Inbox Goals folder since #21846 (the decision ledger: a card per goal, no table), so it has no case in helpers/resize_cases.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady, framesJs } = require('./helpers/wait');
