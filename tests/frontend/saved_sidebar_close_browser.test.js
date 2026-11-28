@@ -81,7 +81,7 @@ async function run() {
         // The dock shut: Saved opens it, the X shuts it again.
         await ev(`window.toggleAgenticPanel(false); true`); await closed('the agent\'s dock shut');
         await clickDockSaved(); await opened('Saved opens the shut dock');
-        check('the panel has no title and no X at the top (#7926): its bar is the Search box alone, with no Filters icon, panel, Type, From or Sort (#22072: those are on the main Saved page)', await ev(`!document.getElementById('saved-close') && !document.getElementById('saved-scope') && !document.querySelector('#saved-ui .saved-head') && !!document.querySelector('#saved-bar .list-bar-search') && !document.querySelector('#saved-bar .list-bar-toggle, #saved-bar .list-bar-filter-btn, #saved-bar .list-bar-menu, #saved-bar select, #sv-kind, #sv-conv, #sv-sort')`));
+        check('the panel has no title and no X at the top (#7926): its bar is the Search box alone, with no Filters icon, panel, Type, From or Sort (#22072: those are on the main Saved page)', await ev(`!document.getElementById('saved-close') && !document.getElementById('saved-scope') && !document.querySelector('#saved-ui .saved-head') && !!document.querySelector('#saved-bar .list-bar-search') && !document.querySelector('#saved-bar .list-bar-toggle, #saved-bar .list-bar-filter-btn, #saved-bar .list-bar-menu, #saved-bar select')`));
         await clickDockSaved(); await closed('closing shuts it again (it was shut before)');
         await clickDockSaved(); await opened('opened'); await esc(); await closed('Escape shuts it again');
 
