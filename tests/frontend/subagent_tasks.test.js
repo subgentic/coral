@@ -68,6 +68,8 @@ async function run() {
   const ev = async (x) => { const r = await Runtime.evaluate({ expression: x, awaitPromise: true, returnByValue: true }); if (r.exceptionDetails) throw new Error('page eval: ' + JSON.stringify(r.exceptionDetails).slice(0, 400)); return r.result.value; };
   await Emulation.setDeviceMetricsOverride({ width: 1500, height: 950, deviceScaleFactor: 1, mobile: false });
   await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/team_grouping').SOURCE }); // the Team view: the list is grouped by status unless chosen (#21466)
+  // #21853: this all-status fixture explicitly shows done tasks; task_show_done_browser covers the fresh default.
+  await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-hide-completed', 'false');` });
   await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
   // Condition waits (#3118). The coral socket is stubbed, so startup is everything but the feed.
   const { waitFor, waitStable, nextFrame, coralReady } = require('./helpers/wait').bind(ev);
