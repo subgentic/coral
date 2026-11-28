@@ -40,8 +40,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
             if (place === 'inbox') { // #21846 replaces only the Inbox mail rows with the approved collapsible ledger.
                 await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=3`,at+' decision cards');
                 await ev(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.fontSize='${zoom}%';true`);await ev(framesJs(6));
-                const q=await ev(`(()=>{const c=document.querySelector('#group-table-view .goal-decision-card:has([data-goal-id="${firstGoalId}"])'),t=c.querySelector('.goal-decision-title'),r=t.getBoundingClientRect(),b=c.getBoundingClientRect();return {title:t.textContent,number:c.querySelector('.goal-decision-id').textContent,state:c.querySelector('.goal-decision-state').textContent,done:c.querySelector('.goal-decision-done')?.textContent,left:r.left,right:r.right,cardLeft:b.left,cardRight:b.right,over:document.documentElement.scrollWidth>innerWidth+1,expand:c.querySelector('.goal-decision-toggle').getAttribute('aria-expanded')};})()`);
-                check(q.number==='Goal #'+firstGoalId&&q.state==='Active'&&q.title.includes('Ship the pilot'),at+' identity, state and full title: '+JSON.stringify(q));
+                const q=await ev(`(()=>{const c=document.querySelector('#group-table-view .goal-decision-card:has([data-goal-id="${firstGoalId}"])'),t=c.querySelector('.goal-decision-title'),r=t.getBoundingClientRect(),b=c.getBoundingClientRect();return {title:t.textContent,number:c.querySelector('.goal-decision-id').textContent,state:c.querySelector('.goal-decision-state').getAttribute('aria-label'),done:c.querySelector('.goal-decision-done')?.textContent,left:r.left,right:r.right,cardLeft:b.left,cardRight:b.right,over:document.documentElement.scrollWidth>innerWidth+1,expand:c.querySelector('.goal-decision-toggle').getAttribute('aria-expanded')};})()`);
+                check(q.number==='#'+firstGoalId&&q.state==='Active'&&q.title.includes('Ship the pilot'),at+' identity, state and full title: '+JSON.stringify(q));
                 check(q.left>=q.cardLeft&&q.right<=q.cardRight+1&&!q.over,at+' wrapping ledger title fits its card: '+JSON.stringify(q));
                 await ev(`document.querySelector('#group-table-view [data-goal-id="${firstGoalId}"]').click();true`);
                 check(await ev(`document.querySelector('#group-table-view [data-goal-id="${firstGoalId}"]').getAttribute('aria-expanded')`)!==q.expand,at+' heading tap toggles the set');
@@ -117,7 +117,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`document.querySelector('#group-table-view .goal-decision-toggle').click();true`);
             check(await ev(`document.querySelector('#group-table-view .goal-decision-toggle').getAttribute('aria-expanded')`)!==before,at+' set heading collapses instead of selecting an obsolete mail row');
             check((await ev(`location.pathname`))==='/inbox/goals',at+' collapse keeps the list route');
-            await ev(`document.querySelector('#group-table-view .goal-decision-head-right button').click();true`);
+            await ev(`document.querySelector('#group-table-view .gl-goal-name').click();true`);
             await waitFor(`!!document.querySelector('#inbox-page #goals-detail-title')`,at+' explicit open reaches the shared goal');
         }
     } finally { await removeBoards(ev, [B, SEED]).catch(() => {}); await client.close(); }

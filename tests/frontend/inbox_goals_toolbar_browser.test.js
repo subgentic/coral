@@ -1,3 +1,4 @@
+const {pickGoalState}=require('./helpers/goal_state_menu');
 const { POPULATED_CHAT_COUNTS } = require('./helpers/populated_chat_counts');
 // The Inbox's Goals folder has the shared list toolbar (#8596, goal #62; UI/UX #8589 section 9): the search box, the Filters icon in the same row to its right, the state pills, and in the Filters panel Team, Driver,
 // Updated since and Sort, the chips of what is on and "N on" on the icon; the filters are kept in the browser per folder; the folder list (the sidebar) is not touched. At 1280 and at 390, where the pills are one
@@ -25,8 +26,7 @@ const GOALS = [
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), p = r.querySelector('.team-tb-pills'), s = r.querySelector('.team-tb-select');
         const vis = e => !!e && e.getClientRects().length > 0;
         return { qName: q.getAttribute('aria-label'), sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 6, right: b.left >= a.right - 1, searchW: Math.round(a.width), pills: vis(p), select: vis(s), toggleName: t.getAttribute('aria-label'), vw: innerWidth, over: document.documentElement.scrollWidth - innerWidth }; })()`);
-    const pick = key => ev(`(() => { const s = document.querySelector('.inbox-folder-toolbar .team-tb-select'); if (s && s.getClientRects().length) { s.value = ${JSON.stringify(key)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; }
-        const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.dataset.filter === ${JSON.stringify(key)}); b.click(); return true; })()`);
+    const pick = key => pickGoalState(ev,waitFor,key);
     const setField = (id, value) => ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -42,15 +42,16 @@ const GOALS = [
             const before = await folders();
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
-            await waitFor(`document.querySelectorAll('.goal-decision-title').length >= 1 && !!document.querySelector('.inbox-folder-toolbar .team-tb-pills, .inbox-folder-toolbar .team-tb-select')`, 'the goals and their pills', 10000);
-            if (!mobile) check(`${label}: the folder opens on Active, as the team page does (#16371)`, await ev(`document.querySelector('.team-tb-pills [aria-pressed="true"]')?.dataset.filter === 'active'`));
+            await waitFor(`document.querySelectorAll('.goal-decision-title').length >= 1 && !!document.querySelector('.inbox-folder-toolbar .gl-state-menu')`, 'the goals and their pills', 10000);
+            check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box, not on the heading"}`, await ev(`(() => { const a = document.activeElement; const inSearch = !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : 'inSearch'}; })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));
+            if (!mobile) check(`${label}: the folder opens on Active, as the team page does (#16371)`, await ev(`document.querySelector('.gl-state-menu>button')?.textContent.includes('Active')`));
             await pick('all'); // the rest of this suite includes open and finished goals
             await waitFor(`document.querySelectorAll('.goal-decision-title').length === 5`, 'all five goals including the finished one', 10000); await settle(300);
             { // #22056: one expand-all / collapse-all icon beside New goal, named for what it does next; no robot on this toolbar
-                const fold = () => ev(`(() => { const b = document.querySelector('.inbox-folder-toolbar .goals-fold-all'), r = b && b.getBoundingClientRect(), tg = [...document.querySelectorAll('.goal-decision-toggle')].map(t => t.getAttribute('aria-expanded')); return { label: b && b.getAttribute('aria-label'), icon: b && b.querySelector('.material-icons').textContent, title: b && b.title, w: r && Math.round(r.width), h: r && Math.round(r.height), tg, robot: !!document.querySelector('.inbox-folder-toolbar .agent-copy'), beforeNew: !!(b && b.nextElementSibling && b.nextElementSibling.classList.contains('goals-new')) }; })()`);
+                const fold = () => ev(`(() => { const b = document.querySelector('.inbox-folder-toolbar .goals-fold-all'), r = b && b.getBoundingClientRect(), tg = [...document.querySelectorAll('.goal-decision-toggle')].map(t => t.getAttribute('aria-expanded')); return { label: b && b.getAttribute('aria-label'), icon: b && b.querySelector('.material-icons').textContent, title: b && b.title, w: r && Math.round(r.width), h: r && Math.round(r.height), tg, robot: !!document.querySelector('.inbox-folder-toolbar .agent-copy'), beforeNew: !!(b && b.nextElementSibling && !!b.parentElement.querySelector('.goals-new')) }; })()`);
                 const press = async () => { await ev(`document.querySelector('.inbox-folder-toolbar .goals-fold-all').click(); true`); await settle(250); };
                 let f = await fold();
-                check(`${label}: some goals are open, so the icon says Expand all goals (unfold_more); there is no robot here`, f.label === 'Expand all goals' && f.icon === 'unfold_more' && f.title === f.label && f.tg.includes('true') && f.tg.includes('false') && !f.robot, JSON.stringify(f));
+                check(`${label}: some goals are open, so the icon says Expand all goals (unfold_more); the robot is present`, f.label === 'Expand all goals' && f.icon === 'unfold_more' && f.title === f.label && f.tg.includes('true') && f.tg.includes('false') && f.robot, JSON.stringify(f));
                 check(`${label}: the icon sits right before New goal`, f.beforeNew, JSON.stringify(f));
                 if (mobile) check(`${label}: a 44 px target`, f.w >= 44 && f.h >= 44, `${f.w}x${f.h}`);
                 await press(); f = await fold();
@@ -59,11 +60,10 @@ const GOALS = [
                 check(`${label}: pressed again, every goal is folded and the icon says Expand all goals`, f.tg.every(x => x === 'false') && f.label === 'Expand all goals' && f.icon === 'unfold_more', JSON.stringify(f));
             }
 
-            check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box, not on the heading"}`, await ev(`(() => { const a = document.activeElement; const inSearch = !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : 'inSearch'}; })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));
             const g = await geometry();
             check(`${label}: the Goals page has a search box named "Search goals" and the Filters icon in the same row, to its right`, g && g.qName === 'Search goals' && (mobile ? g.searchW === 0 : g.sameRow && g.right) && /Filters/.test(g.toggleName), JSON.stringify(g));
             if (mobile) check(`${label}: the pills are not in the row (one select in the Filters sheet since #8700), the page's box is not drawn (the top pill is the search, #13591), nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW === 0 && g.over <= 0, JSON.stringify(g));
-            else check(`${label}: the state pills are in the row (All, Active, Blocked, Proposed, Done, Dropped) with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'All 5|Active 2|Blocked 1|Proposed 1|Done 1|Dropped 0');
+            else check(`${label}: the state pills are in the row (All, Active, Blocked, Proposed, Done, Dropped) with their counts`, g && !g.pills && (await ev(`[...document.querySelectorAll('.gl-state-menu [role=menuitemcheckbox]')].map(b => b.textContent.trim()).join('|')`)) === 'All 5|Active 2|Blocked 1|Proposed 1|Done 1|Dropped 0');
 
             await pick('blocked'); await settle(300);
             check(`${label}: the Blocked pill shows only the blocked goal`, JSON.stringify(await titles()) === JSON.stringify(['Cut the cold start']), JSON.stringify(await titles()));
@@ -102,7 +102,7 @@ const GOALS = [
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
             await waitFor(`/Close the old board/.test(document.body.innerText)`, `${label}: the saved Done pill lists the finished goal`, 10000); await settle(600);
-            const saved = await ev(`(() => { const s = document.querySelector('.inbox-folder-toolbar .team-tb-select'); const sel = s && s.getClientRects().length ? [...s.options].map(o => o.textContent.trim()) : null; return (sel || [...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim())).join('|'); })()`);
+            const saved = await ev(`[...document.querySelectorAll('.gl-state-menu [role=menuitemcheckbox]')].map(b=>b.textContent.trim()).join('|')`);
             check(`${label}: after a reload with Done saved, the other pills still count every goal (#14663)`, /All 5/.test(saved) && /Active 2/.test(saved) && /Blocked 1/.test(saved) && /Proposed 1/.test(saved) && /Done 1/.test(saved), saved);
             await pick('all'); await settle(600);
         }

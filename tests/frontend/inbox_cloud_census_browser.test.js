@@ -16,7 +16,7 @@ const HISTORY_KEYS = ['type', 'source_types', 'date_from', 'date_to', 'q', 'page
 const ADDED_ROUTE = '/api/sessions/history/counts';
 // Goals and Artifacts (#11071), plus the owner-only Activity folder (#20394): explicit folder opens read these View routes with their bounded query keys. Activity is forbidden before its folder click below; the census itself opens every folder.
 // #22040: inbox_goal_read_plan.md documents open-goal tasks (200/page); folded goals read nothing.
-const FOLDER_ROUTES = { '/api/board/{team}/tasks': ['goal', 'limit', 'cursor'], '/api/board/{team}/artifacts': ['limit', 'goal', 'sort', 'versions'], '/api/activity': ['limit', 'before'], '/api/goals': ['limit', 'state'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first', 'facets'] };
+const FOLDER_ROUTES = { '/api/operator-asks': ['board', 'goal', 'state', 'limit', 'cursor'], '/api/board/{team}/tasks': ['goal', 'limit', 'cursor'], '/api/board/{team}/artifacts': ['limit', 'goal', 'sort', 'versions'], '/api/activity': ['limit', 'before'], '/api/goals': ['limit', 'state'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first', 'facets'] };
 const ADDED_KEYS = ['active', 'agent_name', 'archived', 'starred', 'with_notes'];
 // #13958: the Inbox badge is dashboard chrome on every tab. It reads one
 // owner-protected attention summary per computer; it never loads a file window.
