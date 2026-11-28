@@ -2,7 +2,7 @@
 // target; a tap opens it; Select in the phone title bar (#top-phone-bar .nl-phone-select) shows each row's check, a check adds the row, and the selection bar (.nl-summary: "N selected", Dismiss, Mark as read, Clear) acts on it,
 // one request per item through the same routes as a row's own buttons, one toast with Undo; a selection that does not fit an action turns it off. Review and question rows at 390 and 360 px and a phone-sized window whose
 // pointer is not coarse, real touch through CDP. Retired with the old table (#22094, by design): the long press and the swipe (selection is Select and the check; a file's Dismiss is the bar's; welcome_swipe_browser keeps
-// the welcome swipe), Goal and Task chips in a row (the goal is the row's group heading), and the bar's Approve, Save for later, Changes and Mark unread with Approve's confirm (review decisions stay in the file viewer).
+// the welcome swipe), Goal and Task chips in a row (the goal is the row's group heading), and the main list bar's Approve, Save for later, Changes and Mark unread. Team-page Approve confirms remain covered below; main list decisions stay in the file viewer.
 const assert = require('node:assert/strict');
 const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
