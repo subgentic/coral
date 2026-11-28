@@ -7,7 +7,7 @@ const BASE=require('./test_base').BASE;
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  try{
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
-  await Page.addScriptToEvaluateOnNewDocument({source:`localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode');localStorage.removeItem('coral-inbox-task-open');localStorage.removeItem('coral-inbox-activity-filters');`});
+  await Page.addScriptToEvaluateOnNewDocument({source:`localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode');localStorage.removeItem('coral-inbox-activity-group-mode');localStorage.removeItem('coral-inbox-task-open');localStorage.removeItem('coral-inbox-activity-filters');`});
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');
@@ -24,7 +24,7 @@ const BASE=require('./test_base').BASE;
    assert.ok(await ev(`document.querySelectorAll('.activity-folder .al-row').length`)>=8,width+': Goal: the records are plain rows under their goal (not shut with a task)');
    assert.ok(await ev(`[...document.querySelectorAll('.activity-folder .al-row')].some(r=>/Write the plan/.test(r.textContent))`),width+': Goal: a row still names its task');
    await set('task');await waitFor(`document.querySelectorAll('.activity-folder .al-subgroup-head').length===2`,width+': Goal and task: task headings');
-   assert.equal(await ev(`localStorage.getItem('coral-inbox-group-mode')`),'task',width+': kept in this browser');
+   assert.equal(await ev(`localStorage.getItem('coral-inbox-activity-group-mode')`),'task',width+': kept in this browser, under Activity\'s own key (#22043)');
    await set('none');await waitFor(`document.querySelectorAll('.activity-folder .al-group-head').length===0`,width+': None again');
   }
   console.log('PASS Activity Group by: None, Goal, Goal and task, kept, at desktop and phone');
