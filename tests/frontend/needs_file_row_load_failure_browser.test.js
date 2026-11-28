@@ -1,5 +1,6 @@
 // #11963: a click on a file-for-review row loads the viewer module the first time and, when that load fails, said nothing: the row looked dead while goal rows (whose code is already loaded) still opened, until the
-// app was reopened. Now a failed load says so ("Could not load the file viewer ...") and the next click tries again (importOnce's retry). The viewer's module request is made to fail, then allowed. 1280 px.
+// app was reopened. Now a failed load says so ("Could not load the file viewer ...") and the next click tries again (importOnce's retry). The viewer's module request is made to fail, then allowed; the click is on the file's title button (.nl-file-open) of its
+// Needs you row (#22094, article.nl-row.nl-file; Group by None so the row is on screen). 1280 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -11,7 +12,7 @@ const { safePaused } = require('./helpers/paused');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-group-mode', 'none'); localStorage.setItem('coral-inbox-group-review-goal', 'false');` }); // Group by None: no folded goal group over the row
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Writer',job_title:'Writer',session_name:'writer-${team}'})}).then(r=>r.status)`), 200);
@@ -25,18 +26,18 @@ const { safePaused } = require('./helpers/paused');
             window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await ev(`import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view [data-review-artifact]').length === 1`, 'the file row', 15000);
+        await waitFor(`[...document.querySelectorAll('#group-table-view .nl-file .nl-file-open')].filter(b => b.getClientRects().length).length === 1`, 'the file row', 15000);
         // the viewer's module request fails
         let failing = true, failed = 0;
         await client.Fetch.enable({ patterns: [{ urlPattern: '*artifact_viewer.js*', requestStage: 'Request' }] });
         safePaused(client, async ({ requestId }) => { if (failing) { failed++; await client.Fetch.failRequest({ requestId, errorReason: 'Failed' }); } else await client.Fetch.continueRequest({ requestId }); });
-        await ev(`document.querySelector('#group-table-view [data-review-artifact]').closest('tr').click(); true`);
+        await ev(`document.querySelector('#group-table-view .nl-file .nl-file-open').click(); true`);
         await waitFor(`/Could not load the file viewer/.test(document.body.textContent)`, 'a failed load is said', 8000);
         assert.ok(failed >= 1, 'the module request did fail');
         assert.equal(await ev(`!!document.querySelector('.artifact-viewer:not([hidden])')`), false, 'nothing opened');
         // the next click tries again and the file opens
         failing = false;
-        await ev(`document.querySelectorAll('#toast-host .toast').forEach(t => t.remove()); document.querySelector('#group-table-view [data-review-artifact]').closest('tr').click(); true`);
+        await ev(`document.querySelectorAll('#toast-host .toast').forEach(t => t.remove()); document.querySelector('#group-table-view .nl-file .nl-file-open').click(); true`);
         await waitFor(`!!document.querySelector('.artifact-viewer:not([hidden])')`, 'the retry opens the viewer', 10000);
         console.log('PASS a failed load of the file viewer is said, and the next click opens the file');
     } finally { await client.Fetch.disable().catch(() => {}); await removeBoards(ev, [team]).catch(() => {}); await client.close(); }

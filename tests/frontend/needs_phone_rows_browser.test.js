@@ -1,6 +1,8 @@
-// #11671 (the operator, Gmail-style rows on a phone; it replaces #11642's per-row button there): a phone's Needs you row carries no button. A tap opens it, a long press selects it (a check appears, a tap adds more),
-// a swipe to the left ignores it (with Undo), and a bar that takes the toolbar's line acts on the selection: Approve, Changes, Dismiss, Save for later, Mark read or unread, Cancel, one request per item through the same
-// routes as a row's own buttons. A selection that does not fit an action turns it off (a question cannot be approved, Changes is for one file). Welcome, review and question rows at 390 and 360 px, real touch through CDP.
+// #11671 (the operator, Gmail-style rows on a phone), on the Needs you list (article.nl-row, #22094, the approved ledger): a phone's row carries only its own controls (a file's name button, a question's answers, More), every one a 44 px
+// target; a tap opens it; Select in the phone title bar (#top-phone-bar .nl-phone-select) shows each row's check, a check adds the row, and the selection bar (.nl-summary: "N selected", Dismiss, Mark as read, Clear) acts on it,
+// one request per item through the same routes as a row's own buttons, one toast with Undo; a selection that does not fit an action turns it off. Review and question rows at 390 and 360 px and a phone-sized window whose
+// pointer is not coarse, real touch through CDP. Retired with the old table (#22094, by design): the long press and the swipe (selection is Select and the check; a file's Dismiss is the bar's; welcome_swipe_browser keeps
+// the welcome swipe), Goal and Task chips in a row (the goal is the row's group heading), and the bar's Approve, Save for later, Changes and Mark unread with Approve's confirm (review decisions stay in the file viewer).
 const assert = require('node:assert/strict');
 const { showTasksTab } = require('./helpers/tasks_tab.js');
 const { connect } = require('./agent_view_harness');
@@ -12,7 +14,7 @@ const { coralReady } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Fetch } = client, { safePaused } = require('./helpers/paused');
     const team = 'phone-rows-' + Date.now().toString(36);
-    const T = '#group-table-view';
+    const T = '#group-table-view .needs-ledger'; const late = [];
     try {
         await Page.enable(); await showTasksTab(Page); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         // [width, touch emulation]: the third pass is a phone-sized window whose pointer is not reported coarse (a driver that sets only the screen size, #11765): a swipe must work there too
@@ -40,126 +42,80 @@ const { coralReady } = require('./helpers/wait');
                 return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'off', inbox_welcome_done: '' }; return true; })`); // #18764: Getting started items are ordinary, counted rows now (inbox_welcome_counts_browser); off here, the suite is about review and question rows
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length === 6 `, at + 'six counted review/question rows', 15000);
-            await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
+            await waitFor(`document.querySelectorAll('${T} .nl-row').length === 6`, at + 'six counted review/question rows', 15000);
+            await ev(`document.querySelectorAll('${T} .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`); // a goal group starts folded unless it holds a question: the five files' goal is opened
+            await new Promise(r => setTimeout(r, 500)); // sleep-ok: the list settles after its first draw
 
             assert.equal(await ev(`(document.querySelector('#group-table-view .view-list-nav')?.getClientRects().length || 0)`), 0, at + 'row actions remain usable without the Inbox strip');
-            assert.equal(await ev(`document.getElementById('group-table-title').textContent`), 'Needs you', at + 'the current folder name stays visible');
+            assert.equal(await ev(`(n => n && n.getClientRects().length ? n.textContent : '')(document.querySelector('#top-phone-bar .nl-phone-title'))`), 'Needs you', at + 'the current folder name stays visible');
 
-            const rowOf = name => `[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
-            const point = async name => ev(`(() => { const r = ${rowOf(name)}; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + 6, y: b.top + b.height * 0.35 }; })()`); // the card's left padding, clear of the full-width chip rows and their expanded hit targets (#20308)
+            const rowOf = name => `[...document.querySelectorAll('${T} .nl-row')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
             const touch = (type, p) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });
-            const tap = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 60)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 250)); }; // sleep-ok: a tap, and the table redraws
-            const press = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
-            const bar = () => ev(`(() => { const b = document.querySelector('${T} .dt-bar, .gt-toolbar .dt-bar'); if (!b || b.hidden || !b.getClientRects().length) return null; const r = b.getBoundingClientRect(); const tops = [...b.querySelectorAll(':scope > button, :scope > .dt-bar-more > button')].map(x => Math.round(x.getBoundingClientRect().top)); return { count: (b.querySelector('.dt-bar-count') || {}).textContent, h: Math.round(r.height), oneLine: Math.max(...tops) - Math.min(...tops) <= 4, small: [...b.querySelectorAll(':scope > button, :scope > .dt-bar-more > button')].filter(x => x.getBoundingClientRect().width < 43.5 || x.getBoundingClientRect().height < 43.5).map(x => x.getAttribute('aria-label')), actions: [...b.querySelectorAll('button')].map(x => ({ label: x.getAttribute('aria-label') || x.textContent, off: x.disabled })) }; })()`);
-            const pressBar = label => ev(`[...document.querySelectorAll('.dt-bar button')].find(x => (x.getAttribute('aria-label') || x.textContent) === ${JSON.stringify(label)}).click(); true`);
-            const selected = () => ev(`[...document.querySelectorAll('${T} tbody tr.dt-selected')].map(r => r.textContent.slice(0, 60))`);
+            // a tap must start on a settled list: no row added, removed or redrawn for 250 ms (a late Inbox read redraws it on a loaded runner), scrolled to at once (a smooth scroll moves the row under the finger)
+            const settled = () => ev(`new Promise(done => { const root = document.querySelector('#group-table-view'), t0 = Date.now(); let last = Date.now(); const mo = new MutationObserver(() => { last = Date.now(); }); mo.observe(root, { childList: true, subtree: true, characterData: true }); const tick = () => { if (Date.now() - last > 250 || Date.now() - t0 > 8000) { mo.disconnect(); done(true); } else setTimeout(tick, 50); }; tick(); })`);
+            const tapAt = async (js, edge) => { await settled(); const p = await ev(`(() => { const node = ${js}; node.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = node.getBoundingClientRect(), row = node.closest('.nl-row'); return { x: ${edge ? 'row.getBoundingClientRect().left + 6' : 'r.left + r.width / 2'}, y: r.top + Math.min(r.height / 2, 10) }; })()`); await touch('touchStart', p); await new Promise(r => setTimeout(r, 60)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a tap, and the list redraws
+            const check = name => tapAt(`${rowOf(name)}.querySelector('.nl-check')`);
+            const bar = () => ev(`(() => { const b = document.querySelector('${T} .nl-summary'); if (!b || !b.getClientRects().length || !/selected/.test(b.textContent)) return null; const r = b.getBoundingClientRect(), btns = [...b.querySelectorAll('button')].filter(x => x.getClientRects().length), tops = btns.map(x => Math.round(x.getBoundingClientRect().top)); return { count: (b.querySelector('strong') || {}).textContent, h: Math.round(r.height), oneLine: Math.max(...tops) - Math.min(...tops) <= 4, small: btns.filter(x => x.getBoundingClientRect().width < 43.5 || x.getBoundingClientRect().height < 43.5).map(x => x.textContent), actions: btns.map(x => ({ label: x.getAttribute('aria-label') || x.textContent, off: x.disabled })) }; })()`);
+            const pressBar = label => ev(`[...document.querySelectorAll('${T} .nl-summary button')].find(x => (x.getAttribute('aria-label') || x.textContent) === ${JSON.stringify(label)}).click(); true`);
+            const selected = () => ev(`[...document.querySelectorAll('${T} .nl-row.nl-is-selected')].map(r => r.textContent.slice(0, 60))`);
+            const startSelect = async () => { await tapAt(`document.querySelector('#top-phone-bar .nl-phone-select')`); assert.ok(await ev(`[...document.querySelectorAll('${T} .nl-row .nl-check')].every(c => c.getClientRects().length > 0)`), at + 'Select shows every row\'s check'); };
 
-            // Phone rows keep navigation and the approved review star; other actions stay in selection.
-            const visible = await ev(`[...document.querySelectorAll('${T} tbody tr button')].filter(b => { const c = b.getBoundingClientRect(); return b.getClientRects().length > 0 && c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
-            assert.deepEqual(visible.filter(l => !/^(Show all$|Show less$|Open |Goal: |Task: |Star |Remove the star from |Approve: |Request changes: |More actions for |Approve with a note: |Dismiss: |Deny: |Save for later: |Copy version ID: |Answer the question of |Dismiss the question of |Got it: |New agent: |New team: |Connect: |Read it: |Open guide: )/.test(l)), [], at + 'a phone row carries navigation, the review star and its own review buttons (#14627: Approve and Request changes at rest, the rest in More actions): ' + JSON.stringify(visible));
-            // #20309: selection owns taps on nested navigation and action controls too.
-            // The press guard (#16616) drops a click when the card moved or was replaced during the press, so a tap must start on a settled table: no row added, removed or redrawn for 250 ms (a late Inbox read redraws it on a loaded runner).
-            const settled = () => ev(`new Promise(done => { const root = document.querySelector(${JSON.stringify(T)}), t0 = Date.now(); let last = Date.now(); const mo = new MutationObserver(() => { last = Date.now(); }); mo.observe(root, { childList: true, subtree: true, characterData: true }); const tick = () => { if (Date.now() - last > 250 || Date.now() - t0 > 8000) { mo.disconnect(); done(true); } else setTimeout(tick, 50); }; tick(); })`);
-            const touchNode = async (selector, hold = false) => {
-                await settled();
-                const p = await ev(`(() => { const node = document.querySelector(${JSON.stringify(selector)}); node.scrollIntoView({block:'center'}); const r=node.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
-                await touch('touchStart',p); await new Promise(r=>setTimeout(r,hold?700:60)); await touch('touchEnd',p); await new Promise(r=>setTimeout(r,300)); // sleep-ok: real tap or held finger, then selection redraw
-            }; // sleep-ok: real tap or held finger, then the selection redraw
-            const control = (name, suffix) => `${T} tr[data-key] .inbox-review-item:has([data-review-artifact="${name.toString(16).padStart(64,'0')}"]) ${suffix}`;
-            const chip = (n, kind) => control(n, kind === 'goal' ? '[data-goal-pill="77"]' : `[data-task-pill="${n}"]`);
-            await touchNode(chip(2,'goal'),true);
-            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '1 selected'`, at+'long-press Goal chip selects its card', 3000);
-            await touchNode(chip(3,'goal'));
-            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '2 selected'`, at+'Goal chip tap adds its card without navigating', 3000);
-            await touchNode(chip(3,'task'));
-            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '1 selected'`, at+'Task chip tap removes its selected card without navigating', 3000);
-            await touchNode(chip(4,'task'));
-            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '2 selected'`, at+'Task chip tap adds its card without navigating', 3000);
-            const approveChipRow = `${T} tr:has([data-review-artifact="${(3).toString(16).padStart(64,'0')}"]) .inbox-approve-action`;
-            await touchNode(approveChipRow);
-            await waitFor(`document.querySelector('.dt-bar-count')?.textContent === '3 selected'`,at+'row action tap also selects instead of approving',3000);
-            assert.equal(await ev(`!!document.querySelector('dialog[open]')`),false,at+'selection tap never opens the review confirmation');
-            assert.deepEqual(await ev('window.__calls'), [], at+'chip selection sends no action');
-            await pressBar('Cancel');
-            await waitFor(`!document.querySelector('.dt-bar-count')`,at+'Cancel leaves chip selection',3000);
-            // Outside selection, Goal and Task chips must still navigate normally.
-            for (const kind of ['goal','task']) {
-                await touchNode(chip(3,kind));
-                await waitFor(`!(${rowOf('Phone review 3.txt')})`,at+kind+' chip navigates outside selection',8000);
-                await ev(`window.switchNavTab('hub-inbox');import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
-                await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length === 6`,at+'return to unchanged Inbox after normal chip navigation',10000);
-            }
+            // a phone row carries only its own controls, each a 44 px target (the file's name opens it, the question's answers, More)
+            const visible = await ev(`[...document.querySelectorAll('${T} .nl-row button, ${T} .nl-row summary')].filter(b => { const c = b.getBoundingClientRect(); return b.getClientRects().length > 0 && c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden' && !b.closest('details.nl-more:not([open]) .nl-menu'); }).map(b => ({ label: b.getAttribute('aria-label') || b.textContent, own: b.matches('.nl-file-open, .nl-actions button, .nl-more-toggle'), small: b.getBoundingClientRect().height < 43.5 }))`);
+            assert.deepEqual(visible.filter(b => !b.own || b.small), [], at + 'a phone row carries navigation and its own buttons only, each 44 px tall: ' + JSON.stringify(visible));
+            assert.equal(await ev(`document.querySelectorAll('${T} .nl-row [data-goal-pill], ${T} .nl-row [data-task-pill]').length`), 0, at + 'no Goal or Task chip in a row: the goal is its group heading');
+            // the question's More opens on the first tap, at once, even with menu_button.js 1.5 s late (v2.0.24: the press reached nothing on a cold runner)
+            await tapAt(`${rowOf('Which port should the test server use?')}.querySelector('.nl-more-toggle')`);
+            await waitFor(`!!${rowOf('Which port should the test server use?')}.querySelector('details.nl-more[open] .nl-menu .menu-item')`, at + 'the first tap on More opens its menu at once', 600);
+            assert.deepEqual(await ev(`[...${rowOf('Which port should the test server use?')}.querySelectorAll('.nl-menu .menu-item')].map(b => [b.textContent, b.getBoundingClientRect().height >= 43.5])`), [['Open question', true], ['Dismiss', true]], at + 'the question\'s More holds Open question and Dismiss, 44 px each');
+            await ev(`${rowOf('Which port should the test server use?')}.querySelector('details.nl-more').open = false; true`);
             // a tap opens the question
-            await tap('Which port should the test server use?');
+            await tapAt(`${rowOf('Which port should the test server use?')}.querySelector('.nl-title')`, true); // the row's left padding beside its title's first line, clear of the meta line's links that a finger's touch adjustment reaches (#20308)
             await waitFor(`!!document.querySelector('dialog[open]')`, at + 'a tap opens the question', 6000);
             await ev(`document.querySelector('dialog[open]').dispatchEvent(new Event('cancel', { cancelable: true })); const d = document.querySelector('dialog[open]'); if (d) d.close(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
             assert.equal(await bar(), null, at + 'no selection bar before a selection');
-            // a swipe like a phone's: a finger from 350 px to 40 px (a driver's drag, a few moves) on a review file and on a welcome item (not the welcome itself, which has no Dismiss) ignores it (#11765)
-            const drag = async (name, from = 350, to = 40) => { const p = await point(name); const y = p.y; await touch('touchStart', { x: from, y }); for (let i = 1; i <= 5; i++) { await touch('touchMove', { x: from + (to - from) * i / 5, y }); await new Promise(r => setTimeout(r, 16)); } await touch('touchEnd', { x: to, y }); await new Promise(r => setTimeout(r, 500)); }; // sleep-ok: a finger's moves and the row leaving
-            // five folder switches, then ONE drag is ONE request and ONE toast (the swipe's listeners are on the page's persistent list box: they were added again with every table build and stacked, QA Reviewer 2's MUST)
+            await ev(`document.querySelectorAll('${T} .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`);
+            const endGap = () => ev(`(() => { const sc = document.getElementById('group-table-view'), l = document.querySelector('${T}'); return Math.round(sc.scrollHeight - (l.getBoundingClientRect().bottom - sc.getBoundingClientRect().top + sc.scrollTop)); })()`);
+            const gap0 = await endGap();
+            // five folder switches, then ONE Dismiss of one file is ONE request and ONE toast (listeners added again with every list build must not stack, QA Reviewer 2's MUST)
             for (let i = 0; i < 5; i++) {
                 await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`); await new Promise(r => setTimeout(r, 150)); // sleep-ok: the folder draws
                 await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the folder draws
             }
             await waitFor(`!!(${rowOf('Phone review 5.txt')})`, at + 'Needs you is back after the folder switches', 8000);
+            await ev(`document.querySelectorAll('${T} .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`);
             await ev('window.__calls = []; true');
-            await drag('Phone review 5.txt');
-            await waitFor(`window.__calls.some(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore')`, at + 'a drag from 350 to 40 px ignores the review file', 6000);
-            assert.equal(await ev(`window.__calls.filter(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore').length`), 1, at + 'after the folder switches one drag is one ignore request');
-            assert.equal(await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed: Phone review 5/.test(t.textContent)).length`), 1, at + 'and one toast');
-            assert.ok(await ev(`!${rowOf('Phone review 5.txt')}`), at + 'and its row is gone');
+            await startSelect(); await check('Phone review 5.txt');
+            assert.equal((await bar() || {}).count, '1 selected', at + 'one file selected');
+            await pressBar('Dismiss');
+            await waitFor(`window.__calls.some(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore')`, at + 'Dismiss ignores the review file', 6000);
+            await new Promise(r => setTimeout(r, 300)); // sleep-ok: a stacked listener would send its second request meanwhile
+            assert.equal(await ev(`window.__calls.filter(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore').length`), 1, at + 'after the folder switches one Dismiss is one ignore request');
+            assert.equal(await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed 1/.test(t.textContent)).length`), 1, at + 'and one toast');
+            await waitFor(`!${rowOf('Phone review 5.txt')}`, at + 'and its row is gone', 6000);
             await ev('window.__calls = []; true');
-            // a long press selects a review file; a tap adds the question; the bar shows what fits
-            await press('Phone review 1.txt');
-            { const sel = await selected(); assert.ok(sel.length === 1 && sel[0].includes('Phone review 1.txt'), at + 'a long press selects that row and only it: ' + JSON.stringify(sel)); }
+            // Select, then a check selects a review file and only it; the bar shows what fits
+            await ev(`document.querySelectorAll('${T} .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`);
+            if (!(await ev(`!!document.querySelector('${T}.nl-selection-active')`))) await startSelect();
+            await check('Phone review 1.txt');
+            { const sel = await selected(); assert.ok(sel.length === 1 && sel[0].includes('Phone review 1.txt'), at + 'the check selects that row and only it: ' + JSON.stringify(sel)); }
+            assert.equal(await ev(`!!document.querySelector('dialog[open]')`), false, at + 'a check opens nothing');
             let b = await bar();
             assert.ok(b && b.count === '1 selected', at + 'the bar says 1 selected: ' + JSON.stringify(b));
-            assert.deepEqual(b.actions.map(a => a.label), ['Cancel', 'Approve', 'Save for later', 'Dismiss', 'More actions', 'Changes', 'Mark read', 'Mark unread'], at + 'Cancel (X), the buttons in the order of the approved bulk bar (Approve, Save for later, Dismiss: mock #19808 v1, row states and bulk selection bar, #19833), then More with Changes, Mark read, Mark unread; Close goal and Not yet are a goal\'s (#12328) and are not offered for a file (#12401): ' + JSON.stringify(b.actions));
-            // #17450 N2 deliberately uses two header rows; #19470 makes the kinds a compact filter on a phone.
-            // Selecting keeps that header and adds one actions line below, without an orphan control row.
-            const tb = await ev(`(() => {
-                const t = document.querySelector('#group-table-view .gt-toolbar'), box = e => { const r = e?.getBoundingClientRect(); return r && r.width > 0 && r.height > 2 ? { top: r.top, bottom: r.bottom } : null; };
-                const sel = box(t.querySelector(':scope > .team-tb-selection')), head = box(t.querySelector(':scope > .inbox-folder-head, :scope > .inbox-needs-tabs')), more = box(t.querySelector(':scope > .needs-more'));
-                const controls = [...t.children].filter(k => box(k) && !k.matches('.team-tb-selection,.inbox-folder-head,.inbox-needs-tabs,.needs-more'));
-                return { tabs: !!t.querySelector(':scope > .inbox-needs-tabs'), head, more, sel, controls: controls.map(k => ({ cls: String(k.className), ...box(k) })) };
-            })()`);
-            assert.ok(tb.controls.every(c => /^(inbox-needs-tabs|list-bar-search-wrap|goals-chips|inbox-kind-control task-more|btn btn-quiet btn-icon sidebar-collapse-btn|btn btn-quiet btn-small)/.test(c.cls)), at + 'only search, kind filters and toolbar icons share the filter row: ' + JSON.stringify(tb));
-            assert.ok(tb.head && tb.more && tb.sel && tb.controls.length, at + 'title, More, filters and selection are visible: ' + JSON.stringify(tb));
-            if (tb.tabs) assert.ok(tb.more.top >= tb.head.bottom - 1 && Math.max(...tb.controls.map(c => c.top)) < tb.more.bottom, at + 'with the two tabs, the tabs have row one and More joins the filters under them (mock v3, #19904): ' + JSON.stringify(tb));
-            else assert.ok(Math.max(tb.head.top, tb.more.top) < Math.min(tb.head.bottom, tb.more.bottom), at + 'title and More share header row one: ' + JSON.stringify(tb));
-            assert.ok(tb.controls.every(c => c.top >= (tb.tabs ? tb.head.bottom : Math.max(tb.head.bottom, tb.more.bottom)) - 1 && c.bottom <= tb.sel.top + 1), at + 'filters sit below the title and above the selection: ' + JSON.stringify(tb));
-            assert.ok(Math.max(...tb.controls.map(c => c.top)) < Math.min(...tb.controls.map(c => c.bottom)), at + 'all filter controls share one row, with no orphan control row: ' + JSON.stringify(tb));
-            assert.ok(b.oneLine && b.h <= 64 && b.small.length === 0, at + 'the bar is one line, every target 44 px, each named (Gmail, #11707): ' + JSON.stringify({ h: b.h, oneLine: b.oneLine, small: b.small }));
-            // the bar is the top row of the screen and stays there while the list scrolls (the operator, comment 28; #11707): this check was dropped by the rebase onto ux-details and is back
-            const stay = await ev(`(() => { const bar = document.querySelector('.dt-bar'), sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollTop + 500; const r = bar.getBoundingClientRect(), t = sc.getBoundingClientRect(); return { top: Math.round(r.top - t.top), shown: r.height > 0 }; })()`);
-            assert.ok(stay.shown && stay.top >= -1 && stay.top <= 40, at + 'after the list scrolls the bar is still at the top of the screen (within 40 px of the list top): ' + JSON.stringify(stay));
-            // the empty area under the list at its end is the same with rows selected as without (the Hide-all-welcome button and the bottom bar's room, 173 px here): a selection adds none (#11765)
-            const end = await ev(`(() => { const sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollHeight; const rows = [...document.querySelectorAll('${T} tbody tr')], last = { bottom: Math.max(rows[rows.length - 1].getBoundingClientRect().bottom, document.querySelector('${T} .inbox-getting-started')?.getBoundingClientRect().bottom || 0) }, s = sc.getBoundingClientRect(); const note = document.querySelector('${T} .inbox-alerts-link'), cs = note && getComputedStyle(note); return Math.round(s.bottom - last.bottom - (note ? note.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom) : 0)); })()`); // the "Turn on alerts" line (#11837, 11d) is under the list on purpose: it is not empty room
-            assert.ok(end <= 240, at + 'under the last row there is only the page\'s own room (the bar, and the room the + New button needs: at most 240 px, #12634), not a selection\'s empty area: ' + end);
-            assert.ok(!b.actions.find(a => a.label === 'Approve').off && !b.actions.find(a => a.label === 'Changes').off, at + 'a file can be approved or sent back');
-            // the three dots hold Changes, Mark read and Mark unread, and open on a tap
-            await ev(`window.__hides = window.__hides || []; (() => { if (window.__hideHook) return; window.__hideHook = true; const d = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden'); Object.defineProperty(HTMLElement.prototype, 'hidden', { configurable: true, get() { return d.get.call(this); }, set(v) { if (v && this.classList.contains('dt-mail-menu')) window.__hides.push(new Error('hide').stack.split('\\n').slice(1, 7).join(' | ')); d.set.call(this, v); } }); })(); true`);
-            // the module for the three dots loads when the bar first appears, so the first tap never waits on it: with it 1.5 s late, a tap made after that opens the menu at once (v2.0.24: the press reached nothing on a cold runner)
-            await new Promise(r => setTimeout(r, 1800)); // sleep-ok: the slow module arrives meanwhile
-            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`);
-            await waitFor(`!!document.querySelector('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')`, at + 'the first tap on More opens its menu at once', 600);
-            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes (the same button again)
-            // the menu's module loads on the first tap and a refresh can redraw the bar meanwhile (CI, v2.0.24: More did nothing after two swipes): a tap on More with the bar redrawn in the same breath still opens the menu, in the new bar
-            await ev(`(() => { const old = document.querySelector('.dt-bar .dt-bar-more-toggle'), q = [...document.querySelectorAll('${T} tbody tr[data-key]')].find(r => /Phone review/.test(r.textContent) && !r.classList.contains('dt-selected')); /* another review file joins: a question in the selection takes the review actions out of the bar (#15120) */ old.click(); q.click(); window.__oldToggle = old; return true; })()`);
-            assert.equal(await ev(`!!window.__oldToggle && !window.__oldToggle.isConnected && document.querySelector('.dt-bar .dt-bar-count').textContent`), '2 selected', at + 'the bar was redrawn under the tap (another row joined the selection)');
-            await waitFor(`!!document.querySelector('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')`, at + 'More opens its menu', 5000).catch(async e => { throw new Error(e.message + ' | ' + await ev(`JSON.stringify({ toggles: document.querySelectorAll('.dt-bar-more-toggle').length, menus: [...document.querySelectorAll('.dt-bar .menu')].map(m => [m.hidden, m.children.length]), toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim().slice(0, 40)), bar: !!document.querySelector('.dt-bar') })`)); }); // the page's state when it does not open: a lost press, a hidden menu, a toast
-            assert.equal(await ev(`document.querySelectorAll('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item').length`), 3, at + 'the menu opened in the redrawn bar holds its three items (Changes, Mark read, Mark unread; Close goal and Not yet are a goal\'s and are not offered for a file, #12401)');
-            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes (the same button again)
-            await ev(`[...document.querySelectorAll('${T} tbody tr[data-key]')].find(r => /Phone review/.test(r.textContent) && r.classList.contains('dt-selected') && !r.textContent.includes('Phone review 1.txt')).click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the row leaves the selection again, as before this step
-            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`);
-            await waitFor(`!!document.querySelector('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')`, at + 'More opens its menu', 5000).catch(async e => { throw new Error(e.message + ' | ' + await ev(`JSON.stringify({ toggles: document.querySelectorAll('.dt-bar-more-toggle').length, menus: [...document.querySelectorAll('.dt-bar .menu')].map(m => [m.hidden, m.children.length]), toasts: [...document.querySelectorAll('.toast')].map(t => t.textContent.trim().slice(0, 40)), bar: !!document.querySelector('.dt-bar'), hides: window.__hides })`)); }); // the page's state when it does not open: a lost press, a hidden menu, a toast
-            assert.deepEqual(await ev(`[...document.querySelectorAll('.dt-bar .dt-bar-more .menu:not([hidden]) .menu-item')].map(x => [x.textContent, x.disabled])`), [['Changes', false], ['Mark read', false], ['Mark unread', true]], at + 'the menu: Changes and Mark read fit one unread file, Mark unread does not, and Close goal (one selected goal) and Not yet are only for a goal that looks done (#12328)');
-            await ev(`document.querySelector('.dt-bar .dt-bar-more-toggle').click(); true`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the menu closes (the same button again)
-            await tap('Which port should the test server use?');
-            b = await bar(); assert.equal(b.count, '2 selected', at + 'a tap adds a row (it does not open it): ' + JSON.stringify(b)); assert.equal(await ev(`!document.querySelector('dialog[open]')`), true, at + 'and opens nothing');
-            const off = l => b.actions.find(a => a.label === l).off;
-            const has = l => b.actions.some(x => x.label === l); assert.ok(!has('Approve') && !has('Changes') && !has('Save for later') && has('Dismiss') && !off('Dismiss'), at + 'a question with files in the selection: the bar offers no review action (#15120), only Dismiss: ' + JSON.stringify(b.actions));
+            assert.deepEqual(b.actions.map(a => a.label), ['Dismiss', 'Mark as read', 'Clear'], at + 'the bar: Dismiss, Mark as read and Clear (#22094): ' + JSON.stringify(b.actions));
+            if (!(b.oneLine && b.h <= 64 && b.small.length === 0)) late.push(at + 'the bar is one line, every target 44 px, each named (Gmail, #11707): ' + JSON.stringify({ h: b.h, oneLine: b.oneLine, small: b.small }));
+            // the bar is the top row of the list and stays there while the list scrolls (the operator, comment 28; #11707)
+            const stay = await ev(`(() => { const bar = document.querySelector('${T} .nl-summary'), sc = document.getElementById('group-table-view'); sc.scrollTop = sc.scrollTop + 500; const r = bar.getBoundingClientRect(), t = sc.getBoundingClientRect(); return { top: Math.round(r.top - t.top), shown: r.height > 0 }; })()`);
+            if (!(stay.shown && stay.top >= -1 && stay.top <= 40)) late.push(at + 'after the list scrolls the bar is still at the top of the screen (within 40 px of the list top): ' + JSON.stringify(stay)); // the bar's layout is said at the end, so the rest of each pass still runs
+            await ev(`document.getElementById('group-table-view').scrollTop = 0; true`);
+            // the empty area under the list at its end is the same with rows selected as without: a selection adds none (#11765)
+            const gap1 = await endGap();
+            assert.ok(Math.abs(gap1 - gap0) <= 2, at + 'under the last row a selection adds no empty area: ' + JSON.stringify({ without: gap0, with: gap1 }));
+            assert.ok(!b.actions.find(a => a.label === 'Dismiss').off, at + 'a file can be dismissed');
+            // a check adds the question; a question with files: only what fits both
+            await check('Which port should the test server use?');
+            b = await bar(); assert.equal(b.count, '2 selected', at + 'a check adds a row: ' + JSON.stringify(b)); assert.equal(await ev(`!document.querySelector('dialog[open]')`), true, at + 'and opens nothing');
+            const has = l => b.actions.some(x => x.label === l); assert.ok(!has('Approve') && !has('Changes') && !has('Save for later') && has('Dismiss') && !b.actions.find(a => a.label === 'Dismiss').off, at + 'a question with files in the selection: the bar offers no review action (#15120), only Dismiss: ' + JSON.stringify(b.actions));
             // Dismiss both: one request each, one toast with Undo, then Undo puts both back
             await pressBar('Dismiss');
             await waitFor(`window.__calls.some(c => c.ask === 71 && !c.undo) && window.__calls.some(c => c.review && c.decision === 'ignore')`, at + 'one request per item', 8000);
@@ -167,32 +123,18 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await bar(), null, at + 'the selection is over');
             await ev(`[...document.querySelectorAll('.toast')].find(t => /Dismissed 2/.test(t.textContent)).querySelectorAll('button').forEach(x => { if (x.textContent.trim() === 'Undo') x.click(); }); true`);
             await waitFor(`window.__calls.some(c => c.ask === 71 && c.undo) && window.__calls.some(c => c.review && c.decision === 'unignore')`, at + 'Undo is one request per item too', 8000);
-            // one file that was opened is approved directly; an unopened one asks first
-            await waitFor(`!!(${rowOf('Phone review 4.txt')})`, at + 'the fourth file is there', 8000);
-            await press('Phone review 4.txt');
-            await ev('window.__calls = []; true'); await pressBar('Approve');
-            // an unopened file asks first (#12059, #11999): "Approve this file? It is not opened yet."; nothing is sent until it is answered
-            await waitFor(`/Approve this file\\? It is not opened yet\\./.test(document.querySelector('.dt-bar').textContent)`, at + 'one unopened file: Approve asks first', 5000);
-            assert.equal(await ev('window.__calls.length'), 0, at + 'nothing is sent while it asks');
-            await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => !b.classList.contains('dt-bar-keep') && b.textContent.trim() === 'Approve').click(); true`);
-            await waitFor(`window.__calls.some(c => c.review === '${(4).toString(16).padStart(64, '0')}' && c.decision === 'approve')`, at + 'one file: the answer sends it', 8000);
-            // two files: Approve both; Cancel leaves with nothing sent
+            // Clear leaves the selection with nothing sent; Cancel in the title bar does too
             await waitFor(`!!(${rowOf('Phone review 2.txt')})`, at + 'the rows are back', 8000);
-            await press('Phone review 2.txt'); await tap('Phone review 3.txt');
-            b = await bar(); assert.equal(b.count, '2 selected', at + 'two files selected'); assert.ok(!off('Approve') && b.actions.find(a => a.label === 'Changes').off, at + 'Changes is off for two files: ' + JSON.stringify(b.actions));
-            await ev('window.__calls = []; true'); await pressBar('Cancel'); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the bar leaves
+            await ev(`document.querySelectorAll('${T} .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`);
+            if (!(await ev(`!!document.querySelector('${T}.nl-selection-active')`))) await startSelect();
+            await check('Phone review 2.txt'); await check('Phone review 3.txt');
+            b = await bar(); assert.equal(b.count, '2 selected', at + 'two files selected');
+            await ev('window.__calls = []; true'); await pressBar('Clear'); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the bar leaves
+            assert.equal(await bar(), null, at + 'Clear leaves selection'); assert.deepEqual(await selected(), [], at + 'nothing is selected'); assert.equal(await ev('window.__calls.length'), 0, at + 'and nothing was sent');
+            await startSelect(); await check('Phone review 2.txt');
+            assert.equal(await ev(`document.querySelector('#top-phone-bar .nl-phone-select').textContent`), 'Cancel', at + 'the title bar\'s Select is Cancel while selecting');
+            await tapAt(`document.querySelector('#top-phone-bar .nl-phone-select')`);
             assert.equal(await bar(), null, at + 'Cancel leaves selection'); assert.deepEqual(await selected(), [], at + 'nothing is selected'); assert.equal(await ev('window.__calls.length'), 0, at + 'and nothing was sent');
-            await press('Phone review 2.txt'); await tap('Phone review 3.txt');
-            // Approve of several files asks first (Security's SHOULD): "Approve 2 files?", Keep sends nothing, the confirm sends one request per file; one file is approved directly
-            await ev('window.__calls = []; true'); await pressBar('Approve');
-            await waitFor(`/Approve 2 files\\? 2 of them are not opened yet\\./.test(document.querySelector('.dt-bar').textContent)`, at + 'it asks "Approve 2 files? 2 of them are not opened yet."', 5000);
-            assert.equal(await ev('window.__calls.length'), 0, at + 'nothing is sent while it asks');
-            await ev(`document.querySelector('.dt-bar .dt-bar-keep').click(); true`); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the bar draws again
-            assert.equal(await ev('window.__calls.length'), 0, at + 'Keep sends nothing');
-            await pressBar('Approve');
-            await waitFor(`/Approve 2 files\\?/.test(document.querySelector('.dt-bar').textContent)`, at + 'it asks again', 5000);
-            await ev(`[...document.querySelectorAll('.dt-bar button')].filter(x => x.textContent === 'Approve').pop().click(); true`);
-            await waitFor(`window.__calls.filter(c => c.review && c.decision === 'approve').length === 2`, at + 'confirming is one request per file', 8000);
             await removeBoards(ev, [team]).catch(() => {});
         }
         // Desktop nested controls retain their action even when the table has a selection.
@@ -205,6 +147,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`window.__desktopSelectionActions === 1`,'desktop pointer still reaches its nested action while selected',3000);
         assert.equal(await ev(`window.__desktopSelectionTable.selection().size`),1,'desktop action preserves selection');
         await ev(`window.__desktopSelectionHost.remove();true`);
-        console.log('\nPASS the phone rows: no buttons, tap opens, long press selects, the bar acts on the selection');
+        assert.deepEqual(late, [], 'the selection bar: one line of 44 px targets that stays in view');
+        console.log('\nPASS the phone rows: only their own 44 px controls, tap opens, Select and a check select, the bar acts on the selection');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

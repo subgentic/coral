@@ -1,4 +1,6 @@
 // #20101 (final walk, mock S2): Waiting on you is ordered by how long each row has waited, across kinds (a file for review, a question), newest first by default; it was grouped by kind. Failing-first.
+// #22094: the list is the Needs you ledger (needs_ledger.js, article.nl-row). Grouped by Goal (the default) the permission prompt is pinned first in its own section, then each group's Questions and To review read
+// newest first; Group by: None gives one flat .nl-list, newest first across every kind.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -24,11 +26,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 if (u.pathname !== '/api/board/qn/artifacts') return original(url, opts);
                 return json({ project: 'qn', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); }; return true; })()`);
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'); state.liveSessions = [{ name: 'be', session_id: '00000001-0000-4000-8000-000000000001', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Backend Dev', working_directory: '/repo/be', waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Wants to run: Q-perm-end', waiting_since: new Date(Date.now() - 10 * 60000).toISOString() }]; return true; })()`);
-        await ev(`window.switchNavTab('hub-inbox'); true`);
+        await ev(`localStorage.removeItem('coral-inbox-group-mode'); localStorage.removeItem('coral-inbox-group-review-goal'); window.switchNavTab('hub-inbox'); true`); // a fresh Needs you opens grouped by Goal
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr.dt-row').length >= 5`, 'the files and the questions', 20000);
-        const order = await ev(`[...document.querySelectorAll('${T} tbody tr.dt-row')].map(r => (/(plan-oldest|plan-newer|Q-middle|Q-newest|Q-perm)/.exec(r.textContent) || [])[1]).filter(Boolean)`);
-        assert.deepEqual(order, ['Q-newest', 'plan-newer', 'Q-perm', 'Q-middle', 'plan-oldest'], 'rows read by time waiting, newest first, across kinds: ' + JSON.stringify(order));
+        const order = () => ev(`[...document.querySelectorAll('${T} .needs-ledger .nl-row')].map(r => (/(plan-oldest|plan-newer|Q-middle|Q-newest|Q-perm)/.exec(r.textContent) || [])[1]).filter(Boolean)`);
+        await waitFor(`document.querySelectorAll('${T} .needs-ledger .nl-row').length >= 5`, 'the files and the questions', 20000);
+        assert.deepEqual(await order(), ['Q-perm', 'Q-newest', 'Q-middle', 'plan-newer', 'plan-oldest'], 'grouped: the permission prompt pinned first, then Questions and To review each newest first: ' + JSON.stringify(await order()));
+        await waitFor(`(() => { const m = document.querySelector('#needs-group-by-menu'); if (m && !m.hidden) return true; if (Date.now() - (window.__gbAt || 0) > 1500) { window.__gbAt = Date.now(); document.querySelector('.nl-visible-group > button')?.click(); } return false; })()`, 'the Group by menu', 8000); // pressed again if a live redraw of the toolbar swapped the button under the first press
+        await ev(`[...document.querySelectorAll('#needs-group-by-menu button')].find(b => b.textContent === 'None').click(); true`);
+        await waitFor(`!!document.querySelector('${T} .needs-ledger') && !document.querySelector('${T} .nl-group-toggle') && document.querySelectorAll('${T} .needs-ledger .nl-row').length >= 5`, 'the flat list', 8000);
+        assert.deepEqual(await order(), ['Q-newest', 'plan-newer', 'Q-perm', 'Q-middle', 'plan-oldest'], 'rows read by time waiting, newest first, across kinds: ' + JSON.stringify(await order()));
         console.log('PASS needs_order_by_wait');
-    } catch (e) { console.error(e); process.exitCode = 1; } finally { try { await removeBoards(ev, ['qn']); await client.close(); } catch (_) {} }
+    } catch (e) { console.error(e); process.exitCode = 1; } finally { try { await ev(`localStorage.removeItem('coral-inbox-group-mode'); localStorage.removeItem('coral-inbox-group-review-goal'); true`); await removeBoards(ev, ['qn']); await client.close(); } catch (_) {} }
 })();
