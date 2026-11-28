@@ -28,7 +28,7 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
         for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
+            await Page.navigate({ url: BASE + '/?test_agent=1' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings');
             await ev(`fetch('/api/launch-disclosure/ack', { method: 'DELETE' }).then(r => r.ok)`);
             await ev(`try { localStorage.removeItem('coral-launch-notice'); } catch (e) {} true`);
             // 1. a cold load of /inbox/needs with the notice unseen and its read held. A phone loads it twice (#17289): the first time the browser has no hint and a typical height (53 px) is reserved, the second time the notice's own height, kept as the hint, is: the notice is taller than 57 on a renderer whose fonts wrap its headline to a third line (93 px on Windows), so only the second load can stay put within 3 px everywhere
@@ -36,7 +36,7 @@ const TRACK = `(() => { const t = window.__jump = { tops: [], noticeAt: -1 };
             for (const pass of mobile ? [1, 2] : [1]) {
             const ids = [(await Page.addScriptToEvaluateOnNewDocument({ source: HOLD })).identifier, (await Page.addScriptToEvaluateOnNewDocument({ source: RESERVED })).identifier];
             if (mobile) ids.push((await Page.addScriptToEvaluateOnNewDocument({ source: TRACK })).identifier);
-            await Page.navigate({ url: BASE + '/inbox/needs' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: BASE + '/inbox/needs?test_agent=1' }); await Page.loadEventFired(); await install();
             if (pass === 2) check(/^p\|\d+$/.test(await ev(`localStorage.getItem('coral-launch-notice') || ''`)), `${at}the notice's height is kept as the hint after the first load`);
             check(await ev(`window.__reserved`), `${at}the room is reserved before first paint on a cold load of /inbox/needs`);
             await waitFor(`!!document.getElementById('launch-disclosure-banner') && (window.__jump ? window.__jump.noticeAt >= 0 && window.__jump.tops.length >= window.__jump.noticeAt + 3 : true)`, `${at}the notice on a cold load of /inbox/needs`, 15000);

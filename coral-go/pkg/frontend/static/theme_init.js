@@ -21,12 +21,11 @@
     // The launch notice's row (#14835): it is read after first paint, and arriving moved the page by its height. A browser that last saw it unseen kept a hint (a convenience only: the server's 409 gate is the authority), and its room is reserved
     // here, before first paint, until the notice fills it (launch_disclosure.js releases it). The hint is for this kind of screen (phone or not: a phone's window is not its final width while the head is read, so its screen counts too), whose notice is that tall; the hub's pages and a pop-out never get the notice.
     try {
-        var hint = /^([pd])\|(\d{1,3})$/.exec(localStorage.getItem('coral-launch-notice') || ''), phoneScreen = window.innerWidth <= 600 || screen.width <= 600, room_px = '';
-        if (hint && (hint[1] === 'p') === phoneScreen) room_px = hint[2];
-        else { // no hint for this kind of screen (a new profile, a phone after a wide window): when the server says the notice is unseen, a typical height is reserved (#14935, 53 px on a phone, one line since the headline became 'Auto mode' (#17696); the notice's real height is kept as the hint once it is shown)
-            var unseen = false; try { unseen = JSON.parse(document.getElementById('coral-boot').textContent).launch_unseen === true; } catch (_) {}
-            if (unseen) room_px = '53';
-        }
+        var hint = /^([pd])\|(\d{1,3})$/.exec(localStorage.getItem('coral-launch-notice') || ''), phoneScreen = window.innerWidth <= 600 || screen.width <= 600, room_px = '', unseen = false;
+        try { unseen = JSON.parse(document.getElementById('coral-boot').textContent).launch_unseen === true; } catch (_) {}
+        // The server says launch_unseen only when the notice will draw (#22033: unseen, the default is Auto, and a local agent exists), so a row is reserved only for a notice that comes, and is never given back for 'no agent'.
+        // The hint is the height this browser last saw (for this kind of screen); with none, a typical height (#14935, 53 px on a phone, one line since the headline became 'Auto mode' (#17696); the notice's real height is kept as the hint once it is shown).
+        if (unseen) room_px = hint && (hint[1] === 'p') === phoneScreen ? hint[2] : '53';
         if (room_px && mode !== 'cloud' && location.pathname.indexOf('/agent/') !== 0 && document.head) {
             var room = document.createElement('style'); room.id = 'launch-notice-room';
             // The notice sits just above the layout (after the sign-in banner, hidden until shown); on a phone's Inbox (#16460) it is in the pane under its heading, and so is the room
