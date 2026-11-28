@@ -1140,6 +1140,9 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	}
 	// The row says it answered a trust dialog, whichever option was taken (#16129).
 	noteActivity(r, row, "agent", name, "", trustDialogTitle(screen), note)
+	if (row == board.ActPromptAllow || row == board.ActPromptReject) && !screen.Unreadable && screen.Target != "" {
+		noteActivityCommand(r, screen.Target) // the row shows what the agent wanted to run, as the card showed it: read whole from the screen, never the agent's words (#22144)
+	}
 	h.kickWS()                     // every screen showing the card takes the answer now
 	h.forgetDialog(body.SessionID) // the prompt was answered: it is not a dialog the agent is stuck at (#11437); the next pass reads the screen again
 	// One line on success too (#16398: a report that an answer "changed nothing" had no log to show whether it reached the terminal): who, which option, how it was sent, never the question or any typed text.

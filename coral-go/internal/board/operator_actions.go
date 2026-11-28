@@ -133,6 +133,9 @@ type ActivityMeta struct {
 	TaskID int64
 	Asker  string // on a row about an ask: who asked (cleaned and cut here); the Title is the ask's line (#14422)
 	Ask    string // on a file's decision: the question the agent asked with the file, as the person saw it (cleaned and cut here, #19828); empty when it asked none
+	// Command is the request a permission prompt drew, as its card showed it (#22144): already redacted by the caller, kept only on a prompt_allow or prompt_reject row, cleaned and cut here to
+	// activityCommandCap (CommandCut then says so). Empty when the request was not read whole, or the redactor refused it.
+	Command string
 }
 
 type activityKey struct{}
@@ -169,9 +172,13 @@ type OperatorAction struct {
 	// Asker is who asked, on a row about an ask: the row's Title is then the ask's own line, and this keeps the asker readable beside it (#14422). Empty on every other row and on every row made before it.
 	Asker string `db:"asker" json:"asker,omitempty"`
 	// Ask is the question the agent put to the Operator with a file, kept when the Operator decides on it (#19828): written only on a new row, never filled in afterwards. Empty on every other row and on every row made before it.
-	Ask      string `db:"ask" json:"ask,omitempty"`
-	PrevHash string `db:"prev_hash" json:"-"`
-	Hash     string `db:"hash" json:"-"`
+	Ask string `db:"ask" json:"ask,omitempty"`
+	// Command and CommandCut: the command an agent asked to run, on an answered permission prompt's row (#22144, Security's design call): redacted before it is stored and hashed, at most
+	// activityCommandCap runes ("…" and CommandCut when it was longer). Read only by the person's own Activity list (and the chain check); empty on every other row and every row made before it.
+	Command    string `db:"command" json:"command,omitempty"`
+	CommandCut bool   `db:"command_cut" json:"command_cut,omitempty"`
+	PrevHash   string `db:"prev_hash" json:"-"`
+	Hash       string `db:"hash" json:"-"`
 }
 
 func (s *Store) ensureOperatorActionsSchema(ctx context.Context) error {
@@ -210,6 +217,11 @@ func (s *Store) ensureOperatorActionsSchema(ctx context.Context) error {
 	// the question a file was sent with, on a file's decision (#19828): added to a record that has none; an old row keeps '' and its hash (the field joins the hash only when it has text)
 	if _, err := s.db.ExecContext(ctx, `ALTER TABLE operator_actions ADD COLUMN ask TEXT NOT NULL DEFAULT ''`); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 		return err
+	}
+	for _, ddl := range []string{`ALTER TABLE operator_actions ADD COLUMN command TEXT NOT NULL DEFAULT ''`, `ALTER TABLE operator_actions ADD COLUMN command_cut INTEGER NOT NULL DEFAULT 0`} { // #22144
+		if _, err := s.db.ExecContext(ctx, ddl); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return err
+		}
 	}
 	// the thread reads (#14440, Security's INFO 4) filter this record by team and goal or task, and count by task for a page of summaries: indexed, so a thread never reads the whole record
 	for _, idx := range []string{
@@ -267,6 +279,18 @@ func activityText(s string, n int) string {
 	return string(out)
 }
 
+// activityCommandCap bounds the command kept on an answered permission prompt's row (#22144, Security's design call).
+const activityCommandCap = 500
+
+// activityCommand cleans a command for its row and cuts it to activityCommandCap runes, the last one "…" when it was longer (cut is then true).
+func activityCommand(cmd string) (string, bool) {
+	full := []rune(activityText(cmd, 4*activityCommandCap))
+	if len(full) <= activityCommandCap {
+		return string(full), false
+	}
+	return string(full[:activityCommandCap-1]) + "…", true
+}
+
 // activityHash chains a row: the SHA-256 of the previous hash and of every field of this row, each length-prefixed so no two rows hash alike by moving a character between fields.
 func activityHash(prev string, a OperatorAction) string {
 	h := sha256.New()
@@ -276,6 +300,9 @@ func activityHash(prev string, a OperatorAction) string {
 	}
 	if a.Ask != "" { // the same for the question (#19828): a row with none hashes exactly as before the column, so no old row's hash changes
 		fields = append(fields, "ask", a.Ask)
+	}
+	if a.Command != "" { // and for the command (#22144): the redacted text is what is hashed; a row with none hashes as before
+		fields = append(fields, "command", a.Command, "command_cut", strconv.FormatBool(a.CommandCut))
 	}
 	for _, f := range fields {
 		fmt.Fprintf(h, "%d:%s|", len(f), f)
@@ -324,6 +351,9 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 	if a.Actor == "" {
 		a.Actor = "local"
 	}
+	if action == ActPromptAllow || action == ActPromptReject { // a command is kept on an answered permission prompt's row only (#22144)
+		a.Command, a.CommandCut = activityCommand(m.Command)
+	}
 	a.Hash = activityHash(a.PrevHash, a)
 	// the row and the head are one step: a failure between them leaves neither (a savepoint inside the caller's transaction), so the chain never shows a break the action did not cause
 	if _, err := q.ExecContext(ctx, `SAVEPOINT activity_row`); err != nil {
@@ -334,8 +364,8 @@ func appendActivity(ctx context.Context, q activityExec, now time.Time, m Activi
 		_, _ = q.ExecContext(ctx, `RELEASE activity_row`)
 		return err
 	}
-	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, ask, goal_id, task_id, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note, a.Asker, a.Ask, a.GoalID, a.TaskID, a.PrevHash, a.Hash)
+	res, err := q.ExecContext(ctx, `INSERT INTO operator_actions (at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, ask, command, command_cut, goal_id, task_id, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.At, a.Actor, a.Action, a.ItemKind, a.ItemID, a.Version, a.Team, a.Source, a.Hint, a.Surface, a.Title, a.Note, a.Asker, a.Ask, a.Command, a.CommandCut, a.GoalID, a.TaskID, a.PrevHash, a.Hash)
 	if err != nil {
 		return fail(err)
 	}
@@ -455,7 +485,7 @@ const ActivityCheckNote = "Edits made outside Coral are shown unless the whole r
 // removed are not checked: the trim moved the anchor.
 func (s *Store) VerifyActivity(ctx context.Context) (ActivityCheck, error) {
 	rows := []OperatorAction{}
-	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, ask, goal_id, task_id, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
+	if err := s.db.SelectContext(ctx, &rows, `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, ask, command, command_cut, goal_id, task_id, prev_hash, hash FROM operator_actions ORDER BY id`); err != nil {
 		return ActivityCheck{}, err
 	}
 	var head struct {
@@ -555,7 +585,7 @@ func (s *Store) CountActivityWhere(ctx context.Context, f ActivityFilter) (int, 
 // ActivityPage is ListActivity and whether more rows exist past the page (it reads one more than the limit). The limit is at most ActivityMaxLimit and 50 when not given; the order is (time, id) newest
 // first, and a cursor (BeforeAt with BeforeID) pages by that pair.
 func (s *Store) ActivityPage(ctx context.Context, f ActivityFilter) ([]OperatorAction, bool, error) {
-	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, ask, goal_id, task_id FROM operator_actions WHERE 1 = 1`
+	q := `SELECT id, at, actor, action, item_kind, item_id, version, team, source, hint, surface, title, note, asker, ask, command, command_cut, goal_id, task_id FROM operator_actions WHERE 1 = 1`
 	var args []any
 	if f.Team != "" {
 		q += ` AND team = ?`

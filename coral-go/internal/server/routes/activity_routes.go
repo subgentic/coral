@@ -110,6 +110,11 @@ func ActivityRecorder(bs *board.Store, nameOf func(id string) string) func(http.
 				if humanInputCaller(r) {
 					meta := activityMetaFor(r, pend.title, pend.note)
 					meta.TaskID = pend.task
+					if pend.command != "" { // redacted before it is stored and hashed; nothing is kept when the redactor refuses it (#22144, Security's design call)
+						if red, ok := redactComment(pend.command); ok {
+							meta.Command = red
+						}
+					}
 					_ = bs.RecordActivity(context.WithoutCancel(r.Context()), meta, pend.action, pend.kind, pend.item, "", pend.team)
 				}
 				return
@@ -163,13 +168,21 @@ type activityPendingKey struct{}
 type activityPending struct {
 	set                                   bool
 	action, kind, item, team, title, note string
-	task                                  int64 // the task a file's upload is linked to, when the handler knows it (#14421)
+	task                                  int64  // the task a file's upload is linked to, when the handler knows it (#14421)
+	command                               string // the request an answered permission prompt drew, as its card showed it (#22144); redacted by the recorder
 }
 
 // noteActivity asks the recorder for a row for this request's click; the last call wins. Outside the recorder (a handler called on its own in a test) it does nothing.
 func noteActivity(r *http.Request, action, kind, item, team, title, note string) {
 	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil {
-		*p = activityPending{true, action, kind, item, team, title, note, 0}
+		*p = activityPending{true, action, kind, item, team, title, note, 0, ""}
+	}
+}
+
+// noteActivityCommand adds to the row noteActivity asked for the command a permission prompt asked to run (#22144). Call it after noteActivity.
+func noteActivityCommand(r *http.Request, command string) {
+	if p, _ := r.Context().Value(activityPendingKey{}).(*activityPending); p != nil && p.set {
+		p.command = command
 	}
 }
 
