@@ -1,3 +1,5 @@
+2	activity_ledger.js	PAGE
+1	activity_ledger.js	body
 1	agent_config_form.js	CAPABILITY_LABELS[cap] || cap
 1	agent_config_form.js	agentHTML
 1	agent_config_form.js	autoPermissionsHTML

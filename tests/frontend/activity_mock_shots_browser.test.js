@@ -11,13 +11,13 @@ const D = 'a'.repeat(64), D2 = 'b'.repeat(64), V1 = 'c'.repeat(64), V2 = 'd'.rep
  const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
  const min = n => new Date(Date.now() - n * 60000).toISOString();
  const actions = [
-  { id: 10, goal_id: 241, goal_title: 'A new user\'s first team', task_id: 19808, task_title: 'Inbox list design mocks', team: 'coral-go-team', at: min(1), action: 'approved', item_kind: 'file', item_id: 'e'.repeat(64), version: 'e'.repeat(64), title: 'login-screen.png', asker: 'Inbox Designer', note: 'Looks right.', file_n: 1, file_latest_n: 1, ask: 'Is this the login screen you wanted?', source: 'hub' },
-  { id: 9, goal_id: 241, goal_title: 'A new user\'s first team', task_id: 19808, task_title: 'Inbox list design mocks', team: 'coral-go-team', at: min(2), action: 'approved', item_kind: 'file', item_id: D, version: D, title: 'inbox-list-design-mocks.html', asker: 'Inbox Designer', note: '', file_n: 1, file_latest_n: 1, ask: 'Please review the Inbox list mocks.', source: 'local' },
+  { id: 10, goal_id: 241, goal_title: 'A new user\'s first team', task_id: 19808, task_title: 'Inbox list design mocks', team: 'coral-go-team', at: min(1), action: 'approve', item_kind: 'file', item_id: 'e'.repeat(64), version: 'e'.repeat(64), title: 'login-screen.png', asker: 'Inbox Designer', note: 'Looks right.', file_n: 1, file_latest_n: 1, ask: 'Is this the login screen you wanted?', source: 'hub' },
+  { id: 9, goal_id: 241, goal_title: 'A new user\'s first team', task_id: 19808, task_title: 'Inbox list design mocks', team: 'coral-go-team', at: min(2), action: 'approve', item_kind: 'file', item_id: D, version: D, title: 'inbox-list-design-mocks.html', asker: 'Inbox Designer', note: '', file_n: 1, file_latest_n: 1, ask: 'Please review the Inbox list mocks.', source: 'local' },
   { id: 8, goal_id: 256, goal_title: 'Coral 3.0', task_id: 18583, task_title: 'Compaction message check', team: 'coral-hub', at: min(24), action: 'answer', item_kind: 'question', item_id: '18583', title: 'One quick check for #18583: does a message sent while compacting arrive after compaction finishes?', asker: 'Orchestrator', note: 'Yes: sent right while compacting and it delivered ~2 seconds after compaction finished.', source: 'local' },
   { id: 7, goal_id: 259, goal_title: 'Promo video', task_id: 19787, task_title: 'Promo video cut 1', team: 'coral-go-team', at: min(41), action: 'changes', item_kind: 'file', item_id: V2, version: V2, title: 'promo-cut-1.mp4', asker: 'Video Producer', note: '00:00-00:23: show working agents as green. 01:17: open the Inbox first, then click the document.', file_n: 2, file_latest_n: 2, ask: 'Cut 1 of the promo video, ready for review.', file_versions: [{ digest: V1, n: 1, at: min(60*3) }, { digest: V2, n: 2, at: min(45) }], source: 'local' },
   { id: 6, goal_id: 259, goal_title: 'Promo video', task_id: 19787, task_title: 'Promo video cut 1', team: 'coral-go-team', at: min(55), action: 'changes', item_kind: 'file', item_id: V1, version: V1, title: 'promo-cut-1.mp4', asker: 'Video Producer', note: 'Second look: better.', file_n: 1, file_latest_n: 2, ask: 'Cut 1 of the promo video, ready for review.', file_versions: [{ digest: V1, n: 1, at: min(60*3) }, { digest: V2, n: 2, at: min(45) }], source: 'local' },
   { id: 5, team: 'coral-go-team', at: min(60), action: 'goal_close', item_kind: 'goal', item_id: '258', title: 'Team agents have three states (Awake, Asleep, Archived)', note: 'Marked done after v2.1.1 evals passed 3 of 3 runs per case.', source: 'local' },
-  { id: 4, goal_id: 256, goal_title: 'Coral 3.0', task_id: 19750, task_title: 'Device keys design', team: 'coral-go-team', at: min(60 * 24 + 30), action: 'approved', item_kind: 'file', item_id: D2, version: D2, title: 'design-19669.md', asker: 'Backend Dev', note: 'Ship draft 7: keep offline fallback read-only until key rotation lands.', file_n: 7, file_latest_n: 7, ask: 'Approve draft 7 of the device keys design?', source: 'local' },
+  { id: 4, goal_id: 256, goal_title: 'Coral 3.0', task_id: 19750, task_title: 'Device keys design', team: 'coral-go-team', at: min(60 * 24 + 30), action: 'approve', item_kind: 'file', item_id: D2, version: D2, title: 'design-19669.md', asker: 'Backend Dev', note: 'Ship draft 7: keep offline fallback read-only until key rotation lands.', file_n: 7, file_latest_n: 7, ask: 'Approve draft 7 of the device keys design?', source: 'local' },
  ];
  try {
   await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -37,41 +37,46 @@ const D = 'a'.repeat(64), D2 = 'b'.repeat(64), V1 = 'c'.repeat(64), V2 = 'd'.rep
     await shot(`activity-${width}-${theme}`);
     const hasLedger = await ev(`!!document.querySelector('.al-row')`);
     if (hasLedger) {
-     assert.equal(await ev(`!!document.querySelector('.al-date-head')`), true, `${at}: date headers`);
-     const gap = await ev(`(()=>{const bar=document.querySelector('.inbox-folder-toolbar'), h=document.querySelector('.al-date-head'); return {headTop:Math.round(h.getBoundingClientRect().top), barBottom:Math.round(bar.getBoundingClientRect().bottom)}})()`);
-     assert.ok(gap.headTop - gap.barBottom <= 24, `${at}: no empty band between the toolbar and the first date header: ${JSON.stringify(gap)}`);
-     assert.ok(await ev(`[...document.querySelectorAll('.al-date-head')].every(h => /^\\d+$/.test(h.querySelector('.al-day-count')?.textContent || ''))`), `${at}: every date header has its day count`);
-     assert.equal(await ev(`(()=>{const p=document.querySelector('.inbox-folder-toolbar .team-tb-pills-multi'), r=p.getBoundingClientRect(), bar=document.querySelector('.inbox-folder-toolbar').getBoundingClientRect(); return r.width>150&&getComputedStyle(p).display!=='none'&&r.left>=bar.left-1&&[...p.querySelectorAll('.goals-chip')].length===7&&getComputedStyle(document.querySelector('.inbox-folder-toolbar .inbox-pill-field')).display==='none'})()`), true, `${at}: MUST-12 the seven kind pills are inline in the toolbar, not check boxes in Filters`);
-     assert.ok(await ev(`[...document.querySelectorAll('.al-chip')].every(c => c.getBoundingClientRect().width < 160)`), `${at}: chips hold short labels`);
-     assert.equal(await ev(`document.querySelectorAll('.al-tile.al-fk-video, .al-tile.al-fk-markdown, .al-tile.al-fk-html').length>=3`), true, `${at}: video, markdown and html tiles retain their type classes`);
-     assert.ok(await ev(`!!document.querySelector('.al-vnewer') && /v1 reviewed/.test(document.querySelector('.al-vnewer').textContent)`), `${at}: v1 reviewed · v2 newer`);
-     assert.ok(await ev(`!!document.querySelector('.al-ask')`), `${at}: the asked question shows under a file name`);
-     await waitFor(`!!document.querySelector('.al-tile-thumb img')`, `${at}: the picture's thumbnail is drawn in its tile`, 8000);
-     assert.ok(await ev(`document.querySelector('.al-via')?.textContent === 'via Coral Hub'`), `${at}: a decision made through Coral Hub says so`);
-     assert.ok(await ev(`[...document.querySelectorAll('.al-ans-label')].map(e=>e.textContent).includes('Approved with note:') && [...document.querySelectorAll('.al-ans-label')].map(e=>e.textContent).includes('Changes requested:')`), `${at}: the callouts say what the words are`);
-     await ev(`document.querySelector('.al-row[data-kind="goal"] details.al-more > summary').click(); true`); await ev(framesJs(2));
-     assert.ok(await ev(`[...document.querySelectorAll('.al-row[data-kind="goal"] .al-menu-item')].some(b => b.textContent === 'Reopen goal')`), `${at}: a closed goal's More has Reopen goal`);
-     await ev(`document.querySelector('.al-row[data-kind="goal"] details.al-more').open=false; true`);
-     await ev(`document.querySelector('details.al-more > summary').click(); true`); await ev(framesJs(2));
-     assert.ok(await ev(`document.querySelectorAll('details.al-more[open] .al-menu-item').length>=2`), `${at}: the More menu opens with its actions`);
-     assert.equal(await ev(`(()=>{const p=document.querySelector('details.al-more[open] .al-pop').getBoundingClientRect(); return [...document.querySelectorAll('details.al-more[open] .al-menu-item')].every(i => i.getBoundingClientRect().right <= p.right - 1) || JSON.stringify([p.right, [...document.querySelectorAll('details.al-more[open] .al-menu-item')].map(i => [i.textContent, i.getBoundingClientRect().right, i.scrollWidth, i.clientWidth])])})()`), true, `${at}: MUST-10 every More item sits inside its menu's border`);
-     await shot(`activity-more-${width}-${theme}`);
-     await ev(`document.querySelector('details.al-more').open=false; true`);
-     if (width < 600) assert.equal(await ev(`(()=>{const r=document.querySelector('.al-row[data-kind="file"]'), m=r.querySelector('.al-main').getBoundingClientRect().left, b=r.querySelector('.al-actions .btn').getBoundingClientRect().left; return Math.abs(b-m)<2||b-m})()`), true, `${at}: MUST-11 the action buttons start at the text's left edge`);
-     await ev(`document.querySelector('details.al-versions > summary').click(); true`); await ev(framesJs(2));
-     assert.equal(await ev(`(()=>{const p=document.querySelector('details.al-versions[open] .al-pop').getBoundingClientRect();return p.left>=0&&p.right<=innerWidth+1})()`), true, `${at}: the Versions popover stays on screen`);
-     assert.equal(await ev(`(()=>{const p=document.querySelector('details.al-versions[open] .al-pop'); return ([...p.querySelectorAll('.al-pop-state')].every(e => e.getBoundingClientRect().width > 40) && p.getBoundingClientRect().height < 160) || JSON.stringify([p.getBoundingClientRect().width, p.getBoundingClientRect().height, [...p.querySelectorAll('.al-pop-state')].map(e => [e.getBoundingClientRect().width, e.textContent])])})()`), true, `${at}: MUST-9 the version rows read as words, the popover is short (not one character a line)`);
-     if (width < 600) assert.ok(await ev(`document.querySelector('details.al-versions[open] .al-pop').getBoundingClientRect().width > 300`), `${at}: MUST-9 a phone's popover is as wide as the row`);
-     await shot(`activity-versions-${width}-${theme}`);
+     assert.equal(await ev(`!!document.querySelector('.al-date-head')`), true, `${at}: date headings`);
+     const gap = await ev(`(()=>{const bar=document.querySelector('.inbox-folder-toolbar'), h=document.querySelector('.al-sum'); return {headTop:Math.round(h.getBoundingClientRect().top), barBottom:Math.round(bar.getBoundingClientRect().bottom)}})()`);
+     assert.ok(gap.headTop - gap.barBottom <= 24, `${at}: no empty band between the toolbar and the count line: ${JSON.stringify(gap)}`);
+     assert.ok(await ev(`/^\\d+ actions?$/.test(document.querySelector('.al-sum').textContent)`), `${at}: the line under the top row says how many actions the list has`);
+     assert.ok(await ev(`[...document.querySelectorAll('.al-date-head')].every(h => /^\\d+$/.test(h.querySelector('.al-day-count')?.textContent || ''))`), `${at}: every day heading has its count`);
+     assert.ok(await ev(`!!document.querySelector('.al-switch') && !!document.querySelector('.al-kind-menu') && !document.querySelector('.team-tb-pills')?.getClientRects().length`), `${at}: a two-part switch and a Kind menu, not seven tabs`);
+     assert.ok(await ev(`[...document.querySelectorAll('.al-row')].every(r => { const s = r.querySelector('.al-lead svg'); return s && Math.round(s.getBoundingClientRect().width) === 16; })`), `${at}: every row wears a 16 px kind mark`);
+     assert.equal(await ev(`document.querySelectorAll('.al-open, .al-chip, .al-vchip, .al-vnewer, .al-tile, .al-qa').length`), 0, `${at}: no heavy buttons, pills, tiles or previews on a row`);
+     assert.ok(await ev(`[...document.querySelectorAll('.al-ver')].some(e => /^version 1 of 2$/.test(e.textContent))`), `${at}: "version 1 of 2" in grey, once`);
+     assert.ok(await ev(`!document.querySelector('.al-ask') && !!document.querySelector('.al-title[title]')`), `${at}: no ask line under a file name (the mock draws none); the ask is the name's tip`);
+     assert.ok(await ev(`!!document.querySelector('.al-sub .al-glink svg.al-gflag') && !!document.querySelector('.al-sub .al-v-ok') && !!document.querySelector('.al-sub .al-v-ch')`), `${at}: the goal has its flag; the verdict words are green and amber`);
+     assert.ok(await ev(`[...document.querySelectorAll('.al-ynote')].some(e => /^Your note:/.test(e.textContent))`), `${at}: your note on a change request is a plain box`);
+     assert.ok(await ev(`document.querySelector('.al-sub')?.textContent.includes('via Coral Hub') || [...document.querySelectorAll('.al-sub')].some(e => e.textContent.includes('via Coral Hub'))`), `${at}: a decision made through Coral Hub says so`);
+     const rowBox = await ev(`(()=>{const r=[...document.querySelectorAll('.al-row')].find(x => x.querySelector('details.al-versions')); r.scrollIntoView({block:'center'}); const b=r.getBoundingClientRect(); return {x:Math.round(b.left+b.width/2), y:Math.round(b.top+b.height/2)}})()`);
+     if (width >= 600) {
+      assert.equal(await ev(`getComputedStyle(document.querySelector('.al-hov')).display`), 'none', `${at}: no button shows until you point at a row`);
+      await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: rowBox.x, y: rowBox.y }); await ev(framesJs(3));
+      assert.ok(await ev(`(()=>{const r=document.querySelector('.al-row:hover'); return !!r && getComputedStyle(r.querySelector('.al-hov')).display !== 'none' && getComputedStyle(r.querySelector('.al-when')).display === 'none'})()`), `${at}: pointing at a row shows its buttons in place of the time`);
+      await shot(`activity-hover-${width}-${theme}`);
+      await ev(`document.querySelector('.al-row:hover details.al-more > summary').click(); true`); await ev(framesJs(2));
+      assert.ok(await ev(`document.querySelectorAll('details.al-more[open] .al-menu-item').length>=1`), `${at}: the More menu opens with its actions`);
+      await shot(`activity-more-${width}-${theme}`);
+      await ev(`document.querySelectorAll('details.al-more').forEach(d => d.open = false); true`);
+      await ev(`document.querySelector('.al-row:hover details.al-versions > summary').click(); true`); await ev(framesJs(2));
+      assert.equal(await ev(`(()=>{const p=document.querySelector('details.al-versions[open] .al-pop').getBoundingClientRect();return p.left>=0&&p.right<=innerWidth+1})()`), true, `${at}: the Versions popover stays on screen`);
+      await shot(`activity-versions-${width}-${theme}`);
+      await ev(`document.querySelectorAll('details.al-versions').forEach(d => d.open = false); true`);
+      await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 5 });
+     } else {
+      assert.ok(await ev(`(()=>{const r=[...document.querySelectorAll('.al-row')].find(x => x.querySelector('.al-dots')); const d=r.querySelector('details.al-dots > summary'); return getComputedStyle(r.querySelector('.al-hov')).display === 'none' && d && Math.round(d.getBoundingClientRect().height) >= 44 && Math.round(d.getBoundingClientRect().width) >= 44})()`), `${at}: a phone has one 44 px menu, not the buttons`);
+      await ev(`document.querySelector('.al-row details.al-dots > summary').click(); true`); await ev(framesJs(2));
+      assert.ok(await ev(`(()=>{const p=document.querySelector('details.al-dots[open] .al-pop').getBoundingClientRect(); return p.left>=0 && p.right<=innerWidth+1 && document.querySelectorAll('details.al-dots[open] .al-menu-item').length>=1})()`), `${at}: the phone menu opens on screen with its actions`);
+      await shot(`activity-more-${width}-${theme}`);
+      await ev(`document.querySelectorAll('details.al-dots').forEach(d => d.open = false); true`);
+     }
      await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`); await ev(framesJs(2));
      await shot(`activity-filters-${width}-${theme}`);
-     assert.equal(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .al-preset')].map(b => b.textContent).join('|')`), 'Today|Last 7 days|Last 30 days', `${at}: MUST-12 the Since field has its quick dates`);
-     assert.equal(await ev(`(()=>{const m=document.querySelector('.inbox-folder-toolbar .list-bar-menu'), r=m.getBoundingClientRect(); const scrolls = /auto|scroll/.test(getComputedStyle(m).overflowY); /* a phone's sheet scrolls inside itself: its controls are reached by scrolling */ const bad = [...m.querySelectorAll('select, input, .al-preset')].filter(e => e.getClientRects().length && e.getBoundingClientRect().width > 4 && ((!scrolls && e.getBoundingClientRect().bottom > r.bottom + 1) || e.getBoundingClientRect().right > r.right + 1)).map(e => (e.id || e.className) + ':' + Math.round(e.getBoundingClientRect().right) + '/' + Math.round(r.right) + ',' + Math.round(e.getBoundingClientRect().bottom) + '/' + Math.round(r.bottom)); return (!bad.length && (scrolls || m.scrollHeight <= m.clientHeight + 1)) || JSON.stringify(bad)})()`), true, `${at}: MUST-11 every Filters control sits inside the panel (Action, Since, Sort, Group by are reachable)`);
+     assert.equal(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .al-preset')].map(b => b.textContent).join('|')`), 'Today|Last 7 days|Last 30 days', `${at}: the Since field has its quick dates`);
      await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`); await ev(framesJs(2));
-     await ev(`document.querySelector('details.al-versions').open=false; document.querySelector('details.al-qa > summary').click(); true`); await ev(framesJs(2));
-     assert.ok(await ev(`document.querySelectorAll('details.al-qa[open] .al-qa-msg').length>=2`), `${at}: the Q&A preview shows its messages`);
-     await shot(`activity-qa-${width}-${theme}`);
-     await ev(`document.querySelector('details.al-qa').open=false; [...document.querySelectorAll('.al-row[data-kind="file"] button.al-title')].find(b => /promo-cut-1/.test(b.textContent)).click(); true`); await ev(framesJs(3));
+     await ev(`[...document.querySelectorAll('.al-row[data-kind="file"] button.al-title')].find(b => /promo-cut-1/.test(b.textContent)).click(); true`); await ev(framesJs(3));
      assert.ok(await ev(`!!document.querySelector('.activity-file-dialog .activity-file-series')`), `${at}: the file dialog lists the file's versions`);
      await shot(`activity-file-${width}-${theme}`);
      await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.querySelector('.activity-file-dialog')?.closest('dialog, .modal, .coral-dialog')?.remove(); true`);
