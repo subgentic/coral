@@ -12,6 +12,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/logparse"
 )
 
 // Questions to the Operator in their Needs you (#11417). An agent asks the Operator in one of two ways: a post that @mentions them with --ask (an open question of the board), or a wait for their reply
@@ -327,11 +328,20 @@ func (h *BoardHandler) answeredOperatorAsks(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	subjects, links := h.askSubjects(ctx, boardID, askIDsOf(answered))
+	sessions := map[string]string{} // the asker's agent session (#22106: Frontend Dev 3 opens the agent from it): the session the asker's subscription names now, "" when it names none
+	if subs, err := h.bs.ListSubscribers(ctx, boardID); err == nil {
+		for _, sub := range subs {
+			if _, sid := logparse.ParseSessionName(sub.SessionName); sid != "" {
+				sessions[strings.ToLower(sub.SubscriberID)] = sid
+			}
+		}
+	}
 	rows := make([]operatorAskRow, 0, len(answered))
 	for _, a := range answered {
 		text, cut := operatorAskText(a.Content)
 		row := operatorAskRow{Board: boardID, BoardLabel: label, Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339),
-			GoalID: a.GoalID, TaskID: a.TaskID, GoalTitle: links.goalTitle(ctx, a.GoalID), TaskTitle: links.taskTitle(ctx, a.TaskID), MayNoLongerApply: subjects[a.MessageID].MayNoLongerApply}
+			GoalID: a.GoalID, TaskID: a.TaskID, GoalTitle: links.goalTitle(ctx, a.GoalID), TaskTitle: links.taskTitle(ctx, a.TaskID), MayNoLongerApply: subjects[a.MessageID].MayNoLongerApply,
+			SessionID: sessions[strings.ToLower(a.Asker)]}
 		if a.AnswerText != "" {
 			row.AnswerText, _ = operatorAskText(a.AnswerText)
 			row.AnsweredAt = a.AnsweredAt.UTC().Format(time.RFC3339)
