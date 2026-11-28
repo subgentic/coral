@@ -30,8 +30,11 @@ func TestListActiveWaitsNeverTakesTheWriter(t *testing.T) {
 
 	rctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
+	start := time.Now()
 	waits, err := s.ListActiveWaits(rctx, "team")
 	require.NoError(t, err, "a read must not wait for the writer")
+	// The old read ran its expiry UPDATE on the held writer and waited for the whole ctx (ignoring the error), so only the time tells the two apart.
+	require.Less(t, time.Since(start), 500*time.Millisecond, "a read must not queue behind the writer")
 	require.Len(t, waits, 1)
 	require.Equal(t, live.ID, waits[0].ID, "the expired wait is left out")
 	require.NoError(t, tx.Rollback())
