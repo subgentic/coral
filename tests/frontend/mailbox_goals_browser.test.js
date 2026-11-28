@@ -27,6 +27,10 @@ const { coralReady } = require('./helpers/wait');
         const g1 = await mkGoal(A, 'Ship the mailbox', 'One Inbox'), g2 = await mkGoal(A, 'Explore goals', 'Two teams'), g3 = await mkGoal(B, 'Plan the notes', 'Notes ready');
         for (const t of ['One', 'Two', 'Three']) assert.ok((await api('POST', `/api/board/${A}/tasks`, { title: t, body: 'x', created_by: 'orch', priority: 'medium', goal_id: g1 })).status < 300);
 
+        const reportTask = (await api('GET', `/api/board/${A}/tasks`)).body.tasks.find(t => t.goal_id === g1);
+        assert.ok(reportTask, 'real task for decision progress');
+        assert.ok((await api('POST', `/api/board/${A}/tasks/${reportTask.id}/complete`, {subscriber_id:'orch',message:'Report ready',outcome:'success',artifacts:[{name:'report.md',content:'# Report'}]})).status < 300, 'real file for the approved decision progress words');
+
         // #21846 replaces the old table/mail layouts with the same goal ledger at both widths.
         for(const width of [1280,1024,390]){
             await open(width,844,width===390);
@@ -48,6 +52,11 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=3`,'clear search restores every goal');
             await ev(`(()=>{const c=[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent==='Ship the mailbox'),t=c.querySelector('.goal-decision-toggle');if(t.getAttribute('aria-expanded')==='false')t.click();t.dataset.axp='with-tasks';return true;})()`);
             assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent==='Ship the mailbox').textContent.includes('Tasks (3)')`),'task rollup survives in the approved footer');
+            await waitFor(`(()=>{const c=document.querySelector('#group-table-view .goal-decision-card:has([data-goal-id="${g1}"])');return c?.querySelector('.goal-decision-progress')?.textContent.includes('0 of 1 approved · 0 left')})()`, 'file approval progress replaces old task completion words');
+            if(width===390){
+                const targets=await ev(`(()=>{return [...document.querySelectorAll('#group-table-view .goal-decision-toggle')].map(t=>{const r=t.getBoundingClientRect();return {name:t.getAttribute('aria-label'),height:r.height,width:r.width}})})()`);
+                assert.ok(targets.length>=3 && targets.every(t=>t.height>=44&&t.width>=44),'every phone goal heading has a 44px tap target: '+JSON.stringify(targets));
+            }
             const ax=await axName(client,'#group-table-view .goal-decision-toggle[data-goal-id="'+g1+'"]');assert.ok(ax?.name.includes('Ship the mailbox')&&ax.name.includes('Active'),'goal heading has title and state in its accessible name: '+JSON.stringify({width,ax}));
         }
         console.log('PASS Inbox goal ledger: source teams, rollup, search, navigation, accessibility and responsive bounds');
