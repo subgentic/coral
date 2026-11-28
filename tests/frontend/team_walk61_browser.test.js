@@ -34,7 +34,8 @@ const BASE = require('./test_base').BASE;
             const idle = await ev(`[...document.querySelectorAll('#team-panel-agents tbody tr')].map(r=>r.textContent)`);
             check(idle.every(x=>x.includes('Waiting for work') && !/\\bFree\\b/.test(x)), width + ': one idle status: '+JSON.stringify(idle));
             await ev(`import(${S}+'team_page.js').then(m=>m.goTab('goals'))`);
-            await ev(`window.saveTeamFromSidebar(${JSON.stringify(team)});true`);
+            await ev(`window.saveTeamFromSidebar(${JSON.stringify(team)})`);
+            await waitFor(`document.getElementById('prompt-modal')?.getClientRects().length > 0`, 'Save template prompt loaded');
             check(await ev(`/Not skills, goals or the first task/i.test(document.getElementById('prompt-modal-label').textContent)`), width + ': Save template explains exclusions');
             await ev(`window.hidePromptModal();true`);
             // A count response arrives after a person scrolls the strip towards another tab.
