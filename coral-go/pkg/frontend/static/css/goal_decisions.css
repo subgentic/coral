@@ -35,3 +35,5 @@
 .goal-decision-toggle .state-word,.goal-review-desk-title .state-word{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
 /* A task list nested in a goal card stays inside it; the Inbox's full-width tables use negative side margins. */
 #group-table-view[data-group^="hub-inbox:"] .goal-decision-body > .goal-ledger-tasks{margin-inline:0}
+
+.goal-decision-agent-icon{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0}
