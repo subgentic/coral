@@ -1,5 +1,8 @@
 /* A saved or shared team template built from a running team (moved out of team_actions.js, #15311: it is only read when a team is saved or shared, so it stays out of the start bundle). */
 import { state } from './state.js';
+import { showToast } from './utils.js';
+import { showPromptModal } from './prompt_modals.js';
+import { updateSettingList, upsertByName, parseList } from './settings_lists.js';
 import { keyLabel, inTeam, teamFetch, boardFetch } from './server_base.js';
 
 function _buildTeamTemplateFromBoard(boardName) {
@@ -79,4 +82,26 @@ async function _attachWorkingModeToTemplate(boardName, tmpl) {
 export async function templateFromBoard(boardName) {
     const tmpl = _buildTeamTemplateFromBoard(boardName);
     return tmpl && await _attachWorkingModeToTemplate(boardName, await _attachKnowledgeToTemplate(boardName, tmpl));
+}
+
+export function saveTeamFromSidebar(boardName) {
+    showPromptModal('Save team template', 'Name. Saves: members, models, thinking, modes, working mode, instructions. Not skills, goals or the first task.', keyLabel(boardName), async (templateName) => {
+        const tmpl = await templateFromBoard(boardName);
+        if (!tmpl) {
+            showToast("No agents found on this board", "error");
+            return;
+        }
+        tmpl.name = templateName;
+
+        // into the list the server has now (#4423)
+        try {
+            const { raw } = await updateSettingList("saved_team_templates", list => upsertByName(list, [tmpl]),
+                { local: parseList(state.settings.saved_team_templates, []) });
+            state.settings.saved_team_templates = raw;
+        } catch {
+            showToast("Could not save the template", "error");
+            return;
+        }
+        showToast(`Saved template "${templateName}" (${tmpl.agents.length} agents)`);
+    });
 }
