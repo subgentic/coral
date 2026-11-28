@@ -425,7 +425,6 @@
 1	sidebar_rail.js	style
 1	sidebar_rail.js	unread > 9 ? '9+' : unread
 1	status_groups.js	sum
-1	status_groups.js	toggle
 1	subagents.js	_formatTokenCount(n || 0)
 1	subagents.js	extraClass
 1	subagents.js	field('API Calls', sa.api_calls ? String(sa.api_calls) : '')
