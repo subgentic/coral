@@ -10,7 +10,7 @@ type CurrentTask struct {
 	ID     int64  `json:"id"`
 	Title  string `json:"title"`
 	Status string `json:"status"` // "in_progress" or "pending" (queued)
-	// GoalID and GoalTitle: the goal the task belongs to (#22093), absent for none.
+	// GoalID and GoalTitle: the goal the task belongs to (#22093), absent for none and when the agent has two tasks in progress (#22112).
 	GoalID    int64  `json:"goal_id,omitempty"`
 	GoalTitle string `json:"goal_title,omitempty"`
 }
@@ -44,13 +44,19 @@ func (s *Store) CurrentTasks(ctx context.Context) (map[string]CurrentTask, error
 	out := make(map[string]CurrentTask, len(rows))
 	for _, r := range rows {
 		k := CurrentTaskKey(r.BoardID, r.Assignee)
-		if _, seen := out[k]; !seen {
-			ct := CurrentTask{ID: r.ID, Title: r.Title, Status: r.Status}
-			if r.GoalID != nil && r.GoalTitle != nil {
-				ct.GoalID, ct.GoalTitle = *r.GoalID, *r.GoalTitle
+		if first, seen := out[k]; seen {
+			// An agent with two tasks in progress is on no single goal: the goal is left out rather than guessed (#22112). Rows come in progress first, so a second in_progress row is that case.
+			if r.Status == "in_progress" && first.Status == "in_progress" && first.GoalID != 0 {
+				first.GoalID, first.GoalTitle = 0, ""
+				out[k] = first
 			}
-			out[k] = ct
+			continue
 		}
+		ct := CurrentTask{ID: r.ID, Title: r.Title, Status: r.Status}
+		if r.GoalID != nil && r.GoalTitle != nil {
+			ct.GoalID, ct.GoalTitle = *r.GoalID, *r.GoalTitle
+		}
+		out[k] = ct
 	}
 	return out, nil
 }
