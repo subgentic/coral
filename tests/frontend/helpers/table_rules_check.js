@@ -177,17 +177,27 @@ module.exports.run = GROUP => (async () => {
                     const sample = await ev(`(() => {
                         const cards = [...document.querySelectorAll('#group-table-view .goal-decision-card')];
                         return { overflow: document.documentElement.scrollWidth - innerWidth, cards: cards.map(c => {
-                            const t = c.querySelector('.goal-decision-title'), b = c.getBoundingClientRect(), r = t.getBoundingClientRect(), toggle = c.querySelector('.goal-decision-toggle'), hit = toggle.getBoundingClientRect();
-                            return { title: t.textContent, id: c.querySelector('.goal-decision-id')?.textContent, state: c.querySelector('.goal-decision-state')?.getAttribute('aria-label'), source: c.querySelector('.goal-decision-team')?.textContent, bounded: r.left >= b.left - 1 && r.right <= b.right + 1 && b.left >= -1 && b.right <= innerWidth + 1, hit: { width: hit.width, height: hit.height }, expanded: toggle.getAttribute('aria-expanded') };
+                            const t = c.querySelector('.goal-decision-title'), b = c.getBoundingClientRect(), r = t.getBoundingClientRect(), toggle = c.querySelector('.goal-decision-toggle'), hit = (innerWidth === 390 ? c.querySelector('.goal-decision-head') : toggle).getBoundingClientRect(), menu = c.querySelector('.gl-menu>button').getBoundingClientRect();
+                            return { title: t.textContent, id: c.querySelector('.goal-decision-id')?.textContent, state: c.querySelector('.goal-decision-state')?.getAttribute('aria-label'), source: c.querySelector('.goal-decision-team')?.textContent, bounded: r.left >= b.left - 1 && r.right <= b.right + 1 && b.left >= -1 && b.right <= innerWidth + 1, hit: { width: hit.width, height: hit.height }, menu: { width: menu.width, height: menu.height }, expanded: toggle.getAttribute('aria-expanded') };
                         }) };
                     })()`);
                     assert.equal(sample.cards.length, 3, 'all three seeded goals remain visible');
                     assert.ok(sample.cards.every(c => c.id?.startsWith('#') && c.title && c.state && c.source?.includes(B)), 'goal identity, state and source remain explicit');
                     assert.ok(sample.overflow <= 1 && sample.cards.every(c => c.bounded), `ledger at ${w}px / ${text}% fits: ` + JSON.stringify(sample));
-                    if (w === 390) assert.ok(sample.cards.every(c => c.hit.width >= 44 && c.hit.height >= 44), 'phone heading controls are at least 44x44: ' + JSON.stringify(sample));
+                    // Designer #286747 / Orchestrator #286752: the compact arrow uses the full row background as its phone fold target.
+                    if (w === 390) {
+                        assert.ok(sample.cards.every(c => c.hit.width >= 44 && c.hit.height >= 44), 'phone row-background fold targets are at least 44x44: ' + JSON.stringify(sample));
+                        assert.ok(sample.cards.every(c => c.menu.width >= 44 && c.menu.height >= 44), 'phone goal menus remain at least 44x44: ' + JSON.stringify(sample));
+                    }
                     const expanded = sample.cards[0].expanded;
                     await ev(`document.querySelector('#group-table-view .goal-decision-toggle').click(); true`);
                     assert.notEqual(await ev(`document.querySelector('#group-table-view .goal-decision-toggle').getAttribute('aria-expanded')`), expanded, 'heading still collapses and expands');
+                    if (w === 390) {
+                        const point = await ev(`(() => { const h = document.querySelector('#group-table-view .goal-decision-head'); h.scrollIntoView({block:'center'}); const r = h.getBoundingClientRect(), x = r.left + 4, y = r.top + r.height / 2, target = document.elementFromPoint(x, y); return {x,y,background: !!target && target.closest('.goal-decision-head') === h && !target.closest('button,a')}; })()`);
+                        assert.ok(point.background, 'physical phone tap lands on the row fold target, outside links and menu');
+                        await mouse('mousePressed', point.x, point.y); await mouse('mouseReleased', point.x, point.y);
+                        assert.equal(await ev(`document.querySelector('#group-table-view .goal-decision-toggle').getAttribute('aria-expanded')`), expanded, 'physical row-background tap reverses the arrow fold at both text sizes');
+                    }
                     report.checked++; (report.samples ||= {})[kind + ' ' + w + '/' + text] = sample;
                     await ev(`document.documentElement.style.fontSize = ''; true`);
                 }
