@@ -655,6 +655,7 @@
         display: grid;
         grid-template-columns: auto auto;
         align-items: center;
+        max-width: none;
         gap: 2px 4px;
     }
 
@@ -814,4 +815,9 @@
 @media(max-width:767px) {
     .nl-file .nl-side .nl-when { grid-column: 1 / -1; justify-self: end; }
     .nl-file .nl-side .nl-hover-actions { display: none; }
+}
+
+@media(max-width:767px) {
+    body[data-nav-tab=hub-inbox]:has(.needs-ledger.nl-tools-open) #top-phone-bar { flex-wrap: wrap; }
+    body[data-nav-tab=hub-inbox]:has(.needs-ledger.nl-tools-open) #top-phone-bar .phone-bar-search { display: block; order: 10; flex: 1 0 100%; }
 }
