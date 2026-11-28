@@ -114,7 +114,7 @@ func (s *Store) ensureWaitsSchema(ctx context.Context) error {
 // ExpiredOperatorQuestions are the operator waits with a question whose time ran out unanswered and that have not been kept yet (#11919): the Operator's Needs you shows an active wait only, so the question would
 // leave it with no trace. Asking first expires any wait that is past its time.
 func (s *Store) ExpiredOperatorQuestions(ctx context.Context, project string) ([]RegisteredWait, error) {
-	if _, err := s.ListActiveWaits(ctx, project); err != nil {
+	if err := s.expireDueWaits(ctx, project); err != nil {
 		return nil, err
 	}
 	var waits []RegisteredWait
@@ -261,7 +261,8 @@ func (s *Store) GetActiveWait(ctx context.Context, project, subscriberID string)
 	return &wait, nil
 }
 
-// ListActiveWaits returns all active waits on a project, expiring any whose timeout has elapsed.
+// ListActiveWaits returns the active waits on a project whose time has not run out. It only reads: a wait past its time is left out here and is marked expired by the background pass
+// (DispatchExpiredWaitNotices) or by ExpiredOperatorQuestions, never from a read path, so the board status read does not queue behind the single writer (#22160, coral-hub #286989).
 func (s *Store) ListActiveWaits(ctx context.Context, project string) ([]RegisteredWait, error) {
 	var waits []RegisteredWait
 	err := s.reader().SelectContext(ctx, &waits,
@@ -274,15 +275,24 @@ func (s *Store) ListActiveWaits(ctx context.Context, project string) ([]Register
 	var active []RegisteredWait
 	for _, w := range waits {
 		if t, parseErr := time.Parse(time.RFC3339, w.ExpiresAt); parseErr == nil && now.After(t) {
-			_, _ = s.db.ExecContext(ctx,
-				"UPDATE board_waits SET status = 'expired', resolved_at = ? WHERE id = ? AND status = 'active'",
-				now.Format(time.RFC3339), w.ID)
-			s.waitChanges.signal()
 			continue
 		}
 		active = append(active, w)
 	}
 	return active, nil
+}
+
+// expireDueWaits marks this project's waits that ran out as expired, on the writer. Only a caller that must see them as expired (ExpiredOperatorQuestions) calls it.
+func (s *Store) expireDueWaits(ctx context.Context, project string) error {
+	now := nowUTC()
+	res, err := s.db.ExecContext(ctx, "UPDATE board_waits SET status='expired', resolved_at=? WHERE project=? AND status='active' AND expires_at<=?", now, project, now)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		s.waitChanges.signal()
+	}
+	return nil
 }
 
 // CancelActiveWait cancels any active wait for a subscriber on a project.
