@@ -21,7 +21,7 @@ export function needsGroupButton(value, change) {
 }
 export function needsLedger(cfg) {
     const { rows, state, keyOf, about, unread, name, source, actions, open, agentLink, teamLink, goalLink, taskLink, bulkActions, eligible } = cfg;
-    const root = el('section', 'needs-ledger'); root.setAttribute('aria-label', 'Needs you');
+    const root = el('section', 'needs-ledger'); root.setAttribute('aria-label', 'Needs you'); root.classList.toggle('nl-tools-open', !!state.toolsOpen);
     const summary = el('div', 'nl-summary'), lists = el('div', 'nl-lists'); root.append(summary, lists);
     const phoneHeader = document.getElementById('top-phone-bar'), phoneSummary = phoneHeader?.querySelector('.nl-phone-summary') || el('span', 'nl-phone-summary'); phoneHeader?.append(phoneSummary);
     let selecting = state.select || state.selected.size > 0;
@@ -40,7 +40,7 @@ export function needsLedger(cfg) {
         for (const { input, items } of checks) { const available = items.filter(eligible), n = available.filter(r => state.selected.has(keyOf(r))).length; input.checked = n > 0 && n === available.length; input.indeterminate = n > 0 && n < available.length; input.disabled = !available.length; }
         root.querySelectorAll('[data-needs-key]').forEach(n => n.classList.toggle('nl-is-selected', state.selected.has(n.dataset.needsKey)));
         const phoneFocus = phoneSummary.contains(document.activeElement) ? (document.activeElement.classList.contains('nl-phone-count') ? '.nl-phone-count' : '.nl-phone-select') : '';
-        phoneSummary.replaceChildren(el('strong', 'nl-phone-title', 'Needs you'), button(`${rows.length} · ${rows.filter(unread).length} new`, 'btn btn-quiet nl-phone-count', () => { root.classList.toggle('nl-tools-open'); phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-expanded', String(root.classList.contains('nl-tools-open'))); }), button(selecting || selected.length ? 'Cancel' : 'Select', 'btn btn-quiet nl-phone-select', () => { if (selecting || state.selected.size) api.clear(); else { selecting = true; sync(); } }));
+        phoneSummary.replaceChildren(el('strong', 'nl-phone-title', 'Needs you'), button(`${rows.length} · ${rows.filter(unread).length} new`, 'btn btn-quiet nl-phone-count', () => { state.toolsOpen = root.classList.toggle('nl-tools-open'); phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-expanded', String(root.classList.contains('nl-tools-open'))); }), button(selecting || selected.length ? 'Cancel' : 'Select', 'btn btn-quiet nl-phone-select', () => { if (selecting || state.selected.size) api.clear(); else { selecting = true; sync(); } }));
         phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-label', 'Show Needs you search and filters');
         if (phoneFocus) phoneSummary.querySelector(phoneFocus)?.focus({ preventScroll: true });
         summary.replaceChildren(checkboxTop, el('strong', '', selected.length ? `${selected.length} selected` : `${rows.length} items`));
@@ -62,17 +62,18 @@ export function needsLedger(cfg) {
     function more(side, entries, label) {
         if (!entries.length) return;
         const details = el('details', 'nl-more'), toggle = el('summary', 'nl-more-toggle'); toggle.setAttribute('aria-label', `More actions for ${safe(label)}`); toggle.append(icon('more_horiz')); details.append(toggle);
-        const menu = el('div', 'menu nl-menu'); menu.setAttribute('role', 'menu'); for (const entry of entries) { const item = button(entry.label, 'menu-item', () => { details.open = false; entry.run(); }); item.setAttribute('role', 'menuitem'); menu.append(item); } details.append(menu); side.append(details);
+        const menu = el('div', 'menu nl-menu'); menu.setAttribute('popover', 'manual'); menu.setAttribute('role', 'menu'); for (const entry of entries) { const item = button(entry.label, 'menu-item', () => { details.open = false; entry.run(); }); item.setAttribute('role', 'menuitem'); menu.append(item); } details.append(menu); side.append(details);
         details.addEventListener('keydown', e => { const items = [...menu.querySelectorAll('button')], index = menuMove(e.key, items.length, items.indexOf(document.activeElement)); if (index >= 0) { e.preventDefault(); e.stopPropagation(); details.open = true; items[index].focus(); } });
         details.addEventListener('focusout', e => { if (!details.contains(e.relatedTarget)) details.open = false; });
         details.addEventListener('toggle', () => {
-            if (!details.open) return;
+            if (!details.open) { menu.hidePopover(); return; }
+            menu.showPopover();
             root.querySelectorAll('details[open]').forEach(other => { if (other !== details) other.open = false; });
             const edge = toggle.getBoundingClientRect();
             menu.style.position = 'fixed'; menu.style.top = '0px'; menu.style.right = 'auto';
             const width = menu.getBoundingClientRect().width, height = menu.getBoundingClientRect().height;
             menu.style.left = `${Math.max(8, Math.min(edge.right - width, innerWidth - width - 8))}px`;
-            menu.style.top = `${Math.max(8, Math.min(edge.bottom, innerHeight - height - 8))}px`;
+            menu.style.top = `${Math.max(8, edge.bottom + height > innerHeight - 8 ? edge.top - height : edge.bottom)}px`;
             menu.style.maxHeight = `${innerHeight - 16}px`; menu.style.overflowY = 'auto';
         });
     root.addEventListener('keydown', e => { if (e.key === 'Escape' && details.open) { e.preventDefault(); e.stopPropagation(); details.open = false; toggle.focus(); } });
@@ -85,14 +86,14 @@ export function needsLedger(cfg) {
         r.append(!row.review && !isPermission && !isQuestion ? cfg.kindIcon(row) : icon(kindIcon, row.review ? 'File for review' : isPermission ? 'Permission prompt' : 'Question'), body, side);
         const words = safe(cfg.words(row)).replace(/^\s*@Operator\s*:?\s*/i, ''), lines = words.split('\n').filter(Boolean);
         const title = row.review ? safe(row.review.name) : isPermission ? `${safe(name(row))} ${/^Wants to edit a file outside/i.test(words) ? 'wants to edit a file outside its folder' : /^Wants to run:/i.test(words) ? 'wants to run a command' : 'needs permission'}` : isQuestion ? lines[0] || 'Question' : safe(name(row));
-        const heading = el('div', 'nl-title', isQuestion && title.length > 160 ? title.slice(0,159)+'…' : title); r.setAttribute('aria-label', title);
+        const heading = el('div', 'nl-title', title); r.setAttribute('aria-label', title);
         if (row.review) { const fileButton = button(title, 'nl-file-open', () => open(row)); heading.replaceChildren(fileButton); if (Number(row.review.version) > 1) fileButton.append(el('span', 'nl-version', `version ${row.review.version}`)); }
         body.append(heading);
         if (row.review) { const note = cfg.fileQuestion(row); if (note) heading.querySelector('.nl-file-open').append(el('span', 'nl-meta', safe(cfg.quoteFileQuestion(row) ? `"${note}"` : note))); }
         else body.append(meta(row, flat));
         const contextNote = cfg.contextNote(row); if (contextNote) body.append(el('div', 'nl-meta', safe(contextNote)));
         if (!row.review && !isQuestion && !isPermission && words) body.append(el('div', 'nl-other-text', words));
-        if (isQuestion && (lines.length > 1 || title.length > 160)) { const box = el('div', 'nl-question-box'), text = title.length > 160 ? words : lines.slice(1).join('\n'); cfg.questionBox(box, row, text); body.append(box); }
+        if (isQuestion && lines.length > 1) { const box = el('div', 'nl-question-box'), text = lines.slice(1).join('\n'); cfg.questionBox(box, row, text); body.append(box); }
         if (isQuestion) { const extra = cfg.questionExtra?.(row); if (extra) body.append(extra); }
         if (isPermission) body.append(el('code', 'nl-command', words.replace(/^Wants to (?:run|edit a file outside its folder):\s*/i, '')));
         let actionNode = actions(row);

@@ -26,6 +26,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             window.fetch = (url, opts = {}) => { const reviewPageURL = new URL(String(url), location.href), reviewPage = reviewPageURL.pathname === '/api/team-artifacts' ? window.__reviewFixturePage(reviewPageURL, location.href, {'qn': window.__items}) : null; if (reviewPage) return json(reviewPage); const u = window.__reviewFixtureURL(String(url), location.origin);
                 if (u.pathname.endsWith('/chat')) { if (decodeURIComponent(u.pathname).includes('Agent 1')) return json({ messages: [], prompt_options: { ask_id: 'a1', question: 'Which database?', options: ['Postgres', 'MySQL', 'SQLite', 'DuckDB'].map((label, i) => ({ n: i + 1, label, action: 'select' })) } }); }
                 if (u.pathname.startsWith('/api/artifacts/')) return Promise.resolve(new Response('Review preview text', { headers: { 'Content-Type': 'text/plain' } }));
+                if (u.pathname === '/api/board/qn/tasks/9') return json({id:9,title:'Draft the notes',status:'pending',assigned_to:'Operator',created_by:'Writer',created_at:new Date().toISOString(),updated_at:new Date().toISOString(),goal_id:4,goal_title:'Ship the release notes',description:'Draft the release notes.'});
                 if (u.pathname === '/api/operator-asks') return json(window.__asks);
                 if (u.pathname !== '/api/board/qn/artifacts') return original(url, opts);
                 return json({ project: 'qn', artifacts: window.__items.filter(a => !u.searchParams.has('tag') || a.tags.includes(u.searchParams.get('tag'))), has_more: false }); }; return true; })()`);
@@ -46,7 +47,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const pk = await ev(`(() => { const tr = [...document.querySelectorAll('${T} .nl-row')].find(t => t.textContent.includes('Agent 1')); return tr ? { btns: [...tr.querySelectorAll('button')].map(b => b.textContent.trim()), more: !!tr.querySelector('.inbox-more-choices') } : null; })()`);
             check(pk && pk.more && pk.btns.filter(x => ['Postgres', 'MySQL'].includes(x)).length === 2 && !pk.btns.includes('SQLite') && !pk.btns.includes('DuckDB'), `${w}: four choices show the first two and More choices (${JSON.stringify(pk)})`);
             await ev(`[...document.querySelectorAll('${T} .nl-question .nl-meta a')].find(a => /task #9/.test(a.textContent)).click(); true`);
-            check(await waitFor(`!!document.querySelector('#inbox-page .ibx-reply-input')`, 'the task page', 8000).then(() => true, () => false), `${w}: the task link leaves the list for the task in the Inbox`);
+            check(await waitFor(`!!document.querySelector('#inbox-page .team-task-page') && document.querySelector('#inbox-page .team-task-page').textContent.includes('Draft the notes')`, 'the task page', 8000).then(() => true, () => false), `${w}: the task link leaves the list for the task in the Inbox`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs'))`); await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 4`, 'back to Needs you', 20000);
         }
     } finally { await client.close(); await removeBoards(ev, ['qn']).catch(() => {}); if (failures.length) { console.error(failures.join('\n')); process.exitCode = 1; } else console.log('ok'); }
