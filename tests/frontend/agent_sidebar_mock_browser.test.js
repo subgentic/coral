@@ -35,14 +35,42 @@ const { setTheme } = require('./helpers/contrast');
     T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
    await scene();
    const root = `#${listId}`;
-   await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 1`, `${width}: the agents are listed`);
-   console.log(width, 'rows', await ev(`document.querySelectorAll('${root} .session-group-item').length`), 'visible list', await ev(`document.querySelector('${root}')?.getClientRects().length`));
-   if (process.env.SIDEBAR_DEBUG) console.log(width, JSON.stringify(await ev(`[...document.querySelectorAll('${root} .board-card-agents > *')].slice(0,4).map(e=>{const r=e.getBoundingClientRect(),cs=getComputedStyle(e);return [e.className.slice(0,40),Math.round(r.top),Math.round(r.height),cs.marginTop,cs.marginBottom,cs.minHeight,cs.paddingTop]})`)));
+   await waitFor(`document.querySelectorAll('${root} .session-group-item').length === 12`, `${width}: every agent is a row (no fold)`);
+   const R = n => `[...document.querySelectorAll('${root} .session-group-item')].find(r => r.querySelector('.session-label').textContent.trim() === '${n}')`;
+   // 1. one mark, four meanings, named
+   const marks = await ev(`Object.fromEntries(['Designer','Frontend Dev','QA','Copy Editor'].map(n => { const d = [...document.querySelectorAll('${root} .session-group-item')].find(r => r.querySelector('.session-label').textContent.trim() === n).querySelector('.session-dot'); return [n, [d.getAttribute('aria-label'), d.getClientRects().length > 0]]; }))`);
+   assert.deepEqual(marks, { Designer: ['Working', true], 'Frontend Dev': ['Awake, waiting', true], QA: ['Needs you', true], 'Copy Editor': ['Asleep', true] }, `${width}: the four marks ` + JSON.stringify(marks));
+   // 2. the task line: #N is the one link, the title is not; no state pill in a row
+   const tline = await ev(`(() => { const t = ${R('Frontend Dev')}.querySelector('.session-task-line'), a = t.querySelector('.task-id-link'); return { text: t.textContent, link: a && a.textContent, role: a && a.getAttribute('role'), links: t.querySelectorAll('[role=link], a').length, pills: document.querySelectorAll('${root} .session-group-item .session-state-pill').length }; })()`);
+   assert.deepEqual(tline, { text: '#412Guest checkout: address form', link: '#412', role: 'link', links: 1, pills: 0 }, `${width}: the task line ` + JSON.stringify(tline));
+   // 3. queued: a tag at the right, after the name's spacer and before the time
+   assert.equal(await ev(`(() => { const r = ${R('Frontend Dev 2')}, q = r.querySelector('.status-queued'), t = r.querySelector('.session-time'); return q.textContent + ':' + (q.getBoundingClientRect().right <= t.getBoundingClientRect().left) + ':' + (q.getBoundingClientRect().left > r.querySelector('.session-label').getBoundingClientRect().right); })()`), 'queued:true:true', `${width}: "queued" sits at the right, before the time`);
+   // 4. headings like the other pages, the team line quiet, archived in one fold, Group by names the grouping
+   assert.deepEqual(await ev(`[...document.querySelectorAll('${root} .status-sub')].map(h => h.querySelector('.status-name').textContent + ' ' + h.querySelector('.session-group-count').textContent)`), ['On a task 7', 'No task 4'], `${width}: the headings (asleep agents stay in their group)`);
+   assert.deepEqual(await ev(`(() => { const h = document.querySelector('${root} .session-team-group > .board-card-header'); return [h.querySelector('.session-group-count').textContent, !!h.querySelector('.team-group-icon, .team-health-btn')]; })()`), ['12', false], `${width}: the team line is its name and count`);
+   assert.equal(await ev(`document.querySelector('${root} .archived-summary-row .row-btn').innerText.replace(/\\s+/g, ' ').trim()`), 'Archived 3 ▾', `${width}: one Archived fold`);
+   assert.equal(await ev(`[...document.querySelectorAll('[data-group-by-label]')].filter(b => b.getClientRects().length).map(b => b.closest('button').textContent.replace('expand_more', '').replace(/\\s+/g, ' ').trim()).join()`), 'Group by: Team, Task', `${width}: Group by beside the search box names the grouping`);
+   assert.equal(await ev(`document.querySelectorAll('[data-phone-chip], .sidebar-header[data-header="agents"] [data-group-toggle], .mobile-list-header [data-group-toggle]').length`), 0, `${width}: no status pills and no expand/collapse-all (the Orchestrator's calls 2 and 3)`);
+   // 5. the time and "⋯": a hover swaps them on a wide screen; a phone shows both, the ⋯ 44 by 44, rows 48 high
+   const rt = n => ev(`(() => { const r = ${R(n)}, t = r.querySelector('.session-time'), k = r.querySelector('.sidebar-kebab-btn'), kr = k.getBoundingClientRect(); return { time: t.getClientRects().length > 0, more: k.getClientRects().length > 0, w: Math.round(kr.width), h: Math.round(kr.height), row: Math.round(r.getBoundingClientRect().height) }; })()`);
+   if (mobile) {
+    const a = await rt('Reviewer');
+    assert.ok(a.time && a.more && a.w >= 44 && a.h >= 44 && a.row >= 48, `390: time and ⋯ on every row, 44 by 44, rows 48 high ` + JSON.stringify(a));
+   } else {
+    assert.deepEqual(await rt('Reviewer').then(a => [a.time, a.more]), [true, false], '1280: at rest the time, no ⋯');
+    const box = await ev(`(() => { const b = ${R('Writer')}.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+    await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: box.x, y: box.y }); await ev(framesJs(2));
+    assert.deepEqual(await rt('Writer').then(a => [a.time, a.more]), [false, true], '1280: a hover swaps the time for ⋯');
+    await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 700, y: 900 });
+   }
+   // 6. a click on #N opens the task, never the agent
+   await ev(`window.__opened = []; ${R('Frontend Dev')}.querySelector('.task-id-link').click(); true`);
+   assert.equal(await ev(`!!${R('Frontend Dev')}.classList.contains('active')`), false, `${width}: #N does not select the agent`);
    for (const theme of ['dark', 'light']) {
     await setTheme(ev, theme); await ev(framesJs(4));
     if (shots) { fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
    }
   }
-  console.log('PASS agent sidebar: the mock roster drawn at 1280 and 390, light and dark');
+  console.log('PASS agent sidebar (#22105): four marks, #N the one link, queued at the right, the time/⋯ swap, quiet headings and team line, one Archived fold, Group by named; 1280 and 390, light and dark');
  } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

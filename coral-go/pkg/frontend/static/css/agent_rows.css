@@ -5,7 +5,7 @@
 :is(#live-sessions-list, #mobile-session-list) .session-group-item:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item.active, :is(#live-sessions-list, #mobile-session-list) .session-group-item.active:hover { background: color-mix(in srgb, var(--accent-dim) 20%, transparent); box-shadow: none; }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .drag-grip, :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-status-line { display: none; }
-:is(#live-sessions-list, #mobile-session-list) .session-group-item .session-name-row { display: flex; align-items: center; gap: 6px; min-height: 21px; }
+:is(#live-sessions-list, #mobile-session-list) .session-group-item .session-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; min-height: 21px; }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-label { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; font-weight: var(--fw-strong); line-height: 21px; color: var(--text-primary); }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-label-name, :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-label .sln-head, :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-label .sln-tail { color: inherit; font-weight: inherit; }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item.sleeping .session-label { color: var(--text-secondary); font-weight: var(--fw-medium); }
@@ -44,16 +44,18 @@
 /* archived agents: one quiet fold at the bottom */
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row { min-height: 0; margin: 10px 8px 0 34px; padding: 0; border: 0; }
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .row-btn { gap: 6px; padding: 0; min-height: 0; font-size: 12.5px; font-style: normal; color: var(--text-secondary); }
+:is(#live-sessions-list, #mobile-session-list) .archived-summary-row .sleeping-summary-label { font-style: normal; }
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .archived-n { color: var(--text-muted); }
 /* Group by beside the search box */
-.sidebar-header[data-header="agents"] { flex-wrap: nowrap; }
-.sidebar-header[data-header="agents"] .sidebar-search { flex: 1 1 0; min-width: 0; }
-.sidebar-groupby-btn { flex: none; height: 30px; gap: 4px; padding: 0 9px; border: 1px solid var(--control-border); border-radius: 6px; font-size: 12.5px; font-weight: 400; white-space: nowrap; }
-.sidebar-groupby-btn b { font-weight: var(--fw-strong); margin-inline-start: 2px; }
+.sidebar-header[data-header="agents"] { flex-wrap: nowrap; justify-content: flex-start; gap: 6px; }
+.sidebar-header[data-header="agents"] .sidebar-search { flex: 1 1 auto; min-width: 5em; }
+.sidebar-groupby-btn { display: inline-flex; align-items: center; margin: 0; flex: 0 0 auto; width: auto; max-width: none; min-width: 0; overflow: hidden; height: 30px; gap: 2px; padding: 0 6px 0 9px; border: 1px solid var(--control-border); border-radius: 6px; font-size: 12.5px; font-weight: 400; white-space: nowrap; }
+.sidebar-groupby-btn b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-strong); margin-inline-start: 2px; } /* a narrow sidebar cuts the words, never the search box */
 .sidebar-groupby-btn .material-icons { font-size: 16px; }
 /* a phone: nothing behind a hover. Every row keeps its time and has its "⋯" (44 by 44); rows are at least 48 high */
 @media (max-width: 767px), (pointer: coarse) {
     :is(#live-sessions-list, #mobile-session-list) .session-group-item { min-height: 48px; padding-right: 0 !important; }
+    :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-name-row > .btn:is([data-mode="wake"], [data-mode="sleep"]) { display: none; } /* Wake and Sleep are in the row's ⋯ (nothing rides on a hover here) */
     :is(#live-sessions-list, #mobile-session-list) .session-group-item .sidebar-kebab-wrapper, :is(#live-sessions-list, #mobile-session-list) .session-group-item:is(:hover, :focus-within) .sidebar-kebab-wrapper { display: block; }
     :is(#live-sessions-list, #mobile-session-list) .session-group-item:is(:hover, :focus-within, :has(.sidebar-kebab-btn[aria-expanded="true"])) .session-time { display: inline; }
     :is(#live-sessions-list, #mobile-session-list) .session-group-item .sidebar-kebab-btn { width: 44px; height: 44px; margin: -11px 0; background: transparent; color: var(--text-secondary); }
