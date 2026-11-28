@@ -789,3 +789,25 @@
 .nl-summary > .nl-check-hit { align-self: center; margin-top: 0; }
 #group-table-view:has(.needs-ledger) .inbox-filter-hidden { padding-left: 14px; }
 @media (max-width: 767px) { .nl-group-head:not(.nl-goal) .nl-group-toggle { display: flex; align-items: flex-end; } }
+
+/* Keep bulk controls in the scrolling workspace, including narrow phones. */
+@media(max-width:767px) {
+    .nl-has-selection .nl-summary {
+        position: sticky;
+        top: 0;
+        z-index: 6;
+        background: var(--bg-primary);
+        flex-wrap: nowrap;
+        gap: 4px;
+        padding: 4px 0;
+    }
+    .nl-has-selection .nl-summary > .nl-check-hit { display: none; }
+    .nl-has-selection .nl-summary > strong { white-space: nowrap; }
+    .needs-ledger.nl-has-selection .nl-summary .btn { padding-inline: 6px; }
+}
+
+@media(max-width:767px) {
+    .nl-file .nl-side { display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px 4px; }
+    .nl-file .nl-side .nl-when { grid-column: 1 / -1; justify-self: end; }
+    .nl-file .nl-side .nl-hover-actions { display: none; }
+}

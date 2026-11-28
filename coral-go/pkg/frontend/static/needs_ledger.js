@@ -13,8 +13,8 @@ const safe = s => markHidden(String(s || ''), { strict: true });
 const button = (label, cls, run) => { const b = el('button', cls, label); b.type = 'button'; b.addEventListener('click', e => { e.stopPropagation(); run(e); }); return b; };
 const icon = (name, label) => { const i = el('span', 'material-icons nl-icon', name); if (label) { i.setAttribute('role', 'img'); i.setAttribute('aria-label', label); } else i.setAttribute('aria-hidden', 'true'); return i; };
 const timeOf = r => Date.parse(r.waiting_since || r.operatorAsk?.at || r.review?.created_at || '') || 0;
-const question = r => !!r.operatorAsk || r.waiting_kind === 'ask' || r.waiting_kind === 'question';
-const permission = r => r.waiting_kind === 'permission';
+const question = r => !!r.operatorAsk || r.waiting_kind === 'ask' || r.waiting_kind === 'question' || /^Wants to know:/i.test(r.waiting_summary || '');
+const permission = r => r.waiting_kind === 'permission' && !question(r);
 export function needsGroupButton(value, change) {
     const box = sharedMenu('needs-group-by', ['goal', 'none'].map(mode => ({ label: mode === 'goal' ? 'Goal' : 'None', pressed: value === mode, run: () => change(mode) })), { label: 'Group by', wrapClass: 'task-more nl-visible-group' });
     const b = box.querySelector('button'); b.replaceChildren(document.createTextNode('Group by: '), el('b', '', value === 'none' ? 'None' : 'Goal'), icon('expand_more')); b.setAttribute('aria-label', b.textContent.replace('expand_more', '').trim()); return box;
@@ -63,7 +63,16 @@ export function needsLedger(cfg) {
         const menu = el('div', 'menu nl-menu'); menu.setAttribute('role', 'menu'); for (const entry of entries) { const item = button(entry.label, 'menu-item', () => { details.open = false; entry.run(); }); item.setAttribute('role', 'menuitem'); menu.append(item); } details.append(menu); side.append(details);
         details.addEventListener('keydown', e => { const items = [...menu.querySelectorAll('button')], index = menuMove(e.key, items.length, items.indexOf(document.activeElement)); if (index >= 0) { e.preventDefault(); e.stopPropagation(); details.open = true; items[index].focus(); } });
         details.addEventListener('focusout', e => { if (!details.contains(e.relatedTarget)) details.open = false; });
-        details.addEventListener('toggle', () => { if (details.open) root.querySelectorAll('details[open]').forEach(other => { if (other !== details) other.open = false; }); });
+        details.addEventListener('toggle', () => {
+            if (!details.open) return;
+            root.querySelectorAll('details[open]').forEach(other => { if (other !== details) other.open = false; });
+            const edge = toggle.getBoundingClientRect();
+            menu.style.position = 'fixed'; menu.style.top = '0px'; menu.style.right = 'auto';
+            const width = menu.getBoundingClientRect().width, height = menu.getBoundingClientRect().height;
+            menu.style.left = `${Math.max(8, Math.min(edge.right - width, innerWidth - width - 8))}px`;
+            menu.style.top = `${Math.max(8, Math.min(edge.bottom, innerHeight - height - 8))}px`;
+            menu.style.maxHeight = `${innerHeight - 16}px`; menu.style.overflowY = 'auto';
+        });
     root.addEventListener('keydown', e => { if (e.key === 'Escape' && details.open) { e.preventDefault(); e.stopPropagation(); details.open = false; toggle.focus(); } });
     }
     function rowNode(row, flat = false) {
@@ -96,11 +105,12 @@ export function needsLedger(cfg) {
             if (row.review) actionNode.hidden = true; // files open once; review decisions stay in the viewer
             body.append(actionNode);
         }
+        if (row.review && cfg.decidedFile(row)) { const dismiss = bulkActions.find(a => a.label === 'Dismiss'); if (dismiss && !dismiss.hidden?.([row]) && !dismiss.disabled?.([row])) extras.push({ label: 'Dismiss', run: () => dismiss.run([row]) }); }
         const extraActions = [...new Map(extras.map(entry => [entry.label, entry])).values()];
         if (row.review) side.append(cfg.fileAgent(row));
         if (unread(row)) side.append(el('span', 'nl-new', 'New'));
         const when = el('time', 'nl-when', cfg.when(row)); when.dateTime = row.waiting_since || ''; side.append(when);
-        if (!row.review) { const hover = el('span', 'nl-hover-actions'); for (const entry of extraActions.filter(x => !isQuestion || x.label === 'Dismiss')) hover.append(button(entry.label, 'btn btn-small btn-quiet', entry.run)); side.prepend(hover); more(side, extraActions, title); }
+        if (!row.review || cfg.decidedFile(row)) { const hover = el('span', 'nl-hover-actions'); for (const entry of extraActions.filter(x => row.review ? x.label === 'Dismiss' : !isQuestion || x.label === 'Dismiss')) hover.append(button(entry.label, 'btn btn-small btn-quiet', entry.run)); side.prepend(hover); more(side, row.review ? extraActions.filter(x => x.label === 'Dismiss') : extraActions, title); }
         r.addEventListener('click', e => { if (!e.target.closest('button,a,input,label,details')) open(row); });
         r.addEventListener('keydown', e => { if (e.target === r && e.key === 'Enter') { e.preventDefault(); open(row); } });
         return r;
@@ -117,7 +127,7 @@ export function needsLedger(cfg) {
             const box = section('By goal', groups.length);
             for (const g of groups) {
                 const questions = ordered(g.rows.filter(question)), files = ordered(g.rows.filter(r => r.review)), other = ordered(g.rows.filter(r => !question(r) && !r.review));
-                const openNow = folds.has(g.key) ? folds.get(g.key) : questions.length > 0, head = el('div', 'nl-group-head'), groupBody = el('div', 'nl-group-body');
+                const openNow = cfg.searching || (folds.has(g.key) ? folds.get(g.key) : questions.length > 0), head = el('div', 'nl-group-head'), groupBody = el('div', 'nl-group-body');
                 head.classList.toggle('nl-goal', !!g.a.goalId); if (g.a.goalId) head.append(checkbox(g.rows, `Select ${safe(g.a.goalTitle || 'Goal')}`)); else { const select = checkbox(g.rows, 'Select items not tied to a goal'); select.classList.add('nl-direct-check'); head.append(select); } head.append(icon(g.a.goalId ? 'flag' : 'radio_button_unchecked', g.a.goalId ? 'Goal' : 'Not tied to a goal')); if (!g.a.goalId) { head.lastChild.classList.add('nl-direct-icon'); head.lastChild.replaceChildren(); }
                 const main = el('div', 'nl-body'), toggle = button('', 'nl-group-toggle', () => { keepFold(g.key, groupBody.hidden); groupBody.hidden = !groupBody.hidden; toggle.setAttribute('aria-expanded', String(!groupBody.hidden)); head.classList.toggle('nl-open', !groupBody.hidden); });
                 toggle.setAttribute('aria-expanded', String(openNow)); const title = el('span', 'nl-title'); if (g.a.goalId) title.append(el('span', 'nl-goal-id', `#${g.a.goalId}`), document.createTextNode(' '+safe(g.a.goalTitle || 'Goal'))); else title.textContent = 'Not tied to a goal'; toggle.append(title); main.append(toggle);
