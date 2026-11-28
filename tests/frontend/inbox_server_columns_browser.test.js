@@ -48,6 +48,20 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
    })()`);
    for(const folder of folders){try{
     await open(folder);
+    if(folder==='goals'){ // #21846: the source-qualified team label replaces the old Server/Team columns.
+     await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length===2`,'two source-qualified goal sets');
+     const labels=await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-team')].map(e=>e.textContent)`);
+     assert.ok(labels.some(t=>t.includes('This computer'))&&labels.some(t=>t.includes('Remote box')),'goal set labels identify both origins: '+JSON.stringify(labels));
+     assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'goal source labels fit both widths');
+     await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
+     await waitFor(`document.getElementById('inbox-goals-team')?.getClientRects().length>0`,'goal Team filter');
+     const choices=await ev(`[...document.getElementById('inbox-goals-team').options].map(o=>({value:o.value,text:o.textContent}))`);
+     assert.ok(choices.some(o=>o.value==='@box-2/same-team'&&o.text.includes('Remote box')),'team picker names the remote source explicitly');
+     await ev(`(()=>{const s=document.getElementById('inbox-goals-team');s.value='@box-2/same-team';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+     await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length===1&&document.querySelector('#group-table-view .goal-decision-team').textContent.includes('Remote box')`,'source-qualified goal filter excludes the local identity');
+     await ev(`(()=>{const s=document.getElementById('inbox-goals-team');s.value='';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
+     await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length===2`,'clearing restores both goal origins');continue;
+    }
     // A phone's rows are mail rows (#9545): one cell each, no Server column or sort. What holds there: rows of both origins are listed and the Server filter in the panel narrows them (the columns are checked at 1280).
     if(width===390)await waitFor(`!!document.querySelector('#group-table-view tr.dt-mailed')||!!document.querySelector('#group-table-view th[data-key="server"]')`,'the '+folder+' rows, as mail rows or as a table',8000); // Artifacts rows come after the folder opens
     if(folder==='needs'||width===390&&await ev(`!!document.querySelector('#group-table-view tr.dt-mailed')`)){

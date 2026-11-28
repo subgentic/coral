@@ -1,7 +1,5 @@
-// The Inbox's Goals folder (#7776, the mailbox mock): the open goals of every team as the team page's goal row plus a Team column, on data_table; a quiet count in the sidebar; the search narrows it; a click opens the goal on its
-// team's page. Real boards on the isolated dev server (two teams, removed again). Desktop and a phone.
+// #21846: Inbox Goals is a source-qualified decision ledger. Keep real-board coverage for identity, task rollup, title sorting, search, explicit navigation, accessible names and responsive bounds.
 const assert = require('node:assert/strict');
-const { SIZING } = require('./helpers/table_sizing');
 const { connect } = require('./agent_view_harness');
 const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
@@ -19,7 +17,7 @@ const { coralReady } = require('./helpers/wait');
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length >= 3`, 'the goals', 15000);
+        await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length >= 3`, 'the goals', 15000);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -29,46 +27,29 @@ const { coralReady } = require('./helpers/wait');
         const g1 = await mkGoal(A, 'Ship the mailbox', 'One Inbox'), g2 = await mkGoal(A, 'Explore goals', 'Two teams'), g3 = await mkGoal(B, 'Plan the notes', 'Notes ready');
         for (const t of ['One', 'Two', 'Three']) assert.ok((await api('POST', `/api/board/${A}/tasks`, { title: t, body: 'x', created_by: 'orch', priority: 'medium', goal_id: g1 })).status < 300);
 
-        console.log('1. Desktop: the Goals folder');
-        await open(1280, 800, false);
-        const d = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { title: document.getElementById('group-table-title').textContent, heads: [...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()).filter(Boolean), tick: !!document.querySelector('#group-table-view tbody tr input[type=checkbox], #group-table-view tbody tr [role=checkbox]'), /* the tick column of the team page's Goals too (#16371) */
-            rows: rows.map(r => ({ goal: r.querySelector('.dt-primary').textContent, team: r.querySelector('td[data-key="team"]').textContent.trim(), chip: r.querySelector('.status-mark').textContent, shape: !!r.querySelector('.status-mark svg.status-shape'), progress: r.querySelector('td[data-key="progress"]').textContent.replace(/\\s+/g, ' ').trim() })),
-            sidebar: [...document.querySelectorAll('.view-list-item')].map(${ROW_WORDS}).filter(t => /^(Needs you|Tasks|Goals|Saved)/.test(t)), goalsSoon: !!document.querySelector('.view-list-item[data-key="goals"].view-list-soon, .view-list-item[data-key="goals"][aria-disabled="true"]') }; })()`);
-        assert.equal(d.title, 'Goals'); assert.equal(d.tick, true, 'each row has a tick, as on the team page (#16371)'); assert.deepEqual(d.heads, ['Goal', 'State', 'Team', 'Progress', 'Updated'], 'the team page\'s goal row plus a Team column, in the same order');
-        assert.ok(d.rows.every(r => r.shape), 'each State is the status mark: a shape and its word ' + JSON.stringify(d.rows));
-        await ev(`document.querySelector('#group-table-view .dt-sort[data-key="state"]').click(); true`); // sort still works on State (#15827)
-        await waitFor(`(() => { const w = [...document.querySelectorAll('#group-table-view .dt-table tbody tr .status-word')].map(e => e.textContent); return w.length >= 3 && w.every((x, i) => !i || w[i - 1].localeCompare(x) <= 0); })()`, 'the rows are in State order after the sort');
-        for (const bw of [1280, 1024]) { // the table's default sizes (#9856): the goal's title is at least 24 characters and nothing scrolls sideways, at 1280 and at 1024
-            await Emulation.setDeviceMetricsOverride({ width: bw, height: 800, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
-            const z = await ev(SIZING('#group-table-view .dt-box', 'goal'));
-            assert.ok(z && !z.scroll && z.name >= z.ch24 - 1, `${bw}: the goal title is at least 24 characters and the table does not scroll sideways: ` + JSON.stringify(z));
+        // #21846 replaces the old table/mail layouts with the same goal ledger at both widths.
+        for(const width of [1280,1024,390]){
+            await open(width,844,width===390);
+            const rows=await ev(`(()=>{return [...document.querySelectorAll('#group-table-view .goal-decision-card')].map(c=>({title:c.querySelector('.goal-decision-title').textContent,team:c.querySelector('.goal-decision-team').textContent,state:c.querySelector('.goal-decision-state').textContent,body:c.textContent}));})()`);
+            const mine=rows.filter(r=>[A,B].some(t=>r.team.includes(t)));
+            assert.deepEqual(mine.map(r=>r.title).sort(),['Explore goals','Plan the notes','Ship the mailbox'],'goals of both teams remain listed');
+            assert.ok(mine.every(r=>r.state==='Active'),'goal state stays explicit');
+            assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'ledger fits '+width);
+            await ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click();(()=>{const s=document.querySelector('.inbox-folder-toolbar select[id$="-sort"]');s.value='title';s.dispatchEvent(new Event('change',{bubbles:true}));})();true`);
+            await waitFor(`(()=>{const t=[...document.querySelectorAll('#group-table-view .goal-decision-title')].map(e=>e.textContent);return t.length>=3&&t.every((v,i)=>!i||t[i-1].localeCompare(v)<=0)})()`,'ledger title sort replaces table State-column sort');
+            assert.ok(await ev(`[...document.querySelectorAll('.view-list-item')].some(e=>/^Goals\\s*\\d+$/.test((${ROW_WORDS})(e)))`),'Goals remains a counted sidebar folder');
+            await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('notes'))`);
+            await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length===1&&document.querySelector('#group-table-view .goal-decision-title').textContent==='Plan the notes'`,'search narrows by goal title');
+            await ev(`document.querySelector('#group-table-view .goal-decision-head-right button').click();true`);
+            await waitFor(`document.querySelector('#inbox-page #goals-detail-title')?.textContent.includes('Plan the notes')`,'explicit goal open reaches the shared Inbox goal');
+            await ev(`document.querySelector('#inbox-page .goal-review-desk-head .goals-back').click();true`);
+            await waitFor(`!!document.querySelector('#group-table-view .goal-decision-card')`,'Back returns to filtered ledger');
+            await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox(''))`);
+            await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=3`,'clear search restores every goal');
+            await ev(`(()=>{const c=[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent==='Ship the mailbox'),t=c.querySelector('.goal-decision-toggle');if(t.getAttribute('aria-expanded')==='false')t.click();t.dataset.axp='with-tasks';return true;})()`);
+            assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent==='Ship the mailbox').textContent.includes('Tasks (3)')`),'task rollup survives in the approved footer');
+            const ax=await axName(client,'#group-table-view .goal-decision-toggle[data-goal-id="'+g1+'"]');assert.ok(ax?.name.includes('Ship the mailbox')&&ax.name.includes('Active'),'goal heading has title and state in its accessible name: '+JSON.stringify({width,ax}));
         }
-        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: back to the suite's width
-        const mine = d.rows.filter(r => [A, B].includes(r.team));
-        assert.deepEqual(mine.map(r => r.goal).sort(), ['Explore goals', 'Plan the notes', 'Ship the mailbox'], 'the open goals of both teams ' + JSON.stringify(d.rows));
-        assert.match(mine.find(r => r.goal === 'Ship the mailbox').progress, /0 of 3 done/, 'progress words'); assert.match(mine.find(r => r.goal === 'Plan the notes').progress, /No tasks yet/);
-        assert.ok(mine.every(r => ['Active', 'Proposed', 'Blocked'].includes(r.chip)), 'the goal state words ' + JSON.stringify(mine.map(r => r.chip)));
-        assert.ok(d.sidebar.some(t => /^Goals\s*\d+$/.test(t)) && !d.goalsSoon, 'Goals is a folder in the sidebar with its count, not "soon" ' + JSON.stringify(d.sidebar));
-        // the search narrows the folder
-        await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => { m.filterInbox('notes'); return true; })`);
-        await waitFor(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary')].every(b => /notes/i.test(b.textContent)) && document.querySelectorAll('#group-table-view .dt-table tbody tr').length >= 1`, 'the search narrows the goals');
-        await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => { m.filterInbox(''); return true; })`);
-        await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr').length >= 3`, 'all goals again');
-        // a click opens the goal on its team's page
-        await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].find(r => r.querySelector('.dt-primary').textContent === 'Plan the notes').click(); true`);
-        await waitFor(`!!document.getElementById('goals-detail-title') && document.getElementById('goals-detail-title').textContent === 'Plan the notes'`, 'the goal opened on its team page', 12000);
-        console.log('   ✓');
-
-        console.log('2. Phone: the one-line row (#8960)');
-        await open(390, 844, true);
-        await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-one-line')`, 'a one-line table on a phone', 5000);
-        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr')]; return { h: rows.map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, head: getComputedStyle(document.querySelector('#group-table-view thead')).display }; })()`);
-        assert.equal(p.head, 'none', 'a phone\'s rows are mail rows (#9545): no column heads, and no Sort row (a mail list has none)'); assert.ok(p.h.every(h => h >= 44), '44 px rows ' + JSON.stringify(p.h)); assert.ok(p.over <= 1, 'no sideways scroll');
-        await ev(`document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-primary').forEach((b, i) => b.setAttribute('data-axp', b.querySelector('.dt-mail-title')?.textContent === ${JSON.stringify('#' + g1 + ' Ship the mailbox')} ? 'with-tasks' : String(i))); true`);
-        // The first sorted goal can be Explore goals (no tasks, so its time/state is just Active).
-        // Pin the goal with a known 0/3 rollup; never assume the first returned row has progress.
-        const axn = await axName(client, '[data-axp="with-tasks"]'); assert.equal(axn && axn.name, `Ship the mailbox, Active, Active · 0/3 · ${A}`, `a goal's phone button is "<goal>, <state>, <time>" as Chrome computes it (its state is on the row's second line: #9747): ${axn && axn.name}`);
-        console.log('   ✓');
-        console.log('PASS Inbox Goals folder: every team\'s open goals as the goal row with a Team column');
+        console.log('PASS Inbox goal ledger: source teams, rollup, search, navigation, accessibility and responsive bounds');
     } finally { await removeBoards(ev, [A, B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

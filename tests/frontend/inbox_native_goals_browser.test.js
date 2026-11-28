@@ -28,7 +28,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
         // #20397 reads goals when their folder opens, rather than reading hidden lists.
         await waitFor(`(${FOLDER_ROWS}).some(w => /^Goals2$/.test(w))`, 'Goals counts the goals of both computers: ' + JSON.stringify(await ev(FOLDER_ROWS)), 10000);
         for (const title of ['Goal from m1', 'Goal from m2']) {
-            await waitFor(`[...document.querySelectorAll('#group-table-view .dt-primary')].some(e => e.textContent.includes(${JSON.stringify(title)}))`, title + ' is listed', 10000);
+            await waitFor(`[...document.querySelectorAll('#group-table-view .goal-decision-title')].some(e => e.textContent.includes(${JSON.stringify(title)}))`, title + ' is listed', 10000);
         }
         const reads = await ev(`window.__remoteRequests.filter(r => r.path === '/api/goals').map(r => r.server).sort()`);
         assert.ok(reads.includes('m1') && reads.includes('m2'), 'both computers were asked: ' + JSON.stringify(reads));

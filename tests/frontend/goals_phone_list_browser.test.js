@@ -37,6 +37,17 @@ const { coralReady, framesJs } = require('./helpers/wait');
                 await ev(`window.switchNavTab('hub-inbox');true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);
             }
+            if (place === 'inbox') { // #21846 replaces only the Inbox mail rows with the approved collapsible ledger.
+                await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=3`,at+' decision cards');
+                await ev(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.fontSize='${zoom}%';true`);await ev(framesJs(6));
+                const q=await ev(`(()=>{const c=document.querySelector('#group-table-view .goal-decision-card:has([data-goal-id="${firstGoalId}"])'),t=c.querySelector('.goal-decision-title'),r=t.getBoundingClientRect(),b=c.getBoundingClientRect();return {title:t.textContent,number:c.querySelector('.goal-decision-id').textContent,state:c.querySelector('.goal-decision-state').textContent,done:c.querySelector('.goal-decision-done')?.textContent,left:r.left,right:r.right,cardLeft:b.left,cardRight:b.right,over:document.documentElement.scrollWidth>innerWidth+1,expand:c.querySelector('.goal-decision-toggle').getAttribute('aria-expanded')};})()`);
+                check(q.number==='Goal #'+firstGoalId&&q.state==='Active'&&q.title.includes('Ship the pilot'),at+' identity, state and full title: '+JSON.stringify(q));
+                check(q.left>=q.cardLeft&&q.right<=q.cardRight+1&&!q.over,at+' wrapping ledger title fits its card: '+JSON.stringify(q));
+                await ev(`document.querySelector('#group-table-view [data-goal-id="${firstGoalId}"]').click();true`);
+                check(await ev(`document.querySelector('#group-table-view [data-goal-id="${firstGoalId}"]').getAttribute('aria-expanded')`)!==q.expand,at+' heading tap toggles the set');
+                await ev(`document.querySelector('#group-table-view [data-goal-id="${firstGoalId}"]').click();true`);
+                continue;
+            }
             const scope = place === 'team' ? P : '#group-table-view';
             await waitFor(`document.querySelectorAll('${scope} tbody tr').length >= 3`, at + ' rows');
             await ev(`document.documentElement.setAttribute('data-theme','${theme}');document.documentElement.style.fontSize='${zoom}%';true`);
@@ -101,16 +112,13 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 3`, at + 'the goal rows', 15000);
-            await ev(framesJs(6));
-            const g = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'), ask = r.querySelector('.dt-mail-ask'), title = r.querySelector('.dt-mail-title'); return { ask: ask ? ask.textContent : null, stacked: !!ask && ask.getBoundingClientRect().top >= title.getBoundingClientRect().bottom - 2, side: r.querySelector('.dt-mail-time').textContent }; })()`);
-            check(!g.ask, at + 'the row omits the outcome preview: ' + JSON.stringify(g));
-            check(/^Active/.test(g.side), at + 'with the state on the right: ' + g.side);
-            const at2 = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr .dt-mail-title').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
-            const tt = type => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: at2.x, y: at2.y, id: 1 }] });
-            await tt('touchStart'); await new Promise(r => setTimeout(r, 700)); await tt('touchEnd'); // sleep-ok: a long press is a held finger
-            await waitFor(`/1 selected/.test(document.querySelector('#group-table-view .gt-toolbar')?.textContent || document.querySelector('.dt-bar')?.textContent || '')`, at + 'a long press selects the goal', 5000).catch(() => check(false, at + 'a long press selects the goal (no "1 selected" bar); the page is on ' + location.pathname));
-            check(!(await ev(`location.pathname`)).includes('/goals/'), at + 'and does not open it');
+            await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=3`,at+' decision sets',15000);
+            const before=await ev(`document.querySelector('#group-table-view .goal-decision-toggle').getAttribute('aria-expanded')`);
+            await ev(`document.querySelector('#group-table-view .goal-decision-toggle').click();true`);
+            check(await ev(`document.querySelector('#group-table-view .goal-decision-toggle').getAttribute('aria-expanded')`)!==before,at+' set heading collapses instead of selecting an obsolete mail row');
+            check((await ev(`location.pathname`))==='/inbox/goals',at+' collapse keeps the list route');
+            await ev(`document.querySelector('#group-table-view .goal-decision-head-right button').click();true`);
+            await waitFor(`!!document.querySelector('#inbox-page #goals-detail-title')`,at+' explicit open reaches the shared goal');
         }
     } finally { await removeBoards(ev, [B, SEED]).catch(() => {}); await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }

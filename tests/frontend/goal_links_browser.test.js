@@ -39,8 +39,8 @@ const { coralReady } = require('./helpers/wait');
         };
 
         console.log('1. The Inbox Goals folder');
-        await inboxFolder('goals', '#group-table-view .dt-table tbody tr');
-        await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].find(r => r.textContent.includes(${JSON.stringify(TITLE)})).querySelector('.dt-primary').click(); true`);
+        await inboxFolder('goals', '#group-table-view .goal-decision-card');
+        await ev(`[...[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(r => r.textContent.includes(${JSON.stringify(TITLE)})).querySelectorAll('.goal-decision-foot button')].find(b=>/^Tasks /.test(b.textContent)).click(); true`);
         const inboxGoal = `/inbox/goals/${B}/${G}`;
         await waitFor(`location.pathname === ${JSON.stringify(inboxGoal)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'Goals folder: the goal opens in the Inbox', 15000);
         assert.equal(await ev(`getComputedStyle(document.getElementById('inbox-page')).display !== 'none'`), true, 'the Inbox goal is on screen');
