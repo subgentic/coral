@@ -476,7 +476,7 @@ export function handleCoralMessage(data) {
         if (data.type === "coral_update") {
             // Per-server status ([{id,label,status}]) is only sent when remotes exist.
             state.servers = (state.hub && Array.isArray(data.servers)) ? data.servers : [];
-            state.serversKnown = true;
+            state.serversKnown = 2; // 2: the feed has said (launch_disclosure.js holds the notice row until it has, #22033); a list read says true and never takes that back
             updateServersTabVisibility();
             _toastNewlyWaiting(data);
 

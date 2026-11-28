@@ -20,6 +20,7 @@ const HINT_KEY = 'coral-launch-notice'; // "p|57" or "d|73": this browser last s
 const hint = {
     set(px) { browserLocal.set(HINT_KEY, `${window.innerWidth <= 600 ? 'p' : 'd'}|${Math.max(0, Math.min(999, Math.round(px)))}`); }, // storage that is blocked just means no reserved row
     clear() { browserLocal.remove(HINT_KEY); },
+    drop() { this.clear(); this.release(); }, // the notice is not coming: nothing is kept or reserved for it
     release() { document.getElementById('launch-notice-room')?.remove(); document.documentElement.removeAttribute('data-launch-notice'); }, // the notice fills the room, or there is none to fill
 };
 /** The notice says agents default to auto mode, so it is only true while the saved default is Auto (unset is Auto too, settings_diff's FIELD_DEFAULT): with another default saved it is hidden, and comes back when the default does (#16367). */
@@ -41,7 +42,7 @@ async function acknowledge(server, disclosure) {
     const response = await serverFetch(server, '/api/launch-disclosure/ack', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: disclosure.id }) });
     const answer = await response.json().catch(() => null);
     if (!response.ok || answer?.id !== disclosure.id || answer.seen !== true) throw new Error('Could not record that you have read this. Nothing was launched. Try again.');
-    if (normServer(server) === 'local') { readGeneration++; document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release(); }
+    if (normServer(server) === 'local') { readGeneration++; dropNotice(); }
 }
 export async function confirmLaunchDisclosure(server, disclosure, payload = null) {
     if (!valid(disclosure) || disclosure.seen !== false) { showToast('The launch disclosure could not be read. Nothing was launched.', true); return false; }
@@ -68,6 +69,7 @@ export async function confirmLaunchDisclosure(server, disclosure, payload = null
 // Where the notice sits (#16460): the global strip under the top bar, except on a phone's Inbox, where it is in the pane, under the pane's own heading (after .inbox-folder-toolbar) and above the list.
 // It is ONE element moved in and out: the pane is rebuilt on every redraw (which drops what is in it), so a watcher puts it back, and a tab or a rotation moves it to the strip or the pane.
 let shown = null, watching = false;
+const dropNotice = () => { document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.drop(); };
 export function placeNotice() {
     const banner = shown;
     if (!banner) return;
@@ -89,13 +91,18 @@ function watchPlace() {
 export function refreshDefaultNotice() {
     if (defaultIsAuto() && hasLocalAgent()) return refreshLaunchDisclosure();
     bannerEligible = hasLocalAgent(); readGeneration++;
-    document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release();
+    dropNotice();
 }
-const ROOM_GRACE_MS = 1500;
-let roomTimer = 0;
+const ROOM_CAP_MS = 8000; // the longest the row is held for a feed that never answers
+let roomTimer = 0, fed = state.serversKnown === 2, listLanded = false; // state.serversKnown is 2 once the feed has said which servers there are (websocket.js); a list read says true
+const giveRoomBack = () => { clearTimeout(roomTimer); roomTimer = 0; if (!hasLocalAgent() && !document.getElementById('launch-disclosure-banner')) hint.drop(); };
+const answered = () => fed && listLanded; // the first list and the feed's first update are both in (on a slow computer either can come first, and each can be empty, #22033)
+// No agent yet is 'no agent' only once both are in; until then the row stays (capped). The feed's answer is told by a list read not taking it back: the value is watched from here, so the start path carries none of this.
+if (!fed) { let known = state.serversKnown; Object.defineProperty(state, 'serversKnown', { configurable: true, enumerable: true, get: () => known, set: v => { known = v; if (v === 2) { fed = true; queueMicrotask(() => { if (answered()) giveRoomBack(); }); } } }); } // after the sessions of that same update are in (websocket.js names the servers first)
+liveListReady.then(() => { listLanded = true; if (answered()) giveRoomBack(); });
 function holdRoom() {
-    if (roomTimer || !document.getElementById('launch-notice-room')) return;
-    roomTimer = setTimeout(() => { roomTimer = 0; if (!hasLocalAgent() && !document.getElementById('launch-disclosure-banner')) { hint.clear(); hint.release(); } }, ROOM_GRACE_MS);
+    if (answered()) { giveRoomBack(); return; }
+    if (!roomTimer && document.getElementById('launch-notice-room')) roomTimer = setTimeout(giveRoomBack, ROOM_CAP_MS);
 }
 export async function refreshLaunchDisclosure() {
     if (isCloud() || document.body.classList.contains('popout-mode')) { hint.release(); return; }
@@ -103,7 +110,7 @@ export async function refreshLaunchDisclosure() {
     const generation = ++readGeneration;
     try {
         const response = await serverFetch('local', '/api/launch-disclosure', { cache: 'no-store' });
-        if (!response.ok) { hint.clear(); hint.release(); return; } // older servers and non-owners have no offer: nothing is reserved for it
+        if (!response.ok) { hint.drop(); return; } // older servers and non-owners have no offer: nothing is reserved for it
         const disclosure = await response.json(); if (generation !== readGeneration) return; if (!valid(disclosure)) { hint.release(); return; }
         const mode = document.getElementById('settings-permission-mode');
         if (mode) {
@@ -111,11 +118,11 @@ export async function refreshLaunchDisclosure() {
             if (!line) { const part = disclosureSection('settings-launch-disclosure-body', 'Permissions notice', disclosure); line = part.text; line.id = 'settings-launch-disclosure'; mode.closest('.sv-row')?.querySelector('.sv-text')?.append(part.section); }
             line.textContent = disclosure.text;
         }
-        if (!defaultIsAuto()) { document.getElementById('launch-disclosure-banner')?.remove(); shown = null; hint.clear(); hint.release(); return; } // the default is not Auto: nothing here is true to say; the launch-time confirm (409) is the server's and stays
+        if (!defaultIsAuto()) { dropNotice(); return; } // the default is not Auto: nothing here is true to say; the launch-time confirm (409) is the server's and stays
         if (!hasLocalAgent()) { await liveListReady; if (generation !== readGeneration) return; } // the page's first list may not have landed yet: no agent in it is not 'no agent', and giving the reserved row back (and the hint) now would move the page when the notice comes a moment later
         const previous = document.getElementById('launch-disclosure-banner');
-        if (disclosure.seen === true) { previous?.remove(); shown = null; hint.clear(); hint.release(); return; }
-        if (!hasLocalAgent()) { previous?.remove(); shown = null; holdRoom(); return; } // unseen, and no agent in the list yet: the notice comes with the first local agent, a moment after the list (#21962), so the row is kept for ROOM_GRACE_MS and not given back at once; a person with no agent at all gets it back then (a held empty row would take room from a page that has no notice, #22005)
+        if (disclosure.seen === true) { dropNotice(); return; }
+        if (!hasLocalAgent()) { previous?.remove(); shown = null; holdRoom(); return; } // unseen, and no agent in the list yet: the notice comes with the first local agent (#21962), so the row is kept until the feed's first update has been applied (capped); a person with no agent at all gets it back then (a held empty row would take room from a page that has no notice, #22005)
         if (disclosure.seen === false && previous?.dataset.disclosureId === disclosure.id) { hint.set(previous.getBoundingClientRect().height); return; } // already drawn (an earlier read): the hint is kept as it is
         if (disclosure.seen !== false) return;
         previous?.remove(); shown = null;

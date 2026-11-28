@@ -24,6 +24,7 @@ const BOARD = 'kb-up-' + Date.now().toString(36);
         for (let i = 1; i <= 14; i++) await post('/messages', { subscriber_id: 'Boss', content: `Message number ${i} on the team board with a few more words so that it is a line of text.` });
         await ev(`window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'messages' }).then(() => true)`);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 12`, 'the messages', 15000);
+        await waitFor(`!document.getElementById('launch-notice-room')`, 'the launch notice row given back (this board has no agent: it is held until the feed first update, so on a loaded machine it is still there when the messages are), #22033', 15000);
         await new Promise(r => setTimeout(r, 800)); // sleep-ok: the board settles at the newest message
         let l = await list();
         check(l.atEnd, `the board opens at the newest message: ${JSON.stringify(l)}`);
