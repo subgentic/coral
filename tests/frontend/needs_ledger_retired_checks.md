@@ -72,3 +72,6 @@ Additional v3 manifest migrations:
 | needs_you_waiting_for_open | First-paint snapshots retain no misleading empty Waiting-for column. Ledger has no such column. |
 | needs_save_later | Orchestrator09:32: owned and migrated on #22132, layered on this head; released together. Not a #22094 pass claim. |
 | needs_star_room / needs_star_slot | Orchestrator09:32: Star geometry moves to Saved (#22108), since v19 has no main-list Star. Existing behavior must remain covered there. |
+
+
+**Operator amendment via Orchestrator09:33 (supersedes09:32 above):** Save for later is now part of #22094; FD6's #22132 code and layout fixes are integrated. `needs_save_later` remains FD6's migration on this combined head. `needs_star_room` and `needs_star_slot` now keep their text-range overlap/containment checks against the desktop Save hover icon and phone More target. Main-list Star placement is retired; Save behavior is proved by both Save suites. The new `needs_save_later_icon` is an extra gate suite beyond QA's133.
