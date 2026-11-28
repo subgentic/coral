@@ -1394,9 +1394,19 @@
       "first_release_verified_route_contract": "v2.0.11",
       "query": [
         {
+          "key": "board",
+          "shape_in_generated_table": "board",
+          "first_release_verified_query_contract": null
+        },
+        {
           "key": "cursor",
           "shape_in_generated_table": "cursor",
           "first_release_verified_query_contract": "v2.0.48"
+        },
+        {
+          "key": "goal",
+          "shape_in_generated_table": "goal",
+          "first_release_verified_query_contract": null
         },
         {
           "key": "limit",
@@ -1407,6 +1417,11 @@
           "key": "paged",
           "shape_in_generated_table": "paged",
           "first_release_verified_query_contract": "v2.0.48"
+        },
+        {
+          "key": "state",
+          "shape_in_generated_table": "state",
+          "first_release_verified_query_contract": null
         }
       ]
     },
