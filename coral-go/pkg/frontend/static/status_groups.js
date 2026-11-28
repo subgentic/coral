@@ -1,5 +1,5 @@
 /* The agent list grouped by status (#21466, the Operator's approved mock, concept mocks v3 idea 4): Needs you, Working, Idle and Done today (folded), the newest update first inside each group.
- * The group heading carries the status shape, so a row here has no dot of its own. Status is the default; Team (the orchestrator-folded view, group_cards.js) is the other choice, and the
+ * The group heading carries the status shape, so a row here has no dot of its own. Team and Task are the default for a new viewer (#22104); Status is none ticked, Team the orchestrator-folded view (group_cards.js), and the
  * choice is remembered per viewer. On a phone the list is short: every agent that needs you, two that are working, and one line that counts the rest ("2 more working · 3 idle · 6 done today").
  * Loaded when the list draws (render.js asks for it), so the first paint carries none of these bytes; its rules are in the start sheet (css/status_groups.css, last before forced-colors), paid for by the theme editor's sheet going lazy. */
 import { browserLocal } from './safe_storage.js';
@@ -12,8 +12,9 @@ import { DISPLAY_PANEL_OPEN } from './display_panel.js';
 import { loadStyles } from './lazy_styles.js';
 const groupByStyles = () => loadStyles('group_by.css'); // the Group by boxes and the task split: a request of their own the first time the Display panel opens or a task split draws, not at start (#21685)
 
-const KEYS = { server: 'coral-group-computer', team: 'coral-group-team', task: 'coral-group-task' }; // 'true' / 'false' per box; none set = the old choices (below), else all off
+const KEYS = { server: 'coral-group-computer', team: 'coral-group-team', task: 'coral-group-task' }; // 'true' / 'false' per box; one not set = the old choices (below) if the browser made one, else the default (DEFAULTS)
 const LEGACY = { server: ['coral-group-by-server', 'true'], team: ['coral-agent-grouping', 'team'] }; // what a browser chose before the three boxes
+const DEFAULTS = { server: false, team: true, task: true }; // a viewer with no choice saved opens on Team and Task (Operator 11-28, #22104)
 const FOLD = 'coral-status-folded'; // JSON: the groups the person opened or folded by hand
 const MORE = 'coral-status-more'; // the phone's one line is open
 const DAY = 86400;
@@ -52,9 +53,11 @@ function mountGroupBy(e) {
 const syncBoxes = () => { const g = groupBy(); for (const input of document.querySelectorAll('fieldset[data-group-by] input[data-box]')) if (input.checked !== g[input.dataset.box]) input.checked = g[input.dataset.box]; }; // the sidebar's bar and the phone's show the one choice
 document.addEventListener(DISPLAY_PANEL_OPEN, mountGroupBy);
 
-/** Which boxes are ticked: { server (the Computer box), team, task }. All off unless chosen; a browser that chose Team or Group by computer before the boxes keeps that choice. */
+/** Which boxes are ticked: { server (the Computer box), team, task }. A box the viewer ticked or unticked keeps that; a browser that chose Status, Team or Group by computer before the boxes keeps
+ *  that choice (Task off); a viewer with neither opens on Team and Task (#22104). */
 export function groupBy() {
-    const on = k => { const v = read(KEYS[k], null); if (v !== null) return v === 'true'; const old = LEGACY[k]; return !!old && read(old[0], null) === old[1]; };
+    const choseBefore = Object.values(LEGACY).some(([k]) => read(k, null) !== null);
+    const on = k => { const v = read(KEYS[k], null); if (v !== null) return v === 'true'; if (!choseBefore) return DEFAULTS[k]; const old = LEGACY[k]; return !!old && read(old[0], null) === old[1]; };
     return { server: on('server'), team: on('team'), task: on('task') };
 }
 
