@@ -78,7 +78,11 @@ const [ra, rb] = [...r3.querySelectorAll('.al-row')];
 assert.equal(ra.querySelector('.al-ynote').textContent, 'Your note: Fix the title');
 assert.equal(ra.querySelector('.al-v').textContent, '\u21a9 Asked for changes');
 assert.equal(rb.querySelector('.al-cmd').textContent, 'npm install x');
-assert.equal(rb.querySelector('.al-title').textContent, 'a asked for permission'); // a recorded command: the title says so, the box holds it
+assert.equal(rb.querySelector('.al-title').textContent, 'a wanted to run a command'); // a recorded command: the title says so, the box holds it
+// a command is text, never markup (Security MUST 4, task #22144)
+const r4 = Ledger.ledger([{ id: 61, at: new Date(now).toISOString(), action: 'prompt_reject', item_kind: 'agent', item_id: 'a', title: 'a', note: 'No', command: '<b>x</b><img src=x onerror=alert(1)>…', command_cut: true }], x, { now });
+const cmd4 = r4.querySelector('.al-cmd');
+assert.equal(cmd4.textContent, '<b>x</b><img src=x onerror=alert(1)>…'); assert.equal(cmd4.children.length, 0); assert.equal(r4.querySelectorAll('img, b').length, 0);
 assert.ok(!rb.querySelector('.al-sub').textContent.includes('(Yes)'), 'a bare Yes is not repeated after Allowed');
 // the phone's one menu holds what the hover buttons hold
 const dots = ul.querySelector('.al-row[data-key="3"] details.al-dots');
