@@ -1348,7 +1348,7 @@ function savedListSpec(where = '') {
         return wrap; } };
 }
 /** A saved file's or message's facts and actions for the Saved page's row (saved_ledger.js, #22108). */
-const SAVED_TAGS = [['for review', 'To review', 'blue'], ['approved', 'Approved', 'green'], ['denied', 'Denied', 'amber']]; // the verdict as the tag under Done (the mock)
+const SAVED_TAGS = [['for review', 'To review', 'blue'], ['approved', 'Approved', 'green'], ['denied', 'Denied', 'red']]; // the verdict as the tag under Done (the mock); Denied in Activity's red (Orchestrator, round 4)
 function savedLedgerRow(e) {
     if (e.kind === 'file') {
         const a = e.a, name = markHidden(a.name, { strict: true }), server = splitKey(a.team).server, canAct = !isCloud() && !decisionNeedsPerson(server), version = (/^version (\d+)/.exec(a.version_line || '') || [])[1] || (a.earlier?.length ? String(a.earlier.length + 1) : ''); // the server's version line, else the versions this row stands for
