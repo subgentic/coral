@@ -65,11 +65,12 @@ const BASE = require('./test_base').BASE;
             await click('.ac-toggle'); await close(); await open();
             assert.equal(await ev(`document.querySelector('#artifact-viewer .ac-toggle').getAttribute('aria-expanded')`),'false','Markdown Comments choice does not change HTML');
             await Input.dispatchKeyEvent({type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-            assert.equal(await ev(`document.querySelector('#artifact-viewer').hidden`),false,'first Escape restores dialog');
-            assert.equal(await ev(`document.querySelector('${control}').getAttribute('aria-pressed')`),'false');
-            assert.ok(await ev(`document.activeElement.matches('${control}')`),'Escape returns focus to the toggle');
-            await Input.dispatchKeyEvent({type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-            assert.equal(await ev(`document.querySelector('#artifact-viewer').hidden`),true,'second Escape closes');
+            assert.equal(await ev(`document.querySelector('#artifact-viewer').hidden`),true,'Escape in full screen closes the viewer (#22085)');
+            assert.equal(await ev(`localStorage.getItem('coral-artifact-fullscreen:text/html')`),'true','Escape keeps the saved full-screen choice');
+            await open();
+            assert.equal(await ev(`document.querySelector('${control}').getAttribute('aria-pressed')`),'true','the next open is full screen again');
+            await shot('escape-reopen-'+label);
+            await close();
         }
         if (!failures.length) {
             await Emulation.setDeviceMetricsOverride({width:844,height:390,deviceScaleFactor:1,mobile:true});
