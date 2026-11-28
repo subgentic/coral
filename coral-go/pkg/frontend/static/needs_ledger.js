@@ -123,7 +123,7 @@ export function needsLedger(cfg) {
             body.append(actionNode);
         }
         if (row.review && cfg.decidedFile(row)) { const dismiss = bulkActions.find(a => a.label === 'Dismiss'); if (dismiss && !dismiss.hidden?.([row]) && !dismiss.disabled?.([row])) extras.push({ label: 'Dismiss', run: () => dismiss.run([row]) }); }
-        extras.push(...(cfg.secondaryActions?.(row) || []));
+        extras.push(...(cfg.secondaryActions?.(row) || []).map(entry => ({ ...entry, run: e => entry.run(e?.currentTarget || r.querySelector('.nl-more-toggle')) })));
         const extraActions = [...new Map(extras.map(entry => [entry.label, entry])).values()];
         if (row.review) side.append(cfg.fileAgent(row));
         if (unread(row)) side.append(el('span', 'nl-new', 'New'));
