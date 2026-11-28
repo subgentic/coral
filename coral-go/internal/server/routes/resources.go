@@ -359,6 +359,15 @@ func (h *ResourcesHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	}
 	h.reap() // a lease that ran out is over: it cannot be renewed
 	e, err := h.M.Queue().Renew(chi.URLParam(r, "name"), who)
+	if errors.Is(err, resourcequeue.ErrNotHolder) {
+		// Say why and when the hold ended (#22131): a run stopped for a lost slot was told only "kicked, or its lease ran out".
+		body := map[string]any{"error": err.Error(), "code": "not_holder"}
+		if end, ok := h.M.Queue().LastEnd(chi.URLParam(r, "name"), who); ok {
+			body["ended"], body["ended_why"], body["ended_at"] = end.Kind, end.Why, end.At.UTC().Format(time.RFC3339)
+		}
+		writeJSON(w, http.StatusConflict, body)
+		return
+	}
 	if err != nil {
 		h.fail(w, err)
 		return

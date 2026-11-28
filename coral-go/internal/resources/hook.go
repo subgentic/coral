@@ -262,6 +262,12 @@ func (h *Hook) giveBack(keys []holdKey, why string) {
 	for _, k := range keys {
 		grace := resourcequeue.DefaultAwayGrace // a place still in line is kept for a grace when the wait ended without a turn (#13706); a slot held is given back; an agent that is GONE keeps nothing
 		if why == "gone" {
+			if h.m.Queue().HasLiveRun(k.resource, k.agent) {
+				// A session reset (a compaction, a resume) is not the end of a `claim --run` that still runs: a background run outlives it, and giving its slot back stopped it at its next renew (#22131).
+				// Its run's end, or Reap when its process is gone, gives the slot back.
+				slog.Info("[resource] kept a hold at a session reset: its run still runs", "resource", k.resource, "agent", k.agent)
+				continue
+			}
 			grace = 0
 		}
 		if err := h.m.Queue().LeaveWhy(k.resource, k.agent, grace, why); err == nil { // already released by hand: nothing to do
@@ -731,9 +737,15 @@ func (h *Hook) SessionEnded(session string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for k, ah := range h.hold {
-		if ah.session == session {
-			h.releaseLocked(k, ah, "gone")
+		if ah.session != session {
+			continue
 		}
+		if h.m.Queue().HasLiveRun(k.resource, k.agent) { // the agent's one entry also carries a `claim --run` that still runs: the hook stops counting this call, the slot stays with the run (#22131)
+			delete(h.hold, k)
+			slog.Info("[resource] kept a hold at a session reset: its run still runs", "resource", k.resource, "agent", k.agent)
+			continue
+		}
+		h.releaseLocked(k, ah, "gone")
 	}
 }
 
