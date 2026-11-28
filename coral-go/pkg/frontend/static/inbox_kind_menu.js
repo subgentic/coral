@@ -12,7 +12,8 @@ export function mount(node, pills) {
     const menu = moreMenu('inbox-kind', (pills.menuItems || pills.items).map(it => ({ label: `${it.label}${it.count == null ? '' : ' '+it.count}`, pressed: it.key === pills.current, run: () => pills.onPick(it.key) })), { label: 'Kind', wrapClass: 'inbox-kind-control task-more' });
     const button = menu.querySelector('button');
     button.textContent = 'Kind'; button.setAttribute('aria-label', `Kind: ${(pills.menuItems || pills.items).find(it => it.key === pills.current)?.label || 'All'}`);
-    row.insertBefore(menu, row.querySelector('.list-bar-toggle'));
+    const toggle = row.querySelector('.list-bar-toggle');
+    row.insertBefore(menu, toggle?.parentElement === row ? toggle : row.querySelector('.nl-toolbar-actions'));
     group.classList.add('inbox-kind-strip');
     const fit = () => {
         if (!node.isConnected) { node._kindObserver?.disconnect(); return; }

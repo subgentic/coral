@@ -30,7 +30,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(g.length, 5, w + ': one ledger row per request');
             assert.ok(g.every(r => r.check && r.icon && r.title && Number.isFinite(r.at)), w + ': each row keeps selection, separate icon/title, and a valid source timestamp: ' + JSON.stringify(g));
             assert.ok(g.every(r => r.muted && /ago$/.test(r.age)), w + ': elapsed time remains short, explicit and muted: ' + JSON.stringify(g));
-            assert.ok(g.every(r => !r.permissionDismiss), w + ': permission Dismiss is absent under the approved v19 action rules');
+            assert.ok(g.filter(r => r.permission).every(r => r.permissionDismiss), w + ': permission Dismiss remains under the Orchestrator action ruling');
             await shot(`rows-${w}`);
         }
         await client.close(); process.exit(0);
