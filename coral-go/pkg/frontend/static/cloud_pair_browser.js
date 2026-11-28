@@ -8,13 +8,13 @@ const URL = '/api/cloud/pair-browser';
 const MODES = ['view', 'interact', 'launch'];
 export function pairBrowser(root) {
     const box = el('section', 'cloud-pair-browser'); box.dataset.cloud = 'pair-browser';
-    box.setAttribute('aria-label', 'Connect another browser or phone'); // the box's name is not shown: Settings' text budget (#22081)
+    const title = el('h3', null, 'Connect another browser or phone');
     const intro = el('p', null, 'Keep this computer connected. Open a pairing link on the other device, then allow it here after comparing its key.');
-    const actions = el('div', 'cloud-pair-actions'), start = el('button', 'btn', 'Pair a browser'); start.type = 'button'; start.dataset.pair = 'start'; actions.append(start);
+    const actions = el('div', 'cloud-pair-actions'), start = el('button', 'btn', 'Pair a browser or phone'); start.type = 'button'; start.dataset.pair = 'start'; actions.append(start);
     const waiting = el('div'); waiting.dataset.cloud = 'code'; waiting.hidden = true;
     const link = el('a'); link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Open pairing link'; link.dataset.pair = 'link';
     const code = el('p'), key = el('p'); code.className = 'cloud-pair-key'; key.className = 'cloud-pair-key';
-    const cancel = el('button', 'btn', 'Cancel pairing'); cancel.type = 'button'; cancel.dataset.pair = 'cancel'; waiting.append(intro, link, code, key, cancel);
+    const cancel = el('button', 'btn', 'Cancel pairing'); cancel.type = 'button'; cancel.dataset.pair = 'cancel'; waiting.append(link, code, key, cancel);
     const ask = el('div', 'cloud-pair-ask'); ask.hidden = true;
     const question = el('h4'), fingerprint = el('p', 'cloud-pair-key'), help = el('p', null, 'Compare this key with the one shown on that browser or phone. If they differ, deny it.');
     question.tabIndex = -1;
@@ -24,7 +24,7 @@ export function pairBrowser(root) {
     const explainMode = () => { modeHelp.textContent = mode.value === 'launch' ? 'Read, type into agents, and start or stop agents. Launching runs code on this computer as you.' : mode.value === 'interact' ? 'Read and type into running agents. Typing can run commands through an agent’s tools.' : 'Read this computer’s agents, files and boards. Cannot type, change or start anything.'; };
     mode.addEventListener('change', explainMode);
     const decisions = el('div', 'cloud-pair-actions'); decisions.append(allow, deny); ask.append(question, fingerprint, help, label, modeHelp, decisions);
-    const say = el('p'); say.setAttribute('role', 'status'); say.dataset.pair = 'status'; box.append(actions, ask, say, waiting);
+    const say = el('p'); say.setAttribute('role', 'status'); say.dataset.pair = 'status'; box.append(title, intro, actions, ask, say, waiting);
     const anchor = root.querySelector('[data-cloud="code"]'); if (anchor) anchor.after(box); else root.append(box);
     const qr = enrollmentQR(box, 'Scan with the browser or phone you want to connect. Come back here to compare its key and choose Allow.');
     let state = {}, timer = null, running = false, busy = false, generation = 0, pendingKey = '', error = '';

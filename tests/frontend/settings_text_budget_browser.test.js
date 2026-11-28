@@ -20,7 +20,9 @@ const BEFORE = { 'Coral Hub and remote access':186, 'Storage and backup':151, Up
 // #17538: Storage and backup +22 (Local backup heading, the data-folder path, Copy path button, and the one-line backup note)
 const HELP_WORDS = { 'Coral Hub and remote access':80, 'Storage and backup':21+18+22+4, Updates:6, 'Teams and Chief':12, Appearance:22, 'Files and Git':8+1+17, 'Security and privacy':17 };
 // #16725: measured 112 visible Defaults words on current main, with Advanced closed; no inherited Agents allowance.
+// #22081: Coral Hub and remote access +26 for the pairing box (#21908: its heading, one intro line and the Pair a browser or phone button; 31 words) less the 5 the join-keys note lost: 266 to 292.
 const BUDGET = { ...Object.fromEntries(Object.entries(BEFORE).map(([k,v])=>[k,v+(HELP_WORDS[k]||0)])), Defaults:112 };
+BUDGET['Coral Hub and remote access'] += 26;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
