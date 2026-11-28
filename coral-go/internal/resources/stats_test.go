@@ -117,3 +117,44 @@ func TestAConnectedMachineThatCannotRunTheCommandIsUpWithNoStats(t *testing.T) {
 	assert.Equal(t, "ok", run(linuxOut, &RemoteExit{Code: 1}).remoteStats("epoch").State, "a Unix box whose last command exits non-zero still reads")
 	assert.Equal(t, "ok", run(linuxOut, nil).remoteStats("epoch").State)
 }
+
+// #22128: Windows' cmd.exe exits 255 on the stats script's POSIX redirects, the code ssh uses for a connection failure, so frontier showed unreachable and was closed to pool runs while its logins worked.
+// A failed read is told apart by one "exit 0" probe that every shell runs alike: it connects, so the box is up with no stats; it does not, so it is unreachable. A read that timed out is not probed again.
+func TestAWindowsBoxWhoseShellExits255IsUpNotUnreachable(t *testing.T) {
+	board := func(stats, probe error) (*StatsBoard, *[]string) {
+		var ran []string
+		return &StatsBoard{Run: func(_ context.Context, _, script string) (string, error) {
+			ran = append(ran, script)
+			if script == connectProbe {
+				return "", probe
+			}
+			return "", stats
+		}}, &ran
+	}
+	exit255 := errors.New("exit status 255")
+
+	b, ran := board(exit255, nil)
+	st := b.remoteStats("frontier")
+	assert.Equal(t, NoStats, st.State, "the shell's 255, and the probe connects: up with no stats")
+	assert.Equal(t, []string{statsScript, connectProbe}, *ran)
+	assert.False(t, (&StatsBoard{cache: map[string]Stats{"remote:frontier": st}}).Closed("frontier", "remote"), "so it stays open to pool runs")
+
+	b, _ = board(exit255, &RemoteExit{Code: 1})
+	assert.Equal(t, NoStats, b.remoteStats("frontier").State, "a probe that ran and exited non-zero connected too")
+
+	b, ran = board(exit255, exit255)
+	assert.Equal(t, "unreachable", b.remoteStats("frontier").State, "neither connects: unreachable")
+	assert.Len(t, *ran, 2)
+
+	slow, slowRan := &StatsBoard{}, 0
+	slow.Run = func(ctx context.Context, _, _ string) (string, error) {
+		slowRan++
+		<-ctx.Done()
+		return "", ctx.Err()
+	}
+	if testing.Short() {
+		t.Skip("the timeout case waits the read's 8 s")
+	}
+	assert.Equal(t, "unreachable", slow.remoteStats("frontier").State, "a read that timed out is unreachable")
+	assert.Equal(t, 1, slowRan, "and is not probed again")
+}
