@@ -138,13 +138,14 @@ export function needsLedger(cfg) {
     }
     function saveFile(row, save) { // the row leaves for Saved: the filled bookmark until it goes, then the keyboard on its neighbour (the button it was on is gone)
         const key = keyOf(row), node = root.querySelector(`.nl-row[data-needs-key="${CSS.escape(key)}"]`), shown = [...root.querySelectorAll('.nl-row')].filter(n => n.getClientRects().length), i = shown.indexOf(node), near = i < 0 ? '' : (shown[i + 1] || shown[i - 1])?.dataset.needsKey || '';
-        const mark = node?.querySelector('.nl-save-later'), had = node?.contains(document.activeElement); if (mark) { mark.disabled = true; mark.querySelector('.nl-icon').textContent = 'bookmark'; }
+        const mark = node?.querySelector('.nl-save-later'), had = node?.contains(document.activeElement); if (node?.classList.contains('nl-saving')) return Promise.resolve();
+        node?.classList.add('nl-saving'); if (mark) { mark.setAttribute('aria-disabled', 'true'); mark.querySelector('.nl-icon').textContent = 'bookmark'; } // aria-disabled, not disabled: the keyboard stays on it, so the row keeps showing the filled bookmark until it goes
         return Promise.resolve().then(save).then(async () => {
             for (let k = 0; k < 90 && node?.isConnected; k++) await new Promise(r => requestAnimationFrame(r));
             for (let k = 0; near && had && k < 60; k++) { // the list may redraw more than once as the reviews settle: put the keyboard back each time it is left on nothing
                 const a = document.activeElement; if (!a || a === document.body || !a.isConnected) document.querySelector(`.nl-row[data-needs-key="${CSS.escape(near)}"]`)?.focus({ preventScroll: true });
                 await new Promise(r => requestAnimationFrame(r)); }
-        }, () => { if (mark?.isConnected) { mark.disabled = false; mark.querySelector('.nl-icon').textContent = 'bookmark_border'; } });
+        }, () => { node?.classList.remove('nl-saving'); if (mark?.isConnected) { mark.removeAttribute('aria-disabled'); mark.querySelector('.nl-icon').textContent = 'bookmark_border'; } });
     }
     const newest = list => Math.max(0, ...list.map(timeOf)), ordered = list => [...list].sort((a, b) => timeOf(b) - timeOf(a) || keyOf(a).localeCompare(keyOf(b)));
     const prompts = ordered(rows.filter(permission)), rest = rows.filter(r => !permission(r));
