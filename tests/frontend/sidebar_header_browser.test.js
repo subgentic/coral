@@ -50,8 +50,8 @@ const SERVERS = [
             for (const c of ctl) assert.ok(Math.abs(c.cy - ctl[0].cy) <= 1, `${dev}: one centre line (${ctl.map(x => x.cy).join(', ')})`);
             if (dev === 'desktop') {
                 assert.ok(row.collapse && row.collapse.l > row.menu.r - 0.5, 'desktop: the collapse button is the last control, right of the display menu');
-                assert.ok(row.toggle && row.toggle.l > row.menu.r - 0.5 && row.collapse.l > row.toggle.r - 0.5, 'desktop: Display, then the one Collapse / Expand toggle, then the sidebar button');
-                const gaps = [row.search, row.menu, row.toggle, row.collapse].map((c, i, a) => i ? Math.round(c.l - a[i - 1].r) : null).filter(g => g !== null);
+                assert.equal(row.toggle, null, 'desktop: no Collapse / Expand toggle on the agent list (#22105, the Orchestrator\'s call 2 on the approved sidebar mock)');
+                const gaps = [row.search, row.menu, row.collapse].map((c, i, a) => i ? Math.round(c.l - a[i - 1].r) : null).filter(g => g !== null);
                 assert.ok(Math.max(...gaps) - Math.min(...gaps) <= 1, `desktop: even spacing (${gaps.join(', ')})`);
             }
 

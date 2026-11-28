@@ -164,7 +164,7 @@ const SLEEPING_PLACEHOLDER = '';
         assert.ok(r.filter(x => x.first).length <= 1, 'at most one first-page /chat');
         sb = await sidebar();
         assert.ok(sb.archived.some(x => x.sid === 'solo-awake-id') && !sb.main.includes('solo-awake-id'), 'the row moved to the Archived section');
-        assert.match(sb.summary, /^Archived \(6\)(?: · .*)?$/);
+        assert.match(sb.summary, /^Archived\s*6\s*▾$/);
         console.log('   ✓ archived view at once, 1 POST, ≤1 re-select, row moved, count 6');
 
         console.log('5. An archived agent: history, autoload, Sleep (unarchive) in place');
@@ -282,7 +282,7 @@ const SLEEPING_PLACEHOLDER = '';
         await ev(`(async () => { const mob = await import((window.__coralStatic||'/static/')+'mobile.js'); mob.syncMobileAgentList(); })()`);
         await waitFor(`!!document.querySelector('#mobile-session-list .archived-summary-row')`, 'mobile Archived row', 3000);
         let mb = await sidebar('#mobile-session-list');
-        assert.match(mb.summary || '', /^Archived \(1\)(?: · .*)?$/);
+        assert.match(mb.summary || '', /^Archived\s*1\s*▾$/);
         assert.ok(!mb.main.includes('m-arch-id'), 'mobile main list excludes the archived agent');
         await ev(`document.querySelector('#mobile-session-list .archived-summary-row').click()`);
         await waitFor(`!!document.querySelector('#mobile-session-list li[data-session-id="m-arch-id"]')`, 'tapping Archived on the phone shows the archived rows', 3000);

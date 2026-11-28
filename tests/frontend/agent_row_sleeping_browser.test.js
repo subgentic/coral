@@ -31,7 +31,7 @@ const row = (n, o) => Object.assign({ name: 'ag-' + n, session_id: uid(n), agent
         check(l.order.filter(x => !x.asleep).every(x => x.wake === null), 'an awake agent has no Wake button');
         await ev(`window.__woke = []; window.toggleAgentSleep = (...a) => { window.__woke.push(a.slice(0, 4)); return Promise.resolve(); }; true`);
         await ev(`document.querySelector('#live-sessions-list .session-group-item.sleeping').focus(); true`); await new Promise(r => setTimeout(r, 100)); // sleep-ok: focus-within applies
-        const focused = await ev(`(() => { const li = document.querySelector('#live-sessions-list .session-group-item.sleeping'); const w = li.querySelector('.session-name-row > .btn[data-mode="wake"]'), return [getComputedStyle(w).display]; })()`);
+        const focused = await ev(`(() => { const li = document.querySelector('#live-sessions-list .session-group-item.sleeping'); const w = li.querySelector('.session-name-row > .btn[data-mode="wake"]'); return [getComputedStyle(w).display]; })()`);
         check(focused[0] !== 'none', 'the keyboard on the row shows Wake: ' + JSON.stringify(focused));
         await shot('sleeping-rows-two');
         await ev(`document.querySelector('#live-sessions-list .session-group-item.sleeping .session-name-row > .btn[data-mode="wake"]').click(); true`); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the click's handlers run

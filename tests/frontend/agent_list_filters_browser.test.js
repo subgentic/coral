@@ -159,18 +159,17 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         assert.deepEqual(await chips(), []); assert.equal(await count(), '30 agents'); assert.equal(await badge(), '', 'cleared: no dot');
         await set('#al-sort', 'default');
 
-        console.log('7. With Collapse all: a filter shows its matches in collapsed groups, and clearing it folds them again');
-        const groupToggle = `document.querySelector('.sidebar-header [data-group-toggle]')`;
-        assert.equal(await ev(`${groupToggle}.hidden === false && ${groupToggle}.getAttribute('aria-label')`), 'Collapse all groups', 'one toggle in the header, beside the Display button');
-        await ev(`${groupToggle}.click(); true`);
+        console.log('7. With every group folded: a filter shows its matches in collapsed groups, and clearing it folds them again');
+        const groupToggle = `document.querySelector('.sidebar-header[data-header="agents"] [data-group-toggle]')`;
+        assert.equal(await ev(`!${groupToggle}`), true, 'no Collapse / Expand toggle in the agent list header (#22105)');
+        await ev(`import((window.__coralStatic || '/static/') + 'group_collapse.js').then(m => { m.toggleAllGroups(); return true; })`); // the list's own fold-all (its header button went in #22105)
         assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-header[aria-expanded="true"]').length`), 0, 'every group is folded');
-        await waitFor(`${groupToggle}.getAttribute('aria-label') === 'Expand all groups'`, 'the toggle now offers the way back');
         await set('#al-state', 'needs_input');
         assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-header[aria-expanded="false"]').length`), 0, 'while a filter is on its matches show');
         expectIds(await ids(), byState('needs_input'), 'the needs-input agents are all in the list');
         await set('#al-state', '');
         assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-header[aria-expanded="true"]').length`), 0, 'cleared: folded again');
-        await ev(`${groupToggle}.click(); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'group_collapse.js').then(m => { m.toggleAllGroups(); return true; })`);
         assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-header[aria-expanded="false"]').length`), 0, 'the second press opens them all');
 
         console.log('8. Long names: the row and the bar do not scroll sideways');

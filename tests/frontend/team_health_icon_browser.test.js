@@ -95,7 +95,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await icon(), null, 'a row that says the check is off: no icon, the settings are reached from the info button');
         await render(true);
         await ev(`document.querySelector('.team-health-item').closest('.sidebar-kebab-wrapper').querySelector('.sidebar-kebab-btn').click(); true`);
-        await waitFor(`document.querySelector('.team-health-item').getClientRects().length > 0`, 'the team menu is open');
+        await waitFor(`document.querySelector('.team-health-item').getClientRects().length > 0 && !!document.activeElement.closest('.sidebar-kebab-menu')`, 'the team menu is open, the keyboard in it'); // a scripted click is a keyboard open: the menu puts the focus on its first item first
         await ev(`document.querySelector('.team-health-item').focus(); true`);
         await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
         await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });

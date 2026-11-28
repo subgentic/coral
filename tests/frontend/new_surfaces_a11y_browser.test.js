@@ -125,7 +125,7 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`!!document.activeElement.closest('${hdr} [data-display-panel]')`), true, 'and moves the keyboard into it');
             const panel = await ax(`${hdr} [data-display-panel]`); assert.equal(panel.role, 'group'); assert.ok(panel.name, 'the panel is named');
             await ev(`(() => { const s = document.querySelector('${hdr} [data-display-panel] select'); const o = [...s.options].find(x => x.value); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            d = await ax(btn); assert.match(d.name, /Display options, 1 filter on/, 'the button says a filter is on: ' + d.name);
+            d = await ax(btn); assert.match(d.name, /^Group by: .+1 filter on$/, 'the button says a filter is on (its words, then the dot\'s name, #22105): ' + d.name);
             await key('Escape');
             assert.equal((await ax(btn)).props.expanded, false, 'Escape closes it'); assert.equal(await ev(`!!document.activeElement.closest('${btn}') || document.activeElement.matches('${btn}')`), true, 'and focus is back on the Display button');
             assert.equal(await ev(`document.querySelector('${hdr} [data-agent-list-summary]') === null`), true, 'no summary line under the search (#6597): the button names what is on');

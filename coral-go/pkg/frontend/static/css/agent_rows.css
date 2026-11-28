@@ -32,13 +32,13 @@
 :is(#live-sessions-list, #mobile-session-list) .task-id-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--radius-sm); }
 /* group headings like the other pages: "On a task 7", the count beside the words */
 :is(#live-sessions-list, #mobile-session-list) .status-sub, :is(#live-sessions-list, #mobile-session-list) .status-head { min-height: 0; margin: 14px 8px 4px 34px; padding: 0; }
-:is(#live-sessions-list, #mobile-session-list) :is(.status-sub, .status-head) .status-head-toggle { gap: 8px; align-items: baseline; min-height: 0; padding: 0; font-size: var(--fs-md); font-weight: var(--fw-title); color: var(--text-secondary); background: none; }
+:is(#live-sessions-list, #mobile-session-list) :is(.status-sub, .status-head) .status-head-toggle { gap: 8px; align-items: baseline; min-height: 0; padding: 0; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-secondary); background: none; }
 :is(#live-sessions-list, #mobile-session-list) :is(.status-sub, .status-head) .status-caret, :is(#live-sessions-list, #mobile-session-list) .status-head .status-shape { display: none; }
 :is(#live-sessions-list, #mobile-session-list) :is(.status-sub, .status-head) .session-group-count { margin: 0; padding: 0; border: 0; background: none; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-muted); }
 /* the team line: the name and its count; its "⋯" on a hover of the line itself */
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header { padding: 6px 8px !important; box-shadow: none; border-radius: var(--radius-md); }
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
-:is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header .group-name-text { font-size: var(--fs-lg); font-weight: var(--fw-title); }
+:is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header .group-name-text { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header .session-group-count { margin-inline-start: 8px; padding: 0; border: 0; background: none; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-muted); }
 :is(#live-sessions-list, #mobile-session-list) .session-team-group:hover > .board-card-header .group-kebab-btn { opacity: 0; }
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header:is(:hover, :focus-within) .group-kebab-btn { opacity: 1; }
@@ -49,7 +49,7 @@
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .archived-n { color: var(--text-muted); }
 /* Group by beside the search box */
 .sidebar-header[data-header="agents"] { justify-content: flex-start; }
-.sidebar-header[data-header="agents"] .sidebar-search { flex: 1 1 0; min-width: 5em; } /* the controls share one line; the Display panel (100%) wraps under them */
+:is(#live-sessions-list, #mobile-session-list) .board-card-agents .status-workers-sum { padding-inline-start: 36px; } /* the folded workers' line starts under the orchestrator's mark */
 .sidebar-groupby-btn { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; margin: 0; min-width: 0; overflow: hidden; } /* the family's .btn (its height, border and type); only its place here */
 .sidebar-groupby-btn b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-strong); margin-inline-start: 2px; } /* a narrow sidebar cuts the words, never the search box */
 .sidebar-groupby-btn .material-icons { font-size: var(--fs-xl); }

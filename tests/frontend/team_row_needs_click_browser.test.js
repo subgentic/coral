@@ -31,6 +31,7 @@ const row = (id, team) => ({ session_id: id, name: id, agent_type: 'claude', wor
                 await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(${JSON.stringify([row('a1', ALPHA), row('b1', 'beta')])}); true`);
                 await waitFor(`!!${header} && !!${header}.querySelector('.team-needs-item')`, at + 'the Needs you item in the team menu', 15000);
                 await ev(what);
+                if (key) { await waitFor(`!!document.activeElement.closest('.sidebar-kebab-menu')`, at + 'the keyboard is in the menu', 5000); await ev(`${header}.querySelector('.team-needs-item').focus(); true`); } // a scripted click opens the menu as a key does: its first item takes the focus first
                 if (key) { await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }); }
                 await waitFor(`!!window.__tp.tablist()`, at + 'the team page', 10000);
                 await waitFor(`window.__tp.allTabs().some(x => x.getAttribute('aria-selected') === 'true')`, at + 'a tab is open', 10000);
@@ -41,7 +42,7 @@ const row = (id, team) => ({ session_id: id, name: id, agent_type: 'claude', wor
             }
             if (chip === 'key') assert.equal(await ev(`(() => { const c = ${header}.querySelector('.team-needs-item'); return c.tagName === 'BUTTON' && c.tabIndex >= 0 && /^Needs you/.test(c.textContent.trim()); })()`), true, at + 'the item is a button with a name, so the keyboard reaches it');
             const menu = `${header}.querySelector('.group-kebab-btn').click();`; // the item is in the team's ⋯ menu
-            await openFrom(chip === 'key' ? `${menu} ${header}.querySelector('.team-needs-item').focus(); true` : chip ? `${menu} ${header}.querySelector('.team-needs-item').click(); true` : `${header}.click(); true`, chip === 'key');
+            await openFrom(chip === 'key' ? `${menu} true` : chip ? `${menu} ${header}.querySelector('.team-needs-item').click(); true` : `${header}.click(); true`, chip === 'key');
             await settle(600); // the page draws its tab before the picture
             if (process.env.CORAL_SCREENSHOT_DIR && chip) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${process.env.SHOT_TAG || 'after'}-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } // after the chip's click: the tab that opened
             assert.equal(await selected(), chip ? 'Needs you' : 'Goals', at + (chip ? 'the item opens Needs you' : 'the rest of the row opens the team on Goals'));
