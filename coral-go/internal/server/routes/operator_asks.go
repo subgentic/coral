@@ -58,6 +58,9 @@ type operatorAskRow struct {
 	TaskInReview bool `json:"task_in_review,omitempty"`
 	// Superseded: the same agent has asked again on this team since (#15078). The row says so and offers Dismiss first; nothing is closed on its own.
 	Superseded bool `json:"superseded,omitempty"`
+	// AnswerText and AnsweredAt: on a row of ?state=answered (#22106), the Operator's latest reply to the question (cleaned, cut like Text) and when they posted it; absent on an open question.
+	AnswerText string `json:"answer_text,omitempty"`
+	AnsweredAt string `json:"answered_at,omitempty"`
 	// Key is the id of the first of the questions that are the same question (post --ask --same-as, #17738): rows with one key are one question to answer once. Absent for a question that is alone.
 	Key int64 `json:"key,omitempty"`
 }
@@ -88,6 +91,10 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if refuseUnlessPerson(w, r, "read the questions asked of them") {
+		return
+	}
+	if r.URL.Query().Has("state") {
+		h.answeredOperatorAsks(w, r)
 		return
 	}
 	paged, pagedLimit, pagedAfter, ok := operatorAsksPageParams(w, r)
@@ -259,4 +266,92 @@ func pageOperatorAsks(rows []operatorAskRow, limit int, after *operatorAskPos) m
 		out["asks"] = rows[start:end]
 	}
 	return out
+}
+
+// answeredOperatorAsks answers GET /api/operator-asks?board=<team>&goal=<id>&state=answered[&limit=N][&cursor=C] (#22106): the questions about one goal that the Operator answered, newest first, each with the
+// Operator's latest reply. The envelope is the paged one: {asks, has_more, next_cursor}. Owner-only, as the open list is (the caller checked); bounded by limit (1 to 100, default 50) and by the store's scan.
+func (h *BoardHandler) answeredOperatorAsks(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	if q.Get("state") != "answered" {
+		errBadRequest(w, "state must be answered")
+		return
+	}
+	boardID := q.Get("board")
+	goalID, gerr := strconv.ParseInt(q.Get("goal"), 10, 64)
+	if boardID == "" || gerr != nil || goalID < 1 {
+		errBadRequest(w, "board and goal are required: the answered questions of one goal")
+		return
+	}
+	limit := 50
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 100 {
+			errBadRequest(w, "limit must be 1 to 100")
+			return
+		}
+		limit = n
+	}
+	var before int64
+	if c := q.Get("cursor"); c != "" {
+		raw, err := base64.RawURLEncoding.DecodeString(c)
+		var pos struct {
+			ID int64 `json:"i"`
+		}
+		if len(c) > 256 || err != nil || json.Unmarshal(raw, &pos) != nil || pos.ID < 1 {
+			errBadRequest(w, "invalid cursor")
+			return
+		}
+		before = pos.ID
+	}
+	ctx := r.Context()
+	projects, err := h.bs.ListProjects(ctx)
+	if err != nil {
+		errInternalServer(w, "could not read the boards")
+		return
+	}
+	var label string
+	found := false
+	for _, p := range projects {
+		if p.Project == boardID && !p.Archived {
+			found, label = true, clitext.CleanName(p.BoardLabel)
+		}
+	}
+	out := map[string]any{"asks": []operatorAskRow{}, "has_more": false}
+	if !found {
+		writeJSON(w, http.StatusOK, out) // an unknown or put-away team has none, as the open list leaves it out
+		return
+	}
+	answered, more, err := h.bs.AnsweredAsksForGoal(ctx, boardID, board.OperatorName, goalID, limit, before)
+	if err != nil {
+		errInternalServer(w, "could not read the questions")
+		return
+	}
+	subjects, links := h.askSubjects(ctx, boardID, askIDsOf(answered))
+	rows := make([]operatorAskRow, 0, len(answered))
+	for _, a := range answered {
+		text, cut := operatorAskText(a.Content)
+		row := operatorAskRow{Board: boardID, BoardLabel: label, Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339),
+			GoalID: a.GoalID, TaskID: a.TaskID, GoalTitle: links.goalTitle(ctx, a.GoalID), TaskTitle: links.taskTitle(ctx, a.TaskID), MayNoLongerApply: subjects[a.MessageID].MayNoLongerApply}
+		if a.AnswerText != "" {
+			row.AnswerText, _ = operatorAskText(a.AnswerText)
+			row.AnsweredAt = a.AnsweredAt.UTC().Format(time.RFC3339)
+		}
+		rows = append(rows, row)
+	}
+	out["asks"] = rows
+	if more && len(answered) > 0 {
+		raw, _ := json.Marshal(struct {
+			ID int64 `json:"i"`
+		}{answered[len(answered)-1].MessageID})
+		out["has_more"], out["next_cursor"] = true, base64.RawURLEncoding.EncodeToString(raw)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func askIDsOf(a []board.AnsweredGoalAsk) []int64 {
+	ids := make([]int64, len(a))
+	for i, x := range a {
+		ids[i] = x.MessageID
+	}
+	return ids
 }
