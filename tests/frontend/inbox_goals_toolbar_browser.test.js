@@ -46,6 +46,18 @@ const GOALS = [
             if (!mobile) check(`${label}: the folder opens on Active, as the team page does (#16371)`, await ev(`document.querySelector('.team-tb-pills [aria-pressed="true"]')?.dataset.filter === 'active'`));
             await pick('all'); // the rest of this suite includes open and finished goals
             await waitFor(`document.querySelectorAll('.goal-decision-title').length === 5`, 'all five goals including the finished one', 10000); await settle(300);
+            { // #22056: one expand-all / collapse-all icon beside New goal, named for what it does next; no robot on this toolbar
+                const fold = () => ev(`(() => { const b = document.querySelector('.inbox-folder-toolbar .goals-fold-all'), r = b && b.getBoundingClientRect(), tg = [...document.querySelectorAll('.goal-decision-toggle')].map(t => t.getAttribute('aria-expanded')); return { label: b && b.getAttribute('aria-label'), icon: b && b.querySelector('.material-icons').textContent, title: b && b.title, w: r && Math.round(r.width), h: r && Math.round(r.height), tg, robot: !!document.querySelector('.inbox-folder-toolbar .agent-copy'), beforeNew: !!(b && b.nextElementSibling && b.nextElementSibling.classList.contains('goals-new')) }; })()`);
+                const press = async () => { await ev(`document.querySelector('.inbox-folder-toolbar .goals-fold-all').click(); true`); await settle(250); };
+                let f = await fold();
+                check(`${label}: some goals are open, so the icon says Expand all goals (unfold_more); there is no robot here`, f.label === 'Expand all goals' && f.icon === 'unfold_more' && f.title === f.label && f.tg.includes('true') && f.tg.includes('false') && !f.robot, JSON.stringify(f));
+                check(`${label}: the icon sits right before New goal`, f.beforeNew, JSON.stringify(f));
+                if (mobile) check(`${label}: a 44 px target`, f.w >= 44 && f.h >= 44, `${f.w}x${f.h}`);
+                await press(); f = await fold();
+                check(`${label}: pressed, every goal is open and the icon says Collapse all goals (unfold_less)`, f.tg.length === 5 && f.tg.every(x => x === 'true') && f.label === 'Collapse all goals' && f.icon === 'unfold_less', JSON.stringify(f));
+                await press(); f = await fold();
+                check(`${label}: pressed again, every goal is folded and the icon says Expand all goals`, f.tg.every(x => x === 'false') && f.label === 'Expand all goals' && f.icon === 'unfold_more', JSON.stringify(f));
+            }
 
             check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box, not on the heading"}`, await ev(`(() => { const a = document.activeElement; const inSearch = !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : 'inSearch'}; })()`), await ev(`document.activeElement && (document.activeElement.id || document.activeElement.className || document.activeElement.tagName)`));
             const g = await geometry();
