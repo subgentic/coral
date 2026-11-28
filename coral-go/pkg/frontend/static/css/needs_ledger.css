@@ -670,7 +670,7 @@
 }
 
 @media(max-width:767px) {
-    .needs-ledger-toolbar .nl-toolbar-actions { gap:6px; margin-left:0; }
+    .needs-ledger-toolbar .nl-toolbar-actions { gap:6px; margin-left:0; flex-wrap:nowrap; width:100%; justify-content:flex-end; }
     .needs-ledger-toolbar .nl-toolbar-actions .nl-visible-group { margin-left:0; }
     .needs-ledger-toolbar .nl-toolbar-actions .nl-visible-group select { width:6.5rem; min-width:0; }
     .needs-ledger-toolbar .nl-visible-group .list-bar-field-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
@@ -851,6 +851,5 @@
     .needs-ledger-toolbar .team-tb-pills button { min-width:44px; }
 }
 @media(max-width:767px) {
-    .needs-ledger-toolbar .nl-toolbar-actions { flex-wrap:nowrap; width:100%; justify-content:flex-end; }
     .needs-ledger-toolbar .nl-toolbar-actions .list-bar-toggle { margin:0; }
 }
