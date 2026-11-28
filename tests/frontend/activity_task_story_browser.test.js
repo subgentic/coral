@@ -8,7 +8,7 @@ const BASE=require('./test_base').BASE;
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  try{
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
-  await Page.addScriptToEvaluateOnNewDocument({source:`localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode');localStorage.removeItem('coral-inbox-task-open');localStorage.removeItem('coral-inbox-activity-filters');`});
+  await Page.addScriptToEvaluateOnNewDocument({source:`localStorage.removeItem('coral-inbox-group-review-goal');localStorage.removeItem('coral-inbox-group-mode');localStorage.removeItem('coral-inbox-activity-group-mode');localStorage.removeItem('coral-inbox-task-open');localStorage.removeItem('coral-inbox-activity-filters');`});
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev,'startup','settings');
