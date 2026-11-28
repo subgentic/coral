@@ -12,8 +12,8 @@ const { guardSettings } = require('./helpers/settings_guard');
     const team = 'goal-news-' + Date.now().toString(36), failures = [];
     const T = '#group-table-view';
     const STAMPS = Object.fromEntries([1, 2, 3, 4].map(id => [id, new Date(Date.now() - id * 60000).toISOString()])); // fixed once: the same strings in the stub and in the saved read list
-    const rowOf = text => `[...document.querySelectorAll('${T} tbody tr, ${T} .goal-decision-card')].find(r => r.textContent.includes(${JSON.stringify(text)}))`;
-    const tagOn = text => ev(`(() => { const r = ${rowOf(text)}; return !![...r.querySelectorAll('.dt-tag, .goal-new-comments')].find(t => t.textContent.trim() === 'New comments') || (innerWidth < 500 && /New comments/.test(r.textContent)); })()`); // a phone's Goals row is the mail row: the words lead its second line
+    const rowOf = text => `[...document.querySelectorAll('${T} .nl-row, ${T} .goal-decision-card')].find(r => r.textContent.includes(${JSON.stringify(text)}))`;
+    const tagOn = text => ev(`(() => { const r = ${rowOf(text)}; return !![...r.querySelectorAll('.dt-tag, .goal-new-comments, .nl-meta')].find(t => t.textContent.trim() === 'New comments') || (innerWidth < 500 && /New comments/.test(r.textContent)); })()`); // a phone's Goals row is the mail row: the words lead its second line
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const width of [1280, 390]) {
@@ -36,20 +36,20 @@ const { guardSettings } = require('./helpers/settings_guard');
                         return original(url, opts);
                     }; return true;
                 })()`);
-                await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
+                await ev(`localStorage.removeItem('coral.inbox.tab'); localStorage.setItem('coral-inbox-group-mode','none'); window.switchNavTab('hub-inbox'); true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${rowOf('Goal with news')})&&!!(${rowOf('Goal without news')})&&!!(${rowOf('Read goal with news')})&&!!(${rowOf('Read goal without news')})`, 'the four goals look done in Needs you', 20000);
                 assert.ok(await tagOn('Goal with news'), 'the goal looks done row says New comments');
                 assert.ok(!(await tagOn('Goal without news')), 'the other has none');
-                const titleDrawn = await ev(`(() => { const tr = ${rowOf('Goal with news')}; const t = [...tr.querySelectorAll('*')].find(e => (e.children.length === 0 && /looks done: Goal with news/.test(e.textContent)) || (e.classList.contains('inbox-review-name') && e.textContent.trim().startsWith('Goal with news')) /* a phone's title is its own line under the intro (#13911) */); if (!t) return { error: 'no title' }; t.scrollIntoView({ block: 'center' }); const b = t.getBoundingClientRect(), hit = document.elementFromPoint(b.left + Math.min(20, b.width / 2), b.top + b.height / 2); return { w: Math.round(b.width), h: Math.round(b.height), onTop: !!hit && (hit === t || t.contains(hit)) }; })()`);
+                const titleDrawn = await ev(`(() => { const tr = ${rowOf('Goal with news')}; const t = [...tr.querySelectorAll('*')].find(e => (e.children.length === 0 && /looks done: Goal with news/.test(e.textContent)) || ((e.classList.contains('inbox-review-name') || e.classList.contains('nl-title')) && e.textContent.trim().startsWith('Goal with news')) /* a phone's title is its own line under the intro (#13911) */); if (!t) return { error: 'no title' }; t.scrollIntoView({ block: 'center' }); const b = t.getBoundingClientRect(), hit = document.elementFromPoint(b.left + Math.min(20, b.width / 2), b.top + b.height / 2); return { w: Math.round(b.width), h: Math.round(b.height), onTop: !!hit && (hit === t || t.contains(hit)) }; })()`);
                 assert.ok(titleDrawn.w > 40 && titleDrawn.h >= 10 && titleDrawn.onTop, 'the title is drawn beside its marker (not clipped by the phone margin rule): ' + JSON.stringify(titleDrawn));
-                assert.equal(await ev(`[...document.querySelectorAll('${T} tbody tr, ${T} .goal-decision-card')].filter(r => /Goal #1 /.test(r.textContent)).length`), 1, 'the same row, not a second item');
+                assert.equal(await ev(`[...document.querySelectorAll('${T} .nl-row, ${T} .goal-decision-card')].filter(r => r.dataset.needsKey?.endsWith(':1')).length`), 1, 'the same row, not a second item');
                 assert.ok(await tagOn('Read goal with news'), 'a goal opened before, with news since, says New comments');
                 assert.ok(!(await tagOn('Read goal without news')), 'a read goal with no news carries none');
                 // one number: the unread rows are counted, a read goal with news again among them, a read one without news is listed and not counted
-                assert.equal(await ev(`(document.querySelector('${T} .session-group-count') || {}).textContent`), '3', 'the heading counts the goal with news, the other unread one, and the read one that has news again');
-                assert.ok(await ev(`[...document.querySelectorAll('${T} tbody tr, ${T} .goal-decision-card')].find(r => /Read goal without news/.test(r.textContent)).classList.contains('dt-read')`), 'the read goal without news is drawn read');
-                assert.ok(!(await ev(`[...document.querySelectorAll('${T} tbody tr, ${T} .goal-decision-card')].find(r => /Read goal with news/.test(r.textContent)).classList.contains('dt-read')`)), 'and the one with news is drawn unread');
+                assert.equal(await ev(`(document.querySelector('${T} .nl-summary-new') || {}).textContent`), '· 3 new', 'the heading counts the goal with news, the other unread one, and the read one that has news again');
+                assert.ok(await ev(`[...document.querySelectorAll('${T} .nl-row, ${T} .goal-decision-card')].find(r => /Read goal without news/.test(r.textContent)).querySelector('.nl-new') === null`), 'the read goal without news is drawn read');
+                assert.ok(!(await ev(`[...document.querySelectorAll('${T} .nl-row, ${T} .goal-decision-card')].find(r => /Read goal with news/.test(r.textContent)).querySelector('.nl-new') === null`)), 'and the one with news is drawn unread');
                 // the Goals list
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('goals')).then(()=>true)`);
                 await waitFor(`!!(${rowOf('Goal with news')})&&!!(${rowOf('Goal without news')})`, 'both goals in the Goals list', 20000);

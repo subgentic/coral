@@ -11,10 +11,10 @@ const { coralReady } = require('./helpers/wait');
     const B = 'gcr-' + Date.now().toString(36);
     const S = `(window.__coralStatic || '/static/')`;
     const api = (method, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body === undefined ? 'undefined' : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
-    const openNeeds = () => ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
+    const openNeeds = () => ev(`localStorage.setItem('coral-inbox-group-mode','none'); window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
     const needsCount = () => ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs)`);
     const countIs = n => waitFor(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs === ${n})`, `the count is ${n}`, 15000).catch(() => {}); // the rows come from the goals read, the count from the counts read: wait for the count, then assert it (#17540)
-    const rowTitles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => e.textContent)`);
+    const rowTitles = () => ev(`[...document.querySelectorAll('#group-table-view .nl-title')].map(e => e.textContent)`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -30,7 +30,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal((await api('POST', `/api/board/${B}/goals/${c}/close`, { subscriber_id: 'orch', state: 'done', reason: 'All tasks done' })).status, 200);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); // a fresh page: it reads the closed goals again
         await openNeeds();
-        await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${a} closed as done by orch'))`, 'the agent-closed goal has its row', 15000);
+        await waitFor(`[...document.querySelectorAll('#group-table-view .nl-title')].some(e => e.textContent.includes('Goal #${a} closed as done by orch'))`, 'the agent-closed goal has its row', 15000);
         const titles = await rowTitles();
         assert.ok(titles.some(t => t.includes(`Goal #${c} closed as done by orch`)), 'the second agent-closed goal too: ' + JSON.stringify(titles));
         assert.ok(!titles.some(t => t.includes(`Goal #${b} `)), 'a goal the Operator closed has no row: ' + JSON.stringify(titles));
@@ -38,14 +38,14 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs === ${baseline + 2})`, 'the count follows the rows (the rows and the count are two reads)', 15000).catch(() => {}); // the rows are drawn from the goals read, the count from the counts read: wait for it, then assert it
         assert.equal(await needsCount(), baseline + 2, 'counted (#16753): two goals the person made, closed by an agent, add two (the one the Operator closed adds nothing)');
         assert.equal(Number(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`) || 0), Number(baselineBadge || 0) + 2, 'the Inbox badge moves with it');
-        const press = (goal, label) => ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view tr')].find(r => r.textContent.includes('Goal #${goal} closed as done')); const btn = tr && [...tr.querySelectorAll('button')].find(x => x.textContent === ${JSON.stringify(label)}); if (btn) btn.click(); return !!btn; })()`);
+        const press = (goal, label) => ev(`(() => { const tr = [...document.querySelectorAll('#group-table-view .nl-row')].find(r => r.textContent.includes('Goal #${goal} closed as done')); const btn = tr && [...tr.querySelectorAll('button')].find(x => x.textContent === ${JSON.stringify(label)}); if (btn) btn.click(); return !!btn; })()`);
         assert.ok(await press(a, 'Reopen'), 'Reopen is on the row');
-        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${a} closed as done'))`, 'Reopen takes the row away', 10000);
+        await waitFor(`![...document.querySelectorAll('#group-table-view .nl-title')].some(e => e.textContent.includes('Goal #${a} closed as done'))`, 'Reopen takes the row away', 10000);
         assert.equal((await api('GET', `/api/board/${B}/goals/${a}`)).body.state, 'active', 'the goal is active again');
         await countIs(baseline + 1);
         assert.equal(await needsCount(), baseline + 1, 'Reopen takes its count away');
         assert.ok(await press(c, 'Dismiss'), 'Dismiss is on the row');
-        await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${c} closed as done'))`, 'Dismiss takes the row away', 10000);
+        await waitFor(`![...document.querySelectorAll('#group-table-view .nl-title')].some(e => e.textContent.includes('Goal #${c} closed as done'))`, 'Dismiss takes the row away', 10000);
         assert.equal((await api('GET', `/api/board/${B}/goals/${c}`)).body.state, 'done', 'dismissed, not reopened');
         await countIs(baseline);
         assert.equal(await needsCount(), baseline, 'Dismiss takes its count away');

@@ -11,7 +11,7 @@ const { coralReady } = require('./helpers/wait');
     const B = 'gcc-' + Date.now().toString(36);
     const S = `(window.__coralStatic || '/static/')`;
     const api = (method, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body === undefined ? 'undefined' : JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
-    const openNeeds = () => ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
+    const openNeeds = () => ev(`localStorage.setItem('coral-inbox-group-mode','none'); window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const f = window.fetch.bind(window); window.fetch = (u, o) => (window.__slowSettings && String(u).startsWith('/api/settings') && (!o || !o.method || o.method === 'GET')) ? new Promise(r => setTimeout(r, 3000)).then(() => f(u, o)) : f(u, o); })();` }); // sleep-ok: the settings read is held on purpose, so the goals read is known to be unfinished while the row is drawn
@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
         const baseline = await ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs)`);
         await ev(`window.__slowSettings = true; true`);
         await openNeeds();
-        await waitFor(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.textContent.includes('Goal #${g.body.id} closed as done by orch'))`, 'the agent-closed goal has its row', 20000);
+        await waitFor(`[...document.querySelectorAll('#group-table-view .nl-title')].some(e => e.textContent.includes('Goal #${g.body.id} closed as done by orch'))`, 'the agent-closed goal has its row', 20000);
         const at = await ev(`import(${S} + 'inbox_tab.js').then(m => m.inboxCountsNow().needs)`);
         assert.equal(at, baseline + 1, 'the count is up by one when the row is there, not 3 s later');
         console.log('PASS the count of a goal an agent closed arrives with its row');

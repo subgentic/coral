@@ -14,10 +14,10 @@ const B = 'goal-done-unc-' + Date.now().toString(36);
     const api = (method, path, body) => ev(`fetch('/api/board/${B}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const root = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const T = '#group-table-view';
-    const doneRows = () => ev(`[...document.querySelectorAll('${T} tbody tr')].filter(tr => /looks done/.test(tr.textContent)).map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), buttons: [...tr.querySelectorAll('button')].map(b => b.textContent.trim()) }))`);
+    const doneRows = () => ev(`[...document.querySelectorAll('${T} .nl-row')].filter(tr => tr.dataset.needsKey.includes('goal_done:')).map(tr => ({ text: tr.textContent.replace(/\\s+/g, ' ').trim(), buttons: [...tr.querySelectorAll('button')].map(b => b.textContent.trim()) }))`);
     const openNeeds = async () => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
-        await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
+        await ev(`localStorage.removeItem('coral.inbox.tab'); localStorage.setItem('coral-inbox-group-mode','none'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
     };
     const task = async (gid, finish) => {
@@ -42,11 +42,11 @@ const B = 'goal-done-unc-' + Date.now().toString(36);
         const gid = g.json.id || g.json.goal.id;
         await task(gid, true);
         await openNeeds();
-        await waitFor(`/looks done/.test(document.querySelector('${T}')?.textContent || '')`, 'the goal item', 20000);
+        await waitFor(`!!document.querySelector('${T} .nl-row[data-needs-key*="goal_done:"]')`, 'the goal item', 20000);
         await waitFor(`/not committed/.test(document.querySelector('${T}')?.textContent || '')`, 'the uncommitted words on the row', 8000);
         const rows = await doneRows();
         assert.match(rows[0].text, /3 files in shop not committed/, 'the row says the folder has files not committed: ' + rows[0].text);
-        await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => /looks done/.test(tr.textContent)).querySelector('.inbox-review-name').click(); true`);
+        await ev(`[...document.querySelectorAll('${T} .nl-row')].find(tr => tr.dataset.needsKey.includes('goal_done:')).querySelector('.nl-title').click(); true`);
         // Goal updates replace this box. Capture one complete render in the wait's
         // evaluation, so a redraw cannot split the words from their buttons.
         await waitFor(`(() => {
