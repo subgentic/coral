@@ -1,6 +1,7 @@
-// Phone Needs you, the mobile pass's four findings (#11894, #11891): a question shows up to two lines, not one; a goal proposal's row is laid out like the other rows (who proposed it leads, the same type, a plain second
-// line) and the Goals tab counts the goal waiting for approval; a long press selects a goal row instead of opening its card; and the card says Done when once (not again under "Also sets") with Approve first and wide,
-// the other three buttons in one row under it. A question and the four proposals are page stubs (the proposals' routes as in proposals_browser). 390 px.
+// Phone Needs you, the mobile pass's four findings (#11894, #11891), on the Needs you list (article.nl-row, #22094): a question's title shows all its lines, not one; a goal proposal's row is laid out like the other rows (who
+// proposed it is the title .nl-title in the same type as the question's, its meta line .nl-meta in the same type, the proposal in a plain line .nl-other-text) and the Goals tab counts the goal waiting for approval; selecting a goal row
+// (Select in the phone title bar, then its check) opens no card and the selection bar offers no Approve and cannot Dismiss it; and the card says Done when once (not again under "Also sets") with Approve first and wide, the other
+// three buttons in one row under it. A question and the four proposals are page stubs (the proposals' routes as in proposals_browser). 390 px.
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
@@ -33,9 +34,9 @@ const STUB = `(() => {
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect(); const failures = [];
     const check = (ok, what) => { if (!ok) failures.push(what); };
-    const T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
+    const T = '#group-table-view .needs-ledger', S = `(window.__coralStatic || '/static/')`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const rowOf = re => `[...document.querySelectorAll('${T} tbody tr')].find(r => ${re}.test(r.textContent))`;
+    const rowOf = re => `[...document.querySelectorAll('${T} .nl-row')].find(r => ${re}.test(r.textContent))`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
@@ -48,18 +49,18 @@ const STUB = `(() => {
         await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await ev(`import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`);
-        await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 5`, 'rows', 15000); await ev(framesJs(8));
+        await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 5`, 'rows', 15000); await ev(`document.querySelectorAll('${T} .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`); await ev(framesJs(8)); // a goal group starts folded unless it holds a question: open them all
         // (1) a question shows up to two lines
-        const q = await ev(`(() => { const n = (${rowOf('/Which port/')}).querySelector('.inbox-review-name'), cs = getComputedStyle(n), lh = parseFloat(cs.lineHeight) || 1.4 * parseFloat(cs.fontSize); return { lines: Math.round(n.getBoundingClientRect().height / lh), clamp: cs.webkitLineClamp, text: n.textContent.length }; })()`);
+        const q = await ev(`(() => { const n = (${rowOf('/Which port/')}).querySelector('.nl-title'), cs = getComputedStyle(n), lh = parseFloat(cs.lineHeight) || 1.4 * parseFloat(cs.fontSize); return { lines: Math.round(n.getBoundingClientRect().height / lh), clamp: cs.webkitLineClamp, text: n.textContent.length }; })()`);
         check(q.lines >= 3 && q.clamp === 'none', 'a long question shows all its lines, not two (#14574): ' + JSON.stringify(q));
         // (4) a goal proposal's row is laid out like the other rows: who proposed it leads, the same name type; Goals counts it
-        const r = await ev(`(() => { const pr = ${rowOf('/Ship the beta/')}, ask = ${rowOf('/Which port/')}, st = e => e && { fs: getComputedStyle(e).fontSize, fw: getComputedStyle(e).fontWeight }, from = pr.querySelector('.inbox-review-from'), line = pr.querySelector('.inbox-proposal-line'); return { from: from && from.textContent, fromSt: st(from), askFrom: st(ask.querySelector('.inbox-review-from')), nameSt: st(pr.querySelector('.inbox-review-name')), askName: st(ask.querySelector('.inbox-review-name')), lineSt: st(line), lineText: line && line.textContent }; })()`);
-        check(r.from === 'Orchestrator' && JSON.stringify(r.fromSt) === JSON.stringify(r.askFrom) && r.fromSt.fs === r.askFrom.fs, 'a goal proposal row leads with who proposed it, in the same type as the other rows (a question row (#13829) has the agent name first too, its ask under it): ' + JSON.stringify(r));
-        check(r.lineText === null && r.lineSt === null, 'a phone draws no "Proposes a goal" line: the proposer is line one and the proposal line two (#13911): ' + JSON.stringify(r));
+        const r = await ev(`(() => { const pr = ${rowOf('/Ship the beta/')}, ask = ${rowOf('/Which port/')}, st = e => e && { fs: getComputedStyle(e).fontSize, fw: getComputedStyle(e).fontWeight }, title = pr.querySelector('.nl-title'), line = pr.querySelector('.nl-other-text'); return { from: title && title.textContent, fromSt: st(title), askFrom: st(ask.querySelector('.nl-title')), metaSt: st(pr.querySelector('.nl-meta')), askMeta: st(ask.querySelector('.nl-meta')), lineSt: st(line), lineText: line && line.textContent, proposes: (pr.innerText.match(/Proposes a goal/g) || []).length, lines: pr.querySelectorAll('.nl-other-text').length, lineBelow: !!line && line.getBoundingClientRect().top >= title.getBoundingClientRect().bottom - 1 }; })()`);
+        check(r.from === 'Orchestrator' && JSON.stringify(r.fromSt) === JSON.stringify(r.askFrom) && JSON.stringify(r.metaSt) === JSON.stringify(r.askMeta), 'a goal proposal row leads with who proposed it, in the same type as the other rows (the title and the meta line as a question row\'s): ' + JSON.stringify(r));
+        check(r.proposes === 1 && r.lines === 1 && /Ship the beta/.test(r.lineText || '') && r.lineBelow, 'a phone draws no extra "Proposes a goal" line: the proposer is line one and the proposal one plain line under it, said once (#13911): ' + JSON.stringify(r));
         const goals = await ev(`[...document.querySelectorAll('#inbox-nav-list button, .view-list-item')].filter(b => /Goals/.test(b.textContent)).map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);
         check(goals.length > 0 && goals.every(t => /Goals\s*1$/.test(t)), 'the Goals tab counts the goal waiting for approval: ' + JSON.stringify(goals));
         // (3) the card: Done when once, Approve first and as wide as the card
-        await ev(`${rowOf('/Ship the beta/')}.querySelector('.dt-primary, .inbox-review-name, td').click(); true`);
+        await ev(`${rowOf('/Ship the beta/')}.querySelector('.nl-title').click(); true`);
         await waitFor(`!!document.querySelector('dialog[open] .proposal-buttons')`, 'the card', 8000); await ev(framesJs(6));
         const card = await ev(`(() => { const d = document.querySelector('dialog[open]'), b = [...d.querySelectorAll('.proposal-buttons button')].filter(x => x.getClientRects().length), ap = b.find(x => x.textContent === 'Approve'), rest = b.filter(x => x !== ap), box = d.getBoundingClientRect(); return { also: /Also sets/.test(d.textContent), doneWhen: (d.textContent.match(/Done when/g) || []).length, apW: Math.round(ap.getBoundingClientRect().width), cardW: Math.round(box.width), first: rest.every(x => ap.getBoundingClientRect().top < x.getBoundingClientRect().top), restRows: new Set(rest.map(x => Math.round(x.getBoundingClientRect().top))).size }; })()`);
         check(!card.also && card.doneWhen === 1, 'the card says Done when once, not again under "Also sets": ' + JSON.stringify(card));
@@ -67,13 +68,12 @@ const STUB = `(() => {
         await shot('needs-phone-proposal-card');
         await ev(`[...document.querySelectorAll('dialog[open] .proposal-buttons button')].find(b => b.textContent === 'Close').click(); true`);
         await waitFor(`!document.querySelector('dialog[open]')`, 'the card closes', 4000);
-        // (5) a long press selects the goal row, it does not open its card
-        const pt = await ev(`(() => { const row = ${rowOf('/Ship the beta/')}; row.scrollIntoView({ block: 'center' }); const r = row.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
-        const touch = (type, x, y) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
-        await touch('touchStart', pt.x, pt.y); await ev(`new Promise(r => setTimeout(r, 900))`); await touch('touchEnd', pt.x, pt.y); await ev(framesJs(6)); // sleep-ok: the press is held
-        const sel = await ev(`({ dialog: !!document.querySelector('dialog[open]'), selected: ${rowOf('/Ship the beta/')}.classList.contains('dt-selected'), bar: !!document.querySelector('.dt-select-bar, .dt-bar [class*=selected], .gt-toolbar .dt-bar') })`);
-        check(!sel.dialog && sel.selected, 'a long press selects the goal row and opens no card: ' + JSON.stringify(sel));
-        const bar = await ev(`[...document.querySelectorAll('.gt-toolbar button, .dt-bar button')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || b.title || b.textContent).trim(), off: b.disabled || b.getAttribute('aria-disabled') === 'true' }))`);
+        // (5) selecting the goal row opens no card (the long press of the old table is gone with it, #22094: selection is Select, then the row's check, needs_phone_rows_browser)
+        await ev(`document.querySelector('#top-phone-bar .nl-phone-select').click(); true`); await ev(framesJs(2));
+        await ev(`${rowOf('/Ship the beta/')}.querySelector('.nl-check').click(); true`); await ev(framesJs(4));
+        const sel = await ev(`({ dialog: !!document.querySelector('dialog[open]'), selected: ${rowOf('/Ship the beta/')}.classList.contains('nl-is-selected'), count: document.querySelector('${T} .nl-summary strong')?.textContent })`);
+        check(!sel.dialog && sel.selected && sel.count === '1 selected', 'selecting the goal row selects it and opens no card: ' + JSON.stringify(sel));
+        const bar = await ev(`[...document.querySelectorAll('${T} .nl-summary button')].filter(b => b.getClientRects().length).map(b => ({ name: (b.getAttribute('aria-label') || b.textContent).trim(), off: b.disabled || b.getAttribute('aria-disabled') === 'true' }))`);
         check(!bar.some(b => /^Approve/.test(b.name)) && bar.some(b => /^Dismiss/.test(b.name) && b.off), 'with a proposal selected the bar offers no Approve (a file action, #15120) and cannot Dismiss it (proposals are approved or rejected): ' + JSON.stringify(bar));
         await shot('needs-phone-proposals'); 
     } finally { await client.close(); }

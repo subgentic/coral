@@ -1,6 +1,8 @@
 // Needs you keeps the order the person is looking at when a computer answers late (#12636, coral-hub's beta pass, finding 3): the Hub shows this computer's rows at once, then each registered computer's questions
 // arrive over the next seconds, and the list was re-sorted by waiting time every time, so rows moved under a finger about to tap one. Now a row already shown stays where it is, a row that is new (even an older one)
 // goes after them (the default sort puts the newest first, so a new one used to jump to the top), and a different search, filter or sort starts the order afresh. At 1280 and 390 px (a coarse pointer at 390), with the questions of one computer shown first and an older one of another arriving after.
+// #22094: the list is the Needs you ledger (needs_ledger.js): each question is an article.nl-row in the 'Not tied to a goal' group (open, it holds questions). The ledger lists every row newest first on each draw
+// (its documented order), so a late computer's row now takes its time place too, as this computer's do; what still never moves is the row under a held pointer (the redraw waits for the release).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -11,7 +13,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
     const ask = (id, asker, minutes, server) => ({ ...(server ? { server } : {}), board: 'team-a', kind: 'ask', id, asker, text: 'Q-' + asker + '-end', at: new Date(Date.now() - minutes * 60000).toISOString() });
-    const order = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => (/Q-(\\w+)-end/.exec(r.textContent) || [])[1]).filter(Boolean)`);
+    const order = () => ev(`[...document.querySelectorAll('${T} .nl-row')].map(r => (/Q-(\\w+)-end/.exec(r.textContent) || [])[1]).filter(Boolean)`);
     const refresh = () => ev(`import(${S} + 'operator_asks.js').then(m => m.refreshOperatorAsks(true)).then(() => true)`).then(() => ev(framesJs(10)));
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -27,7 +29,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await refresh();
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 2`, 'the two questions', 15000);
+            await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 2`, 'the two questions', 15000);
             let first = await order();
             assert.deepEqual([...first].sort(), ['Alpha', 'Bravo'], at + 'the two questions are shown: ' + JSON.stringify(first));
 
@@ -40,56 +42,53 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`window.__asks = window.__asks.filter(a => !['Golf', 'Hotel', 'India'].includes(a.asker)); true`);
             await refresh();
             assert.deepEqual(await order(), first, at + 'the burst answered, the first rows are as they were');
-            await ev(`window.__asks.push(${JSON.stringify(ask(3, 'Charlie', 7, 'box-2'))}); true`); // ANOTHER computer that answered late, with a question that would slot in between the rows shown (the default sort puts the newest first: Bravo, Charlie, Alpha)
+            await ev(`window.__asks.push(${JSON.stringify(ask(3, 'Charlie', 7.5, 'box-2'))}); true`); // ANOTHER computer that answered late, with a question between the rows shown
             await refresh();
-            assert.deepEqual(await order(), [...first, 'Charlie'], at + 'the late question from another computer goes after the rows on screen, it does not slot in among them');
+            assert.deepEqual(await order(), [first[0], first[1], 'Charlie', first[2]], at + 'the late question from another computer takes its time place, newest first (the ledger\'s order; it went after the rows shown, #12636)');
             await ev(`window.__asks.push(${JSON.stringify(ask(7, 'Delta', 0.5))}); true`); // a question newer than everything on screen is the freshest arrival: on top, and visible
             await refresh();
-            assert.deepEqual(await order(), ['Delta', ...first, 'Charlie'], at + 'a question newer than everything shown goes on top');
+            assert.deepEqual(await order(), ['Delta', first[0], first[1], 'Charlie', first[2]], at + 'a question newer than everything shown goes on top');
 
             const gone = first[0]; // one is answered: the rest keep their order
             await ev(`window.__asks = window.__asks.filter(a => a.asker !== ${JSON.stringify(gone)}); true`);
             await refresh();
-            assert.deepEqual(await order(), ['Delta', first[1], first[2], 'Charlie'], at + 'an answered row leaves, the others stay in order');
+            assert.deepEqual(await order(), ['Delta', first[1], 'Charlie', first[2]], at + 'an answered row leaves, the others stay in order');
 
             await ev(`(async () => { const m = await import(${S} + 'inbox_tab.js'); m.selectInboxTab('tasks'); await new Promise(r => setTimeout(r, 50)); m.selectInboxTab('needs'); return true; })()`);
             await ev(`window.__asks.push(${JSON.stringify(ask(4, 'Echo', 60, 'box-2'))}); true`);
             await refresh();
-            assert.deepEqual(await order(), ['Delta', first[1], first[2], 'Charlie', 'Echo'], at + 'switching folders keeps what the person saw too, until a filter changes');
+            assert.deepEqual(await order(), ['Delta', first[1], 'Charlie', first[2], 'Echo'], at + 'switching folders and back, then an older late row: newest first, the older one last');
 
-            // a column sort the person chose is kept the same way: Item ascending, then a late computer's row that sorts first goes after the rows shown (the table used to sort the whole list again)
-            await ev(`(() => { const th = document.querySelector('${T} thead th[data-key=agent]'); (th.querySelector('button') || th).click(); return true; })()`);
-            await ev(framesJs(6));
+            // the column-sort check (Item ascending, then a late row after the rows shown) is retired: the ledger has no column headers or sort (#22094, removed by design; its order is newest first, needs_ledger_browser 'flat rows keep strict time order')
             const sorted = await order();
-            assert.deepEqual(sorted, [...sorted].sort(), at + 'Item ascending sorts the rows shown: ' + JSON.stringify(sorted));
-            await ev(`window.__asks.push(${JSON.stringify(ask(5, 'Aardvark', 2, 'box-2'))}); true`);
-            await refresh();
-            assert.deepEqual(await order(), [...sorted, 'Aardvark'], at + 'under a column sort a late row sorting first still goes after the rows on screen');
 
             // the page's own click on a row opens its question: the held presses below are counted and swallowed here, so the table stays in view
-            await ev(`window.__clicks = []; document.addEventListener('click', e => { const row = e.target.closest && e.target.closest('${T} tbody tr'); if (!row) return; window.__clicks.push({ connected: e.target.isConnected && document.contains(row), row: (/Q-(\\w+)-end/.exec(row.textContent) || [])[1] }); e.stopImmediatePropagation(); e.preventDefault(); }, true); true`);
-            // a row under the pointer never moves: hold the mouse down on a row, a late older row arrives, the row is where it was
-            const target = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); const b = row.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), top: Math.round(b.top) }; })()`);
+            await ev(`window.__clicks = []; document.addEventListener('click', e => { const row = e.target.closest && e.target.closest('${T} .nl-row'); if (!row) return; window.__clicks.push({ connected: e.target.isConnected && document.contains(row), row: (/Q-(\\w+)-end/.exec(row.textContent) || [])[1] }); e.stopImmediatePropagation(); e.preventDefault(); }, true); true`);
+            // a row under the pointer never moves: hold the mouse down on a row, a late row newer than all (the ledger would draw it on top) arrives, the row is where it was
+            const place = () => ev(`(() => { const row = [...document.querySelectorAll('${T} .nl-row')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); const b = row.getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), top: Math.round(b.top) }; })()`);
+            let target = await place();
             await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
-            await ev(`window.__asks.push(${JSON.stringify(ask(6, 'Aaron', 90))}); true`);
+            await ev(`window.__asks.push(${JSON.stringify(ask(9, 'Aaron', 0.2, 'box-2'))}); true`);
             await refresh();
-            const held = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
+            const held = await ev(`(() => { const row = [...document.querySelectorAll('${T} .nl-row')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
             await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
             assert.equal(held, target.top, at + 'the row under the held pointer did not move when a late row arrived');
+            await waitFor(`/Q-Aaron-end/.test(document.querySelector('${T} .nl-row')?.textContent || '')`, 'the newer late row drawn on top once the pointer is up', 10000);
+            target = await place(); // it moved the held row down one place, after the release
 
             // and when a row ABOVE it is answered elsewhere while the pointer is held: it stays on screen until the pointer goes up, then it goes
             await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
             await ev(`window.__asks = window.__asks.filter(a => !(new RegExp('Q-' + ${JSON.stringify(sorted[0])} + '-end')).test(a.text)); true`);
             await refresh();
             const heldNames = await order();
-            const heldTop = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
+            const heldTop = await ev(`(() => { const row = [...document.querySelectorAll('${T} .nl-row')].find(t => /Q-(\\w+)-end/.exec(t.textContent)[1] === ${JSON.stringify(sorted[1])}); return Math.round(row.getBoundingClientRect().top); })()`);
             await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
             assert.equal(heldTop, target.top, at + 'a row above the held one was answered elsewhere: the held row did not move up: ' + JSON.stringify({ heldTop, target, heldNames, sorted }));
             assert.ok(heldNames.includes(sorted[0]), at + 'the answered row stays until the pointer is released: ' + JSON.stringify(heldNames));
-            await waitFor(`!${JSON.stringify(sorted[0])} || ![...document.querySelectorAll('${T} tbody tr')].some(t => t.textContent.includes('Q-' + ${JSON.stringify(sorted[0])} + '-end'))`, 'the answered row goes once the pointer is up', 10000);
+            await waitFor(`!${JSON.stringify(sorted[0])} || ![...document.querySelectorAll('${T} .nl-row')].some(t => t.textContent.includes('Q-' + ${JSON.stringify(sorted[0])} + '-end'))`, 'the answered row goes once the pointer is up', 10000);
 
             // a press on a row, a row elsewhere answered during the hold, release: the click reaches the row that was pressed, once, still in the page (the redraw waits until the click is done)
-            const pick = await ev(`(() => { const names = [...document.querySelectorAll('${T} tbody tr')].map(t => (/Q-(\\w+)-end/.exec(t.textContent) || [])[1]); const row = [...document.querySelectorAll('${T} tbody tr')].find(t => (/Q-(\\w+)-end/.exec(t.textContent) || [])[1] === names[names.length - 1]); row.scrollIntoView({ block: 'center' }); const r = row.getBoundingClientRect(); return { name: names[names.length - 1], first: names[0], x: Math.round(Math.max(r.left, 0) + 120), y: Math.round(r.top + r.height / 2) }; })()`);
+            const pick = await ev(`(() => { const names = [...document.querySelectorAll('${T} .nl-row')].map(t => (/Q-(\\w+)-end/.exec(t.textContent) || [])[1]); const row = [...document.querySelectorAll('${T} .nl-row')].find(t => (/Q-(\\w+)-end/.exec(t.textContent) || [])[1] === names[names.length - 1]); row.scrollIntoView({ block: 'center' }); const r = row.getBoundingClientRect(); return { name: names[names.length - 1], first: names[0], x: Math.round(Math.max(r.left, 0) + 120), y: Math.round(r.top + r.height / 2) }; })()`);
             await ev(`window.__clicks = []; true`);
             await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: pick.x, y: pick.y, button: 'left', clickCount: 1 });
             await ev(`window.__asks = window.__asks.filter(a => !(new RegExp('Q-' + ${JSON.stringify(pick.first)} + '-end')).test(a.text)); true`);

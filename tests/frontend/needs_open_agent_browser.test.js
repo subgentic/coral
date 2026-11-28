@@ -1,5 +1,6 @@
 // A Needs you row for an agent at a prompt Coral cannot offer answers for (Claude's "Is this a project you trust?", #12346, Beta Tester's v2.0.35 run) had only Dismiss, so the person had to find the agent's chat.
 // It now has Open agent, which goes straight to that agent's chat; nothing is typed for the person. A row that does have choices keeps them and does not get the button. 1280 px.
+// #22094: the list is the Needs you ledger (needs_ledger.js): the row is an article.nl-row in the folded 'Not tied to a goal' group (opened here), its answers in .nl-actions, Dismiss in the row's hover actions.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -16,11 +17,12 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(async () => { const st = await import(${S} + 'state.js'); st.state.liveSessions = [{ session_id: 'd1', name: 'coral-d1', display_name: 'Security Reviewer', agent_type: 'claude', model: 'claude-opus-5-5', server: 'local', board_unread: 5, working: false, context_pct: null, skipped_send: ${JSON.stringify(trust)} }];
             window.__opened = null; window.selectLiveSession = (...a) => { window.__opened = a; }; const real = window.fetch; window.fetch = (u, o) => String(u).includes('/ask') && String(u).includes('d1') ? Promise.resolve(new Response(JSON.stringify({ choices: [], ask: '' }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`!!document.querySelector('#group-table-view tbody tr .inbox-answers')`, 'the dialog row with its answers cell', 15000);
+        await waitFor(`!!document.querySelector('#group-table-view .nl-row .nl-actions .inbox-answers')`, 'the dialog row with its answers cell', 15000);
+        await ev(`document.querySelectorAll('#group-table-view .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`); // the group holds no question, so it starts folded
         await waitFor(`!!document.querySelector('#group-table-view .inbox-open-agent')`, 'Open agent on a row with nothing to answer', 8000);
-        const names = await ev(`[...document.querySelectorAll('#group-table-view tbody tr .inbox-answers button')].map(b => b.textContent.trim())`);
+        const names = await ev(`[...document.querySelectorAll('#group-table-view .nl-row .inbox-answers button')].filter(b => b.getClientRects().length).map(b => b.textContent.trim())`);
         assert.deepEqual(names, ['Open agent'], 'the row offers Open agent as its one button, Dismiss is in the kebab (#17451, N5): ' + JSON.stringify(names));
-        assert.ok(await ev(`!!document.querySelector('#group-table-view tbody tr .inbox-single-action .inbox-dismiss')`), 'the row exposes its sole Dismiss directly (#20203)');
+        assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .nl-row .nl-hover-actions button')].some(b => b.textContent.trim() === 'Dismiss')`), 'the row exposes its sole Dismiss directly, in its hover actions (#20203)');
         assert.equal(await ev(`document.querySelector('#group-table-view .inbox-open-agent').getAttribute('aria-label')`), 'Open Security Reviewer to answer');
         await ev(`document.querySelector('#group-table-view .inbox-open-agent').click(); true`);
         assert.deepEqual((await ev('window.__opened || null'))?.slice(0, 3), ['coral-d1', 'claude', 'd1'], "the click opens that agent's chat, and not the row's own page");
