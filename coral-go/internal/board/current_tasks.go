@@ -13,6 +13,8 @@ type CurrentTask struct {
 	// GoalID and GoalTitle: the goal the task belongs to (#22093), absent for none.
 	GoalID    int64  `json:"goal_id,omitempty"`
 	GoalTitle string `json:"goal_title,omitempty"`
+	// Claims: how many tasks the assignee has in progress, when more than one (#22093): the task shown is then the newest claim, and nothing may be guessed from it about which one a question is about. 0 for one.
+	Claims int `json:"claims,omitempty"`
 }
 
 // CurrentTaskKey is the key CurrentTasks files an agent's task under: the board and the assignee's name, lower case (a task's assignee is matched without case, as ClaimedTaskOf does).
@@ -42,12 +44,21 @@ func (s *Store) CurrentTasks(ctx context.Context) (map[string]CurrentTask, error
 		return nil, err
 	}
 	out := make(map[string]CurrentTask, len(rows))
+	inProgress := map[string]int{}
+	for _, r := range rows {
+		if r.Status == "in_progress" {
+			inProgress[CurrentTaskKey(r.BoardID, r.Assignee)]++
+		}
+	}
 	for _, r := range rows {
 		k := CurrentTaskKey(r.BoardID, r.Assignee)
 		if _, seen := out[k]; !seen {
 			ct := CurrentTask{ID: r.ID, Title: r.Title, Status: r.Status}
 			if r.GoalID != nil && r.GoalTitle != nil {
 				ct.GoalID, ct.GoalTitle = *r.GoalID, *r.GoalTitle
+			}
+			if n := inProgress[k]; n > 1 {
+				ct.Claims, ct.GoalID, ct.GoalTitle = n, 0, "" // two claims: no goal is guessed
 			}
 			out[k] = ct
 		}

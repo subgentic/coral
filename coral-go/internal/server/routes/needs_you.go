@@ -229,7 +229,7 @@ func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 		}
 		kind, _ := row["waiting_kind"].(string)
 		it := NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at, StillWaiting: hid, Dialog: !wait, Permission: wait && kind == "permission"}
-		if bt, _ := row["board_task"].(map[string]any); bt != nil && bt["status"] == "in_progress" { // the task the agent has claimed (#22093), not one that only waits in its queue
+		if bt, _ := row["board_task"].(map[string]any); bt != nil && bt["status"] == "in_progress" && bt["claims"] == nil { // the task the agent has claimed (#22093), not one that only waits in its queue
 			if id, ok := bt["id"].(int64); ok {
 				it.TaskID = id
 			}

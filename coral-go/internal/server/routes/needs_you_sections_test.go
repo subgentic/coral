@@ -28,6 +28,9 @@ func TestNeedsYouAgentItemsCarryTheClaimedTaskAndItsGoal(t *testing.T) {
 	assert.EqualValues(t, 41, items[0].GoalID)
 	assert.Equal(t, "Checkout redesign", items[0].GoalTitle)
 	assert.Equal(t, "Guest checkout", items[0].TaskTitle)
+	amb := row("s4", "in_progress", true)
+	amb["board_task"].(map[string]any)["claims"] = 2
+	assert.Zero(t, needsYouAgentItems([]map[string]any{amb}, now)[0].TaskID, "two claims: nothing is guessed")
 	assert.Zero(t, items[1].TaskID, "a queued task is not the agent's claimed task")
 	assert.EqualValues(t, 412, items[2].TaskID)
 	assert.Zero(t, items[2].GoalID, "a task with no goal")
@@ -47,6 +50,8 @@ func TestCurrentTasksCarryTheGoal(t *testing.T) {
 	ct := cur[board.CurrentTaskKey("team", "Dev")]
 	assert.Equal(t, goal.ID, ct.GoalID)
 	assert.Equal(t, "Checkout redesign", ct.GoalTitle)
+	assert.Zero(t, ct.Claims)
+
 }
 
 func TestNeedsYouGroupsOrderByNewestAfterThePermissionPrompts(t *testing.T) {

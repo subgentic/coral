@@ -905,6 +905,9 @@ func (d *listData) currentTaskOf(sub *board.Subscriber) any {
 			if t.GoalID > 0 { // additive (#22093): the goal the task belongs to, for Needs you
 				m["goal_id"], m["goal_title"] = t.GoalID, t.GoalTitle
 			}
+			if t.Claims > 1 {
+				m["claims"] = t.Claims
+			}
 			return m
 		}
 	}
