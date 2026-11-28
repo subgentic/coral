@@ -532,7 +532,7 @@ function inboxNeedsToolbar() {
     node.classList.toggle('needs-ledger-toolbar', needsTab === 'you' && !activeNeedsTeam);
     if (needsTab === 'you' && !activeNeedsTeam) {
         let tools = node.querySelector('.nl-toolbar-actions'); if (!tools) { tools = DT.el('div', 'nl-toolbar-actions'); (node.querySelector('.list-bar-search-row') || node).append(tools); }
-        for (const selector of ['.nl-visible-group', '.inbox-copy-for-agent', '.inbox-fold-all']) { const control = node.querySelector(selector); if (control) tools.append(control); }
+        for (const selector of ['.nl-visible-group', '#inbox-needs-toggle', '.inbox-copy-for-agent', '.inbox-fold-all']) { const control = node.querySelector(selector); if (control) tools.append(control); }
     }
     node.querySelector('.inbox-fold-all')?.sync();
 
@@ -1602,7 +1602,7 @@ function newNeedsList(rows) {
         questionExtra: s => agentAskExtra(s), questionBox: (box, s, text) => { const raw = s.operatorAsk ? askOpened(s.operatorAsk, { code: true }) : text; NF.openQuestion(box, /^```/.test(raw) ? raw : raw.split('\n').slice(1).join('\n'), text); },
         when: s => { const text = shortWait(s.waiting_since); return text ? `${text} ago` : ''; },
         eligible: s => !!(s.waitItem || s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal || s.goalDone || promptCanSelect(s)),
-        onFoldChange: () => document.querySelector('.inbox-fold-all')?.sync(), kindIcon: NF.kindIcon, open, openTerminal: s => { markQuestionRead(s); openInAgents(s); }, readQuestion: markQuestionRead, bulkActions: needsBulkActions(), dismissPrompt: s => promptCanSelect(s) ? promptDismiss(s).catch(e => showToast(e.message || 'Not dismissed', true)) : undefined,
+        secondaryActions: s => !isItem(s) ? rowActions(s) : [], onFoldChange: () => document.querySelector('.inbox-fold-all')?.sync(), kindIcon: NF.kindIcon, open, openTerminal: s => { markQuestionRead(s); openInAgents(s); }, readQuestion: markQuestionRead, bulkActions: needsBulkActions(), dismissPrompt: s => promptCanSelect(s) ? promptDismiss(s).catch(e => showToast(e.message || 'Not dismissed', true)) : undefined,
         agentLink: s => agentLink(markHidden(needsAgentName(s), { strict: true }), { board: needsAbout(s).team, session: s.operatorAsk ? s.operatorAsk.session_id || '' : s.session_id }),
         teamLink: s => { const team = needsAbout(s).team; return splitKey(team).name ? teamLabelLink(team) : DT.el('span', '', multipleServers() ? pagingServerLabel(serverOf(s)) : teamOf(s)); },
         goalLink: a => link(`#${a.goalId} ${a.goalTitle}`, { ...folderRoute, id: a.team, item: a.goalId }),
