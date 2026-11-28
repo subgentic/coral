@@ -285,7 +285,7 @@ function showHeldNote(n) {
 function leaveList() { hoverOver = false; const k = deferredKind, had = hoverHeldSince !== null; hoverHeldSince = null; document.querySelectorAll('.group-table-held').forEach(n => n.remove()); if (k && had && !holding()) { deferredKind = null; setTimeout(() => refreshGroupTable(k), 0); } }
 if (typeof document !== 'undefined') {
     // Every mouse move says where the pointer is now: a button that was pressed and then replaced (an answered row's choices) sends no pointerout, so the way out is seen on the first move outside the list.
-    document.addEventListener('pointermove', e => { if (!canHover()) return; const inside = e.target instanceof Element && !!e.target.closest('#group-table-view tbody'); if (inside) hoverOver = true; else if (hoverOver) leaveList(); }, true);
+    document.addEventListener('pointermove', e => { if (!canHover()) return; const inside = e.target instanceof Element && !!e.target.closest('#group-table-view :is(tbody,ul)'); if (inside) hoverOver = true; else if (hoverOver) leaveList(); }, true);
     document.addEventListener('pointerout', e => { if (hoverOver && e.relatedTarget === null) leaveList(); }, true); // the pointer left the window
     window.addEventListener('blur', leaveList);
 }

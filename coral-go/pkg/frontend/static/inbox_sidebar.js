@@ -569,7 +569,7 @@ function changesIcon() { return svgIcon('M2.5 3h11v7.5H7L4 13.5v-3H2.5z'); }
 function bookmarkIcon() { return svgIcon('M4 2.5h8v11L8 10.5l-4 3z', { 'stroke-linecap': 'round' }); }
 
 /** A row's less used actions in one menu behind a three-dot button (menu_button.js: arrow keys, Escape back to the button, Tab or a tap elsewhere closes). items: [{ label, title, run(button) }]. */
-function moreMenu(items, label, { menu: asMenu = false } = {}) {
+function moreMenu(items, label, { menu: asMenu = false, look = '' } = {}) { // look: 'dots' or 'button' (an outlined More with its arrow), else a computer's word and a phone's dots
     if (items.length === 1 && !asMenu) { // one action is its own button, unless the caller wants the menu (the Saved list's More, #22108)
         const it = items[0], wrap = DT.el('span', 'inbox-row-more inbox-single-action'), button = DT.el('button', `btn btn-quiet btn-small${it.danger ? ' inbox-deny' : ''}`, it.label);
         button.type = 'button'; if (it.label === 'Dismiss') button.classList.add('inbox-dismiss'); button.setAttribute('aria-label', `${it.label}: ${label}`); if (it.title) button.title = it.title;
@@ -578,7 +578,8 @@ function moreMenu(items, label, { menu: asMenu = false } = {}) {
     const id = `inbox-more-${++moreMenus}`, wrap = DT.el('span', 'inbox-row-more'), toggle = DT.el('button', 'btn btn-quiet btn-icon inbox-row-more-toggle');
     toggle.type = 'button'; toggle.id = id; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`); toggle.setAttribute('aria-label', `More actions for ${label}`);
     toggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg>';
-    if (!isPhoneLayout()) { toggle.className = 'btn btn-quiet btn-small inbox-row-more-toggle'; toggle.textContent = 'More'; } // a computer's row says it in a word, like its other buttons (#15722); a phone keeps the dots
+    if (look === 'button') { toggle.className = 'btn btn-small inbox-row-more-toggle'; toggle.textContent = 'More'; const arrow = DT.el('span', 'material-icons inbox-more-arrow', 'expand_more'); arrow.setAttribute('aria-hidden', 'true'); toggle.append(arrow); }
+    else if (look !== 'dots' && !isPhoneLayout()) { toggle.className = 'btn btn-quiet btn-small inbox-row-more-toggle'; toggle.textContent = 'More'; } // a computer's row says it in a word, like its other buttons (#15722); a phone keeps the dots
     const menu = DT.el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', `Actions for ${label}`);
     for (const it of items) {
         const b = DT.el('button', `menu-item${it.danger ? ' inbox-deny' : ''}`, it.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.setAttribute('aria-label', `${it.label}: ${label}`); if (it.title) b.title = it.title; // the word, then the file: the same name the row's own buttons have
@@ -1354,9 +1355,9 @@ function savedListSpec(where = '') {
     const order = saved.savedFiltersNow().sort === 'oldest' ? 'oldest saved first' : 'newest saved first';
     return { ...spec, count: `${entries.length} saved`, empty: entries.length || loadingMore ? null : spec.empty, signature: JSON.stringify([spec.signature, v.tab, reviewPagingSignature(), loadingEmpty(), tabFiles.map(a => [a.reviewKey, a.name, a.starred, a.tags])]), node: () => {
         const wrap = DT.el('div', 'saved-files-wrap saved-ledger-wrap'), host = DT.el('div', 'saved-ledger-host');
-        if (entries.length) { const line = DT.el('p', 'saved-ledger-count'); line.append(DT.el('b', '', `${entries.length} saved`), ` \u00b7 ${tabFiles.length} file${tabFiles.length === 1 ? '' : 's'}, ${rows.length} message${rows.length === 1 ? '' : 's'} \u00b7 ${order}`); wrap.append(line); }
+        if (entries.length) { const line = DT.el('p', 'saved-ledger-count'); line.append(DT.el('b', '', `${entries.length} saved`), ` \u00b7 ${[tabFiles.length ? `${tabFiles.length} file${tabFiles.length === 1 ? '' : 's'}` : '', rows.length ? `${rows.length} message${rows.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')} \u00b7 ${order}`); wrap.append(line); }
         wrap.append(host); appendReviewPaging(wrap, true);
-        if (entries.length) importOnce('./saved_ledger.js').then(m => m.fillSavedLedger(host, entries.map(savedLedgerRow), { phone: isPhoneLayout(), moreMenu: (items, label) => moreMenu(items, label, { menu: true }) })).catch(e => console.error('saved list', e));
+        if (entries.length) importOnce('./saved_ledger.js').then(m => m.fillSavedLedger(host, entries.map(savedLedgerRow), { phone: isPhoneLayout(), moreMenu: (items, label, look) => moreMenu(items, label, { menu: true, look }) })).catch(e => console.error('saved list', e));
         return wrap; } };
 }
 /** A saved file's or message's facts and actions for the Saved page's row (saved_ledger.js, #22108). */
@@ -1369,7 +1370,7 @@ function savedLedgerRow(e) {
         return { key: `file:${a.reviewKey}`, kind: 'file', name, media: a.media_type || '', version, open: () => openReview(a),
             team: { text: multipleServers() ? e.team : splitKey(a.team).name, open: () => go(keyRoute('team', a.team)) }, // "This computer" is left out when there is one
             goal: a.goal_id && a.goal_title ? { text: `#${Number(a.goal_id)} ${markHidden(String(a.goal_title), { strict: true })}`, open: () => go({ ...folderRoute, id: a.team, item: Number(a.goal_id) }) } : null,
-            agent: { text: markHidden(a.produced_by || '', { strict: true }) }, text: questionOf({ review: a }), starred: !!a.starred, tag: tag.length ? { text: tag[1], tone: tag[2] } : null, time: e.when,
+            agent: { text: markHidden(a.produced_by || '', { strict: true }) }, text: questionOf({ review: a }) ? `"${questionOf({ review: a })}"` : '', starred: !!a.starred, tag: tag.length ? { text: tag[1], tone: tag[2] } : null, time: e.when, // the agent's question in quote marks, as the mock and Needs you (#22094)
             remove: canAct ? { label: 'Remove from Saved', title: 'Put it back in Needs you as it was', run: () => importOnce('./artifact_review.js').then(async ({ unsaveRow }) => { await unsaveRow(a.team, a); sayLive(`${name} is back in Needs you.`); }).catch(failed) } : null,
             star: canAct && a.hex ? { on: !!a.starred, run: () => starControl(a, { hex: a.hex, name, reviewPin: true, onChange: on => { reviewStarChanged(a, on); renderInboxNav(true); } })?.click() } : null,
             more: canAct ? [{ label: 'Copy version ID', title: 'The id of this version only', run: () => importOnce('./artifact_clipboard.js').then(m => m.copyArtifactId(a.id)).catch(failed) }, { label: 'Dismiss', title: 'Take it out of Saved; nobody is told', run: () => importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { const out = await ignoreRow(a.team, a); if (stillWaitingOnAgent(a)) WA.dismissArtifact(a.id); sayIgnored(a.team, a, out); sayLive(`Dismissed ${name}.`); }).catch(failed) }] : [] }; // the toast with Undo, as Dismiss in Needs you

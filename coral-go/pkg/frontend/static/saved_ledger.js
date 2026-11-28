@@ -52,12 +52,12 @@ function row(r, x) {
     if (r.star) items.push({ label: r.star.on ? 'Remove star' : 'Star', run: r.star.run });
     if (x.phone || x.touch) { // a phone, or a touch screen with no hover: every action in the row's "..." menu, beside the right side
         const acts = el('div', 'sl-actions sl-actions-phone');
-        acts.append(x.moreMenu([{ label: 'Open', run: () => r.open() }, ...items, ...r.more], said));
+        acts.append(x.moreMenu([{ label: 'Open', run: () => r.open() }, ...items, ...r.more], said, 'dots')); // the dots, on a phone and a wider touch screen alike
         li.append(acts);
     } else if (items.length || r.more.length) {
         const acts = el('div', 'sl-actions');
         for (const it of items) { const b = el('button', 'btn btn-small sl-act', it.label); b.type = 'button'; b.setAttribute('aria-label', `${it.label}: ${said}`); if (it.title) b.title = it.title; b.addEventListener('click', e => { e.stopPropagation(); it.run(b); }); acts.append(b); }
-        if (r.more.length) acts.append(x.moreMenu(r.more, said));
+        if (r.more.length) acts.append(x.moreMenu(r.more, said, 'button')); // an outlined More with its arrow, like the buttons beside it (the mock)
         li.append(acts);
     }
     li.addEventListener('click', e => { if (e.target.closest('button, a, .menu')) return; r.open(); }); // a click anywhere on the row opens it; its own controls do their own thing

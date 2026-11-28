@@ -61,7 +61,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const row = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(e => e.textContent.includes('plan-1.md')); if (!r) return null; return { text: r.textContent.replace(/\\s+/g, ' '), tag: (r.querySelector('.sl-tag') || {}).textContent || '', agent: (r.querySelector('.sl-avatar') || {}).title || r.textContent, names: [...r.querySelectorAll('button')].map(b => (b.getAttribute('aria-label') || b.textContent).trim()) }; })()`);
             check(!!row, at + 'the saved file has a row');
             if (row) {
-                check(mobile || /Ship plan 1\?/.test(row.text), at + 'the file\'s question is on line 2, read from review_question as Needs you does: ' + row.text);
+                check(mobile || /"Ship plan 1\?"/.test(row.text), at + 'the file\'s question is on line 2, read from review_question as Needs you does: ' + row.text);
                 check(/Plan Writer/.test(row.agent), at + 'the sender is the row\'s agent, read from produced_by: ' + JSON.stringify(row.agent));
                 check(row.tag === 'To review', at + 'the tag says "To review": ' + JSON.stringify(row.tag));
                 check(!row.names.some(n => /^(Approve|Request changes|Deny|Comment):/.test(n)), at + 'no verdict buttons on the row: ' + JSON.stringify(row.names));

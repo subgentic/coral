@@ -44,14 +44,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(framesJs(4));
             if (!mobile) { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 5 }); await ev(framesJs(3)); }
             // the row (#22108, the Saved mock): no buttons at rest; with the pointer on it, Remove from Saved, Star and More take the right side's place; a phone has one 44x44 "..." menu
-            const row = `document.querySelector('.saved-ledger .sl-row')`;
+            const row = `[...document.querySelectorAll('.saved-ledger .sl-row')].find(r => /plan-1\\.md/.test(r.textContent))`; // plan-2 is newer, so it is first (newest saved first)
             const rest = await ev(`(() => { const r = ${row}; return { tag: r.querySelector('.sl-tag')?.textContent, actions: getComputedStyle(r.querySelector('.sl-actions')).display, approve: !!r.querySelector('[data-slot="approve"], .inbox-approve-action') }; })()`);
             check(rest.tag === 'To review' && !rest.approve, at + 'the row says To review and has no Approve: ' + JSON.stringify(rest));
             if (!mobile) {
                 check(rest.actions === 'none', at + 'no buttons at rest: ' + rest.actions);
                 const at1 = await ev(`(() => { const r = ${row}.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
                 await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: at1.x, y: at1.y }); await ev(framesJs(3));
-                const hover = await ev(`(() => { const r = ${row}; return { shown: getComputedStyle(r.querySelector('.sl-actions')).display, names: [...r.querySelectorAll('.sl-actions > button, .sl-actions .inbox-row-more-toggle')].map(b => b.getAttribute('aria-label')), right: getComputedStyle(r.querySelector('.sl-right')).display }; })()`);
+                const hover = await ev(`(() => { const r = ${row}; return { shown: getComputedStyle(r.querySelector('.sl-actions')).display, names: [...r.querySelectorAll('.sl-actions > button, .sl-actions .inbox-row-more-toggle')].map(b => b.getAttribute('aria-label')), right: getComputedStyle(r.querySelector('.sl-right')).visibility === 'hidden' ? 'none' : 'shown' }; })()`);
                 check(hover.shown === 'flex' && hover.right === 'none' && JSON.stringify(hover.names) === JSON.stringify(['Remove from Saved: plan-1.md', 'Star: plan-1.md', 'More actions for plan-1.md']), at + 'on hover the actions take the right side\'s place: ' + JSON.stringify(hover));
             } else {
                 const dots = await ev(`(() => { const b = ${row}.querySelector('.inbox-row-more-toggle'), r = b.getBoundingClientRect(); return { w: r.width, h: r.height, label: b.getAttribute('aria-label') }; })()`);
