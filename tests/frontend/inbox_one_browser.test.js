@@ -163,11 +163,11 @@ const AGENTS = (waiting) => waiting ? [
             assert.deepEqual([look.name[0], look.name[1], look.agent, look.acts], ['14px', '600', 'Agent One', w === 1024 && await ev(`matchMedia('(hover: none)').matches`) ? 'flex' : 'none'], at + 'the name at 14/600, the agent as an icon, no buttons at rest: ' + JSON.stringify(look));
             await ev(`document.querySelector('${ROW} .sl-name').focus(); true`);
             await waitFor(`getComputedStyle(document.querySelector('${ROW} .sl-actions')).display === 'flex'`, at + 'the actions show when the keyboard is on the row', 3000);
-            assert.deepEqual(await ev(`[...document.querySelector('${ROW} .sl-actions').querySelectorAll(':scope > button, .inbox-row-more-toggle')].map(b => b.textContent.trim())`), ['Remove from Saved', 'More'], at + 'Remove from Saved and More (a message has no star)');
+            assert.deepEqual(await ev(`[...document.querySelector('${ROW} .sl-actions').querySelectorAll(':scope > button, .inbox-row-more-toggle')].map(b => b.firstChild.textContent.trim())`), ['Remove from Saved', 'More'], at + 'Remove from Saved and More (a message has no star)');
             await ev(`document.activeElement.blur(); true`);
             const rowAt = await ev(`(() => { const r = document.querySelector('${ROW}').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             await mouseTo(rowAt.x, rowAt.y);
-            await waitFor(`getComputedStyle(document.querySelector('${ROW} .sl-actions')).display === 'flex' && getComputedStyle(document.querySelector('${ROW} .sl-right')).display === 'none'`, at + 'and on the row\'s hover, in the right side\'s place', 3000);
+            await waitFor(`getComputedStyle(document.querySelector('${ROW} .sl-actions')).display === 'flex' && getComputedStyle(document.querySelector('${ROW} .sl-right')).visibility === 'hidden'`, at + 'and on the row\'s hover, in the right side\'s place', 3000);
             await mouseTo(2, 2);
             if (w === 1024) { // a touch screen has no hover: the actions are always drawn
                 await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });

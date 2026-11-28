@@ -59,10 +59,12 @@ const { setTheme } = require('./helpers/contrast');
             for (const theme of ['light', 'dark']) {
                 await setTheme(ev, theme); await ev(framesJs(3));
                 if (!mobile) {
-                    const p = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-1/.test(x.textContent)).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+                    const p = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-1/.test(x.textContent)).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, h: r.height, next: r.bottom }; })()`);
                     await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await ev(framesJs(2));
-                    const hov = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-1/.test(x.textContent)); const vis = e => !!e && e.getClientRects().length > 0; return { acts: vis(r.querySelector('.sl-actions')), right: vis(r.querySelector('.sl-right')) }; })()`);
+                    const hov = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-1/.test(x.textContent)); const vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden'; const bs = [...r.querySelectorAll('.sl-actions button')].filter(b => !b.closest('[role=menu]')), rb = bs.map(b => b.getBoundingClientRect()); const more = bs.find(b => b.classList.contains('inbox-row-more-toggle')); return { acts: vis(r.querySelector('.sl-actions')), right: vis(r.querySelector('.sl-right')), h: r.getBoundingClientRect().height, bottom: r.getBoundingClientRect().bottom, words: bs.map(b => b.textContent.trim()), gaps: rb.slice(1).map((b, i) => Math.round(b.left - rb[i].right)), outlined: !!more && more.classList.contains('btn') && !more.classList.contains('btn-quiet') && parseFloat(getComputedStyle(more).borderTopWidth) > 0 }; })()`);
                     check(hov.acts && !hov.right, at + theme + ': the pointer on a row shows its buttons in place of the right side: ' + JSON.stringify(hov));
+                    check(Math.abs(hov.h - p.h) < 1 && Math.abs(hov.bottom - p.next) < 1, at + theme + ': the row keeps its height on hover, nothing under it moves: ' + JSON.stringify([p.h, hov.h]));
+                    check(JSON.stringify(hov.words) === JSON.stringify(['Remove from Saved', 'Star', 'Moreexpand_more']) && hov.outlined && hov.gaps.every(g => g >= 6 && g <= 14), at + theme + ': Remove from Saved, Star and an outlined More with its arrow, about 10 px apart: ' + JSON.stringify(hov));
                     await shot(`saved-states-${w}-hover-${theme}`);
                     await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 790 });
                 } else {

@@ -29,8 +29,8 @@ async function run() {
     const settle = (cond, label) => waitFor(cond, label, { timeout: 8000 });
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     // the Open and Done totals are read from the pills of the page toolbar (#8602)
-    const snap = () => ev(`(() => { const bar = document.getElementById('inbox-saved-bar'), t = document.getElementById('group-table-view'), rows = [...t.querySelectorAll('tbody tr')], n = c => c && c.textContent !== '0' ? '(' + c.textContent + ')' : '';
-        return { shown: !!bar.firstChild, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent), titles: rows.map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 80)),
+    const snap = () => ev(`(() => { const bar = document.getElementById('inbox-saved-bar'), t = document.getElementById('group-table-view'), rows = [...t.querySelectorAll('.saved-ledger .sl-row')], n = c => c && c.textContent !== '0' ? '(' + c.textContent + ')' : '';
+        return { shown: !!bar.firstChild, count: (bar.querySelector('.list-bar-count') || {}).textContent || '', chips: [...bar.querySelectorAll('.list-bar-chip-text')].map(e => e.textContent), titles: rows.map(r => ((r.querySelector('.sl-avatar')?.getAttribute('aria-label') || '') + ' ' + r.textContent).replace(/\\s+/g, ' ').trim().slice(0, 80)),
             empty: (t.querySelector('.empty-state-line') || {}).textContent || null, note: (t.querySelector('.group-table-note') || {}).textContent || '', tabs: [...document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')].map(b => { const m = b.textContent.match(/\\d+/); return m && m[0] !== '0' ? '(' + m[0] + ')' : ''; }), over: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
     const chip = async i => { await settle(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip').length > ${i}`, `pill ${i}`); return ev(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')[${i}].click(); true`); }; // Open (0) and Done (1): the pills of the page toolbar (#8602)
     const setQuery = text => ev(`(() => { const e = document.getElementById('inbox-search'); e.value = ${JSON.stringify(text)}; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
@@ -72,14 +72,14 @@ async function run() {
             await ev(`try { localStorage.removeItem('coral-saved-filters'); } catch {} true`); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); // the filters are kept in the browser (#8602): each device starts with none
             await waitFor(`typeof window._coralSetLiveSessions === 'function'`, 'the app hooks', { timeout: 10000 });
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'saved.js'); await m.openSaved(); return true; })()`); // the Inbox at Saved: the table, its Open and Done chips, the sidebar's search and Display options (Filters and Sort)
-            await settle(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, 'the four open messages').catch(async e => { throw new Error(e.message + ' | ' + JSON.stringify(await ev(`({ rows: document.querySelectorAll('#saved-list > li').length, text: document.getElementById('saved-list').textContent.slice(0, 200), status: document.getElementById('saved-status').textContent, bar: !!document.getElementById('saved-bar').firstChild })`)) + ' | ' + exceptions.join(' ; ')); });
+            await settle(`document.querySelectorAll('#group-table-view .saved-ledger .sl-row').length === 4`, 'the four open messages').catch(async e => { throw new Error(e.message + ' | ' + JSON.stringify(await ev(`({ rows: document.querySelectorAll('.saved-ledger .sl-row').length, text: (document.getElementById('group-table-view')?.textContent || '').slice(0, 200) })`)) + ' | ' + exceptions.join(' ; ')); });
             let s = await snap();
-            check(`${dev}: the bar is between the tabs and the list; the plain list is the 4 open ones (6 saved: 4 open, 2 done)`, s.shown && s.titles.length === 4 && s.count === '4 messages' && s.chips.length === 0 && s.tabs.join() === '(4),(2)', JSON.stringify([s.shown, s.titles.length, s.count, s.tabs]));
+            check(`${dev}: the bar is between the tabs and the list; the plain list is the 4 open ones (6 saved: 4 open, 2 done); Open | Done has no numbers (the Saved mock, #22108)`, s.shown && s.titles.length === 4 && s.count === '4 messages' && s.chips.length === 0 && s.tabs.join() === ',', JSON.stringify([s.shown, s.titles.length, s.count, s.tabs]));
 
             await type('retry');
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'the search');
             s = await snap();
-            check(`${dev}: "retry" matches two of the open ones (titles and snippets), with a chip; the tabs' totals stay`, s.titles.length === 2 && s.chips.join() === 'Search: retry' && s.tabs.join() === '(4),(2)', JSON.stringify([s.titles.length, s.count, s.chips, s.tabs]));
+            check(`${dev}: "retry" matches two of the open ones (titles and snippets), with a chip; the switch stays without numbers`, s.titles.length === 2 && s.chips.join() === 'Search: retry' && s.tabs.join() === ',', JSON.stringify([s.titles.length, s.count, s.chips, s.tabs]));
             await ev(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')[1].click(); true`);
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '1 of 2'`, 'the Done tab');
             s = await snap();
@@ -90,7 +90,7 @@ async function run() {
             s = await snap();
             check(`${dev}: nothing matching says so`, s.empty === 'No saved messages match this search.' && s.shown, JSON.stringify([s.empty, s.count]));
             await ev(`document.getElementById('inbox-search').value = ''; document.getElementById('inbox-search').dispatchEvent(new Event('input', { bubbles: true })); true`);
-            await settle(`document.querySelectorAll('#group-table-view tbody tr').length === 4`, 'the plain list again');
+            await settle(`document.querySelectorAll('#group-table-view .saved-ledger .sl-row').length === 4`, 'the plain list again');
 
             await pick('sv-kind', 'board');
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-chip-text')?.textContent === 'Type: Board message' && document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'the board filter');
@@ -101,7 +101,7 @@ async function run() {
             await settle(`document.querySelector('#inbox-saved-bar .list-bar-chip-text')?.textContent === 'From: Frontend Dev' && document.querySelector('#inbox-saved-bar .list-bar-count').textContent === '2 of 4'`, 'From a conversation')
                 .catch(async e => { throw new Error(`${e.message} | case: the option existed but the pick had no effect | ${JSON.stringify(await convState())}`); });
             // The board filter and this conversation both match two rows. The chip updates before the fetch, so its count alone can still describe the previous answer.
-            await settle(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr')]; return rows.length === 2 && rows.every(r => r.textContent.includes('Frontend Dev')); })()`, 'the selected conversation rows');
+            await settle(`(() => { const rows = [...document.querySelectorAll('#group-table-view .saved-ledger .sl-row')]; return rows.length === 2 && rows.every(r => (r.textContent + (r.querySelector('.sl-avatar')?.getAttribute('aria-label') || '')).includes('Frontend Dev')); })()`, 'the selected conversation rows');
             s = await snap();
             check(`${dev}: From a conversation (by its title) leaves that chat's two, and the chip reads the title`, s.titles.length === 2 && s.titles.every(t => /Frontend Dev/.test(t)) && s.chips.join() === 'From: Frontend Dev', JSON.stringify([s.titles, s.chips]));
             await ev(`document.querySelector('#inbox-saved-bar .list-bar-filter-btn').click(); document.querySelector('#inbox-saved-bar .list-bar-clear-all').click(); true`);
@@ -116,10 +116,10 @@ async function run() {
             check(`${dev}: a late answer to an old filter does not overwrite the list (4 messages, no chip)`, s.titles.length === 4 && s.chips.length === 0, JSON.stringify([s.titles.length, s.chips]));
             await ev(`window.fetch = window.__realFetch; true`);
 
-            const order = () => ev(`[...document.querySelectorAll('#group-table-view tbody .dt-primary')].map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 40))`); // the snippets: a row's Gone sentence is said once for the list (#7122), so the whole text differs by row
+            const order = () => ev(`[...document.querySelectorAll('#group-table-view .saved-ledger .sl-row')].map(r => r.textContent.replace(/\\s+/g, ' ').slice(0, 40))`); // the snippets: a row's Gone sentence is said once for the list (#7122), so the whole text differs by row
             const newest = await order();
             await pick('svi-sort', 'oldest');
-            await settle(`(() => { const r = document.querySelector('#group-table-view tbody tr'); return !!r && !/rollout checklist|unrelated/.test(r.textContent); })()`, 'oldest first');
+            await settle(`(() => { const r = document.querySelector('#group-table-view .saved-ledger .sl-row'); return !!r && !/rollout checklist|unrelated/.test(r.textContent); })()`, 'oldest first');
             const oldest = await order();
             check(`${dev}: Oldest saved reverses the order`, JSON.stringify(oldest) === JSON.stringify([...newest].reverse()), JSON.stringify([newest[0], oldest[0]]));
             await pick('svi-sort', 'newest');

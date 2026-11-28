@@ -71,9 +71,7 @@ const id = n => n.toString(16).padStart(64, '0');
         assert.ok(saved.length === 1 && /\(version 3\)/.test(saved[0]), 'one Saved row, the newest, with its version in brackets (#22108): ' + JSON.stringify(saved));
 
         // Remove from Saved: back to Needs you as one row
-        await ev(`window.__decisions.length = 0; const r = document.querySelector('.saved-ledger .sl-row'); r.querySelector('button[aria-haspopup=menu]').click(); true`);
-        await waitFor(`!![...document.querySelectorAll('.saved-ledger .menu-item')].find(b => /Remove from Saved/.test(b.textContent))`, 'the menu', 4000);
-        await ev(`[...document.querySelectorAll('.saved-ledger .menu-item')].find(b => /Remove from Saved/.test(b.textContent)).click(); true`);
+        await ev(`window.__decisions.length = 0; [...document.querySelector('.saved-ledger .sl-row').querySelectorAll('.sl-act')].find(b => /Remove from Saved/.test(b.textContent)).click(); true`); // its own button on a computer (the mock), not in More
         await waitFor(`window.__decisions.length >= 3`, 'unsave went to every version', 8000);
         assert.deepEqual((await decisions()).sort(), ['unsave:1', 'unsave:2', 'unsave:3']);
         await openNeeds(); await refresh();

@@ -32,14 +32,22 @@
 .sl-av-5 { background: var(--avatar-5); } .sl-av-6 { background: var(--avatar-6); } .sl-av-7 { background: var(--avatar-7); } .sl-av-8 { background: var(--avatar-8); }
 .sl-time { font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
 /* The row's actions take the right side's place on hover and keyboard focus; a screen with no hover shows them. */
-.sl-actions { display: none; align-items: center; gap: var(--space-sm); }
+.sl-actions { display: none; align-items: center; gap: 0.625rem; }
 .sl-row:hover .sl-actions, .sl-row:focus-within .sl-actions { display: flex; }
-.sl-row:hover .sl-right, .sl-row:focus-within .sl-right { display: none; }
-@media (hover: none) { .saved-ledger:not(.saved-ledger-phone) .sl-row { grid-template-columns: 1.25rem minmax(0, 1fr) auto auto; } .saved-ledger:not(.saved-ledger-phone) .sl-actions { display: flex; } .saved-ledger:not(.saved-ledger-phone) .sl-row:is(:hover, :focus-within) .sl-right { display: grid; } } /* a touch screen wider than a phone: the buttons in a fourth column beside the right side, on one line */
+.sl-row:hover .sl-right, .sl-row:focus-within .sl-right { visibility: hidden; }
+/* A computer: the buttons lie over the right side's place, so the row keeps its height and nothing under it moves (the designer's round 2) */
+.saved-ledger:not(.saved-ledger-phone) .sl-row { position: relative; }
+.saved-ledger:not(.saved-ledger-phone) .sl-actions { position: absolute; inset-block: 0; inset-inline-end: var(--space-lg); padding-inline-start: var(--space-md); background: var(--card-fill); }
+.saved-ledger:not(.saved-ledger-phone) .sl-row:hover .sl-actions { background: var(--bg-hover); }
+.sl-actions > .inbox-row-more, .sl-actions .btn { margin: 0; } /* a shared button rule gives 20 px each side: the mock's buttons are 10 px apart */
+.sl-act, .sl-actions .inbox-row-more-toggle { min-height: 1.75rem; height: 1.75rem; padding-block: 0; }
+.sl-actions .inbox-row-more-toggle:not(.btn-icon) { display: inline-flex; align-items: center; gap: 2px; }
+.inbox-more-arrow { font-size: var(--fs-lg); }
+@media (hover: none) { .saved-ledger:not(.saved-ledger-phone) .sl-row { grid-template-columns: 1.25rem minmax(0, 1fr) auto auto; } .saved-ledger:not(.saved-ledger-phone) .sl-actions { display: flex; position: static; padding: 0; background: none; } .saved-ledger:not(.saved-ledger-phone) .sl-row:is(:hover, :focus-within) .sl-right { visibility: visible; } } /* a touch screen wider than a phone: the buttons in a fourth column beside the right side, on one line */
 .sl-act { white-space: nowrap; }
 /* A phone: the "..." menu on every row, 44 by 44; the time, the agent icon and the text are left out. */
 .saved-ledger-phone .sl-row { grid-template-columns: 1.125rem minmax(0, 1fr) auto auto; column-gap: var(--space-md); padding: var(--space-md); align-items: start; }
-.saved-ledger-phone .sl-row:hover .sl-right, .saved-ledger-phone .sl-row:focus-within .sl-right { display: grid; }
+.saved-ledger-phone .sl-row:hover .sl-right, .saved-ledger-phone .sl-row:focus-within .sl-right { visibility: visible; }
 .saved-ledger-phone .sl-right { grid-template-columns: auto auto; }
 .saved-ledger-phone .sl-actions { display: flex; }
 .saved-ledger-phone .sl-line1 { flex-wrap: wrap; }

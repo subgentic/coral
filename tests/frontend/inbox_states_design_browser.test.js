@@ -77,7 +77,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the saved files fill in after the messages
         await ev(`window.scrollTo(0, 0); true`); await ev(framesJs(10));
         const sv = await ev(`(() => { const on = document.querySelector('.inbox-folder-toolbar .goals-chip[aria-pressed="true"]'), cs = on && getComputedStyle(on); return { head: (document.querySelector('.inbox-folder-head .session-group-count') || {}).textContent, pill: on && on.textContent, bg: cs && cs.backgroundColor, border: cs && cs.borderTopWidth, tile: !!document.querySelector('.saved-ledger .sl-icon') }; })()`);
-        check(/^\d+ saved$/.test(sv.head || '') && sv.pill === 'Open' && sv.border === '1px' && sv.tile, `the Saved page says what it holds, and Open is the picked half of the switch with no number (#22108): ${JSON.stringify(sv)}`);
+        check(/^\d+ saved$/.test(sv.head || '') && sv.pill === 'Open' && !/^rgba\(0, 0, 0, 0\)$/.test(sv.bg || '') && sv.tile, `the Saved page says what it holds, and Open is the picked, filled half of the switch with no number (#22108): ${JSON.stringify(sv)}`);
         await shot('inbox-saved-1280-dark');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
         await waitFor(`document.querySelectorAll('${T} tbody tr.inbox-card-tr').length >= 6`, 'the rows again', 15000);
