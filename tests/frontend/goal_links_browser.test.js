@@ -21,7 +21,7 @@ const { coralReady } = require('./helpers/wait');
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: TITLE, outcome: 'Every link', done_when: 'it is true' });
         assert.equal(g.status, 201, JSON.stringify(g)); const G = g.body.id;
         const t = await api('POST', `/api/board/${B}/tasks`, { title: 'A task with a goal', body: 'x', created_by: 'orch', priority: 'medium', assigned_to: 'Operator', goal_id: G });
-        assert.ok(t.status < 300, JSON.stringify(t));
+        assert.ok(t.status < 300, JSON.stringify(t)); const T = t.body.id || t.body.task?.id; assert.ok(T, 'the task has an id');
         const WANT = `/team/${B}/goals/${G}`;
         const home = async () => { await ev(`window.switchNavTab('agents'); window.history.replaceState(null, '', '/'); true`); };
         // the URL and the open goal are right, and the old board page was never the address
@@ -60,16 +60,21 @@ const { coralReady } = require('./helpers/wait');
         console.log('2. A Needs you row\'s Goal');
         await home();
         await ev(`(async () => { const { state } = await import(${S} + 'state.js'), m = await import(${S} + 'inbox_tab.js'); state.liveSessions = [{ name: 'gl-agent', session_id: '00000001-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Goal Agent', working_directory: '/repo/a', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), board_project: ${JSON.stringify(B)}, goal: { id: ${G}, title: ${JSON.stringify(TITLE)} }, sleeping: false }]; m.updateInboxTab(); return true; })()`);
-        await inboxFolder('needs', '#group-table-view .dt-table tbody tr');
-        await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr .dt-link')].find(b => b.textContent === ${JSON.stringify(TITLE)}).click(); true`);
+        await inboxFolder('needs', '#group-table-view .needs-ledger .nl-row');
+        // The approved Needs ledger exposes per-row goal links in Group by: None.
+        await ev(`document.querySelector('.nl-visible-group > button').click(); true`);
+        await waitFor(`document.querySelector('.nl-visible-group [role=menu]:not([hidden])')`, 'Needs you Group by menu');
+        await ev(`[...document.querySelectorAll('.nl-visible-group [role=menuitemcheckbox]')].find(b => b.textContent.trim() === 'None').click(); true`);
+        await waitFor(`[...document.querySelectorAll('#group-table-view .nl-permission .nl-meta a')].some(a => a.textContent === ${JSON.stringify('#' + G + ' ' + TITLE)})`, 'the Needs row has its goal link');
+        await ev(`[...document.querySelectorAll('#group-table-view .nl-permission .nl-meta a')].find(a => a.textContent === ${JSON.stringify('#' + G + ' ' + TITLE)}).click(); true`);
         await waitFor(`location.pathname === ${JSON.stringify(`/inbox/goals/${B}/${G}`)} && document.querySelector('#inbox-page #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'Needs you: the goal opens in the Inbox (#8861)', 15000);
         assert.equal(await ev(`location.pathname.startsWith('/board/')`), false, 'Needs you: not the board page');
         console.log('   ✓');
 
         console.log('3. The Inbox task page\'s Goal button');
         await home();
-        await inboxFolder('tasks', '#group-table-view .dt-table tbody tr .dt-primary');
-        await ev(`document.querySelector('#group-table-view .dt-table tbody tr .dt-primary').click(); true`);
+        // #22109 hides the Tasks folder; existing task-detail links remain supported.
+        await Page.navigate({ url: BASE + `/inbox/tasks/${B}/${T}` }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await waitFor(`!![...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x=>x.textContent==='Goal')?.nextElementSibling.querySelector('button')`, 'the task page with its Goal button', 15000);
         await ev(`[...document.querySelectorAll('#inbox-page .goals-facts dt')].find(x=>x.textContent==='Goal')?.nextElementSibling.querySelector('button').click(); true`);
         // since #8861 the goal opens inside the Inbox, at its own address (the quiet team link is the way out)
