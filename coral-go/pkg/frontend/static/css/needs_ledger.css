@@ -650,7 +650,10 @@
     }
 
     .nl-file .nl-side {
-        gap: 4px;
+        display: grid;
+        grid-template-columns: auto auto;
+        align-items: center;
+        gap: 2px 4px;
     }
 
     .needs-ledger .nl-actions .btn {
@@ -807,7 +810,6 @@
 }
 
 @media(max-width:767px) {
-    .nl-file .nl-side { display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px 4px; }
     .nl-file .nl-side .nl-when { grid-column: 1 / -1; justify-self: end; }
     .nl-file .nl-side .nl-hover-actions { display: none; }
 }
