@@ -40,7 +40,14 @@ export function needsLedger(cfg) {
         for (const { input, items } of checks) { const available = items.filter(eligible), n = available.filter(r => state.selected.has(keyOf(r))).length; input.checked = n > 0 && n === available.length; input.indeterminate = n > 0 && n < available.length; input.disabled = !available.length; }
         root.querySelectorAll('[data-needs-key]').forEach(n => n.classList.toggle('nl-is-selected', state.selected.has(n.dataset.needsKey)));
         const phoneFocus = phoneSummary.contains(document.activeElement) ? (document.activeElement.classList.contains('nl-phone-count') ? '.nl-phone-count' : '.nl-phone-select') : '';
-        phoneSummary.replaceChildren(el('strong', 'nl-phone-title', 'Needs you'), button(`${rows.length} · ${rows.filter(unread).length} new`, 'btn btn-quiet nl-phone-count', () => { state.toolsOpen = root.classList.toggle('nl-tools-open'); phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-expanded', String(root.classList.contains('nl-tools-open'))); }), button(selecting || selected.length ? 'Cancel' : 'Select', 'btn btn-quiet nl-phone-select', () => { if (selecting || state.selected.size) api.clear(); else { selecting = true; sync(); } }));
+        phoneSummary._toggleTools = () => { state.toolsOpen = root.classList.toggle('nl-tools-open'); phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-expanded', String(state.toolsOpen)); };
+        phoneSummary._select = () => { if (selecting || state.selected.size) api.clear(); else { selecting = true; sync(); } };
+        const phoneTitle = phoneSummary.querySelector('.nl-phone-title') || el('strong', 'nl-phone-title', 'Needs you');
+        const phoneCount = phoneSummary.querySelector('.nl-phone-count') || button('', 'btn btn-quiet nl-phone-count', () => phoneSummary._toggleTools());
+        const phoneSelect = phoneSummary.querySelector('.nl-phone-select') || button('', 'btn btn-quiet nl-phone-select', () => phoneSummary._select());
+        phoneCount.textContent = `${rows.length} · ${rows.filter(unread).length} new`;
+        phoneSelect.textContent = selecting || selected.length ? 'Cancel' : 'Select';
+        if (!phoneTitle.isConnected || !phoneCount.isConnected || !phoneSelect.isConnected) phoneSummary.replaceChildren(phoneTitle, phoneCount, phoneSelect);
         phoneSummary.querySelector('.nl-phone-count')?.setAttribute('aria-label', 'Show Needs you search and filters');
         if (phoneFocus) phoneSummary.querySelector(phoneFocus)?.focus({ preventScroll: true });
         summary.replaceChildren(checkboxTop, el('strong', '', selected.length ? `${selected.length} selected` : `${rows.length} items`));

@@ -27,7 +27,7 @@ for(const [width,theme] of [[1280,'light'],[390,'light'],[320,'light'],[1280,'da
  await ev(`[...document.querySelectorAll('.nl-file-open')].find(b=>b.textContent.includes('Document 3.md')).click();true`);
  await waitFor(`window.__openedCalls.length===1`,'successfully opened version is recorded once');
  await ev(`document.querySelector('.artifact-viewer-close').click();true`);
- await waitFor(`![...document.querySelectorAll('.nl-file')].find(r=>r.textContent.includes('Document 3.md')).querySelector('.nl-new')`,'new-version attention clears after opening');
+ try { await waitFor(`![...document.querySelectorAll('.nl-file')].find(r=>r.textContent.includes('Document 3.md')).querySelector('.nl-new')`,'new-version attention clears after opening'); } catch(e) { throw new Error(e.message+' '+await ev(`JSON.stringify({fixture:window.__groupRows.find(r=>r.name==='Document 3.md'),row:[...document.querySelectorAll('.nl-file')].find(r=>r.textContent.includes('Document 3.md'))?.textContent,live:document.querySelector('.inbox-live')?.textContent,toasts:[...document.querySelectorAll('.toast')].map(n=>n.textContent)})`)); }
  await ev(`document.querySelector('[data-needs-tab="agent"]').click();true`);
  const waitingId='e'.padStart(64,'0');
  await waitFor(`!!document.querySelector('[data-review-artifact="${waitingId}"]')`,'the sent-back file is on Waiting on an agent');
