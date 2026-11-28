@@ -37,6 +37,7 @@ const { setTheme } = require('./helpers/contrast');
    const root = `#${listId}`;
    await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 1`, `${width}: the agents are listed`);
    console.log(width, 'rows', await ev(`document.querySelectorAll('${root} .session-group-item').length`), 'visible list', await ev(`document.querySelector('${root}')?.getClientRects().length`));
+   if (process.env.SIDEBAR_DEBUG) console.log(width, JSON.stringify(await ev(`[...document.querySelectorAll('${root} .board-card-agents > *')].slice(0,4).map(e=>{const r=e.getBoundingClientRect(),cs=getComputedStyle(e);return [e.className.slice(0,40),Math.round(r.top),Math.round(r.height),cs.marginTop,cs.marginBottom,cs.minHeight,cs.paddingTop]})`)));
    for (const theme of ['dark', 'light']) {
     await setTheme(ev, theme); await ev(framesJs(4));
     if (shots) { fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }

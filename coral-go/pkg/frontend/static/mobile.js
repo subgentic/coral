@@ -121,17 +121,7 @@ function _listHeader(agentList) {
     header.innerHTML = `
             <span class="phone-break" aria-hidden="true"></span>
             <h2 class="mobile-list-title">Agents</h2>
-            <div class="phone-chips" role="group" aria-label="Show">
-                <button class="chip phone-chip phone-chip-need" type="button" data-phone-chip="needs_input" data-on-click="phone-home-filter" aria-pressed="false" hidden></button>
-                <button class="chip phone-chip" type="button" data-phone-chip="working" data-on-click="phone-home-filter" aria-pressed="false" hidden></button>
-            </div>
-            <button class="btn btn-quiet btn-icon sidebar-collapse-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel" title="Display options" aria-label="Display options">
-                <span class="material-icons" style="font-size:var(--icon-size)" aria-hidden="true">notes</span><span class="display-dot" data-display-badge hidden></span>
-            </button>
-            <button class="btn btn-quiet btn-icon sidebar-collapse-btn group-toggle-btn" type="button" data-group-toggle data-next="collapse" data-on-click="groups-toggle-all" title="Collapse all groups" aria-label="Collapse all groups" hidden>
-                <svg class="group-toggle-collapse" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg>
-                <svg class="group-toggle-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>
-            </button>
+            <button class="btn btn-small sidebar-groupby-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel">Group by: <b data-group-by-label>Status</b><span class="material-icons" aria-hidden="true">expand_more</span><span class="display-dot" role="img" data-display-badge hidden></span></button>
             <button class="btn btn-small btn-primary" data-on-click="launch-show">New</button>
             <span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>
             <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" hidden>
@@ -144,7 +134,7 @@ function _listHeader(agentList) {
         `;
     const searchRow = document.createElement('div'); searchRow.className = 'mobile-search-row'; searchRow.id = 'mobile-search-row';
     searchRow.innerHTML = `<input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents and messages" autocomplete="off" aria-label="Search agents and messages" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">`;
-    searchRow.append(...header.querySelectorAll('[data-display-button], [data-group-toggle]'));
+    searchRow.append(...header.querySelectorAll('[data-display-button]'));
     header.prepend(buildPhoneBar({ pill: searchRow })); // the shared navigation/title/action row with search and filters below it
     agentList.prepend(header);
     const hubWords = document.body.getAttribute('data-hub-label'); if (hubWords) header.querySelector('.phone-hub-state').textContent = `, ${hubWords}`; // the hub's state, if it was read before this header was built (hub_indicator.js)

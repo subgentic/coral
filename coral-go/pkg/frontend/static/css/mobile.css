@@ -764,15 +764,9 @@
 
     /* A card that needs the Operator has no amber border or glow of its own (#5123): its flashing dot and the state chip carry it. */
     #mobile-session-list .session-group-item .chip.session-state-pill { display: none; } /* a state is a sentence under the name, not a pill (#10691) */
-    #mobile-session-list .session-status-line { display: block; margin-left: var(--row-dot-block); font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary); } /* one muted line, in sentence case: "Needs input", "Working"; a real span, so a screen reader and find-in-page have it (#10801) */
-    #mobile-session-list .session-group-item.needs-attention .session-status-line { color: var(--warning); }
     #mobile-session-list .sleeping-summary-row, #mobile-session-list .sleeping-summary-label { font-style: normal; } /* no italics in the list */
     #mobile-session-list .session-line2, #mobile-session-list .session-model { padding-left: 0; margin-left: var(--row-dot-block); } /* Show summary and Show model start under the name, where the status line does (#10872): the sidebar's 18 px indent is 6 px short of the phone row's grid */
 
-    #mobile-session-list .session-group-item.needs-attention .session-dot.waiting,
-    #mobile-session-list .session-group-item.needs-attention .session-dot.stuck {
-        box-shadow: 0 0 0 6px rgba(var(--fx-yellow-rgb), 0.12);
-    }
 
     
     
@@ -1352,7 +1346,7 @@
    Under 601 px the page's top bar is the list header's first row: the menu button, a round search pill and the account button; then the title with two chips ("N need you", "N working"); then the agents as cards: a round
    avatar (the team's colour, the agent's initial) with the state as a dot on its corner, the name, the short time at the right and a two-line preview (the goal until the last message is a field of the row). No borders, soft
    surfaces. Wider screens keep the sidebar's row (the avatar, the time and the preview are drawn by this block only). */
-.session-avatar, .session-time, .session-preview, .phone-menu-btn, .phone-account-btn, .phone-break, .phone-chips { display: none; }
+.session-time, .phone-menu-btn, .phone-account-btn, .phone-break { display: none; }
 .phone-bar, .phone-bar-title { display: none; }
 #mobile-agent-list .phone-bar { display: flex; align-items: center; gap: 4px; flex: 1 0 100%; min-width: 0; } /* Home's list is the page up to 767 px, and its search is in this bar: the bar is there at every width the list is (the ☰ and the avatar are drawn only on a phone, below) */
 #mobile-agent-list .phone-bar .phone-bar-pill { flex: 1 1 0; min-width: 0; margin: 0; }
@@ -1385,37 +1379,9 @@
 @media (max-width: 600px) {
     #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
     #mobile-agent-list .mobile-list-title { order: 4; font-size: var(--fs-2xl); font-weight: var(--fw-regular); margin: 0 auto 0 8px; }
-    #mobile-agent-list .phone-chips { order: 5; display: flex; gap: 6px; flex: 0 1 auto; min-width: 0; }
-    #mobile-agent-list .phone-chip { min-height: 44px; height: auto; padding: 0 12px; border: 0; border-radius: var(--radius-lg); background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-md); white-space: nowrap; cursor: pointer; }
-    #mobile-agent-list .phone-chip[hidden] { display: none; }
-    #mobile-agent-list .phone-chip-need { background: rgba(var(--fx-yellow-rgb), 0.18); color: var(--warning); }
-    #mobile-agent-list .phone-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
     #mobile-agent-list .mobile-list-header > .btn-small { order: 7; }
 
-    /* the cards */
-    #mobile-session-list { padding: 0 8px 112px; } /* room under the floating nav and the + (96 px of them) */
-    #mobile-session-list .session-group-item, #mobile-session-list > .session-group-item {
-        position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 12px; align-items: start;
-        margin: 0 0 3px; padding: 14px 12px !important; min-height: 76px; border: 0; border-radius: 14px; background: var(--bg-secondary); box-shadow: none;
-    }
-    #mobile-session-list .session-group-item.active { background: var(--bg-tertiary); box-shadow: none; }
-    #mobile-session-list .session-avatar { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: color-mix(in srgb, var(--avatar, var(--accent)) 62%, rgb(var(--black-rgb))); color: var(--text-on-accent); font-size: var(--fs-xl); font-weight: var(--fw-medium); }
-    #mobile-session-list .session-info { min-width: 0; }
-    #mobile-session-list .session-dot { position: absolute; left: 46px; top: 48px; width: 16px; height: 16px; margin: 0; border: 3px solid var(--bg-secondary); box-sizing: border-box; }
-    #mobile-session-list .session-name-row { display: flex; align-items: baseline; gap: 8px; min-height: 0; }
-    #mobile-session-list .session-label { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xl); font-weight: var(--fw-regular); }
-    #mobile-session-list .session-label-name, #mobile-session-list .session-label .sln-head, #mobile-session-list .session-label .sln-tail { color: var(--agent-name-color, var(--text-primary)); font-weight: inherit; } /* the name in the card's ink, bold when the agent needs you */
-    #mobile-session-list .session-label-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; } /* the name itself ends in an ellipsis inside the card at 320 px (mobile_text_sizes) */
-    #mobile-session-list .session-group-item .session-name-spacer { display: none; }
-    #mobile-session-list .session-time { display: block; flex: none; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
-    #mobile-session-list .session-status-line { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; } /* still text for a screen reader and find-in-page: the dot and the preview are what the card shows */
-    #mobile-session-list .session-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; padding-right: 56px; font-size: var(--fs-lg); color: var(--text-secondary); overflow-wrap: anywhere; } /* the ⋯ (24 px, 20 px from the card edge, drawn at the card's bottom right) is under the text of a one-line preview: the text ends 56 px short of the edge (the phone walk, item 4) */
-    #mobile-session-list .session-line2 { display: none; } /* the preview is the summary here */
-    #mobile-session-list .session-model { margin-left: 0; padding-left: 0; font-size: var(--fs-md); }
-    #mobile-session-list .session-group-item.needs-attention .session-label { font-weight: var(--fw-strong); }
-    #mobile-session-list .session-group-item.needs-attention .session-preview { color: var(--text-primary); }
-    #mobile-session-list .session-group-item.needs-attention .session-time { color: var(--link-text); font-weight: var(--fw-medium); } /* the text-safe accent: 4.5:1 or more on the card in both themes (the accent was 4.44 in light, and darkening it for light made dark 4.4: #4581c7 on #18181c) */
-    #mobile-session-list .session-group-item .sidebar-kebab-wrapper { position: absolute; right: 20px; bottom: 15px; } /* the card is the containing block and the wrapper sits 9 px further out than `right` says: the 24 px button is 11 px from the card's right edge and 12 from its bottom, so its 44 px hit area ends at them, not past them */
+    #mobile-session-list { padding: 0 8px 112px; } /* room under the bottom bar; the rows are the sidebar's (#22105, agent_rows.css) */
 }
 
 /* ── The phone's floating nav and + (#11116, slice C of the Google Chat style) ───────────────────────────────────────────────────────────────────────────────────────────────────────────────

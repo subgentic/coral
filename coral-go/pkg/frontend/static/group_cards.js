@@ -11,7 +11,7 @@ import { CHEVRON_DECO, _chevron, _collapseAttrs, _isGroupCollapsed, _teamHeaderA
 import { getFolderTags, renderFolderTagPills } from './folder_tags.js';
 import { pinPathForKey, emptyPins, notePinKeys } from './pinned_folders.js';
 import { localFirst } from './server_status.js';
-import { killAllItem, deleteTeamItem, teamHealthBtn, _rowNameWithServer, _rowServerLine, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
+import { killAllItem, deleteTeamItem, teamHealthItem, _rowNameWithServer, _rowServerLine, _boardAccentStyle, _pinMenuItem, FOLDER_GROUP_ICON } from './list_card_parts.js';
 import { _pinMatchesFilter } from './list_filter_match.js';
 import { SVGO } from './svg_open.js';
 const _mk0 = "<line x1=\"4\" y1=\"4\" x2=\"12\" y2=\"12\"/><line x1=\"12\" y1=\"4\" x2=\"4\" y2=\"12\"/></svg>\n                    Stop all\n                </button>";
@@ -33,6 +33,7 @@ function _renderTeamCard(boardName, boardSessions) {
             <button class="btn btn-quiet btn-icon btn-xs sidebar-kebab-btn group-kebab-btn" data-coral-hook="sidebar-kebab-button" data-on-click="kebab-toggle" title="Group actions" aria-label="More actions for ${escapeAttr(keyLabel(boardName))}" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(kebabId('team', boardName))}">${MORE_DOTS_SVG}</button>
             <div class="menu sidebar-kebab-menu" data-coral-hook="sidebar-kebab-menu" id="${escapeAttr(kebabId('team', boardName))}" style="display:none" role="menu" aria-label="Actions for ${escapeAttr(keyLabel(boardName))}">
                 <button class="menu-item overflow-menu-item" data-on-click="team-working-mode" data-board="${escapeAttr(boardName)}"><span class="material-icons" style="font-size:var(--fs-lg);vertical-align:-2px" aria-hidden="true">settings</span> Team settings</button>
+                ${teamHealthItem(boardName, boardSessions)}
                 ${teamLinkOffered(splitKey(boardName).server) ? `<button class="menu-item overflow-menu-item" data-on-click="team-link" data-board="${escapeAttr(boardName)}"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5l3-3"/><path d="M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1"/><path d="M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1"/></svg> Link team...</button>` : ''}
                 <button class="menu-item overflow-menu-item" data-on-click="team-add-agent" data-board="${escapeAttr(boardName)}" data-dir="${escapeAttr(boardWorkDir)}">
                     ${SVGO.o1}<line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
@@ -91,7 +92,7 @@ function _renderTeamCard(boardName, boardSessions) {
         const sleepingClass = boardIsSleeping ? ' team-sleeping' : '';
         html += `<li class="session-board-card session-team-group session-board-card-toplevel${sleepingClass}"${accentStyle}>
             <div class="session-group-header board-card-header${escapeAttr(state.selectedTeam === boardName ? ' team-selected' : '')}"${state.selectedTeam === boardName ? ' aria-current="true"' : ''} data-group-name="${escapeAttr(boardName)}" data-on-click="team-name-open" data-board="${escapeAttr(boardName)}" data-group="${escapeAttr(boardName)}"${_teamHeaderAttrs(boardName)}>${_chevron(boardName, boardCollapsed)}
-                <div class="group-header-text"><div class="group-name-line"><svg class="team-group-icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4a3 3 0 0 1 0 6M21 21v-2a6 6 0 0 0-4-5.65"/></svg><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.length}</span>${loadedModule('./active_teams.js')?.chip(boardName) || ''}</div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${teamHealthBtn(boardName, boardSessions)}${bKebab}
+                <div class="group-header-text"><div class="group-name-line"><span class="group-name-text" title="${escapeAttr(keyLabel(boardName))}">${_rowNameWithServer(boardName)}</span>${boardSleepIcon}${distillChip(boardName)} <span class="session-group-count">${boardSessions.length}</span></div>${_rowServerLine(boardName)}</div><span class="session-name-spacer"></span>${bKebab}
             </div>
             <ul class="board-card-agents${boardCollapsed ? ' board-card-collapsed' : ''}">`;
 

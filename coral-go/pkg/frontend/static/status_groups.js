@@ -6,7 +6,8 @@ import { browserLocal } from './safe_storage.js';
 import { registerActions, tokenOf, textOf } from './actions.js';
 import { redrawLiveList } from './list_hooks.js';
 import { escapeHtml, escapeAttr } from './utils.js';
-import { isPhoneLayout } from './phone_layout.js';
+import { sessionTeamKey } from './server_base.js';
+import { importOnce } from './import_once.js';
 import { sessionStateInfo } from './session_state.js';
 import { DISPLAY_PANEL_OPEN } from './display_panel.js';
 import { loadStyles } from './lazy_styles.js';
@@ -16,11 +17,9 @@ const KEYS = { server: 'coral-group-computer', team: 'coral-group-team', task: '
 const LEGACY = { server: ['coral-group-by-server', 'true'], team: ['coral-agent-grouping', 'team'] }; // what a browser chose before the three boxes
 const DEFAULTS = { server: false, team: true, task: true }; // a viewer with no choice saved opens on Team and Task (Operator 11-28, #22104)
 const FOLD = 'coral-status-folded'; // JSON: the groups the person opened or folded by hand
-const MORE = 'coral-status-more'; // the phone's one line is open
 const DAY = 86400;
 const SHAPE = { needs: 'st-needs', working: 'st-working', idle: 'st-idle', done: 'st-done' };
 const WORKERS_MIN = 4; // a team folds its workers under the orchestrator from this many
-const PHONE_WORKING = 2; // working agents a phone shows before the line that counts the rest
 const GROUPS = [['needs', 'Needs you'], ['working', 'Working'], ['idle', 'Idle'], ['done', 'Done today']];
 
 const read = (k, d) => { try { return browserLocal.get(k) ?? d; } catch { return d; } };
@@ -99,21 +98,6 @@ export function renderStatusGroups(sessions, renderRow) {
     }
     for (const g of Object.values(by)) g.sort((a, b) => age(a) - age(b)); // the newest update first: an agent that comes back with output moves up
     let html = '';
-    if (isPhoneLayout()) {
-        const open = read(MORE, 'false') === 'true';
-        const shownWorking = open ? by.working : by.working.slice(0, PHONE_WORKING);
-        const rest = open ? [] : by.working.slice(PHONE_WORKING);
-        const hidden = open ? [] : [...by.idle, ...by.done];
-        for (const [key, label] of GROUPS) {
-            const shown = key === 'needs' ? by.needs : key === 'working' ? shownWorking : open ? by[key] : [];
-            if (!shown.length) continue;
-            html += headHtml(key, label, by[key].length, false) + shown.map(s => rowHtml(s, renderRow)).join('');
-        }
-        const parts = [rest.length ? `${rest.length} more working` : '', !open && by.idle.length ? `${by.idle.length} idle` : '', !open && by.done.length ? `${by.done.length} done today` : ''].filter(Boolean);
-        if (open) return html + `<li class="status-more"><button type="button" class="btn btn-quiet status-more-toggle" data-on-click="status-more" aria-expanded="true"><span class="status-caret open" aria-hidden="true"></span>Show fewer</button></li>`;
-        if (parts.length || hidden.length) html += `<li class="status-more"><button type="button" class="btn btn-quiet status-more-toggle" data-on-click="status-more" aria-expanded="false"><span class="status-caret" aria-hidden="true"></span>${escapeHtml(parts.join(' · '))}</button></li>`;
-        return html;
-    }
     for (const [key, label] of GROUPS) {
         if (!by[key].length) continue;
         const folded = isFolded(key);
@@ -130,37 +114,34 @@ registerActions({
         const name = textOf(el.dataset.name), type = tokenOf(el.dataset.agentType);
         if (name && type) window.selectLiveSession(name, type, textOf(el.dataset.sessionId) || '', textOf(el.dataset.server) || '', { pointer: !!event && event.detail > 0, focusChat: !!event && event.detail === 0 });
     },
-    'status-more': () => { write(MORE, read(MORE, 'false') === 'true' ? 'false' : 'true'); redrawLiveList(); },
+    'row-task-open': (el, event) => { event.stopPropagation(); importOnce('./task_navigation.js').then(m => m.openTask(el.dataset.board, el.dataset.task, el)); }, // the row's #N (#22105): opens the task, never the agent
 });
 
 /** The Task box (#21685): an agent is On a task when the board's task data names it the assignee of an open task (the live row's board_task: in progress, else the oldest queued, which says "queued"). */
 const hasTask = s => !!(s.board_task && s.board_task.id);
 const SPLIT = [['on', 'On a task'], ['no', 'No task']];
 
-/** A row's task line, and the "queued" tag beside its name: the shared row, with the mock's "#21685 Sidebar: Group by Task" line under the name. */
+/** A row's task line and its "queued" tag (#22105, the approved sidebar mock v2): under the name, the task's #N (the one link: it opens the task) and its title, cut at the row's edge;
+ *  a task not started yet is a quiet "queued" tag at the right, before the time. */
 function withTaskLine(html, s) {
     if (!hasTask(s)) return html;
-    const t = s.board_task, queued = t.status === 'pending';
-    return html.replace('<span class="session-name-spacer"></span>', `${queued ? '<span class="status-queued">queued</span>' : ''}<span class="session-name-spacer"></span>`)
-        .replace(/(\s*<\/div>\s*<div class="session-tooltip">)/, `<span class="session-task-line"><b>#${Number(t.id)}</b>${escapeHtml(String(t.title || ''))}</span>$1`); // inside the row's info column, after its last line
+    const t = s.board_task, id = Number(t.id), queued = t.status === 'pending';
+    return html.replace('<span class="session-name-spacer"></span>', `<span class="session-name-spacer"></span>${queued ? `<span class="status-queued" title="Task #${id} is queued: not started yet">queued</span>` : ''}`)
+        .replace(/(\s*<\/div>\s*<div class="session-tooltip">)/, `<span class="session-task-line"><button type="button" class="task-id-link" role="link" data-on-click="row-task-open" data-board="${escapeAttr(sessionTeamKey(s) || '')}" data-task="${id}" title="Open task #${id}">#${id}</button>${escapeHtml(String(t.title || ''))}</span>$1`); // inside the row's info column, after its last line
 }
 /** A subgroup's heading (On a task, No task): a caret, the name and the count, folded by hand like the Status groups. */
 const subHead = (key, label, n, folded) => `<li class="status-sub" data-status="${escapeAttr(key)}"><button type="button" class="btn btn-quiet status-head-toggle" data-on-click="status-fold" data-group="${escapeAttr(key)}" aria-expanded="${escapeAttr(String(!folded))}"><span class="status-caret" aria-hidden="true"></span><span class="status-name">${escapeHtml(label)}</span><span class="session-group-count">${Number(n)}</span></button></li>`;
-/** The Task box inside one scope (a team, a computer, the whole list): On a task, then No task, each with its rows. rows(list) draws agents as that scope always does.
- *  On a phone each keeps a short list: two rows of On a task and one line that counts the rest ("1 more on a task", "3 without a task"), which opens the rest. */
+/** The Task box inside one scope (a team, a computer, the whole list): On a task, then No task, each with its rows; asleep agents stay in their group, last (#22105). rows(list) draws agents as that scope always does. */
 function taskSplit(list, scope, rows) {
     groupByStyles();
-    const by = { on: list.filter(hasTask), no: list.filter(s => !hasTask(s)) };
-    if (!by.on.length && !by.no.length) return '';
-    const phone = isPhoneLayout(), open = !phone || !isFolded('m:' + scope);
+    const last = l => [...l.filter(s => !s.sleeping), ...l.filter(s => s.sleeping)];
+    const by = { on: last(list.filter(hasTask)), no: last(list.filter(s => !hasTask(s))) };
     let html = '';
     for (const [k, label] of SPLIT) {
         if (!by[k].length) continue;
-        const key = `t:${scope}:${k}`, folded = !phone && isFolded(key), shown = open ? by[k] : k === 'on' ? by[k].slice(0, PHONE_WORKING) : [];
-        html += subHead(key, label, by[k].length, folded) + (folded ? '' : rows(shown).replace(/<li /g, '<li data-in="1" '));
-        if (!open) { const rest = by[k].length - shown.length; if (rest) html += `<li class="status-more status-more-in"><button type="button" class="btn btn-quiet status-more-toggle" data-on-click="status-fold" data-group="${escapeAttr('m:' + scope)}" aria-expanded="false"><span class="status-caret" aria-hidden="true"></span>${Number(rest)} ${k === 'on' ? 'more on a task' : 'without a task'}</button></li>`; }
+        const key = `t:${scope}:${k}`, folded = isFolded(key);
+        html += subHead(key, label, by[k].length, folded) + (folded ? '' : rows(by[k]).replace(/<li /g, '<li data-in="1" '));
     }
-    if (phone && open && list.length > PHONE_WORKING) html += `<li class="status-more status-more-in"><button type="button" class="btn btn-quiet status-more-toggle" data-on-click="status-fold" data-group="${escapeAttr('m:' + scope)}" aria-expanded="true"><span class="status-caret open" aria-hidden="true"></span>Show fewer</button></li>`;
     return html;
 }
 
@@ -171,6 +152,7 @@ export function lay(regular, limits, archived, renderRow, wrap) {
     arch = archived;
     mountGroupBy();
     const g = groupBy();
+    const words = BOXES.filter(([k]) => g[k]).map(([, l]) => l).join(', ') || 'Status'; for (const b of document.querySelectorAll('[data-group-by-label]')) if (b.textContent !== words) b.textContent = words; // the button says the grouping (#22105)
     if (g.server || g.team || g.task) groupByStyles(); // a grouped view is drawing: its sheet (none ticked: only the bundle's)
     if (g.team) return null;
     const sleeping = limits?.sleeping || [];
@@ -192,7 +174,7 @@ export function teamList(saved, board, draw, row) {
     const task = groupBy().task, all = [...saved.filter(isOrch), ...saved.filter(s => !isOrch(s))]; // the saved order, the orchestrator pinned to the top
     const [orch, ...rest] = all, workers = rest.filter(s => !s.sleeping), asleep = rest.filter(s => s.sleeping); // sleeping ones keep the list's own "N sleeping" row
     const split = list => taskSplit(list, board, l => withTaskRows(draw(l), l)); // the Task box: the team's workers split On a task / No task
-    if (task && !isOrch(orch)) return split(saved.filter(s => !s.sleeping)) + draw(saved.filter(s => s.sleeping));
+    if (task && !isOrch(orch)) return split(saved);
     if (!task && (!isOrch(orch) || workers.length < WORKERS_MIN)) return draw(all);
     const fold = workers.length >= WORKERS_MIN; // a small team has no fold button (with the Task box its workers are split under the orchestrator all the same)
     const key = 'w:' + board, folded = task ? !!foldedMap()[key] : isFolded(key), // with the Task box the split is the point: the workers start open (the button still folds them)
@@ -200,7 +182,7 @@ export function teamList(saved, board, draw, row) {
     const sum = [`${n('working')} working`, n('needs') ? `<span class="status-shape st-needs" aria-hidden="true"></span>${Number(n('needs'))} needs you` : '', `${n('idle')} ready`].filter(x => x && !x.startsWith('0 ')).join(' · ');
     let html = (task ? withTaskRows(draw([orch]), [orch]) : draw([orch])); // the orchestrator is the team's first row, whatever the grouping (with the Task box it keeps its task line, and is in neither split group)
     if (fold) html = html.replace(/( aria-label="[^"]*)"/, `$1, ${Number(workers.length)} workers" aria-expanded="${escapeAttr(String(!folded))}"`).replace(' data-on-click="session-open"', ` data-on-click="status-orch-open" data-fold="${escapeAttr(key)}"`); // no fold button (#22045): a click (or Enter) on the row once it is selected opens or closes its workers; the first click selects it
-    if (task && !(fold && folded)) return html + split(workers) + draw(asleep);
+    if (task && !(fold && folded)) return html + split(rest);
     if (folded) return html + `<li class="status-workers-sum">${sum}</li>` + draw(asleep);
     const done = arch.filter(x => x.board_project === board && doneToday(x)), dkey = 'd:' + board, dOpen = !isFolded(dkey);
     html += draw(workers);
@@ -209,4 +191,4 @@ export function teamList(saved, board, draw, row) {
 }
 
 // A browser that opens with Task ticked (the one box whose rows need the sheet; Computer and Team draw with the start sheet) holds this module (so the list's first grouped draw) until the sheet is in: no unstyled first frame (#21784). With none ticked there is nothing to wait for and the start has the bundle's sheet only.
-if (groupBy().task) await groupByStyles();
+await Promise.all([loadStyles('agent_rows.css'), groupBy().task && groupByStyles()]); // the agent rows' look (#22105) is in its own sheet, loaded before the list's first draw: no start byte, no unstyled first frame
