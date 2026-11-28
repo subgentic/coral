@@ -313,6 +313,8 @@
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .team-tb-pills { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; } /* the chips scroll sideways when the title, the field and the icon leave them too little (#12455) */
 .inbox-folder-toolbar .list-bar-search-row.gt-toolbar > .list-bar-search-wrap { flex: 0 1 16rem; } /* the search box is capped so the chip beside the pills has the rest of the row (#9078) */
 .inbox-folder-toolbar .list-bar-menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; align-items: start; }
+.list-bar-foot { display: flex; align-items: center; font-size: var(--fs-base); color: var(--text-secondary); }
+.list-bar-menu-foot > .list-bar-clear-all { grid-column: 1; justify-self: start; }
 @media (min-width: 768px) { .inbox-folder-toolbar .list-bar-menu-grid.list-bar-menu-foot { grid-template-columns: repeat(3, minmax(0, 1fr)); } } /* three to a line: Include archived teams takes the cell beside Sort and the panel keeps its two rows (#22004) */
 .inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 4px; } /* a field's label above its box, two fields a line (UI/UX on #8681): the panel is two or three lines tall, not one per field */
 .inbox-folder-toolbar .list-bar-menu :is(.list-bar-field, .list-bar-sort) > .list-bar-field-label { flex: none; white-space: nowrap; }
