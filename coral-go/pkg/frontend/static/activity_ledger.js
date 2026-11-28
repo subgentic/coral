@@ -80,7 +80,7 @@ const KIND_SVG = {
 const FLAG = '<svg class="al-gflag" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5v13M3 2.5h9l-2 3 2 3H3" fill="currentColor" fill-opacity=".9" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
 const svgNode = html => { const t = document.createElement('template'); t.innerHTML = html; return t.content.firstChild; };
 /** Which drawing a row gets: a file by what it is (a page, a picture, text), else its kind. */
-export const kindMark = r => { const k = tileKind(r), fk = k === 'file' || k === 'image' ? fileKindOf(r.title) : null; return fk ? (fk.kind === 'html' ? 'html' : fk.kind === 'image' ? 'image' : 'text') : KIND_SVG[k] ? k : k === 'run' || k === 'job_run' || k === 'workflow_run' ? 'other' : 'other'; };
+export const kindMark = r => { const k = tileKind(r), fk = k === 'file' || k === 'image' ? fileKindOf(r.title) : null; return fk ? (fk.kind === 'html' ? 'html' : fk.kind === 'image' ? 'image' : 'text') : Object.hasOwn(KIND_SVG, k) ? k : 'other'; };
 const MARK = { approve: '✓ ', changes: '↩ ', deny: '✕ ', answer: '' };
 const VCLASS = { approve: 'ok', changes: 'ch', deny: 'no', answer: 'an', neutral: 'dm', purple: 'goal' };
 /** One clock time ("9:44 PM"): the day is the heading's, the exact stamp is the hover (#22100). */
@@ -89,7 +89,9 @@ const link = (cls, text, run, label) => { const b = el('button', `al-link ${cls 
 
 /** One row. `x`: { parts(r) -> { did, on, detail, about }, opens(r), openRow(r), openLabel(r), teamWords(r), teamNode?(r, words), fromWords(r), keyOf(r), openGoal?(r), openTask?(r) }. The approved Activity mock: a kind mark, the name, one line of what you did and where, the clock time at the right; the buttons show on hover or focus, and a phone has one menu. */
 export function ledgerRow(r, x) {
-    const p = x.parts(r), v = verdictOf(r), open = x.opens(r), kind = tileKind(r);
+    const perm = r.action === 'prompt_allow' || r.action === 'prompt_reject', p0 = x.parts(r);
+    const p = perm ? { ...p0, did: r.action === 'prompt_reject' ? 'Denied' : 'Allowed', on: `${(x.agentName && x.agentName(r)) || r.item_id || 'An agent'} asked for permission`, detail: '' } : p0; // the mock and Needs you say Denied; the record keeps no command yet (task #22144), so the title names the agent
+    const v = verdictOf(r), open = x.opens(r), kind = tileKind(r);
     const li = el('li', `al-row${r.action === 'wait_send' ? ' is-noise' : ''}`); li.dataset.key = x.keyOf(r); li.dataset.kind = kind || 'other';
     const lead = el('span', `al-lead al-lead-${kind || 'other'}`); lead.append(svgNode(KIND_SVG[kindMark(r)] || KIND_SVG.other));
     if (kind === 'goal') lead.classList.add('al-lead-goal');
@@ -100,21 +102,23 @@ export function ledgerRow(r, x) {
     if (r.file_n) head.append(el('span', 'al-ver', r.file_latest_n > r.file_n ? `version ${r.file_n} of ${r.file_latest_n}` : `version ${r.file_n}`)); // grey, once: the version this row acted on
     main.append(head);
     if (r.ask) title.title = r.ask; // the question the file was sent with: the mock's row has no line for it, so it is the name's tip
-    const said = p.detail.replace(/^from [^·]+(?: · |$)/, '').replace(/^Your answer: /, ''), asker = r.item_kind === 'question' && x.fromWords(r) ? x.fromWords(r).replace(/^from /, 'to ') : '';
+    const said = String(p.detail || '').replace(/^from [^·]+(?: · |$)/, '').replace(/^Your answer: /, ''), asker = r.item_kind === 'question' && x.fromWords(r) ? x.fromWords(r).replace(/^from /, 'to ') : '';
     const sub = el('div', 'al-sub'), parts = [];
     const verb = el('span', `al-v al-v-${VCLASS[v] || 'dm'}`, `${MARK[v] || ''}${p.did}`);
     const first = el('span', 'al-seg'); first.append(verb);
-    if (r.item_kind === 'question' && said) first.append(document.createTextNode(` “${said}”${asker ? ` ${asker}` : ''}`));
+    if (r.item_kind === 'question' && said) { first.append(document.createTextNode(` “${said}”${asker ? ' to ' : ''}`)); if (asker) { const who = asker.replace(/^to /, ''), w = link('al-who', who, () => x.openAgent && x.openAgent(who), `Open ${who}`); if (!x.openAgent) w.disabled = true; first.append(w); } } // the agent answered, a bold link, as the mock draws it
+    const label = perm ? String(r.note || '').trim() : '';
+    if (label && !/^(yes|no)(,? once)?\.?$/i.test(label)) first.append(document.createTextNode(` (${label})`)); // "Yes, and don't ask again" says more than the verb; a bare Yes or No does not
     parts.push(first);
     if (r.goal_id && !x.hideGoal && !(r.item_kind === 'goal' && String(r.item_id) === String(r.goal_id))) { const g = el('span', 'al-seg'); const gl = link('al-glink', `#${r.goal_id}${r.goal_title ? ` ${r.goal_title}` : ''}`, () => x.openGoal && x.openGoal(r), `Goal #${r.goal_id}${r.goal_title ? `: ${r.goal_title}` : ''}`); gl.prepend(svgNode(FLAG)); if (!x.openGoal) gl.disabled = true; g.append(gl); parts.push(g); }
     if (r.task_id && !x.hideTask && !(r.item_kind === 'task' && String(r.item_id) === String(r.task_id))) { const t = el('span', 'al-seg'), tl = link('', `task #${r.task_id}${r.task_title ? ` ${r.task_title}` : ''}`, () => x.openTask && x.openTask(r), `Task #${r.task_id}${r.task_title ? `: ${r.task_title}` : ''}`); if (!x.openTask) tl.disabled = true; t.append(tl); parts.push(t); }
     const team = x.teamWords(r);
     if (team) { const t = el('span', 'al-seg al-team'); t.append(x.teamNode ? x.teamNode(r, team) : document.createTextNode(team)); parts.push(t); }
-    parts.forEach((seg, i) => { if (i) sub.append(el('span', 'al-sep', '·')); sub.append(seg); });
-    if (r.source === 'hub') sub.append(el('span', 'al-sep', '·'), el('span', 'al-seg', 'via Coral Hub'));
+    if (r.source === 'hub') parts.push(el('span', 'al-seg', 'via Coral Hub'));
+    parts.forEach((seg, i) => { if (i < parts.length - 1) glueDot(seg); sub.append(seg); if (i < parts.length - 1) sub.append(' '); }); // one run of words: a line may break after a dot, never before one
     sub.append(el('span', 'al-sr', `. You did this from ${x.doneFrom(r)}.`)); // who and where, for a screen reader: the mock shows neither
     main.append(sub);
-    if (r.action === 'prompt_allow' || r.action === 'prompt_reject') { const cmd = said || ''; if (cmd) main.append(el('div', 'al-cmd', cmd)); }
+    if (perm) { if (r.command) main.append(el('div', 'al-cmd', String(r.command))); } // the command, once the record keeps it (task #22144)
     else if (said && r.item_kind !== 'question') { // the person's own words: a plain box, as an agent's words are in Needs you
         const note = el('div', 'al-ynote'); note.append(el('span', '', r.item_kind === 'file' ? 'Your note:' : 'Note:'), document.createTextNode(` ${said}`)); main.append(note);
     }
@@ -129,10 +133,17 @@ export function ledgerRow(r, x) {
     return li;
 }
 
+/** The "·" after a segment, held to its last word or link so a line never starts with a dot or leaves one alone: a link is an atomic box, so it and the dot share a no-wrap span. */
+function glueDot(seg) {
+    const last = seg.lastChild, dot = el('span', 'al-sep', '·');
+    if (last && last.nodeType === 3) { last.textContent += '\u00a0'; seg.append(dot); return; }
+    const nw = el('span', 'al-nw'); if (last) nw.append(last); nw.append('\u00a0', dot); seg.append(nw);
+}
+
 /** A phone has no hover: one 44 px menu holds what the buttons hold (the versions to open, then the row's More actions). */
 function phoneMenu(r, x, hasVersions, hasMore, opens) {
     const items = [];
-    if (hasVersions) { const vers = versionsList(r, x); for (const v of [...vers].reverse()) items.push({ label: `Open v${v.n}`, run: () => x.openRow(v.row) }); }
+    if (hasVersions) { const vers = versionsList(r, x); for (const v of [...vers].reverse()) items.push({ label: `Open version ${v.n}`, run: () => x.openRow(v.row) }); }
     else if (opens) items.push({ label: 'Open', run: () => x.openRow(r) });
     if (hasMore) items.push(...x.moreFor(r));
     const d = el('details', 'al-dots'), sum = el('summary', null, '⋯'), pop = el('div', 'al-pop'); pop.setAttribute('role', 'menu'); sum.setAttribute('aria-label', `Actions for ${x.openLabel(r)}`);

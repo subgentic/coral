@@ -5,7 +5,7 @@
 .al-switch .al-switch-btn[aria-pressed="true"] { background: var(--accent-dim); color: var(--text-on-accent); }
 .al-switch .al-switch-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .inbox-folder-toolbar .al-kind-menu { display: inline-flex; flex: none; margin: 0; }
-.al-kind-menu .task-more-btn { margin: 0; font-weight: var(--fw-regular); height: var(--toolbar-control-h, 32px); min-height: var(--toolbar-control-h, 32px); white-space: nowrap; }
+.al-kind-menu .task-more-btn { margin: 0; background: transparent; border: 1px solid var(--control-border); color: var(--text-primary); font-weight: var(--fw-regular); height: var(--toolbar-control-h, 32px); min-height: var(--toolbar-control-h, 32px); white-space: nowrap; }
 .al-kind-menu .menu-item[aria-checked="true"] { background: color-mix(in srgb, var(--accent-dim) 22%, transparent); font-weight: var(--fw-strong); }
 @media (max-width: 767px), (pointer: coarse) { .al-switch, .al-switch .al-switch-btn, .al-kind-menu .task-more-btn { height: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } }
 @media (max-width: 767px) { .inbox-folder-toolbar .list-bar-search-row:has(> .al-switch) { justify-content: flex-start; } .inbox-folder-toolbar .list-bar-search-row:has(> .al-switch) > .list-bar-toggle { margin-left: auto; } #group-table-view .inbox-folder-toolbar .list-bar-search-row:has(> .al-switch) > .inbox-folder-head { position: absolute; width: 1px; height: 1px; margin: 0; flex: none; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } } /* the mock starts the switch and Kind at the left; the Filters icon keeps the right end */

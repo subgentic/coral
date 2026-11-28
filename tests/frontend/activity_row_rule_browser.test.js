@@ -45,7 +45,7 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
                 const cols = await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(tr => { const v = tr.querySelector('.al-v'), seg = tr.querySelector('.al-sub .al-seg'); return { did: v && v.textContent.replace(/^[\\u2713\\u21a9\\u2715]\\s*/, ''), on: (tr.querySelector('.al-title') || {}).textContent, detail: seg ? seg.textContent.slice(v ? v.textContent.length : 0).trim() : '' }; })`);
                 assert.deepEqual(cols.map(c => c.did), ['Dismissed', 'Answered', 'Answered', 'Answered', 'Dismissed', 'Unstarred', 'Starred', 'Changed the tags', 'Shared'], `${width}: what you did is the verb alone: ${JSON.stringify(cols.map(c => c.did))}`);
                 assert.deepEqual(cols.map(c => c.on), ['a question', 'Orchestrator’s question', 'Which of the two designs should ship in v2.0.61?', 'a question', 'Ship it?', 'release-plan.md', 'a file', 'tagged-plan.md', 'shared-plan.md'], `${width}: the name is the object alone: ${JSON.stringify(cols.map(c => c.on))}`);
-                const d = cols.map(c => c.detail);
+                const d = cols.map(c => c.detail.replace(/[\s\u00a0]*\u00b7$/, '')); // the dot that joins the next part is not the answer
                 assert.ok(d[0] === '' && d[1].startsWith('\u201c1 is fine for now\u201d') && d[2] === '\u201cOption 2\u201d to Orchestrator' && d[3].startsWith('\u201cYes\u201d') && d[4].includes(LONG) && d.slice(5).every(x => x === ''), `${width}: the answer is inline on the second line: ${JSON.stringify(d)}`);
             } else {
                 // a phone row (#22100): the kind mark, the name and what you did, the time and the one menu, every one inside the width

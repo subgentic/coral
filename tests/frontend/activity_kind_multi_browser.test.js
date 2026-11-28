@@ -47,6 +47,7 @@ const BASE = require('./test_base').BASE;
             assert.equal(await kindWord(), 'Kind: 2 kinds \u25be', `${tag}: two kinds are on together`);
             assert.equal(await rowsNow(), 2, `${tag}: the two kinds' rows (two permissions; the word has no row, #18466)`);
             assert.deepEqual((await menuItemsOpen()).map(i => i.text), counts, `${tag}: the counts do not move with the choice`);
+            await shot(`kinds-menu-open-${tag}`); // the Kind menu open, two kinds ticked
             await ev(`document.querySelector('#inbox-activity-kind').click(); true`);
             assert.equal(await ev(`[...document.querySelectorAll('.list-bar-chip, .team-tb-chip')].filter(e => e.getClientRects().length).map(e => e.textContent).join('|')`), '', `${tag}: no filter chip repeats the kinds`);
             assert.equal(await ev(`!!document.querySelector('.inbox-folder-toolbar .list-bar-toggle .display-badge:not([hidden])')`), false, `${tag}: and no badge counts them`);
