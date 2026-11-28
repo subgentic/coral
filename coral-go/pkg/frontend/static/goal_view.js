@@ -51,7 +51,7 @@ const PAGE = 50;
 /** Shared JSON reader for this goal's page and its expanded ledger contents. */
 export async function readGoalJSON(project, path, failure = r => new Error(`Goal contents could not be read (HTTP ${r.status}).`)) {
     const response = await boardFetch(project, path);
-    if (!response.ok) throw await failure(response);
+    if (!response.ok) throw Object.assign(await failure(response), { status: response.status });
     return response.json();
 }
 
