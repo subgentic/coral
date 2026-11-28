@@ -2,6 +2,9 @@
 // state that builds up in the page. This soak keeps one Needs you page open through many redraws: files arrive, get new versions, are approved, saved, ignored and marked read elsewhere (the board's list
 // changes under the page), the live list is redrawn, folders are switched and the viewer is opened and closed, the window is resized; then a REAL mouse click lands on each file row in three places (its name, its
 // empty middle, its far end) and on the goal row, at 1280 and 1440: every one must open its file (or goal). Real board for the team and its goal, the team's files stubbed in the page.
+// On the ledger (#22094): the file rows are article.nl-row.nl-file (Group by None, so none is folded away) and their name is the .nl-file-open button. Save for later is the row's bookmark
+// (.nl-save-later), and Dismiss is the selection bar's Dismiss after ticking the row (a file row has no Dismiss of its own until it is decided). Retired: the row's inline Approve. Ledger file
+// rows have no Approve (v19: review decisions stay in the viewer); the viewer's Approve is covered by needs_actions_b, and approvals made elsewhere still happen in this soak (every 4th cycle).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -14,12 +17,13 @@ const hex = n => n.toString(16).padStart(64, '0');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const api = (method, path, body) => ev(`fetch('/api/board/${team}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => ({})) }))`);
     const T = '#group-table-view';
+    const ROWS = `[...document.querySelectorAll('${T} .nl-row.nl-file')].filter(r => r.getClientRects().length)`;
     const viewerShown = () => ev(`!!document.querySelector('.artifact-viewer:not([hidden])') && getComputedStyle(document.querySelector('.artifact-viewer:not([hidden])')).display !== 'none'`);
     const closeViewer = async () => { await ev(`document.querySelector('.artifact-viewer-close')?.click(); true`); await waitFor(`!document.querySelector('.artifact-viewer:not([hidden])')`, 'the viewer closes', 5000); };
     const click = async (x, y) => { await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x, y }); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x, y, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }); };
     const refresh = () => ev(`import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-group-mode', 'none'); localStorage.setItem('coral-inbox-group-review-goal', 'false');` });
         for (const width of [1280, 1440]) {
             const at = `${width} px: `;
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -50,7 +54,7 @@ const hex = n => n.toString(16).padStart(64, '0');
                 window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await refresh();
-            await waitFor(`document.querySelectorAll('${T} [data-review-artifact]').length >= 4`, at + 'the files are rows', 15000);
+            await waitFor(`${ROWS}.length >= 4`, at + 'the files are rows', 15000);
 
             // the soak: the page stays open while the board changes under it, again and again
             for (let i = 0; i < 90; i++) {
@@ -65,31 +69,31 @@ const hex = n => n.toString(16).padStart(64, '0');
                 await ev(`window.T.render.renderLiveSessions(window.T.state.liveSessions); true`);
                 if (i % 6 === 2) { await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`); await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); }
                 if (i % 6 === 4) { // the viewer opened from a row and closed again
-                    await ev(`document.querySelector('${T} [data-review-artifact]')?.click(); true`);
+                    await ev(`document.querySelector('${T} .nl-row.nl-file .nl-file-open')?.click(); true`);
                     await waitFor(`!!document.querySelector('.artifact-viewer:not([hidden])')`, at + `cycle ${i}: the viewer opens`, 5000);
                     await closeViewer();
                 }
                 // the Operator's own actions on the page, as a long session has them: Approve, Save for later, Dismiss (and Undo), Move back, hover and keys, refreshes that overlap
-                if (i % 9 === 1) { await ev(`document.querySelector('${T} tbody tr .inbox-bookmark')?.click(); true`); await new Promise(r => setTimeout(r, 120)); } // sleep-ok: the save goes through and the row leaves
-                if (i % 9 === 4) { await ev(`[...document.querySelectorAll('${T} tbody tr button')].find(b => /^Dismiss: /.test(b.getAttribute('aria-label') || ''))?.click(); true`); await new Promise(r => setTimeout(r, 120)); } // sleep-ok: the ignore goes through
+                if (i % 9 === 1) { await ev(`document.querySelector('${T} .nl-row.nl-file .nl-save-later')?.click(); true`); await new Promise(r => setTimeout(r, 120)); } // sleep-ok: the save goes through and the row leaves
+                if (i % 9 === 4) { await ev(`(() => { const c = document.querySelector('${T} .nl-row.nl-file .nl-check'); if (!c) return false; c.click(); [...document.querySelectorAll('${T} .nl-summary button')].find(b => b.textContent.trim() === 'Dismiss' && !b.disabled)?.click(); return true; })()`); await new Promise(r => setTimeout(r, 120)); } // sleep-ok: the ignore goes through
                 if (i % 9 === 6) { await ev(`document.querySelector('.toast button')?.click(); true`); await new Promise(r => setTimeout(r, 120)); } // sleep-ok: an Undo in a toast
-                if (i % 9 === 7) { await ev(`(() => { [...document.querySelectorAll('${T} tbody tr button')].find(b => /^Approve: /.test(b.getAttribute('aria-label') || ''))?.click(); const cm = document.getElementById('confirm-modal'); if (cm && getComputedStyle(cm).display !== 'none') document.getElementById('confirm-modal-yes').click(); return true; })()`); await new Promise(r => setTimeout(r, 120)); } // an unopened file asks 'Approve without opening?' (#11999): the Operator answers it; sleep-ok: the approve goes through
-                if (i % 3 === 0) { await ev(`(() => { const trs = [...document.querySelectorAll('${T} tbody tr')]; const tr = trs[${i} % Math.max(1, trs.length)]; tr?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); tr?.querySelector('.dt-primary, .inbox-review-name')?.focus(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); return true; })()`); }
+                // (i % 9 === 7 was the row's inline Approve: retired on the ledger, see the header)
+                if (i % 3 === 0) { await ev(`(() => { const trs = [...document.querySelectorAll('${T} .nl-row')]; const tr = trs[${i} % Math.max(1, trs.length)]; tr?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); tr?.focus(); (tr || document).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); return true; })()`); }
                 if (i % 4 === 0) await ev(`Promise.all([import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => Promise.all([m.refreshReviews(true), m.refreshReviews(), m.refreshReviews(true)])), import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.updateInboxTab())]).then(() => true)`);
                 if (i % 10 === 5) { await Emulation.setDeviceMetricsOverride({ width: width - 200, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: false }); }
             }
-            await waitFor(`document.querySelectorAll('${T} [data-review-artifact]').length >= 3`, at + 'files are still rows after the soak', 8000);
+            await waitFor(`${ROWS}.length >= 3`, at + 'files are still rows after the soak', 8000);
 
             // then a real click on every file row, in three places, and on the goal row
             await ev(`document.querySelectorAll('#toast-host .toast').forEach(t => t.remove()); true`); // an Undo toast sits bottom right for 30 s: that is the page working, not a dead target
-            const rows = await ev(`[...document.querySelectorAll('${T} tbody tr')].map((tr, i) => { const r = tr.getBoundingClientRect(), file = tr.querySelector('[data-review-artifact]'); return { i, file: !!file, name: tr.textContent.replace(/\\s+/g, ' ').trim().slice(0, 50), x0: Math.round(r.left), x1: Math.round(r.right), y: Math.round(r.top + Math.min(r.height / 2, 20)), nameX: file ? Math.round(file.getBoundingClientRect().left + 8) : 0 }; })`);
+            const rows = await ev(`${ROWS}.map((tr, i) => { const r = tr.getBoundingClientRect(), file = tr.querySelector('.nl-file-open'); return { i, file: !!file, name: tr.textContent.replace(/\\s+/g, ' ').trim().slice(0, 50), x0: Math.round(r.left), x1: Math.round(r.right), y: Math.round(r.top + Math.min(r.height / 2, 20)), nameX: file ? Math.round(file.getBoundingClientRect().left + 8) : 0 }; })`);
             const files = rows.filter(r => r.file);
             assert.ok(files.length >= 3, at + 'file rows to click: ' + JSON.stringify(rows.map(r => r.name)));
             for (const f of files) {
                 for (const [place, x] of [['its name', f.nameX], ['its empty middle', Math.round((f.x0 + f.x1) / 2)], ['its far end', f.x1 - 6]]) {
-                    await ev(`window.scrollTo(0, 0); document.querySelectorAll('${T} tbody tr')[${f.i}].scrollIntoView({ block: 'center' }); true`);
-                    const y = await ev(`(() => { const r = document.querySelectorAll('${T} tbody tr')[${f.i}].getBoundingClientRect(); return Math.round(r.top + Math.min(r.height / 2, 20)); })()`);
-                    const topmost = await ev(`(() => { const e = document.elementFromPoint(${x}, ${y}); const tr = document.querySelectorAll('${T} tbody tr')[${f.i}]; return !!e && (tr.contains(e)); })()`);
+                    await ev(`window.scrollTo(0, 0); ${ROWS}[${f.i}].scrollIntoView({ block: 'center' }); true`);
+                    const y = await ev(`(() => { const r = ${ROWS}[${f.i}].getBoundingClientRect(); return Math.round(r.top + Math.min(r.height / 2, 20)); })()`);
+                    const topmost = await ev(`(() => { const e = document.elementFromPoint(${x}, ${y}); const tr = ${ROWS}[${f.i}]; return !!e && (tr.contains(e)); })()`);
                     assert.ok(topmost, at + `${f.name}: ${place} is on the row, not under something else (an overlay, a backdrop)`);
                     await click(x, y);
                     const opened = await ev(`new Promise(res => { const t0 = Date.now(), tick = () => { const v = document.querySelector('.artifact-viewer:not([hidden])'); if (v && getComputedStyle(v).display !== 'none') return res(true); if (Date.now() - t0 > 3000) return res(false); setTimeout(tick, 50); }; tick(); })`);

@@ -1,7 +1,10 @@
 // #14152: an active wait remains listed after Dismiss; a sleeping request can still be hidden.
+// On the ledger (#22094): each wait is an article.nl-row; the direct Dismiss (#20203) is the row's one-click Dismiss in .nl-hover-actions (the ⋯ menu has it too). A permission prompt must offer it as well
+// (Orchestrator, task #22094: a prompt stays counted until it is answered or dismissed); if its row has none, that is recorded as a failure and the bulk Dismiss is used so the machine call is still checked.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const problems = [];
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -26,13 +29,19 @@ const BASE = require('./test_base').BASE;
         const waiting = () => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); return m.waitingCount(); })()`);
         assert.equal(await waiting(), 4, 'four agents wait on the person');
         await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')); true`);
-        const rowOf = who => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r => r.textContent.includes(${JSON.stringify(who)}))`;
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 4`, 'the four rows', 10000);
-        const dismissVia = async words => ev(`(${rowOf(words)}).querySelector('.inbox-single-action .inbox-dismiss').click();true`); // #20203: the sole Dismiss is direct.
-        const dismissOf = who => ev(`!!(${rowOf(who)} || document.body).querySelector('.inbox-dismiss')`);
-        for (const [who, words] of [['inputter', 'Needs input: pick a colour'], ['signer', 'Sign in to continue'], ['sleeper', 'Wants to know: which font'], ['permit', 'Wants to run: npm test']]) {
+        const rowOf = who => `[...document.querySelectorAll('#group-table-view .nl-row')].find(r => r.textContent.includes(${JSON.stringify(who)}) || (r.getAttribute('aria-label') || '').includes(${JSON.stringify(who)}))`;
+        const directDismiss = words => `[...((${rowOf(words)}) || document.createElement('i')).querySelectorAll('.nl-hover-actions button')].find(b => b.textContent.trim() === 'Dismiss')`;
+        await waitFor(`document.querySelectorAll('#group-table-view .nl-row').length >= 4`, 'the four rows', 10000);
+        const dismissVia = async words => { // #20203: the sole Dismiss is direct: one click on the row
+            if (await ev(`!!(${directDismiss(words)})`)) return ev(`(${directDismiss(words)}).click(); true`);
+            // no direct Dismiss (recorded above): Select and the bulk Dismiss, so the machine call is still checked
+            await ev(`(() => { const r = ${rowOf(words)}, c = r.querySelector('.nl-check'); if (!c.checked) c.click(); return true; })()`);
+            await waitFor(`[...document.querySelectorAll('.nl-summary button')].some(b => b.textContent.trim() === 'Dismiss' && !b.disabled)`, `${words}: the bulk Dismiss`, 4000);
+            return ev(`[...document.querySelectorAll('.nl-summary button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
+        };
+        for (const [who, words] of [['inputter', 'Needs input: pick a colour'], ['signer', 'Sign in to continue'], ['sleeper', 'Wants to know: which font'], ['permit', 'npm test']]) {
             assert.ok(await ev(`!!(${rowOf(words)})`), `${who}: its row is listed`);
-            assert.ok(await ev(`!!(${rowOf(words)}).querySelector('.inbox-single-action .inbox-dismiss')`), `${who}: its row has direct Dismiss (#20203)`);
+            if (!await ev(`!!(${directDismiss(words)})`)) problems.push(`${who}: its row has direct Dismiss (#20203): ` + await ev(`JSON.stringify([...((${rowOf(words)}) || document.createElement('i')).querySelectorAll('.nl-side button, .nl-menu button')].map(b => b.textContent.trim()))`));
         }
         // an input prompt: hidden here, nothing sent, the count follows, and it stays hidden when the list is drawn again
         await dismissVia('Needs input: pick a colour');
@@ -52,9 +61,10 @@ const BASE = require('./test_base').BASE;
         assert.equal(await waiting(), 3, 'only the sleeping request leaves the count');
         assert.deepEqual(await ev(`window.__posts.map(p => p.body.session_id)`), ['inputter-id', 'signer-id'], 'the sleeping agent\'s request is hidden in this browser: nothing was asked of the machine for it');
         // a permission on an awake agent still clears Coral's record of the wait
-        await dismissVia('Wants to run: npm test');
+        await dismissVia('npm test');
         await waitFor(`window.__posts.length === 3`, 'the permission Dismiss goes to the machine', 6000);
         assert.deepEqual(await ev(`window.__posts.slice(-1).map(p => p.body)`), [{ session_id: 'permit-id', agent_type: 'claude' }]);
+        assert.deepEqual(problems, [], 'Dismiss on every wait:\n  ' + problems.join('\n  '));
         console.log('PASS active waits stay reachable after Dismiss; a dismissed sleeping request leaves Needs you');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
