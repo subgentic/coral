@@ -61,24 +61,27 @@ assert.match(ul.querySelector('.al-row .al-when').textContent, /\d:\d\d/, 'the t
 // an answered question says what you answered inline, to whom; goal, task and team are links
 const base = { id: 7, at: new Date(now).toISOString(), action: 'answered', item_kind: 'question', item_id: '5', title: 'Did it arrive?', note: 'from Orchestrator · Yes, it did', asker: 'Orchestrator', team: 'team', goal_id: 41, goal_title: 'Checkout redesign', task_id: 413, task_title: 'One-page layout' };
 const q = Ledger.ledger([base], { ...x, parts: r => ({ did: 'Answered', on: r.title, detail: r.note, about: '' }), fromWords: r => `from ${r.asker}` }, { now });
-assert.equal(q.querySelector('.al-sub .al-seg').textContent, 'Answered \u201cYes, it did\u201d to Orchestrator');
+assert.equal(q.querySelector('.al-sub .al-seg').textContent, 'Answered \u201cYes, it did\u201d to Orchestrator\u00a0\u00b7', 'the dot after a segment is held to its last word (#22100 round 2: no line starts with a dot)');
 assert.equal(q.querySelector('details.al-qa'), null, 'no Q&A preview on the row');
-const links = [...q.querySelectorAll('.al-sub .al-link')];
+assert.equal(q.querySelector('.al-sub .al-who').textContent, 'Orchestrator', 'the agent answered is its own (bold) link, as the mock draws it');
+const links = [...q.querySelectorAll('.al-sub .al-link:not(.al-who)')];
 assert.deepEqual(links.map(b => b.textContent), ['#41 Checkout redesign', 'task #413 One-page layout']);
 assert.ok(links[0].querySelector('svg.al-gflag'), 'the goal has its flag');
 links[0].click(); links[1].click();
 assert.deepEqual([goals.at(-1), tasks.at(-1)], [41, 413]);
 // grouped under its task, the row does not say the goal and task again
 const grouped = Ledger.ledger([base], { ...x, hideGoal: true, hideTask: true, parts: r => ({ did: 'Answered', on: r.title, detail: r.note, about: '' }) }, { now, groupFor: () => ({ key: 'g', label: 'Goal', open: true }) });
-assert.equal(grouped.querySelector('.al-sub .al-link'), null);
+assert.equal(grouped.querySelector('.al-sub .al-link:not(.al-who)'), null); // no goal or task link; the agent answered stays named
 // your words on a file: a plain box that says whose they are; a permission's command in its own line
-const r3 = Ledger.ledger([{ ...file(51, 7, new Date(now).toISOString(), 'changes'), note: 'Fix the title' }, { id: 60, at: new Date(now).toISOString(), action: 'prompt_allow', item_kind: 'agent', item_id: 'a', title: 'a', note: 'npm install x', team: 'team' }], { ...x, parts: r => ({ did: r.action === 'changes' ? 'Asked for changes' : 'Allowed', on: r.title, detail: r.note, about: '' }) }, { now });
+const r3 = Ledger.ledger([{ ...file(51, 7, new Date(now).toISOString(), 'changes'), note: 'Fix the title' }, { id: 60, at: new Date(now).toISOString(), action: 'prompt_allow', item_kind: 'agent', item_id: 'a', title: 'a', note: 'Yes', command: 'npm install x', team: 'team' }], { ...x, parts: r => ({ did: r.action === 'changes' ? 'Asked for changes' : 'Allowed', on: r.title, detail: r.note, about: '' }) }, { now });
 const [ra, rb] = [...r3.querySelectorAll('.al-row')];
 assert.equal(ra.querySelector('.al-ynote').textContent, 'Your note: Fix the title');
 assert.equal(ra.querySelector('.al-v').textContent, '\u21a9 Asked for changes');
 assert.equal(rb.querySelector('.al-cmd').textContent, 'npm install x');
+assert.equal(rb.querySelector('.al-title').textContent, 'a asked for permission'); // the agent's name; the box holds the recorded command only (task #22144 records it)
+assert.ok(!rb.querySelector('.al-sub').textContent.includes('(Yes)'), 'a bare Yes is not repeated after Allowed');
 // the phone's one menu holds what the hover buttons hold
 const dots = ul.querySelector('.al-row[data-key="3"] details.al-dots');
 assert.ok(dots && dots.querySelector('summary').getAttribute('aria-label').startsWith('Actions for'), 'a phone menu on a row with actions');
-assert.deepEqual([...dots.querySelectorAll('.al-menu-item')].map(b => b.textContent), ['Open v2', 'Open v1']);
+assert.deepEqual([...dots.querySelectorAll('.al-menu-item')].map(b => b.textContent), ['Open version 2', 'Open version 1']);
 console.log('ok activity_ledger');

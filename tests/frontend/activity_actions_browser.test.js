@@ -32,7 +32,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(!words.includes('__oneshot__'),'internal one-off name is never shown');
             assert.ok(words.includes('Check release readiness') && words.includes('Job 42'),'run display name and legacy fallback shown');
             if(!(words.includes('Answered')&&words.includes('Ada’s question')&&words.includes('“Ship it”'))) missing.push(width+': Answered | Ada’s question | “Ship it” (verb, object, the answer in quotes as the #22100 mock draws it)');
-            if(!(words.includes('Allowed')&&words.includes('claude-ada’s permission request')&&words.includes('Yes, once'))) missing.push(width+': Allowed | claude-ada’s permission request | Yes, once');
+            if(!(words.includes('Allowed')&&words.includes('claude-ada asked for permission')&&!words.includes('(Yes, once)'))) missing.push(width+': Allowed | claude-ada asked for permission | no bare (Yes, once) label (#22100 round 2)');
             if(!(words.includes('Completed')&&words.includes('task #12 Ship release'))) missing.push(width+': Completed | task #12 Ship release');
             if(width===1280) assert.ok(await ev(`Array.from(document.querySelectorAll('#group-table-view tbody button.al-title')).every(b=>(b.getAttribute('aria-label')||'').startsWith(b.textContent.trim()))`),'visible sentence starts each item button name');
             const filters=await ev(`(async()=>{const p=window.__coralStatic||'/static/',a=await import(p+'inbox_activity.js'),f=await import(p+'operator_activity_filters.js');return f.ACTIONS.map(action=>[action,a.filtered({...f.EMPTY,action}).length]);})()`);

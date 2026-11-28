@@ -1,5 +1,5 @@
 /* The Activity folder's decision ledger (#19816, the Inbox Designer's mocks v1). Lazy: loaded by inbox_activity.js, not at start. */
-.al-list { list-style: none; margin: 0; padding: 0; background: var(--bg-elevated, var(--card-fill)); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: clip; }
+.al-list { list-style: none; margin: 0; padding: 0; background: var(--al-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: clip; }
 .al-group-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) var(--space-xl); background: var(--bg-secondary); border-bottom: 1px solid var(--border); font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: 0; color: var(--text-primary); }
 .al-subgroup-head { padding-left: calc(var(--space-xl) + var(--space-2xl)); color: var(--text-secondary); }
 .al-group-toggle { flex: 1; min-width: 0; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; gap: var(--space-md); min-height: 44px; }
@@ -55,9 +55,11 @@
 button.al-title:hover { text-decoration: underline; text-underline-offset: 2px; }
 button.al-title:focus-visible, .al-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .al-ver { color: var(--text-muted); font-size: var(--fs-md); }
-.al-sub { font-size: var(--fs-md); color: var(--text-secondary); margin-top: 1px; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-sm); }
+.al-sub { font-size: var(--fs-md); color: var(--text-secondary); margin-top: 1px; overflow-wrap: break-word; } /* one run of words that wraps like a sentence, as the mock: no item starts its own line */
 .al-seg { min-width: 0; }
-.al-sep { color: var(--text-muted); }
+.al-sep { color: var(--text-muted); margin-inline-end: var(--space-xs); }
+.al-nw { white-space: nowrap; }
+.al-link.al-who { font-weight: var(--fw-strong); color: var(--text-primary); }
 .al-v { font-weight: var(--fw-strong); white-space: nowrap; }
 .al-v-ok { color: var(--success-text, var(--success)); } .al-v-ch { color: var(--warning-text, var(--warning)); } .al-v-no { color: var(--error-text, var(--error)); } .al-v-dm { color: var(--text-secondary); } .al-v-an { color: var(--text-primary); } .al-v-goal { color: var(--al-goal); }
 .al-link { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
@@ -66,7 +68,7 @@ button.al-title:focus-visible, .al-link:focus-visible { outline: 2px solid var(-
 .al-glink { white-space: nowrap; }
 .al-gflag { width: 11px; height: 11px; color: var(--al-goal); margin-right: 3px; vertical-align: -1px; }
 .al-ynote, .al-cmd { margin-top: var(--space-md); max-width: 68ch; }
-.al-ynote { font-size: var(--fs-lg); padding: var(--space-md) var(--space-lg); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); overflow-wrap: anywhere; }
+.al-ynote { max-width: 37.5rem; font-size: var(--fs-lg); padding: var(--space-md) var(--space-lg); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); overflow-wrap: anywhere; }
 .al-ynote > span { color: var(--text-secondary); }
 .al-cmd { display: inline-block; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .al-side { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-xs); margin-left: auto; }
@@ -90,10 +92,12 @@ button.al-title:focus-visible, .al-link:focus-visible { outline: 2px solid var(-
     .al-row:hover .al-hov ~ .al-when, .al-row:focus-within .al-hov ~ .al-when { display: inline; }
     .al-dots { display: block; position: static; }
     .al-when { min-width: 0; }
-    .al-dots .al-pop { left: var(--space-md); right: var(--space-md); }
+    .al-dots .al-pop { left: var(--space-md); right: var(--space-md); display: flex; flex-direction: column; padding: var(--space-xs) 0; } /* a list, one action per line, as the mock's phone menu */
+    .al-dots .al-pop > .btn { width: 100%; min-height: var(--control-touch-height); margin: 0; padding: 0 var(--space-lg); border: 0; border-radius: 0; background: none; color: var(--text-primary); font-weight: var(--fw-regular); }
 }
 
-.activity-folder { --al-goal: var(--color-tool-agent); }
+.activity-folder { --al-goal: var(--color-tool-agent); --al-card: var(--bg-elevated); }
+[data-theme="light"] .activity-folder { --al-card: var(--card-fill); } /* the light card is white, as Needs you and Saved draw theirs; dark keeps the mock's raised grey */
 
 /* the file decision dialog (activity_file_dialog.js) still draws its own tile, verdict and note with these */
 .al-tile { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); }
