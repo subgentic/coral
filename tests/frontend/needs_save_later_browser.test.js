@@ -1,25 +1,28 @@
-// Save for later on a Needs you review row (#11641, the operator): the row's three dots have "Save for later" (and a row can be dragged onto Saved): the file leaves Needs you and its count, a toast offers Undo, Saved lists it
+// Save for later on a Needs you review row (#11641, the operator; on the ledger #22094/#22132): at 1440 the row's hover bookmark (.nl-save-later), on a phone the row's ⋯ menu, "Save for later" (and a row can be dragged
+// onto Saved): the file leaves Needs you and its count, a toast offers Undo, Saved lists it
 // under "Files for review" with Approve, Changes and Deny still there and "Move to Needs you" in its dots, which brings it back as it was. Each is one decision on the review route ('save', 'unsave') and nothing else is posted
-// (nothing is sent to the agent). The server's tags are modelled in the page. 1440 and 390. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
+// (nothing is sent to the agent). The server's tags are modelled in the page. 1440 and 390, Group by None. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
+// Retired (#22094): "Save stays separate from the review star in the row" (#20203): the ledger's rows draw no star; the star and its room are checked in needs_star_room and needs_star_slot.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady, framesJs } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 
 (async () => {
-    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect(); const { Input } = client;
     const failures = [];
     const team = 'later-' + Date.now().toString(36);
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const T = '#group-table-view';
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const S = `(window.__coralStatic || '/static/')`;
-    const rowsOf = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
+    const ROWS = `[...document.querySelectorAll('${T} .nl-row.nl-file')].filter(r => r.getClientRects().length)`, rowOf = f => `${ROWS}.find(r => r.querySelector('.nl-file-open')?.textContent.includes('${f}'))`;
+    const rowsOf = () => ev(`${ROWS}.map(r => (r.textContent.match(/plan-\\d/) || [''])[0]).sort()`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' })); localStorage.setItem('coral-inbox-group-mode', 'none'); localStorage.setItem('coral-inbox-group-review-goal', 'false');` });
         for (const [w, h, mobile] of [[1440, 800, false], [390, 800, true]]) {
             const at = `${w} px: `;
-            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile }); await Emulation.setEmulatedMedia({ features: [{ name: 'pointer', value: mobile ? 'coarse' : 'fine' }, { name: 'hover', value: mobile ? 'none' : 'hover' }] });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Plan Writer', job_title: 'Writer' }) }).then(r => r.status)`);
             await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
@@ -41,16 +44,22 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'three review rows', 15000);
+            await waitFor(`${ROWS}.length === 3`, at + 'three review rows', 15000);
             await ev(framesJs(3));
-            const dots = file => ev(`(() => { document.querySelector('${T} button[aria-label="More actions for ${file}"]').click(); return true; })()`);
-            // the three dots: Save for later
-            { // Save stays separate from the star at both widths (#20203).
-                check(await ev(`!!document.querySelector('${T} .dt-star') && !!document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]')`), at + 'the row has separate Save for later and review star controls');
-                { const order = await ev(`[...document.querySelector('${T} .inbox-review-actions').querySelectorAll('button')].filter(e => e.getClientRects().length).map(e => e.matches('.inbox-row-more-toggle') ? 'More' : e.classList.contains('dt-star') ? 'Star' : e.classList.contains('inbox-bookmark') ? 'Save' : e.textContent.trim() || e.getAttribute('aria-label'))`); check(order[order.length - 1] === 'More' && order.indexOf('Star') < order.indexOf('More'), at + 'the row ends Star, then More (#20239): ' + JSON.stringify(order)); }
-                await ev(`document.querySelector('${T} button.inbox-bookmark[aria-label="Save for later: plan-1.md"]').click(); true`);
+            // the row's Save for later: the hover bookmark at 1440, the ⋯ menu's words on a phone (#22132)
+            if (!mobile) {
+                const box = await ev(`(() => { const r = ${rowOf('plan-1.md')}.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+                await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: box.x, y: box.y });
+                await waitFor(`!!${rowOf('plan-1.md')}.querySelector('button.nl-save-later[aria-label="Save for later: plan-1.md"]')?.getClientRects().length`, at + 'hovering the row shows its Save for later bookmark', 5000);
+                check(!(await ev(`!!${rowOf('plan-1.md')}.querySelector('.dt-star')`)), at + 'the row draws no star (Star is in Saved, needs_star_room)');
+                await ev(`${rowOf('plan-1.md')}.querySelector('button.nl-save-later').click(); true`);
+            } else {
+                check(!(await ev(`!!${rowOf('plan-1.md')}.querySelector('.nl-save-later')?.getClientRects().length`)), at + 'a phone row draws no bookmark icon');
+                await ev(`${rowOf('plan-1.md')}.querySelector('.nl-more-toggle').click(); true`);
+                await waitFor(`[...${rowOf('plan-1.md')}.querySelectorAll('.nl-menu [role=menuitem]')].some(b => b.getClientRects().length && b.textContent.trim() === 'Save for later')`, at + 'the row\'s ⋯ menu has Save for later', 5000);
+                await ev(`[...${rowOf('plan-1.md')}.querySelectorAll('.nl-menu [role=menuitem]')].find(b => b.textContent.trim() === 'Save for later').click(); true`);
             }
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 2`, at + 'the saved row leaves Needs you', 8000);
+            await waitFor(`${ROWS}.length === 2`, at + 'the saved row leaves Needs you', 8000);
             check(JSON.stringify(await rowsOf()) === JSON.stringify(['plan-2', 'plan-3']), at + 'the others stay: ' + JSON.stringify(await rowsOf()));
             let calls = await ev(`window.__calls`);
             check(calls.length === 1 && calls[0].path.endsWith('/review') && calls[0].body.decision === 'save', at + 'one decision, "save", and nothing else was posted: ' + JSON.stringify(calls));
@@ -73,14 +82,14 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`document.querySelector('.saved-files .menu-item[aria-label="Move to Needs you: plan-1.md"]').click(); true`);
             await waitFor(`!document.querySelector('.saved-files') || !document.querySelector('.saved-files').textContent.includes('plan-1.md')`, at + 'it leaves Saved', 8000);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'it is back in Needs you', 10000);
+            await waitFor(`${ROWS}.length === 3`, at + 'it is back in Needs you', 10000);
             calls = await ev(`window.__calls`);
             check(calls.length === 2 && calls[1].body.decision === 'unsave', at + 'the second decision is "unsave", nothing else: ' + JSON.stringify(calls.map(c => c.body)));
             // drag onto Saved (a desktop's gesture)
             if (!mobile) {
-                await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /plan-2/.test(r.textContent)), dt = new DataTransfer(), saved = document.querySelector('.view-list-item[data-key="saved"]');
+                await ev(`(() => { const tr = ${rowOf('plan-2.md')}, dt = new DataTransfer(), saved = document.querySelector('.view-list-item[data-key="saved"]');
                     tr.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt })); saved.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt })); saved.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt })); return true; })()`);
-                await waitFor(`[...document.querySelectorAll('${T} tbody tr')].every(r => !/plan-2/.test(r.textContent))`, at + 'a row dragged onto Saved is saved', 8000);
+                await waitFor(`${ROWS}.every(r => !/plan-2/.test(r.textContent))`, at + 'a row dragged onto Saved is saved', 8000);
                 calls = await ev(`window.__calls`);
                 check(calls.length === 3 && calls[2].body.decision === 'save', at + 'the drop is one "save" decision: ' + JSON.stringify(calls.map(c => c.body)));
             }
