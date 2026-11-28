@@ -470,6 +470,7 @@ func runUnderClaim(name, me, runID string, args []string, leaseUntil, where, mac
 	runCtx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()
 	lost := make(chan struct{})
+	lostWhy := "" // set before lost is closed
 	var lease time.Duration
 	if t, err := time.Parse(time.RFC3339Nano, leaseUntil); err == nil {
 		lease = time.Until(t)
@@ -483,7 +484,8 @@ func runUnderClaim(name, me, runID string, args []string, leaseUntil, where, mac
 			case <-runCtx.Done():
 				return
 			case <-tick.C:
-				if _, status, err := resourceCall("POST", "/"+name+"/renew", map[string]any{"subscriber_id": me}); err == nil && status == http.StatusConflict {
+				if data, status, err := resourceCall("POST", "/"+name+"/renew", map[string]any{"subscriber_id": me}); err == nil && status == http.StatusConflict {
+					lostWhy = lostReason(data)
 					close(lost)
 					cancelRun()
 					return
@@ -501,7 +503,10 @@ func runUnderClaim(name, me, runID string, args []string, leaseUntil, where, mac
 	select {
 	case <-lost:
 		wasLost = true
-		fmt.Printf("this run lost its slot of %s (kicked, or its lease ran out): it was stopped so it does not run beside the next agent's\n", plainText(name))
+		if lostWhy == "" {
+			lostWhy = "kicked, or its lease ran out"
+		}
+		fmt.Printf("this run lost its slot of %s (%s): it was stopped so it does not run beside the next agent's\n", plainText(name), plainText(lostWhy))
 	default:
 	}
 	code = heavyFinalCode(code, wasLost)
@@ -682,4 +687,24 @@ func newRunID() string {
 		return fmt.Sprintf("run-%d-%d", os.Getpid(), time.Now().UnixNano())
 	}
 	return hex.EncodeToString(b[:])
+}
+
+// lostReason is the words for why a renewed hold was refused (#22131): the server's ended, ended_why and ended_at when it knows them, else "".
+func lostReason(data []byte) string {
+	var v struct {
+		Ended   string `json:"ended"`
+		Why     string `json:"ended_why"`
+		EndedAt string `json:"ended_at"`
+	}
+	if json.Unmarshal(data, &v) != nil || v.Ended == "" {
+		return ""
+	}
+	out := v.Ended
+	if v.Why != "" && v.Why != v.Ended {
+		out += ": " + v.Why
+	}
+	if v.EndedAt != "" {
+		out += " at " + v.EndedAt
+	}
+	return out
 }

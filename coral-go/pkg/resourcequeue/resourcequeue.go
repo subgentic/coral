@@ -138,10 +138,13 @@ func (q *Queue) note(kind string, e *Entry) { q.noteWhy(kind, "", e) }
 
 // noteWhy is note for an event that ENDS a hold or a place: it says why, and carries how many times the lease was renewed (#14222). Every way an entry leaves the queue goes through it once.
 func (q *Queue) noteWhy(kind, why string, e *Entry) {
+	now := q.now()
+	if why != "" && !e.Waiting() {
+		q.noteEnd(e, HoldEnd{Why: why, Kind: kind, At: now})
+	}
 	if q.cfg.OnEvent == nil {
 		return
 	}
-	now := q.now()
 	ev := Event{At: now, Kind: kind, Resource: e.Resource, Agent: e.Agent, Task: e.Task, Entry: e.ID, Via: e.Via, Pattern: e.Pattern, Why: why}
 	if why != "" {
 		ev.Renews = e.Renews
@@ -204,8 +207,65 @@ type Queue struct {
 	res     map[string]*Resource
 	entries []*Entry
 	nextID  int64
-	spans   map[string][]span // finished holds per member over the last UseWindow, for the spread (#17586)
-	pend    []Event           // events noted under the lock, told to the sink after it (OnEvent)
+	spans   map[string][]span  // finished holds per member over the last UseWindow, for the spread (#17586)
+	pend    []Event            // events noted under the lock, told to the sink after it (OnEvent)
+	ended   map[string]HoldEnd // the last end of each agent's hold per resource (#22131): a renew that is refused says why and when
+}
+
+// HoldEnd is why and when an agent's hold of a resource last ended (#22131): Kind is the end event's (released, expired, gone, kicked), Why its reason (lease, gone, idle, job ended, ...).
+type HoldEnd struct {
+	Kind, Why string
+	At        time.Time
+}
+
+// maxEnded bounds the ends kept: one per agent and resource, so it is small; past it the oldest are forgotten all at once.
+const maxEnded = 4096
+
+func endKey(resource, agent string) string { return resource + "\x00" + agent }
+
+// noteEnd keeps the end of e's hold under its resource and, for a pool's entry, under the member it ran on, so a renew by either name finds it.
+func (q *Queue) noteEnd(e *Entry, end HoldEnd) {
+	if q.ended == nil || len(q.ended) >= maxEnded {
+		q.ended = map[string]HoldEnd{}
+	}
+	q.ended[endKey(e.Resource, e.Claimant.Agent)] = end
+	if e.Member != "" {
+		q.ended[endKey(e.Member, e.Claimant.Agent)] = end
+	}
+}
+
+// LastEnd is why and when agent's hold of key (or of a resource sharing its slots) last ended, if one did since this server started (#22131).
+func (q *Queue) LastEnd(key, agent string) (HoldEnd, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if end, ok := q.ended[endKey(key, agent)]; ok {
+		return end, true
+	}
+	var best HoldEnd
+	found := false
+	for k := range q.related(key) {
+		if end, ok := q.ended[endKey(k, agent)]; ok && (!found || end.At.After(best.At)) {
+			best, found = end, true
+		}
+	}
+	return best, found
+}
+
+// HasLiveRun reports whether agent's entry on key (a hold, or a place in line) carries a `claim --run` whose process is known and still alive (#22131): such an entry stands on its run, not on the session that
+// started it. A waiting `claim --wait --run` counts too: a compaction cancelled one still in line ("Your place in line ... was cancelled") while its process waited.
+func (q *Queue) HasLiveRun(key, agent string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	e := q.entryFor(key, agent)
+	if e == nil {
+		return false
+	}
+	for _, r := range e.Runs {
+		if pid, ok := e.RunPIDs[r]; ok && (q.cfg.PidAlive == nil || q.cfg.PidAlive(pid)) {
+			return true
+		}
+	}
+	return false
 }
 
 // New makes an empty Queue, or one loaded from cfg.Persist.
