@@ -80,3 +80,12 @@ Additional v3 manifest migrations:
 | needs_sticky_actions | Ledger summary replaces toolbar-mounted bar; visible top-of-workspace and no observer accumulation assertions preserved. |
 | needs_skills / needs_skill_approve | Skill title/version, publisher sanitization, Review navigation and no-scripts-only confirm retained on ledger rows; folded groups opened for inspection. |
 | needs_retained_wait | Phone ledger selector replaces mailed table class; retained explanation/count/no-repeat-dismiss/source routing unchanged. |
+
+Remaining twenty-suite migration (test-only `c739366101`, integrated as `946af109b2`):
+coral://artifacts/9ed62eb29a59816f72fc822b17137d4a16a8f7abd4f904ba1e001ec7cd52311b.
+Its table lists every retired placement and retained behavior. The Orchestrator's
+10:07 ruling keeps permission/trust Dismiss and retained-wait Remove in hover
+controls and the phone menu; those actions are restored, not retired. The designer's
+10:07 ruling keeps file icons and side metadata aligned to the title's top line;
+`needs_row_top` and `needs_rows_compact` retain their top-alignment checks. Real
+44px touch hit areas and robot/filter alignment remain product requirements.
