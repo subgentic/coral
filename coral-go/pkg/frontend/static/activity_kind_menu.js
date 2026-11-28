@@ -17,8 +17,8 @@ export function mount(node, pills) {
         sw.append(b);
     }
     const kinds = pills.items.filter(it => it.key !== 'important' && it.key !== 'all'), picked = pills.kinds;
-    const items = [{ label: `All ${pills.items.find(it => it.key === 'all')?.count ?? ''}`.trim(), pressed: picked.length === 0, run: () => pills.change(pills.important, []) },
-        ...kinds.map(k => ({ label: `${k.label} ${k.count}`, pressed: picked.includes(k.key), run: () => pills.change(pills.important, picked.includes(k.key) ? picked.filter(x => x !== k.key) : [...picked, k.key]) }))];
+    const items = [{ label: 'All', count: pills.items.find(it => it.key === 'all')?.count ?? '', pressed: picked.length === 0, run: () => pills.change(pills.important, []) },
+        ...kinds.map(k => ({ label: k.label, count: k.count, pressed: picked.includes(k.key), run: () => pills.change(pills.important, picked.includes(k.key) ? picked.filter(x => x !== k.key) : [...picked, k.key]) }))];
     const word = picked.length === 0 ? 'All' : picked.length === 1 ? kinds.find(k => k.key === picked[0])?.label || 'All' : `${picked.length} kinds`;
     const menu = moreMenu('inbox-activity-kind', items, { label: 'Kind', wrapClass: 'al-kind-menu task-more' });
     const button = menu.querySelector('button');

@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
     const rowsNow = () => ev(`document.querySelectorAll('#group-table-view .al-row').length`);
     const menuItemsOpen = async () => { await openMenu(); return menuItems(); };
     const kindWord = () => ev(`(document.querySelector('.al-kind-menu .task-more-btn') || {}).textContent`);
-    const menuItems = () => ev(`[...document.querySelectorAll('#inbox-activity-kind-menu [role^="menuitem"]')].map(b => ({ text: b.textContent.replace(/\\s+/g, ' ').trim(), on: b.getAttribute('aria-checked') }))`);
+    const menuItems = () => ev(`[...document.querySelectorAll('#inbox-activity-kind-menu [role^="menuitem"]')].map(b => ({ text: [...b.childNodes].map(n => n.textContent).join(' ').replace(/\\s+/g, ' ').trim(), on: b.getAttribute('aria-checked') }))`);
     const openMenu = async () => { assert.ok(await ev(`(() => { const b = document.querySelector('#inbox-activity-kind'); if (!b || !b.getClientRects().length) return false; b.click(); return true; })()`), 'the Kind button is there to press'); await waitFor(`!document.querySelector('#inbox-activity-kind-menu').hidden`, 'the Kind menu opens'); };
     const pick = async word => { await openMenu(); assert.ok(await ev(`(() => { const b = [...document.querySelectorAll('#inbox-activity-kind-menu [role^="menuitem"]')].find(x => x.textContent.trim().startsWith(${JSON.stringify(word)})); if (!b) return false; b.click(); return true; })()`), `the ${word} item is there`); await ev(framesJs(4)); };
     const clipped = () => ev(`(() => { const bar = document.querySelector('.inbox-folder-toolbar'), br = bar.getBoundingClientRect(), out = []; for (const e of bar.querySelectorAll('.al-switch, .al-kind-menu, .list-bar-search-wrap, .list-bar-toggle')) if (e.getClientRects().length) { const r = e.getBoundingClientRect(); if (r.right > br.right + 1 || r.left < br.left - 1) out.push(e.className); } return out; })()`);
@@ -47,6 +47,8 @@ const BASE = require('./test_base').BASE;
             assert.equal(await kindWord(), 'Kind: 2 kinds \u25be', `${tag}: two kinds are on together`);
             assert.equal(await rowsNow(), 2, `${tag}: the two kinds' rows (two permissions; the word has no row, #18466)`);
             assert.deepEqual((await menuItemsOpen()).map(i => i.text), counts, `${tag}: the counts do not move with the choice`);
+            const edge = await ev(`(() => { const m = document.querySelector('#inbox-activity-kind-menu').getBoundingClientRect(), it = document.querySelector('#inbox-activity-kind-menu [role^="menuitem"]'), c = it.querySelector('.menu-item-count'), l = it.querySelector('.more-item-label'); return { right: Math.round(m.right - c.getBoundingClientRect().right), grey: getComputedStyle(c).color !== getComputedStyle(l).color }; })()`);
+            assert.ok(edge.right <= 20 && edge.grey, `${tag}: the count sits at the menu's right edge in grey (the mock): ${JSON.stringify(edge)}`);
             await shot(`kinds-menu-open-${tag}`); // the Kind menu open, two kinds ticked
             await ev(`document.querySelector('#inbox-activity-kind').click(); true`);
             assert.equal(await ev(`[...document.querySelectorAll('.list-bar-chip, .team-tb-chip')].filter(e => e.getClientRects().length).map(e => e.textContent).join('|')`), '', `${tag}: no filter chip repeats the kinds`);

@@ -11,8 +11,9 @@ export function moreMenu(id, items, { label = 'More actions', wrapClass = 'task-
     const menu = make('div', `menu team-more-menu ${menuClass}`); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', label);
     for (const it of items) {
         if (it.separatorBefore) { const hr = make('hr', 'menu-sep'); hr.setAttribute('role', 'separator'); menu.append(hr); } // (Delete last, set apart)
-        const b = make(it.href ? 'a' : 'button', it.danger ? 'menu-item menu-item-danger mb-action-danger' : 'menu-item', it.description ? '' : it.label); if (it.href) b.href = it.href; else b.type = 'button'; // href: a real link (#16260): Cmd/Ctrl-click and middle-click open it in a new tab, a plain click runs `run` here
+        const b = make(it.href ? 'a' : 'button', it.danger ? 'menu-item menu-item-danger mb-action-danger' : 'menu-item', it.description || it.count !== undefined ? '' : it.label); if (it.href) b.href = it.href; else b.type = 'button'; // href: a real link (#16260): Cmd/Ctrl-click and middle-click open it in a new tab, a plain click runs `run` here
         if (it.description) { b.append(make('span', 'more-item-label', it.label), make('small', 'more-item-desc', it.description)); b.classList.add('menu-item-described'); } // what the item does, under its name
+        if (it.count !== undefined) { b.append(make('span', 'more-item-label', it.label), make('span', 'menu-item-count', String(it.count))); b.classList.add('menu-item-counted'); if (!it.ariaLabel) b.setAttribute('aria-label', `${it.label} ${it.count}`); } // a number at the right edge, quiet (Activity's Kind menu, #22100)
         b.addEventListener('click', async (e) => {
             if (it.href && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button)) return; // the browser opens the link elsewhere: nothing runs here
             if (it.href) e.preventDefault();
