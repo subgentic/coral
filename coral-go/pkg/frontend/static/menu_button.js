@@ -8,7 +8,7 @@ import { keepMenuOnScreen } from './menu_fit.js';
 
 let current = null; // { toggle, menu }
 
-const items = menu => [...menu.querySelectorAll('[role="menuitem"]:not([disabled]):not([hidden])')];
+const items = menu => [...menu.querySelectorAll('[role="menuitem"]:not([disabled]):not([hidden]),[role="menuitemcheckbox"]:not([disabled]):not([hidden])')];
 
 export function closeMenus({ restoreFocus = false } = {}) {
     if (!current) return;

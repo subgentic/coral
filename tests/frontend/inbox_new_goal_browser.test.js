@@ -1,3 +1,4 @@
+const {pickGoalState}=require('./helpers/goal_state_menu');
 // #11593 (the operator): a New goal button in the Inbox. The Goals folder's toolbar ends with a primary "New goal" (a 44 px target on a phone) that opens the existing New goal form; the form asks which team
 // (the Team filter's team is chosen when one is set, else the first), the goal is created on that team's board (POST /api/board/<team>/goals), and the list is read again. At 1280 and 390. The goals and the
 // create are stood in (fetch) so no board is touched.
@@ -33,8 +34,8 @@ const GOALS = [
             await waitFor(`(rows => /Goals2/.test(rows.join('|')))(${FOLDER_ROWS})`, 'the goals count', 10000);
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
-            await waitFor(`!!document.querySelector('.inbox-folder-toolbar .goals-new') && !!document.querySelector('.inbox-folder-toolbar .team-tb-pills, .inbox-folder-toolbar .team-tb-select')`, `${label}: the goals toolbar and New goal`, 10000); await settle(300);
-            await ev(`(() => { const s = document.querySelector('.inbox-folder-toolbar .team-tb-select'); if (s && s.getClientRects().length) { s.value = 'all'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; } const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.dataset.filter === 'all'); if (b) b.click(); return true; })()`); await waitFor(`document.querySelectorAll('.goal-decision-title').length >= 1`, `${label}: the goals`, 10000); await settle(300); // the folder opens on Active (#16371); this suite looks at every open goal
+            await waitFor(`!!document.querySelector('.inbox-folder-toolbar .goals-new') && !!document.querySelector('.inbox-folder-toolbar .gl-state-menu')`, `${label}: the goals toolbar and New goal`, 10000); await settle(300);
+            await pickGoalState(ev,waitFor,'all');
             const b = await ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row') || document.querySelector('.inbox-folder-toolbar'), x = r.querySelector('.goals-new'), q = r.querySelector('input[type=search]'), bx = x.getBoundingClientRect(), qx = q.getBoundingClientRect();
                 return { text: x.textContent.trim(), primary: x.classList.contains('btn-primary'), h: Math.round(bx.height), right: bx.left >= qx.right - 1, inside: bx.right <= innerWidth + 0.5 }; })()`);
             assert.equal(b.text, 'New goal', `${label}: the button says New goal: ${JSON.stringify(b)}`);

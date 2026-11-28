@@ -23,7 +23,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`(() => { const style = document.createElement('style'); style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(style); return true; })()`);
     };
     const clickGoal = async mount => {
-        const point = await ev(`(() => { const card = [...document.querySelectorAll('${mount} .goal-decision-card')].find(e=>e.querySelector('.goal-decision-title')?.textContent==='Keep this goal in the Inbox'); const row = card ? [...card.querySelectorAll('.goal-decision-foot button')].find(b=>/^Tasks /.test(b.textContent)) : [...document.querySelectorAll('${mount} .dt-primary')].find(e=>(e.querySelector('.dt-mail-title')||e).textContent.replace(/^#\\d+\\s+/, '')==='Keep this goal in the Inbox'); const r = row.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        const point = await ev(`(() => { const card = [...document.querySelectorAll('${mount} .goal-decision-card')].find(e=>e.querySelector('.goal-decision-title')?.textContent==='Keep this goal in the Inbox'); const row = card ? card.querySelector('.gl-goal-name') : [...document.querySelectorAll('${mount} .dt-primary')].find(e=>(e.querySelector('.dt-mail-title')||e).textContent.replace(/^#\\d+\\s+/, '')==='Keep this goal in the Inbox'); const r = row.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
         await client.Input.dispatchMouseEvent({type:'mousePressed',...point,button:'left',clickCount:1});
         await client.Input.dispatchMouseEvent({type:'mouseReleased',...point,button:'left',clickCount:1});
     };
