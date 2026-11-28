@@ -184,11 +184,11 @@ module.exports.run = GROUP => (async () => {
                         const cards = [...document.querySelectorAll('#group-table-view .goal-decision-card')];
                         return { overflow: document.documentElement.scrollWidth - innerWidth, cards: cards.map(c => {
                             const t = c.querySelector('.goal-decision-title'), b = c.getBoundingClientRect(), r = t.getBoundingClientRect(), toggle = c.querySelector('.goal-decision-toggle'), hit = toggle.getBoundingClientRect();
-                            return { title: t.textContent, id: c.querySelector('.goal-decision-id')?.textContent, state: c.querySelector('.goal-decision-state')?.textContent, source: c.querySelector('.goal-decision-team')?.textContent, bounded: r.left >= b.left - 1 && r.right <= b.right + 1 && b.left >= -1 && b.right <= innerWidth + 1, hit: { width: hit.width, height: hit.height }, expanded: toggle.getAttribute('aria-expanded') };
+                            return { title: t.textContent, id: c.querySelector('.goal-decision-id')?.textContent, state: c.querySelector('.goal-decision-state')?.getAttribute('aria-label'), source: c.querySelector('.goal-decision-team')?.textContent, bounded: r.left >= b.left - 1 && r.right <= b.right + 1 && b.left >= -1 && b.right <= innerWidth + 1, hit: { width: hit.width, height: hit.height }, expanded: toggle.getAttribute('aria-expanded') };
                         }) };
                     })()`);
                     assert.equal(sample.cards.length, 3, 'all three seeded goals remain visible');
-                    assert.ok(sample.cards.every(c => c.id?.startsWith('Goal #') && c.title && c.state && c.source?.includes(B)), 'goal identity, state and source remain explicit');
+                    assert.ok(sample.cards.every(c => c.id?.startsWith('#') && c.title && c.state && c.source?.includes(B)), 'goal identity, state and source remain explicit');
                     assert.ok(sample.overflow <= 1 && sample.cards.every(c => c.bounded), `ledger at ${w}px / ${text}% fits: ` + JSON.stringify(sample));
                     if (w === 390) assert.ok(sample.cards.every(c => c.hit.width >= 44 && c.hit.height >= 44), 'phone heading controls are at least 44x44: ' + JSON.stringify(sample));
                     const expanded = sample.cards[0].expanded;
