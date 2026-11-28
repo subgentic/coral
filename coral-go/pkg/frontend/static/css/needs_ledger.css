@@ -214,7 +214,7 @@
 
 .nl-new {
     display: inline-block;
-    background: color-mix(in srgb,var(--accent) 24%,transparent);
+    background: color-mix(in srgb,var(--accent) 10%,transparent);
     color: var(--accent);
     border-radius: var(--radius-xl);
     font-size: var(--fs-needs-meta);
