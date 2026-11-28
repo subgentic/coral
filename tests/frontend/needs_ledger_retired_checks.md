@@ -75,3 +75,8 @@ Additional v3 manifest migrations:
 
 
 **Operator amendment via Orchestrator09:33 (supersedes09:32 above):** Save for later is now part of #22094; FD6's #22132 code and layout fixes are integrated. `needs_save_later` remains FD6's migration on this combined head. `needs_star_room` and `needs_star_slot` now keep their text-range overlap/containment checks against the desktop Save hover icon and phone More target. Main-list Star placement is retired; Save behavior is proved by both Save suites. The new `needs_save_later_icon` is an extra gate suite beyond QA's133.
+
+| needs_select_phone / needs_select_dismiss | Header Select replaces table toggle; per-row 44px checks, shift-range selection, bulk Dismiss/Undo, Clear and Escape preserved. |
+| needs_sticky_actions | Ledger summary replaces toolbar-mounted bar; visible top-of-workspace and no observer accumulation assertions preserved. |
+| needs_skills / needs_skill_approve | Skill title/version, publisher sanitization, Review navigation and no-scripts-only confirm retained on ledger rows; folded groups opened for inspection. |
+| needs_retained_wait | Phone ledger selector replaces mailed table class; retained explanation/count/no-repeat-dismiss/source routing unchanged. |
