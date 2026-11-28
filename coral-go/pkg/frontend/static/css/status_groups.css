@@ -10,8 +10,6 @@
 .status-shape.st-idle { border-radius: 50%; border: 1.5px solid var(--text-muted); }
 .status-shape.st-done { width: auto; height: auto; color: var(--text-muted); font-weight: var(--fw-strong); line-height: 1; }
 .status-shape.st-done::before { content: "\2713"; }
-.status-more { list-style: none; margin-top: var(--space-md); }
-.status-more-toggle { display: flex; align-items: center; gap: var(--space-md); width: 100%; justify-content: flex-start; text-align: start; font-size: var(--fs-base); }
 /* A row here has no dot (its heading is its status) and no drag handle (the order is the time). */
 .session-list .session-group-item[data-group="__status__"] .session-dot, .session-list .session-group-item[data-group="__status__"] .drag-grip { display: none; }
 /* The mock shows the time at the right of every row ("6 min", "now"); the computer's row hides it elsewhere, so a row here shows it. */

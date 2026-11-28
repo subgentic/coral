@@ -1,4 +1,4 @@
-// A long agent name wraps to a second line in the phone's agent list without the state chip drawn over it (#4612: the name row was a fixed 16 px high, so the second line
+// A long agent name stays on one line in the phone's agent list (the approved sidebar mock v2, #22105; it wrapped before) without the state chip drawn over it (#4612: the name row was a fixed 16 px high, so the second line
 // overflowed it and the IDLE chip below covered "...-4-9"). Drives Chrome over CDP through agent_view_harness.js against an isolated dev server; run_cdp_suites.mjs finds it by name.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -19,9 +19,10 @@ const { coralReady } = require('./helpers/wait');
             render.flushLiveSessionsRender(); return true; })()`);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the list draws on the next frame
         const rows = await ev(`[...document.querySelectorAll('#mobile-session-list .session-group-item, .session-group-item')].filter(r => r.getClientRects().length).map(r => { const nm = r.querySelector('.session-label'); const row = r.querySelector('.session-name-row'); const chip = r.querySelector('.session-status-chip'); const a = nm.getBoundingClientRect(), b = row.getBoundingClientRect(), c = chip ? chip.getBoundingClientRect() : null;
-            return { name: nm.textContent.trim(), lines: Math.round(a.height / parseFloat(getComputedStyle(nm).lineHeight)), labelBottom: Math.round(a.bottom), rowBottom: Math.round(b.bottom), chipTop: c ? Math.round(c.top) : null }; })`);
+            return { name: nm.textContent.trim(), lines: Math.round(a.height / parseFloat(getComputedStyle(nm).lineHeight)), labelBottom: Math.round(a.bottom), labelRight: Math.round(a.right), itemRight: Math.round(r.getBoundingClientRect().right), rowBottom: Math.round(b.bottom), chipTop: c ? Math.round(c.top) : null }; })`);
         assert.ok(rows.length >= 4, 'the rows are in the list: ' + JSON.stringify(rows));
-        assert.ok(rows.some(r => r.lines >= 2), 'a long name wraps to two lines on a phone (the case under test): ' + JSON.stringify(rows));
+        // the approved sidebar mock v2 (#22105): a long name stays on one line, cut with an ellipsis inside its row (it wrapped to two lines before)
+        assert.ok(rows.every(r => r.lines === 1 && r.labelRight <= r.itemRight + 1), 'a long name stays on one line inside its row on a phone: ' + JSON.stringify(rows));
         for (const r of rows) {
             assert.ok(r.rowBottom >= r.labelBottom - 1, `${r.name}: the name row holds its name (row bottom ${r.rowBottom}, name bottom ${r.labelBottom})`);
             if (r.chipTop !== null) assert.ok(r.chipTop >= r.labelBottom - 1, `${r.name}: the state chip starts below the name (chip ${r.chipTop}, name bottom ${r.labelBottom})`);

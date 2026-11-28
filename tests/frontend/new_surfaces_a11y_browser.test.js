@@ -119,13 +119,13 @@ const { coralReady } = require('./helpers/wait');
             if (mobile) await ev(`window.switchNavTab('agents'); window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             const btn = `${hdr} [data-display-button]`;
             let d = await ax(btn);
-            assert.equal(d.role, 'button'); assert.ok(/Display options/.test(d.name), d.name); assert.equal(d.props.expanded, false);
+            assert.equal(d.role, 'button'); assert.ok(/^Group by: /.test(d.name), d.name); // its words are its name (#22105) assert.equal(d.props.expanded, false);
             await focus(btn); await key('Enter');
             assert.equal((await ax(btn)).props.expanded, true, 'Enter opens the panel');
             assert.equal(await ev(`!!document.activeElement.closest('${hdr} [data-display-panel]')`), true, 'and moves the keyboard into it');
             const panel = await ax(`${hdr} [data-display-panel]`); assert.equal(panel.role, 'group'); assert.ok(panel.name, 'the panel is named');
             await ev(`(() => { const s = document.querySelector('${hdr} [data-display-panel] select'); const o = [...s.options].find(x => x.value); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-            d = await ax(btn); assert.match(d.name, /Display options, 1 filter on/, 'the button says a filter is on: ' + d.name);
+            d = await ax(btn); assert.match(d.name, /^Group by: .+1 filter on$/, 'the button says a filter is on (its words, then the dot\'s name, #22105): ' + d.name);
             await key('Escape');
             assert.equal((await ax(btn)).props.expanded, false, 'Escape closes it'); assert.equal(await ev(`!!document.activeElement.closest('${btn}') || document.activeElement.matches('${btn}')`), true, 'and focus is back on the Display button');
             assert.equal(await ev(`document.querySelector('${hdr} [data-agent-list-summary]') === null`), true, 'no summary line under the search (#6597): the button names what is on');
@@ -178,16 +178,18 @@ const { coralReady } = require('./helpers/wait');
         }
 
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
-            console.log(`${w} px: 4. the team health icon`);
+            console.log(`${w} px: 4. the team health check, in the team's menu (#22105)`);
             await open(w, h, mobile);
             await ev(`import(${MOD} + 'render.js').then(async r => { const { state } = await import(${MOD} + 'state.js');
                 state.liveSessions = ${JSON.stringify([1, 2].map(i => ({ session_id: `hl-${i}`, name: `hl-agent-${i}`, display_name: `Agent ${i}`, agent_type: 'claude', working_directory: '/tmp/hl', board_project: TEAM, status: 'idle', team_health_on: i === 1 })))};
                 r.flushLiveSessionsRender(); r.renderLiveSessions(state.liveSessions); return true; })`);
-            await waitFor(`!!document.querySelector('.team-health-btn')`, 'the health icon', 5000);
-            const hb = await ax('.team-health-btn');
-            assert.equal(hb.role, 'button'); assert.match(hb.name, /Health check settings for /, hb.name);
-            assert.equal(await ev(`document.querySelector('.team-health-btn').tabIndex >= 0`), true, 'the keyboard reaches it');
-            assert.equal(await ev(`document.querySelector('.team-health-btn').hasAttribute('aria-pressed')`), false, 'it opens the settings, it does not toggle: its state is in its name, not a pressed state');
+            await waitFor(`!!document.querySelector('.team-health-item')`, 'the Health check item', 5000);
+            await ev(`document.querySelector('.team-health-item').closest('.sidebar-kebab-wrapper').querySelector('.sidebar-kebab-btn').click(); true`);
+            await waitFor(`document.querySelector('.team-health-item').getClientRects().length > 0`, 'the team menu is open', 5000);
+            assert.deepEqual(await ev(`(() => { const b = document.querySelector('.team-health-item'); return [b.tagName, b.textContent.trim(), b.closest('[aria-hidden="true"]') === null]; })()`), ['BUTTON', 'Health check', true], 'a button named Health check, in the open menu');
+            assert.equal(await ev(`document.querySelector('.team-health-item').tabIndex >= 0`), true, 'the keyboard reaches it');
+            assert.equal(await ev(`document.querySelector('.team-health-item').hasAttribute('aria-pressed')`), false, 'it opens the settings, it does not toggle');
+            await key('Escape');
         }
 
         console.log('2. a sectioned dialog (Restart): tablist, tabs, panels, a section with a problem');

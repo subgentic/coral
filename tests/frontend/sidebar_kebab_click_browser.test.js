@@ -32,6 +32,7 @@ const { safePaused } = require('./helpers/paused');
             const click = async p => { await Input.dispatchMouseEvent({ type: 'mouseMoved', x: p.x, y: p.y }); await Input.dispatchMouseEvent({ type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 }); await Input.dispatchMouseEvent({ type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 }); };
             await ev(`document.querySelector('${BTN}').scrollIntoView({ block: 'center' }); true`);
             for (let j = 0, prev = ''; j < 40; j++) { const now = JSON.stringify(await centre(BTN)); if (now === prev) break; prev = now; await new Promise(r => setTimeout(r, 100)); } // sleep-ok: waits for the button to stop moving (the team's card draws after the list and shifts it)
+            { const r = await centre('.session-group-item[data-session-id="w-sid"] .session-label'); await Input.dispatchMouseEvent({ type: 'mouseMoved', x: r.x, y: r.y }); await ev(framesJs(2)); } // at 1280 the row's ⋯ shows on a hover (#22105, the approved sidebar mock): point at the row first, as a person does
             await click(await centre(BTN));
             if (holdHelp) {
                 await waitFor('window.__helpPaused===true', 'help import is held');

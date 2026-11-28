@@ -1,4 +1,4 @@
-// The "N need input" chip on a team's sidebar row opens that team's Needs you tab, not its Goals (#19429, the Operator's bug); the rest of the row still opens the team's page on Goals. 1440 and 390.
+// The team menu's "Needs you N" item (#22105, the approved sidebar mock; it was a chip on the team's row) opens that team's Needs you tab, not its Goals (#19429); the rest of the row still opens the team's page on Goals. 1440 and 390.
 // The question list is a stub of /api/operator-asks; the rows are drawn from state.liveSessions.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -18,7 +18,7 @@ const row = (id, team) => ({ session_id: id, name: id, agent_type: 'claude', wor
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [width, mobile, chip] of [[1440, false, true], [1440, false, false], [1440, false, 'key'], [390, true, true], [390, true, false]]) {
-            const at = width + ' px, ' + (chip === 'key' ? 'the chip by keyboard' : chip ? 'the chip' : 'the row') + ': ';
+            const at = width + ' px, ' + (chip === 'key' ? 'the item by keyboard' : chip ? 'the item' : 'the row') + ': ';
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installTP(ev); await seed(ev, ALPHA);
             await ev(`(() => { localStorage.removeItem('coral-group-by-team'); localStorage.removeItem('coral_collapsed_groups'); window.switchNavTab('agents');
@@ -29,22 +29,24 @@ const row = (id, team) => ({ session_id: id, name: id, agent_type: 'claude', wor
             const selected = () => ev(`(() => { const t = window.__tp.allTabs().find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__tp.tabLabel(t).replace(/\\s*\\d+\\+?$/, '') : null; })()`);
             const openFrom = async (what, key) => {
                 await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(${JSON.stringify([row('a1', ALPHA), row('b1', 'beta')])}); true`);
-                await waitFor(`!!${header} && !!${header}.querySelector('.team-row-needs')`, at + 'the count on the team row', 15000);
+                await waitFor(`!!${header} && !!${header}.querySelector('.team-needs-item')`, at + 'the Needs you item in the team menu', 15000);
                 await ev(what);
+                if (key) { await waitFor(`!!document.activeElement.closest('.sidebar-kebab-menu')`, at + 'the keyboard is in the menu', 5000); await ev(`${header}.querySelector('.team-needs-item').focus(); true`); } // a scripted click opens the menu as a key does: its first item takes the focus first
                 if (key) { await Input.dispatchKeyEvent({ type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }); }
                 await waitFor(`!!window.__tp.tablist()`, at + 'the team page', 10000);
                 await waitFor(`window.__tp.allTabs().some(x => x.getAttribute('aria-selected') === 'true')`, at + 'a tab is open', 10000);
             };
             if (chip === 'key') { // the row is drawn by openFrom's own first steps: draw it here too, or a slow runner reads a null header (post70t)
                 await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(${JSON.stringify([row('a1', ALPHA), row('b1', 'beta')])}); true`);
-                await waitFor(`!!${header} && !!${header}.querySelector('.team-row-needs')`, at + 'the count on the team row', 15000);
+                await waitFor(`!!${header} && !!${header}.querySelector('.team-needs-item')`, at + 'the Needs you item in the team menu', 15000);
             }
-            if (chip === 'key') assert.equal(await ev(`(() => { const c = ${header}.querySelector('.team-row-needs'); return c.tagName === 'BUTTON' && c.tabIndex >= 0 && /Needs you/.test(c.getAttribute('aria-label')); })()`), true, at + 'the chip is a button with a name, so Tab reaches it');
-            await openFrom(chip === 'key' ? `${header}.querySelector('.team-row-needs').focus(); true` : chip ? `${header}.querySelector('.team-row-needs').click(); true` : `${header}.click(); true`, chip === 'key');
+            if (chip === 'key') assert.equal(await ev(`(() => { const c = ${header}.querySelector('.team-needs-item'); return c.tagName === 'BUTTON' && c.tabIndex >= 0 && /^Needs you/.test(c.textContent.trim()); })()`), true, at + 'the item is a button with a name, so the keyboard reaches it');
+            const menu = `${header}.querySelector('.group-kebab-btn').click();`; // the item is in the team's ⋯ menu
+            await openFrom(chip === 'key' ? `${menu} true` : chip ? `${menu} ${header}.querySelector('.team-needs-item').click(); true` : `${header}.click(); true`, chip === 'key');
             await settle(600); // the page draws its tab before the picture
             if (process.env.CORAL_SCREENSHOT_DIR && chip) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/${process.env.SHOT_TAG || 'after'}-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } // after the chip's click: the tab that opened
-            assert.equal(await selected(), chip ? 'Needs you' : 'Goals', at + (chip ? 'the chip opens Needs you' : 'the rest of the row opens the team on Goals'));
+            assert.equal(await selected(), chip ? 'Needs you' : 'Goals', at + (chip ? 'the item opens Needs you' : 'the rest of the row opens the team on Goals'));
         }
-        console.log('PASS the "need input" chip opens the team\'s Needs you; the rest of the row opens Goals');
+        console.log('PASS the team menu\'s Needs you item opens the team\'s Needs you; the rest of the row opens Goals');
     } finally { await removeBoards(ev, [ALPHA]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

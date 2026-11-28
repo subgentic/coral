@@ -37,7 +37,7 @@ const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
                     const l = label.getBoundingClientRect(), n = name.getBoundingClientRect(), t = tag?.getBoundingClientRect();
                     const walker = document.createTreeWalker(name, NodeFilter.SHOW_TEXT), text = walker.nextNode(), range = document.createRange(); range.setStart(text, 0); range.setEnd(text, Math.min(6, text.length)); const first = range.getBoundingClientRect();
                     const clip = name.querySelector('.sln-head') || label, c = clip.getBoundingClientRect(), style = getComputedStyle(label);
-                    return { name: name.textContent, title: label.title, aria: r.getAttribute('aria-label'), tag: tag?.textContent.trim(), firstVisible: first.left >= c.left - 1 && first.right <= c.right + 1 && first.width > 0, nameWidth: l.width, ellipsis: style.textOverflow, whiteSpace: style.whiteSpace, tagWhole: !!tag && tag.scrollWidth <= tag.clientWidth + 1, tagBelow: !!t && t.top >= l.bottom - 1, overlap: !!t && t.left < l.right && t.right > l.left && t.top < l.bottom && t.bottom > l.top, overflow: document.documentElement.scrollWidth > innerWidth + 1 };
+                    const mk = r.querySelector('.session-dot'); return { mark: mk ? mk.className : '', markShown: !!mk && mk.getClientRects().length > 0, name: name.textContent, title: label.title, aria: r.getAttribute('aria-label'), tag: tag?.textContent.trim(), firstVisible: first.left >= c.left - 1 && first.right <= c.right + 1 && first.width > 0, nameWidth: l.width, ellipsis: style.textOverflow, whiteSpace: style.whiteSpace, tagWhole: !!tag && tag.scrollWidth <= tag.clientWidth + 1, tagBelow: !!t && t.top >= l.bottom - 1, overlap: !!t && t.left < l.right && t.right > l.left && t.top < l.bottom && t.bottom > l.top, overflow: document.documentElement.scrollWidth > innerWidth + 1 };
                 })()`);
                 const at = `${width}${narrow ? '-narrow' : ''}-${theme}`;
                 console.log(at + ': ' + JSON.stringify(facts));
@@ -47,8 +47,7 @@ const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
                     assert.equal(facts.ellipsis, 'ellipsis'); assert.equal(facts.whiteSpace, 'nowrap');
                     // an agent row is one line, the dot, the name and at most one chip (#9686): a waiting agent's chip is DRAWN at every width, whole and not over the name; on a phone it sits on the line, not below
                     if (width === 390) assert.match(facts.aria, /, Needs input \u00b7 Permission$/, 'on a phone the status is the row\'s own muted second line, not a chip (Option A, #10691), and the row is named with it: ' + JSON.stringify(facts));
-                    else assert.ok(facts.tag && facts.tagWhole && !facts.overlap && !facts.overflow, 'whole tag and no overlap: ' + JSON.stringify(facts));
-                    if (narrow) assert.ok(facts.tagBelow, 'tag below name in narrow layout: ' + JSON.stringify(facts));
+                    else assert.ok(/mk-need/.test(facts.mark) && facts.markShown && /, Needs input \u00b7 Permission$/.test(facts.aria) && !facts.tag && !facts.overflow, 'needs you is the amber mark and the row\'s name, no pill (#22105, the approved sidebar mock v2), and nothing spills: ' + JSON.stringify(facts));
                 } catch (error) { failures.push(at + ': ' + error.message); }
                 const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, 'out', 'shots-8268') : '');
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, `waiting-name-${at}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }

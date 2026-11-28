@@ -170,7 +170,7 @@ const SETTINGS_PRELOAD = `(() => {
         assert.ok(lay.headerLeft < lay.rowMin, `server headers sit left of every team and agent row (icon ${lay.headerLeft} < rows ${lay.rowMin})`);
         assert.ok(lay.m3.down && lay.m3.op < lay.m2op && lay.m3.opName < 1, `the offline server is dimmed (${JSON.stringify(lay.m3)})`);
         assert.equal(lay.m3.title, 'Old Laptop: Unreachable'); assert.match(lay.m3.aria, /^Computer Old Laptop: Unreachable, 2 agents$/); // aria-expanded says open or collapsed; the name does not repeat it (#4272)
-        assert.ok(lay.agents.length >= 4 && lay.agents.every(a => a.dot && !a.title && /^.+, .+/.test(a.label)), `agent state dots kept under server headers: the dot has no native title any more (#9822), the row's name says the state (${JSON.stringify(lay.agents)})`);
+        assert.ok(lay.agents.length >= 4 && lay.agents.every(a => a.dot && ['Working', 'Awake, waiting', 'Needs you', 'Asleep'].includes(a.title) && /^.+, .+/.test(a.label)), `agent state marks kept under server headers: the mark's word is its tooltip (#22105, the approved sidebar mock; it had none since #9822), the row's name says the state (${JSON.stringify(lay.agents)})`);
         console.log(`   ✓ grouped: headers outermost (icon at ${lay.headerLeft}px, rows from ${lay.rowMin}px), computer icon, no dots, offline dimmed + tooltip + aria; ${lay.agents.length} agent rows keep their state dot`);
         const m2rows = ['solo-m2-id', 'team-m2-id'];
         assert.ok(m2rows.every(id => v.rows.includes(id)), 'm2 agents listed while expanded');
@@ -272,10 +272,10 @@ const SETTINGS_PRELOAD = `(() => {
             return { w: [server.fontWeight, team.fontWeight, folder.fontWeight, agent.fontWeight].map(Number), serverColor: server.color, primary: probe('var(--text-primary)'),
                 team: team.color, folder: folder.color, agent: agent.color, secondary: probe('var(--text-secondary)') };
         })()`);
-        assert.deepEqual(hier.w, [600, 600, 600, 500], `weights: server, team, folder, agent (700 is only for the 20 and 32 px titles, Goal #84) (${JSON.stringify(hier)})`);
+        assert.deepEqual(hier.w, [600, 600, 600, 600], `weights: server, team, folder, agent (the agent name is 600 in the approved sidebar mock, #22105; 700 is only for the 20 and 32 px titles, Goal #84) (${JSON.stringify(hier)})`);
         assert.equal(hier.serverColor, hier.primary, 'the server header is the brightest text');
         assert.equal(hier.folder, hier.team, 'folders match teams (no accent blue)'); assert.equal(hier.team, col.neutral);
-        assert.equal(hier.agent, hier.secondary, 'agent names are muted (no light blue)');
+        assert.equal(hier.agent, hier.primary, 'agent names in the primary text, no light blue (#22105, the approved sidebar mock: the name leads)');
         // #3507 v4: folder groups have a folder icon, named for screen readers and aligned with the
         // team rows' people icon, in both views.
         const icons = () => ev(`(() => {
@@ -289,7 +289,7 @@ const SETTINGS_PRELOAD = `(() => {
             await ev(`localStorage.setItem('coral-group-computer', '${grouped}'); T.render.renderLiveSessions(T.state.liveSessions); true`);
             const ic = await icons();
             assert.ok(ic.n >= 3 && ic.withIcon === ic.n, `${grouped ? 'grouped' : 'ungrouped'}: every folder group has the named folder icon (${JSON.stringify(ic)})`);
-            assert.ok(ic.teamX.length > 0 && ic.folderX.every(x => Math.abs(x - ic.teamX[0]) <= 1), `${grouped ? 'grouped' : 'ungrouped'}: aligned with the team icons (${JSON.stringify(ic)})`);
+            assert.ok(ic.teamX.length === 0 && ic.folderX.every(x => Math.abs(x - ic.folderX[0]) <= 1), `${grouped ? 'grouped' : 'ungrouped'}: the folder icons line up, and a team line has no icon (#22105, the approved sidebar mock) (${JSON.stringify(ic)})`);
         }
         // #3507 v4: the header row is the button (aria-expanded, Enter or Space); a team header opens the team and its chevron button collapses (#5989).
         await ev(`localStorage.setItem('coral-group-computer', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);

@@ -1,5 +1,5 @@
 // One row style for every sidebar list (#9926, the operator's): the Inbox's view list, the agent list, the Analytics views and the Settings tabs read the same. A row at rest is 14 px / 400 in
-// the secondary colour, the current one 14 / 600 in the primary colour (the Slack model: quiet, and the one you are on is bold), every row 36 px, and the team heading of the agent list is the strong
+// the secondary colour, the current one 14 / 600 in the primary colour (the Slack model: quiet, and the one you are on is bold), every row 36 px (the agent list: 33 and every name 600, the approved sidebar mock v2, #22105), and the team heading of the agent list is the strong
 // text. A row that needs you says so with its dot or chip, never with louder text. Both themes at 1280, the numbers read from the real page against the tokens.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -46,12 +46,14 @@ const SESSIONS = Array.from({ length: 4 }, (_, i) => { const n = i + 1; return {
                 const rest = await look(l.row, l.label, l.rest), cur = await look(l.row, l.label, name === 'Agents' ? 'e => e.classList.contains("active")' : l.cur);
                 const at = `${theme} ${name}: `;
                 const ok = (cond, what) => { if (!cond) failures.push(at + what); };
-                ok(rest && rest.size === '14px' && rest.weight === '400' && rest.color === secondary, 'a row at rest is 14px/400 in the secondary colour: ' + JSON.stringify(rest) + ' wanted ' + secondary);
+                if (name === 'Agents') ok(rest && rest.size === '14px' && rest.weight === '600' && rest.color === primary, 'an agent row is 14px/600 in the primary colour at rest too (#22105, the approved sidebar mock v2: the name leads; the tint marks the current row): ' + JSON.stringify(rest) + ' wanted ' + primary);
+                else ok(rest && rest.size === '14px' && rest.weight === '400' && rest.color === secondary, 'a row at rest is 14px/400 in the secondary colour: ' + JSON.stringify(rest) + ' wanted ' + secondary);
                 ok(cur && cur.size === '14px' && cur.weight === '600' && cur.color === primary, 'the current row is 14px/600 in the primary colour: ' + JSON.stringify(cur) + ' wanted ' + primary);
-                ok(rest && rest.h === 36 && cur && cur.h === 36, 'rows are 36 px: ' + JSON.stringify([rest && rest.h, cur && cur.h]));
+                const rowH = name === 'Agents' ? 33 : 36; // the agent list's one-line row is the mock's: 6 + a 21 px name + 6 (#22105)
+                ok(rest && rest.h === rowH && cur && cur.h === rowH, `rows are ${rowH} px: ` + JSON.stringify([rest && rest.h, cur && cur.h]));
                 if (name === 'Agents') {
                     const w = await look(l.row, l.label, 'e => e.classList.contains("needs-attention")');
-                    ok(w && w.weight === '400' && w.size === '14px', 'a row that needs input is not louder text, its dot and chip say it: ' + JSON.stringify(w));
+                    ok(w && w.weight === rest.weight && w.size === '14px', 'a row that needs input is not louder text, its amber mark says it: ' + JSON.stringify(w));
                     const head = await ev(`(() => { const e = [...document.querySelectorAll('#live-sessions-list .board-card-header .group-name-text')].find(x => x.getClientRects().length); const c = e && getComputedStyle(e); return c && { size: c.fontSize, weight: c.fontWeight }; })()`);
                     ok(head && head.size === '14px' && head.weight === '600', 'the team heading is 14px/600: ' + JSON.stringify(head));
                 }

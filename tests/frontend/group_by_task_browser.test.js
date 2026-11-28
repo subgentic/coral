@@ -38,7 +38,7 @@ const { connect } = require('./agent_view_harness');
    const heads = scope => ev(`[...document.querySelectorAll('${scope} .status-sub')].map(h => h.querySelector('.status-name').textContent + ' ' + h.querySelector('.session-group-count').textContent)`);
    const text = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].map(e => e.textContent.replace(/\\s+/g, ' ').trim())`);
    await scene();
-   await waitFor(mobile ? `!!document.querySelector('${root} .status-more-toggle')` : `document.querySelectorAll('${root} .session-group-item').length >= 8`, 'the agents are listed (on a phone: the one line that counts them)');
+   await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 8`, 'the agents are listed (a phone too: every agent a row, #22105)');
 
    // 1. Three boxes, Computer, Team, Task: a viewer with no choice saved opens on Team and Task (#22104). Unticking both is the Status view, and a saved untick wins over the default.
    await openPanel();
@@ -64,20 +64,12 @@ const { connect } = require('./agent_view_harness');
    await tick('task');
    await waitFor(`document.querySelectorAll('${root} .session-team-group .status-sub').length >= 3`, 'the teams split by task');
    const alpha = `${root} .session-team-group:has([data-group-name$="/alpha"])`, beta = `${root} .session-team-group:has([data-group-name$="/beta"])`;
-   if (!mobile) {
-    assert.deepEqual(await heads(alpha), ['On a task 3', 'No task 1'], 'alpha: three on a task, one without (its Orchestrator is the first row, in neither group, #21838)');
-    assert.deepEqual(await heads(beta), ['On a task 1', 'No task 1'], 'beta');
-    assert.ok((await text(`${alpha} .session-task-line`)).includes('#21685Sidebar: Group by Task'), 'a row says #number and title');
-    assert.deepEqual(await text(`${beta} .status-queued`), ['queued'], 'a task that has not started says queued');
-    assert.equal((await text(`${alpha} .status-queued`)).length, 0, 'an in-progress task does not');
-   } else {
-    // the phone: two rows of On a task, one line for the rest, one line for the agents without a task
-    assert.deepEqual(await text(`${alpha} .status-more-toggle`), ['1 more on a task', '1 without a task'], 'the phone counts the rest on one line each');
-    await ev(`document.querySelector('${alpha} .status-more-toggle').click(); true`);
-    await waitFor(`document.querySelectorAll('${alpha} .session-group-item').length === 5`, 'the lines open the rest');
-    await ev(`document.querySelector('${alpha} .status-more-toggle').click(); true`);
-    await waitFor(`document.querySelectorAll('${alpha} .session-group-item').length === 3`, 'and fold again (the Orchestrator and two on a task)');
-   }
+   // a phone is the same list (#22105, the approved sidebar mock: every agent a row, no line that counts the rest)
+   assert.deepEqual(await heads(alpha), ['On a task 3', 'No task 1'], 'alpha: three on a task, one without (its Orchestrator is the first row, in neither group, #21838)');
+   assert.deepEqual(await heads(beta), ['On a task 1', 'No task 1'], 'beta');
+   assert.ok((await text(`${alpha} .session-task-line`)).includes('#21685Sidebar: Group by Task'), 'a row says #number and title');
+   assert.deepEqual(await text(`${beta} .status-queued`), ['queued'], 'a task that has not started says queued');
+   assert.equal((await text(`${alpha} .status-queued`)).length, 0, 'an in-progress task does not');
    await shot('group-by-team-task'); await listShot('group-by-team-task');
 
    // 4. Computer too: a header per computer, the teams inside it, the split inside each team.

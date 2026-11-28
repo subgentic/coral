@@ -1,6 +1,6 @@
 /* The agent list shows the teams that are active (#15744, the Operator via coral-hub: leftover test boards filled the phone drawer): a team with an agent that is awake or a message
  * waiting for one of its agents, newest message first; the rest are one row away (Show all teams), remembered in this browser. The open team is always listed, and so is every team
- * while the search box has words in it. Loaded when the list draws a team (group_cards.js asks for it, so the first paint carries none of these bytes); it also carries the Needs you chip on a team row (#17781), so the row adds no start-path import of its own. */
+ * while the search box has words in it. Loaded when the list draws a team (group_cards.js asks for it, so the first paint carries none of these bytes); it also carries the team menu's Needs you item (#17781; a chip on the row until #22105), so the row adds no start-path import of its own. */
 import { browserLocal } from './safe_storage.js';
 import { registerActions } from './actions.js';
 import { redrawLiveList } from './list_hooks.js';
@@ -12,8 +12,8 @@ import { importOnce } from './import_once.js';
 const KEY = 'coral-teams-show-all';
 let needs = null; // team_row_needs.js, once it is in: it draws the Needs you chip on a team row (#17781)
 importOnce('./team_row_needs.js').then(m => { needs = m; }).catch(() => {});
-/** The chip for a team row ("" until team_row_needs.js is in; it draws the list again itself). */
-export const chip = team => needs ? needs.chip(team) : '';
+/** The team menu's Needs you item ("" until team_row_needs.js is in; it draws the list again itself). */
+export const needsItem = team => needs ? needs.menuItem(team) : '';
 export const FEW = 4; // up to this many teams are all listed: nothing to hide
 const asleepOnly = list => list.every(s => s.sleeping) && !list.some(s => Number(s.board_unread) > 0);
 const newest = list => Math.max(0, ...list.map(s => Date.parse(s.last_message?.at) || 0));

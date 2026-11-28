@@ -4,8 +4,6 @@ import { getDotClass, resolveSessionIdentity, sessionGoalText, sessionStateInfo,
 import { _saveSessionOrder } from './list_order.js';
 import { MORE_DOTS_SVG, escapeHtml, escapeAttr, agentNameColor } from './utils.js';
 import { keepMenuItem } from './codex_mode.js';
-import { getAgentColor } from './agent_colors.js';
-import { _getBoardColor } from './board_accents.js';
 import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
 import { getCachedAgentAvailability } from './team_availability.js';
 import { isGoneAsleep, isExitedAsleep } from './terminal_gone.js';
@@ -38,12 +36,9 @@ function _archivedTeamLabel(s) {
 export function _renderArchivedSection(archived) {
     if (!archived.length) return '';
     const expanded = _isArchivedExpanded();
-    const names = [...new Set(archived.filter(s => s.board_project).map(_archivedTeamLabel))]; // the line names its teams, so an archived team is not a nameless count (#17491)
-    const named = names.length ? ' · ' + names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2}` : '') : '';
     let html = `<li class="sleeping-summary-row archived-summary-row" data-on-click="archived-toggle"><button type="button" class="row-btn" aria-expanded="${escapeAttr(expanded)}">
-        ${SVGO.o4}<rect x="2" y="3" width="12" height="3" rx="0.5"/><path d="M3 6v7h10V6"/><path d="M6.5 9h3"/></svg>
-        <span class="sleeping-summary-label">Archived (${archived.length})${escapeHtml(named)}</span>
-    </button></li>`;
+        <span class="sleeping-summary-label">Archived <span class="archived-n">${archived.length}</span></span><span class="archived-caret" aria-hidden="true">&#9662;</span>
+    </button></li>`; // one quiet fold at the bottom (#22105, the approved sidebar mock: "Archived 3")
     if (!expanded) return html;
     const byTeam = new Map();
     for (const s of archived) {
@@ -276,7 +271,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // warning pill; "Task assigned · idle" a neutral one (#3227). "Ready for input"
     // has none: the tooltip and the aria-label carry that state (no dot) (task #175).
     const pillKind = stateInfo.attention ? 'waiting-badge session-state-pill session-attention-pill' : 'session-state-pill';
-    const waitingBadge = stateInfo.pill && (stateInfo.attention || stateInfo.key === 'usage_limit') // one row, one line: the one chip is for an agent that needs you (the dot says every other state, #9686)
+    const waitingBadge = stateInfo.pill && stateInfo.key === 'usage_limit' // the mark says Needs you (#22105, the approved sidebar mock): a pill only for a usage limit // one row, one line: the one chip is for an agent that needs you (the dot says every other state, #9686)
         ? ` <span class="chip chip-caps ${pillKind}${stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''}"${stateInfo.label !== stateInfo.pill.split(' · ')[0] ? ` title="${escapeAttr(stateInfo.label)}"` : ''}>${escapeHtml(stateInfo.key === 'usage_limit' ? stateInfo.pill : stateInfo.pill.split(' · ')[0])}</span>` // one chip, one word: the reason (Question, Permission) is the chip's hover and the row's name, not in the pill (UI/UX, #9784)
         : '';
     // Context is secondary: any state pill owns line 1 and the ctx pill
@@ -285,7 +280,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s);
     const heldChip = !waitingBadge && skipped ? ` <span class="chip chip-caps session-state-pill neutral session-held-chip" title="${escapeAttr(skipped.why)}" data-on-click="held-why">Message held</span>` : '';
     // Terminal-gone sleepers already have their restart chip. A sleeping agent is a row like any other (#10062): its one quiet chip says Sleeping (when no other chip owns the row; titled when Coral stopped it), and Wake is on the row at a hover or the keyboard, named for the agent
-    const sleepChip = s.sleeping && !isGoneAsleep(s) && !isExitedAsleep(s) && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
+    
     // An ended agent (its CLI exited, #15777) has one word, Ended (no moon, no Sleeping pill); at a hover it offers Restart, Wake and Sleep in the chip's place
     const restartBtn = isExitedAsleep(s) && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-restart-same" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="restart" title="Its program exited; Restart starts it again" aria-label="Restart ${escapeAttr(resolveSessionIdentity(s))}">Restart</button>` : '';
     const wakeBtn = s.sleeping && !s.archived && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="wake" aria-label="Wake ${escapeAttr(resolveSessionIdentity(s))}">Wake</button>` : '';
@@ -319,7 +314,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     </div>`;
     const compactClass = isCompact ? ' session-compact' : '';
     const collapsedClass = collapsed ? ' group-collapsed' : '';
-    const sleepingClass = s.sleeping ? ' sleeping' : '';
+    const sleepingClass = (s.sleeping ? ' sleeping' : '') + (s.archived ? ' archived-row' : '');
     const attentionClass = needsAttention ? ' needs-attention' : '';
     // Hub: an agent on an unreachable server is last-known data only.
     const stale = isStaleSession(s);
@@ -333,7 +328,9 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         + (unreadCount > 0 ? `, ${unreadCount} unread` : '')
         + (heldChip ? ', message held' : ''); // the row's one chip says it in words: the name says it too (QA Engineer, #9723)
     const stuckClass = stateInfo.key === 'stuck' || stateInfo.key === 'blocked' ? ' is-stuck' : '';
-    const avatar = avatarOf(s, identity, groupName);
+    const asking = !s.sleeping && !!loadedModule('./operator_asks.js')?.operatorAsks().some(a => a.board === s.board_project && a.asker === (s.board_subscriber_id || s.name)); // a question of this agent's waits in Needs you (#22093's items): amber too
+    const [markClass, markWord0] = s.sleeping ? MARK.sleep : stateInfo.attention || asking ? MARK.need : /^(working|compacting)$/.test(stateInfo.key) ? MARK.work : MARK.idle;
+    const markWord = s.sleeping && s.sleep_reason === 'coral_stopped' ? 'Asleep since Coral restarted' : markWord0; // what the Sleeping chip's title said (#10057)
     return `<li class="session-group-item list-row${isActive ? ' active list-row-current' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
         draggable="${stale ? 'false' : 'true'}"${stale ? ` aria-disabled="true" title="${escapeAttr(staleReason(s))}"` : ''}
         data-state="${escapeAttr(stateInfo.key)}"
@@ -344,19 +341,17 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         data-group="${escapeAttr(groupName)}"
         ${clickHandler}>
         <span class="drag-grip" title="Drag to reorder">&#x2630;</span>
-        <span class="session-avatar" aria-hidden="true" style="--avatar:${escapeAttr(avatar.color)}">${escapeHtml(avatar.initial)}</span>
         <div class="session-info">
             <div class="session-name-row">
-                <span class="session-dot ${dotClass}${isExitedAsleep(s) ? ' ended' : ''}${ctxHigh ? ' ctx-high' : ''}" aria-hidden="true"></span>
+                <span class="session-dot ${dotClass} ${markClass}${ctxHigh ? ' ctx-high' : ''}" role="img" aria-label="${escapeAttr(markWord)}" title="${escapeAttr(markWord)}"></span>
                 <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}${piHooksChip(s)}
                 <span class="session-name-spacer"></span>
                 <span class="session-time" aria-hidden="true">${escapeHtml(_shortAgo(s.staleness_seconds))}</span>
-                ${stale ? '' : waitingBadge + heldChip + sleepChip + restartBtn + wakeBtn + sleepBtn}
+                ${stale ? '' : waitingBadge + heldChip + restartBtn + wakeBtn + sleepBtn}
                 ${stale ? '' : kebabMenu}
             </div>
             ${stateInfo.key === 'usage_limit' ? `<span class="usage-limit-detail">${escapeHtml(loadedModule('./usage_limit.js')?.usageLimitDetail(s) || '')}</span>` : ''}
             <span class="session-status-line">${escapeHtml(stateInfo.short || stateInfo.label)}</span>
-            <span class="session-preview" aria-hidden="true">${escapeHtml(previewOf(s, identity))}</span>
             ${rowLinesHtml(s)}
         </div>
         <div class="session-tooltip"></div>
@@ -384,6 +379,8 @@ function _renderSleepingSummary(sleepingAgents, groupName, isCompact, teamDefaul
 }
 
 const SLEEPING_ROWS_UP_TO = 3;
+/** The row's one mark (#22105, the approved sidebar mock): four meanings, the word its tooltip and its name. */
+const MARK = { work: ['mk-work', 'Working'], idle: ['mk-idle', 'Awake, waiting'], need: ['mk-need', 'Needs you'], sleep: ['mk-sleep', 'Asleep'] };
 
 // A folder with many agents shows its first FOLDER_SHOWN and a "Show 19 more" row (#10319, Mobile pass 23), at every width (a phone's list is the one that needed it, and one rule is easier to know): the long list does not push the others out of the screen. The open agent stays in view (and is not counted among the hidden); Show fewer folds it again.
 const FOLDER_SHOWN = 5;
@@ -435,17 +432,6 @@ export function isRowLineShown(part) {
 export function setRowLineShown(part, on) {
     try { browserLocal.set(ROW_LINE_KEY[part], on ? 'true' : 'false'); } catch { /* per-viewer only */ }
 }
-/** A phone's card (#11096, the Google Chat look): the avatar's initial and its colour (the team's own colour, else one per team, else one per CLI), the short time since the agent last did anything, and the preview line (the goal summary until the last message is a field of the row). Drawn by the phone's styles only; hidden on every wider screen. */
-const avatarOf = (s, identity, groupName) => {
-    const team = sessionTeamKey(s) || groupName || '';
-    return { color: (team && _getBoardColor(team)) || getAgentColor(team ? `team:${team}` : `cli:${s.agent_type || ''}`), initial: (Array.from(String(identity || '?'))[0] || '?').toUpperCase() };
-};
-/** The card's preview line (#11116, slice B): the agent's last message as "You: ..." (the person's words) or "<Name>: ..." (the agent's), from the live row's last_message {role, text, at} (text redacted and cut at 140 characters by the server); a row without one shows the goal, else "No messages yet". The server sends no person's text to an agent's token, so such a row is the goal's. */
-const previewOf = (s, identity) => {
-    const lm = s.last_message, text = lm && typeof lm.text === 'string' ? lm.text.replace(/\s+/g, ' ').trim() : '';
-    if (text) return `${lm.role === 'user' ? 'You' : identity}: ${text}`;
-    return sessionGoalText(s) || 'No messages yet';
-};
 const _shortAgo = sec => (sec === null || sec === undefined ? '' : sec < 60 ? 'now' : sec < 3600 ? `${Math.floor(sec / 60)}m` : sec < 86400 ? `${Math.floor(sec / 3600)}h` : `${Math.floor(sec / 86400)}d`);
 
 /** The Show model line: "Opus 4.1 · High" (#11063, the operator): the model, then the level on record (the newest turn's, else the one it was started with: the chat bar's rule), or the model alone when none is. */

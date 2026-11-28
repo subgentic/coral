@@ -13,7 +13,7 @@
 .usage-limit-detail { display: block; color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .session-group-item[data-state="usage_limit"] .session-name-row { flex-wrap: wrap; height: auto; padding-right: var(--space-2xl); }
 #mobile-session-list .session-group-item[data-state="usage_limit"] .session-status-line { position: static; width: auto; height: auto; overflow: visible; clip-path: none; color: var(--warning-text); }
-#mobile-session-list .session-group-item[data-state="usage_limit"] .session-preview, #mobile-session-list .usage-limit-detail { display: none; }
+#mobile-session-list .usage-limit-detail { display: none; }
 @media (forced-colors: active) { .session-dot.usage-limit { outline: 2px solid CanvasText; } }
 .session-list li.usage-limit-summary { display: flex; gap: var(--space-md); align-items: flex-start; }
 .session-list li.usage-limit-heading { display: block; }

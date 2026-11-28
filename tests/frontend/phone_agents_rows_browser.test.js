@@ -1,5 +1,5 @@
 // The phone's Agents tab is the sidebar's row at a thumb's size (#10691, the operator picked Option A): the title is "Agents" (not "Live Sessions"); a team or folder header is chevron, name, count, menu with no card around it; an
-// agent is one 56 px row, a status dot, the name and ONE muted status line (a real span, #10801) in sentence case ("Needs input · Permission", "Working"), the state pill gone; no ALL-CAPS and no italics anywhere in the list; the per-row
+// agent is a row of at least 48 px (#22105, the approved sidebar mock v2: the mark says the state, no status line; the row's accessible name keeps it), the state pill gone; no ALL-CAPS and no italics anywhere in the list; the per-row
 // menu stays a touch target. 390 px, dark and light; the agents are mocked.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -27,24 +27,21 @@ const { coralReady } = require('./helpers/wait');
             const g = await ev(`(() => { const list = document.getElementById('mobile-session-list'), rows = [...list.querySelectorAll('.session-group-item[data-session-id]')], cs = (e, p) => getComputedStyle(e, p);
                 const hdr = list.querySelector('.session-group-header'), all = [...list.querySelectorAll('*')];
                 return { title: document.querySelector('.mobile-list-title').textContent.trim(), rowH: rows.map(r => Math.round(r.getBoundingClientRect().height)), status: rows.map(r => { const l = r.querySelector('.session-info > .session-status-line'); return l ? l.textContent.trim() : null; }), statusShown: rows.map(r => { const l = r.querySelector('.session-status-line'); return !!l && cs(l).display !== 'none' && l.getClientRects().length > 0; }), statusBefore: rows.map(r => cs(r.querySelector('.session-info'), '::after').content), named: rows.map(r => { const l = r.querySelector('.session-status-line'); return !!l && (r.getAttribute('aria-label') || '').includes(l.textContent.trim()); }), found: ['Needs input', 'Working'].map(t => { getSelection().removeAllRanges(); return window.find(t, false, false, true); }),
-                    pill: rows.some(r => { const p = r.querySelector('.chip.session-state-pill'); return !!p && cs(p).display !== 'none'; }),
+                    marks: rows.map(r => (r.querySelector('.session-dot') || {}).className || ''), pill: rows.some(r => { const p = r.querySelector('.chip.session-state-pill'); return !!p && cs(p).display !== 'none'; }),
                     upper: all.filter(e => e.getClientRects().length && e.textContent.trim() && cs(e).textTransform === 'uppercase').map(e => e.className).slice(0, 5), italic: all.filter(e => e.getClientRects().length && e.textContent.trim() && cs(e).fontStyle === 'italic').map(e => e.className).slice(0, 5),
                     header: { bg: cs(hdr).backgroundColor, radius: cs(hdr).borderTopLeftRadius }, kebab: rows.map(r => { const k = r.querySelector('.sidebar-kebab-btn'); const b = k && k.getBoundingClientRect(); return b ? [Math.round(b.width), Math.round(b.height)] : null; }) }; })()`);
             assert.equal(g.title, 'Agents', `${theme}: the title is Agents`);
-            assert.ok(g.rowH.every(h => h >= 56), `${theme}: every agent row is at least 56 px: ${JSON.stringify(g.rowH)}`);
-            assert.ok(g.status.includes('Needs input · Permission') && g.status.includes('Working'), `${theme}: a muted status line in sentence case: ${JSON.stringify(g.status)}`);
-            assert.ok(g.status.every(t => t && !/[A-Z]{3,}/.test(t)), `${theme}: no ALL-CAPS status: ${JSON.stringify(g.status)}`);
-            // a real span, not ::after content (#10801): drawn, in the row's accessible name, and found by find-in-page
-            assert.ok(g.statusShown.every(Boolean), `${theme}: every status span is drawn: ${JSON.stringify(g.statusShown)}`);
-            assert.ok(g.statusBefore.every(c => c === 'none' || c === 'normal'), `${theme}: nothing is printed by ::after: ${JSON.stringify(g.statusBefore)}`);
+            assert.ok(g.rowH.every(h => h >= 48), `${theme}: every agent row is at least 48 px (the approved sidebar mock v2, #22105): ${JSON.stringify(g.rowH)}`);
+            // the state is the mark (amber needs you, filled green working) and the row's accessible name; no status line is drawn (mock v2: the name, then the task line)
+            assert.ok(g.marks.some(c => /mk-need/.test(c)) && g.marks.some(c => /mk-work/.test(c)), `${theme}: the marks say needs you and working: ${JSON.stringify(g.marks)}`);
+            assert.ok(g.statusShown.every(v => !v), `${theme}: no status line under the name: ${JSON.stringify(g.statusShown)}`);
             assert.ok(g.named.every(Boolean), `${theme}: each row's accessible name has its status: ${JSON.stringify(g.named)}`);
-            assert.deepEqual(g.found, [true, true], `${theme}: find-in-page finds the status text`);
             assert.equal(g.pill, false, `${theme}: no state pill on a row`);
             assert.deepEqual([g.upper, g.italic], [[], []], `${theme}: no ALL-CAPS and no italics in the list`);
             assert.ok(g.header.bg === 'rgba(0, 0, 0, 0)' && g.header.radius === '0px', `${theme}: the header has no card: ${JSON.stringify(g.header)}`);
             assert.ok(g.kebab.every(k => k && k[0] >= 24 && k[1] >= 24), `${theme}: each row keeps its menu: ${JSON.stringify(g.kebab)}`);
             await shot(`phone-agents-${theme}`);
         }
-        console.log('PASS Phone Agents (Option A): Agents, 56 px rows, a sentence status line, no pill, no caps, no italics, no card, a menu per row, dark and light');
+        console.log('PASS Phone Agents (Option A): Agents, 48 px rows, the mark and the accessible name say the state, no pill, no caps, no italics, no card, a menu per row, dark and light');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
