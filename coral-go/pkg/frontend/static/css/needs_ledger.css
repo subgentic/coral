@@ -339,6 +339,8 @@
 }
 
 .nl-menu {
+    margin: 0;
+    inset: auto;
     position: absolute;
     right: 0;
     top: 42px;
