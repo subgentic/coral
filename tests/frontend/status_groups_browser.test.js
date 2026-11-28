@@ -70,9 +70,9 @@ const { settle, coralReady, framesJs } = require('./helpers/wait');
             for (const type of ['mousePressed', 'mouseReleased']) await Input.dispatchMouseEvent({ type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
         };
 
-        console.log('computer: a fresh profile opens on Status');
+        console.log('computer: with Team and Task unticked the list is by Status');
         await load({ width: 1440, height: 900, mobile: false });
-        await ev(`try { localStorage.removeItem('coral-agent-grouping'); localStorage.setItem('coral_display_panel_open', '1'); } catch (e) {} true`);
+        await ev(`try { localStorage.removeItem('coral-agent-grouping'); localStorage.setItem('coral-group-team', 'false'); localStorage.setItem('coral-group-task', 'false'); localStorage.setItem('coral_display_panel_open', '1'); } catch (e) {} true`); // a new viewer opens on Team and Task (#22104)
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         assert.equal(await scene(), 14);
         await waitFor(`!!document.querySelector('.sidebar .status-head')`, 'the status groups', 6000);

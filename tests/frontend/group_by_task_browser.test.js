@@ -40,9 +40,14 @@ const { connect } = require('./agent_view_harness');
    await scene();
    await waitFor(mobile ? `!!document.querySelector('${root} .status-more-toggle')` : `document.querySelectorAll('${root} .session-group-item').length >= 8`, 'the agents are listed (on a phone: the one line that counts them)');
 
-   // 1. Three boxes, Computer, Team, Task, all unticked: the Status view as it opens today.
+   // 1. Three boxes, Computer, Team, Task: a viewer with no choice saved opens on Team and Task (#22104). Unticking both is the Status view, and a saved untick wins over the default.
    await openPanel();
-   assert.deepEqual(await boxes(), { server: false, team: false, task: false }, `${width}: all three start unticked`);
+   assert.deepEqual(await boxes(), { server: false, team: true, task: true }, `${width}: Team and Task start ticked`);
+   await waitFor(`document.querySelectorAll('${root} .session-team-group').length === 2 && document.querySelectorAll('${root} .session-team-group .status-sub').length >= 3`, 'the default draws the teams split by task');
+   await shot('group-by-default');
+   await tick('team'); await tick('task');
+   assert.deepEqual(await boxes(), { server: false, team: false, task: false }, `${width}: both unticked`);
+   assert.deepEqual(await ev(`[localStorage.getItem('coral-group-team'), localStorage.getItem('coral-group-task')]`), ['false', 'false'], 'the untick is saved, so the default no longer applies');
    assert.equal(await ev(`[...document.querySelectorAll('#${barId} fieldset[data-group-by] label')].map(l => l.textContent.trim()).join()`), 'Computer,Team,Task', 'in the mock\'s order');
    assert.equal(await ev(`!!document.querySelector('#${barId} select[data-group-by]')`), false, 'the Status | Team select is gone');
    assert.equal(await ev(`!!document.querySelector('[data-display-input="group"]')`), false, 'so is the Display panel\'s Group by computer switch');
