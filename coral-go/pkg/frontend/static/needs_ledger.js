@@ -63,9 +63,9 @@ export function needsLedger(cfg) {
         if (!entries.length) return;
         const details = el('details', 'nl-more'), toggle = el('summary', 'nl-more-toggle'); toggle.setAttribute('aria-label', `More actions for ${safe(label)}`); toggle.append(icon('more_horiz')); details.append(toggle);
         const menu = el('div', 'menu nl-menu'); menu.setAttribute('popover', 'manual'); menu.setAttribute('role', 'menu'); for (const entry of entries) { const item = button(entry.label, 'menu-item', () => { details.open = false; entry.run(); }); item.setAttribute('role', 'menuitem'); menu.append(item); } details.append(menu); side.append(details);
-        details.addEventListener('keydown', e => { const items = [...menu.querySelectorAll('button')], index = menuMove(e.key, items.length, items.indexOf(document.activeElement)); if (index >= 0) { e.preventDefault(); e.stopPropagation(); details.open = true; items[index].focus(); } });
+        details.addEventListener('keydown', e => { const items = [...menu.querySelectorAll('button')], index = menuMove(e.key, items.length, items.indexOf(document.activeElement)); if (index >= 0) { e.preventDefault(); e.stopPropagation(); details.open = true; placeMenu(); items[index].focus(); } });
         details.addEventListener('focusout', e => { if (!details.contains(e.relatedTarget)) details.open = false; });
-        details.addEventListener('toggle', () => {
+        function placeMenu() {
             if (!details.open) { menu.hidePopover(); return; }
             menu.showPopover();
             root.querySelectorAll('details[open]').forEach(other => { if (other !== details) other.open = false; });
@@ -75,7 +75,8 @@ export function needsLedger(cfg) {
             menu.style.left = `${Math.max(8, Math.min(edge.right - width, innerWidth - width - 8))}px`;
             menu.style.top = `${Math.max(8, edge.bottom + height > innerHeight - 8 ? edge.top - height : edge.bottom)}px`;
             menu.style.maxHeight = `${innerHeight - 16}px`; menu.style.overflowY = 'auto';
-        });
+        }
+        details.addEventListener('toggle', placeMenu);
     root.addEventListener('keydown', e => { if (e.key === 'Escape' && details.open) { e.preventDefault(); e.stopPropagation(); details.open = false; toggle.focus(); } });
     }
     function rowNode(row, flat = false) {
