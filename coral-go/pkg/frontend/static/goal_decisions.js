@@ -46,6 +46,15 @@ const classes = { approved: 'is-approved', sentback: 'is-sentback', denied: 'is-
 const words = { approved: 'Approved', sentback: 'Sent back', denied: 'Denied', review: 'To review', shared: 'Shared' };
 export const decisionOrder = items => [...items].sort((a, b) => Number(a.task_id || 0) - Number(b.task_id || 0) || readableName(a).localeCompare(readableName(b), undefined, { numeric: true }) || itemKey(a).localeCompare(itemKey(b)));
 export const decisionFiles = (items, item, team) => ({ goalItems: items, ...fileContext(items, item, { key: itemKey, options: a => ({ hex: managedHex(a), server: splitKey(team).server, board: splitKey(team).name, filename: readableName(a), mediaType: a.media_type }) }) });
+/** Keep the shared agent navigation and identity while displaying only its icon. */
+function agentIcon(who, team, session = '') {
+    const opts = { board: team, session }, person = avatar(who, safe(who), opts);
+    const link = agentLink(who, opts), icon = person.querySelector('.dt-avatar');
+    link.replaceChildren(...(icon ? [icon] : []));
+    link.classList.add('goal-decision-agent-icon');
+    if (link.tagName !== 'BUTTON') { link.setAttribute('role', 'img'); link.setAttribute('aria-label', safe(who)); }
+    return link;
+}
 /** Keyboard row links and agent buttons are separate controls; nothing is built from HTML. */
 export function decisionList(items, { team, onOpen, headings = true }) {
     const list = el('ul', 'goal-decision-list'), ordered = decisionOrder(items), tasks = new Set(ordered.map(a => a.task_id)); let previous;
@@ -58,7 +67,7 @@ export function decisionList(items, { team, onOpen, headings = true }) {
         const name = button('goal-decision-name', readableName(a), open); name.title = readableName(a);
         const question = el('span', 'goal-decision-question', status === 'sentback' && a.review_note ? `Sent back: “${safe(a.review_note)}”` : [status === 'approved' ? 'Approved' : status === 'sentback' ? 'Sent back' : '', safe(a.review_question || '')].filter(Boolean).join(' · ')); question.title = question.textContent;
         const who = a.produced_by || a.uploaded_by || a.uploader || '', agent = el('span', 'goal-decision-agent');
-        if (who) { const person = avatar(who, safe(who), { board: team, session: a.session_id || '' }); person.querySelector('.dt-person-name')?.replaceWith(agentLink(who, { board: team, session: a.session_id || '' })); agent.append(person); const live = liveAgentOf(who, { board: team, session: a.session_id || '' }); if (status === 'sentback' && live) { const liveState = safe(live.status || ''); if (liveState) agent.append(el('span', 'goal-decision-live', ` · ${liveState}`)); } }
+        if (who) { agent.append(agentIcon(who, team, a.session_id || '')); const live = liveAgentOf(who, { board: team, session: a.session_id || '' }); if (status === 'sentback' && live) { const liveState = safe(live.status || ''); if (liveState) agent.append(el('span', 'goal-decision-live', ` · ${liveState}`)); } }
         const chip = el('span', `chip goal-decision-chip ${classes[status]}`, words[status]);
         const last = ['review', 'shared'].includes(status) ? button('goal-decision-open', 'Open ↗', open) : el('time', 'goal-decision-time', whenText(a.review?.at || a.created_at));
         li.append(mark, tile, name, question, agent, chip, last);
@@ -68,14 +77,14 @@ export function decisionList(items, { team, onOpen, headings = true }) {
     return list;
 }
 /** Questions use the same row geometry as review files. */
-function subjectList(rows, kind, nameOf, whoOf, open) {
+function subjectList(rows, kind, nameOf, whoOf, open, team) {
     const list = el('ul', 'goal-decision-list');
     for (const item of rows) {
         const row = el('li', 'list-row goal-decision-row'); row.dataset.subjectKind = kind;
         const title = safe(nameOf(item)), run = () => open(item, row.querySelector('.goal-decision-name'));
         const name = button('goal-decision-name', title, run); name.title = title;
         row.append(el('span', 'goal-decision-mark', '•'), el('span', 'goal-decision-type', '?'), name,
-            el('span', 'goal-decision-question'), el('span', 'goal-decision-agent', safe(whoOf(item))),
+            el('span', 'goal-decision-question'), (() => { const who = whoOf(item), cell = el('span', 'goal-decision-agent'); if (who) cell.append(agentIcon(who, team, item.session_id || '')); return cell; })(),
             el('span', 'chip goal-decision-chip', 'Question'), button('goal-decision-open', 'Open ↗', run));
         row.addEventListener('click', e => { if (!e.target.closest('button,a')) run(); }); list.append(row);
     }
@@ -119,7 +128,7 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, ques
             context.append(done, progress, el('span', 'goal-decision-age', whenText(g.updated_at || g.updatedAt))); body.replaceChildren(context);
             const asks = questions(g), taskIds = new Set(st.tasks.map(t => Number(t.id)));
             const fileList = items => decisionList(items, { team, headings: false, onOpen: (a, opener) => openFile(g, a, opener, decisionFiles(st.items, a, team)) });
-            const questionList = rows => subjectList(rows, 'question', a => a.text || 'Question', a => a.subscriber_id || a.asker || '', a => openQuestion(a));
+            const questionList = rows => subjectList(rows, 'question', a => a.text || 'Question', a => a.subscriber_id || a.asker || '', a => openQuestion(a), team);
             const related = id => {
                 const files = st.items.filter(a => Number(a.task_id) === id), questions = asks.filter(a => Number(a.task_id) === id);
                 if (!files.length && !questions.length) return null;
