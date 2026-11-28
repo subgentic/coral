@@ -1,6 +1,9 @@
 // The All pill counts every listed row, not "N of M" (#16734, #16778): with one read and one unread review,
 // All says "2" (every visible row), the badge is the unread count alone, and the tooltip says "N unread, M in the list".
 // Walked at 1280 (desktop pills) and 390 (phone select). Real Chrome against the isolated dev server.
+// On the ledger (#22094): the rows are article.nl-row (a folded goal group still lists them). The ledger's kind chips are All, Unread and Questions with no number (the approved mock); the list's number moved to the
+// "Waiting on you N" tab and the list's own line "N items · M new" (.nl-summary), so "every listed row, not N of M" is checked there, and All is checked to carry no "of".
+// Retired on the ledger (#22094): "All N" with a number on the All chip itself; covered by the tab and summary checks here and in needs_ledger_browser.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -28,7 +31,7 @@ const TEAM = 'npill-' + Date.now().toString(36);
                 window.__m.agents = {}; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length >= 2`, `${label}: the listed files`, 15000);
+            await waitFor(`document.querySelectorAll('#group-table-view .nl-row').length >= 2`, `${label}: the listed files`, 15000);
             await ev(framesJs(10));
 
             // the All pill (a desktop's button or a phone's select option)
@@ -41,7 +44,11 @@ const TEAM = 'npill-' + Date.now().toString(36);
             })()`);
             assert.ok(pill, `${label}: the All pill is found`);
             assert.ok(!pill.hasOf, `${label}: the All pill has no "of" — it says the total, not "N of M": ${pill.text}`);
-            assert.ok(/^All\s+\d/.test(pill.text), `${label}: the All pill is "All N" with just a number: ${pill.text}`);
+            const listed = await ev(`(() => { const vis = e => !!e && e.getClientRects().length > 0, tab = document.querySelector('.inbox-needs-tab[data-needs-tab=you] .inbox-needs-tab-count'), sum = [...document.querySelectorAll('.nl-summary, .nl-phone-summary')].filter(vis).map(e => e.textContent.replace(/\\s+/g, ' ').trim());
+                return { rows: document.querySelectorAll('#group-table-view .nl-row').length, tab: tab ? tab.textContent.trim() : null, tabShown: vis(tab), sum }; })()`);
+            assert.equal(listed.rows, 2, `${label}: both files are listed: ${JSON.stringify(listed)}`);
+            assert.equal(listed.tab, '2', `${label}: the Waiting on you tab counts every listed row, read ones too, not "N of M": ${JSON.stringify(listed)}`);
+            assert.ok(listed.sum.some(t => /(^|\s|Needs you)2( items)?\s*·/.test(t) && !/ of /.test(t)), `${label}: the list's line says "2 items" (the phone's title bar: "Needs you 2 · 1 new"), not "N of M": ${JSON.stringify(listed)}`);
 
             // the sidebar badge and tooltip
             const sidebar = await ev(`(() => {

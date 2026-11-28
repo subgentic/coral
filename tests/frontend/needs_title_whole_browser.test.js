@@ -1,5 +1,7 @@
 // The Needs you page title stays whole beside the filter chips (#12455, Mobile Beta Tester #12450 item 4): at 1280 and 1100 px with the sidebar open the chips took the room and the title read "Nee…". The chips scroll
 // sideways or give way first; the title (an h2 with an ellipsis for a long name) is never what gives. Many chips are drawn here (a Needs you page with every kind of item has seven or eight).
+// On the ledger (#22094): the list's rows are article.nl-row. The title is measured beside the ledger's real toolbar: the tabs, the search, the three fixed chips (All, Unread, Questions), Kind, Filters, Group by and the icons.
+// Retired on the ledger (#22094): the 760 px filler that stood in for seven or eight kind chips. The ledger never draws more than three chips; the kinds are in the Kind menu (#19470), covered by inbox_needs_toolbar_browser.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -17,11 +19,11 @@ const { coralReady } = require('./helpers/wait');
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`(async () => { const st = await import(${S} + 'state.js'); st.state.liveSessions = [{ session_id: 'd1', name: 'coral-d1', display_name: 'Security Reviewer', agent_type: 'claude', model: 'claude-opus-5-5', server: 'local', board_unread: 5, working: false, context_pct: null, skipped_send: ${JSON.stringify(trust)} }]; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`!!document.querySelector('#group-table-view tbody tr') && !!document.querySelector('.inbox-needs-tab[data-needs-tab=you]') && !!document.querySelector('.goals-chips-row')`, `${w}: the page and its chips`, 15000);
+            await waitFor(`!!document.querySelector('#group-table-view .nl-row') && !!document.querySelector('.inbox-needs-tab[data-needs-tab=you]') && !!document.querySelector('.goals-chips-row')`, `${w}: the page and its chips`, 15000);
             // a Needs you page with every kind of item has more chips than the one stubbed row makes (seven or eight, 700 px or more): a filler of that width is put in the chip row, the layout is read in the same step (the page
             // would redraw its own chips between steps), and the filler is taken out again
             const m = await ev(`(() => { const h = document.querySelector('.inbox-needs-tab[data-needs-tab=you]'), head = h.parentElement, bar = head.parentElement, row = bar.querySelector('.goals-chips-row'), field = bar.querySelector('.inbox-pill-field'), host = row && row.getClientRects().length ? row : field, r = e => e.getBoundingClientRect();
-                const filler = document.createElement('span'); filler.style.cssText = 'flex: none; width: 760px; height: 20px; display: inline-block'; if (host) host.append(filler); // the chips at 1280; below 46 rem (1100 px) the select takes their place and has no row to fill
+                const filler = document.createElement('span'); filler.style.cssText = 'flex: none; width: 760px; height: 20px; display: inline-block'; if (host && !document.querySelector('.needs-ledger')) host.append(filler); /* the old table's many chips; the ledger's three are real */ // the chips at 1280; below 46 rem (1100 px) the select takes their place and has no row to fill
                 const range = document.createRange(); range.selectNodeContents(h);
                 const out = { text: h.textContent.trim(), need: Math.ceil(range.getBoundingClientRect().width), w: Math.round(r(h).width), cut: h.scrollWidth > h.clientWidth + 1, headW: Math.round(r(head).width), bar: Math.round(r(bar).width), host: host ? host.className.toString().slice(0, 30) : 'none', page: document.documentElement.scrollWidth - document.documentElement.clientWidth, over: Math.round([...bar.children].filter(c => c.getClientRects().length).reduce((n, c) => Math.max(n, r(c).right), 0) - r(bar).right) };
                 filler.remove(); return out; })()`);
