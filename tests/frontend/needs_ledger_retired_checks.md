@@ -43,3 +43,18 @@ The Orchestrator's 2026-11-28 08:52 ruling makes v19 authoritative and permits r
 Selectors alone changed in count, paging, filter-empty, live-announcement, alerts, bulk Undo, bulk partial-selection and welcome Dismiss/Undo/Restore suites; their existing behavior assertions remain. No waiver of the combined 68-suite run, census/golden, current static checks or reviewer verdict is implied.
 
 - `needs_full_width`: Orchestrator ruling 2026-11-28 09:05: approved v19 supersedes #18358; assert the 880px cap at all three desktop widths.
+
+
+FD6's `needs_e*` onward per-check migration map (28 suites):
+coral://artifacts/7e68dddc38d2ee45b2d1e8185f98174c99a7dc348797d934bf0174a7613437de.
+Its open questions were ruled on by the Orchestrator at 09:05 on 2026-11-28:
+
+| Prior check / concern | Current behavior proof |
+| --- | --- |
+| Late-source append order | Approved newest-first order; `needs_order_stable` retains held-pointer stability. |
+| Search results inside folded groups | Search forces matching groups open; fold preferences remain for clearing search. |
+| Completed-goal notice title | Its actual goal title replaces the generic goal number. Grouping can wait. |
+| Decided-file Got it placement | Decided files have Dismiss on hover/phone menu and bulk Dismiss; existing ignore owner retained. |
+| Phone selection by body tap | Check-only selection is approved; body still opens the item. |
+| Team-page bulk approval confirms | Restored to `needs_phone_rows`: unopened two-file confirmation, Keep writes nothing, confirm sends one request per file. |
+| Phone file height | Compact avatar/New metadata grid; designer checks latest screenshots at resubmission. |
