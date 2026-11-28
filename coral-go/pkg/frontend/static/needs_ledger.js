@@ -121,10 +121,30 @@ export function needsLedger(cfg) {
         if (row.review) side.append(cfg.fileAgent(row));
         if (unread(row)) side.append(el('span', 'nl-new', 'New'));
         const when = el('time', 'nl-when', cfg.when(row)); when.dateTime = row.waiting_since || ''; side.append(when);
-        if (!row.review || cfg.decidedFile(row)) { const hover = el('span', 'nl-hover-actions'); for (const entry of extraActions.filter(x => row.review ? x.label === 'Dismiss' : !isQuestion || x.label === 'Dismiss')) hover.append(button(entry.label, 'btn btn-small btn-quiet', entry.run)); side.prepend(hover); more(side, row.review ? extraActions.filter(x => x.label === 'Dismiss') : extraActions, title); }
+        if (!row.review) { const hover = el('span', 'nl-hover-actions'); for (const entry of extraActions.filter(x => !isQuestion || x.label === 'Dismiss')) hover.append(button(entry.label, 'btn btn-small btn-quiet', entry.run)); side.prepend(hover); more(side, extraActions, title); }
+        else {
+            const entries = cfg.decidedFile(row) ? extraActions.filter(x => x.label === 'Dismiss') : [], save = cfg.saveLater?.(row), hover = el('span', 'nl-hover-actions nl-save-hover');
+            if (save) {
+                const run = () => saveFile(row, save), mark = button('', 'btn btn-small btn-quiet btn-icon nl-save-later', run);
+                mark.append(icon('bookmark_border')); mark.title = 'Save for later'; mark.setAttribute('aria-label', `Save for later: ${title}`); hover.append(mark); entries.unshift({ label: 'Save for later', run });
+            }
+            for (const entry of entries.filter(x => x.label === 'Dismiss')) hover.append(button(entry.label, 'btn btn-small btn-quiet', entry.run));
+            if (hover.childNodes.length) side.insertBefore(hover, side.querySelector('.nl-when'));
+            more(side, entries, title);
+        }
         r.addEventListener('click', e => { if (!e.target.closest('button,a,input,label,details')) open(row); });
         r.addEventListener('keydown', e => { if (e.target === r && e.key === 'Enter') { e.preventDefault(); open(row); } });
         return r;
+    }
+    function saveFile(row, save) { // the row leaves for Saved: the filled bookmark until it goes, then the keyboard on its neighbour (the button it was on is gone)
+        const key = keyOf(row), node = root.querySelector(`.nl-row[data-needs-key="${CSS.escape(key)}"]`), shown = [...root.querySelectorAll('.nl-row')].filter(n => n.getClientRects().length), i = shown.indexOf(node), near = i < 0 ? '' : (shown[i + 1] || shown[i - 1])?.dataset.needsKey || '';
+        const mark = node?.querySelector('.nl-save-later'), had = node?.contains(document.activeElement); if (mark) { mark.disabled = true; mark.querySelector('.nl-icon').textContent = 'bookmark'; }
+        return Promise.resolve().then(save).then(async () => {
+            for (let k = 0; k < 90 && node?.isConnected; k++) await new Promise(r => requestAnimationFrame(r));
+            for (let k = 0; near && had && k < 60; k++) { // the list may redraw more than once as the reviews settle: put the keyboard back each time it is left on nothing
+                const a = document.activeElement; if (!a || a === document.body || !a.isConnected) document.querySelector(`.nl-row[data-needs-key="${CSS.escape(near)}"]`)?.focus({ preventScroll: true });
+                await new Promise(r => requestAnimationFrame(r)); }
+        }, () => { if (mark?.isConnected) { mark.disabled = false; mark.querySelector('.nl-icon').textContent = 'bookmark_border'; } });
     }
     const newest = list => Math.max(0, ...list.map(timeOf)), ordered = list => [...list].sort((a, b) => timeOf(b) - timeOf(a) || keyOf(a).localeCompare(keyOf(b)));
     const prompts = ordered(rows.filter(permission)), rest = rows.filter(r => !permission(r));
