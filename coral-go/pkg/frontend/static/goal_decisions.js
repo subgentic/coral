@@ -10,7 +10,11 @@ import { pollEvery } from './overload.js';
 import { onArtifactsRev } from './artifacts_feed.js';
 const { needsReviewAttention } = await importOnce('./inbox_review_state.js');
 const { el } = await importOnce('./dom_el.js');
-const { avatar, chip } = await importOnce('./data_table.js');
+const Tasks = await importOnce('./tasks_view.js');
+const DT = await importOnce('./data_table.js');
+const { avatar, chip } = DT;
+const { isParked } = await importOnce('./goal_words.js');
+const { readGoalJSON } = await importOnce('./goal_view.js');
 const { agentLink, liveAgentOf } = await importOnce('./agent_link.js');
 const { readableName, itemKey, managedHex } = await importOnce('./artifact_item.js');
 const { fileContext } = await importOnce('./artifact_file_context.js');
@@ -52,19 +56,33 @@ export function decisionList(items, { team, onOpen }) {
     }
     return list;
 }
+/** Questions use the same row geometry as review files. */
+function subjectList(rows, kind, nameOf, whoOf, open) {
+    const list = el('ul', 'goal-decision-list');
+    for (const item of rows) {
+        const row = el('li', 'list-row goal-decision-row'); row.dataset.subjectKind = kind;
+        const title = safe(nameOf(item)), run = () => open(item, row.querySelector('.goal-decision-name'));
+        const name = button('goal-decision-name', title, run); name.title = title;
+        row.append(el('span', 'goal-decision-mark', '•'), el('span', 'goal-decision-type', '?'), name,
+            el('span', 'goal-decision-question'), el('span', 'goal-decision-agent', safe(whoOf(item))),
+            el('span', 'chip goal-decision-chip', 'Question'), button('goal-decision-open', 'Open ↗', run));
+        row.addEventListener('click', e => { if (!e.target.closest('button,a')) run(); }); list.append(row);
+    }
+    return list;
+}
 function counts(items) {
     const c = { approved: 0, sentback: 0, review: 0, denied: 0, shared: 0 }; for (const a of items) c[decisionState(a)]++;
     return c;
 }
 /** Source-qualified cache: a failed refresh keeps the prior records with an error. */
-export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal }) {
+export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, questions = () => [], openQuestion = () => {} }) {
     mounted?.dispose();
     const root = el('div', 'goal-decision-tracker'), refreshers = [], visibleReads = new Map();
     const observer = typeof IntersectionObserver === 'function' ? new IntersectionObserver(items => { for (const item of items) if (item.isIntersecting && item.target.isConnected) { observer.unobserve(item.target); visibleReads.get(item.target)?.(); } }, { rootMargin: '200px' }) : null;
     mounted = { root, refresh: () => refreshers.forEach(run => run()), dispose: () => observer?.disconnect() };
     for (const [index, g] of goals.entries()) {
         const team = g.board_id, key = JSON.stringify([team, g.id]);
-        if (!entries.has(key)) { if (entries.size >= 200) entries.delete(entries.keys().next().value); entries.set(key, { items: [], at: 0, loaded: false, busy: false, error: '', cursor: '', waiters: [] }); }
+        if (!entries.has(key)) { if (entries.size >= 200) entries.delete(entries.keys().next().value); entries.set(key, { items: [], tasks: [], taskState: DT.tableState(), at: 0, loaded: false, busy: false, error: '', cursor: '', waiters: [] }); }
         const st = entries.get(key), card = el('section', 'goal-decision-card'); card.dataset.goalKey = key;
         if (!folds.has(key)) { if (folds.size >= 200) folds.delete(folds.keys().next().value); folds.set(key, index < 2); }
         const bar = el('div', 'goal-decision-head'), toggle = button('goal-decision-toggle', '', () => { folds.set(key, !folds.get(key)); paint(); if (folds.get(key)) load(false); });
@@ -72,33 +90,62 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal }) {
         toggle.append(el('span', 'goal-decision-chevron', '▾'), (() => { const s = chip(safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown'), `goal-state-${g.state || 'unknown'}`); s.classList.remove('dt-chip'); s.classList.add('goal-decision-state'); return s; })(), el('span', 'goal-decision-id', `Goal #${g.id}`), el('span', 'goal-decision-title', safe(g.title)));
         const right = el('div', 'goal-decision-head-right'), summary = el('span', 'goal-decision-summary'), teamLabel = el('span', 'goal-decision-team', safe(teamOf(g)));
         if (Number(g.new_comments) > 0) right.append(chip('New comments', 'goal-new-comments'));
-        right.append(summary, teamLabel, button('btn btn-small btn-quiet', 'Open Goal Artifacts ↗', () => openGoal(g, 'artifacts'))); bar.append(toggle, right);
+        const openArtifacts = button('btn btn-small btn-quiet goal-artifacts-open', '↗', () => openGoal(g, 'artifacts'));
+        openArtifacts.title = 'Open goal artifacts'; openArtifacts.setAttribute('aria-label', 'Open goal artifacts');
+        right.append(summary, teamLabel, openArtifacts); bar.append(toggle, right);
         const body = el('div', 'goal-decision-body'); card.append(bar, body); root.append(card);
         function paint() {
             const open = folds.get(key); toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} Goal #${g.id} ${safe(g.title)}, ${safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown')}`); card.classList.toggle('is-collapsed', !open); body.hidden = !open;
             const c = counts(st.items), total = st.items.length;
-            summary.textContent = st.error ? 'Decisions unavailable' : st.loaded ? `${c.review} to review · ${c.sentback} sent back · ${c.approved} approved${c.denied ? ` · ${c.denied} denied` : ''}${c.shared ? ` · ${c.shared} shared` : ''}${st.cursor ? ' (loaded files)' : ''}` : open ? 'Loading decisions…' : 'Expand to read decisions';
+            summary.hidden = st.loaded && !total;
+            summary.textContent = st.error ? 'Decisions unavailable' : st.loaded ? `${c.review} to review · ${c.sentback} sent back · ${c.approved} approved${c.denied ? ` · ${c.denied} denied` : ''}${st.cursor ? ' (loaded files)' : ''}` : open ? 'Loading decisions…' : 'Expand to read decisions';
             if (!open) return;
             const active = document.activeElement, focusKey = body.contains(active) ? active.closest('[data-file-key]')?.dataset.fileKey : '', focusClass = focusKey ? active.className : '';
             const context = el('div', 'goal-decision-context'), done = el('div', 'goal-decision-done'); done.append(el('strong', null, 'Done when: '), safe(g.done_when || g.doneWhen || 'Not specified'));
-            for (const id of [...new Set(st.items.map(a => a.task_id).filter(id => Number.isSafeInteger(id) && id > 0))]) done.append(el('span', 'chip chip-tag goal-decision-task', `Task #${id}`));
             const progress = el('div', 'goal-decision-progress');
-            if (st.loaded && total) { progress.append(el('span', null, `${c.approved} of ${total} approved · ${c.review} left${st.cursor ? ' (loaded)' : ''}`)); const segments = el('div', 'goal-decision-segments'); segments.setAttribute('role', 'img'); segments.setAttribute('aria-label', `${c.approved} approved, ${c.review} to review, ${c.sentback} sent back, ${c.shared} shared, ${c.denied} denied`); for (const s of ['approved', 'review', 'sentback', 'denied', 'shared']) { const n = c[s]; if (n) { const part = el('span', classes[s]); part.style.flexGrow = String(n); segments.append(part); } } progress.append(segments); }
+            if (st.loaded && total) { progress.append(el('span', null, `${c.approved} of ${total} approved · ${c.review} to review${st.cursor ? ' (loaded)' : ''}`)); const segments = el('div', 'goal-decision-segments'); segments.setAttribute('role', 'img'); segments.setAttribute('aria-label', `${c.approved} approved, ${c.review} to review, ${c.sentback} sent back, ${c.denied} denied`); for (const s of ['approved', 'review', 'sentback', 'denied']) { const n = c[s]; if (n) { const part = el('span', classes[s]); part.style.flexGrow = String(n); segments.append(part); } } progress.append(segments); }
             context.append(done, progress, el('span', 'goal-decision-age', whenText(g.updated_at || g.updatedAt))); body.replaceChildren(context);
+            if (st.tasks.length) {
+                const stateOf = t => t.status === 'skipped' ? 'Skipped' : t.status === 'parked' || isParked(t) ? 'Parked' : '';
+                const tasks = Tasks.tasksTable('goal', st.tasks, { bare: true, fold: 'none', sortBar: false, state: st.taskState,
+                    ctx: { goalTitleOf: () => g.title },
+                    tweak: columns => columns.map(c => ['state', 'task'].includes(c.key) ? { ...c, cell: t => {
+                        const node = c.cell(t), real = stateOf(t);
+                        if (real && c.key === 'state') node.textContent = real;
+                        if (real && c.key === 'task') node.querySelector('.dt-primary')?.setAttribute('aria-label', `Open task #${t.id}: ${t.title}, ${real}`);
+                        return node;
+                    } } : c),
+                    open: (t, row) => importOnce('./task_navigation.js').then(m => m.openTask(team, t.id, row.querySelector('.dt-primary'), { from: g.title })) });
+                tasks.el.classList.add('goal-ledger-tasks'); body.append(tasks.el);
+            }
             if (st.error) { const e = el('p', 'goal-decision-error', st.error); e.setAttribute('role', 'alert'); e.append(button('btn btn-small', 'Retry', () => load(false, true))); body.append(e); }
             if (!st.loaded) body.append(el('p', 'goal-decision-note', st.error ? 'Decisions are unavailable.' : 'Loading decisions…'));
             else if (total) body.append(decisionList(st.items, { team, onOpen: (a, opener, files) => openFile(g, a, opener, files) }));
-            else body.append(el('p', 'goal-decision-note', 'No decisions shared for this goal yet.'));
+            else body.append(el('p', 'goal-decision-note', 'No files sent for review on this goal.'));
+            const asks = questions(g);
+            if (asks.length) body.append(subjectList(asks, 'question', a => a.text || 'Question', a => a.subscriber_id || a.asker || '', a => openQuestion(a)));
             if (st.cursor) { const more = button('btn btn-small', st.busy ? 'Loading…' : 'Load more files', () => load(true)); more.disabled = st.busy; body.append(more); }
             const foot = el('div', 'goal-decision-foot'); foot.append(el('span', null, `Click a decision to inspect in Goal #${g.id} › Artifacts.`)); const links = el('span'); for (const [tab, label] of [['tasks', `Tasks (${Number.isSafeInteger(g.rollup?.total) ? g.rollup.total : ['done', 'active', 'blocked', 'queued'].reduce((n, k) => n + (Number(g.rollup?.[k]) || 0), 0)})`], ['comments', `Comments (${Number.isSafeInteger(g.comments_open) ? g.comments_open : '—'})`]]) links.append(button('btn btn-small btn-quiet', label, () => openGoal(g, tab))); if (closeGoal && !['done', 'dropped'].includes(g.state)) links.append(button('btn btn-small btn-quiet', 'Close goal', () => closeGoal(g))); foot.append(links); body.append(foot);
             if (focusKey) [...body.querySelectorAll('[data-file-key]')].find(row => row.dataset.fileKey === focusKey)?.querySelector(`button.${CSS.escape(String(focusClass).split(' ')[0])}`)?.focus({ preventScroll: true });
+        }
+        async function readTasks() {
+            const rows = new Map(), seen = new Set(); let cursor = '';
+            do {
+                const data = await limitedRead(() => readGoalJSON(team, `/tasks?goal=${encodeURIComponent(g.id)}&limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`));
+                if (!Array.isArray(data.tasks)) throw Error('Tasks could not be read.');
+                for (const t of data.tasks) rows.set(t.id, t);
+                cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';
+                if (cursor && seen.has(cursor)) throw Error('The task list could not be read completely. Retry.');
+                seen.add(cursor);
+            } while (cursor);
+            return [...rows.values()];
         }
         async function load(more, retry = false) {
             if (st.error && !retry) return;
             if (st.busy) { st.waiters.push(() => { if (card.isConnected) paint(); }); return; }
             if ((!more && st.loaded && Date.now() - st.at < 30000)) return;
             st.busy = true;
-            try { const response = await limitedRead(() => boardFetch(team, `/artifacts?goal=${encodeURIComponent(g.id)}&versions=newest&sort=name&limit=50${more && st.cursor ? `&cursor=${encodeURIComponent(st.cursor)}` : ''}`)); if (response.status === 403 || response.status === 404) { st.items = []; st.loaded = false; } if (!response.ok) throw Error(response.status === 403 ? 'Artifacts are only available to the account this computer is linked to.' : `Decisions could not be read (HTTP ${response.status}).`); const data = await response.json(); if (!Array.isArray(data.artifacts)) throw Error('Decisions could not be read.'); const merged = new Map((more ? st.items : []).map(a => [itemKey(a), a])); for (const a of data.artifacts) merged.set(itemKey(a), a); st.items = decisionOrder([...merged.values()]); st.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : ''; st.loaded = true; st.at = Date.now(); st.error = ''; } catch (e) { st.error = e.message || 'Decisions could not be read.'; } finally { st.busy = false; if (card.isConnected) paint(); for (const run of st.waiters.splice(0)) run(); }
+            try { if (!more) st.tasks = await readTasks(); const response = await limitedRead(() => boardFetch(team, `/artifacts?goal=${encodeURIComponent(g.id)}&tag=for%20review&tag=approved&tag=changes%20requested&tag=denied&versions=newest&sort=name&limit=50${more && st.cursor ? `&cursor=${encodeURIComponent(st.cursor)}` : ''}`)); if (response.status === 403 || response.status === 404) { st.items = []; st.loaded = false; } if (!response.ok) throw Error(response.status === 403 ? 'Artifacts are only available to the account this computer is linked to.' : `Decisions could not be read (HTTP ${response.status}).`); const data = await response.json(); if (!Array.isArray(data.artifacts)) throw Error('Decisions could not be read.'); const merged = new Map((more ? st.items : []).map(a => [itemKey(a), a])); for (const a of data.artifacts) if (decisionState(a) !== 'shared') merged.set(itemKey(a), a); st.items = decisionOrder([...merged.values()]); st.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : ''; st.loaded = true; st.at = Date.now(); st.error = ''; } catch (e) { st.error = e.message || 'Decisions could not be read.'; } finally { st.busy = false; if (card.isConnected) paint(); for (const run of st.waiters.splice(0)) run(); }
         }
         refreshers.push(() => { if (folds.get(key) || st.loaded) load(false); });
         visibleReads.set(card, () => load(false)); observer?.observe(card);
