@@ -207,8 +207,10 @@ export async function openAskDialog(a, onDone, runners = {}) {
         const left = ownAction(); try { await replyToAsk(a, replyText()); finish(); left(); showToast(`Reply sent to ${markHidden(a.asker, { strict: true })}`); } // the dialog closes: say it went (#15078)
         catch (e) { err.textContent = e.message || 'Not sent.'; sending = false; sync(); box.focus(); } // the text stays
     });
+    const readMarks = await importOnce('./needs_question_read.js').catch(() => null);
     document.body.append(dlg);
     dlg.showModal();
+    readMarks?.markQuestionRead({ operatorAsk: a, server: a.server });
     startKeyboardWatch();
     box.focus();
     if (missingCloudSource) err.textContent = 'This question’s computer is not loaded yet. Close and reopen it after the computer list arrives.';

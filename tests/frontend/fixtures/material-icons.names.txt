@@ -6,6 +6,7 @@ api
 archive
 arrow_back
 arrow_forward
+article
 assistant
 auto_awesome
 badge
@@ -49,6 +50,7 @@ email
 error
 error_outline
 expand
+expand_less
 expand_more
 favorite_border
 favorite_outline
@@ -74,6 +76,7 @@ http
 https
 hub
 image
+inbox
 info
 input
 insights
@@ -82,6 +85,7 @@ javascript
 key
 keyboard_arrow_down
 keyboard_arrow_up
+keyboard_control
 label
 language
 launch
@@ -97,6 +101,7 @@ menu_book
 message
 messenger_outline
 mode
+more_horiz
 note
 notes
 notifications
@@ -146,6 +151,7 @@ stop
 style
 subject
 swap_vert
+sync
 system_update
 tab
 task
@@ -162,6 +168,7 @@ verified_user
 view_list
 visibility
 warning
+waving_hand
 web
 widgets
 window
