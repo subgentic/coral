@@ -16,7 +16,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
     const names = () => ev(`[...document.querySelectorAll('#group-table-view .nl-row .nl-meta > .agent-link')].filter(b => b.getClientRects().length).map(b => (b.querySelector('.dt-mail-title') || b).textContent.trim())`); // a phone's row is a mail row (#9545): its button holds the name, the ask and the time; the name is the title
     const folders = () => ev(`${FOLDER_ROWS}.join('|')`);
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
-        const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
+        const field = innerWidth < 768 ? document.querySelector('#top-phone-bar .phone-bar-search') || q : q; const a = field.getBoundingClientRect(), b = t.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
         return { qName: q.getAttribute('aria-label'), sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 6, right: b.left >= a.right - 1, searchW: Math.round(a.width), pills: vis(r.querySelector('.team-tb-pills')), select: vis(r.querySelector('.team-tb-select')), toggleName: t.getAttribute('aria-label'), over: document.documentElement.scrollWidth - innerWidth }; })()`);
     const pick = async key => {
         await ev(`(() => { if (innerWidth < 768 && !document.querySelector('.nl-tools-open')) document.querySelector('.nl-phone-count').click(); document.querySelector('#inbox-kind').click(); return true; })()`);
