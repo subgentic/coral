@@ -1,3 +1,4 @@
+// #22094: ledger row selection and summary; all bulk-write/Undo/keyboard/sticky behavior assertions retained.
 // #17128 (walk 49): a phone's Needs you list has a visible Select button (44 px) in its toolbar. It shows a checkbox per row (a 44 px target), a tap on a row's box selects it, the bar's Dismiss clears the selected rows together, and Done leaves select mode. 390 px, touch; the fixture is the bulk Dismiss suite's.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,7 +12,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
     const failures = [];
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const S = `(window.__coralStatic || '/static/')`, T = '#group-table-view';
-    const rowNames = () => ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => (r.textContent.match(/bulk-0\\d/) || [''])[0])`);
+    const rowNames = () => ev(`[...document.querySelectorAll('${T} .nl-row')].map(r => (r.textContent.match(/bulk-0\\d/) || [''])[0])`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [width, mobile] of [[390, true]]) {
@@ -36,28 +37,29 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`fetch('/api/board/bulk/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Writer', job_title: 'W' }) }).then(r => r.status)`);
             await ev(`localStorage.removeItem('coral-inbox-needs-filters'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3`, `${at}three review rows`, 15000);
+            await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 3`, `${at}three review rows`, 15000);
+            await ev(`document.querySelectorAll('.nl-group-toggle[aria-expanded=false]').forEach(b=>b.click());true`);
             const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; await new Promise(r => setTimeout(r, 400)); /* sleep-ok: a screenshot waits out transitions */ fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, visible: e.getClientRects().length > 0 }; })()`);
             const tap = async sel => { await ev(`document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: 'center' }); true`); const r = await rect(sel); await client.Input.dispatchMouseEvent({ type: 'mousePressed', x: r.x + r.w / 2, y: r.y + r.h / 2, button: 'left', clickCount: 1 }); await client.Input.dispatchMouseEvent({ type: 'mouseReleased', x: r.x + r.w / 2, y: r.y + r.h / 2, button: 'left', clickCount: 1 }); };
             await shot('needs-before-select');
-            const sb = await rect(`${T} .dt-select-toggle`);
+            const sb = await rect('#top-phone-bar .nl-phone-select');
             check(sb && sb.visible && sb.w >= 44 && sb.h >= 44 && sb.x >= 0 && sb.x + sb.w <= 390, `${at}the toolbar has a visible Select button, a 44 px target on screen: ` + JSON.stringify(sb));
-            await tap(`${T} .dt-select-toggle`);
-            await waitFor(`document.querySelectorAll('${T} tbody .dt-check input').length >= 3 && [...document.querySelectorAll('${T} tbody .dt-check input')].every(i => i.getClientRects().length > 0)`, `${at}Select shows a checkbox on each row`, 6000);
-            const boxes = await ev(`[...document.querySelectorAll('${T} tbody tr .dt-check-hit')].map(c => { const r = c.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })`);
+            await tap('#top-phone-bar .nl-phone-select');
+            await waitFor(`document.querySelectorAll('${T} .nl-row .nl-check').length >= 3 && [...document.querySelectorAll('${T} .nl-row .nl-check')].every(i => i.getClientRects().length > 0)`, `${at}Select shows a checkbox on each row`, 6000);
+            const boxes = await ev(`[...document.querySelectorAll('${T} .nl-row .nl-check-hit')].map(c => { const r = c.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })`);
             check(boxes.length >= 3 && boxes.every(([w, h]) => w >= 44 && h >= 44), `${at}each checkbox is a 44 px target: ` + JSON.stringify(boxes));
             await shot('needs-select-mode');
             for (const n of ['bulk-01', 'bulk-02']) {
-                await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(r => /${n}/.test(r.textContent)); row.querySelector('.dt-check input').id = 'tap-${n}'; return true; })()`);
+                await ev(`(() => { const row = [...document.querySelectorAll('${T} .nl-row')].find(r => /${n}/.test(r.textContent)); row.querySelector('.nl-check').id = 'tap-${n}'; return true; })()`);
                 if (n === 'bulk-02') { await ev(framesJs(30)); await shot('needs-one-ticked'); } // the bar takes the toolbar's line: the rows settle before the next tap
                 await tap(`#tap-${n}`);
-                await waitFor(`document.querySelectorAll('${T} tbody tr.dt-selected').length === ${n === 'bulk-01' ? 1 : 2}`, `${at}${n} is ticked`, 6000);
+                await waitFor(`document.querySelectorAll('${T} .nl-row.nl-is-selected').length === ${n === 'bulk-01' ? 1 : 2}`, `${at}${n} is ticked`, 6000);
             }
-            await waitFor(`/2 selected/.test(document.querySelector('.dt-bar')?.textContent || '')`, `${at}two taps: 2 selected in the bar`, 6000);
+            await waitFor(`/2 selected/.test(document.querySelector('.nl-summary')?.textContent || '')`, `${at}two taps: 2 selected in the bar`, 6000);
             await shot('needs-two-selected');
-            await ev(`[...document.querySelectorAll('.dt-bar button')].find(b => (b.getAttribute('aria-label') || b.textContent).trim().startsWith('Dismiss')).click(); true`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, `${at}the two dismissed files leave Needs you together`, 10000);
+            await ev(`[...document.querySelectorAll('.nl-summary button')].find(b => (b.getAttribute('aria-label') || b.textContent).trim().startsWith('Dismiss')).click(); true`);
+            await waitFor(`document.querySelectorAll('${T} .nl-row').length === 1`, `${at}the two dismissed files leave Needs you together`, 10000);
             await shot('needs-after-dismiss');
             await ev(`[...document.querySelectorAll('.toast')].filter(t => /Dismissed 2/.test(t.textContent)).forEach(t => t.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Undo') b.click(); })); true`);
             await removeBoards(ev, ['bulk']).catch(() => {});
