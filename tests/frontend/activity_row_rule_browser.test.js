@@ -35,23 +35,22 @@ const LONG = 'Not now: the build is red, the release notes are not written and I
             assert.ok(!/Dismissed\\s*[“"]?Dismissed by/.test(text) && !/Dismissed by/.test(text), `${width}: no "Dismissed Dismissed by": ${text.slice(0, 200)}`);
             assert.ok(!/@Orchestrator/.test(text), `${width}: no raw @mention in an answer`);
             assert.ok(!/You answered/.test(text), `${width}: no repeated verb ("You answered")`);
-            assert.ok(text.includes('Your answer: 1 is fine for now') && text.includes('Your answer: Option 2') && text.includes('Your answer: Yes'), `${width}: the answers are shown clean`);
-            assert.ok(text.includes('Which of the two designs should ship in v2.0.61?') && text.includes('from Orchestrator'), `${width}: a new answer names its question and who asked`);
+            assert.ok(text.includes('\u201c1 is fine for now\u201d') && text.includes('\u201cOption 2\u201d') && text.includes('\u201cYes\u201d'), `${width}: the answers are shown clean`);
+            assert.ok(text.includes('Which of the two designs should ship in v2.0.61?') && text.includes('\u201cOption 2\u201d to Orchestrator'), `${width}: a new answer names its question and who asked`);
             assert.ok(text.includes('Orchestrator’s question'), `${width}: an older answer names the asker's question`);
             assert.ok(text.includes('release-plan.md') && /Unstarred/.test(text) && /Starred/.test(text), `${width}: Starred and Unstarred show the file name`);
             assert.ok(text.includes('a file'), `${width}: an older starred row falls back to "a file"`);
             assert.ok(text.includes(LONG), `${width}: a long note is whole, not cut`);
             if (width === 1280) {
-                const cols = await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(tr => ({ did: (tr.querySelector('.al-verdict') || {}).textContent, on: (tr.querySelector('.al-title') || {}).textContent, detail: (tr.querySelector('.al-answer') || {}).textContent || '', cut: tr.querySelector('.al-answer') ? tr.querySelector('.al-answer').scrollWidth > tr.querySelector('.al-answer').clientWidth + 1 : false }))`);
-                assert.deepEqual(cols.map(c => c.did), ['Dismissed', 'Answered', 'Answered', 'Answered', 'Dismissed', 'Unstarred', 'Starred', 'Changed the tags', 'Shared'], `${width}: YOU DID is the verb alone: ${JSON.stringify(cols.map(c => c.did))}`);
-                assert.deepEqual(cols.map(c => c.on), ['a question', 'Orchestrator’s question', 'Which of the two designs should ship in v2.0.61?', 'a question', 'Ship it?', 'release-plan.md', 'a file', 'tagged-plan.md', 'shared-plan.md'], `${width}: ON is the object alone: ${JSON.stringify(cols.map(c => c.on))}`);
-                assert.deepEqual(cols.map(c => c.detail), ['', 'Your answer: 1 is fine for now', 'Your answer: Option 2', 'Your answer: Yes', LONG, '', '', '', ''], `${width}: the detail is on its own line: ${JSON.stringify(cols.map(c => c.detail))}`);
-                assert.ok(cols.every(c => !c.cut), `${width}: no detail is cut`);
+                const cols = await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(tr => { const v = tr.querySelector('.al-v'), seg = tr.querySelector('.al-sub .al-seg'); return { did: v && v.textContent.replace(/^[\\u2713\\u21a9\\u2715]\\s*/, ''), on: (tr.querySelector('.al-title') || {}).textContent, detail: seg ? seg.textContent.slice(v ? v.textContent.length : 0).trim() : '' }; })`);
+                assert.deepEqual(cols.map(c => c.did), ['Dismissed', 'Answered', 'Answered', 'Answered', 'Dismissed', 'Unstarred', 'Starred', 'Changed the tags', 'Shared'], `${width}: what you did is the verb alone: ${JSON.stringify(cols.map(c => c.did))}`);
+                assert.deepEqual(cols.map(c => c.on), ['a question', 'Orchestrator’s question', 'Which of the two designs should ship in v2.0.61?', 'a question', 'Ship it?', 'release-plan.md', 'a file', 'tagged-plan.md', 'shared-plan.md'], `${width}: the name is the object alone: ${JSON.stringify(cols.map(c => c.on))}`);
+                const d = cols.map(c => c.detail);
+                assert.ok(d[0] === '' && d[1].startsWith('\u201c1 is fine for now\u201d') && d[2] === '\u201cOption 2\u201d to Orchestrator' && d[3].startsWith('\u201cYes\u201d') && d[4].includes(LONG) && d.slice(5).every(x => x === ''), `${width}: the answer is inline on the second line: ${JSON.stringify(d)}`);
             } else {
-                // a phone card (#19816): the tile, the subject and verdict, the quoted answer and the chips, every one whole and inside the width
-                const ph = await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(r => ({ tile: !!r.querySelector('.al-tile'), title: !!r.querySelector('.al-title'), verdict: !!r.querySelector('.al-verdict'), detail: (r.querySelector('.al-answer') || {}).textContent || '', fits: r.scrollWidth <= r.clientWidth + 1 }))`);
-                assert.ok(ph.length >= 5 && ph.every(c => c.tile && c.title && c.verdict && c.fits), `${width}: each phone card has its tile, subject and verdict and fits the width: ${JSON.stringify(ph)}`);
-                assert.ok(ph.some(c => /^from Orchestrator \u00b7 Your answer: Option 2$/.test(c.detail) || /Your answer: Option 2/.test(c.detail)), `${width}: the answer is on the card: ${JSON.stringify(ph.map(c => c.detail))}`);
+                // a phone row (#22100): the kind mark, the name and what you did, the time and the one menu, every one inside the width
+                const ph = await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(r => ({ mark: !!r.querySelector('.al-lead svg'), title: !!r.querySelector('.al-title'), did: !!r.querySelector('.al-v'), fits: r.scrollWidth <= r.clientWidth + 1 }))`);
+                assert.ok(ph.length >= 5 && ph.every(c => c.mark && c.title && c.did && c.fits), `${width}: each phone row has its mark, name and verb and fits the width: ${JSON.stringify(ph)}`);
             }
         }
         console.log('activity_row_rule: ok');

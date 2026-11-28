@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
-const ABOUT = 'Goal #233 · Threaded Needs you · Task #14390 · Mockups for threading';
+const ABOUT = '#233 Threaded Needs you', ABOUT2 = 'task #14390 Mockups for threading'; // the approved mock's words (#22100): the goal with its flag, then the task, each a link
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
@@ -32,16 +32,16 @@ const ABOUT = 'Goal #233 · Threaded Needs you · Task #14390 · Mockups for thr
             const byId = id => ev(`(() => { const tr = document.querySelector('#group-table-view .al-row[data-key="${id}"]'); if (!tr) return null; const btn = tr.querySelector('button.dt-mail-open, button.al-title'); return { text: tr.textContent.replace(/\\s+/g, ' ').trim(), name: btn ? btn.getAttribute('aria-label') : '' }; })()`);
             const R = {}; for (const id of [9, 8, 7, 6, 5, 4]) { R[id] = await byId(id); assert.ok(R[id] && R[id].text.length > 0, `${width}: fixture row ${id} is on the page`); }
             const T = id => R[id].text;
-            assert.ok(T(9).includes('Which docs format do you want?') && T(9).includes(ABOUT), `${width}: an answer says its goal and task: ${T(9)}`);
-            assert.ok(T(7).includes('after-filter-open-1280.png') && T(7).includes(ABOUT), `${width}: a star says its goal and task: ${T(7)}`);
-            assert.ok(T(8).includes('Completed') && /Goal #233 · Threaded Needs you/.test(T(8)) && (T(8).match(/task #14390/gi) || []).length === 1, `${width}: a task's own row says its goal and is not told its task again: ${T(8)}`);
-            assert.ok(T(6).includes('done: shipped') && (T(6).match(/Goal #233/g) || []).length === 0, `${width}: a goal's own row is not told its goal again: ${T(6)}`);
-            assert.ok(/a file/.test(T(5)) && /Starred/.test(T(5)) && !/Goal #|Task #\d/.test(T(5)), `${width}: an older starred row (id 5, no key) reads 'a file' and has no goal or task line: ${T(5)}`);
-            assert.ok(/a question/.test(T(4)) && /Your answer: Yes/.test(T(4)) && !/Goal #|Task #\d/.test(T(4)), `${width}: an older answer (id 4, no key) reads 'a question' and has no goal or task line: ${T(4)}`);
+            assert.ok(T(9).includes('Which docs format do you want?') && (T(9).includes(ABOUT) && T(9).includes(ABOUT2)), `${width}: an answer says its goal and task: ${T(9)}`);
+            assert.ok(T(7).includes('after-filter-open-1280.png') && (T(7).includes(ABOUT) && T(7).includes(ABOUT2)), `${width}: a star says its goal and task: ${T(7)}`);
+            assert.ok(T(8).includes('Completed') && /#233 Threaded Needs you/.test(T(8)) && (T(8).match(/task #14390/gi) || []).length === 1, `${width}: a task's own row says its goal and is not told its task again: ${T(8)}`);
+            assert.ok(T(6).includes('done: shipped') && (T(6).match(/#233/g) || []).length === 0, `${width}: a goal's own row is not told its goal again: ${T(6)}`);
+            assert.ok(/a file/.test(T(5)) && /Starred/.test(T(5)) && !/#\d/.test(T(5)), `${width}: an older starred row (id 5, no key) reads 'a file' and has no goal or task line: ${T(5)}`);
+            assert.ok(/a question/.test(T(4)) && /\u201cYes\u201d/.test(T(4)) && !/#\d/.test(T(4)), `${width}: an older answer (id 4, no key) reads 'a question' and has no goal or task line: ${T(4)}`);
             assert.ok([9, 7].every(id => !/\ba file\b|\ba question\b/.test(T(id))), `${width}: a new row never reads "a file" or "a question": ${T(9)} / ${T(7)}`);
             // the row's accessible name says what the row says (WCAG 2.5.3): its goal and task are in it too, the same words as the visible line
             for (const id of [9, 7]) { const nm = R[id].name; if (nm) assert.ok(nm.includes('Goal #233') && nm.includes('Task #14390'), `${width}: row ${id}'s accessible name carries its goal and task: ${nm}`); }
-            if (width === 390) { const chips = await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(r => r.querySelectorAll('.al-chip').length)`); assert.ok(chips.some(c => c >= 2) && await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), `${width}: the goal and task are chips on a phone card and nothing runs past the width (#19816): ${JSON.stringify(chips)}`); }
+            if (width === 390) { const chips = await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(r => r.querySelectorAll('.al-sub .al-link').length)`); assert.ok(chips.some(c => c >= 2) && await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), `${width}: the goal and task are links on a phone row and nothing runs past the width (#19816): ${JSON.stringify(chips)}`); }
             assert.ok(await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`) <= 0, `${width}: no sideways scroll`);
             if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/activity-about-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
             console.log(`   ✓ ${width} px`);

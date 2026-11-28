@@ -55,7 +55,7 @@ const HEX = 'c'.repeat(64);
         const t = await ev(`document.getElementById('group-table-view').textContent.replace(/\\s+/g, ' ')`);
         assert.match(t, /Closed/); assert.match(t, /Created/); // the verb is YOU DID, the goal is ON (#14423) assert.ok(t.includes(SECOND) && t.includes(FIRST), 'both of this run\'s goals are listed');
         // the action identity of this run's rows: two creates and two closes, and each goal has one of each
-        const words = await ev(`${mine}.map(r => (((r.querySelector('.al-verdict') || r).textContent.trim() === 'Closed') ? 'close' : ((r.querySelector('.al-verdict') || r).textContent.trim() === 'Created') ? 'create' : '?') + ':' + (r.textContent.includes(${JSON.stringify(FIRST)}) ? 'first' : r.textContent.includes(${JSON.stringify(SECOND)}) ? 'second' : '?'))`);
+        const words = await ev(`${mine}.map(r => (((r.querySelector('.al-v') || r).textContent.replace(/^[\\u2713\\u21a9\\u2715]\\s*/, '').trim() === 'Closed') ? 'close' : ((r.querySelector('.al-v') || r).textContent.replace(/^[\\u2713\\u21a9\\u2715]\\s*/, '').trim() === 'Created') ? 'create' : '?') + ':' + (r.textContent.includes(${JSON.stringify(FIRST)}) ? 'first' : r.textContent.includes(${JSON.stringify(SECOND)}) ? 'second' : '?'))`);
         assert.deepEqual([...words].sort(), ['close:first', 'close:second', 'create:first', 'create:second'], `each goal has a created row and a closed row: ${JSON.stringify(words)}`); assert.match(t, /this computer/); assert.match(t, /not needed any more/);
         assert.equal(await ev(`document.querySelector('.activity-check')`), null, 'an intact record says nothing above the table (#18620: the count and its caveat were not words anyone could use)');
         assert.match(await ev(`document.querySelector('#group-table-view .al-row').textContent`), new RegExp(SECOND), 'newest first');
@@ -77,7 +77,7 @@ const HEX = 'c'.repeat(64);
         console.log('2. The sidebar search narrows the rows');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox(${JSON.stringify(FIRST)})).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .al-row').length === 2`, 'the two rows of that goal (created, closed)', 8000);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(r => (((r.querySelector('.al-verdict') || r).textContent.trim() === 'Closed') ? 'close' : ((r.querySelector('.al-verdict') || r).textContent.trim() === 'Created') ? 'create' : '?')).sort()`), ['close', 'create'], 'the search keeps both of the goal\'s rows');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(r => (((r.querySelector('.al-v') || r).textContent.replace(/^[\\u2713\\u21a9\\u2715]\\s*/, '').trim() === 'Closed') ? 'close' : ((r.querySelector('.al-v') || r).textContent.replace(/^[\\u2713\\u21a9\\u2715]\\s*/, '').trim() === 'Created') ? 'create' : '?')).sort()`), ['close', 'create'], 'the search keeps both of the goal\'s rows');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.filterInbox('')).then(() => true)`);
         await waitFor(`${mine}.length === 4`, 'this run\'s four rows again', 8000);
         console.log('   ✓');

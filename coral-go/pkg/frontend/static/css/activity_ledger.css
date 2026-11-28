@@ -1,8 +1,6 @@
 /* The Activity folder's decision ledger (#19816, the Inbox Designer's mocks v1). Lazy: loaded by inbox_activity.js, not at start. */
-.al-list { list-style: none; margin: 0; padding: 0; background: var(--card-fill); border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: clip; }
-.al-date-head, .al-group-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) var(--space-xl); background: var(--bg-secondary); border-bottom: 1px solid var(--border); font-size: var(--fs-sm); font-weight: var(--fw-strong); text-transform: uppercase; letter-spacing: var(--ls-caps); color: var(--text-muted); }
-.al-date-head { position: sticky; top: 0; z-index: 2; }
-.al-group-head { text-transform: none; letter-spacing: 0; font-size: var(--fs-base); color: var(--text-primary); }
+.al-list { list-style: none; margin: 0; padding: 0; background: var(--bg-elevated, var(--card-fill)); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: clip; }
+.al-group-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) var(--space-xl); background: var(--bg-secondary); border-bottom: 1px solid var(--border); font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: 0; color: var(--text-primary); }
 .al-subgroup-head { padding-left: calc(var(--space-xl) + var(--space-2xl)); color: var(--text-secondary); }
 .al-group-toggle { flex: 1; min-width: 0; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; gap: var(--space-md); min-height: 44px; }
 .al-group-toggle::before { content: "\25B8"; flex: none; width: 1.25em; color: var(--text-secondary); }
@@ -13,22 +11,94 @@
 .al-group-words { display: flex; flex-wrap: wrap; gap: 0 var(--space-lg); align-items: baseline; }
 .al-story-row { padding: var(--space-lg) var(--space-xl); border-top: 1px solid var(--border); }
 .al-group-meta { font-weight: var(--fw-regular); color: var(--text-muted); }
-.al-row { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; column-gap: var(--space-lg); align-items: start; padding: var(--space-lg) var(--space-xl); border-top: 1px solid var(--border); }
-.al-date-head + .al-row, .al-group-head + .al-row { border-top: 0; }
-.al-row:hover { background: var(--bg-hover); }
+
+.al-versions { position: relative; }
+.al-versions > summary { list-style: none; cursor: pointer; }
+.al-versions > summary::-webkit-details-marker { display: none; }
+.al-pop { position: absolute; right: 0; top: 100%; z-index: 5; width: max-content; min-width: 16rem; max-width: calc(100vw - 2 * var(--space-xl)); margin-top: var(--space-xs); padding: var(--space-sm); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); box-shadow: var(--shadow-md); }
+.al-pop-row { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-xs) var(--space-sm); }
+.al-pop-name { font-weight: var(--fw-strong); }
+.al-pop-state { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: break-word; }
+
+.al-pop-row .al-pop-state { white-space: normal; }
+.al-more { position: relative; }
+.al-more > summary { list-style: none; cursor: pointer; }
+.al-more > summary::-webkit-details-marker { display: none; }
+.al-more .al-pop { min-width: 12rem; display: flex; flex-direction: column; gap: var(--space-xs); }
+.al-menu-item { justify-content: flex-start; box-sizing: border-box; }
+@media (max-width: 767px) { .al-versions, .al-more { position: static; } .al-row { position: relative; } .al-pop { left: var(--space-md); right: var(--space-md); top: auto; width: auto; min-width: 0; max-width: none; } } /* a phone's popover is as wide as its row, under the buttons, not squeezed beside them */
+/* Activity has no selection bar, so its toolbar keeps no empty actions line under it (the 50 px band at 1280, QA's #19816 note) */
+#group-table-view .inbox-folder-toolbar.list-bar-bar:has(+ .activity-folder) { padding-bottom: var(--space-md); }
+/* #21538: the team name in an Activity row's label is a link: the label's look, an underline on hover, a ring on focus. */
+.al-team .team-label-link { color: inherit; border-radius: var(--radius-sm); text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+.al-team .team-label-link:hover { color: var(--accent); text-decoration-color: currentColor; }
+.al-team .team-label-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (pointer: coarse), (max-width: 767px) { .al-team .team-label-link { position: relative; } .al-team .team-label-link::after { content: ""; position: absolute; left: calc(50% - 22px); top: calc(50% - 22px); width: 44px; height: 44px; } } /* a tap target of 44 px: the link's own box stays as the words, the hit area is its transparent ::after (the rule touch_needs_tablet_browser counts), #21642 */
+
+/* #22100, the approved Activity mock: a calm list. A day heading with its count above its own box; each row is a kind mark, the name, one line of what you did and where, and the clock time at the right. */
+.al-sum, .al-days { max-width: 55rem; } /* the mock's list is 880 px at most */
+.al-sum { font-size: var(--fs-md); font-weight: var(--fw-strong); margin: 0 0 var(--space-lg) var(--space-xs); min-height: 1.9rem; display: flex; align-items: center; }
+.al-days > .al-date-head { display: flex; align-items: baseline; gap: var(--space-md); margin: var(--space-2xl) 0 var(--space-sm) var(--space-xs); padding: 0; background: none; border: 0; position: static; font-size: var(--fs-base); font-weight: var(--fw-strong); color: var(--text-secondary); text-transform: none; letter-spacing: 0; }
+.al-days > .al-date-head:first-child { margin-top: 0; }
+.al-day-count { font-weight: var(--fw-regular); color: var(--text-muted); }
+.al-row { display: flex; align-items: flex-start; gap: var(--space-lg); padding: var(--space-lg) var(--space-xl); border-top: 1px solid var(--border); position: relative; }
+.al-list > .al-row:first-child, .al-group-head + .al-row { border-top: 0; }
+.al-row:hover, .al-row:focus-within { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 .al-row.is-noise { opacity: 0.72; }
-.al-tile { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); }
-.al-tile-file, .al-tile-image:not(.al-tile-thumb) { color: var(--needs-icon-blue-fg); background: var(--needs-icon-blue-bg); border-color: color-mix(in srgb, var(--needs-icon-blue-fg) 28%, transparent); } /* File reviews share one palette; glyphs still identify their type (#20714). */
-.al-tile .material-icons { font-size: var(--fs-lg); }
-.al-tile-question, .al-tile-proposal { color: var(--accent); background: rgba(var(--accent-rgb), 0.14); border-color: rgba(var(--accent-rgb), 0.3); }
-.al-tile-goal, .al-tile-task { color: var(--success-text); background: rgba(var(--success-rgb), 0.14); border-color: rgba(var(--success-rgb), 0.3); }
-.al-tile-permission, .al-tile-skill { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.14); border-color: rgba(var(--warning-rgb), 0.3); }
-.al-tile-run, .al-tile-job_run, .al-tile-workflow_run { color: var(--error-text); background: rgba(var(--error-rgb), 0.14); border-color: rgba(var(--error-rgb), 0.3); }
-.al-main { min-width: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
-.al-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); }
-.al-title { margin: 0; padding: 0; border: 0; background: none; font: inherit; font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-ui); color: var(--text-primary); text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.al-lead { flex: 0 0 18px; height: 21px; display: grid; place-items: center; color: var(--text-secondary); }
+.al-kind { width: 16px; height: 16px; }
+.al-lead-goal { color: var(--al-goal); }
+.al-main { flex: 1; min-width: 0; }
+.al-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-md); }
+.al-title { margin: 0; padding: 0; border: 0; background: none; font: inherit; font-size: var(--fs-lg); font-weight: var(--fw-strong); line-height: var(--lh-body); color: var(--text-primary); text-align: left; overflow-wrap: anywhere; cursor: pointer; }
 .al-title-plain { cursor: default; }
-button.al-title:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+button.al-title:hover { text-decoration: underline; text-underline-offset: 2px; }
+button.al-title:focus-visible, .al-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.al-ver { color: var(--text-muted); font-size: var(--fs-md); }
+.al-sub { font-size: var(--fs-md); color: var(--text-secondary); margin-top: 1px; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-sm); }
+.al-seg { min-width: 0; }
+.al-sep { color: var(--text-muted); }
+.al-v { font-weight: var(--fw-strong); white-space: nowrap; }
+.al-v-ok { color: var(--success-text, var(--success)); } .al-v-ch { color: var(--warning-text, var(--warning)); } .al-v-no { color: var(--error-text, var(--error)); } .al-v-dm { color: var(--text-secondary); } .al-v-an { color: var(--text-primary); } .al-v-goal { color: var(--al-goal); }
+.al-link { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+.al-link:hover:not(:disabled) { color: var(--accent); text-decoration-color: currentColor; }
+.al-link:disabled { cursor: default; text-decoration: none; }
+.al-glink { white-space: nowrap; }
+.al-gflag { width: 11px; height: 11px; color: var(--al-goal); margin-right: 3px; vertical-align: -1px; }
+.al-ynote, .al-cmd { margin-top: var(--space-md); max-width: 68ch; }
+.al-ynote { font-size: var(--fs-lg); padding: var(--space-md) var(--space-lg); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); overflow-wrap: anywhere; }
+.al-ynote > span { color: var(--text-secondary); }
+.al-cmd { display: inline-block; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--bg-tertiary); font-family: var(--font-mono); font-size: var(--fs-sm); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.al-side { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-xs); margin-left: auto; }
+.al-when { font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; min-width: 64px; text-align: right; }
+/* The buttons show where the pointer is, or the keyboard (the title is the focus stop); a phone has the one menu instead. No (hover: none) query hides anything (#6137). */
+.al-hov { display: none; align-items: center; gap: var(--space-xs); }
+.al-row:hover .al-hov, .al-row:focus-within .al-hov { display: inline-flex; }
+.al-row:hover .al-hov ~ .al-when, .al-row:focus-within .al-hov ~ .al-when { display: none; }
+.al-hov > * { margin: 0; }
+.al-hov > details { display: inline-flex; align-items: center; width: max-content; }
+.al-hov .btn { margin: 0; display: inline-flex; align-items: center; height: var(--toolbar-control-h); min-height: var(--toolbar-control-h); padding-top: 0; padding-bottom: 0; border-color: var(--control-border); color: var(--text-primary); }
+.al-dots { display: none; }
+.al-dots > summary { list-style: none; cursor: pointer; display: grid; place-items: center; width: 44px; height: 44px; margin-right: -12px; font-size: var(--fs-2xl); color: var(--text-secondary); }
+.al-dots > summary::-webkit-details-marker { display: none; }
+.al-dots > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.al-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 767px), (pointer: coarse) {
+    .al-row { padding: var(--space-lg); gap: var(--space-lg); }
+    .al-side { flex-direction: column; align-items: flex-end; gap: 0; }
+    .al-hov, .al-row:hover .al-hov, .al-row:focus-within .al-hov { display: none; }
+    .al-row:hover .al-hov ~ .al-when, .al-row:focus-within .al-hov ~ .al-when { display: inline; }
+    .al-dots { display: block; position: static; }
+    .al-when { min-width: 0; }
+    .al-dots .al-pop { left: var(--space-md); right: var(--space-md); }
+}
+
+.activity-folder { --al-goal: var(--color-tool-agent); }
+
+/* the file decision dialog (activity_file_dialog.js) still draws its own tile, verdict and note with these */
+.al-tile { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); }
+.al-tile-file { color: var(--needs-icon-blue-fg); background: var(--needs-icon-blue-bg); border-color: color-mix(in srgb, var(--needs-icon-blue-fg) 28%, transparent); } /* File reviews share one palette; glyphs still identify their type (#20714). */
+.al-tile .material-icons { font-size: var(--fs-lg); }
 .al-verdict { display: inline-flex; align-items: center; padding: 1px var(--space-md); border-radius: var(--radius-xl); font-size: var(--fs-sm); font-weight: var(--fw-strong); white-space: normal; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); }
 .al-v-approve { color: var(--success-text); background: rgba(var(--success-rgb), 0.14); border-color: rgba(var(--success-rgb), 0.3); }
 .al-v-changes { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.14); border-color: rgba(var(--warning-rgb), 0.3); }
@@ -39,56 +109,8 @@ button.al-title:hover { color: var(--accent); text-decoration: underline; text-u
 .al-ans-changes { border-left-color: var(--warning); }
 .al-ans-deny { border-left-color: var(--error); }
 .al-ans-answer { border-left-color: var(--accent); }
-.al-meta { min-width: 0; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); font-size: var(--fs-base); color: var(--text-muted); }
-.al-author { color: var(--text-secondary); font-weight: var(--fw-medium); }
-.al-chip { max-width: 100%; overflow-wrap: anywhere; }
-.al-chip, .al-via { border: 1px solid var(--border); background: var(--bg-tertiary); } /* Goal and Task are chips with an edge, as the mock draws them (#19871) */
-.al-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; align-self: stretch; gap: var(--space-lg); }
-.al-right-meta { display: inline-flex; align-items: center; gap: var(--space-sm); font-size: var(--fs-base); color: var(--text-muted); white-space: nowrap; }
-.al-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
-@media (max-width: 599px) {
-  .al-row { grid-template-columns: 2rem minmax(0, 1fr); padding: var(--space-lg); }
-  .al-right-meta { white-space: normal; flex-wrap: wrap; flex: 1 0 100%; }
-  .al-right { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; }
-  .al-actions { justify-content: flex-start; }
-  .al-actions .btn { margin: 0; }
-}
-.al-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
-.al-qa { margin-top: var(--space-xs); font-size: var(--fs-base); color: var(--text-secondary); }
-.al-qa > summary { cursor: pointer; min-height: var(--control-touch-height, 44px); display: inline-flex; align-items: center; color: var(--accent); }
-.al-qa-body { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-sm) var(--space-lg); border-left: 2px solid var(--border); }
-.al-qa-msg { display: flex; flex-direction: column; gap: var(--space-xs); overflow-wrap: anywhere; }
-.al-qa-who { color: var(--text-primary); }
-.al-versions { position: relative; }
-.al-versions > summary { list-style: none; cursor: pointer; }
-.al-versions > summary::-webkit-details-marker { display: none; }
-.al-pop { position: absolute; right: 0; top: 100%; z-index: 5; width: max-content; min-width: 16rem; max-width: calc(100vw - 2 * var(--space-xl)); margin-top: var(--space-xs); padding: var(--space-sm); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); box-shadow: var(--shadow-md); }
-.al-pop-row { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-xs) var(--space-sm); }
-.al-pop-name { font-weight: var(--fw-strong); }
-.al-pop-state { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-base); overflow-wrap: break-word; }
-
-.al-vchip, .al-vnewer { display: inline-flex; align-items: center; padding: 1px var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); }
+.al-vchip { display: inline-flex; align-items: center; padding: 1px var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: var(--fs-sm); }
 .al-vchip-latest { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.14); } /* in a file's version list: the newest is blue, the one decided here is green (#19871) */
 .al-vchip-mine { color: var(--success-text); border-color: rgba(var(--success-rgb), 0.3); background: rgba(var(--success-rgb), 0.14); }
-.al-vnewer { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.14); }
-.al-ask { margin-top: var(--space-xs); font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); overflow-wrap: anywhere; }
 .al-glyph { font-size: var(--fs-base); font-weight: var(--fw-strong); letter-spacing: 0; }
-.al-pop-row .al-pop-state { white-space: normal; }
-.al-more { position: relative; }
-.al-more > summary { list-style: none; cursor: pointer; }
-.al-more > summary::-webkit-details-marker { display: none; }
-.al-more .al-pop { min-width: 12rem; display: flex; flex-direction: column; gap: var(--space-xs); }
-.al-menu-item { justify-content: flex-start; box-sizing: border-box; }
-@media (max-width: 767px) { .al-versions, .al-more { position: static; } .al-row { position: relative; } .al-pop { left: var(--space-md); right: var(--space-md); top: auto; width: auto; min-width: 0; max-width: none; } } /* a phone's popover is as wide as its row, under the buttons, not squeezed beside them */
-/* Activity has no selection bar, so its toolbar keeps no empty actions line under it (the 50 px band at 1280, QA's #19816 note) */
-#group-table-view .inbox-folder-toolbar.list-bar-bar:has(+ .activity-folder) { padding-bottom: var(--space-md); }
 .al-ans-label { font-weight: var(--fw-strong); color: var(--text-primary); }
-.al-tile-thumb { padding: 0; overflow: hidden; background: none; color: var(--success-text); border-color: rgba(var(--success-rgb), 0.3); }
-.al-tile-thumb .artifact-thumbnail { width: 100%; height: 100%; }
-.al-via { color: var(--accent); border-color: var(--accent); background: none; }
-/* #21538: the team name in an Activity row's label is a link: the label's look, an underline on hover, a ring on focus. */
-.al-team .team-label-link { color: inherit; text-decoration: none; border-radius: var(--radius-sm); }
-.al-team .team-label-link:hover { text-decoration: underline; }
-.al-team .team-label-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (pointer: coarse), (max-width: 767px) { .al-team .team-label-link { position: relative; } .al-team .team-label-link::after { content: ""; position: absolute; left: calc(50% - 22px); top: calc(50% - 22px); width: 44px; height: 44px; } } /* a tap target of 44 px: the link's own box stays as the words, the hit area is its transparent ::after (the rule touch_needs_tablet_browser counts), #21642 */

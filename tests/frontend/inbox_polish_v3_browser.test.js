@@ -44,8 +44,8 @@ const question = '@Operator Please inspect this command. ' + 'Context to keep th
    await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.openInboxGroup('activity'))`);
    await waitFor(`!!document.querySelector('.al-row')`, 'Activity card', 10000); await ev(framesJs(3)); await shot(`activity-${width}`);
    try {
-    const icon=await ev(`(()=>{const n=document.querySelector('.al-row .al-tile');return n&&{width:n.getBoundingClientRect().width,glyph:n.textContent.trim()};})()`);
-    assert.ok(icon,`${width}: Activity rows wear a kind tile`); assert.equal(icon.glyph,'help_outline','a question row shows the question tile'); assert.ok(icon.width>=32,'the tile is at least 32 px');
+    const icon=await ev(`(()=>{const n=document.querySelector('.al-row .al-lead svg');return n&&{width:n.getBoundingClientRect().width,label:n.getAttribute('aria-label')};})()`);
+    assert.ok(icon,`${width}: Activity rows wear a quiet kind mark`); assert.equal(icon.label,'Question','a question row shows the question mark'); assert.equal(Math.round(icon.width),16,'the mark is 16 px (#22100)');
     assert.equal(await ev(`!!document.querySelector('.activity-check')`),false,'healthy record check remains hidden');
     assert.equal(await ev(`document.querySelector('.activity-folder').textContent.includes('hub-user-private-id')`),false,'no actor id');
    } catch(e) { failures.push(e.message); }

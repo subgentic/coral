@@ -188,7 +188,7 @@ export const mountPresets = node => {
 /** The Show pills (#16087, #19149): Important leaves out delivery bookkeeping and is on when nothing was chosen before; a kind chip toggles its kind; Everything clears Important and every kind, and the last kind off is Everything again. change(important, kinds) keeps the choice. */
 export const showPills = (f, change) => {
     const picked = AF.kindsOf(f.kind), imp = f.important === true;
-    return { label: 'Show', panelLabel: 'Show', multi: true, current: [...(imp ? ['important'] : []), ...picked], items: [{ key: 'important', label: 'Important', count: total({ important: true }) }, { key: 'all', label: 'Everything', count: total() }, ...AF.KINDS.map(k => ({ key: k, label: AF.KIND_LABEL[k], count: countKind(k, f) }))], onPick: key => key === 'all' ? change(false, []) : key === 'important' ? change(!imp, picked) : change(imp, AF.kindsOf(picked.includes(key) ? picked.filter(k => k !== key) : [...picked, key])) };
+    return { change, important: imp, kinds: picked, label: 'Show', panelLabel: 'Show', multi: true, current: [...(imp ? ['important'] : []), ...picked], items: [{ key: 'important', label: 'Important', count: total({ important: true }) }, { key: 'all', label: 'Everything', count: total() }, ...AF.KINDS.map(k => ({ key: k, label: AF.KIND_LABEL[k], count: countKind(k, f) }))], onPick: key => key === 'all' ? change(false, []) : key === 'important' ? change(!imp, picked) : change(imp, AF.kindsOf(picked.includes(key) ? picked.filter(k => k !== key) : [...picked, key])) };
 };
 
 /** The page's table spec for the sidebar's group table. `open` has { file(row), goal(row), question(row) }: how a row's item opens (the sidebar knows the routes). */
@@ -208,6 +208,7 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
         signature: JSON.stringify([list.map(keyOf), check, loaded, failed, denied, more, missingComputers(), multipleServers(), grouped, grouped ? taskSignature : '']),
         node: () => {
             const wrap = DT.el('div', 'activity-folder');
+            if (list.length) wrap.append(DT.el('div', 'al-sum', `${list.length} ${list.length === 1 ? 'action' : 'actions'}`)); // the count of the rows below, in words, under the top line (#22100)
             const words = checkWords(check);
             if (words) { // a notice with its icon, a heading and the sentence under it (the mock's record integrity notice, #19871)
                 const n = DT.el('div', `activity-check${check && !check.intact ? ' activity-check-broken' : ''}`), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');
@@ -216,13 +217,6 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
             }
             const openRow = r => { if (!opens(r)) return; if (r.item_kind === 'file' && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) open.file(r); else if (r.item_kind === 'goal') open.goal(r); else if (r.item_kind === 'question' && opens(r)) open.question(r); else if (r.item_kind === 'task' && opens(r)) open.task(r); else if (r.item_kind === 'agent' && opens(r)) open.agent(r); else if (r.item_kind === 'message' && opens(r)) open.message(r); else if (r.item_kind === 'chat' && opens(r)) open.chat(r); else if (r.item_kind === 'workflow_run' && opens(r)) open.workflow(r); else if (r.item_kind === 'job_run' && opens(r)) open.job(r, jobRunParts(r.item_id)); }
             // the row's More menu: what else can be done with this record, from the actions the dialogs already have (#19828). A file's decision: its details and comments, back to review, its link. An answered question: the thread, back to Needs you, its board message, its task.
-            const threadFor = async r => { // the question's thread, read on demand for the row's Q&A preview
-                const { fetchMessages } = await importOnce('./board_fetch.js'), { threadOf } = await importOnce('./activity_dialog.js'), askId = Number(r.item_id);
-                if (!r.team || !askId) return [];
-                const all = []; let after = Math.max(0, askId - 1);
-                for (let page = 0; page < 5; page++) { const { messages } = await fetchMessages(r.team, 200, { after_id: after }); all.push(...messages); const last = Math.max(after, ...messages.map(m => Number(m.id) || 0)); if (messages.length < 200 || last === after) break; after = last; }
-                return threadOf(all, askId).map(m => ({ who: m.subscriber_id === 'dashboard' || /operator/i.test(m.subscriber_id || '') ? 'You' : M(m.subscriber_id || 'An agent'), text: String(m.content || '').replace(/\s+/g, ' ').trim() }));
-            };
             const moreFor = r => {
                 const items = [], team = r.team ? splitKey(r.team) : null;
                 if (r.item_kind === 'file' && ['approve', 'changes', 'deny'].includes(r.action) && /^[a-f0-9]{64}$/i.test(r.version || r.item_id || '')) {
@@ -241,10 +235,9 @@ export function spec(f, open, { grouped = false, byTask = true, tasks, taskSigna
                 }
                 return items;
             };
-            const openPrimary = r => (r.item_kind === 'file' && open.viewer && ['approve', 'changes', 'deny'].includes(r.action)) ? open.viewer(r) : openRow(r); // "Open file" opens the file; the row's title opens its decision
             const teamWords = r => { const w = teamOf(r), srv = ` \u00b7 ${serverLabel(r.server || LOCAL_SERVER)}`; return multipleServers() && !w.endsWith(srv) ? w + srv : w; }; // with several computers read, the computer is named beside the team (#15730), once: teamOf already carries it when the labels name their computers (#21571)
             const ordered = grouped ? Threads.arrangeActivityRows(list) : list;
-            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, openPrimary, moreFor, threadFor, teamNode: (r, words) => teamLabelLink(r.team, { full: words, cls: 'al-team' }), thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
+            wrap.append(Ledger.ledger(ordered, { label: `Activity, ${list.length}`, parts, opens, openRow, moreFor, teamNode: (r, words) => teamLabelLink(r.team, { full: words, cls: 'al-team' }), thumbUrl: (path, r) => serverUrl(path, r.server || LOCAL_SERVER), openLabel: r => M(itemWords(r)), openGoal: r => open.goal({ ...r, item_id: String(r.goal_id) }), openTask: open.taskOf ? r => open.taskOf(r) : null, hideGoal: grouped, hideTask: grouped && byTask, teamWords, fromWords: r => AF.agentOf(r) ? `from ${M(AF.agentOf(r))}` : '', doneFrom: fromCell, keyOf }, { groupFor }));
             const gaps = loaded ? missingWords(missingComputers(), shownComputers()) : '';
             if (gaps) { // the mock's "Partial multi-computer view" notice: the same icon, heading and sentence as the record check (#19924)
                 const n = DT.el('div', 'activity-check activity-check-partial'), tile = DT.el('span', 'activity-check-tile material-icons'), text = DT.el('div', 'activity-check-text');

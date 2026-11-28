@@ -27,9 +27,9 @@ const BASE = require('./test_base').BASE;
     };
     const rowsNow = () => ev(`document.querySelectorAll('#group-table-view .al-row').length`);
     const text = () => ev(`[...document.querySelectorAll('#group-table-view .al-row')].map(r => r.textContent).join(' | ')`);
-    const pressed = () => ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip[aria-pressed="true"]')].map(b => b.dataset.filter)`);
-    const pills = () => ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.dataset.filter + ':' + b.textContent.replace(/\\s+/g, ' ').trim())`);
-    const pick = async key => { assert.ok(await ev(`(() => { const b = document.querySelector('.team-tb-pills .goals-chip[data-filter="${key}"]'); if (!b || !b.getClientRects().length) return false; b.click(); return true; })()`), `the ${key} chip is there to press`); await ev(framesJs(4)); };
+    const pressed = () => ev(`[...document.querySelectorAll('.al-switch .al-switch-btn[aria-pressed="true"]')].map(b => b.textContent.trim() === 'Important' ? 'important' : 'all')`); // the Important | Everything switch (#22100 mock)
+    const pills = () => ev(`[...document.querySelectorAll('.al-switch .al-switch-btn')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);
+    const pick = async key => { const word = key === 'all' ? 'Everything' : 'Important'; assert.ok(await ev(`(() => { const b = [...document.querySelectorAll('.al-switch .al-switch-btn')].find(x => x.textContent.trim() === '${word}'); if (!b || !b.getClientRects().length) return false; b.click(); return true; })()`), `the ${word} button is there to press`); await ev(framesJs(4)); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, theme] of [[1440, 'dark'], [1440, 'light'], [390, 'dark']]) {
@@ -40,8 +40,7 @@ const BASE = require('./test_base').BASE;
             if (w < 500) { await shot(`important-default-${tag}`); continue; }
             assert.deepEqual(await pressed(), ['important'], `${tag}: Important is the pressed pill`);
             const list = await pills();
-            assert.ok(list[0].startsWith('important:Important') && list[1].startsWith('all:Everything'), `${tag}: Important first, then Everything: ${JSON.stringify(list)}`);
-            assert.match(list[0], /3\s*$/, `${tag}: Important counts what it shows`); assert.match(list[1], /5\s*$/, `${tag}: Everything counts every row`);
+            assert.deepEqual(list, ['Important', 'Everything'], `${tag}: Important first, then Everything (the mock's switch has no counts)`);
             await shot(`important-default-${tag}`);
             await pick('all');
             assert.deepEqual(await pressed(), ['all'], `${tag}: Everything is pressed`);

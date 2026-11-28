@@ -30,7 +30,7 @@ const BASE=require('./test_base').BASE;
    if(process.env.CORAL_SCREENSHOT_DIR)require('node:fs').writeFileSync(process.env.CORAL_SCREENSHOT_DIR+'/activity-threads-'+width+'.png',Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));
    assert.ok(await ev(`[...document.querySelectorAll('.activity-folder .al-group-head')].every(tr=>{const next=tr.nextElementSibling;return !next?.classList.contains('dt-row')||tr.querySelector('th').getBoundingClientRect().bottom<=next.getBoundingClientRect().top+1})`),'group headings never cover their first action');
    const words=await ev(`document.querySelector('.activity-folder').textContent`);
-   for(const label of ['Approved','Asked for changes','Denied','Answered','Dismissed'])assert.ok((await ev(`[...document.querySelectorAll('.al-verdict')].map(e=>e.textContent)`)).includes(label),label+' is a visible Decision chip');
+   for(const label of ['Approved','Asked for changes','Denied','Answered','Dismissed'])assert.ok((await ev(`[...document.querySelectorAll('.al-v')].map(e=>e.textContent.replace(/^[\\u2713\\u21a9\\u2715]\\s*/, ''))`)).includes(label),label+' is a visible verdict word');
    assert.ok(words.includes('My words for changes')&&words.includes('My words for deny')&&words.includes('My words for dismiss'),'personal words stay with decisions');
    assert.ok(words.includes('Yes, keep @Designer informed.')&&!words.includes('@Reviewer'),'answer formatting preserves other mentions');
    assert.ok(!(await ev(`document.querySelector('.activity-folder').textContent`)).includes('Waiting on you'),'decided rows never imply an unread request');
