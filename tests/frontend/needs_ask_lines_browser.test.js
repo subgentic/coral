@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
-const ASK = '@Operator Please do these in order:\n1. Open Settings\n2. Click Save\n\n3. Reply done';
+const ASK = ['@Operator Please do these in order:', '1. Open Settings', '2. Click Save', '', '3. Reply done'].join(String.fromCharCode(10));
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -26,13 +26,13 @@ const ASK = '@Operator Please do these in order:\n1. Open Settings\n2. Click Sav
                 await waitFor(`!!document.querySelector('#mobile-inbox-list .sidebar-pane')`, at + 'the phone list', 8000);
             } else await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`!!document.querySelector('#group-table-view .inbox-ask-name')`, at + 'the ask row', 10000);
-            const s = await ev(`(() => { const n = document.querySelector('#group-table-view .inbox-ask-name'), cs = getComputedStyle(n), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4;
+            await waitFor(`!!document.querySelector('#group-table-view .nl-question-box')`, at + 'the ask row', 10000);
+            const s = await ev(`(() => { const n = document.querySelector('#group-table-view .nl-question-box'), cs = getComputedStyle(n), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4;
                 const r = document.createRange(); r.selectNodeContents(n); const tops = new Set([...r.getClientRects()].map(x => Math.round(x.top)));
-                return { text: n.textContent, ws: cs.whiteSpace, lines: tops.size, h: Math.round(n.getBoundingClientRect().height), lh: Math.round(lh), clamp: cs.webkitLineClamp }; })()`);
-            if (s.text !== '@Operator Please do these in order:\n1. Open Settings\n2. Click Save\n3. Reply done') problems.push(at + 'the row keeps the lines (empty ones dropped): ' + JSON.stringify(s.text));
+                return { text: n.closest('.nl-body').querySelector('.nl-title').textContent + String.fromCharCode(10) + n.textContent, ws: cs.whiteSpace, lines: tops.size, h: Math.round(n.getBoundingClientRect().height), lh: Math.round(lh), clamp: cs.webkitLineClamp }; })()`);
+            if (s.text !== ['Please do these in order:', '1. Open Settings', '2. Click Save', '3. Reply done'].join(String.fromCharCode(10))) problems.push(at + 'the row keeps the lines (empty ones dropped): ' + JSON.stringify(s.text));
             if (!['pre-line', 'pre-wrap'].includes(s.ws)) problems.push(at + 'the row breaks at them: white-space is ' + s.ws);
-            if (s.lines < 4) problems.push(at + 'four lines drawn (heading + three steps), got ' + s.lines + ' ' + JSON.stringify(s));
+            if (s.lines < 3) problems.push(at + 'three separate step lines below the question title, got ' + s.lines + ' ' + JSON.stringify(s));
             if (process.env.SHOT_DIR) { fs.mkdirSync(process.env.SHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.SHOT_DIR}/ask-lines-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         }
     } finally { await client.close(); }

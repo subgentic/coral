@@ -87,7 +87,7 @@ const AGENTS = (waiting) => waiting ? [
             assert.equal(await ev(`document.getElementById('inbox-title') === null && document.getElementById('inbox-tablist') === null`), true, at + 'the old title and tab strip are gone');
 
             if (mobile) {
-                await waitFor(`!!document.querySelector('#group-table-view .inbox-folder-toolbar') && document.getElementById('group-table-view').getClientRects().length > 0`, at + 'the phone opens on the table with the folder\'s title row on top and no tab strip (#13596)', 10000);
+                await waitFor(`!!document.querySelector('#group-table-view .nl-row') && !!document.querySelector('#top-phone-bar .nl-phone-title') && document.getElementById('group-table-view').getClientRects().length > 0`, at + 'the phone opens on the ledger with its title in the phone bar and no tab strip (#13596)', 10000);
                 assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .view-list-nav, #group-table-view [role=tablist]:not(.inbox-needs-tabs)')].filter(e => e.getClientRects().length).length`), 0, at + 'no tab strip on a phone');
                 assert.equal(await ev(`[...document.querySelectorAll('#mobile-inbox-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
                 await shot(`inbox-one-list-${w}`);
@@ -105,25 +105,31 @@ const AGENTS = (waiting) => waiting ? [
                 continue;
             }
 
-            // the tab opens on the group last on screen: Needs you, as a table
-            await waitFor(`!!document.querySelector('#group-table-view table.dt-table') && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a table', 10000);
+            // #22094 replaces the Needs you table with a ledger. Keep ordering,
+            // row context, search and typography coverage on its new elements.
+            await waitFor(`document.querySelectorAll('#group-table-view .nl-permission').length === 2 && document.getElementById('group-table-view').checkVisibility()`, at + 'the first group as a ledger', 10000);
             assert.equal(await tableTitle(), 'Needs you', at + 'Needs you first');
-            const needsBar = await ev(`(() => { const b = document.querySelector('#group-table-view .gt-toolbar'), s = b && b.querySelector('.gt-search, .list-bar-search'); return s ? { w: Math.round(s.getBoundingClientRect().width), left: Math.round(s.getBoundingClientRect().left), action: !!b.querySelector('.team-tb-action'), chips: b.querySelectorAll('.group-chip').length } : null; })()`);
-            assert.ok(needsBar && needsBar.chips === 0 && !needsBar.action, at + 'the page has the toolbar line: the search field, no chips and no create action on Needs you (#7723): ' + JSON.stringify(needsBar));
-            // the title and its count are the first thing of the toolbar's one row, not a row of their own (#8700; inbox_header_browser measures the line)
-            assert.equal(await ev(`(() => { const row = document.querySelector('#group-table-view .inbox-folder-toolbar .list-bar-search-row'); return !!row && (row.firstElementChild.classList.contains('inbox-folder-head') || row.firstElementChild.classList.contains('inbox-needs-tabs')) && row.querySelector(':scope > .inbox-folder-head #group-table-title') !== null && !document.querySelector('#group-table-view .group-table-head'); })()`), true, at + 'the title is in the toolbar row, with no row of its own');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th:not(.dt-check)')].map(h => [h.textContent.replace(/[\u2191\u2193\u2195]/g, '').trim(), h.getAttribute('scope')])`), [['Item', 'col'], ['CLI', 'col'], ['Folder', 'col'], ['Team', 'col'], ['Goal', 'col'], ['Waiting', 'col'], ['Actions', 'col']], at + 'Item (the agent, with a card choices in its row, #10400, #12701), CLI, Folder (the rows have one), Team, Goal because a row has one, how long it Waits, and the row Actions (#12701); no Waiting for column when no row has a question');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => r.querySelector('.dt-primary').textContent.trim() + '|' + r.querySelector('td[data-key="team"]').textContent.trim())`), ['Agent Two|team-b', 'Agent One|team-a'], at + 'a row per waiting agent, with its team, the one that has waited least first (newest first, #11552)');
-            assert.equal(await ev(`document.querySelector('#group-table-view tbody tr .dt-link').textContent`), 'Ship 169', at + "the goal's cell opens the goal");
-            assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#group-table-title')), c = getComputedStyle(document.querySelector('#group-table-view .inbox-folder-head .session-group-count')); return [t.fontSize, t.fontWeight, c.fontSize, c.fontWeight]; })()`), ['20px', '700', '11px', '600'], at + 'the title is 20/700, its count 11/600');
-            assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the table is on the scale');
-            await shot(`inbox-one-needs-${w}`);
+            assert.equal(await ev(`(() => { const b = document.querySelector('#group-table-view .gt-toolbar'); return !!b?.querySelector('input[type=search]') && !b.querySelector('.team-tb-action,.group-chip'); })()`), true, at + 'the shared search remains without a create action or folder chips');
+            assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), [11,12,12.5,13,13.5,14,15,17,18,20])`), [], at + 'ledger text stays on the approved type scale');
 
-            // the search names its group and narrows it
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .nl-permission')].map(r => r.querySelector('.nl-title').textContent.split(' needs permission')[0] + '|' + r.querySelector('.team-label-link').textContent.trim())`), ['Agent Two|team-b', 'Agent One|team-a'], at + 'waiting agents keep newest-first order and team context');
+            assert.equal(await ev(`document.querySelectorAll('#group-table-view table').length`), 0, at + 'the ledger replaces the old column headings');
+            assert.equal(await ev(`document.querySelector('#group-table-view .needs-ledger').getAttribute('aria-label')`), 'Needs you', at + 'the list has an accessible name');
+            assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .nl-permission')].every(r => r.querySelector('time') && r.querySelector('.nl-actions') && r.querySelector('a,button'))`), true, at + 'time, actions and context remain in each row');
+            await shot(`inbox-one-needs-${w}`);
+            // Goal context formerly occupied a column. In the ledger's flat view it
+            // stays an actual link beside the agent and team.
+            await ev(`document.querySelector('#group-table-view .nl-visible-group > button').click(); true`);
+            await waitFor(`!!document.querySelector('#needs-group-by-menu button')`, at + 'Group by choices');
+            await ev(`[...document.querySelectorAll('#needs-group-by-menu button')].find(b => b.textContent.trim() === 'None').click(); true`);
+            await waitFor(`[...document.querySelectorAll('#group-table-view .nl-meta a')].some(a => a.textContent.includes('Ship 169'))`, at + 'the flat row retains its goal link');
+
+
+            // The shared search still narrows and clears the ledger.
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'two'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'the search narrows Needs you', 5000);
+            await waitFor(`document.querySelectorAll('#group-table-view .nl-row').length === 1`, at + 'the search narrows Needs you', 5000);
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'cleared', 5000);
+            await waitFor(`document.querySelectorAll('#group-table-view .nl-row').length === 2`, at + 'cleared', 5000);
 
             // Tasks
             await ev(`window.switchNavTab('hub-inbox', { folder: 'tasks' }); true`);
