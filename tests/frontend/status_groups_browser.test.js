@@ -2,7 +2,7 @@
 //   1. a fresh profile opens on Status: Needs you, Working, Idle, then Done today, folded; each heading has its count, no row has a status dot, and a group's rows run newest update first;
 //   2. Done today opens from its heading with a real click; the choice is kept after a reload;
 //   3. the Team button brings back the teams (the orchestrator card), is remembered across a reload, and Status brings the groups back;
-//   4. a phone shows every agent that needs you, two working, and one line: "2 more working · 3 idle · 6 done today", which opens the rest;
+//   4. a phone shows the same groups as a wide screen, every agent a row (#22105, the approved sidebar mock: no short list);
 //   5. an agent that comes back with output moves up (a working agent's update is newer than the others'), and an agent that asks a question moves to Needs you.
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
@@ -83,7 +83,7 @@ const { settle, coralReady, framesJs } = require('./helpers/wait');
         assert.deepEqual(p.out.filter(x => x.head).map(x => [x.head, x.name, x.n]), [['needs', 'Needs you', 1], ['working', 'Working', 4], ['idle', 'Idle', 3], ['done', 'Done today', 6]], 'the four groups, in order, with their counts');
         assert.deepEqual(p.out.filter(x => x.head).map(x => x.open), ['true', 'true', 'true', 'false'], 'Done today is folded');
         assert.deepEqual(p.out.filter(x => x.row).map(x => x.row), ['ask-407', 'Orchestrator', 'work-409', 'work-410', 'work-411', 'idle-designer', 'idle-402', 'idle-qa'], 'newest update first inside each group');
-        assert.ok(p.out.filter(x => x.row).every(x => !x.dot), 'a row has no status dot: its heading is the status');
+        assert.ok(p.out.filter(x => x.row).every(x => x.dot), 'every row has its state mark (#22105, the approved sidebar mock)');
         assert.equal(p.out.find(x => x.row === 'work-410').time, '2 min');
         assert.deepEqual(p.switchOn, [], 'no Group by box is ticked: the Status view');
         assert.equal(p.oldSwitch, 0, 'no segmented switch is drawn any more');
@@ -159,7 +159,7 @@ const { settle, coralReady, framesJs } = require('./helpers/wait');
         assert.equal(names('working')[0] === 'Orchestrator' || names('working')[0] === 'idle-qa', true, 'the agent that came back is among the first of Working');
         assert.equal(names('idle').includes('idle-qa'), false);
 
-        console.log('phone 390: one line counts the rest');
+        console.log('phone 390: the same groups, every agent a row');
         await ev(`try { localStorage.removeItem('coral-status-more'); localStorage.removeItem('coral-status-folded'); } catch (e) {} true`);
         // The launch notice's read answers late, as on a slow runner (#21921): it came about 70 ms after the list, between a press being aimed and made, and the press landed on a row. It is held here so that every run has that order.
         await client.Fetch.enable({ patterns: [{ urlPattern: '*/api/launch-disclosure', requestStage: 'Request' }] });
@@ -170,13 +170,11 @@ const { settle, coralReady, framesJs } = require('./helpers/wait');
         await waitFor(`!!document.getElementById('launch-disclosure-banner')`, 'the launch notice, which comes with the first local agent', 6000);
         await shot('groupby-phone-390');
         p = await picture(true);
-        assert.deepEqual(p.out.filter(x => x.row).map(x => x.row), ['ask-407', 'Orchestrator', 'work-409'], 'the agent that needs you and two that are working');
-        assert.equal(p.out.find(x => x.more).more, '2 more working · 3 idle · 6 done today');
+        assert.equal(p.out.some(x => x.more), false, 'no line that counts the rest');
+        assert.deepEqual(p.out.filter(x => x.row).map(x => x.row).slice(0, 3), ['ask-407', 'Orchestrator', 'work-409'], 'the agent that needs you first, then the working ones');
+        assert.ok(p.out.filter(x => x.row && x.group === 'idle').length >= 3, 'the idle ones are rows too: ' + JSON.stringify(p.out));
         assert.ok(p.overflow <= 0, `no horizontal overflow: ${p.overflow}`);
         await shot('status-phone-390');
-        await click('#mobile-agent-list .status-more-toggle');
-        await waitFor(`document.querySelectorAll('#mobile-agent-list .session-group-item[data-group="__status__"]').length === 14`, 'every agent', 4000);
-        await shot('status-phone-390-all');
         console.log('phone 390: the Team view says the same, folded');
         await ev(`(() => { for (const n of ['ask-407', 'work-409', 'work-410', 'work-411', 'idle-402']) window.__patch(n, { board_project: 'shop' }); return true; })()`);
         await pick('team', 'mobile-agent-list-bar');

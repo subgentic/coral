@@ -159,18 +159,17 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         assert.deepEqual(await chips(), []); assert.equal(await count(), '30 agents'); assert.equal(await badge(), '', 'cleared: no dot');
         await set('#al-sort', 'default');
 
-        console.log('7. With Collapse all: a filter shows its matches in collapsed groups, and clearing it folds them again');
-        const groupToggle = `document.querySelector('.sidebar-header [data-group-toggle]')`;
-        assert.equal(await ev(`${groupToggle}.hidden === false && ${groupToggle}.getAttribute('aria-label')`), 'Collapse all groups', 'one toggle in the header, beside the Display button');
-        await ev(`${groupToggle}.click(); true`);
+        console.log('7. With every group folded: a filter shows its matches in collapsed groups, and clearing it folds them again');
+        const groupToggle = `document.querySelector('.sidebar-header[data-header="agents"] [data-group-toggle]')`;
+        assert.equal(await ev(`!${groupToggle}`), true, 'no Collapse / Expand toggle in the agent list header (#22105)');
+        await ev(`import((window.__coralStatic || '/static/') + 'group_collapse.js').then(m => { m.toggleAllGroups(); return true; })`); // the list's own fold-all (its header button went in #22105)
         assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-header[aria-expanded="true"]').length`), 0, 'every group is folded');
-        await waitFor(`${groupToggle}.getAttribute('aria-label') === 'Expand all groups'`, 'the toggle now offers the way back');
         await set('#al-state', 'needs_input');
         assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-header[aria-expanded="false"]').length`), 0, 'while a filter is on its matches show');
         expectIds(await ids(), byState('needs_input'), 'the needs-input agents are all in the list');
         await set('#al-state', '');
         assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-header[aria-expanded="true"]').length`), 0, 'cleared: folded again');
-        await ev(`${groupToggle}.click(); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'group_collapse.js').then(m => { m.toggleAllGroups(); return true; })`);
         assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-header[aria-expanded="false"]').length`), 0, 'the second press opens them all');
 
         console.log('8. Long names: the row and the bar do not scroll sideways');
@@ -203,7 +202,7 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         assert.equal(await panelOpen('phone'), false); await toggleBtn('phone'); assert.equal(await panelOpen('phone'), true);
         await waitFor(`!!document.querySelector('#mobile-agent-list-bar #alm-sort')`, 'the phone bar, drawn as the panel opens', { timeout: 8000 });
         assert.equal(await ev(`document.querySelector('#mobile-agent-list-bar .list-bar-count').textContent`), '30 agents');
-        const touch = await ev(`(() => { const r = e => Math.round(document.querySelector(e).getBoundingClientRect().height); return { button: r('.mobile-list-header [data-display-button]'), toggle: r('.mobile-list-header [data-group-toggle]'), state: r('#alm-state'), sort: r('#alm-sort') }; })()`); // the display options are drawn only with servers to choose between (mobile_group_by_server measures them)
+        const touch = await ev(`(() => { const r = e => Math.round(document.querySelector(e).getBoundingClientRect().height); return { button: r('.mobile-list-header [data-display-button]'), state: r('#alm-state'), sort: r('#alm-sort') }; })()`); // the display options are drawn only with servers to choose between (mobile_group_by_server measures them)
         assert.ok(Object.values(touch).every(h => h >= 44), 'targets at least 44 px: ' + JSON.stringify(touch));
         await set('#alm-state', 'needs_input', 'phone');
         assert.equal(await count(), `${byState('needs_input').length} of 30 agents`); assert.deepEqual(await chips('phone'), ['State: Needs input']);
@@ -224,9 +223,9 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         const big = await ev(`(() => { const r = e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
             const btn = document.querySelector('.sidebar-header [data-display-button]'); const icon = btn.querySelector('.material-icons'); const dot = btn.querySelector('[data-display-badge]');
             const a = r(icon), d = r(dot); const ow = Math.max(0, Math.min(a.r, d.r) - Math.max(a.l, d.l)), oh = Math.max(0, Math.min(a.b, d.b) - Math.max(a.t, d.t));
-            return { dotShown: !dot.hidden && d.r > d.l, overlap: Math.round(ow * oh) / Math.round((a.r - a.l) * (a.b - a.t)), name: btn.getAttribute('aria-label') }; })()`);
+            return { dotShown: !dot.hidden && d.r > d.l, overlap: Math.round(ow * oh) / Math.round((a.r - a.l) * (a.b - a.t)), name: dot.getAttribute('aria-label') }; })()`); // the button's name is its words (#22105): the dot names the filters
         assert.ok(big.dotShown, 'the count dot is shown'); assert.ok(big.overlap < 0.15, 'and does not cover the icon: ' + big.overlap);
-        assert.equal(big.name, 'Display options, 2 filters on', 'the button names how many filters are on');
+        assert.equal(big.name, '2 filters on', 'the dot names how many filters are on');
         await toggleBtn();
         const stacked = await ev(`(() => [...document.querySelectorAll('#agent-list-bar .list-bar-field')].filter(f => f.getClientRects().length).map(f => { const l = f.querySelector('.list-bar-field-label').getBoundingClientRect(), s = f.querySelector('select').getBoundingClientRect(), p = document.querySelector('.sidebar-header [data-display-panel]').getBoundingClientRect();
             return { under: s.top >= l.bottom - 1 || s.left >= l.right - 1, wide: s.width, inside: s.left >= p.left - 1 && s.right <= p.right + 1 }; }))()`);

@@ -236,12 +236,12 @@
 1	group_cards.js	distillChip(boardName)
 1	group_cards.js	groupKebab
 1	group_cards.js	killAllItem(boardName)
-1	group_cards.js	loadedModule('./active_teams.js')?.chip(boardName) || ''
+1	group_cards.js	loadedModule('./active_teams.js')?.needsItem(boardName) || ''
 1	group_cards.js	sleepLabel
 1	group_cards.js	sleepingClass
 1	group_cards.js	sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-cl
 1	group_cards.js	tagDots
-1	group_cards.js	teamHealthBtn(boardName, boardSessions)
+1	group_cards.js	teamHealthItem(boardName, boardSessions)
 1	group_cards.js	wfKebab
 1	group_cards.js	wfRunId ? ' · Run #' + wfRunId : ''
 1	group_cards.js	wfRunId ? `<button class="menu-item overflow-menu-item" data-on-click="wf-run-open" data-run-id="${Number(wfRu
@@ -260,7 +260,7 @@
 1	launch_core.js	failList
 1	launch_core.js	started
 1	list_card_parts.js	PIN_ICON
-2	list_card_parts.js	SVGO.o5
+1	list_card_parts.js	SVGO.o5
 4	list_card_parts.js	icon
 1	markdown.js	HL_MARK
 2	message_board.js	p.message_count
@@ -353,7 +353,7 @@
 18	session_rows.js	SVGO.o0
 8	session_rows.js	SVGO.o1
 4	session_rows.js	SVGO.o2
-2	session_rows.js	SVGO.o4
+1	session_rows.js	SVGO.o4
 1	session_rows.js	['codex', 'claude', 'agy'].includes(s.agent_type) && typeof s.keep_full_access === 'boolean' ? (() => { const 
 2	session_rows.js	_mk0
 1	session_rows.js	_mk1
@@ -371,6 +371,7 @@
 1	session_rows.js	dotClass
 1	session_rows.js	hooksMissingChip(s)
 2	session_rows.js	label
+1	session_rows.js	markClass
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	piHooksChip(s)
 1	session_rows.js	pillKind
@@ -378,7 +379,7 @@
 1	session_rows.js	rowLinesHtml(s)
 1	session_rows.js	sleepingClass
 1	session_rows.js	stale ? '' : kebabMenu
-1	session_rows.js	stale ? '' : waitingBadge + heldChip + sleepChip + restartBtn + wakeBtn + sleepBtn
+1	session_rows.js	stale ? '' : waitingBadge + heldChip + restartBtn + wakeBtn + sleepBtn
 1	session_rows.js	staleClass
 1	session_rows.js	stateInfo.pillClass ? ' ' + stateInfo.pillClass : ''
 1	session_rows.js	stuckClass

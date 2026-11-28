@@ -41,19 +41,17 @@ export function deleteTeamItem(boardName) {
                 </button>`;
 }
 
-// The team's health check (#4962, quieter in #5119): an accent icon beside the team view button while the check is ON, that opens the setting; while it is off there is no icon
+// The team's health check (#4962, quieter in #5119): while the check is ON the team's menu has a Health check item that opens the setting; while it is off there is none
 // (turned on in Team settings, Health check, and in the Agent Team dialog).
 // The state is "team_health_on" on the team's rows in the live list; Hub's web shell: plain icon.
 // The icon must not blink: a feed message that leaves the field out or nulls it (a field-level diff says null for a field a row no longer has) is not the team turning
 // the check off, so the last state seen for the team stands until a row says otherwise.
 const _healthSeen = new Map(); // team (board) name -> the last team_health_on a row of it carried
-export function teamHealthBtn(boardName, boardSessions) {
+export function teamHealthItem(boardName, boardSessions) { // the team menu's Health check (#22105, the approved sidebar mock: the team line's pulse icon moved into its menu), while the check is on
     const row = boardSessions.find(s => typeof s.team_health_on === 'boolean');
     if (row) _healthSeen.set(boardName, row.team_health_on);
-    if (!_healthSeen.get(boardName)) return '';
-    if (isCloud()) return `<span class="team-health-btn is-on" role="img" aria-label="Health check is on">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></span>`;
-    const label = `Health check settings for ${keyLabel(boardName)}`;
-    return `<button type="button" class="btn btn-quiet btn-icon btn-xs folder-copy-btn team-health-btn is-on" data-on-click="team-health" data-board="${escapeAttr(boardName)}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg></button>`;
+    if (!_healthSeen.get(boardName) || isCloud()) return '';
+    return `<button class="menu-item overflow-menu-item team-health-item" data-on-click="team-health" data-board="${escapeAttr(boardName)}">${SVGO.o5}<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg>Health check</button>`;
 }
 
 // A folder icon on folder groups, as teams have the people icon (#3507 v4, the operator's

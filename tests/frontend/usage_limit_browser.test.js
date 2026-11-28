@@ -36,7 +36,7 @@ const { connect } = require('./agent_view_harness');
    if(mobile)assert.deepEqual(mockStyle.summary,['3 Codex agents reset 22:07','1 Claude agent resets 09:00 tomorrow','1 Antigravity agent: reset time unknown']);
 
 
-   if(mobile)assert.ok(await ev(`(()=>{const r=document.querySelector('${root} [data-session-id="codex"]'),a=r.querySelector('.session-avatar').getBoundingClientRect(),d=r.querySelector('.session-dot').getBoundingClientRect();return d.left>=a.left&&d.right<=a.right+4&&d.top>=a.top&&d.bottom<=a.bottom+4;})()`),'the usage dot stays on its phone avatar');
+   if(mobile)assert.ok(await ev(`(()=>{const r=document.querySelector('${root} [data-session-id="codex"]'),b=r.getBoundingClientRect(),d=r.querySelector('.session-dot').getBoundingClientRect();return d.width>0&&d.left>=b.left&&d.right<=b.right&&d.top>=b.top&&d.bottom<=b.bottom;})()`),'the row keeps its state mark inside it on a phone (#22105: the phone row is the sidebar\'s, no avatar)');
    const layout = await ev(`(() => {const r=document.querySelector('${root} [data-session-id="agy"]');const n=r.querySelector('.session-name-row').getBoundingClientRect(), d=r.querySelector('.usage-limit-detail').getBoundingClientRect(); return {clear:d.height===0||d.top>=n.bottom-1,lines:[...document.querySelectorAll('${root} .usage-limit-summary p')].filter(p=>p.getBoundingClientRect().height).map(p=>p.getBoundingClientRect().top)};})()`);
    if(mobile)assert.match(await ev(`document.querySelector('${root} [data-session-id="codex"] .session-status-line').textContent`),/^Limit · resets /,'phone uses the mock’s single compact limit line');
    assert.equal(layout.clear,true,'unknown-time pill never overlaps its detail');

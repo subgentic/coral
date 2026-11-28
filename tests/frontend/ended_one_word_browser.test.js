@@ -23,7 +23,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!!document.querySelector('.session-group-item[data-session-id="ended-one-id"]')`, 'the ended agent\'s row', 5000);
         const read = () => ev(`(() => { const li = document.querySelector('.session-group-item[data-session-id="ended-one-id"]'), row = li.querySelector('.session-name-row');
             const words = [...row.querySelectorAll('.terminal-gone-chip, .session-state-pill, .btn')].filter(e => e.textContent.trim()).map(e => ({ text: e.textContent.trim(), shown: e.getClientRects().length > 0, title: e.title || '' }));
-            return { words, shownWords: words.filter(w => w.shown).map(w => w.text), dotShown: getComputedStyle(li.querySelector('.session-dot')).visibility !== 'hidden' }; })()`);
+            return { words, shownWords: words.filter(w => w.shown).map(w => w.text), dotShown: getComputedStyle(li.querySelector('.session-dot')).visibility !== 'hidden', mark: li.querySelector('.session-dot').getAttribute('aria-label'), moon: getComputedStyle(li.querySelector('.session-dot'), '::before').content }; })()`);
         for (const [width, height, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -34,7 +34,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(!all.includes('Sleeping'), `${width}: no Sleeping pill on an ended row: ${JSON.stringify(all)}`);
             assert.deepEqual(r.shownWords, ['Ended'], `${width}: at rest the row says one word, Ended: ${JSON.stringify(r.words)}`);
             assert.equal(r.words.find(w => w.text === 'Ended').title, 'Its program exited; Restart starts it again', `${width}: the tooltip says why`);
-            assert.equal(r.dotShown, false, `${width}: no moon (the state dot is hidden)`);
+            assert.ok(r.dotShown && r.mark === 'Asleep' && !/\u263E|☾/.test(r.moon), `${width}: the Asleep mark, no moon (#22105, the approved sidebar mock: one mark for every asleep agent) ` + JSON.stringify(r));
             assert.deepEqual(all.filter(w => w !== 'Ended').sort(), ['Restart', 'Sleep', 'Wake'], `${width}: the three actions are on the row: ${JSON.stringify(all)}`);
         }
         console.log('   ✓ an ended row says Ended alone, with Restart as its one action');

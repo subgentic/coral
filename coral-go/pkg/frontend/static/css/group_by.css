@@ -9,9 +9,8 @@
 /* Task rows: the sub-heading under a team or computer, and each row's #number title line (the mock: accent number, muted title, one line). */
 .status-sub { list-style: none; margin: var(--space-xs) 0 0; padding-inline-start: var(--space-md); }
 .status-sub .status-head-toggle { font-size: var(--fs-sm); color: var(--text-secondary); min-height: 30px; padding-block: 0; }
-.session-group-item[data-in] .session-preview, .session-group-item[data-in] .session-status-line { display: none; } /* the mock's row is the name and the task line */
+.session-group-item[data-in] .session-status-line { display: none; } /* the mock's row is the name and the task line */
 .session-group-item[data-in] { padding-inline-start: var(--space-xl); }
 .session-task-line { display: block; padding-left: 18px; color: var(--text-secondary); font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-task-line b { color: var(--accent); font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; margin-inline-end: var(--space-xs); }
 .status-queued { color: var(--text-muted); font-size: var(--fs-sm); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 var(--space-xs); margin-inline-start: var(--space-sm); flex: none; }
-.status-more-in { padding-inline-start: var(--space-xl); margin-top: 0; }
