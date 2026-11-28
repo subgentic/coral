@@ -66,7 +66,7 @@ const { guardSettings } = require('./helpers/settings_guard');
                 check(first && first.c === 'title' && second, `${w} px: a ${r.kind} row has its title on line one and a second line under it (#13911): ` + JSON.stringify(r.lines));
                 check(r.words.every(t => ({review:['For review'],ask:['Question'],goal_done:['Goal looks done']}[r.kind] || []).includes(t)), `${w} px: a ${r.kind} row draws only its approved metadata kind (#20203): ` + JSON.stringify(r.words));
                 // Designer 10:07 ruling: file icons also stay at the title top.
-                // a file's row centres its icon and its side (agent, New, time) on its tall title button (needs_ledger.css .nl-file, approved v19); every other row keeps them at the top
+                const file = r.kind === 'review'; // file metadata keeps its separate phone time line
                 if (when) check(first && when.l >= first.r - 1 && (file || when.t < (second ? second.t + second.h : first.t + first.h)), `${w} px: the time is at the right of the row's first lines in a ${r.kind} row: ` + JSON.stringify(r.lines.map(l => [l.c, l.t, l.l, l.r]))); // a row with no wait time (a welcome item) draws none
                 check(r.iconTop !== null && (r.iconTop >= 4 && r.iconTop <= 16) && r.iconLeft >= 8 && r.iconLeft <= 20, `${w} px: a ${r.kind} row's icon is in the one spot, top left: ` + JSON.stringify([r.iconTop, r.iconLeft, r.iconH, r.h]));
                 check(r.inside, `${w} px: a ${r.kind} row shows its full wrapped content (#20203), all inside the row: ` + JSON.stringify(r.lines.map(l => [l.c, l.t, l.h])));
