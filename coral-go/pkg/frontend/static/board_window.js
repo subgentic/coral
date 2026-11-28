@@ -261,23 +261,24 @@ function revealMessage(target, instant = false) {
     if (run) run.open = true; // a task-queue line inside a collapsed row
     if (target.classList.contains('mb-message')) toggleRow(target, true); // a jump (a search hit, a saved message, a link) lands on the whole message
     target.classList.add('chat-search-target');
-    if (target.classList.contains('mb-message') && target.parentElement && target.parentElement.classList.contains('mb-table')) revealRow(target, instant ? 'auto' : scrollBehavior());
+    const inTable = target.classList.contains('mb-message') && target.parentElement && target.parentElement.classList.contains('mb-table');
+    if (inTable) revealRow(target, instant ? 'auto' : scrollBehavior());
     else target.scrollIntoView({ block: 'center', behavior: instant ? 'auto' : scrollBehavior() });
     target.setAttribute('tabindex', '-1'); // the focus goes to the message
     target.focus({ preventScroll: true });
-    if (!(target.classList.contains('mb-message') && target.parentElement && target.parentElement.classList.contains('mb-table'))) keepInView(target, instant); // the table's rows are placed under its sticky head by revealRow: that is its own placing
+    keepInView(target, instant, inTable ? () => revealRow(target, 'auto') : null); // a table row is placed under its sticky head by revealRow, and put back the same way
 }
 
 // The jump scrolls to its message once; rows and counts that arrive a moment later (an older page, an opened thread, day dividers) move it away, and on a slow machine the smooth scroll is still on its way when they do (#14881: the match
 // was marked and focused and out of view). After a jump the message is looked at again when the list's size changes and once more when the scroll has settled, and put back in view if it is not, until the person takes over (a wheel, a touch,
 // a key or a press in the list) or three seconds have passed.
-function keepInView(target, instant) {
+function keepInView(target, instant, place) {
     const box = target.closest('#mb-messages');
     if (!box) return;
     box._keepOff?.(); // one watch at a time: a newer jump replaces the older
     let timer = 0, ended = false, ro = null;
     const inView = () => { const a = target.getBoundingClientRect(), b = box.getBoundingClientRect(); return a.top >= b.top - 1 && a.bottom <= b.bottom + 1 || a.height > b.height && a.top <= b.top + 1 && a.bottom >= b.bottom - 1; };
-    const look = () => { if (ended) return; if (!target.isConnected || !target.classList.contains('chat-search-target')) return end(); if (!inView()) target.scrollIntoView({ block: 'center', behavior: 'auto' }); };
+    const look = () => { if (ended) return; if (!target.isConnected || !target.classList.contains('chat-search-target')) return end(); if (!inView()) { if (place) place(); else target.scrollIntoView({ block: 'center', behavior: 'auto' }); } };
     const later = ms => { clearTimeout(timer); timer = setTimeout(look, ms); };
     const events = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
     function end() { if (ended) return; ended = true; clearTimeout(timer); clearTimeout(stop); ro?.disconnect(); for (const e of events) box.removeEventListener(e, end, true); if (box._keepOff === end) box._keepOff = null; }
