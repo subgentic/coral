@@ -26,7 +26,7 @@
 .sl-tag { background: var(--bg-tertiary); color: var(--text-secondary); white-space: nowrap; }
 .sl-tag-blue { color: var(--accent); background: rgba(var(--accent-rgb), 0.16); }
 .sl-tag-green { color: var(--success-text); background: rgba(var(--success-rgb), 0.16); }
-.sl-tag-amber { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.16); }
+.sl-tag-red { color: var(--error-text); background: rgba(var(--error-rgb), 0.16); } /* Denied: the red of Activity's Denied (activity_ledger.css) */
 .sl-avatar, .sl-av-1 { display: inline-flex; align-items: center; justify-content: center; width: 1.375rem; height: 1.375rem; border-radius: 50%; font-size: var(--fs-sm); font-weight: var(--fw-strong); color: var(--on-avatar); background: var(--avatar-1); }
 .sl-av-2 { background: var(--avatar-2); } .sl-av-3 { background: var(--avatar-3); } .sl-av-4 { background: var(--avatar-4); }
 .sl-av-5 { background: var(--avatar-5); } .sl-av-6 { background: var(--avatar-6); } .sl-av-7 { background: var(--avatar-7); } .sl-av-8 { background: var(--avatar-8); }
