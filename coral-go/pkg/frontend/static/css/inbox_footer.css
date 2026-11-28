@@ -158,8 +158,8 @@
 /* Implied introductions remain in the accessible text without taking a visible row. */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row .inbox-implied-intro { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row .inbox-v4-heading { line-height: var(--lh-ui); align-self: start; align-items: flex-start; min-height: 0; margin-block-start: 0; padding-block-start: 0; }
-:root :is(#group-table-view, .team-needs-list) .inbox-folder-toolbar .list-bar-search-row:has(> .inbox-copy-for-agent) > .inbox-needs-tabs { flex-basis: 100%; }
-:root :is(#group-table-view, .team-needs-list) .inbox-folder-toolbar .list-bar-search-row:has(> .inbox-copy-for-agent) > .inbox-copy-for-agent { order: 2; margin-inline-start: 0; }
+:root :is(#group-table-view, .team-needs-list) .inbox-folder-toolbar .list-bar-search-row:has(> .needs-tools) > .inbox-needs-tabs { flex-basis: 100%; }
+:root :is(#group-table-view, .team-needs-list) .inbox-folder-toolbar .list-bar-search-row:has(> .needs-tools) > .needs-tools { order: 2; margin-inline-start: 0; }
 
 @media (max-width: 760px) {
     :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-v4-row.inbox-kind-row.inbox-message-row > .inbox-v4-content { padding-block-start: 0; align-self: start; align-items: flex-start; }
