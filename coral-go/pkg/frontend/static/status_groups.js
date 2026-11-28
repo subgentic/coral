@@ -152,7 +152,7 @@ export function lay(regular, limits, archived, renderRow, wrap) {
     arch = archived;
     mountGroupBy();
     const g = groupBy();
-    const on = BOXES.filter(([k]) => g[k]).map(([, l]) => l), words = on.length > 1 ? String(on.length) : on[0] || 'Status'; for (const b of document.querySelectorAll('[data-group-by-label]')) if (b.textContent !== words) b.textContent = words; // the button says the grouping (#22105): one box its name, two or more how many (the Orchestrator's call 1, revised: the search box keeps its room)
+    const on = BOXES.filter(([k]) => g[k]).map(([, l]) => l), words = on.length > 1 ? String(on.length) : on[0] || ''; for (const b of document.querySelectorAll('[data-group-by-label]')) { if (b.textContent !== words) b.textContent = words; const v = b.closest('[data-group-by-value]'); if (v && v.hidden !== !words) v.hidden = !words; } // the button says the grouping (#22105): none ticked just "Group by", one box its name, two or more how many (the Orchestrator's call 1, revised twice: the search box keeps its room)
     if (g.server || g.team || g.task) groupByStyles(); // a grouped view is drawing: its sheet (none ticked: only the bundle's)
     if (g.team) return null;
     const sleeping = limits?.sleeping || [];
@@ -181,7 +181,7 @@ export function teamList(saved, board, draw, row) {
          n = g => workers.filter(s => groupOf(s) === g).length;
     const sum = [`${n('working')} working`, n('needs') ? `<span class="status-shape st-needs" aria-hidden="true"></span>${Number(n('needs'))} needs you` : '', `${n('idle')} ready`].filter(x => x && !x.startsWith('0 ')).join(' · ');
     let html = (task ? withTaskRows(draw([orch]), [orch]) : draw([orch])); // the orchestrator is the team's first row, whatever the grouping (with the Task box it keeps its task line, and is in neither split group)
-    if (fold) html = html.replace(/( aria-label="[^"]*)"/, `$1, ${Number(workers.length)} workers" aria-expanded="${escapeAttr(String(!folded))}"`).replace(' data-on-click="session-open"', ` data-on-click="status-orch-open" data-fold="${escapeAttr(key)}"`); // no fold button (#22045): a click (or Enter) on the row once it is selected opens or closes its workers; the first click selects it
+    if (fold) { const end = html.indexOf('>') + 1; html = html.slice(0, end).replace(/( aria-label="[^"]*)"/, `$1, ${Number(workers.length)} workers" aria-expanded="${escapeAttr(String(!folded))}"`).replace(' data-on-click="session-open"', ` data-on-click="status-orch-open" data-fold="${escapeAttr(key)}"`) + html.slice(end); } // no fold button (#22045): a click (or Enter) on the row once it is selected opens or closes its workers; the first click selects it
     if (task && !(fold && folded)) return html + split(rest);
     if (folded) return html + `<li class="status-workers-sum">${sum}</li>` + draw(asleep);
     const done = arch.filter(x => x.board_project === board && doneToday(x)), dkey = 'd:' + board, dOpen = !isFolded(dkey);

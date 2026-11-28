@@ -31,7 +31,7 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
                 ws.handleCoralMessage({ type: 'coral_update', servers: [], sessions: ${JSON.stringify(SESSIONS)} }); render.flushLiveSessionsRender(); render.renderLiveSessions(state.liveSessions); return true; })()`);
             await waitFor(`document.querySelectorAll('#live-sessions-list .session-group-item, #mobile-session-list .session-group-item').length === 6`, 'six agents', 8000);
             const dot = () => ev(`(() => { const b = document.querySelector('${header} [data-display-badge]'); return !!b && !b.hidden && b.getClientRects().length > 0; })()`);
-            const label = () => ev(`(() => { const b = document.querySelector('${header} [data-display-button]'), d = b.querySelector('[data-display-badge]'); return 'Group by: ' + b.querySelector('[data-group-by-label]').textContent + (d && !d.hidden ? ' | ' + d.getAttribute('aria-label') : ''); })()`); // the button's name is its words (#22105); the dot names the filters
+            const label = () => ev(`(() => { const b = document.querySelector('${header} [data-display-button]'), d = b.querySelector('[data-display-badge]'); return b.innerText.replace('expand_more', '').replace(/\\s+/g, ' ').trim() + (d && !d.hidden ? ' | ' + d.getAttribute('aria-label') : ''); })()`); // the button's name is its words (#22105); the dot names the filters
             const gone = async what => {
                 assert.equal(await ev(`document.querySelector('${header} [data-agent-list-summary]')`), null, at + 'no summary line ' + what);
                 assert.equal(await ev(`document.querySelector('${header} .agent-list-summary-clear')`), null, at + 'no Clear link ' + what);
@@ -42,7 +42,7 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             // 1. nothing on: no line, no dot
             await gone('with nothing on');
             assert.equal(await dot(), false, at + 'no dot with nothing on');
-            assert.match(await label(), /^Group by: [^|]+$/);
+            assert.match(await label(), /^Group by(: [^|]+)?$/);
 
             // 2. display settings only (what is left of them: Show computer; Group by is three boxes now, #21685): still no dot, no line. The switches are drawn only with servers to choose between, so they are flipped where they are in the panel (#9686 removed the other five)
             await panel(true);
@@ -53,7 +53,7 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             await panel(false);
             await gone('after the display settings');
             assert.equal(await dot(), false, at + 'no dot for show/hide display settings');
-            assert.match(await label(), /^Group by: [^|]+$/);
+            assert.match(await label(), /^Group by(: [^|]+)?$/);
 
             // 3. a sort is not a filter: no dot
             await panel(true);
@@ -69,7 +69,7 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             await panel(false);
             await gone('with a filter on');
             assert.equal(await dot(), true, at + 'a filter that narrows the list shows the dot');
-            assert.match(await label(), /^Group by: .+ \| 1 filter on$/);
+            assert.match(await label(), /^Group by(: [^|]+)? \| 1 filter on$/);
             assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-item, #mobile-session-list .session-group-item').length`), 1, at + 'the list is narrowed to the one waiting agent');
             await shot(`agent-list-header-filter-${w}`);
 
@@ -78,7 +78,7 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             await ev(`document.querySelector('${bar} .list-bar-clear-all').click(); true`);
             await panel(false);
             assert.equal(await dot(), false, at + 'cleared: no dot');
-            assert.match(await label(), /^Group by: [^|]+$/);
+            assert.match(await label(), /^Group by(: [^|]+)?$/);
             await shot(`agent-list-header-clear-${w}`);
 
             // 6. what the list now holds is said politely when the person changes a filter or the search (#6612), and not when it only redraws

@@ -9,7 +9,12 @@
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-label { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--fs-lg); font-weight: var(--fw-strong); line-height: 21px; color: var(--text-primary); }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-label-name, :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-label .sln-head, :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-label .sln-tail { color: inherit; font-weight: inherit; }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item.sleeping .session-label { color: var(--text-secondary); font-weight: var(--fw-medium); }
+:is(#live-sessions-list, #mobile-session-list) .session-group-item.sleeping.active .session-label { color: var(--text-primary); } /* on the selected tint the grey name was 3.8:1 (AA needs 4.5) */
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-name-spacer { flex: 1 1 auto; display: block; }
+:is(#live-sessions-list, #mobile-session-list) .session-label.session-label-split { display: flex; align-items: baseline; text-overflow: clip; } /* a long name: the head shrinks with an ellipsis, the last words stay whole (#4624), on a phone too (one line, as the mock draws it) */
+:is(#live-sessions-list, #mobile-session-list) .session-label-split .session-label-name { display: flex; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+:is(#live-sessions-list, #mobile-session-list) .session-label-split .sln-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+:is(#live-sessions-list, #mobile-session-list) .session-label-split .sln-tail { flex: none; white-space: nowrap; }
 /* the mark: always there, in the same place */
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-dot[class*="mk-"] { display: block; position: absolute; left: 30px; top: 12px; width: 9px; height: 9px; margin: 0; border: 0; border-radius: 50%; box-sizing: border-box; background: transparent; box-shadow: none; animation: none; opacity: 1; visibility: visible; }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-dot[class*="mk-"]::before { content: none; }
@@ -36,7 +41,7 @@
 :is(#live-sessions-list, #mobile-session-list) :is(.status-sub, .status-head) .status-caret, :is(#live-sessions-list, #mobile-session-list) .status-head .status-shape { display: none; }
 :is(#live-sessions-list, #mobile-session-list) :is(.status-sub, .status-head) .session-group-count { margin: 0; padding: 0; border: 0; background: none; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-muted); }
 /* the team line: the name and its count; its "⋯" on a hover of the line itself */
-:is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header { padding: 6px 8px !important; box-shadow: none; border-radius: var(--radius-md); }
+:is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header { padding: 4.5px 8px !important; box-shadow: none; border-radius: var(--radius-md); } /* 33 px, the mock's team line: its 24 px collapse and ⋯ buttons set the line, so 4.5 + 24 + 4.5 */
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header .group-name-text { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header .session-group-count { margin-inline-start: 8px; padding: 0; border: 0; background: none; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-muted); }
@@ -59,4 +64,5 @@
     :is(#live-sessions-list, #mobile-session-list) .session-group-item:is(:hover, :focus-within, :has(.sidebar-kebab-btn[aria-expanded="true"])) .session-time { display: inline; }
     :is(#live-sessions-list, #mobile-session-list) .session-group-item .sidebar-kebab-btn { width: 44px; height: 44px; margin: -11px 0; background: transparent; color: var(--text-secondary); }
     :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header .group-kebab-btn { opacity: 1; }
+    :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .row-btn { min-height: 44px; } /* a finger's target (phone_layout: it was 18 high) */
 }

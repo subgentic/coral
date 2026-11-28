@@ -19,7 +19,7 @@ const { setTheme } = require('./helpers/contrast');
  ];
  try {
   await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-  for (const [width, mobile, listId] of [[1280, false, 'live-sessions-list'], [390, true, 'mobile-agent-list']]) {
+  for (const [width, mobile, listId] of [[1280, false, 'live-sessions-list'], [1024, false, 'live-sessions-list'], [390, true, 'mobile-agent-list']]) {
    await Emulation.setDeviceMetricsOverride({ width, height: 1000, deviceScaleFactor: 1, mobile });
    await Emulation.setTouchEmulationEnabled({ enabled: mobile, maxTouchPoints: 5 });
    await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
@@ -93,6 +93,15 @@ const { setTheme } = require('./helpers/contrast');
    await ev(`[...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length).closest('button').click(); true`);
    await waitFor(`[...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length).closest('button').getAttribute('aria-expanded') === 'true'`, `${width}: Group by opens its menu`);
    await snap('groupby');
+   // the label as the boxes change: none ticked just "Group by", one its name, two or more how many (the Orchestrator's call 1, revised)
+   const words = () => ev(`[...document.querySelectorAll('[data-group-by-label]')].filter(b => b.closest('button').getClientRects().length).map(b => b.closest('button').innerText.replace('expand_more', '').replace(/\\s+/g, ' ').trim()).join()`);
+   const tick = k => ev(`[...document.querySelectorAll('fieldset[data-group-by] input[data-box="${k}"]')].find(i => i.getClientRects().length).click(); true`);
+   await tick('team'); await tick('task'); await ev(framesJs(2));
+   assert.equal(await words(), 'Group by', `${width}: none ticked, the button says just Group by`);
+   await tick('team'); await ev(framesJs(2));
+   assert.equal(await words(), 'Group by: Team', `${width}: one ticked, its name`);
+   await tick('task'); await ev(framesJs(2));
+   assert.equal(await words(), 'Group by: 2', `${width}: two ticked, how many`);
    await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
    // 6. a click on #N opens the task, never the agent (last: on a phone the task takes the screen)
    await ev(`window.__opened = []; ${R('Frontend Dev')}.querySelector('.task-id-link').click(); true`);
