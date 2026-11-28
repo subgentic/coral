@@ -162,13 +162,13 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, ques
             return [...rows.values()];
         }
         async function load(more, retry = false) {
-            if (st.error && !retry) return;
+            if (!folds.get(key) || (st.error && !retry)) return;
             if (st.busy) { st.waiters.push(() => { if (card.isConnected) paint(); }); return; }
             if ((!more && st.loaded && Date.now() - st.at < 30000)) return;
             st.busy = true;
             try { if (!more) st.tasks = await readTasks(); const response = await limitedRead(() => boardFetch(team, `/artifacts?goal=${encodeURIComponent(g.id)}&tag=for%20review&tag=approved&tag=changes%20requested&tag=denied&versions=newest&sort=name&limit=50${more && st.cursor ? `&cursor=${encodeURIComponent(st.cursor)}` : ''}`)); if (response.status === 403 || response.status === 404) { st.items = []; st.tasks = []; st.loaded = false; } if (!response.ok) throw Error(response.status === 403 ? 'Artifacts are only available to the account this computer is linked to.' : `Decisions could not be read (HTTP ${response.status}).`); const data = await response.json(); if (!Array.isArray(data.artifacts)) throw Error('Decisions could not be read.'); const merged = new Map((more ? st.items : []).map(a => [itemKey(a), a])); for (const a of data.artifacts) if (decisionState(a) !== 'shared') merged.set(itemKey(a), a); st.items = decisionOrder([...merged.values()]); st.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : ''; st.loaded = true; st.at = Date.now(); st.error = ''; } catch (e) { if ([403, 404].includes(e.status)) { st.items = []; st.tasks = []; st.loaded = false; } st.error = e.message || 'Decisions could not be read.'; } finally { st.busy = false; if (card.isConnected) paint(); for (const run of st.waiters.splice(0)) run(); }
         }
-        refreshers.push(() => { if (folds.get(key) || st.loaded) load(false); });
+        refreshers.push(() => { if (folds.get(key)) load(false); });
         visibleReads.set(card, () => load(false)); observer?.observe(card);
         paint(); if (folds.get(key)) queueMicrotask(() => { if (card.isConnected) load(false); });
     }
