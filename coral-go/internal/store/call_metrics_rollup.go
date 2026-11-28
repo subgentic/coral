@@ -164,3 +164,10 @@ func (d *DB) PruneCallMetricsHourly(ctx context.Context, cutoff time.Time) (int6
 		}
 	}
 }
+
+// CheckpointPassive copies the WAL's committed pages into the database file without waiting on readers or writers (#22119). A prune calls it after each batch, so each checkpoint carries only that batch's pages:
+// left to SQLite's automatic checkpoint, a prune's deletes collected about 4 MB of WAL that one write then had to copy and sync, which on a slow Windows disk held the writer over 2 s.
+func (d *DB) CheckpointPassive(ctx context.Context) error {
+	_, err := d.ExecContext(ctx, `PRAGMA wal_checkpoint(PASSIVE)`)
+	return err
+}
