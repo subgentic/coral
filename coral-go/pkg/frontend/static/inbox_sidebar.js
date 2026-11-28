@@ -486,7 +486,7 @@ function inboxNeedsToolbar() {
     const shownKinds = needsKinds.filter(k => rows.some(s => NF.kindOf(s) === k));
     const counts = shownKinds.map(k => rows.filter(s => NF.kindOf(s) === k).length);
     const moreReviews = reviewFilters() ? !!reviewQueryState()?.more : reviewPages().some(p => p.has_more); // the active window, not an unfinished page from another filter (#16619)
-    const ledgerPills = { label: 'Show Needs you', current: needsNewOnly ? 'new' : needsFilters.kind === 'question' ? 'question' : 'all', items: [{key:'all',label:'All'},{key:'new',label:'Unread'},{key:'question',label:'Questions'}], onPick: key => { needsNewOnly = key === 'new'; needsFilters = {...needsFilters,kind:key === 'question' ? 'question' : ''}; persistNeedsFilters(); needsOrder = null; renderInboxNav(true); } };
+    const ledgerPills = { label: 'Show Needs you', current: needsNewOnly ? 'new' : needsFilters.kind || 'all', menuItems: [{key:'all',label:'All'}, ...shownKinds.map((key,i) => ({key,label:NF.KIND_LABEL[key],count:counts[i]}))], items: [{key:'all',label:'All'},{key:'new',label:'Unread'},{key:'question',label:'Questions'}], onPick: key => { needsNewOnly = key === 'new'; needsFilters = {...needsFilters,kind:['all','new'].includes(key) ? '' : key}; persistNeedsFilters(); needsOrder = null; renderInboxNav(true); } };
     const node = needsBar.draw({
         filters: needsFilters,
         options: { team: { values: teams, labels: {} }, agent: { values: names, labels: {} }, goal: { values: goalNames, labels: {} } },
@@ -1610,12 +1610,12 @@ function newNeedsList(rows) {
     const link = (label, route) => { const a = DT.el('a', '', markHidden(label, { strict: true })); a.href = build(route); a.dataset.route = ''; return a; };
     return needsLedger({ rows, state: needsState, grouped: groupReviews, keyOf: s => `${sessionServer(s)}:${s.session_id}`, about: needsAbout, unread: needsUnread, name: needsName, source: reviewSourceLabel,
         words: s => s.operatorAsk ? askOpened(s.operatorAsk) : askOf(s) || s.waiting_summary || '', quoteFileQuestion: s => !!s.review && !decidedWithNews(s.review), fileQuestion: s => s.review && decidedWithNews(s.review) ? `${decidedWord(s.review)} · ${Number(s.review.new_comments)} new comments` : questionOf(s), contextNote: s => s.operatorAsk ? questionContextNote(s.operatorAsk) : '',
-        questionBox: (box, s, text) => { const raw = s.operatorAsk ? askOpened(s.operatorAsk, { code: true }) : text; NF.openQuestion(box, /^```/.test(raw) ? raw : raw.split('\n').slice(1).join('\n'), text); },
+        questionExtra: s => agentAskExtra(s), questionBox: (box, s, text) => { const raw = s.operatorAsk ? askOpened(s.operatorAsk, { code: true }) : text; NF.openQuestion(box, /^```/.test(raw) ? raw : raw.split('\n').slice(1).join('\n'), text); },
         when: s => { const text = shortWait(s.waiting_since); return text ? `${text} ago` : ''; },
         eligible: s => !!(s.waitItem || s.review || s.operatorAsk || s.welcome || s.autorun || s.proposal || s.goalDone || promptCanSelect(s)),
         onFoldChange: () => document.querySelector('.inbox-fold-all')?.sync(), kindIcon: NF.kindIcon, open, openTerminal: s => { markQuestionRead(s); openInAgents(s); }, readQuestion: markQuestionRead, bulkActions: needsBulkActions(), dismissPrompt: s => promptCanSelect(s) ? promptDismiss(s).catch(e => showToast(e.message || 'Not dismissed', true)) : undefined,
         agentLink: s => agentLink(markHidden(needsAgentName(s), { strict: true }), { board: needsAbout(s).team, session: s.operatorAsk ? s.operatorAsk.session_id || '' : s.session_id }),
-        teamLink: s => { const team = needsAbout(s).team; return splitKey(team).name ? teamLabelLink(team) : DT.el('span', '', teamOf(s)); },
+        teamLink: s => { const team = needsAbout(s).team; return splitKey(team).name ? teamLabelLink(team) : DT.el('span', '', multipleServers() ? pagingServerLabel(serverOf(s)) : teamOf(s)); },
         goalLink: a => link(`#${a.goalId} ${a.goalTitle}`, { ...folderRoute, id: a.team, item: a.goalId }),
         taskLink: a => link(`task #${a.taskId}${a.taskTitle ? ' '+a.taskTitle : ''}`, { view: 'inbox-tasks', sub: 'tasks', id: a.team, item: a.taskId }),
         openGoal: a => go({ view: 'inbox-goals', sub: 'goals', id: a.team, item: a.goalId }),

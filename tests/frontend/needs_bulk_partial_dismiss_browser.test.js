@@ -32,15 +32,15 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(`(() => { const orig = window.fetch.bind(window); window.fetch = (u, o) => String(u) === '/api/operator-asks' ? Promise.resolve(new Response(JSON.stringify([{ board: '${team}', kind: 'ask', id: 71, asker: 'Lead', text: 'Which port should the test server use for the integration run, and should it be the same one the dashboard is on? Say which, and why.', at: new Date(Date.now() - 300000).toISOString() }]), { status: 200, headers: { 'Content-Type': 'application/json' } })) : orig(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 3 && !!document.querySelector('${T} tbody tr .inbox-answers, ${T} tbody tr [data-on-click*="ask"], ${T} tbody tr button')`, at + 'the review rows and the question', 15000);
+            await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 3 && !!document.querySelector('${T} .nl-row .inbox-answers, ${T} .nl-row [data-on-click*="ask"], ${T} .nl-row button')`, at + 'the review rows and the question', 15000);
             await ev(framesJs(4));
             await ev(`(() => { const st = document.createElement('style'); st.textContent = '*, *::before, *::after { transition: none !important; }'; document.head.append(st); return true; })()`);
             await ev(`(() => { const real = window.fetch.bind(window); window.fetch = (u, o) => String(u).includes('/api/settings') && o && o.method === 'PUT' ? Promise.resolve(new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
             await ev(`import(${S} + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'off', inbox_welcome_done: '' }; return true; })`); // #18764: Getting started items are ordinary rows now; this suite is about the review files and the question
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`!!document.querySelector('${T} tbody tr.dt-row')`, at + 'the Needs rows', 15000);
-            await ev(`[...document.querySelectorAll('${T} tbody tr.dt-row .dt-check input')].forEach(i => { if (!i.checked) i.click(); }); true`); await ev(framesJs(4));
-            const selection = await ev(`({ ticked: document.querySelectorAll('${T} tbody .dt-check input:checked').length, count: document.querySelector('.dt-bar-count')?.textContent || '' })`);
+            await waitFor(`!!document.querySelector('${T} .nl-row')`, at + 'the Needs rows', 15000);
+            await ev(`[...document.querySelectorAll('${T} .nl-row .nl-check')].forEach(i => { if (!i.checked) i.click(); }); true`); await ev(framesJs(4));
+            const selection = await ev(`({ ticked: document.querySelectorAll('${T} .nl-row .nl-check:checked').length, count: document.querySelector('.nl-summary strong')?.textContent || '' })`);
             check(selection.ticked === 4 && /4/.test(selection.count), at + 'bulk selection counts only the three review files and question: ' + JSON.stringify(selection));
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
