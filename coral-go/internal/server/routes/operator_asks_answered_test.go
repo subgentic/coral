@@ -30,10 +30,11 @@ func readAnswered(t *testing.T, h *BoardHandler, query string, mod func(*http.Re
 func TestOperatorAsksAnsweredListsOneGoalsAnsweredQuestionsWithTheirAnswers(t *testing.T) {
 	h, bs := operatorAsksRig(t)
 	ctx := context.Background()
-	for _, who := range []string{"Lead", "Operator"} {
-		_, err := bs.Subscribe(ctx, "team", who, who, "", nil, "all")
-		require.NoError(t, err)
-	}
+	const leadSession = "6f1c2a9e-3b4d-4e5f-8a7b-9c0d1e2f3a4b"
+	_, err := bs.Subscribe(ctx, "team", "Lead", "Lead", "claude-"+leadSession, nil, "all")
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, "team", "Operator", "Operator", "", nil, "all")
+	require.NoError(t, err)
 	goal, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Checkout", CreatedBy: "Lead"})
 	require.NoError(t, err)
 	other, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Emails", CreatedBy: "Lead"})
@@ -76,6 +77,7 @@ func TestOperatorAsksAnsweredListsOneGoalsAnsweredQuestionsWithTheirAnswers(t *t
 	assert.Equal(t, "Guest checkout", second["task_title"])
 	assert.Equal(t, "Checkout", second["goal_title"])
 	assert.Equal(t, "Lead", second["asker"])
+	assert.Equal(t, leadSession, second["session_id"], "the asking agent's session, to open it")
 	assert.Equal(t, false, out["has_more"])
 
 	// paged: one at a time, the cursor gives the next
