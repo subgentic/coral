@@ -1,3 +1,4 @@
+// #22094: ledger selectors; all original live-update, no-toast, navigation and literal-text safety assertions retained.
 // A Needs you row opens the agent on its chat, where the card that asks is, whatever view was saved last (#10141, Desktop tester #10138: "opening the row lands on the terminal view, so I had to switch views first").
 // (A permission row opens its card in a dialog over the Inbox instead, #11837: needs_permission_card_browser; this suite seeds the other kind of wait.) The saved choice (Terminal) is not changed: it is for this opening only. 1280 px, isolated dev server, the waiting agent seeded as inbox_local_browser does.
 const assert = require('node:assert/strict');
@@ -21,17 +22,17 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, 'the waiting badge', 8000);
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view tbody .dt-primary').length === 2`, 'the Needs you rows', 8000);
-        const needs = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr')]; const bad = rows.find(r => /onerror/.test(r.textContent)); return { shownLiterally: !!bad && bad.textContent.includes('<img src=x onerror=window.__pwn=1>'), elements: bad ? bad.querySelectorAll('img').length : -1, rows: rows.length }; })()`);
+        await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .nl-row').length === 2`, 'the Needs you rows', 8000);
+        const needs = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .nl-row')]; const bad = rows.find(r => /onerror/.test(r.textContent)); return { shownLiterally: !!bad && bad.textContent.includes('<img src=x onerror=window.__pwn=1>'), elements: bad ? bad.querySelectorAll('img').length : -1, rows: rows.length }; })()`);
         assert.deepEqual(needs, { shownLiterally: true, elements: 0, rows: 2 }, 'the Needs you row shows an agent\'s markup as text, not as an element: ' + JSON.stringify(needs));
-        await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => /rm -rf build/.test(r.textContent)).querySelector('.dt-primary').click(); true`);
+        await ev(`[...document.querySelectorAll('#group-table-view .nl-row')].find(r => /rm -rf build/.test(r.textContent)).click(); true`);
         await waitFor(`document.querySelector('.top-nav-tab.active')?.dataset.arg === 'agents' && document.getElementById('live-view-btn-chat')?.getAttribute('aria-pressed') === 'true'`, 'the agent opened on its chat', 8000);
         assert.equal(await ev(`localStorage.getItem('coral-live-view-mode')`), 'terminal', 'the saved view is still Terminal: this opening only');
         // the card of the agent whose ask is markup: the text, literally, as one element's text (#10192)
         await ev(`document.querySelector('.top-nav-tab[data-arg="hub-inbox"]')?.click(); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody .dt-primary').length === 2`, 'the Needs you rows again', 8000);
-        await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].find(r => /onerror/.test(r.textContent)).querySelector('.dt-primary').click(); true`);
+        await waitFor(`document.querySelectorAll('#group-table-view .nl-row').length === 2`, 'the Needs you rows again', 8000);
+        await ev(`[...document.querySelectorAll('#group-table-view .nl-row')].find(r => /onerror/.test(r.textContent)).click(); true`);
         await waitFor(`!!document.querySelector('#live-history-messages .chat-needs-input') || !!document.querySelector('.chat-needs-input')`, 'the card of the second agent', 8000).catch(() => {});
         const card = await ev(`(() => { const c = document.querySelector('.chat-needs-input'); return c ? { text: c.textContent.includes('<img src=x onerror=window.__pwn=1>'), imgs: c.querySelectorAll('img').length } : null; })()`);
         assert.deepEqual(card, { text: true, imgs: 0 }, 'the card shows it as text: ' + JSON.stringify(card));

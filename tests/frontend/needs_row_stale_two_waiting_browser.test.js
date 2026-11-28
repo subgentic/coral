@@ -1,3 +1,4 @@
+// #22094: ledger selectors; all original live-update, no-toast, navigation and literal-text safety assertions retained.
 // Minimal repro for the Needs you redraw question (#14408, goal #226): two agents wait; one stops waiting (state right, needsYou false, badge 2 -> 1); its row should leave the table, but stays for 12 s+ in this harness (a direct refreshGroupTable('hub-inbox') removes it). No pointer, no answer. EXPECTED TO FAIL until the redraw is understood. 1280 px.
 // (POST .../answer-prompt, with the number and the label), the row says Answered and goes when the agent stops waiting, and the agent is not opened. A question with a multi-select has no buttons. Keyboard (Tab, Enter)
 // and a 44 px target at 390. 1280 and 390 px, isolated dev server; the agents are mocked, the chat reply and the answer are stubbed.
@@ -30,10 +31,10 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); // as the real entries do (app_actions, phone_drawer, goal_view, saved): the Inbox tab is shown first, which mounts its hooks (#14447)
             await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .inbox-answer').length === 4`, `${w}: both rows' two choices`, 12000);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the buttons are armed (the table has settled) before a press
-            const rowOf = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(tr => tr.textContent.includes('${name}'))`; // the rows of the agents named qa and qb (neither name is part of the other)
+            const rowOf = name => `[...document.querySelectorAll('#group-table-view .nl-row')].find(tr => tr.textContent.includes('${name}'))`; // the rows of the agents named qa and qb (neither name is part of the other)
             const stoppedAt = Date.now();
             await ev(`window.__waiting = false; window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
-            await waitFor(`!${rowOf('qa')}`, `${w}: qa's row leaves`, 12000).catch(async e => { throw new Error(e.message + ' | rows: ' + await ev(`JSON.stringify([...document.querySelectorAll('#group-table-view tbody tr')].map(t => t.textContent.replace(/\\s+/g, ' ').slice(0, 60)))`) + ' badge: ' + await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`)); });
+            await waitFor(`!${rowOf('qa')}`, `${w}: qa's row leaves`, 12000).catch(async e => { throw new Error(e.message + ' | rows: ' + await ev(`JSON.stringify([...document.querySelectorAll('#group-table-view .nl-row')].map(t => t.textContent.replace(/\\s+/g, ' ').slice(0, 60)))`) + ' badge: ' + await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`)); });
             const took = Date.now() - stoppedAt;
             assert.ok(took < 3500, `${w}: the answered row left as soon as the agent stopped waiting, under a resting pointer (took ${took} ms; a hold is up to 10 s)`);
             assert.ok(await ev(`!!${rowOf('qb')}`), `${w}: the other waiting agent's row stays`);

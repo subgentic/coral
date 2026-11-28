@@ -58,3 +58,17 @@ Its open questions were ruled on by the Orchestrator at 09:05 on 2026-11-28:
 | Phone selection by body tap | Check-only selection is approved; body still opens the item. |
 | Team-page bulk approval confirms | Restored to `needs_phone_rows`: unopened two-file confirmation, Keep writes nothing, confirm sends one request per file. |
 | Phone file height | Compact avatar/New metadata grid; designer checks latest screenshots at resubmission. |
+
+
+Additional v3 manifest migrations:
+
+| Suite | Preserved proof / retired placement |
+| --- | --- |
+| needs_toast_over_rows | Live waiting updates do not duplicate a visible Needs row with a toast; another page still announces it. Selectors only. |
+| needs_row_stale_no_tab_switch / needs_row_stale_two_waiting | Completed wait leaves promptly under a resting pointer; other waiting row remains. Selectors only. |
+| needs_row_opens_chat | One click opens correct chat without changing saved Terminal view; agent markup remains literal in row, card and toast. Selectors only. |
+| needs_welcome_title | All five welcome titles remain above descriptions and inside their rows. Old table cell placement removed. |
+| needs_row_title_whole | Agent identity and question both retain their full widths; identity is now the metadata line. |
+| needs_you_waiting_for_open | First-paint snapshots retain no misleading empty Waiting-for column. Ledger has no such column. |
+| needs_save_later | Orchestrator09:32: owned and migrated on #22132, layered on this head; released together. Not a #22094 pass claim. |
+| needs_star_room / needs_star_slot | Orchestrator09:32: Star geometry moves to Saved (#22108), since v19 has no main-list Star. Existing behavior must remain covered there. |
