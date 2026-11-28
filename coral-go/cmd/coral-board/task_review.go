@@ -57,6 +57,10 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 	head := fs.String("head", "", "The commit you submit (submit-review; default: HEAD of the folder you run it in: a linked worktree is accepted, a detached HEAD included, but the shared checkout and main are refused, so pass --head <sha> or --branch <name> there). A resubmit of the commit a reviewer rejected is refused")
 	branch := fs.String("branch", "", "The branch you submit, when --head is not given (submit-review): its tip is the commit; use it from the shared checkout, where this folder's HEAD is refused")
 	noTests := fs.String("no-tests", "", "Why the note carries no test result, e.g. a docs-only change (submit-review)")
+	if noTestsWithoutReason(args[1:]) {
+		fmt.Fprintln(os.Stderr, noTestsNeedsReasonText)
+		os.Exit(2) // usage
+	}
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	*message = flagText(*message, "completion message")
 	if strings.TrimSpace(*reason) == "" {
@@ -64,7 +68,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		clierr.Exit1()
 	}
 	if action == "submit-review" && strings.TrimSpace(*noTests) == "" && !hasTestResult(*message+"\n"+*reason) {
-		fmt.Fprintln(os.Stderr, "paste the last line of the test run you did (npm test:cloud, go test, or the one browser suite) into the note; a docs-only change says why with --no-tests \"why\"")
+		fmt.Fprintln(os.Stderr, noTestResultText(*message))
 		clierr.Exit1()
 	}
 	body := map[string]any{"subscriber_id": resolveSubscriberID(), "reason": *reason, "message": *message, "outcome": *outcome}
@@ -114,13 +118,8 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		body["expected_revision"] = *revision
 	}
 	if *manifest != "" {
-		data, err := os.ReadFile(*manifest)
+		artifacts, err := clihelp.ReadArtifactManifest(*manifest)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			clierr.Exit1()
-		}
-		var artifacts []map[string]any
-		if err := json.Unmarshal(data, &artifacts); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			clierr.Exit1()
 		}
@@ -449,8 +448,44 @@ func branchHead(name string) string {
 	return ""
 }
 
-// testResultLine matches a line of a test run pasted into a note: pass/fail counts, PASS/FAIL, a go test "ok  pkg" line or an exit code (#18292).
-var testResultLine = regexp.MustCompile(`(?i)(\b\d+\s+(passed|failed|passing|failing|tests?)\b|\b(passed|failed)\b\s*[:=]?\s*\d+|\bPASS\b|\bFAIL\b|\bok\s+\S*/|\bexit(\s+code)?\s*[:=]?\s*\d+\b|\ball passed\b|\d+/\d+ suites? passed)`)
+// testResultLine matches a line of a test run pasted into a note: pass/fail counts, PASS/FAIL, a go test "ok  pkg" line or an exit code, as exit code 1 or exited with code 1 (#18292, #587).
+var testResultLine = regexp.MustCompile(`(?i)(\b\d+\s+(passed|failed|passing|failing|tests?)\b|\b(passed|failed)\b\s*[:=]?\s*\d+|\bPASS\b|\bFAIL\b|\bok\s+\S*/|\bexit(ed\s+with)?(\s+code)?\s*[:=]?\s*\d+\b|\ball passed\b|\d+/\d+ suites? passed)`)
 
 // hasTestResult reports whether the text has a line that looks like a test result: a plain text check, no state.
 func hasTestResult(text string) bool { return testResultLine.MatchString(text) }
+
+// noTestResultText is submit-review's refusal when the note has no test result. It holds no quotes, so an agent that pastes it into a
+// command does not break the shell, and its example (N passed, M failed) has no digits, so the refusal pasted into --message is not
+// itself taken for a test result (#587: a model pasted a quoted example into --message, then looped on the same refusal).
+// When --message was given, it says the note was read and why it did not count.
+func noTestResultText(message string) string {
+	const how = "put the last line your test run printed (npm test:cloud, go test, or the one browser suite) in --message as it printed it: a line like N passed, M failed or exit code N counts. A change with no test to run, docs only for example, gives the reason with --no-tests instead."
+	if strings.TrimSpace(message) == "" {
+		return "submit-review needs a test result in the note: " + how
+	}
+	return "--message was read but has no test result line, so it does not count: " + how
+}
+
+// noTestsNeedsReasonText is the answer to a --no-tests with no reason after it. Like noTestResultText it holds no quotes, and its
+// example is one word, so it works pasted as it is in any shell (#587, eval t06: a model wrote a bare --no-tests and got the flag
+// package's usage error, costing it another failed command).
+const noTestsNeedsReasonText = "--no-tests needs the reason there is no test result after it, for example --no-tests docs-only"
+
+// noTestsWithoutReason reports a --no-tests that has no reason: last on the line, given as --no-tests= with nothing, or followed by
+// another option, which the flag package would otherwise take as the reason.
+func noTestsWithoutReason(args []string) bool {
+	for i, a := range args {
+		if a == "--" {
+			return false
+		}
+		switch a {
+		case "--no-tests", "-no-tests":
+			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "-") {
+				return true
+			}
+		case "--no-tests=", "-no-tests=":
+			return true
+		}
+	}
+	return false
+}

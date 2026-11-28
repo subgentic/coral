@@ -19,6 +19,7 @@ func TestHasTestResultReadsTheLinesPeoplePaste(t *testing.T) {
 	for _, ok := range []string{
 		"test:cloud EXIT=0", "ok  \tgithub.com/subgentic/coral/internal/background\t0.8s", "1/1 suites passed in 1.2s",
 		"12 passed, 0 failed", "FAIL\tgithub.com/x/y", "--- PASS: TestX", "go test exit 0", "all passed",
+		"Command exited with code 1", "exited with code 0", "exit code 1", // #587: a model sent exited with code 1 and was refused
 	} {
 		if !hasTestResult(ok) {
 			t.Errorf("%q is a test result", ok)
@@ -54,13 +55,80 @@ func TestSubmitReviewWithoutATestLineIsRefusedUnlessNoTestsSaysWhy(t *testing.T)
 		return string(out), err
 	}
 	out, err := run("--message", "candidate 1")
-	if err == nil || !strings.Contains(out, "paste the last line of the test run") || calls != 0 {
-		t.Fatalf("a note with no test line must exit 1 before any request: err=%v calls=%d out=%q", err, calls, out)
+	if err == nil || !strings.Contains(out, noTestResultText("candidate 1")) || calls != 0 {
+		t.Fatalf("a note with no test line must exit 1 before any request, saying the message was read: err=%v calls=%d out=%q", err, calls, out)
 	}
+	if out, err = run(); err == nil || !strings.Contains(out, noTestResultText("")) || calls != 0 {
+		t.Fatalf("no --message at all is refused with the plain ask: err=%v calls=%d out=%q", err, calls, out)
+	}
+	if out, err = run("--message", noTestResultText("candidate 1")); err == nil || calls != 0 {
+		t.Fatalf("the refusal pasted into --message is not a test result: err=%v calls=%d out=%q", err, calls, out)
+	}
+	if out, err = run("--message", "Command exited with code 1"); err != nil || calls != 1 {
+		t.Fatalf("an exit line goes through (#587): err=%v calls=%d out=%q", err, calls, out)
+	}
+	calls = 0
 	if out, err = run("--message", "go test: ok  github.com/subgentic/coral/cmd/coral-board 0.6s"); err != nil || calls != 1 {
 		t.Fatalf("a pasted result goes through: err=%v calls=%d out=%q", err, calls, out)
 	}
 	if out, err = run("--message", "README only", "--no-tests", "docs only"); err != nil || calls != 2 {
 		t.Fatalf("--no-tests lets a docs-only change through: err=%v calls=%d out=%q", err, calls, out)
+	}
+	for _, bare := range [][]string{{"--no-tests"}, {"--no-tests", "--message", "README only"}, {"--no-tests="}} {
+		if out, err = run(bare...); err == nil || !strings.Contains(out, noTestsNeedsReasonText) || calls != 2 {
+			t.Fatalf("%v: a --no-tests with no reason says it needs one, before any request (#587): err=%v calls=%d out=%q", bare, err, calls, out)
+		}
+	}
+	if out, err = run("--no-tests", "docs-only"); err != nil || calls != 3 {
+		t.Fatalf("the example in that answer, as it is, goes through: err=%v calls=%d out=%q", err, calls, out)
+	}
+}
+
+// #587 (eval Pass B, t06): a model pasted the old refusal's quoted example into --message, the shell broke on the quotes, and it then
+// looped on the same refusal. The refusal holds no quotes, says when --message was read and did not count, shows what counts, keeps
+// --no-tests in sight, and is not itself a test result.
+func TestNoTestResultTextIsSafeToPasteAndSaysWhatCounts(t *testing.T) {
+	empty, read := noTestResultText(""), noTestResultText("candidate 1")
+	if empty == read {
+		t.Fatalf("an empty note and a note that was read get the same refusal: %q", empty)
+	}
+	if !strings.Contains(read, "--message was read") || !strings.Contains(read, "does not count") {
+		t.Errorf("a note that was given is said to be read and not to count: %q", read)
+	}
+	for _, text := range []string{empty, read} {
+		if strings.ContainsAny(text, "\"'`<>$") {
+			t.Errorf("the refusal holds a quote or shell character, which breaks a command it is pasted into: %q", text)
+		}
+		for _, want := range []string{"--message", "N passed, M failed", "exit code N", "--no-tests"} {
+			if !strings.Contains(text, want) {
+				t.Errorf("the refusal does not say %q: %q", want, text)
+			}
+		}
+		if hasTestResult(text) {
+			t.Errorf("the refusal reads as a test result, so pasting it would pass the check: %q", text)
+		}
+	}
+	for _, ex := range []string{"12 passed, 0 failed", "exit code 0"} { // the example's shape with real numbers is what counts
+		if !hasTestResult(ex) {
+			t.Errorf("the example's shape with numbers, %q, is not taken", ex)
+		}
+	}
+}
+
+// #587 (eval t06 rerun): a bare --no-tests got the flag package's usage error. It now says a reason goes after it, with a one-word
+// example that needs no quotes; an option right after it is not taken for the reason.
+func TestNoTestsWithoutReasonIsNamed(t *testing.T) {
+	for _, args := range [][]string{{"--no-tests"}, {"-no-tests"}, {"--no-tests="}, {"--message", "x", "--no-tests"}, {"--no-tests", "--head", "abc"}} {
+		if !noTestsWithoutReason(args) {
+			t.Errorf("%v has a --no-tests with no reason", args)
+		}
+	}
+	for _, args := range [][]string{{}, {"--no-tests", "docs-only"}, {"--no-tests=docs-only"}, {"--no-tests", "docs only", "--head", "abc"}, {"--", "--no-tests"}} {
+		if noTestsWithoutReason(args) {
+			t.Errorf("%v gives --no-tests a reason, or has none", args)
+		}
+	}
+	if strings.ContainsAny(noTestsNeedsReasonText, "\"'`<>$") || !strings.Contains(noTestsNeedsReasonText, "--no-tests docs-only") {
+		t.Errorf("the answer holds a quote or shell character, or lacks its one-word example: %q", noTestsNeedsReasonText)
 	}
 }

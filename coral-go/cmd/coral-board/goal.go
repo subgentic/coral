@@ -74,10 +74,13 @@ func cmdGoal() {
 	case "request-decline":
 		cmdGoalRequestDecline(st, args)
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown goal subcommand: %s\n", sub)
+		fmt.Fprintf(os.Stderr, "Unknown goal subcommand: %s\nThe goal subcommands are: %s. update changes a goal's title, done-when, state or driver, e.g. coral-board goal update 3 --driver \"Agent Name\".\nRun coral-board goal --help for what each one does.\n", sub, strings.Join(goalSubcommands, ", "))
 		os.Exit(2)
 	}
 }
+
+// goalSubcommands are the subcommands cmdGoal runs: an unknown subcommand's error lists them (eval #577: agents guessed goal driver and goal set-owner).
+var goalSubcommands = []string{"add", "list", "show", "brief", "update", "close", "request", "requests", "request-decline"}
 
 func goalPath(st *boardState, id int64, tail string) string {
 	p := "/" + url.PathEscape(st.Project) + "/goals"

@@ -20,6 +20,11 @@ import (
 // identifies the caller, while privileges come from the active registration
 // on this board. Personal task endpoints use a separate store/scope.
 func (h *BoardHandler) requireTaskPlanner(w http.ResponseWriter, r *http.Request, project, actor string) bool {
+	return h.requireTaskPlannerHint(w, r, project, actor, "")
+}
+
+// requireTaskPlannerHint is requireTaskPlanner with a hint added to the refusal of a caller who is not a planner: what that caller can run instead.
+func (h *BoardHandler) requireTaskPlannerHint(w http.ResponseWriter, r *http.Request, project, actor, hint string) bool {
 	// Operator is the reserved identity used by the desktop dashboard. Server
 	// auth already gates remote requests; local clients share the desktop trust
 	// boundary. This is not cryptographic attestation of a human caller.
@@ -38,7 +43,7 @@ func (h *BoardHandler) requireTaskPlanner(w http.ResponseWriter, r *http.Request
 		return true
 	}
 	if err := h.bs.RequireTaskReviewer(r.Context(), project, actor); err != nil {
-		errForbidden(w, "only Operator or an active registered orchestrator may create or reassign shared tasks; coordinate with your orchestrator")
+		errForbidden(w, "only Operator or an active registered orchestrator may create or reassign shared tasks; coordinate with your orchestrator"+hint)
 		return false
 	}
 	return true

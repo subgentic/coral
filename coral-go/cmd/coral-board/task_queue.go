@@ -48,13 +48,8 @@ func cmdTaskQueueVerb(st *boardState, args []string, action string) {
 			fmt.Fprintln(os.Stderr, "--artifacts manifest.json is required")
 			os.Exit(2) // usage
 		}
-		data, err := os.ReadFile(*manifest)
+		artifacts, err := clihelp.ReadArtifactManifest(*manifest)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			clierr.Exit1()
-		}
-		var artifacts []map[string]any
-		if err := json.Unmarshal(data, &artifacts); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			clierr.Exit1()
 		}
