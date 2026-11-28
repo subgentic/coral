@@ -1,6 +1,6 @@
 /* The approved Goals decision ledger (#21846). Reads expanded and nearby visible goals;
  * existing board artifact records remain the authority for identity and decisions. */
-import { boardFetch, splitKey } from './server_base.js';
+import { boardFetch, serverFetch, splitKey } from './server_base.js';
 import { loadStyles } from './lazy_styles.js';
 import { importOnce } from './import_once.js';
 import { markHidden } from './visible_marks.js';
@@ -8,10 +8,10 @@ import { markHidden } from './visible_marks.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { onArtifactsRev } from './artifacts_feed.js';
-import { isParked, allTasksOf } from './goal_words.js';
+import { allTasksOf } from './goal_words.js';
 const { needsReviewAttention } = await importOnce('./inbox_review_state.js');
 const { el } = await importOnce('./dom_el.js');
-const Tasks = await importOnce('./tasks_view.js');
+const Ledger = await importOnce('./goal_ledger_rows.js');
 const DT = await importOnce('./data_table.js');
 const { avatar, chip } = DT;
 
@@ -21,6 +21,7 @@ const { agentLink, liveAgentOf } = await importOnce('./agent_link.js');
 const { readableName, itemKey, managedHex } = await importOnce('./artifact_item.js');
 const { fileContext } = await importOnce('./artifact_file_context.js');
 await loadStyles('goal_decisions.css');
+await loadStyles('goal_ledger.css');
 const safe = t => markHidden(String(t || ''), { strict: true });
 const button = (cls, text, run) => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', run); return b; };
 const entries = new Map(), folds = new Map(), foldButtons = new Set();
@@ -76,98 +77,67 @@ export function decisionList(items, { team, onOpen, headings = true }) {
     }
     return list;
 }
-/** Questions use the same row geometry as review files. */
-function subjectList(rows, kind, nameOf, whoOf, open, team) {
-    const list = el('ul', 'goal-decision-list');
-    for (const item of rows) {
-        const row = el('li', 'list-row goal-decision-row'); row.dataset.subjectKind = kind;
-        const title = safe(nameOf(item)), run = () => open(item, row.querySelector('.goal-decision-name'));
-        const name = button('goal-decision-name', title, run); name.title = title;
-        row.append(el('span', 'goal-decision-mark', '•'), el('span', 'goal-decision-type', '?'), name,
-            el('span', 'goal-decision-question'), (() => { const who = whoOf(item), cell = el('span', 'goal-decision-agent'); if (who) cell.append(agentIcon(who, team, item.session_id || '')); return cell; })(),
-            el('span', 'chip goal-decision-chip', 'Question'), button('goal-decision-open', 'Open ↗', run));
-        row.addEventListener('click', e => { if (!e.target.closest('button,a')) run(); }); list.append(row);
-    }
-    return list;
-}
 function counts(items) {
     const c = { approved: 0, sentback: 0, review: 0, denied: 0, shared: 0 }; for (const a of items) c[decisionState(a)]++;
     return c;
 }
 /** Source-qualified cache: a failed refresh keeps the prior records with an error. */
-export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, questions = () => [], openQuestion = () => {} }) {
+export function goalTracker({ goals, teamOf, openGoal, openTeam, openFile, closeGoal, questions = () => [], openQuestion = () => {}, dismissQuestion = null }) {
     mounted?.dispose();
     const root = el('div', 'goal-decision-tracker'), refreshers = [], visibleReads = new Map();
     const observer = typeof IntersectionObserver === 'function' ? new IntersectionObserver(items => { for (const item of items) if (item.isIntersecting && item.target.isConnected) { observer.unobserve(item.target); visibleReads.get(item.target)?.(); } }, { rootMargin: '200px' }) : null;
     const cards = []; // each goal's key, paint and read, for the toolbar's expand-all / collapse-all
     mounted = { root, cards, refresh: () => refreshers.forEach(run => run()), dispose: () => observer?.disconnect() };
+    const summary = el('p', 'gl-summary'); summary.append(el('strong', null, `${goals.length} ${goals.length === 1 ? 'goal' : 'goals'}`), ` · ${goals.filter(g => g.state === 'active').length} active`); root.append(summary);
     for (const [index, g] of goals.entries()) {
         const team = g.board_id, key = JSON.stringify([team, g.id]);
-        if (!entries.has(key)) { if (entries.size >= 200) entries.delete(entries.keys().next().value); entries.set(key, { items: [], tasks: [], taskState: DT.tableState(), at: 0, loaded: false, busy: false, error: '', cursor: '', waiters: [] }); }
+        if (!entries.has(key)) { if (entries.size >= 200) entries.delete(entries.keys().next().value); entries.set(key, { items: [], tasks: [], answered: [], at: 0, loaded: false, busy: false, error: '', cursor: '', waiters: [] }); }
         const st = entries.get(key), card = el('section', 'goal-decision-card'); card.dataset.goalKey = key;
         if (!folds.has(key)) { if (folds.size >= 200) folds.delete(folds.keys().next().value); folds.set(key, index < 2); }
-        const bar = el('div', 'goal-decision-head'), toggle = button('goal-decision-toggle', '', () => { folds.set(key, !folds.get(key)); paint(); if (folds.get(key)) load(false); syncFoldButtons(); });
+        const bar = el('div', 'goal-decision-head list-row gl-goal-row'), body = el('div', 'goal-decision-body');
+        const toggle = button('goal-decision-toggle', '', () => { folds.set(key, !folds.get(key)); paint(); if (folds.get(key)) load(false); syncFoldButtons(); });
         toggle.dataset.goalId = String(g.id);
-        toggle.append(el('span', 'goal-decision-chevron', '▾'), (() => { const label = safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown'), s = chip('', `goal-state-${g.state || 'unknown'}`); s.title = label; s.setAttribute('aria-label', label); s.setAttribute('role', 'img'); s.classList.remove('dt-chip'); s.classList.add('goal-decision-state'); return s; })(), el('span', 'goal-decision-id', `#${g.id}`), el('span', 'goal-decision-title', safe(g.title)));
-        const right = el('div', 'goal-decision-head-right'), summary = el('span', 'goal-decision-summary'), taskProgress = el('span', 'goal-decision-task-progress', `${Number(g.rollup?.done) || 0} of ${allTasksOf(g.rollup || {})} tasks done`), teamLabel = el('span', 'goal-decision-team', safe(teamOf(g)));
-        if (Number(g.new_comments) > 0) right.append(chip('New comments', 'goal-new-comments'));
-        const openArtifacts = button('btn btn-small btn-quiet goal-artifacts-open', '↗', () => openGoal(g, 'tasks'));
-        openArtifacts.title = 'Open goal tasks'; openArtifacts.setAttribute('aria-label', 'Open goal tasks');
-        right.append(taskProgress, summary, teamLabel, openArtifacts); bar.append(toggle, right);
-        const body = el('div', 'goal-decision-body'); card.append(bar, body); root.append(card);
+        const open = opener => openGoal(g, 'tasks', opener), name = Ledger.action('', open, 'gl-goal-name');
+        const id = el('span', 'goal-decision-id', `#${g.id}`), title = el('span', 'goal-decision-title', safe(g.title)); name.append(id, title);
+        const facts = el('div', 'gl-goal-meta'), main = el('div', 'gl-goal-main'); main.append(name, facts);
+        const hover = Ledger.action('Open goal', open, 'gl-goal-open'), time = el('time', 'gl-goal-time'), right = el('div', 'gl-goal-side');
+        const menu = Ledger.rowMenu(`goal-menu-${encodeURIComponent(team)}-${g.id}`, [{ label: 'Open goal', run: open }, { label: 'Copy for an agent', run: () => importOnce('./agent_copy_button.js').then(m => m.copyForAgent('goal', `Goal #${g.id}: ${g.title}. Team ${team}. Run coral-board goal show ${g.id}.`)) }]);
+        toggle.append(el('span', 'goal-decision-chevron', '▾')); right.append(hover, time, menu, toggle);
+        bar.append(Ledger.glyph('flag'), main, right); card.append(bar, body); root.append(card);
+        bar.addEventListener('click', e => { if (e.target.closest('button,a,[role=menu]')) return; if (matchMedia('(max-width:760px)').matches) toggle.click(); else open(name); });
         function paint() {
-            const open = folds.get(key); toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} Goal #${g.id} ${safe(g.title)}, ${safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown')}`); card.classList.toggle('is-collapsed', !open); body.hidden = !open;
-            const c = counts(st.items), total = st.items.length;
-            summary.hidden = st.loaded && !total;
-            summary.textContent = st.error ? 'Decisions unavailable' : st.loaded ? `${c.review} to review · ${c.sentback} sent back · ${c.approved} approved${c.denied ? ` · ${c.denied} denied` : ''}${st.cursor ? ' (loaded files)' : ''}` : open ? 'Loading decisions…' : 'Expand to read decisions';
-            if (!open) return;
-            const active = document.activeElement, focusKey = body.contains(active) ? active.closest('[data-file-key]')?.dataset.fileKey : '', focusClass = focusKey ? active.className : '';
-            const context = el('div', 'goal-decision-context'), done = el('div', 'goal-decision-done'); done.append(el('strong', null, 'Done when: '), safe(g.done_when || g.doneWhen || 'Not specified'));
-            const progress = el('div', 'goal-decision-progress');
-            if (st.loaded && total) { progress.append(el('span', null, `${c.approved} of ${total} approved · ${c.review} to review${st.cursor ? ' (loaded)' : ''}`)); const segments = el('div', 'goal-decision-segments'); segments.setAttribute('role', 'img'); segments.setAttribute('aria-label', `${c.approved} approved, ${c.review} to review, ${c.sentback} sent back, ${c.denied} denied`); for (const s of ['approved', 'review', 'sentback', 'denied']) { const n = c[s]; if (n) { const part = el('span', classes[s]); part.style.flexGrow = String(n); segments.append(part); } } progress.append(segments); }
-            context.append(done, progress, el('span', 'goal-decision-age', whenText(g.updated_at || g.updatedAt))); body.replaceChildren(context);
-            const asks = questions(g), taskIds = new Set(st.tasks.map(t => Number(t.id)));
-            const fileList = items => decisionList(items, { team, headings: false, onOpen: (a, opener) => openFile(g, a, opener, decisionFiles(st.items, a, team)) });
-            const questionList = rows => subjectList(rows, 'question', a => a.text || 'Question', a => a.subscriber_id || a.asker || '', a => openQuestion(a), team);
-            const related = id => {
-                const files = st.items.filter(a => Number(a.task_id) === id), questions = asks.filter(a => Number(a.task_id) === id);
-                if (!files.length && !questions.length) return null;
-                const group = el('div', 'goal-task-subjects'); group.dataset.subjectTaskId = String(id);
-                if (files.length) group.append(fileList(files));
-                if (questions.length) group.append(questionList(questions));
-                return group;
-            };
+            const expanded = folds.get(key), stateLabel = safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown');
+            toggle.setAttribute('aria-expanded', String(expanded)); toggle.setAttribute('aria-label', `${expanded ? 'Collapse' : 'Expand'} Goal #${g.id} ${safe(g.title)}, ${stateLabel}`);
+            name.setAttribute('aria-label', `Open Goal #${g.id} ${safe(g.title)}`);
+            card.classList.toggle('is-collapsed', !expanded); body.hidden = !expanded;
+            const asks = [...(st.answered || []), ...questions(g).filter(a => !(st.answered || []).some(b => b.id === a.id && b.board === a.board))], c = counts(st.items), state = el('span', `goal-decision-state goal-state-${g.state || 'unknown'}`);
+            state.title = stateLabel; state.setAttribute('aria-label', stateLabel); state.setAttribute('role', 'img');
+            const taskProgress = el('span', 'goal-decision-task-progress', `${Number(g.rollup?.done) || 0} of ${allTasksOf(g.rollup || {})} tasks done`);
+            const pending = asks.filter(a => !a.answered).length, waits = [pending ? `${pending} ${pending === 1 ? 'question' : 'questions'}` : '', c.review ? `${c.review} to review` : ''].filter(Boolean).join(' · ');
+            facts.replaceChildren(state, taskProgress); if (g.new_comments > 0) facts.append(' · ', el('span', 'goal-new-comments', 'New comments')); if (waits) facts.append(' · ', el('strong', 'gl-waits', waits));
+            const teamName = Ledger.action(safe(teamOf(g)), () => openTeam(g), 'goal-decision-team'); facts.append(' · ', teamName);
+            const stamps = [g.updated_at || g.updatedAt, ...st.tasks.map(t => t.updated_at), ...st.items.map(a => a.review?.at || a.created_at), ...asks.map(a => a.answered_at || a.at)].filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a));
+            time.textContent = Ledger.ledgerTime(stamps[0]); if (stamps[0]) { time.dateTime = stamps[0]; time.title = new Date(stamps[0]).toLocaleString(); }
+            if (!expanded) return;
+            const active = document.activeElement, focusKey = body.contains(active) ? active.closest('[data-file-key]')?.dataset.fileKey : '';
+            const context = el('div', 'goal-decision-context'), done = el('div', 'goal-decision-done'); done.append(el('strong', null, 'Done when: '), safe(g.done_when || g.doneWhen || 'Not specified')); context.append(done); body.replaceChildren(context);
             if (st.tasks.length) {
-                const stateOf = t => t.status === 'skipped' ? 'Skipped' : t.status === 'parked' || isParked(t) ? 'Parked' : '';
-                const tasks = Tasks.tasksTable('goal', st.tasks, { bare: true, fold: 'column', sortBar: false, state: st.taskState,
-                    ctx: { goalTitleOf: () => g.title },
-                    decorate: (t, row) => { const subjects = related(Number(t.id)); if (subjects) DT.addDetailRow(row, subjects); },
-                    tweak: columns => columns.map(c => ['state', 'task'].includes(c.key) ? { ...c, cell: t => {
-                        const node = c.cell(t), real = stateOf(t);
-                        if (real && c.key === 'state') node.textContent = real;
-                        if (real && c.key === 'task') node.querySelector('.dt-primary')?.setAttribute('aria-label', `Open task #${t.id}: ${t.title}, ${real}`);
-                        return node;
-                    } } : c),
-                    open: (t, row) => importOnce('./task_navigation.js').then(m => m.openTask(team, t.id, row.querySelector('.dt-primary'), { from: g.title })) });
-                tasks.el.classList.add('goal-ledger-tasks'); body.append(tasks.el);
+                const count = st.tasks.filter(t => ['completed', 'skipped'].includes(t.status)).length;
+                const heading = el('h3', 'gl-tasks-label', 'Tasks '); heading.append(el('span', null, `${st.tasks.length} · ${count} done`)); body.append(heading);
+                body.append(Ledger.taskRows(st.tasks, { team, goalTitle: g.title, files: st.items, questions: asks, stateOf: decisionState,
+                    openFile: (a, opener, files) => openFile(g, a, opener, files), openQuestion, dismissQuestion,
+                    fileContext: a => decisionFiles(st.items, a, team), goalHref: `#goal-${g.id}` }));
+            }
+            const taskIds = new Set(st.tasks.map(t => Number(t.id))), looseFiles = st.items.filter(a => !taskIds.has(Number(a.task_id))), looseAsks = asks.filter(a => !taskIds.has(Number(a.task_id)));
+            if (looseFiles.length || looseAsks.length) {
+                const section = el('section', 'goal-only-subjects'); section.append(el('h3', 'gl-tasks-label', 'Goal documents and questions'));
+                section.append(Ledger.subjectRows(looseFiles, looseAsks, { team, stateOf: decisionState, openFile: (a, opener, files) => openFile(g, a, opener, files), openQuestion, dismissQuestion, fileContext: a => decisionFiles(st.items, a, team), goalHref: `#goal-${g.id}` })); body.append(section);
             }
             if (st.error) { const e = el('p', 'goal-decision-error', st.error); e.setAttribute('role', 'alert'); e.append(button('btn btn-small', 'Retry', () => load(false, true))); body.append(e); }
-            if (!st.loaded) body.append(el('p', 'goal-decision-note', st.error ? 'Decisions are unavailable.' : 'Loading decisions…'));
-            else {
-                const goalFiles = st.items.filter(a => !a.task_id), goalQuestions = asks.filter(a => !a.task_id);
-                const missingFiles = st.items.filter(a => a.task_id && !taskIds.has(Number(a.task_id))), missingQuestions = asks.filter(a => a.task_id && !taskIds.has(Number(a.task_id)));
-                for (const [label, files, questions] of [['Goal documents and questions', goalFiles, goalQuestions], ['Unavailable task documents and questions', missingFiles, missingQuestions]]) {
-                    if (!files.length && !questions.length) continue;
-                    const section = el('section', 'goal-only-subjects'); section.append(el('h3', 'goal-decision-subhead', label));
-                    if (files.length) section.append(fileList(files));
-                    if (questions.length) section.append(questionList(questions));
-                    body.append(section);
-                }
-                if (!total) body.append(el('p', 'goal-decision-note', 'No files sent for review on this goal.'));
-            }
+            if (!st.loaded) body.append(el('p', 'goal-decision-note', st.error ? 'Decisions are unavailable.' : 'Loading…'));
+            else if (!st.tasks.length && !st.items.length && !asks.length) body.append(el('p', 'goal-decision-note', 'No tasks, review documents or questions on this goal.'));
             if (st.cursor) { const more = button('btn btn-small', st.busy ? 'Loading…' : 'Load more files', () => load(true)); more.disabled = st.busy; body.append(more); }
-            const foot = el('div', 'goal-decision-foot'); foot.append(el('span', null, `Click a decision to inspect in Goal #${g.id} › Artifacts.`)); const links = el('span'); for (const [tab, label] of [['tasks', `Tasks (${Number.isSafeInteger(g.rollup?.total) ? g.rollup.total : ['done', 'active', 'blocked', 'queued'].reduce((n, k) => n + (Number(g.rollup?.[k]) || 0), 0)})`], ['comments', `Comments (${Number.isSafeInteger(g.comments_open) ? g.comments_open : '—'})`]]) links.append(button('btn btn-small btn-quiet', label, () => openGoal(g, tab))); if (closeGoal && !['done', 'dropped'].includes(g.state)) links.append(button('btn btn-small btn-quiet', 'Close goal', () => closeGoal(g))); foot.append(links); body.append(foot);
-            if (focusKey) [...body.querySelectorAll('[data-file-key]')].find(row => row.dataset.fileKey === focusKey)?.querySelector(`button.${CSS.escape(String(focusClass).split(' ')[0])}`)?.focus({ preventScroll: true });
+            if (focusKey) [...body.querySelectorAll('[data-file-key]')].find(row => row.dataset.fileKey === focusKey)?.querySelector('.gl-name')?.focus({ preventScroll: true });
         }
         async function readTasks() {
             const rows = new Map(), seen = new Set(); let cursor = '';
@@ -181,12 +151,26 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, ques
             } while (cursor);
             return [...rows.values()];
         }
+        async function readAnswered() {
+            const source = splitKey(team), rows = new Map(), seen = new Set(); let cursor = '';
+            do {
+                const response = await limitedRead(() => serverFetch(source.server, `/api/operator-asks?board=${encodeURIComponent(source.name)}&goal=${encodeURIComponent(g.id)}&state=answered&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`));
+                if (!response.ok) { const error = Error(`Answered questions could not be read (HTTP ${response.status}).`); error.status = response.status; throw error; }
+                const data = await response.json();
+                if (!Array.isArray(data.asks)) throw Error('Answered questions could not be read.');
+                for (const a of data.asks) rows.set(a.id, { ...a, server: source.server, answered: true });
+                cursor = typeof data.next_cursor === 'string' ? data.next_cursor : '';
+                if (cursor && seen.has(cursor)) throw Error('Answered questions could not be read completely. Retry.');
+                seen.add(cursor);
+            } while (cursor);
+            return [...rows.values()];
+        }
         async function load(more, retry = false) {
             if (!folds.get(key) || (st.error && !retry)) return;
             if (st.busy) { st.waiters.push(() => { if (card.isConnected) paint(); }); return; }
             if ((!more && st.loaded && Date.now() - st.at < 30000)) return;
             st.busy = true;
-            try { if (!more) st.tasks = await readTasks(); const response = await limitedRead(() => boardFetch(team, `/artifacts?goal=${encodeURIComponent(g.id)}&tag=for%20review&tag=approved&tag=changes%20requested&tag=denied&versions=newest&sort=name&limit=50${more && st.cursor ? `&cursor=${encodeURIComponent(st.cursor)}` : ''}`)); if (response.status === 403 || response.status === 404) { st.items = []; st.tasks = []; st.loaded = false; } if (!response.ok) throw Error(response.status === 403 ? 'Artifacts are only available to the account this computer is linked to.' : `Decisions could not be read (HTTP ${response.status}).`); const data = await response.json(); if (!Array.isArray(data.artifacts)) throw Error('Decisions could not be read.'); const merged = new Map((more ? st.items : []).map(a => [itemKey(a), a])); for (const a of data.artifacts) if (decisionState(a) !== 'shared') merged.set(itemKey(a), a); st.items = decisionOrder([...merged.values()]); st.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : ''; st.loaded = true; st.at = Date.now(); st.error = ''; } catch (e) { if ([403, 404].includes(e.status)) { st.items = []; st.tasks = []; st.loaded = false; } st.error = e.message || 'Decisions could not be read.'; } finally { st.busy = false; if (card.isConnected) paint(); for (const run of st.waiters.splice(0)) run(); }
+            try { if (!more) { st.tasks = await readTasks(); st.answered = await readAnswered(); } const response = await limitedRead(() => boardFetch(team, `/artifacts?goal=${encodeURIComponent(g.id)}&tag=for%20review&tag=approved&tag=changes%20requested&tag=denied&versions=newest&sort=name&limit=50${more && st.cursor ? `&cursor=${encodeURIComponent(st.cursor)}` : ''}`)); if (response.status === 403 || response.status === 404) { st.items = []; st.tasks = []; st.answered = []; st.loaded = false; } if (!response.ok) throw Error(response.status === 403 ? 'Artifacts are only available to the account this computer is linked to.' : `Decisions could not be read (HTTP ${response.status}).`); const data = await response.json(); if (!Array.isArray(data.artifacts)) throw Error('Decisions could not be read.'); const merged = new Map((more ? st.items : []).map(a => [itemKey(a), a])); for (const a of data.artifacts) if (decisionState(a) !== 'shared') merged.set(itemKey(a), a); st.items = decisionOrder([...merged.values()]); st.cursor = typeof data.next_cursor === 'string' ? data.next_cursor : ''; st.loaded = true; st.at = Date.now(); st.error = ''; } catch (e) { if ([403, 404].includes(e.status)) { st.items = []; st.tasks = []; st.answered = []; st.loaded = false; } st.error = e.message || 'Decisions could not be read.'; } finally { st.busy = false; if (card.isConnected) paint(); for (const run of st.waiters.splice(0)) run(); }
         }
         refreshers.push(() => { if (folds.get(key)) load(false); }); cards.push({ key, paint, load: () => load(false) });
         visibleReads.set(card, () => load(false)); observer?.observe(card);

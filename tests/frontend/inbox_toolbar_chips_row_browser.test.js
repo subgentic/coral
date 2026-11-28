@@ -1,3 +1,4 @@
+const {pickGoalState}=require('./helpers/goal_state_menu');
 // The shared list toolbar never changes height when a filter is switched on (#9078, the operator: an active chip "No goal x" wrapped under the toolbar and the page jumped). The Inbox's Goals folder at 1280 and 390:
 // the toolbar's box is the same height with no filter, with one chip and with two; a chip is inside the search row, after the pills and before the Filters icon, and readable (128 px or more) with "+N" for the rest at 1280; at 390 the row has no chips and the Filters icon carries the number; nothing is wider than the screen.
 // The goals are stood in at GET /api/goals. Drives Chrome over CDP against the isolated dev server.
@@ -43,8 +44,8 @@ const GOALS = [
             await waitFor(`/Goals4/.test(${FOLDER_ROWS}.join('|')) && /All chats/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);
-            await waitFor(`!!document.querySelector('.inbox-folder-toolbar .team-tb-pills, .inbox-folder-toolbar .team-tb-select')`, 'the goals pills', 10000);
-            await ev(`(() => { const s = document.querySelector('.inbox-folder-toolbar .team-tb-select'); if (s && s.getClientRects().length) { s.value = 'all'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; } const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.dataset.filter === 'all'); if (b) b.click(); return true; })()`); // the folder opens on Active (#16371); this suite starts from every open goal
+            await waitFor(`!!document.querySelector('.inbox-folder-toolbar .gl-state-menu')`, 'the goals pills', 10000);
+            await pickGoalState(ev,waitFor,'all');
             await waitFor(`document.querySelectorAll('.goal-decision-title').length >= 4`, 'four open goals', 10000); await settle(300);
             // the Filters panel stays shut: the toolbar's own height is what is measured (the fields are set while it is hidden)
             const none = await bar();

@@ -44,15 +44,15 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(await ev(`[...document.querySelectorAll('.view-list-item')].some(e=>/^Goals\\s*\\d+$/.test((${ROW_WORDS})(e)))`),'Goals remains a counted sidebar folder');
             await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox('notes'))`);
             await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length===1&&document.querySelector('#group-table-view .goal-decision-title').textContent==='Plan the notes'`,'search narrows by goal title');
-            await ev(`document.querySelector('#group-table-view .goal-decision-head-right button').click();true`);
+            await ev(`document.querySelector('#group-table-view .gl-goal-name').click();true`);
             await waitFor(`document.querySelector('#inbox-page #goals-detail-title')?.textContent.includes('Plan the notes')`,'explicit goal open reaches the shared Inbox goal');
             await ev(`document.querySelector('#inbox-page .goals-back').click();true`);
             await waitFor(`!!document.querySelector('#group-table-view .goal-decision-card')`,'Back returns to filtered ledger');
             await ev(`import((window.__coralStatic||'/static/')+'inbox_sidebar.js').then(m=>m.filterInbox(''))`);
             await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=3`,'clear search restores every goal');
             await ev(`(()=>{const c=[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent==='Ship the mailbox'),t=c.querySelector('.goal-decision-toggle');if(t.getAttribute('aria-expanded')==='false')t.click();t.dataset.axp='with-tasks';return true;})()`);
-            assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent==='Ship the mailbox').textContent.includes('Tasks (3)')`),'task rollup survives in the approved footer');
-            await waitFor(`(()=>{const c=document.querySelector('#group-table-view .goal-decision-card:has([data-goal-id="${g1}"])');return c?.querySelector('.goal-decision-summary')?.hidden})()`, 'plain task-result files contribute no approval counters');
+            assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent==='Ship the mailbox').querySelector('.goal-decision-task-progress').textContent.includes('of 3 tasks done')`),'task rollup survives in the goal metadata');
+            await waitFor(`(()=>{const c=document.querySelector('#group-table-view .goal-decision-card:has([data-goal-id="${g1}"])');return c && !c.querySelector('.gl-waits')})()`, 'plain task-result files contribute no approval counters');
             if(width===390){
                 const targets=await ev(`(()=>{return [...document.querySelectorAll('#group-table-view .goal-decision-toggle')].map(t=>{const r=t.getBoundingClientRect();return {name:t.getAttribute('aria-label'),height:r.height,width:r.width}})})()`);
                 assert.ok(targets.length>=3 && targets.every(t=>t.height>=44&&t.width>=44),'every phone goal heading has a 44px tap target: '+JSON.stringify(targets));

@@ -117,7 +117,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await ev(`document.querySelector('#group-table-view .goal-decision-toggle').click();true`);
             check(await ev(`document.querySelector('#group-table-view .goal-decision-toggle').getAttribute('aria-expanded')`)!==before,at+' set heading collapses instead of selecting an obsolete mail row');
             check((await ev(`location.pathname`))==='/inbox/goals',at+' collapse keeps the list route');
-            await ev(`document.querySelector('#group-table-view .goal-decision-head-right button').click();true`);
+            await ev(`document.querySelector('#group-table-view .gl-goal-name').click();true`);
             await waitFor(`!!document.querySelector('#inbox-page #goals-detail-title')`,at+' explicit open reaches the shared goal');
         }
     } finally { await removeBoards(ev, [B, SEED]).catch(() => {}); await client.close(); }
