@@ -7,11 +7,9 @@ import { redrawLiveList } from './list_hooks.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { launchBlockedReason } from './hub_access.js';
 import { showToast, escapeHtml } from './utils.js';
-import { updateSettingList, upsertByName, parseList } from './settings_lists.js';
 import { _passesFilters } from './list_filter_match.js';
 import { killCount } from './agent_actions.js';
 import { whatStaysKill } from './agent_words.js';
-import { showPromptModal } from './prompt_modals.js';
 import { worktreeConfirmWords } from './worktree_words.js';
 import { showWorktreeNotice } from './worktree_notice.js';
 import { killLiveSession, killLiveTeam, dropKilledRows } from './kill_live.js';
@@ -151,25 +149,7 @@ export async function shareAgentTeam(boardName) {
 }
 
 export function saveTeamFromSidebar(boardName) {
-    showPromptModal('Save team template', 'Name. Saves: members, models, thinking, modes, working mode, instructions. Not skills, goals or the first task.', keyLabel(boardName), async (templateName) => {
-        const tmpl = await (await importOnce('./team_template_build.js')).templateFromBoard(boardName);
-        if (!tmpl) {
-            showToast("No agents found on this board", "error");
-            return;
-        }
-        tmpl.name = templateName;
-
-        // into the list the server has now (#4423)
-        try {
-            const { raw } = await updateSettingList("saved_team_templates", list => upsertByName(list, [tmpl]),
-                { local: parseList(state.settings.saved_team_templates, []) });
-            state.settings.saved_team_templates = raw;
-        } catch {
-            showToast("Could not save the template", "error");
-            return;
-        }
-        showToast(`Saved template "${templateName}" (${tmpl.agents.length} agents)`);
-    });
+    return importOnce('./team_template_build.js').then(m => m.saveTeamFromSidebar(boardName));
 }
 
 /** Wake team found members that were ended (Stop agents, or their own exit) and says so: ask once to resume them all, each in its own folder with its earlier chat, on the team's own computer. */
