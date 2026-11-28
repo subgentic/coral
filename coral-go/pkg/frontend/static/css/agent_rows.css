@@ -47,6 +47,9 @@
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .row-btn { gap: 6px; padding: 0; min-height: 0; font-size: var(--fs-md); font-style: normal; color: var(--text-secondary); }
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .sleeping-summary-label { font-style: normal; }
 :is(#live-sessions-list, #mobile-session-list) .archived-summary-row .archived-n { color: var(--text-muted); }
+:is(#live-sessions-list, #mobile-session-list) .archived-team-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 14px 8px 4px 34px; padding: 0; font-size: var(--fs-md); font-weight: var(--fw-strong); color: var(--text-secondary); text-transform: none; letter-spacing: normal; } /* the open fold's team name is a group heading ("On a task 7"); Restore team on its line, at the right */
+:is(#live-sessions-list, #mobile-session-list) .archived-team-caption .btn { margin: 0; flex: none; }
+:is(#live-sessions-list, #mobile-session-list) .session-group-item.archived-row :is(.session-label, .session-time) { color: var(--text-muted); font-weight: var(--fw-medium); } /* archived agents greyed */
 :is(#live-sessions-list, #mobile-session-list) .board-card-agents .status-workers-sum { padding-inline-start: 36px; } /* the folded workers' line starts under the orchestrator's mark */
 /* a phone: nothing behind a hover. Every row keeps its time and has its "⋯" (44 by 44); rows are at least 48 high */
 @media (max-width: 767px), (pointer: coarse) {

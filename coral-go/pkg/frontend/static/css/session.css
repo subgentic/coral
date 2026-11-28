@@ -1636,7 +1636,6 @@ button.server-update-badge { background: transparent; font: inherit; cursor: poi
 .sidebar-header .sidebar-search { flex: 1 1 0; min-width: 5em; container-type: inline-size; } /* the controls share one line on every tab (#22105: Group by's words beside it) */
 /* the agent list's Group by beside it (#22105): the family's .btn, its words cut before the search box is */
 .sidebar-header[data-header="agents"] { justify-content: flex-start; }
-.sidebar-header[data-header="agents"] .sidebar-search { min-width: 3.5em; } /* "Group by: Team, Task" whole in the 316 px sidebar at 1280 (5em cut it to "Team, …", 4em by 2 px); the box keeps its placeholder's first word */
 .sidebar-groupby-btn { display: inline-flex; align-items: center; gap: 2px; flex: 9 1 0; margin: 0; min-width: 0; max-width: max-content; overflow: hidden; } /* basis 0: the line break never counts its words (a 288 px sidebar at 1024 put Hide on a second line); it grows to its whole words when the search box keeps its 5em, else they are cut */
 .sidebar-groupby-btn b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-strong); margin-inline-start: 2px; }
 .sidebar-groupby-btn .material-icons { font-size: var(--fs-xl); }

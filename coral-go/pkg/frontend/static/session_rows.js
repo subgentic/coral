@@ -314,7 +314,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     </div>`;
     const compactClass = isCompact ? ' session-compact' : '';
     const collapsedClass = collapsed ? ' group-collapsed' : '';
-    const sleepingClass = s.sleeping ? ' sleeping' : '';
+    const sleepingClass = (s.sleeping ? ' sleeping' : '') + (s.archived ? ' archived-row' : '');
     const attentionClass = needsAttention ? ' needs-attention' : '';
     // Hub: an agent on an unreachable server is last-known data only.
     const stale = isStaleSession(s);

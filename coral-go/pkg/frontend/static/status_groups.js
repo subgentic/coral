@@ -152,7 +152,7 @@ export function lay(regular, limits, archived, renderRow, wrap) {
     arch = archived;
     mountGroupBy();
     const g = groupBy();
-    const words = BOXES.filter(([k]) => g[k]).map(([, l]) => l).join(', ') || 'Status'; for (const b of document.querySelectorAll('[data-group-by-label]')) if (b.textContent !== words) b.textContent = words; // the button says the grouping (#22105)
+    const on = BOXES.filter(([k]) => g[k]).map(([, l]) => l), words = on.length > 1 ? String(on.length) : on[0] || 'Status'; for (const b of document.querySelectorAll('[data-group-by-label]')) if (b.textContent !== words) b.textContent = words; // the button says the grouping (#22105): one box its name, two or more how many (the Orchestrator's call 1, revised: the search box keeps its room)
     if (g.server || g.team || g.task) groupByStyles(); // a grouped view is drawing: its sheet (none ticked: only the bundle's)
     if (g.team) return null;
     const sleeping = limits?.sleeping || [];

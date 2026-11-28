@@ -49,9 +49,9 @@ const { setTheme } = require('./helpers/contrast');
    assert.deepEqual(await ev(`[...document.querySelectorAll('${root} .status-sub')].map(h => h.querySelector('.status-name').textContent + ' ' + h.querySelector('.session-group-count').textContent)`), ['On a task 7', 'No task 4'], `${width}: the headings (asleep agents stay in their group)`);
    assert.deepEqual(await ev(`(() => { const h = document.querySelector('${root} .session-team-group > .board-card-header'); return [h.querySelector('.session-group-count').textContent, !!h.querySelector('.team-group-icon, .team-health-btn')]; })()`), ['12', false], `${width}: the team line is its name and count`);
    assert.equal(await ev(`document.querySelector('${root} .archived-summary-row .row-btn').innerText.replace(/\\s+/g, ' ').trim()`), 'Archived 3 ▾', `${width}: one Archived fold`);
-   assert.equal(await ev(`[...document.querySelectorAll('[data-group-by-label]')].filter(b => b.getClientRects().length).map(b => b.closest('button').textContent.replace('expand_more', '').replace(/\\s+/g, ' ').trim()).join()`), 'Group by: Team, Task', `${width}: Group by beside the search box names the grouping`);
+   assert.equal(await ev(`[...document.querySelectorAll('[data-group-by-label]')].filter(b => b.getClientRects().length).map(b => b.closest('button').textContent.replace('expand_more', '').replace(/\\s+/g, ' ').trim()).join()`), 'Group by: 2', `${width}: Group by beside the search box says how many boxes are ticked (two or more: the Orchestrator's call 1, revised)`);
    if (!(await ev(`[...document.querySelectorAll('[data-group-by-label]')].filter(b => b.getClientRects().length).every(b => b.scrollWidth <= b.clientWidth + 1)`)))
-    assert.fail(`${width}: the whole label shows, not cut to "Team, …" ` + await ev(`(() => { const b = [...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length), btn = b.closest('button'), h = btn.parentElement, w = e => Math.round(e.getBoundingClientRect().width), cs = getComputedStyle(btn), sx = h.querySelector('.sidebar-search, input'), ss = sx ? getComputedStyle(sx) : {}; return JSON.stringify({ header: w(h), pad: getComputedStyle(h).paddingLeft, search: sx && w(sx), searchMin: ss.minWidth, searchFont: ss.fontSize, btn: w(btn), btnPad: cs.paddingLeft + ' ' + cs.paddingRight, btnMax: cs.maxWidth, label: [b.scrollWidth, b.clientWidth], kids: [...h.children].filter(k => k.getClientRects().length).map(k => k.className.split(' ').pop() + ':' + w(k)) }); })()`));
+    assert.fail(`${width}: the whole label shows, not cut ` + await ev(`(() => { const b = [...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length), btn = b.closest('button'), h = btn.parentElement, w = e => Math.round(e.getBoundingClientRect().width), cs = getComputedStyle(btn), sx = h.querySelector('.sidebar-search, input'), ss = sx ? getComputedStyle(sx) : {}; return JSON.stringify({ header: w(h), pad: getComputedStyle(h).paddingLeft, search: sx && w(sx), searchMin: ss.minWidth, searchFont: ss.fontSize, btn: w(btn), btnPad: cs.paddingLeft + ' ' + cs.paddingRight, btnMax: cs.maxWidth, label: [b.scrollWidth, b.clientWidth], kids: [...h.children].filter(k => k.getClientRects().length).map(k => k.className.split(' ').pop() + ':' + w(k)) }); })()`));
    assert.equal(await ev(`document.querySelectorAll('[data-phone-chip], .sidebar-header[data-header="agents"] [data-group-toggle], .mobile-list-header [data-group-toggle]').length`), 0, `${width}: no status pills and no expand/collapse-all (the Orchestrator's calls 2 and 3)`);
    // 5. the time and "⋯": a hover swaps them on a wide screen; a phone shows both, the ⋯ 44 by 44, rows 48 high
    const rt = n => ev(`(() => { const r = ${R(n)}, t = r.querySelector('.session-time'), k = r.querySelector('.sidebar-kebab-btn'), kr = k.getBoundingClientRect(); return { time: t.getClientRects().length > 0, more: k.getClientRects().length > 0, w: Math.round(kr.width), h: Math.round(kr.height), row: Math.round(r.getBoundingClientRect().height) }; })()`);
@@ -69,20 +69,29 @@ const { setTheme } = require('./helpers/contrast');
     await setTheme(ev, theme); await ev(framesJs(4));
     if (shots) { fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
    }
-   // 7. the states the design review asked to see (UI/UX on task #22105): a hovered row, the Archived fold open, the Group by menu open
+   // 7. the states the design review asked to see (UI/UX on task #22105): a selected agent and a hovered row, the Archived fold open, the team line hovered, the Group by menu open
+   const mouseTo = async sel => { const box = await ev(`(() => { const b = ${sel}.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`); await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: box.x, y: box.y }); return box; };
+   const snap = async name => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await ev(framesJs(4)); if (shots) fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}-${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } };
+   if (!mobile) { // a click on a row selects it (on a phone it opens the agent's screen)
+    const box = await mouseTo(R('Designer'));
+    for (const type of ['mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
+    await waitFor(`!!${R('Designer')}?.classList.contains('active')`, '1280: a click selects the agent (the light tint)', 5000);
+   }
    await ev(`document.querySelector('${root} .archived-summary-row .row-btn').click(); true`);
    await waitFor(`document.querySelector('${root}').textContent.includes('Old Dev')`, `${width}: the Archived fold opens`);
-   if (!mobile) { const box = await ev(`(() => { const b = ${R('Writer')}.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`); await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: box.x, y: box.y }); }
-   for (const theme of ['dark', 'light']) {
-    await setTheme(ev, theme); await ev(framesJs(4));
-    if (shots) fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}-states.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
-   }
+   // the open fold: the team name a group heading with Restore team on its line, the agents greyed rows
+   const fold = await ev(`(() => { const c = document.querySelector('${root} .archived-team-caption'), b = c.querySelector('button').getBoundingClientRect(), cr = c.getBoundingClientRect(), row = [...document.querySelectorAll('${root} .session-group-item.archived-row')]; return { caps: getComputedStyle(c).textTransform, sameLine: b.top >= cr.top - 1 && b.bottom <= cr.bottom + 1, right: Math.round(cr.right - b.right) <= 1, rows: row.length, grey: row.every(r => getComputedStyle(r.querySelector('.session-label')).color !== getComputedStyle(${R('Reviewer')}.querySelector('.session-label')).color) }; })()`);
+   assert.deepEqual(fold, { caps: 'none', sameLine: true, right: true, rows: 3, grey: true }, `${width}: the open Archived fold ` + JSON.stringify(fold));
+   if (mobile) { // scrolled to the end, the last row clears the New button
+    const clear = await ev(`(() => { const rows = [...document.querySelectorAll('${root} .session-group-item')], last = rows[rows.length - 1]; let p = last.parentElement; while (p && !(p.scrollHeight > p.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(p).overflowY))) p = p.parentElement; (p || document.scrollingElement).scrollTop = 1e6; const fab = [...document.querySelectorAll('.phone-fab')].find(f => f.getClientRects().length); return { last: Math.round(last.getBoundingClientRect().bottom), fab: fab ? Math.round(fab.getBoundingClientRect().top) : null }; })()`);
+    await ev(framesJs(2));
+    assert.ok(clear.fab === null || clear.last <= clear.fab, `390: scrolled to the end, the last row is above the New button ` + JSON.stringify(clear));
+   } else await mouseTo(R('Writer'));
+   await snap('states');
+   if (!mobile) { await mouseTo(`document.querySelector('${root} .session-team-group > .board-card-header')`); await snap('team-hover'); }
    await ev(`[...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length).closest('button').click(); true`);
    await waitFor(`[...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length).closest('button').getAttribute('aria-expanded') === 'true'`, `${width}: Group by opens its menu`);
-   for (const theme of ['dark', 'light']) {
-    await setTheme(ev, theme); await ev(framesJs(4));
-    if (shots) fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}-groupby.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
-   }
+   await snap('groupby');
    await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
    // 6. a click on #N opens the task, never the agent (last: on a phone the task takes the screen)
    await ev(`window.__opened = []; ${R('Frontend Dev')}.querySelector('.task-id-link').click(); true`);
