@@ -1,6 +1,8 @@
 // A Needs you row for a file with several versions opens the newest version itself, never the diff between versions (#11628, the operator): the row's name and a click on the row both open "v3 of 3" with the file's own text,
 // and a diff only when Compare is pressed. The row's artifact is the newest of a three-version series (the stubbed series of artifact_versions_browser). 1280 and 390. Drives Chrome over CDP through
 // agent_view_harness.js against the isolated dev server (the team's artifact list is answered by the page).
+// On the ledger (#22094): the row is article.nl-row.nl-file (Group by None, so it is not folded away); its name is the .nl-file-open button, and "a click on the row" lands on the row's own
+// time (not a button). No check is retired.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { H1, H2, H3, STUB } = require('./helpers/artifact_versions_stub');
@@ -15,7 +17,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const T = '#group-table-view';
     const S = `(window.__coralStatic || '/static/')`;
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-group-mode', 'none'); localStorage.setItem('coral-inbox-group-review-goal', 'false');` });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -29,7 +31,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(STUB); // the series (v1, v2, v3) and the file's text, for the viewer
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1`, at + 'the one review row', 15000);
+            await waitFor(`document.querySelectorAll('${T} .nl-row.nl-file').length === 1`, at + 'the one review row', 15000);
             const state = () => ev(`(() => { const d = document.querySelector('#artifact-viewer'); return { open: !!d && !d.hidden, comparing: !!d && d.classList.contains('av-comparing'), current: ((d && d.querySelector('.av-current')) || {}).textContent || '', heading: !!(d && d.querySelector('.av-heading') && d.querySelector('.av-heading').getClientRects().length), text: (d && d.textContent) || '' }; })()`);
             const opened = async how => {
                 await waitFor(`(() => { const d = document.querySelector('#artifact-viewer'); return !!d && !d.hidden && !!d.querySelector('.av-current'); })()`, at + how + ': the viewer opens with its versions bar', 8000);
@@ -41,9 +43,9 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
                 await waitFor(`document.querySelector('#artifact-viewer').hidden`, at + how + ': closed', 4000);
             };
-            await ev(`document.querySelector('${T} .inbox-review-name').click(); true`);
+            await ev(`document.querySelector('${T} .nl-row.nl-file .nl-file-open').click(); true`);
             await opened('the name');
-            await ev(`document.querySelector('${T} tbody tr td:nth-child(2)').click(); true`); // a click on the row (not a button) opens it too
+            await ev(`document.querySelector('${T} .nl-row.nl-file .nl-when').click(); true`); // a click on the row (not a button) opens it too
             await opened('a click on the row');
             await removeBoards(ev, [team]).catch(() => {});
         }
