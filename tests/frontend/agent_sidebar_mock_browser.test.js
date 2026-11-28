@@ -63,9 +63,6 @@ const { setTheme } = require('./helpers/contrast');
     assert.deepEqual(await rt('Writer').then(a => [a.time, a.more]), [false, true], '1280: a hover swaps the time for ⋯');
     await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 700, y: 900 });
    }
-   // 6. a click on #N opens the task, never the agent
-   await ev(`window.__opened = []; ${R('Frontend Dev')}.querySelector('.task-id-link').click(); true`);
-   assert.equal(await ev(`!!${R('Frontend Dev')}.classList.contains('active')`), false, `${width}: #N does not select the agent`);
    for (const theme of ['dark', 'light']) {
     await setTheme(ev, theme); await ev(framesJs(4));
     if (shots) { fs.mkdirSync(shots, { recursive: true }); fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
@@ -84,6 +81,10 @@ const { setTheme } = require('./helpers/contrast');
     await setTheme(ev, theme); await ev(framesJs(4));
     if (shots) fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}-groupby.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
    }
+   await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+   // 6. a click on #N opens the task, never the agent (last: on a phone the task takes the screen)
+   await ev(`window.__opened = []; ${R('Frontend Dev')}.querySelector('.task-id-link').click(); true`);
+   assert.equal(await ev(`!!${R('Frontend Dev')}.classList.contains('active')`), false, `${width}: #N does not select the agent`);
   }
   console.log('PASS agent sidebar (#22105): four marks, #N the one link, queued at the right, the time/⋯ swap, quiet headings and team line, one Archived fold, Group by named; 1280 and 390, light and dark');
  } finally { await client.close(); }
