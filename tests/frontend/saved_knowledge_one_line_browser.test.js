@@ -37,7 +37,8 @@ const board = 'saved-line-' + Date.now().toString(36);
                     if (folder) { await ev(`window.switchNavTab('hub-inbox'); true`); await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(folder)})).then(() => true)`); }
                     // The rows are the ones measure() finds on screen, and the first measurement with enough of them is the one checked: a redraw between a wait on the DOM and a later measure left it none on Windows (#20972).
                     let rows = [];
-                    for (const end = Date.now() + 15000; ; await new Promise(r => setTimeout(r, 50))) { rows = await measure(); if (rows.length >= (name === 'Saved' ? 3 : 1)) break; if (Date.now() > end) break; }
+                    const measureSaved = () => ev(`[...document.querySelectorAll('#group-table-view .saved-ledger .sl-row')].filter(r => r.getClientRects().length > 0).map(r => ({ h: Math.round(r.getBoundingClientRect().height), title: !!r.querySelector('.sl-name')?.getClientRects().length }))`); // Saved is the calm list since #22108 (the Saved mock): saved_one_list_browser pins its shape
+                    for (const end = Date.now() + 15000; ; await new Promise(r => setTimeout(r, 50))) { rows = await (name === 'Saved' ? measureSaved() : measure()); if (rows.length >= (name === 'Saved' ? 3 : 1)) break; if (Date.now() > end) break; }
                     assert.ok(rows.length >= (name === 'Saved' ? 3 : 1), at + 'rows');
                     for (const r of rows) {
                         assert.ok(r.title, at + 'the title is on the row');
@@ -45,10 +46,10 @@ const board = 'saved-line-' + Date.now().toString(36);
                         assert.deepEqual(r.off, [], at + 'every other cell shares the title\'s line: ' + JSON.stringify(r));
                         assert.ok(r.h <= 64, at + 'one line (a folded compact row is about 61 px; two lines were 76 and more): ' + r.h + ' px: ' + JSON.stringify(r)); assert.ok(r.scrolls <= 1, at + 'no sideways scroll');
                     }
-                    if (width === 390 && name === 'Saved') { // 200% text: the narrow container rule must not let the title wrap (#8981, the 20 rem rule)
+                    if (width === 390 && name === 'Saved') { // 200% text: a phone's Saved name wraps (the Saved mock, #22108); nothing is cut or scrolls sideways (#8981)
                         await ev(`document.documentElement.style.fontSize = '32px'; true`); await new Promise(r => setTimeout(r, 600)); // sleep-ok: the table's fold observer settles
-                        const big = await ev(`[...document.querySelectorAll('.dt-table tbody tr:not(.dt-group)')].filter(r => r.getClientRects().length).map(r => { const b = r.querySelector('button.dt-primary'), t = r.querySelector('.dt-mail-title') || b, c = getComputedStyle(t); /* a phone's Saved row is a mail row (#9583): its title is the line */ return { nowrap: c.whiteSpace, ellipsis: c.textOverflow, h: Math.round(t.getBoundingClientRect().height), lh: parseFloat(c.lineHeight) || parseFloat(c.fontSize) * 1.3 }; })`);
-                        for (const r of big) { assert.equal(r.nowrap, 'nowrap', at + '200% text: the title stays on one line: ' + JSON.stringify(r)); assert.equal(r.ellipsis, 'ellipsis', at + '200% text: cut with an ellipsis'); assert.ok(r.h < 70, at + '200% text: one line high: ' + JSON.stringify(r)); }
+                        const wide = await ev(`({ page: document.documentElement.scrollWidth - document.documentElement.clientWidth, names: [...document.querySelectorAll('#group-table-view .saved-ledger .sl-name')].filter(n => n.getClientRects().length).map(n => n.scrollWidth - n.clientWidth) })`);
+                        assert.ok(wide.page <= 1 && wide.names.length >= 3 && wide.names.every(d => d <= 1), at + '200% text: the names wrap (the Saved mock at 390), nothing is cut or scrolls sideways: ' + JSON.stringify(wide));
                         await ev(`document.documentElement.style.fontSize = ''; true`);
                     }
                     const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out'));
