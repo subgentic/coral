@@ -50,7 +50,7 @@ export function showConfirmModal(title, message, onConfirm, onCancel, opts = {})
     });
     _confirmCancel = onCancel || null;
     const modal = document.getElementById("confirm-modal");
-    if (!modal.contains(document.activeElement)) modal._focusOpener = document.activeElement; // capture before focus moves inside
+    if (document.activeElement !== document.body && !modal.contains(document.activeElement)) modal._focusOpener = document.activeElement; // capture a control before focus moves inside; body means the opener already lost focus, so dialog_focus uses its fallback
     modal.style.display = "flex";
     noBtn.focus(); // the safe answer owns focus before the visible dialog can take a key
 }
