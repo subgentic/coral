@@ -128,12 +128,10 @@ function followLink(d, hex, opts) {
     const entry = { hex: _hex, opts: _lastOpts, name, scroll: bodyScroller(d).scrollTop };
     openArtifactViewer(hex, { ...opts, keepTrail: true, trailFrom: entry });
 }
-function escapeViewer(d) {
+/* Escape cancels an edit, else steps Back in the link trail, else closes; full screen is left to its own button, so the saved choice is kept (#22085). */
+function escapeViewer() {
     if (_editor) { _editor.cancel(); return; }
-    if (d.classList.contains('av-fullscreen') && !isPhoneLayout()) {
-        setFullScreen(d, false, true);
-        d.querySelector('.artifact-viewer-fullscreen').focus();
-    } else if (_trail.length) backInViewer();
+    if (_trail.length) backInViewer();
     else closeArtifactViewer();
 }
 
@@ -247,10 +245,10 @@ function _build() {
         // document's own artifact links inherit the frozen source and attribution.
         followLink(d, hex.toLowerCase(), { server: _lastOpts.server, board: _lastOpts.board, sourceNamed: _lastOpts.sourceNamed, onClose: _lastOpts.onClose, filename: a.textContent.trim() });
     });
-    setDialogHide(d, () => escapeViewer(d)); // modal_chrome's Escape (with the focus anywhere on the page) closes it through its own close, not by display:none, which left it open and every later open a no-op (#12290)
+    setDialogHide(d, () => escapeViewer()); // modal_chrome's Escape (with the focus anywhere on the page) closes it through its own close, not by display:none, which left it open and every later open a no-op (#12290)
     d.addEventListener('keydown', (e) => {
         // Stop here: the page-wide Escape handler (modal_chrome) would also close a modal under the viewer.
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); escapeViewer(d); }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); escapeViewer(); }
         else if (e.key === 'Tab') trapTab(d, e);
     });
     keepFragmentsInside(d.querySelector('.artifact-viewer-body'));
