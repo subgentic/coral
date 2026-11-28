@@ -15,7 +15,8 @@ const HISTORY_KEYS = ['type', 'source_types', 'date_from', 'date_to', 'q', 'page
 // What the plan adds (section 3, rows 1 to 6).
 const ADDED_ROUTE = '/api/sessions/history/counts';
 // Goals and Artifacts (#11071), plus the owner-only Activity folder (#20394): explicit folder opens read these View routes with their bounded query keys. Activity is forbidden before its folder click below; the census itself opens every folder.
-const FOLDER_ROUTES = { '/api/board/{team}/artifacts': ['limit', 'goal', 'sort', 'versions'], '/api/activity': ['limit', 'before'], '/api/goals': ['limit', 'state'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first', 'facets'] };
+// #22040: inbox_goal_read_plan.md documents open-goal tasks (200/page); folded goals read nothing.
+const FOLDER_ROUTES = { '/api/board/{team}/tasks': ['goal', 'limit', 'cursor'], '/api/board/{team}/artifacts': ['limit', 'goal', 'sort', 'versions'], '/api/activity': ['limit', 'before'], '/api/goals': ['limit', 'state'], '/api/team-artifacts': ['limit', 'offset', 'sort', 'versions', 'starred', 'starred_first', 'facets'] };
 const ADDED_KEYS = ['active', 'agent_name', 'archived', 'starred', 'with_notes'];
 // #13958: the Inbox badge is dashboard chrome on every tab. It reads one
 // owner-protected attention summary per computer; it never loads a file window.
@@ -196,6 +197,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
         for (const r of proxied) {
             if (r.p === '/api/goals' && r.query.state !== undefined) assert.ok(['done', 'proposed,active,blocked,done,dropped'].includes(r.query.state), 'only Done or the bounded All-goals ledger adds a state query');
             if (/^\/api\/board\/[^/]+\/artifacts$/.test(r.p) && r.query.goal !== undefined) { assert.match(r.query.goal, /^[1-9]\d*$/); assert.equal(r.query.limit, '50'); assert.equal(r.query.sort, 'name'); assert.equal(r.query.versions, 'newest'); }
+            if (/^\/api\/board\/[^/]+\/tasks$/.test(r.p) && r.query.goal !== undefined) { assert.match(r.query.goal, /^[1-9]\d*$/); assert.equal(r.query.limit, '200'); if (r.query.cursor !== undefined) assert.ok(r.query.cursor.length > 0); }
             if (r.p === '/api/team-artifacts' && r.query.facets !== undefined) assert.equal(r.query.facets, 'team,by,goal', 'review facets use the bounded supported dimensions');
         }
         const stray = [], newKeys = new Set(), newRoutes = new Set();
