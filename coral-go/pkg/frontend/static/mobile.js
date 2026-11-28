@@ -121,7 +121,7 @@ function _listHeader(agentList) {
     header.innerHTML = `
             <span class="phone-break" aria-hidden="true"></span>
             <h2 class="mobile-list-title">Agents</h2>
-            <button class="btn sidebar-groupby-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel">Group by<span data-group-by-value hidden>: <b data-group-by-label></b></span><span class="material-icons" aria-hidden="true">expand_more</span><span class="display-dot" role="img" data-display-badge hidden></span></button>
+            <button class="btn sidebar-groupby-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel"><span>Group by<span data-group-by-value hidden>: <b data-group-by-label></b></span></span><span class="material-icons" aria-hidden="true">expand_more</span><span class="display-dot" role="img" data-display-badge hidden></span></button>
             <button class="btn btn-small btn-primary" data-on-click="launch-show">New</button>
             <span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>
             <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" hidden>

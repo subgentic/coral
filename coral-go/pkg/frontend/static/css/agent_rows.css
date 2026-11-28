@@ -15,6 +15,9 @@
 :is(#live-sessions-list, #mobile-session-list) .session-label-split .session-label-name { display: flex; min-width: 0; flex: 0 1 auto; overflow: hidden; }
 :is(#live-sessions-list, #mobile-session-list) .session-label-split .sln-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
 :is(#live-sessions-list, #mobile-session-list) .session-label-split .sln-tail { flex: none; white-space: nowrap; }
+:is(#live-sessions-list, #mobile-session-list) .session-label:not(.session-label-split) .session-label-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; } /* a name with no space ends in an ellipsis inside its row (mobile_text_sizes at 320 px) */
+#live-sessions-list { container-type: inline-size; }
+@container (max-width: 240px) { #live-sessions-list .session-group-item { padding-left: 28px !important; } } /* a sidebar dragged in to 200 px: the mock's 49 px indent left the name 59 px, too little for its last word (#4624) */
 /* the mark: always there, in the same place */
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-dot[class*="mk-"] { display: block; position: absolute; left: 30px; top: 12px; width: 9px; height: 9px; margin: 0; border: 0; border-radius: 50%; box-sizing: border-box; background: transparent; box-shadow: none; animation: none; opacity: 1; visibility: visible; }
 :is(#live-sessions-list, #mobile-session-list) .session-group-item .session-dot[class*="mk-"]::before { content: none; }
@@ -42,6 +45,7 @@
 :is(#live-sessions-list, #mobile-session-list) :is(.status-sub, .status-head) .session-group-count { margin: 0; padding: 0; border: 0; background: none; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-muted); }
 /* the team line: the name and its count; its "⋯" on a hover of the line itself */
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header { padding: 4.5px 8px !important; box-shadow: none; border-radius: var(--radius-md); } /* 33 px, the mock's team line: its 24 px collapse and ⋯ buttons set the line, so 4.5 + 24 + 4.5 */
+#mobile-session-list .session-team-group > .board-card-header { border-radius: 0; } /* the phone's team line is no card (phone_agents_rows) */
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header .group-name-text { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 :is(#live-sessions-list, #mobile-session-list) .session-team-group > .board-card-header .session-group-count { margin-inline-start: 8px; padding: 0; border: 0; background: none; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-muted); }

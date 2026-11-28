@@ -50,7 +50,7 @@ const { setTheme } = require('./helpers/contrast');
    assert.deepEqual(await ev(`(() => { const h = document.querySelector('${root} .session-team-group > .board-card-header'); return [h.querySelector('.session-group-count').textContent, !!h.querySelector('.team-group-icon, .team-health-btn')]; })()`), ['12', false], `${width}: the team line is its name and count`);
    assert.equal(await ev(`document.querySelector('${root} .archived-summary-row .row-btn').innerText.replace(/\\s+/g, ' ').trim()`), 'Archived 3 ▾', `${width}: one Archived fold`);
    assert.equal(await ev(`[...document.querySelectorAll('[data-group-by-label]')].filter(b => b.getClientRects().length).map(b => b.closest('button').textContent.replace('expand_more', '').replace(/\\s+/g, ' ').trim()).join()`), 'Group by: 2', `${width}: Group by beside the search box says how many boxes are ticked (two or more: the Orchestrator's call 1, revised)`);
-   if (!(await ev(`[...document.querySelectorAll('[data-group-by-label]')].filter(b => b.getClientRects().length).every(b => b.scrollWidth <= b.clientWidth + 1)`)))
+   if (!(await ev(`[...document.querySelectorAll('.sidebar-groupby-btn > span:first-child')].filter(b => b.getClientRects().length).every(b => b.scrollWidth <= b.clientWidth + 1)`)))
     assert.fail(`${width}: the whole label shows, not cut ` + await ev(`(() => { const b = [...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length), btn = b.closest('button'), h = btn.parentElement, w = e => Math.round(e.getBoundingClientRect().width), cs = getComputedStyle(btn), sx = h.querySelector('.sidebar-search, input'), ss = sx ? getComputedStyle(sx) : {}; return JSON.stringify({ header: w(h), pad: getComputedStyle(h).paddingLeft, search: sx && w(sx), searchMin: ss.minWidth, searchFont: ss.fontSize, btn: w(btn), btnPad: cs.paddingLeft + ' ' + cs.paddingRight, btnMax: cs.maxWidth, label: [b.scrollWidth, b.clientWidth], kids: [...h.children].filter(k => k.getClientRects().length).map(k => k.className.split(' ').pop() + ':' + w(k)) }); })()`));
    assert.equal(await ev(`document.querySelectorAll('[data-phone-chip], .sidebar-header[data-header="agents"] [data-group-toggle], .mobile-list-header [data-group-toggle]').length`), 0, `${width}: no status pills and no expand/collapse-all (the Orchestrator's calls 2 and 3)`);
    // 5. the time and "⋯": a hover swaps them on a wide screen; a phone shows both, the ⋯ 44 by 44, rows 48 high
@@ -72,7 +72,7 @@ const { setTheme } = require('./helpers/contrast');
    // 7. the states the design review asked to see (UI/UX on task #22105): a selected agent and a hovered row, the Archived fold open, the team line hovered, the Group by menu open
    const mouseTo = async sel => { const box = await ev(`(() => { const b = ${sel}.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`); await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: box.x, y: box.y }); return box; };
    const snap = async name => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await ev(framesJs(4)); if (shots) fs.writeFileSync(`${shots}/agent-sidebar-${theme}-${width}-${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } };
-   if (!mobile) { // a click on a row selects it (on a phone it opens the agent's screen)
+   if (width === 1280) { // a click on a row selects it (on a phone it opens the agent's screen; at 1024 the open agent folds the sidebar to its rail)
     const box = await mouseTo(R('Designer'));
     for (const type of ['mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
     await waitFor(`!!${R('Designer')}?.classList.contains('active')`, '1280: a click selects the agent (the light tint)', 5000);
@@ -90,8 +90,8 @@ const { setTheme } = require('./helpers/contrast');
    } else await mouseTo(R('Writer'));
    await snap('states');
    if (!mobile) { await mouseTo(`document.querySelector('${root} .session-team-group > .board-card-header')`); await snap('team-hover'); }
-   await ev(`[...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length).closest('button').click(); true`);
-   await waitFor(`[...document.querySelectorAll('[data-group-by-label]')].find(b => b.getClientRects().length).closest('button').getAttribute('aria-expanded') === 'true'`, `${width}: Group by opens its menu`);
+   await ev(`[...document.querySelectorAll('.sidebar-groupby-btn')].find(b => b.getClientRects().length).click(); true`);
+   await waitFor(`[...document.querySelectorAll('.sidebar-groupby-btn')].find(b => b.getClientRects().length).getAttribute('aria-expanded') === 'true'`, `${width}: Group by opens its menu`);
    await snap('groupby');
    // the label as the boxes change: none ticked just "Group by", one its name, two or more how many (the Orchestrator's call 1, revised)
    const words = () => ev(`[...document.querySelectorAll('[data-group-by-label]')].filter(b => b.closest('button').getClientRects().length).map(b => b.closest('button').innerText.replace('expand_more', '').replace(/\\s+/g, ' ').trim()).join()`);
