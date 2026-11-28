@@ -64,7 +64,7 @@ func cmdTaskReview(st *boardState, args []string, action string) {
 		clierr.Exit1()
 	}
 	if action == "submit-review" && strings.TrimSpace(*noTests) == "" && !hasTestResult(*message+"\n"+*reason) {
-		fmt.Fprintf(os.Stderr, "paste the last line of the test run you did (npm test:cloud, go test, or the one browser suite) into the note with --message, e.g. coral-board task submit-review %d --reason \"ready\" --message \"<the last line of your test run>\"; a docs-only change says why with --no-tests \"why\"\n", id)
+		fmt.Fprintln(os.Stderr, noTestResultText(*message))
 		clierr.Exit1()
 	}
 	body := map[string]any{"subscriber_id": resolveSubscriberID(), "reason": *reason, "message": *message, "outcome": *outcome}
@@ -444,8 +444,20 @@ func branchHead(name string) string {
 	return ""
 }
 
-// testResultLine matches a line of a test run pasted into a note: pass/fail counts, PASS/FAIL, a go test "ok  pkg" line or an exit code (#18292).
-var testResultLine = regexp.MustCompile(`(?i)(\b\d+\s+(passed|failed|passing|failing|tests?)\b|\b(passed|failed)\b\s*[:=]?\s*\d+|\bPASS\b|\bFAIL\b|\bok\s+\S*/|\bexit(\s+code)?\s*[:=]?\s*\d+\b|\ball passed\b|\d+/\d+ suites? passed)`)
+// testResultLine matches a line of a test run pasted into a note: pass/fail counts, PASS/FAIL, a go test "ok  pkg" line or an exit code, as exit code 1 or exited with code 1 (#18292, #587).
+var testResultLine = regexp.MustCompile(`(?i)(\b\d+\s+(passed|failed|passing|failing|tests?)\b|\b(passed|failed)\b\s*[:=]?\s*\d+|\bPASS\b|\bFAIL\b|\bok\s+\S*/|\bexit(ed\s+with)?(\s+code)?\s*[:=]?\s*\d+\b|\ball passed\b|\d+/\d+ suites? passed)`)
 
 // hasTestResult reports whether the text has a line that looks like a test result: a plain text check, no state.
 func hasTestResult(text string) bool { return testResultLine.MatchString(text) }
+
+// noTestResultText is submit-review's refusal when the note has no test result. It holds no quotes, so an agent that pastes it into a
+// command does not break the shell, and its example (N passed, M failed) has no digits, so the refusal pasted into --message is not
+// itself taken for a test result (#587: a model pasted a quoted example into --message, then looped on the same refusal).
+// When --message was given, it says the note was read and why it did not count.
+func noTestResultText(message string) string {
+	const how = "put the last line your test run printed (npm test:cloud, go test, or the one browser suite) in --message as it printed it: a line like N passed, M failed or exit code N counts. A change with no test to run, docs only for example, gives the reason with --no-tests instead."
+	if strings.TrimSpace(message) == "" {
+		return "submit-review needs a test result in the note: " + how
+	}
+	return "--message was read but has no test result line, so it does not count: " + how
+}
