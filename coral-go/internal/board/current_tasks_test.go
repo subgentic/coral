@@ -47,3 +47,25 @@ func TestCurrentTasksIsTheInProgressTaskElseTheOldestQueued(t *testing.T) {
 	_, onBeta := cur()[CurrentTaskKey("beta", "Someone Else")]
 	assert.False(t, onBeta, "a task on one board is not on another")
 }
+
+// #22048: a backlog task (task add --later) is not what its assignee is on: a bare claim never offers it, so the sidebar shows no task line and no "queued" for it.
+func TestCurrentTasksSkipsTheBacklog(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	_, err := s.Subscribe(ctx, "alpha", "Dev", "Dev", "", nil, "")
+	require.NoError(t, err)
+	later, err := s.CreateTask(ctx, "alpha", "for later", "", "medium", "Dev", "Dev")
+	require.NoError(t, err)
+	_, err = s.SetBacklog(ctx, "alpha", later.ID)
+	require.NoError(t, err)
+	m, err := s.CurrentTasks(ctx)
+	require.NoError(t, err)
+	_, on := m[CurrentTaskKey("alpha", "Dev")]
+	assert.False(t, on, "a backlog-only agent is on no task")
+
+	next, err := s.CreateTask(ctx, "alpha", "do now", "", "medium", "Dev", "Dev")
+	require.NoError(t, err)
+	m, err = s.CurrentTasks(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, next.ID, m[CurrentTaskKey("alpha", "Dev")].ID, "the queued task the agent will claim, not the older backlog one")
+}

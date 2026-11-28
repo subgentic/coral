@@ -202,10 +202,15 @@ func cmdTaskList(asJSON bool) {
 	}
 
 	fmt.Printf("%-4s %-12s %-9s %-15s %s\n", "ID", "Status", "Priority", "Assignee", "Title")
+	backlog := false
 	for _, t := range tasks {
 		task, _ := t.(map[string]any)
 		id, _ := task["id"].(float64)
 		tStatus, _ := task["status"].(string)
+		if taskInBacklog(task) {
+			tStatus = "backlog" // parked for later (#22048): a bare claim skips it
+			backlog = true
+		}
 		tPriority, _ := task["priority"].(string)
 		tAssignee := "—"
 		if a, ok := task["assigned_to"].(string); ok && a != "" {
@@ -214,6 +219,10 @@ func cmdTaskList(asJSON bool) {
 		tTitle, _ := task["title"].(string)
 
 		fmt.Printf("#%-3.0f %-12s %-9s %-15s %s\n", id, tStatus, tPriority, tAssignee, tTitle)
+	}
+	if backlog {
+		fmt.Println()
+		fmt.Println(backlogHint)
 	}
 }
 
@@ -455,3 +464,12 @@ func isNoTask(data []byte) bool {
 	json.Unmarshal(data, &e)
 	return e.Error == "No available tasks" || e.Error == "No active task"
 }
+
+// taskInBacklog reports a task parked as backlog (#22048): parked_reason "backlog" and no end. A bare 'task claim' skips it; its assignee claims it by number.
+func taskInBacklog(task map[string]any) bool {
+	reason, _ := task["parked_reason"].(string)
+	until, _ := task["parked_until"].(string)
+	return reason == "backlog" && until == ""
+}
+
+const backlogHint = "Backlog tasks are yours when assigned to you, but a bare claim skips them: claim one by number with 'task claim N'."

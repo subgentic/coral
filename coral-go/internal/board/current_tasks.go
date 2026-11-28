@@ -18,7 +18,7 @@ func CurrentTaskKey(board, assignee string) string {
 }
 
 // CurrentTasks is, for every assignee of an open task on any board, the task that assignee is on (#21685, the sidebar's Group by task): the task in progress (the one claimed most recently), else the oldest queued
-// task. An assignee with neither has no entry. Drafts, blocked, review-pending and finished tasks are not "on a task".
+// task. An assignee with neither has no entry. Drafts, blocked, review-pending, finished and parked tasks (the backlog among them, #22048: a bare claim never offers one) are not "on a task".
 func (s *Store) CurrentTasks(ctx context.Context) (map[string]CurrentTask, error) {
 	var rows []struct {
 		ID       int64  `db:"id"`
@@ -29,7 +29,7 @@ func (s *Store) CurrentTasks(ctx context.Context) (map[string]CurrentTask, error
 	}
 	// In progress first (newest claim first), then queued (oldest first): the first row of an assignee is the one to show.
 	if err := s.reader().SelectContext(ctx, &rows, `SELECT id, board_id, title, status, assigned_to FROM board_tasks
-		WHERE assigned_to IS NOT NULL AND assigned_to <> '' AND status IN ('in_progress', 'pending')
+		WHERE assigned_to IS NOT NULL AND assigned_to <> '' AND status IN ('in_progress', 'pending') AND NOT `+parkedSQL+`
 		ORDER BY CASE status WHEN 'in_progress' THEN 0 ELSE 1 END,
 			CASE status WHEN 'in_progress' THEN COALESCE(claimed_at, created_at) END DESC,
 			CASE status WHEN 'pending' THEN created_at END ASC, id ASC`); err != nil {

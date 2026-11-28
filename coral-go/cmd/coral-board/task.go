@@ -228,11 +228,16 @@ func cmdTaskListGoal(st *boardState, asJSON bool, goal int64) {
 	}
 
 	fmt.Printf("%-4s %-12s %-9s %-15s %s\n", "ID", "Status", "Priority", "Assignee", "Title")
+	backlog := false
 	for _, task := range tasks {
 		id, _ := task["id"].(float64)
 		tStatus, _ := task["status"].(string)
 		if taskReviewRequested(task) && tStatus == "in_progress" {
 			tStatus = "review_requested"
+		}
+		if taskInBacklog(task) {
+			tStatus = "backlog" // parked for later (#22048): a bare claim skips it
+			backlog = true
 		}
 		tPriority, _ := task["priority"].(string)
 		tAssignee := "—"
@@ -249,6 +254,10 @@ func cmdTaskListGoal(st *boardState, asJSON bool, goal int64) {
 		}
 
 		fmt.Printf("#%-3.0f %-12s %-9s %-15s %s\n", id, tStatus, tPriority, tAssignee, tTitle)
+	}
+	if backlog {
+		fmt.Println()
+		fmt.Println(backlogHint)
 	}
 }
 
@@ -325,3 +334,12 @@ func printTaskWorkflow(task map[string]any) {
 		}
 	}
 }
+
+// taskInBacklog reports a task parked as backlog (#22048): parked_reason "backlog" and no end. A bare 'task claim' skips it; its assignee claims it by number.
+func taskInBacklog(task map[string]any) bool {
+	reason, _ := task["parked_reason"].(string)
+	until, _ := task["parked_until"].(string)
+	return reason == "backlog" && until == ""
+}
+
+const backlogHint = "Backlog tasks are yours when assigned to you, but a bare claim skips them: claim one by number with 'task claim N'."
