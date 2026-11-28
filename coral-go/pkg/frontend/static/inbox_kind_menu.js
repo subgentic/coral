@@ -9,7 +9,7 @@ export function mount(node, pills) {
     node.querySelector('.inbox-kind-control')?.remove();
     const row = node.querySelector('.list-bar-search-row'), group = row.querySelector('.team-tb-pills');
     if (!group || !pills) return;
-    const menu = moreMenu('inbox-kind', pills.items.map(it => ({ label: `${it.label} ${it.count}`, pressed: it.key === pills.current, run: () => pills.onPick(it.key) })), { label: 'Kind', wrapClass: 'inbox-kind-control task-more' });
+    const menu = moreMenu('inbox-kind', pills.items.map(it => ({ label: `${it.label}${it.count == null ? '' : ' '+it.count}`, pressed: it.key === pills.current, run: () => pills.onPick(it.key) })), { label: 'Kind', wrapClass: 'inbox-kind-control task-more' });
     const button = menu.querySelector('button');
     button.textContent = 'Kind'; button.setAttribute('aria-label', `Kind: ${pills.items.find(it => it.key === pills.current)?.label || 'All'}`);
     row.insertBefore(menu, row.querySelector('.list-bar-toggle'));
