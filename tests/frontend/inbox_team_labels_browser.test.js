@@ -55,9 +55,9 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
 
             // Goals
             await open('goals');
-            await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length >= 2`, `${label}: two goals`, 10000);
-            const gteams = await column('Team');
-            if (!mobile) check(`${label}: Goals' Team column tells the two alpha teams apart`, gteams && gteams.length === 2 && gteams[0] !== gteams[1] && gteams.some(t => /alpha.*This computer/.test(t)) && gteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(gteams));
+            await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-title').length >= 2`, `${label}: two goals`, 10000);
+            const gteams = await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-team')].map(e=>e.textContent)`);
+            if (!mobile) check(`${label}: Goals' source label tells the two alpha teams apart`, gteams && gteams.length === 2 && gteams[0] !== gteams[1] && gteams.some(t => /alpha.*This computer/.test(t)) && gteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(gteams));
             await shot(`team-labels-goals-${label}`, mobile ? 'dark' : 'light');
             await panel();
             await ev(`(() => { const s = document.getElementById('inbox-goals-team'); s.size = s.options.length; return true; })()`); // the choices as a list, for the shot (a native popup is not in one)
@@ -66,7 +66,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             const gchoices = await teamChoices();
             check(`${label}: Goals' Team filter offers both, by their computer`, gchoices.filter(([v]) => v).length === 2 && new Set(gchoices.map(c => c[1])).size === gchoices.length && gchoices.some(([v, t]) => v === '@box-2/alpha' && /Box Two/.test(t)), JSON.stringify(gchoices));
             await ev(`(() => { const s = document.getElementById('inbox-goals-team'); s.value = '@box-2/alpha'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(400);
-            check(`${label}: choosing the remote one shows its goal, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => (b.querySelector('.dt-mail-title') || b).textContent.replace(/^#\\d+\\s+/, '').trim())`)) === '["Remote goal"]' && (mobile || /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`))));
+            check(`${label}: choosing the remote one shows its goal, with a chip that names the computer`, JSON.stringify(await ev(`[...document.querySelectorAll('#group-table-view .goal-decision-title')].map(b => (b.querySelector('.dt-mail-title') || b).textContent.replace(/^#\\d+\\s+/, '').trim())`)) === '["Remote goal"]' && (mobile || /Box Two/.test(await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`))));
 
             // Tasks: the Team column, and the Team filter this folder did not have
             await open('tasks');

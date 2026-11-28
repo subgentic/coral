@@ -40,9 +40,9 @@ const { coralReady } = require('./helpers/wait');
 
         console.log('2. Goals: a word only in a goal outcome shows that goal');
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('goals')); true`);
-        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].some(tr => /Tidy the docs/.test(tr.textContent))`, 'the goals', 10000);
+        await waitFor(`[...document.querySelectorAll('#group-table-view .goal-decision-card')].some(tr => /Tidy the docs/.test(tr.textContent))`, 'the goals', 10000);
         await search('zebrafish');
-        await waitFor(`(() => { const t = [...document.querySelectorAll('#group-table-view tbody tr')].map(tr => tr.textContent); return t.some(x => /Ship the new installer/.test(x)) && !t.some(x => /Tidy the docs/.test(x)); })()`, 'only the goal whose outcome says it', 8000);
+        await waitFor(`(() => { const t = [...document.querySelectorAll('#group-table-view .goal-decision-card')].map(tr => tr.textContent); return t.some(x => /Ship the new installer/.test(x)) && !t.some(x => /Tidy the docs/.test(x)); })()`, 'only the goal whose outcome says it', 8000);
         console.log('PASS the dashboard search finds a word only in a task body or a goal outcome');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(err => { console.error(err); process.exit(1); });

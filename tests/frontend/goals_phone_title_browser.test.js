@@ -24,6 +24,12 @@ const { coralReady, framesJs } = require('./helpers/wait');
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + (where === 'team' ? '/team/' + B + '/goals' : '/') }); await Page.loadEventFired(); await install(); await coralReady(ev);
             if (where === 'inbox') { await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`); await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => true)`); }
+            if(where==='inbox'){
+                await waitFor(`document.querySelectorAll('${root} .goal-decision-card').length>=3`,at+' ledger titles',15000);
+                const q=await ev(`(()=>{const c=[...document.querySelectorAll('${root} .goal-decision-card')].find(c=>c.querySelector('.goal-decision-title').textContent===${JSON.stringify(TITLE)}),t=c.querySelector('.goal-decision-title'),r=t.getBoundingClientRect(),b=c.getBoundingClientRect();return {title:t.textContent,left:r.left,right:r.right,cardLeft:b.left,cardRight:b.right,state:c.querySelector('.goal-decision-state').textContent,over:document.documentElement.scrollWidth>innerWidth+1};})()`);
+                check(q.title===TITLE&&q.left>=q.cardLeft&&q.right<=q.cardRight+1&&!q.over,at+' approved wrapping ledger title is whole within its card: '+JSON.stringify(q));
+                check(q.state==='Active',at+' ledger keeps the state in the heading');continue;
+            }
             await waitFor(`document.querySelectorAll('${root} tbody tr').length >= 3`, at + 'the goal rows', 15000);
             await ev(framesJs(6));
             const m = await ev(probe.replace('ROOT', root));

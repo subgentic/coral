@@ -73,6 +73,13 @@ const STUB = `(() => {
      if(${JSON.stringify(surface)}==='task'){const m=await import(S+'team_task_artifacts.js');host.append(await m.taskArtifactsSection(${JSON.stringify(TEAM)},{id:101}));}
      if(${JSON.stringify(surface)}==='goal'){const m=await import(S+'goal_artifacts.js');m.mountGoalArtifactsList(host,{team:${JSON.stringify(TEAM)},goalId:1});}
      return true;})()`);
+    if(surface==='goal'){
+     await waitFor(`document.querySelectorAll('#artifact-surfaces-test .goal-decision-row').length===3`,'goal decision rows');
+     assert.deepEqual(await ev(`[...document.querySelectorAll('#artifact-surfaces-test .goal-decision-name')].map(b=>b.textContent)`),DATA.map(a=>a.name),'goal ledger preserves natural file order independent of the table sort');
+     assert.equal(await ev(`document.querySelectorAll('#artifact-surfaces-test .goal-decision-chip.is-approved').length`),3,'each goal file keeps its state');
+     assert.ok(await ev(`[...document.querySelectorAll('#artifact-surfaces-test .goal-decision-name')].every(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth+1})`),'goal file names remain real visible controls at both widths');
+     assert.equal(await ev(`!!document.querySelector('#artifact-surfaces-test .dt-folded')`),false,'goal ledger does not fold optional metadata into table cells');continue;
+    }
     await waitFor(`document.querySelectorAll('#artifact-surfaces-test tbody .dt-row').length===3`,surface+' artifact rows');
     assert.equal(await ev(`document.querySelector('#artifact-surfaces-test .dt-box').classList.contains('dt-one-line')`),true,surface);
     assert.equal(await ev(`document.querySelector('#artifact-surfaces-test th[data-key=name]').getAttribute('aria-sort')`),surface==='goal'?'none':'descending',surface==='goal'?'the goal list is grouped by task: its heads stay until a header is pressed on it':'sort remembered across '+surface);

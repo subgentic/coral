@@ -71,10 +71,11 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal }) {
         toggle.dataset.goalId = String(g.id);
         toggle.append(el('span', 'goal-decision-chevron', '▾'), (() => { const s = chip(safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown'), `goal-state-${g.state || 'unknown'}`); s.classList.remove('dt-chip'); s.classList.add('goal-decision-state'); return s; })(), el('span', 'goal-decision-id', `Goal #${g.id}`), el('span', 'goal-decision-title', safe(g.title)));
         const right = el('div', 'goal-decision-head-right'), summary = el('span', 'goal-decision-summary'), teamLabel = el('span', 'goal-decision-team', safe(teamOf(g)));
+        if (Number(g.new_comments) > 0) right.append(chip('New comments', 'goal-new-comments'));
         right.append(summary, teamLabel, button('btn btn-small btn-quiet', 'Open Goal Artifacts ↗', () => openGoal(g, 'artifacts'))); bar.append(toggle, right);
         const body = el('div', 'goal-decision-body'); card.append(bar, body); root.append(card);
         function paint() {
-            const open = folds.get(key); toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} Goal #${g.id} ${safe(g.title)}`); card.classList.toggle('is-collapsed', !open); body.hidden = !open;
+            const open = folds.get(key); toggle.setAttribute('aria-expanded', String(open)); toggle.setAttribute('aria-label', `${open ? 'Collapse' : 'Expand'} Goal #${g.id} ${safe(g.title)}, ${safe(g.state ? g.state[0].toUpperCase() + g.state.slice(1) : 'Unknown')}`); card.classList.toggle('is-collapsed', !open); body.hidden = !open;
             const c = counts(st.items), total = st.items.length;
             summary.textContent = st.error ? 'Decisions unavailable' : st.loaded ? `${c.review} to review · ${c.sentback} sent back · ${c.approved} approved${c.denied ? ` · ${c.denied} denied` : ''}${c.shared ? ` · ${c.shared} shared` : ''}${st.cursor ? ' (loaded files)' : ''}` : open ? 'Loading decisions…' : 'Expand to read decisions';
             if (!open) return;

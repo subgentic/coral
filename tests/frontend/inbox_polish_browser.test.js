@@ -15,7 +15,7 @@ const path = require('node:path');
     const board = 'inbox-polish-' + Date.now().toString(36);
     const api = (method, url, body) => ev(`fetch(${JSON.stringify(url)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json() }))`);
     const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings'); };
-    const firstRowTop = () => ev(`(() => { const r = [...document.querySelectorAll('#group-table-view button.dt-primary')].find(b => b.getClientRects().length); return r ? Math.round(r.getBoundingClientRect().top + scrollY) : null; })()`);
+    const firstRowTop = () => ev(`(() => { const r = [...document.querySelectorAll('#group-table-view .goal-decision-title')].find(b => b.getClientRects().length); return r ? Math.round(r.getBoundingClientRect().top + scrollY) : null; })()`);
     const panelOpen = () => ev(`!document.querySelector('.inbox-folder-toolbar .list-bar-menu').hidden`);
     const toggle = () => ev(`document.querySelector('.inbox-folder-toolbar .list-bar-toggle').click(); true`);
     const shot = async (name, theme) => { // the review shots, when a folder is given (CORAL_SCREENSHOT_DIR)
@@ -35,7 +35,7 @@ const path = require('node:path');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await load('/inbox/goals');
             await ev(`try { localStorage.removeItem('coral-inbox-goals-filters'); } catch {} true`);
-            await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length >= 1 && !!document.querySelector('.inbox-folder-toolbar')`, 'the Goals page', 15000); await settle(300);
+            await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-title').length >= 1 && !!document.querySelector('.inbox-folder-toolbar')`, 'the Goals page', 15000); await settle(300);
 
             // the folder name (the page's header is one row since #8700: inbox_header_browser measures the line)
             const head = await ev(`(() => { const e = document.querySelector('.inbox-folder-head'), h = e && e.querySelector('h2'), r = e && e.getBoundingClientRect(), hr = h && h.getBoundingClientRect(), bar = document.querySelector('.phone-bar-title-text'); return { h2: h && h.textContent, w: r && Math.round(r.width), h: r && Math.round(r.height), h2w: hr && Math.round(hr.width), bar: bar && bar.textContent }; })()`);

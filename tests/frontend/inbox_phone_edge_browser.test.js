@@ -32,6 +32,15 @@ const BASE = require('./test_base').BASE;
         for(const folder of folders) {
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('${folder}')).then(()=>true)`);
             if(folder==='activity'){await waitFor(`document.querySelector('#group-table-view .al-row')`,'activity rows');for(const theme of ['dark','light'])for(const font of [16,32]){await ev(`document.documentElement.setAttribute('data-theme','${theme}');document.documentElement.style.fontSize='${font}px';true`);await ev(framesJs(2));const q=await ev(`(()=>{const r=document.querySelector('#group-table-view .al-row').getBoundingClientRect(),page=document.getElementById('group-table-view');return {left:r.left,right:r.right,sideways:page.scrollWidth>page.clientWidth+1,pad:parseFloat(getComputedStyle(page).paddingBottom)};})()`);if(q.left<-1||q.right>391||q.sideways||q.pad<96)failures.push('activity '+theme+' '+font+'px rows fit the phone with no sideways scroll: '+JSON.stringify(q));}continue;}
+            if(folder==='goals') { // #21846: a goal set is a bordered, collapsible card rather than a mail row.
+                await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length>=2`,'goal decision sets');
+                for(const theme of ['dark','light'])for(const font of [16,32])for(const inset of [0,34]){
+                    await Emulation.setSafeAreaInsetsOverride({insets:{top:0,bottom:inset,left:0,right:0}});
+                    await ev(`document.documentElement.dataset.theme='${theme}';document.documentElement.style.fontSize='${font}px';true`);await ev(framesJs(2));
+                    const q=await ev(`(()=>{const cards=[...document.querySelectorAll('#group-table-view .goal-decision-card')],page=document.getElementById('group-table-view');return {cards:cards.length,fits:cards.every(c=>{const r=c.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1}),sideways:page.scrollWidth>page.clientWidth+1,pad:parseFloat(getComputedStyle(page).paddingBottom),nav:parseFloat(getComputedStyle(document.querySelector('.phone-nav')).paddingBottom)};})()`);
+                    assert.ok(q.cards>=2&&q.fits&&!q.sideways,'goal sets fit both themes and text sizes: '+JSON.stringify(q));assert.equal(q.nav,8+inset);assert.ok(q.pad>=96+inset,'goal sets clear phone controls');
+                }continue;
+            }
             await waitFor(`document.querySelector('#group-table-view[data-group="hub-inbox:${folder}"] tbody tr.dt-row')`,folder+' rows');
             if(folder==='chats'){await ev(`import((window.__coralStatic||'/static/')+'chat_import.js').then(m=>m.loadImportOffer()).then(()=>true)`);await waitFor(`document.querySelector('#group-table-view .chat-import-line button')`,'All chats import offer is drawn');}
             for(const theme of ['dark','light'])for(const font of [16,32])for(const inset of [0,34]) {

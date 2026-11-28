@@ -33,9 +33,9 @@ const ownerRowExists = () => { try { return sqliteText(path.join(DATA, 'sessions
                 await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
                 await load('/inbox/goals');
                 await ev(`localStorage.setItem('coral-artifact-comments-open', 'closed'); true`);
-                const row = `[...document.querySelectorAll('#group-table-view .dt-primary')].find(e => e.textContent.includes('Composer regression goal'))`;
+                const row = `[...document.querySelectorAll('#group-table-view .goal-decision-card')].find(e => e.textContent.includes('Composer regression goal'))`;
                 await waitFor(`!!(${row})`, `${width}: goal in Goals screen`, 15000);
-                await ev(`${row}.click(); true`);
+                await ev(`[...(${row}).querySelectorAll('.goal-decision-foot button')].find(b=>/^Comments /.test(b.textContent)).click(); true`);
                 await waitFor(`!!document.getElementById('goal-tab-comments')`, `${width}: goal page`, 10000);
                 await ev(`document.getElementById('goal-tab-comments').click(); true`);
                 await waitFor(`!!document.querySelector('.goal-comments .ac-whole')`, `${width}: Comment on this goal`, 10000);
