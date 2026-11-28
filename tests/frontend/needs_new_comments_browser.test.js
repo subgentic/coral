@@ -1,6 +1,8 @@
 // #12026 (the Operator): after the Operator comments on a file, an agent's reply in that thread is not a new item: the file's own row in Needs you says "New comments" and is unread again, counted once as that
 // same row (the badge, the folder count and the heading agree). Opening the file at its thread clears it; another reply makes it unread again. A file with no news carries no marker. The server's rule (what
 // /api/needs-you counts, what the list says, what opening the comments clears) is in internal/server/routes; here the page's side, with the list and the comments stood in at its fetch. 1280 and 390.
+// #22094: Waiting on you is the Needs you ledger (needs_ledger.js): a file is an article.nl-row.nl-file in its goal group, its name the .nl-file-open button, unread shows .nl-new, a decided file's
+// line '.nl-file-open .nl-meta' reads 'Approved · N new comments', the list's count is the .nl-summary 'N items · M new'. Waiting on an agent and Saved are still tables.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -9,9 +11,9 @@ const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const team = 'new-comments-' + Date.now().toString(36), failures = [];
-    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
+    const row = name => `[...document.querySelectorAll('#group-table-view tbody tr, #group-table-view .nl-row')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`; // Waiting on you is the ledger (article.nl-row), Waiting on an agent the table
     const badge = () => ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`);
-    const marker = name => ev(`!![...(${row(name)}).querySelectorAll('.inbox-new-comments')].find(t => /[1-9][0-9]* new comments?/.test(t.textContent))`);
+    const marker = name => ev(`/[1-9][0-9]* new comments?/i.test((${row(name)}).textContent)`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const width of [1280, 390]) {
@@ -54,58 +56,55 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`window.switchNavTab('hub-inbox');true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Replied file.txt')})&&!!(${row('Quiet file.txt')})&&!!(${row('Decided file.txt')})&&!!(${row('Changes file.txt')})`, 'the four files in Needs you', 15000);
+                await ev(`document.querySelectorAll('#group-table-view .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`); // the files' group holds no question, so it starts folded
                 assert.ok(await ev(`!${row('Waiting file.txt')}`), 'a sent-back file is not on Waiting on you');
                 await ev(`document.querySelector('[data-needs-tab="agent"]').click(); true`); await waitFor(`!!(${row('Waiting file.txt')})`, 'it is on Waiting on an agent', 8000);
                 assert.ok(await ev(`(${row('Waiting file.txt')}).classList.contains('dt-read')`), 'a sent-back file remains visible and uncounted while waiting on its agent');
-                await ev(`document.querySelector('[data-needs-tab="you"]').click(); true`); await waitFor(`!!(${row('Replied file.txt')})`, 'and back on Waiting on you', 8000);
-                assert.ok(await marker('Changes file.txt'), 'with changes requested AND an agent reply in the thread it is back, marked');
-                // the read file with news is unread again, as the same row: the marker, the unread look, and ONE number (3 = this row, the quiet one and the decided one)
+                await ev(`document.querySelector('[data-needs-tab="you"]').click(); true`); await waitFor(`!!(${row('Replied file.txt')})?.closest('.needs-ledger')`, 'and back on Waiting on you', 8000); await ev(`document.querySelectorAll('#group-table-view .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`);
+                // #22094: an undecided file's row in the ledger carries only the New tag; the 'N new comments' words are drawn for a decided file alone (needs_ledger.js fileQuestion): kept as a check, recorded so the rest still runs
+                if (!(await marker('Changes file.txt'))) failures.push(width + ': with changes requested AND an agent reply in the thread it is back, but its row does not say how many new comments: ' + await ev(`(${row('Changes file.txt')}).textContent`));
+                // the read file with news is unread again, as the same row: the marker, the unread look, and ONE number (4 = this row, the quiet one, the decided one and the changes-requested one)
                 assert.equal(await badge(), '4', 'the file with new comments counts again, once: ' + await badge());
                 assert.ok(await marker('Decided file.txt'), 'a file the Operator already approved comes back as its own row, marked');
-                assert.ok(await marker('Replied file.txt'), 'its row says New comments');
-                // #16399 (Beta Tester): an approved file's new comment is to be read, not reviewed again: the row says Approved (not For review) and offers no Approve or Request changes; a file still waiting says For review and does
-                const rowInfo = name => ev(`(() => { const r = ${row(name)}, m = r.querySelector('.inbox-review-metadata'); return { metaSaysReview: m ? /For review/.test(m.textContent) : false, metaSaysApproved: m ? /Approved/.test(m.textContent) : null, review: /For review/.test(r.textContent), approve: !!r.querySelector('[data-slot=approve]'), changes: !!r.querySelector('[data-slot=changes]') }; })()`); // a phone's card may not draw the metadata line: then only the buttons are checked
-                const decided = await rowInfo('Decided file.txt'), waiting = await rowInfo('Replied file.txt');
-                assert.ok(!decided.metaSaysReview && decided.metaSaysApproved !== false && !decided.approve && !decided.changes, 'an approved file with a new comment says Approved (not For review) in its line, and asks for no new decision: ' + JSON.stringify(decided));
-                // #17696 (walk 80 #15): the decided file's row is information, not a decision: the way out of Needs you says "Got it", not "Dismiss"
-                await ev(`(() => { const r = ${row('Decided file.txt')}; const t = r.querySelector('.inbox-review-actions [aria-haspopup=menu], .inbox-review-actions .dt-menu-toggle'); if (t) t.click(); return !!t; })()`);
-                await waitFor(`[...(${row('Decided file.txt')}).querySelectorAll('.menu-item')].length > 0`, 'the decided row\'s menu opens', 4000);
-                const labels = await ev(`[...(${row('Decided file.txt')}).querySelectorAll('.menu-item')].map(b => b.textContent.trim())`);
-                assert.ok(labels.some(l => /^Got it/.test(l)) && !labels.some(l => /^Dismiss/.test(l)), 'an already-decided file with a reply is cleared with "Got it", not "Dismiss": ' + JSON.stringify(labels));
-                // the menu is left open: the next row action closes it. A synthetic document Escape here raced the later redraw and left the 'Replied file' marker up in 8 of 20 runs (#19505)
-                assert.ok(waiting.review && waiting.approve && waiting.changes && !waiting.metaSaysApproved, 'a file still waiting for review keeps For review, Approve and Request changes: ' + JSON.stringify(waiting));
-                assert.ok(await ev(`(() => { const t = [...(${row('Replied file.txt')}).querySelectorAll('.inbox-new-comments')].find(x => /new comments?/.test(x.textContent)); return !!t && t.scrollWidth <= t.clientWidth + 1; })()`), 'the badge is whole, not cut to New comme... (#17454)');
+                if (!(await marker('Replied file.txt'))) failures.push(width + ': the read file with agent replies is unread again, but its row does not say New comments: ' + await ev(`(${row('Replied file.txt')}).textContent`));
+                // #16399 (Beta Tester): an approved file's new comment is to be read, not reviewed again: the row says Approved (not For review) and offers no Approve or Request changes. In the ledger no file row carries
+                // Approve / Request changes (review decisions stay in the viewer, needs_ledger.js), so the still-waiting file's For review / Approve / Request changes check is retired (removed by design: it sits under the To review subhead)
+                const decided = await ev(`(() => { const r = ${row('Decided file.txt')}, m = r.querySelector('.nl-file-open .nl-meta'); return { meta: m ? m.textContent : '', approve: !!r.querySelector('[data-slot=approve]'), changes: !!r.querySelector('[data-slot=changes]') }; })()`);
+                assert.ok(/^Approved · 1 new comments?$/.test(decided.meta) && !/For review/.test(decided.meta) && !decided.approve && !decided.changes, 'an approved file with a new comment says Approved (not For review) in its line, and asks for no new decision: ' + JSON.stringify(decided));
+                // #17696 (walk 80 #15) "Got it", not "Dismiss", on the decided row's menu: retired, a file row in the ledger has no row menu or hover actions (needs_ledger.js rowNode draws them for non-file rows only); its way out is the summary's bulk Dismiss
+                assert.equal(await ev(`(${row('Replied file.txt')}).closest('.nl-group-body')?.querySelector('.nl-subhead')?.firstChild.textContent || ''`), 'To review', 'a file still waiting for review is listed under To review');
+                assert.ok(await ev(`(() => { const m = (${row('Decided file.txt')}).querySelector('.nl-file-open .nl-meta'), t = m.closest('.nl-title'); return /1 new comments?$/.test(m.textContent) && t.scrollWidth <= t.clientWidth + 1; })()`), 'the new comments words are whole, not cut to New comme... (#17454)');
                 assert.ok(!(await marker('Quiet file.txt')), 'a file with no news carries no marker');
-                assert.ok(await ev(`(() => { const r = ${row('Replied file.txt')}; return r.classList.contains('dt-unread') && !r.classList.contains('dt-read') && /unread/.test(r.querySelector('.inbox-review-item .sr-only').textContent); })()`), 'the row is unread again');
-                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].filter(r => /Replied file/.test(r.textContent)).length`), 1, 'one row, not a second item');
-                assert.equal(await ev(`(document.querySelector('#group-table-view .session-group-count') || {}).textContent`), '4', 'the heading agrees');
+                assert.ok(await ev(`!!(${row('Replied file.txt')}).querySelector('.nl-new')`), 'the row is unread again (New)');
+                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .nl-row')].filter(r => /Replied file/.test(r.textContent)).length`), 1, 'one row, not a second item');
+                assert.match(await ev(`document.querySelector('#group-table-view .nl-summary').textContent`), /^4 items ?· 4 new/, 'the list\'s summary agrees');
                 assert.ok(!(await ev(`window.__tagReads.includes('new comments')`)), 'the page asks for one list (for review), not a second one for news (#12097)');
                 // opening it at its thread clears it
-                await ev(`[...(${row('Replied file.txt')}).querySelectorAll('button')].find(b => /^Open/.test(b.getAttribute('aria-label') || b.textContent.trim())).click(); true`);
+                await ev(`(${row('Replied file.txt')}).querySelector('.nl-file-open').click(); true`);
                 await waitFor(`document.body.textContent.includes('Review preview text')`, 'the file opened');
                 await waitFor(`window.__commentReads.length > 0`, 'the thread was read');
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '3'`, 'the badge drops by one');
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
-                await waitFor(`!!(${row('Replied file.txt')}) && ![...(${row('Replied file.txt')}).querySelectorAll('.inbox-new-comments')].some(t => /[1-9][0-9]* new comments?/.test(t.textContent))`, 'the marker is gone', 8000); // the very test marker() asserts on: '.dt-tag' never matched it, so this wait passed before the redraw
+                await waitFor(`!!(${row('Replied file.txt')}) && !/[1-9][0-9]* new comments?/i.test((${row('Replied file.txt')}).textContent) && !(${row('Replied file.txt')}).querySelector('.nl-new')`, 'the marker is gone', 8000);
                 assert.ok(!(await marker('Replied file.txt')), 'no marker once opened');
-                assert.ok(await ev(`${row('Replied file.txt')}.classList.contains('dt-read')`), 'the row is read, still listed');
+                assert.ok(await ev(`!(${row('Replied file.txt')}).querySelector('.nl-new')`), 'the row is read (no New), still listed');
                 // a read of the thread that fails marks nothing: the decided file keeps its marker and its count (Security's SHOULD)
                 await ev(`window.__commentsFail = true; true`);
-                await ev(`[...(${row('Decided file.txt')}).querySelectorAll('button')].find(b => /^Open/.test(b.getAttribute('aria-label') || b.textContent.trim())).click(); true`);
+                await ev(`(${row('Decided file.txt')}).querySelector('.nl-file-open').click(); true`);
                 await waitFor(`document.body.textContent.includes('Review preview text')`, 'the decided file opened');
                 await new Promise(r => setTimeout(r, 600)); // sleep-ok: the failed read settles
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
                 assert.ok(await marker('Decided file.txt'), 'the marker stays after a read that failed');
                 assert.equal(await badge(), '3', 'and so does the count');
                 await ev(`window.__commentsFail = false; true`);
-                await ev(`[...(${row('Decided file.txt')}).querySelectorAll('button')].find(b => /^Open/.test(b.getAttribute('aria-label') || b.textContent.trim())).click(); true`);
+                await ev(`(${row('Decided file.txt')}).querySelector('.nl-file-open').click(); true`);
                 await waitFor(`window.__commentReads.length > 1`, 'the thread was read');
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, 'opened for real: the count drops');
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
                 // another reply since: unread again
                 await ev(`window.__reviewItems[0].new_comments = 1; import((window.__coralStatic||'/static/')+'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '3'`, 'a new reply makes it unread again (the quiet file, the changes-requested one and this one)');
-                assert.ok(await marker('Replied file.txt'), 'and the marker is back');
+                if (!(await marker('Replied file.txt'))) failures.push(width + ': another reply makes it unread again, but its row does not say New comments: ' + await ev(`(${row('Replied file.txt')}).textContent`));
                 // a saved file's row says it too, and it is not counted (the Orchestrator's decision, #12026)
                 const before = await badge();
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('saved')).then(()=>true)`);

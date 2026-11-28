@@ -1,5 +1,5 @@
 // The Needs you list fills the content area like its toolbar: no max width at 1280, 1920 or 2560 px (#18358, the Operator: 'full width instead of having a max'). Derived from inbox_group_mode_browser (its goal/task fixture).
-// CORAL_SCREENSHOT_DIR also saves a screenshot at each width.
+// The list is the Needs you ledger (#22094: section.needs-ledger in .inbox-needs-results, its folded goal groups opened). CORAL_SCREENSHOT_DIR also saves a screenshot at each width.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -33,10 +33,11 @@ const BASE = require('./test_base').BASE;
                     : s.session_id === 'input-dev' ? { ...s, ...waiting, waiting_kind: 'other', waiting_summary: 'Which branch name should I use?', goal: { id: 1, title: 'Threaded Needs you', board: '${team}' }, task: { id: 12, title: 'Write the docs' } }
                     : s.session_id === 'stray-dev' ? { ...s, ...waiting, waiting_kind: 'permission', waiting_summary: 'Allow a stray command?' } : s); return true; })`);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr.dt-row').length >= 10`, `${at}the ten items`, 20000);
-            const m = await ev(`(() => { const r = document.querySelector('#group-table-view .inbox-needs-results'), host = r.parentElement, box = r.querySelector('.dt-box') || r, bar = document.querySelector('#group-table-view .list-bar, #group-table-view .gt-toolbar'); return { list: Math.round(r.getBoundingClientRect().width), host: Math.round(host.getBoundingClientRect().width), box: Math.round(box.getBoundingClientRect().width), bar: bar ? Math.round(bar.getBoundingClientRect().width) : -1, over: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
+            await waitFor(`document.querySelectorAll('#group-table-view .needs-ledger .nl-row').length >= 10`, `${at}the ten items`, 20000);
+            await ev(`document.querySelectorAll('#group-table-view .nl-group-toggle[aria-expanded="false"]').forEach(b => b.click()); true`); // a goal group without a question starts folded: every row is on screen for the measure
+            const m = await ev(`(() => { const r = document.querySelector('#group-table-view .inbox-needs-results'), host = r.parentElement, box = r.querySelector('.needs-ledger') || r, bar = document.querySelector('#group-table-view .list-bar, #group-table-view .gt-toolbar'); return { list: Math.round(r.getBoundingClientRect().width), host: Math.round(host.getBoundingClientRect().width), box: Math.round(box.getBoundingClientRect().width), bar: bar ? Math.round(bar.getBoundingClientRect().width) : -1, over: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);
             check(m.bar > 0 && m.list >= m.bar - 2, `${at}the Needs you list is as wide as the toolbar above it (no max width): ${JSON.stringify(m)}`);
-            check(m.bar > 0 && m.box >= m.bar - 2, `${at}and so does its table: ${JSON.stringify(m)}`);
+            check(m.bar > 0 && m.box >= m.bar - 2, `${at}and so does the list itself (section.needs-ledger): ${JSON.stringify(m)}`);
             check(!m.over, `${at}no sideways scroll: ${JSON.stringify(m)}`);
             await snap('needs');
         }

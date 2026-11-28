@@ -1,6 +1,7 @@
-// A phone's Needs you row is as tall as its content (#11858, from the Hub parity comparison #11857): no empty 44 px line under the question (the empty Waiting-for and Goal cells and the name's 44 px target used to add
-// about 40 px, rows were 111 to 129 px, now 70 to 90), and (the Operator's decision, #13144) the wait text sits UNDER the file name so the name has the first line beside the sender and rows with different names read differently, on every row. Five For review files (two read), 390 and 412 px, light and
-// dark. Drives Chrome through agent_view_harness.js against the isolated dev server; CORAL_SCREENSHOT_DIR saves the pictures.
+// A phone's Needs you row is as tall as its content (#11858, from the Hub parity comparison #11857): no empty line under the question (the old table's empty cells and 44 px targets used to add about 40 px), on the Needs you
+// list (article.nl-row.nl-file, #22094): each row's last line (the file's question under its name in .nl-file-open) ends at the row's padding, the time since (time.nl-when) is at the right of the file name and whole, and rows with
+// different names read differently (the name has room, on every row). Five For review files (two read) in their group (opened: a group starts folded unless it holds a question), 390 and 412 px, light and dark. Drives Chrome
+// through agent_view_harness.js against the isolated dev server; CORAL_SCREENSHOT_DIR saves the pictures.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -9,7 +10,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const failures = [], team = 'rowh-' + Date.now().toString(36), T = '#group-table-view', S = `(window.__coralStatic || '/static/')`;
+    const failures = [], team = 'rowh-' + Date.now().toString(36), T = '#group-table-view .needs-ledger', S = `(window.__coralStatic || '/static/')`;
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
@@ -30,18 +31,16 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 5`, at + 'five rows', 15000); await ev(framesJs(6));
-            const rows = await ev(`(() => { const probe = document.createElement('div'); probe.style.cssText = 'position:absolute;visibility:hidden;font:600 100px ' + getComputedStyle(document.body).fontFamily; probe.innerHTML = 'Hxg<i style="display:inline-block;width:0;height:0"></i>'; document.body.append(probe);
-                const pr = document.createRange(); pr.selectNodeContents(probe.firstChild); const pt = pr.getBoundingClientRect(), k = (probe.querySelector('i').getBoundingClientRect().bottom - pt.top) / pt.height; probe.remove(); // where the baseline sits in a text's own box (this font)
-                const base = e => { const w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT, { acceptNode: n => (n.textContent.trim() ? 1 : 3) }), n = w.nextNode(), r = document.createRange(); r.selectNodeContents(n); const t = r.getBoundingClientRect(); return t.top + k * t.height; };
-                return [...document.querySelectorAll('${T} tbody tr')].map(tr => { const b = tr.getBoundingClientRect(), nm = tr.querySelector('.inbox-review-name'), wt = tr.querySelector('.inbox-header-meta .inbox-review-wait') || tr.querySelector('td[data-key="waiting"]'), q = tr.querySelector('.dt-subtitle'), vis = [...tr.querySelectorAll('td')].filter(t => t.getClientRects().length && t.getBoundingClientRect().width > 0);
-                    const wtext = wt, lowest = Math.max(...vis.filter(t => !t.matches('[data-key="review"]')).map(t => t.getBoundingClientRect().bottom));
+            await waitFor(`document.querySelectorAll('${T} .nl-row').length >= 5`, at + 'five rows', 15000); await ev(`document.querySelectorAll('${T} .nl-group-toggle[aria-expanded=false]').forEach(b => b.click()); true`); await ev(framesJs(6));
+            const rows = await ev(`(() => {
+                return [...document.querySelectorAll('${T} .nl-row')].map(tr => { const b = tr.getBoundingClientRect(), nm = tr.querySelector('.nl-file-open'), wt = tr.querySelector('.nl-when'), pad = parseFloat(getComputedStyle(tr).paddingBottom) + parseFloat(getComputedStyle(tr).borderBottomWidth);
+                    const lowest = Math.max(...[...tr.querySelectorAll('.nl-title, .nl-file-open > *, .nl-side > *, .nl-check-hit, :scope > .nl-icon')].filter(t => t.getClientRects().length && t.getBoundingClientRect().height > 0).map(t => t.getBoundingClientRect().bottom));
                     const nb = nm.getBoundingClientRect(), tn = [...nm.childNodes].find(n => n.nodeType === 3); let seen = ''; if (tn) for (let k = 0; k < tn.length; k++) { const rg = document.createRange(); rg.setStart(tn, k); rg.setEnd(tn, k + 1); const qb = rg.getBoundingClientRect(); if (qb.width && qb.right <= nb.right + 0.5 && qb.bottom <= nb.bottom + 1) seen += tn.data[k]; }
-                    const footer=tr.querySelector('.inbox-v4-footer'), message=tr.querySelector('.inbox-message'), fr=footer?.getBoundingClientRect(), mr=message?.getBoundingClientRect(); return { footerGap: fr && mr ? fr.top-mr.bottom : null, footerTail: fr ? b.bottom-fr.bottom : null, name: nm.textContent, seen, nameBottom: Math.round(nb.bottom), waitTop: Math.round(wtext.getBoundingClientRect().top), waitInHeader:!!wtext.closest('.inbox-header-meta'), messageTop:mr?.top, h: Math.round(b.height), nameBase: Math.round(base(nm) * 10) / 10, waitBase: Math.round(wtext.getBoundingClientRect().bottom), nameRight: Math.round(nm.getBoundingClientRect().right), waitLeft: Math.round(wtext.getBoundingClientRect().left), waitCut: wtext.scrollWidth > wtext.clientWidth + 1, gap: Math.round(b.bottom - lowest), q: !!q }; }); })()`);
+                    const q = nm.querySelector('.nl-meta'), qr = q?.getBoundingClientRect(), wr = wt.getBoundingClientRect(); return { name: tn ? tn.data : '', seen, h: Math.round(b.height), tail: Math.round(b.bottom - lowest - pad), q: q ? q.textContent : null, qBelow: !!qr && qr.top >= nb.top + 1, nameRight: Math.round(nb.right), nameTop: Math.round(nb.top), nameBottom: Math.round(nb.bottom), waitLeft: Math.round(wr.left), waitTop: Math.round(wr.top), waitBottom: Math.round(wr.bottom), rowTop: Math.round(b.top), rowBottom: Math.round(b.bottom), waitText: wt.textContent, waitCut: wt.scrollWidth > wt.clientWidth + 1 }; }); })()`);
             rows.forEach((r, i) => {
-                check(r.h >= 60 && r.footerGap !== null && r.footerGap >= 0 && r.footerGap <= 24, `${at}row ${i + 1} has its footer directly below the message (#20203): ${r.h}`);
-                check(r.footerTail !== null && r.footerTail >= 0 && r.footerTail <= 14, `${at}row ${i + 1} has no empty line below its footer (#20203) (${r.gap} px below the last cell, the card's 12 px padding and 1 px border, and the buttons' 16 + 44): ${JSON.stringify(r)}`);
-                check(r.waitInHeader && r.waitTop <= r.nameBottom && r.waitTop < r.messageTop, `${at}row ${i + 1}: time is in the top header, above the message (#20239): ${JSON.stringify(r)}`);
+                check(r.h >= 44 && r.q && r.qBelow, `${at}row ${i + 1} holds its name and its question under it: ${JSON.stringify(r)}`);
+                check(r.tail >= -1 && r.tail <= 2, `${at}row ${i + 1} is as tall as its content: no empty line below its lowest line (only the row's own padding, #11858): ${JSON.stringify(r)}`);
+                check(r.waitLeft >= r.nameRight - 1 && r.waitTop >= r.rowTop && r.waitBottom <= r.rowBottom && /ago$/.test(r.waitText), `${at}row ${i + 1}: the time since is at the right of the file name, in the row (#20239, #22094): ${JSON.stringify(r)}`);
                 check(!r.waitCut, `${at}row ${i + 1}: the wait text is not cut: ${JSON.stringify(r)}`);
             });
             const seen = rows.map(r => r.seen); check(new Set(rows.map(r => r.name)).size === rows.length ? new Set(seen).size === seen.length && seen.every(t => t.length >= 4) : true, `${at}review rows with different names show different visible text (the file name has room): ${JSON.stringify(rows.map(r => [r.name, r.seen]))}`);

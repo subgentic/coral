@@ -1,6 +1,7 @@
 // #13162, Stage 1: Needs you's filters are the computer's for the file rows. 900 files are for review on one team; the page's own read of the whole list is made to stop at 200 (as a computer that only returns its
 // first page would leave it), so a match that is item 897 of 900 can only come from the computer's answer to the filter: it is on page 1 of its query. A filter that matches 100 shows the first 50 with 'Showing 50 of 100
-// files for review that match' and Show more brings the rest. No filter: the list is the one the page reads, as before. 1280 px, the real page, a stand-in for the team route.
+// files for review that match' and Show more brings the rest. No filter: the list is the one the page reads, as before. The files are the Needs you list's rows (#22094, article.nl-row.nl-file) with Group by None,
+// so what is listed is on screen (innerText). 1280 px, the real page, a stand-in for the team route.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -14,7 +15,7 @@ const N = 900;
     const settle = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a read or a redraw that would have happened by now; only waiting shows that it did not
     try {
         await Page.enable(); await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-group-mode', 'none'); localStorage.setItem('coral-inbox-group-review-goal', 'false');` }); // Group by None: no folded goal group over the files
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const real = window.fetch, N = ${N}; window.__asked = [];
             const hex = i => String(i + 1).padStart(64, '0');
             const art = i => ({ board_id:'t1', id: 'a-' + i, uri: 'coral://artifacts/' + hex(i), tags: ['for review'], name: 'report-' + String(i).padStart(3, '0') + '.md', created_at: new Date(Date.UTC(2026, 10, 4) - i * 1000).toISOString(), available: true, ...(i === 150 ? {} : { produced_by: 'Dev', session_id: 's-1' }), ...(i === 321 ? { review_question: 'Is the Zulu migration safe to run?' } : {}) });
