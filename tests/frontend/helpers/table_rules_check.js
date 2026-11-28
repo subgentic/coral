@@ -161,6 +161,12 @@ module.exports.run = GROUP => (async () => {
             return true; } });
         surfaces.push({ name: 'tasks (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'tasks'); await rowsOn(3); return true; } });
         surfaces.push({ ledger: true, name: 'goals (live Inbox)', root: '#group-table-view', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => { await openLive(w, 'goals'); await waitFor(`document.querySelectorAll('#group-table-view .goal-decision-card').length >= 3`, 'three goal ledger cards', 8000); return true; } });
+        // #22040: the goal ledger embeds the shared goal-scope Tasks shape.
+        surfaces.push({ name: 'goal tasks (live Inbox)', root: '#group-table-view .goal-ledger-tasks', mixes: ['mixed'], live: true, phoneW: 390, mount: async (mix, w) => {
+            await openLive(w, 'goals');
+            await waitFor(`document.querySelector('#group-table-view .goal-ledger-tasks tbody .dt-row')`, 'embedded goal task rows', 8000);
+            return true;
+        } });
         const NONE = { folded: true, panelW: 0, tableW: 0, boxOver: 0, tableOver: 0, pageOver: 0, vw: 0, rows: 0, cols: [] };
         let measuring = '';
         const measure = async (root) => { const m = await ev(`window.__measure(${JSON.stringify(root)})`); if (m) return m; note(measuring || root, 'no table', ['R7: no table was drawn there (the surface did not open or has no rows)']); return NONE; };

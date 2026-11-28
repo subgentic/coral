@@ -197,7 +197,7 @@
    "file": "goal_decisions.js",
    "calls": 1,
    "surface": "Goals decision ledger: embedded goal tasks",
-   "covered_by": "goals (live Inbox)"
+   "covered_by": "goal tasks (live Inbox)"
   }
  ]
 }
