@@ -37,10 +37,10 @@ const words = { approved: 'Approved', sentback: 'Sent back', denied: 'Denied', r
 export const decisionOrder = items => [...items].sort((a, b) => Number(a.task_id || 0) - Number(b.task_id || 0) || readableName(a).localeCompare(readableName(b), undefined, { numeric: true }) || itemKey(a).localeCompare(itemKey(b)));
 export const decisionFiles = (items, item, team) => ({ goalItems: items, ...fileContext(items, item, { key: itemKey, options: a => ({ hex: managedHex(a), server: splitKey(team).server, board: splitKey(team).name, filename: readableName(a), mediaType: a.media_type }) }) });
 /** Keyboard row links and agent buttons are separate controls; nothing is built from HTML. */
-export function decisionList(items, { team, onOpen }) {
+export function decisionList(items, { team, onOpen, headings = true }) {
     const list = el('ul', 'goal-decision-list'), ordered = decisionOrder(items), tasks = new Set(ordered.map(a => a.task_id)); let previous;
     for (const a of ordered) {
-        if (tasks.size > 1 && previous !== a.task_id) { const sub = el('li', 'goal-decision-subhead', a.task_id ? `Task #${a.task_id} ${safe(a.task_title)}` : 'No task'); list.append(sub); previous = a.task_id; }
+        if (headings && tasks.size > 1 && previous !== a.task_id) { const sub = el('li', 'goal-decision-subhead', a.task_id ? `Task #${a.task_id} ${safe(a.task_title)}` : 'No task'); list.append(sub); previous = a.task_id; }
         const status = decisionState(a), li = el('li', `list-row goal-decision-row ${classes[status]}`); if (status === 'review' && needsReviewAttention(a)) li.classList.add('is-unread'); li.dataset.fileKey = itemKey(a); li.dataset.artifactId = itemKey(a);
         const mark = el('span', 'goal-decision-mark', status === 'approved' ? '✓' : status === 'sentback' ? '↺' : '•'); mark.setAttribute('aria-hidden', 'true');
         const tile = el('span', 'goal-decision-type', /markdown/.test(a.media_type || '') || /\.md$/i.test(a.name) ? 'M↓' : '↗'); tile.setAttribute('aria-hidden', 'true');
@@ -106,10 +106,22 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, ques
             const progress = el('div', 'goal-decision-progress');
             if (st.loaded && total) { progress.append(el('span', null, `${c.approved} of ${total} approved · ${c.review} to review${st.cursor ? ' (loaded)' : ''}`)); const segments = el('div', 'goal-decision-segments'); segments.setAttribute('role', 'img'); segments.setAttribute('aria-label', `${c.approved} approved, ${c.review} to review, ${c.sentback} sent back, ${c.denied} denied`); for (const s of ['approved', 'review', 'sentback', 'denied']) { const n = c[s]; if (n) { const part = el('span', classes[s]); part.style.flexGrow = String(n); segments.append(part); } } progress.append(segments); }
             context.append(done, progress, el('span', 'goal-decision-age', whenText(g.updated_at || g.updatedAt))); body.replaceChildren(context);
+            const asks = questions(g), taskIds = new Set(st.tasks.map(t => Number(t.id)));
+            const fileList = items => decisionList(items, { team, headings: false, onOpen: (a, opener) => openFile(g, a, opener, decisionFiles(st.items, a, team)) });
+            const questionList = rows => subjectList(rows, 'question', a => a.text || 'Question', a => a.subscriber_id || a.asker || '', a => openQuestion(a));
+            const related = id => {
+                const files = st.items.filter(a => Number(a.task_id) === id), questions = asks.filter(a => Number(a.task_id) === id);
+                if (!files.length && !questions.length) return null;
+                const group = el('div', 'goal-task-subjects'); group.dataset.subjectTaskId = String(id);
+                if (files.length) group.append(fileList(files));
+                if (questions.length) group.append(questionList(questions));
+                return group;
+            };
             if (st.tasks.length) {
                 const stateOf = t => t.status === 'skipped' ? 'Skipped' : t.status === 'parked' || isParked(t) ? 'Parked' : '';
                 const tasks = Tasks.tasksTable('goal', st.tasks, { bare: true, fold: 'column', sortBar: false, state: st.taskState,
                     ctx: { goalTitleOf: () => g.title },
+                    decorate: (t, row) => { const subjects = related(Number(t.id)); if (subjects) DT.addDetailRow(row, subjects); },
                     tweak: columns => columns.map(c => ['state', 'task'].includes(c.key) ? { ...c, cell: t => {
                         const node = c.cell(t), real = stateOf(t);
                         if (real && c.key === 'state') node.textContent = real;
@@ -121,10 +133,18 @@ export function goalTracker({ goals, teamOf, openGoal, openFile, closeGoal, ques
             }
             if (st.error) { const e = el('p', 'goal-decision-error', st.error); e.setAttribute('role', 'alert'); e.append(button('btn btn-small', 'Retry', () => load(false, true))); body.append(e); }
             if (!st.loaded) body.append(el('p', 'goal-decision-note', st.error ? 'Decisions are unavailable.' : 'Loading decisions…'));
-            else if (total) body.append(decisionList(st.items, { team, onOpen: (a, opener, files) => openFile(g, a, opener, files) }));
-            else body.append(el('p', 'goal-decision-note', 'No files sent for review on this goal.'));
-            const asks = questions(g);
-            if (asks.length) body.append(subjectList(asks, 'question', a => a.text || 'Question', a => a.subscriber_id || a.asker || '', a => openQuestion(a)));
+            else {
+                const goalFiles = st.items.filter(a => !a.task_id), goalQuestions = asks.filter(a => !a.task_id);
+                const missingFiles = st.items.filter(a => a.task_id && !taskIds.has(Number(a.task_id))), missingQuestions = asks.filter(a => a.task_id && !taskIds.has(Number(a.task_id)));
+                for (const [label, files, questions] of [['Goal documents and questions', goalFiles, goalQuestions], ['Unavailable task documents and questions', missingFiles, missingQuestions]]) {
+                    if (!files.length && !questions.length) continue;
+                    const section = el('section', 'goal-only-subjects'); section.append(el('h3', 'goal-decision-subhead', label));
+                    if (files.length) section.append(fileList(files));
+                    if (questions.length) section.append(questionList(questions));
+                    body.append(section);
+                }
+                if (!total) body.append(el('p', 'goal-decision-note', 'No files sent for review on this goal.'));
+            }
             if (st.cursor) { const more = button('btn btn-small', st.busy ? 'Loading…' : 'Load more files', () => load(true)); more.disabled = st.busy; body.append(more); }
             const foot = el('div', 'goal-decision-foot'); foot.append(el('span', null, `Click a decision to inspect in Goal #${g.id} › Artifacts.`)); const links = el('span'); for (const [tab, label] of [['tasks', `Tasks (${Number.isSafeInteger(g.rollup?.total) ? g.rollup.total : ['done', 'active', 'blocked', 'queued'].reduce((n, k) => n + (Number(g.rollup?.[k]) || 0), 0)})`], ['comments', `Comments (${Number.isSafeInteger(g.comments_open) ? g.comments_open : '—'})`]]) links.append(button('btn btn-small btn-quiet', label, () => openGoal(g, tab))); if (closeGoal && !['done', 'dropped'].includes(g.state)) links.append(button('btn btn-small btn-quiet', 'Close goal', () => closeGoal(g))); foot.append(links); body.append(foot);
             if (focusKey) [...body.querySelectorAll('[data-file-key]')].find(row => row.dataset.fileKey === focusKey)?.querySelector(`button.${CSS.escape(String(focusClass).split(' ')[0])}`)?.focus({ preventScroll: true });
