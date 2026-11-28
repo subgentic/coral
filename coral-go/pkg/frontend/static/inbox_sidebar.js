@@ -515,9 +515,10 @@ function inboxNeedsToolbar() {
     if (needsFilters.team && !activeNeedsTeam) { const n = DT.el('p', 'goals-note inbox-filter-note', `Filtered by team: ${needsFilters.team} `), c = DT.el('button', 'btn', 'Clear'); c.type = 'button'; c.setAttribute('aria-label', `Clear the team filter: ${needsFilters.team}`); c.addEventListener('click', () => { needsFilters = { ...needsFilters, team: '', server: '' }; persistNeedsFilters(); renderInboxNav(true); }); n.append(c); node.append(n); } /* a team filter kept from last time says so above the list (walk 15 M2, #15259) */
     if (!node.querySelector('.inbox-copy-for-agent')) {
         node.querySelectorAll('.needs-more').forEach(e => e.remove());
-        const copy = agentCopyButton('needs_you', 'Coral’s Needs you list: what agents and the board wait on the Operator for.', { className: 'needs-more inbox-copy-for-agent', label: 'Copy Needs you for an agent' }); // the robot, as on every other page (#22056)
-        const fold = foldAllButton('goal groups', { isOpen: needsFoldState, setAll: open => taskHeads.setAll(needsFolds.map(f => f[0]), open) }); fold.classList.add('needs-more', 'inbox-fold-all');
-        const filters = node.querySelector('#inbox-needs-toggle'); if (filters) filters.after(copy, fold);
+        const copy = agentCopyButton('needs_you', 'Coral’s Needs you list: what agents and the board wait on the Operator for.', { className: 'inbox-copy-for-agent', label: 'Copy Needs you for an agent' }); // the robot, as on every other page (#22056)
+        const fold = foldAllButton('goal groups', { isOpen: needsFoldState, setAll: open => taskHeads.setAll(needsFolds.map(f => f[0]), open) }); fold.classList.add('inbox-fold-all');
+        const tools = DT.el('span', 'needs-more needs-tools'); tools.append(copy, fold); // one group: the icons sit together, apart from the heading (#22056)
+        const filters = node.querySelector('#inbox-needs-toggle'); if (filters) filters.after(tools);
     }
     node.querySelector('.inbox-fold-all')?.sync();
 
