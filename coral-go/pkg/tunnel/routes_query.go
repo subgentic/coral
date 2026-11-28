@@ -55,7 +55,7 @@ var routeQueries = map[string]string{
 	"GET /api/launch/check":                       "base,branch,new_worktree,path*,type,worktree_path*",
 	"GET /api/launch/where":                       "path*",
 	"GET /api/needs-you":                          "after,kind=agent|question|wait|proposal|review|goal_done|skill,limit",
-	"GET /api/operator-asks":                      "cursor,limit,paged",
+	"GET /api/operator-asks":                      "board,cursor,goal,limit,paged,state",
 	"GET /api/proposals":                          "cursor,limit,project,state",
 	"GET /api/saved":                              "agent,author,conv,kind,limit,q,sort,state,team",
 	"GET /api/scheduled/jobs/{}/runs":             "limit,offset",

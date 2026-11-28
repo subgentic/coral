@@ -20,11 +20,12 @@ type AnsweredGoalAsk struct {
 }
 
 // answeredAsksScanMax bounds how many of a goal's questions one read looks at, however few are answered.
-const answeredAsksScanMax = 1000
+var answeredAsksScanMax = 200 // a var so a test can cut the scan short
 
 // AnsweredAsksForGoal are the questions of the board about goalID that member was asked and has answered (not closed by hand: those have no answer to show), newest first, at most limit with a message id below
-// beforeID (0 for the newest). more is true when an older answered question may remain. A question the member reopened counts only when answered again after that.
-func (s *Store) AnsweredAsksForGoal(ctx context.Context, project, member string, goalID int64, limit int, beforeID int64) (out []AnsweredGoalAsk, more bool, err error) {
+// beforeID (0 for the newest). next is the beforeID of the following page, 0 when nothing older remains: past the last question listed when the page is full, or past the last one looked at when the
+// bounded scan was cut, so an older answer is always reachable. A question the member reopened counts only when answered again after that.
+func (s *Store) AnsweredAsksForGoal(ctx context.Context, project, member string, goalID int64, limit int, beforeID int64) (out []AnsweredGoalAsk, next int64, err error) {
 	if beforeID <= 0 {
 		beforeID = 1<<62 - 1
 	}
@@ -32,14 +33,14 @@ func (s *Store) AnsweredAsksForGoal(ctx context.Context, project, member string,
 	if err = s.reader().SelectContext(ctx, &asks, `SELECT a.message_id, a.asker, a.asked, a.created_at FROM board_asks a
 		JOIN board_ask_subjects sj ON sj.message_id = a.message_id AND sj.project = a.project
 		WHERE a.project = ? AND sj.goal_id = ? AND a.message_id < ? ORDER BY a.message_id DESC LIMIT ?`, project, goalID, beforeID, answeredAsksScanMax); err != nil {
-		return nil, false, err
+		return nil, 0, err
 	}
 	if len(asks) == 0 {
-		return nil, false, nil
+		return nil, 0, nil
 	}
 	subs, err := s.subscriberIndex(ctx, project)
 	if err != nil {
-		return nil, false, err
+		return nil, 0, err
 	}
 	for _, a := range asks {
 		var to []string
@@ -53,7 +54,7 @@ func (s *Store) AnsweredAsksForGoal(ctx context.Context, project, member string,
 		}
 		var closed bool
 		if err = s.reader().GetContext(ctx, &closed, `SELECT EXISTS(SELECT 1 FROM board_ask_closed WHERE project = ? AND message_id = ?)`, project, a.MessageID); err != nil {
-			return nil, false, err
+			return nil, 0, err
 		}
 		if closed {
 			continue
@@ -63,13 +64,13 @@ func (s *Store) AnsweredAsksForGoal(ctx context.Context, project, member string,
 		a.Floor = after
 		done, err := s.answeredBy(ctx, project, a, member, subs)
 		if err != nil {
-			return nil, false, err
+			return nil, 0, err
 		}
 		if !done {
 			continue
 		}
 		if len(out) == limit {
-			return out, true, nil // one more answered question exists past the page
+			return out, out[len(out)-1].MessageID, nil // one more answered question exists past the page
 		}
 		row := AnsweredGoalAsk{MessageID: a.MessageID, Asker: a.Asker}
 		row.At, _ = time.Parse(time.RFC3339, a.CreatedAt)
@@ -92,5 +93,8 @@ func (s *Store) AnsweredAsksForGoal(ctx context.Context, project, member string,
 		}
 		out = append(out, row)
 	}
-	return out, len(asks) == answeredAsksScanMax, nil // a cut scan: an older answered question may remain
+	if len(asks) == answeredAsksScanMax { // a cut scan: an older answered question may remain, past the last one looked at
+		next = asks[len(asks)-1].MessageID
+	}
+	return out, next, nil
 }
