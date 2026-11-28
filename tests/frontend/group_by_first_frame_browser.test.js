@@ -25,7 +25,7 @@ const { safePaused } = require('./helpers/paused');
   assert.equal(await ev(`document.querySelectorAll('#live-sessions-list .session-group-item').length`), 0, 'nor any unstyled row of the grouped list');
   await Fetch.continueRequest({ requestId: held });
   await waitFor(`!!document.querySelector('#live-sessions-list .status-sub')`, 'the task split is drawn once the sheet is in');
-  const st = await ev(`(() => { const h = document.querySelector('#live-sessions-list .status-sub'), c = getComputedStyle(h); return { list: c.listStyleType, indent: parseFloat(c.paddingInlineStart) }; })()`);
+  const st = await ev(`(() => { const h = document.querySelector('#live-sessions-list .status-sub'), c = getComputedStyle(h); return { list: c.listStyleType, indent: parseFloat(c.paddingInlineStart) + parseFloat(c.marginInlineStart) }; })() /* the heading's indent: padding or, since #22105, margin */`);
   assert.equal(st.list, 'none', 'styled: ' + JSON.stringify(st)); assert.ok(st.indent > 0, 'indented: ' + JSON.stringify(st));
   await Fetch.disable();
   console.log('group_by_first_frame_browser: ok');

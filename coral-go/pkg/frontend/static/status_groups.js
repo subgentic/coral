@@ -126,8 +126,8 @@ const SPLIT = [['on', 'On a task'], ['no', 'No task']];
 function withTaskLine(html, s) {
     if (!hasTask(s)) return html;
     const t = s.board_task, id = Number(t.id), queued = t.status === 'pending';
-    return html.replace('<span class="session-name-spacer"></span>', `<span class="session-name-spacer"></span>${queued ? `<span class="status-queued" title="Task #${id} is queued: not started yet">queued</span>` : ''}`)
-        .replace(/(\s*<\/div>\s*<div class="session-tooltip">)/, `<span class="session-task-line"><button type="button" class="task-id-link" role="link" data-on-click="row-task-open" data-board="${escapeAttr(sessionTeamKey(s) || '')}" data-task="${id}" title="Open task #${id}">#${id}</button>${escapeHtml(String(t.title || ''))}</span>$1`); // inside the row's info column, after its last line
+    return html.replace('<span class="session-name-spacer"></span>', `<span class="session-name-spacer"></span>${queued ? `<span class="status-queued" title="Task #${Number(id)} is queued: not started yet">queued</span>` : ''}`)
+        .replace(/(\s*<\/div>\s*<div class="session-tooltip">)/, `<span class="session-task-line"><button type="button" class="task-id-link" role="link" data-on-click="row-task-open" data-board="${escapeAttr(sessionTeamKey(s) || '')}" data-task="${Number(id)}" title="Open task #${Number(id)}">#${Number(id)}</button>${escapeHtml(String(t.title || ''))}</span>$1`); // inside the row's info column, after its last line
 }
 /** A subgroup's heading (On a task, No task): a caret, the name and the count, folded by hand like the Status groups. */
 const subHead = (key, label, n, folded) => `<li class="status-sub" data-status="${escapeAttr(key)}"><button type="button" class="btn btn-quiet status-head-toggle" data-on-click="status-fold" data-group="${escapeAttr(key)}" aria-expanded="${escapeAttr(String(!folded))}"><span class="status-caret" aria-hidden="true"></span><span class="status-name">${escapeHtml(label)}</span><span class="session-group-count">${Number(n)}</span></button></li>`;

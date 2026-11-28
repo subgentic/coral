@@ -328,7 +328,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         + (unreadCount > 0 ? `, ${unreadCount} unread` : '')
         + (heldChip ? ', message held' : ''); // the row's one chip says it in words: the name says it too (QA Engineer, #9723)
     const stuckClass = stateInfo.key === 'stuck' || stateInfo.key === 'blocked' ? ' is-stuck' : '';
-    const mark = s.sleeping ? 'sleep' : stateInfo.attention ? 'need' : /^(working|compacting)$/.test(stateInfo.key) ? 'work' : 'idle';
+    const [markClass, markWord] = s.sleeping ? MARK.sleep : stateInfo.attention ? MARK.need : /^(working|compacting)$/.test(stateInfo.key) ? MARK.work : MARK.idle;
     return `<li class="session-group-item list-row${isActive ? ' active list-row-current' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
         draggable="${stale ? 'false' : 'true'}"${stale ? ` aria-disabled="true" title="${escapeAttr(staleReason(s))}"` : ''}
         data-state="${escapeAttr(stateInfo.key)}"
@@ -341,7 +341,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         <span class="drag-grip" title="Drag to reorder">&#x2630;</span>
         <div class="session-info">
             <div class="session-name-row">
-                <span class="session-dot ${dotClass} mk-${mark}${ctxHigh ? ' ctx-high' : ''}" role="img" aria-label="${MARK[mark]}" title="${MARK[mark]}"></span>
+                <span class="session-dot ${dotClass} ${markClass}${ctxHigh ? ' ctx-high' : ''}" role="img" aria-label="${escapeAttr(markWord)}" title="${escapeAttr(markWord)}"></span>
                 <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}${piHooksChip(s)}
                 <span class="session-name-spacer"></span>
                 <span class="session-time" aria-hidden="true">${escapeHtml(_shortAgo(s.staleness_seconds))}</span>
@@ -378,7 +378,7 @@ function _renderSleepingSummary(sleepingAgents, groupName, isCompact, teamDefaul
 
 const SLEEPING_ROWS_UP_TO = 3;
 /** The row's one mark (#22105, the approved sidebar mock): four meanings, the word its tooltip and its name. */
-const MARK = { work: 'Working', idle: 'Awake, waiting', need: 'Needs you', sleep: 'Asleep' };
+const MARK = { work: ['mk-work', 'Working'], idle: ['mk-idle', 'Awake, waiting'], need: ['mk-need', 'Needs you'], sleep: ['mk-sleep', 'Asleep'] };
 
 // A folder with many agents shows its first FOLDER_SHOWN and a "Show 19 more" row (#10319, Mobile pass 23), at every width (a phone's list is the one that needed it, and one rule is easier to know): the long list does not push the others out of the screen. The open agent stays in view (and is not counted among the hidden); Show fewer folds it again.
 const FOLDER_SHOWN = 5;

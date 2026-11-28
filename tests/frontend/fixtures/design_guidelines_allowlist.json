@@ -115,7 +115,6 @@
    "height: .command-pane textarea { min-height: 3rem }": 1,
    "height: .nav-more-menu.nav-drawer > button, .nav-more-menu.nav-drawer > a, .na { min-height: 48px }": 1,
    "radius: 0 16px 16px 0": 1,
-   "radius: 14px": 1,
    "radius: 16px": 2,
    "radius: 18px": 1,
    "radius: 20px": 1,
