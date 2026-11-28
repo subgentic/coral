@@ -188,7 +188,7 @@
 }
 
 .nl-file .nl-check-hit {
-    align-self: center;
+    align-self: flex-start;
     margin: 0;
 }
 
@@ -327,15 +327,15 @@
 }
 
 .nl-file {
-    align-items: center;
+    align-items: flex-start;
 }
 
 .nl-file .nl-side {
-    align-self: center;
+    align-self: flex-start;
 }
 
 .nl-file .nl-icon {
-    align-self: center;
+    align-self: flex-start;
 }
 
 .nl-menu {
@@ -842,4 +842,15 @@
     .nl-file .nl-side:has(> .nl-more) > .goal-decision-agent-icon { grid-column: 2; grid-row: 1; }
     .nl-file .nl-side:has(> .nl-more) > .nl-more { grid-column: 3; grid-row: 1; }
     .nl-file .nl-side:has(> .nl-more) > .nl-when { grid-row: 2; }
+}
+
+/* Touch checkboxes keep a real hit box, including tablet widths. */
+@media(pointer:coarse) {
+    .nl-check-hit { width:44px; min-width:44px; min-height:44px; flex-basis:44px; justify-content:center; }
+    .nl-check-hit:before { inset:0; }
+    .needs-ledger-toolbar .team-tb-pills button { min-width:44px; }
+}
+@media(max-width:767px) {
+    .needs-ledger-toolbar .nl-toolbar-actions { flex-wrap:nowrap; width:100%; justify-content:flex-end; }
+    .needs-ledger-toolbar .nl-toolbar-actions .list-bar-toggle { margin:0; }
 }
