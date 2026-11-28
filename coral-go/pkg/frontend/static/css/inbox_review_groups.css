@@ -107,4 +107,4 @@
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-review-item[data-commented] .inbox-review-name { font-weight: var(--fw-strong); } /* #21161: a comment does not demote the title. */
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-commented::before { content: none; }
 :root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-commented-quote { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 28ch; }
-:root :is(#group-table-view, .team-needs-list) :is(.inbox-needs-results, .inbox-saved-card) .inbox-review-actions > .inbox-main-action.inbox-approve-action.btn-quiet { background: transparent; color: var(--text-secondary); border-color: var(--border-color, currentColor); }
+:root :is(#group-table-view, .team-needs-list) .inbox-needs-results .inbox-review-actions > .inbox-main-action.inbox-approve-action.btn-quiet { background: transparent; color: var(--text-secondary); border-color: var(--border-color, currentColor); }

@@ -116,12 +116,6 @@
    "covered_by": "artifacts (live Inbox)"
   },
   {
-   "file": "saved_list.js",
-   "calls": 1,
-   "surface": "Saved for later: files and messages in one list",
-   "covered_by": "files"
-  },
-  {
    "file": "scheduler.js",
    "calls": 1,
    "surface": "Automations: job runs",

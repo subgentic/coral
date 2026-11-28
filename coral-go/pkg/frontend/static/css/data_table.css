@@ -751,9 +751,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 
 .inbox-needs-results .dt-table .inbox-goal-task .dt-link { color: inherit; font: inherit; text-decoration: underline; min-height: 0; height: auto; padding: 0; display: inline; }
 
-.inbox-saved-card .dt-box.dt-compact.dt-fold-column.dt-folded .dt-row:has(.btn) .dt-line-1 { block-size: auto; } /* a two-line message is its row's height at 200% text: a row with a button fixes the name line at 44 px (data_table), and the message would hang over the next row */
 @media (max-width: 639px) { :root #group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection { block-size: auto; min-block-size: var(--tb-bar-h); } :root #group-table-view .gt-toolbar.team-toolbar-selecting > .team-tb-selection .dt-bar { padding-block: 0; } } /* a phone's buttons are 44 px targets: the panel is as tall as they are and does not clip them (needs_phone_rows) */
 :root #group-table-view .inbox-starred-folder .dt-td[data-key="star"] > .dt-star { position: relative; inset-inline-end: 14px; } :root #group-table-view .inbox-starred-folder .dt-td[data-key="flags"] > .dt-chat-flags { position: relative; inset-inline-end: 4px; }
 :root #group-table-view .inbox-starred-folder .dt-td[data-key="flags"] { text-align: end; } :root #group-table-view .inbox-starred-folder .dt-chat-flags { flex-direction: row-reverse; }
-@media (max-width: 767px) { #group-table-view[data-group^="hub-inbox:"] :is(.inbox-saved-card, .inbox-starred-folder) .dt-box { margin-inline: 0; } }
+@media (max-width: 767px) { #group-table-view[data-group^="hub-inbox:"] .inbox-starred-folder .dt-box { margin-inline: 0; } }
 @media (max-width: 767px) { :root #group-table-view .inbox-starred-folder .dt-table { table-layout: auto !important; } }

@@ -148,7 +148,7 @@ const AGENTS = (waiting) => waiting ? [
 
             // Saved
             await ev(`document.querySelector('${pane} .view-list-item[data-key="saved"]').click(); true`);
-            await waitFor(`document.querySelector('#group-table-title').textContent === 'Saved' && document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'Saved opens its table', 10000);
+            await waitFor(`document.querySelector('#group-table-title').textContent === 'Saved' && document.querySelectorAll('#group-table-view .saved-ledger .sl-row').length === 2`, at + 'Saved opens its list', 10000);
             assert.equal(await ev(`document.querySelector('${pane} .sidebar-search-input').getAttribute('aria-label')`), 'Search saved messages', at + 'the search says it is for saved messages');
             assert.equal(await ev(`document.querySelector('${pane} [data-display-button]').hidden`), false, at + 'Display options is there for Saved');
             const savedBar = await ev(`(() => { const b = document.querySelector('#group-table-view .gt-toolbar'), s = b.querySelector('.gt-search, input[type=search]'); return { w: Math.round(s.getBoundingClientRect().width), left: Math.round(s.getBoundingClientRect().left), chipsOnLine: b.querySelectorAll('.group-chip, .team-tb-pills .goals-chip').length, chipsInHead: document.querySelectorAll('#group-table-view .group-table-head ~ .group-table-chips, #group-table-view .group-table-head .group-chip').length, label: s.getAttribute('aria-label') }; })()`);
@@ -156,52 +156,48 @@ const AGENTS = (waiting) => waiting ? [
             const gap = await ev(`(() => { const row = document.querySelector('#group-table-view .inbox-folder-toolbar .list-bar-search-row'), h = row.querySelector('.inbox-folder-head').getBoundingClientRect(), q = row.querySelector('input[type=search]').getBoundingClientRect(); return Math.round(q.left - h.right); })()`);
             assert.ok(gap >= 0 && gap <= 24, at + `the search box follows the title in the one row: ${gap}px after it`);
             assert.deepEqual([savedBar.chipsOnLine, savedBar.chipsInHead, savedBar.label], [2, 0, 'Search saved messages'], at + 'Saved\'s Open and Done chips are on the toolbar line, not a row under the title (QA finding 3), and the page\'s field says what it searches');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent)`), ['Item', 'Team', 'Saved', 'Actions'], at + 'Item, Team, Saved, Actions (the one Saved list, #20508): the Open filter already says Open, so no State column repeats it on every row (#9628)');
-            // a row reads who said what: the sender 14/600, the message after it in the secondary colour; Done is drawn on the row's hover or keyboard focus only (a desktop here has a pointer)
+            // a row as the Saved mock draws it (#22108): a kind icon, the name (14/600) on line 1, the agent as an icon at the right; no buttons at rest, Remove from Saved and More on the row's hover or keyboard focus
             await mouseTo(2, 2);
-            // the one Saved list draws a row as the Needs you row: the sender is the strong title (a name button), the message after it in the secondary colour, and Done at rest on the row (#20508)
-            const look = await ev(`(() => { const who = document.querySelector('#group-table-view tbody .inbox-review-name'), text = document.querySelector('#group-table-view tbody .inbox-row-words'), btn = document.querySelector('#group-table-view tbody .inbox-saved-done'); const cs = e => getComputedStyle(e); return { who: [cs(who).fontSize, cs(who).fontWeight, who.textContent], textColor: cs(text).color !== cs(who).color, textWeight: cs(text).fontWeight, rest: cs(btn).opacity }; })()`);
-            assert.deepEqual([look.who[0], look.who[1], look.who[2].startsWith('Agent One'), look.textColor, look.textWeight, look.rest], ['15px', '600', true, true, '400', '1'], at + 'the sender is the name button at 15/600, the message after it in a colour other than the sender\'s (the secondary text colour), Done drawn at rest, Done drawn at rest (the approved Needs you row shape, #20508) ' + JSON.stringify(look));
-            await ev(`document.querySelector('#group-table-view tbody .inbox-saved-done').focus(); true`);
-            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .inbox-saved-done')).opacity === '1'`, at + 'Done shows when the keyboard is on it', 3000); // the button's own transition settles
+            const ROW = '#group-table-view .saved-ledger .sl-row';
+            const look = await ev(`(() => { const r = document.querySelector('${ROW}'), name = r.querySelector('.sl-name'), cs = getComputedStyle(name); return { name: [cs.fontSize, cs.fontWeight], agent: r.querySelector('.sl-avatar')?.getAttribute('aria-label'), acts: getComputedStyle(r.querySelector('.sl-actions')).display }; })()`);
+            assert.deepEqual([look.name[0], look.name[1], look.agent, look.acts], ['14px', '600', 'Agent One', w === 1024 && await ev(`matchMedia('(hover: none)').matches`) ? 'flex' : 'none'], at + 'the name at 14/600, the agent as an icon, no buttons at rest: ' + JSON.stringify(look));
+            await ev(`document.querySelector('${ROW} .sl-name').focus(); true`);
+            await waitFor(`getComputedStyle(document.querySelector('${ROW} .sl-actions')).display === 'flex'`, at + 'the actions show when the keyboard is on the row', 3000);
+            assert.deepEqual(await ev(`[...document.querySelector('${ROW} .sl-actions').querySelectorAll(':scope > button, .inbox-row-more-toggle')].map(b => b.textContent.trim())`), ['Remove from Saved', 'More'], at + 'Remove from Saved and More (a message has no star)');
             await ev(`document.activeElement.blur(); true`);
-            await mouseTo(2, 2);
-            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .inbox-saved-done')).opacity === '1'`, at + 'and still drawn at rest on a pointer (the mouse in a neutral corner): an outlined pill, as the approved Saved draws it (mock #19808 v1, #19841)', 3000); // the 10 s above is for the emulation to switch; the hide itself is a transition, so a 6 s product lag still fails
-            const rowAt = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr.dt-row').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+            const rowAt = await ev(`(() => { const r = document.querySelector('${ROW}').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             await mouseTo(rowAt.x, rowAt.y);
-            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .inbox-saved-done')).opacity === '1'`, at + 'and shown again when the mouse is on the row', 3000);
+            await waitFor(`getComputedStyle(document.querySelector('${ROW} .sl-actions')).display === 'flex' && getComputedStyle(document.querySelector('${ROW} .sl-right')).display === 'none'`, at + 'and on the row\'s hover, in the right side\'s place', 3000);
             await mouseTo(2, 2);
-            // on a touch screen (a coarse pointer) there is no hover and no focus ring to wait for: Done is always drawn (QA Engineer, #9634). After the pointer steps, on the last desktop width: switching the touch emulation off again does not give a build server's Chrome its pointer back (the CI run of #9864 never saw Done hidden again), and no step after this one needs a pointer.
-            if (w === 1024) {
+            if (w === 1024) { // a touch screen has no hover: the actions are always drawn
                 await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
-                await waitFor(`matchMedia('(pointer: coarse)').matches && getComputedStyle(document.querySelector('#group-table-view tbody .inbox-saved-done')).opacity === '1'`, at + 'Done is shown on touch without hover or focus', 3000);
+                await waitFor(`matchMedia('(hover: none)').matches && getComputedStyle(document.querySelector('${ROW} .sl-actions')).display === 'flex'`, at + 'the actions show on touch without hover or focus', 3000);
             }
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim() + (c.getAttribute('aria-pressed') === 'true' ? '*' : ''))`), ['Open 2*', 'Done 1'], at + 'Open and Done chips with counts');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-quiet')].map(b => b.textContent)`), ['Done', 'Done'], at + 'one quiet Done button per row');
-            assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the saved table is on the scale');
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim() + (c.getAttribute('aria-pressed') === 'true' ? '*' : ''))`), ['Open*', 'Done'], at + 'Open and Done, a switch with no numbers');
+            assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the saved list is on the scale');
             await shot(`inbox-one-saved-${w}`);
             // Display options hold Filters and Sort, and no second search box
             await ev(`document.querySelector('${pane} [data-display-button]').click(); true`);
             await waitFor(`!!document.querySelector('#inbox-saved-bar .list-bar-select, #inbox-saved-bar select')`, at + 'Filters and Sort in Display options', 5000);
             assert.equal(await ev(`document.querySelector('#inbox-saved-bar .list-bar-search') === null`), true, at + 'and no second search box');
             await ev(`document.querySelector('${pane} [data-display-button]').click(); true`);
-            // Done moves a row to the Done chip, and Reopen brings it back
-            await ev(`document.querySelector('#group-table-view tbody .dt-quiet').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Done moves the row out of Open', 8000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim())`), ['Open 1', 'Done 2'], at + 'the counts follow');
+            // Mark done (in More) moves a row to Done, and Reopen brings it back
+            const menuPick = word => ev(`(() => { const b = [...document.querySelectorAll('${ROW} .menu-item')].find(x => x.textContent.trim() === '${word}'); if (!b) return false; b.click(); return true; })()`);
+            assert.equal(await menuPick('Mark done'), true, at + 'More holds Mark done');
+            await waitFor(`document.querySelectorAll('${ROW}').length === 1`, at + 'Mark done moves the row out of Open', 8000);
             assert.equal(await ev(`document.getElementById('inbox-live').textContent`), 'Marked done', at + 'a polite line says so');
             await ev(`document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')[1].click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2 && document.querySelector('#group-table-view tbody .dt-quiet').textContent === 'Reopen'`, at + 'the Done chip lists them, with Reopen', 8000);
-            await ev(`document.querySelector('#group-table-view tbody .dt-quiet').click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Reopen takes it out of Done', 8000);
+            await waitFor(`document.querySelectorAll('${ROW}').length === 2 && [...document.querySelectorAll('${ROW} .menu-item')].some(x => x.textContent.trim() === 'Reopen')`, at + 'Done lists them, with Reopen', 8000);
+            assert.equal(await menuPick('Reopen'), true, at + 'More holds Reopen');
+            await waitFor(`document.querySelectorAll('${ROW}').length === 1`, at + 'Reopen takes it out of Done', 8000);
             await ev(`document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')[0].click(); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'back on Open with both', 8000);
+            await waitFor(`document.querySelectorAll('${ROW}').length === 2`, at + 'back on Open with both', 8000);
             // the search is the server's, and the table says so
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = 'rollback'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1 && /every saved message/.test(document.querySelector('#group-table-view .group-table-note').textContent)`, at + 'the search narrows Saved and says it covers all', 8000);
+            await waitFor(`document.querySelectorAll('${ROW}').length === 1 && /every saved message/.test(document.querySelector('#group-table-view .group-table-note').textContent)`, at + 'the search narrows Saved and says it covers all', 8000);
             assert.ok((await ev(`window.__savedQs`)).some(q => /q=rollback/.test(q)), at + 'the server did the matching');
             await ev(`(() => { const i = document.querySelector('${pane} .sidebar-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
-            await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'cleared', 8000);
+            await waitFor(`document.querySelectorAll('${ROW}').length === 2`, at + 'cleared', 8000);
 
             // the group on screen is kept in this browser, and a newly waiting agent is still announced while Saved is shown
             assert.equal(await ev(`localStorage.getItem('coral.inbox.tab')`), 'saved', at + 'the group last on screen is remembered');
@@ -210,7 +206,7 @@ const AGENTS = (waiting) => waiting ? [
             await waitFor(`/Agent Three needs you/.test(document.getElementById('inbox-live').textContent)`, at + 'the announcement while Saved is shown', 5000);
             await setAgents(true);
             // a saved message's page: its link back, the message, and a bar with the primary last
-            await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
+            await ev(`document.querySelector('${ROW} .sl-name').click(); true`);
             await waitFor(`!!document.querySelector('#inbox-page .item-bar') && document.getElementById('inbox-page').checkVisibility()`, at + "the saved message's page", 8000);
             assert.equal(await ev(`document.querySelector('#inbox-page > .back-link').textContent`), '← Saved', at + 'back names Saved');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#inbox-page .wf-item-title')); return [t.fontSize, t.fontWeight]; })()`), ['20px', '700'], at + 'the title is 20/700 (the item page title, Goal #84)');
@@ -225,7 +221,7 @@ const AGENTS = (waiting) => waiting ? [
             assert.equal(await ev(`[...document.querySelectorAll('#inbox-page .wf-more-menu button')].some(b => b.getClientRects().length > 0)`), false, at + 'Remove is not on the page until More opens');
             await ev(`document.querySelector('#inbox-page .wf-more > .btn').click(); true`);
             await ev(`[...document.querySelectorAll('#inbox-page .wf-more-menu button')].find(b => /Remove/.test(b.textContent)).click(); true`);
-            await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'Remove takes it from the list and returns to the table', 8000);
+            await waitFor(`document.getElementById('group-table-view').checkVisibility() && document.querySelectorAll('${ROW}').length === 1`, at + 'Remove takes it from the list and returns to the table', 8000);
             assert.equal(await ev(`document.querySelector('${pane} .view-list-item[data-key="saved"] .view-list-count').textContent`), '1', at + "and the folder's count");
 
             // nothing waiting: one empty line

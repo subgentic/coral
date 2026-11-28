@@ -1,4 +1,4 @@
-// Saved is ONE list in the Inbox's row (#20508): files and messages together, newest saved first; each is a kind row with its preview and its buttons under it. (Fixture from saved_files_actions.) The Saved folder's "Files for review" rows have the same actions as a Needs you row (#11799, the operator: they had Approve, Changes and Deny but no Dismiss): Approve, a Request changes icon and the three dots in their fixed slots (Dismiss and Deny are in the dots, #12231), the three dots with
+// Saved is ONE list (#20508): files and messages together, newest saved first; each is a calm row as the Saved mock draws it (#22108): a kind icon, the name, line 2, a tag, the agent and the time. (Fixture from saved_files_actions.) The Saved folder's "Files for review" rows have the same actions as a Needs you row (#11799, the operator: they had Approve, Changes and Deny but no Dismiss): Approve, a Request changes icon and the three dots in their fixed slots (Dismiss and Deny are in the dots, #12231), the three dots with
 // "Move to Needs you"; with a mouse the buttons are always shown (Needs you's rule: #11669 had them at the row's hover, #15120 put them on the bottom line), a phone has Deny and Dismiss in the dots. Dismiss takes the file out of Saved with a toast and Undo, and Undo brings it back
 // (decisions 'ignore' and 'unignore', nothing else is posted). The server's tags are modelled in the page. 1440 and 390. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
@@ -14,7 +14,7 @@ const { setTheme } = require('./helpers/contrast');
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const S = `(window.__coralStatic || '/static/')`;
-    const rowsOf0 = () => ev(`[...document.querySelectorAll('.saved-files tbody tr')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
+    const rowsOf0 = () => ev(`[...document.querySelectorAll('.saved-ledger .sl-row')].map(r => (r.textContent.match(/plan-\\d/) || [''])[0])`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1440, 800, false], [390, 800, true]]) {
@@ -42,17 +42,18 @@ const { setTheme } = require('./helpers/contrast');
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('saved')).then(() => true)`);
-            await waitFor(`document.querySelectorAll('.saved-files tbody tr').length === 4`, at + 'Saved is one list of the two files and the two messages', 15000);
+            await waitFor(`document.querySelectorAll('.saved-ledger .sl-row').length === 4`, at + 'Saved is one list of the two files and the two messages', 15000);
             await ev(framesJs(4));
-            const shape = await ev(`(() => { const rows = [...document.querySelectorAll('.saved-files tbody tr')]; return { tables: document.querySelectorAll('.saved-files table, .saved-files [role="table"]').length, order: rows.map(r => r.classList.contains('inbox-file-row') ? 'file' : 'message'), inbox: rows.every(r => r.classList.contains('inbox-kind-row') && r.classList.contains('inbox-message-row')), footers: rows.map(r => !!r.querySelector(${JSON.stringify(mobile ? '.inbox-review-actions' : '.inbox-v4-footer .inbox-review-actions')})), previews: rows.map(r => !!r.querySelector('.inbox-preview')), done: rows.filter(r => r.querySelector('.inbox-saved-done')).length, heads: [...document.querySelectorAll('.inbox-saved-card .inbox-card-head')].map(h => h.textContent) }; })()`);
-            check(shape.tables === 1, at + 'one table, not a files table and a messages table: ' + JSON.stringify(shape));
+            const shape = await ev(`(() => { const rows = [...document.querySelectorAll('.saved-ledger .sl-row')]; return { lists: document.querySelectorAll('.saved-ledger').length, order: rows.map(r => r.classList.contains('sl-file') ? 'file' : 'message'), names: rows.map(r => !!r.querySelector('.sl-line1 .sl-name')), icons: rows.map(r => r.querySelector('.sl-icon')?.textContent), tags: rows.map(r => r.querySelector('.sl-tag')?.textContent || ''), approve: rows.filter(r => r.querySelector('.inbox-approve-action, [data-slot="approve"]')).length, count: document.querySelector('.saved-ledger-count')?.textContent || '', heads: document.querySelectorAll('.saved-ledger-wrap .inbox-card-head').length }; })()`);
+            check(shape.lists === 1, at + 'one list, not a files list and a messages list: ' + JSON.stringify(shape));
             check(JSON.stringify(shape.order) === JSON.stringify(['message', 'file', 'file', 'message']), at + 'newest saved first, files and messages mixed (the older message last): ' + JSON.stringify(shape.order));
             const plans = (await rowsOf0()).filter(Boolean);
             check(JSON.stringify(plans) === JSON.stringify(['plan-1', 'plan-2']), at + 'a file saved later sorts first, by saved_at not by its version time: ' + JSON.stringify(plans));
-            const age = await ev(`(() => { const r = [...document.querySelectorAll('.saved-files tbody tr')].find(x => /plan-1/.test(x.textContent)); return r ? r.textContent : ''; })()`);
-            check(/1 min ago/.test(age) && !/8 min ago/.test(age), at + 'the time a Saved file shows is saved_at (1 min ago), not its version time (8 min ago): ' + age.replace(/\s+/g, ' ').slice(0, 160));
-            check(shape.inbox && shape.footers.every(Boolean) && shape.previews.every(Boolean), at + 'every row is an Inbox row: kind row, message row, preview, buttons under it: ' + JSON.stringify(shape));
-            check(shape.done === 2 && shape.heads.length === 1, at + 'a message has Done under its words, and the list has one head: ' + JSON.stringify([shape.done, shape.heads]));
+            const age = await ev(`(() => { const r = [...document.querySelectorAll('.saved-ledger .sl-row')].find(x => /plan-1/.test(x.textContent)); return r ? (r.querySelector('.sl-time')?.textContent || r.textContent) : ''; })()`);
+            if (!mobile) check(/1 min ago/.test(age) && !/8 min ago/.test(age), at + 'the time a Saved file shows is saved_at (1 min ago), not its version time (8 min ago): ' + age.replace(/\s+/g, ' ').slice(0, 160));
+            check(shape.names.every(Boolean) && JSON.stringify(shape.icons) === JSON.stringify(['chat_bubble_outline', 'description', 'description', 'chat_bubble_outline']), at + 'every row: a grey kind icon and the name on line 1 (#22108): ' + JSON.stringify(shape));
+            check(JSON.stringify(shape.tags) === JSON.stringify(['', 'To review', 'To review', '']) && shape.approve === 0, at + 'a file still to decide says To review, a message has no tag, and no row has Approve: ' + JSON.stringify([shape.tags, shape.approve]));
+            if (!mobile) check(/^4 saved · 2 files, 2 messages · newest saved first$/.test(shape.count.replace(/\s+/g, ' ').trim()) && shape.heads === 0, at + 'the count is said once, above the list: ' + JSON.stringify([shape.count, shape.heads]));
             for (const theme of ['light', 'dark']) { await setTheme(ev, theme); await ev(framesJs(3)); await shot(`saved-one-list-${w}-${theme}`); }
             await removeBoards(ev, [team]).catch(() => {});
         }

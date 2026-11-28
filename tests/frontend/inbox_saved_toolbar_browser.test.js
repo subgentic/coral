@@ -17,7 +17,7 @@ const ITEMS = [
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
-    const rows = () => ev(`[...document.querySelectorAll('button.dt-primary')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()).sort()`);
+    const rows = () => ev(`[...document.querySelectorAll('#group-table-view .sl-row .sl-name')].filter(b => b.getClientRects().length).map(b => b.textContent.trim()).sort()`);
     const folders = () => ev(`${FOLDER_ROWS}.map(r => /^Saved/.test(r) ? r : r.replace(/\\d+/g, '')).join('|')`); // the Saved row keeps its count; every other row's count arrives on its own time (a slow runner: Windows)
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), vis = e => !!e && e.getClientRects().length > 0;
@@ -26,7 +26,7 @@ const ITEMS = [
         const b = [...document.querySelectorAll('.team-tb-pills .goals-chip')].find(x => x.dataset.filter === ${JSON.stringify(key)}); b.click(); return true; })()`);
     const setField = (id, value) => ev(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     const chipText = () => ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-chip-text')].map(e => e.textContent).join('|')`);
-    const waitRows = (n, what) => waitFor(`[...document.querySelectorAll('button.dt-primary')].filter(b => b.getClientRects().length).length === ${n}`, what, 8000);
+    const waitRows = (n, what) => waitFor(`[...document.querySelectorAll('#group-table-view .sl-row .sl-name')].filter(b => b.getClientRects().length).length === ${n}`, what, 8000);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
@@ -53,7 +53,7 @@ const ITEMS = [
             const g = await geometry();
             check(`${label}: the Saved page has a search box named "Search saved messages" and the Filters icon in the same row, to its right`, g && g.qName === 'Search saved messages' && (mobile ? g.searchW === 0 : g.sameRow && g.right) && /Filters/.test(g.toggleName), JSON.stringify(g));
             if (mobile) check(`${label}: the Open | Done pills are not in the row (one select in the Filters sheet since #8700), the page's box is not drawn (the top pill is the search, #13591), nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW === 0 && g.over <= 0, JSON.stringify(g));
-            else check(`${label}: the pills Open and Done are in the row, with their counts`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'Open 3|Done 1');
+            else check(`${label}: Open and Done are in the row, a switch with no numbers (#22108)`, g && g.pills && (await ev(`[...document.querySelectorAll('.team-tb-pills .goals-chip')].map(b => b.textContent.trim()).join('|')`)) === 'Open|Done');
             check(`${label}: the page's old Show chips are gone (the pills are the toolbar's)`, !(await ev(`!!document.querySelector('[data-action="inbox-saved-chip"], .group-chips')`)));
 
             await pick('done'); await waitRows(1, 'the done tab');

@@ -47,12 +47,12 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(reply.openTag, null, 'already on the task page: no redundant Open task link');
         // Saved: a message whose transcript is gone says Gone in the table (one word, not a sentence on every row) and says why once, on its own page
         await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('saved')); true`);
-        await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'three saved', 10000);
-        await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr')].every(tr => tr.querySelector('td[data-key="state"]')?.textContent.trim() === 'Gone')`, 'the rows are marked gone from the list\'s own answer', 10000);
-        const saved = await ev(`({ gone: [...document.querySelectorAll('#group-table-view tbody tr')].filter(tr => tr.querySelector('td[data-key="state"]')?.textContent.trim() === 'Gone').length, sentences: document.querySelectorAll('#group-table-view .inbox-saved-why, #group-table-view .why').length, buttons: document.querySelectorAll('#group-table-view .dt-quiet').length })`);
+        await waitFor(`document.querySelectorAll('#group-table-view .sl-row').length === 3`, 'three saved', 10000);
+        await waitFor(`[...document.querySelectorAll('#group-table-view .sl-row')].every(tr => tr.querySelector('.sl-tag')?.textContent.trim() === 'Gone')`, 'the rows are marked gone from the list\'s own answer', 10000);
+        const saved = await ev(`({ gone: [...document.querySelectorAll('#group-table-view .sl-row')].filter(tr => tr.querySelector('.sl-tag')?.textContent.trim() === 'Gone').length, sentences: document.querySelectorAll('#group-table-view .inbox-saved-why, #group-table-view .why').length, buttons: document.querySelectorAll('#group-table-view .sl-actions button').length })`);
         assert.equal(saved.gone, 3, 'three gone rows: ' + JSON.stringify(saved));
         assert.equal(saved.sentences, 0, 'the sentence is not repeated on the rows: ' + JSON.stringify(saved));
-        await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
+        await ev(`document.querySelector('#group-table-view .sl-row .sl-name').click(); true`);
         await waitFor(`!!document.querySelector('#inbox-page .inbox-saved-why')`, 'the reason on the page', 8000);
         assert.equal(await ev(`document.querySelectorAll('#inbox-page .inbox-saved-why').length`), 1, 'the reason is said once on the page');
         assert.ok((await ev(`document.querySelector('#inbox-page .inbox-saved-why').textContent.trim().length`)) > 10, 'and it is a sentence');
