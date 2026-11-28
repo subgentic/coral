@@ -1,3 +1,4 @@
+// #22094: full agent identity in metadata and whole question title; former mail-column placement retired.
 // The name on a phone's Needs you row is read whole (walk 74 item 6, #17875): it shared one line with the question and was cut to 48 percent of it, "Orchestrat…" / "Frontend Dev Tea…", while the question took the rest.
 // The name keeps what it needs (up to 70 percent) and the question gets what is left. 390 px, isolated dev server, stubbed waiting agents as in needs_row_opens_chat. Shots in CORAL_SCREENSHOT_DIR.
 const assert = require('node:assert/strict');
@@ -19,9 +20,9 @@ const { coralReady } = require('./helpers/wait');
             window.__m.add('w1', 'A', 4, { sleeping: false, board_project: 'coral-go-team', session_id: 'w1-id' }); window.__m.add('w2', 'A', 4, { sleeping: false, board_project: 'coral-go-team', session_id: 'w2-id' }); return true; })()`);
         await waitFor(`(window.__qaState && window.__qaState.liveSessions || []).length === 2`, 'agents', 8000);
         await ev(`window.__qaState.liveSessions = window.__qaState.liveSessions.map(s => ({ ...s, ...window.__m.entry(window.__m.agents[s.session_id]) })); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }); true`);
-        await waitFor(`document.getElementById('group-table-view')?.dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view tbody tr').length >= 2`, 'the Needs you rows', 8000);
+        await waitFor(`document.getElementById('group-table-view')?.dataset.group === 'hub-inbox:needs' && document.querySelectorAll('#group-table-view .nl-row').length >= 2`, 'the Needs you rows', 8000);
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the rows settle after the list render
-        const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(tr => { const t = tr.querySelector('.dt-mail-title'), s = tr.querySelector('.dt-mail-snippet'); return t && { name: t.textContent, cut: t.scrollWidth > t.clientWidth + 1, snippetW: Math.round(s ? s.clientWidth : 0) }; })`);
+        const rows = await ev(`[...document.querySelectorAll('#group-table-view .nl-row')].map(tr => { const t = tr.querySelector('.nl-meta > .agent-link, .nl-meta > .agent-name'), s = tr.querySelector('.nl-title'); return t && { name: t.textContent, cut: t.scrollWidth > t.clientWidth + 1, snippetW: Math.round(s ? s.clientWidth : 0) }; })`);
         const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/needs-row-390.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         assert.equal(rows.length, 2, JSON.stringify(rows));
         for (const r of rows) { assert.equal(r.cut, false, `the name is read whole: ${JSON.stringify(rows)}`); assert.ok(r.snippetW >= 40, `the question keeps some room: ${JSON.stringify(rows)}`); }
