@@ -8,7 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { coralReady } = require('./helpers/wait');
+const { coralReady, waitStable } = require('./helpers/wait');
 const { stubCliChecks } = require('./helpers/new_agent');
 
 const ALL = ['claude', 'codex', 'agy', 'pi', 'opencode', 'hermes'];
@@ -16,16 +16,17 @@ const only = (...have) => ALL.filter(t => !have.includes(t)); // stubCliChecks t
 
 (async () => {
     const work = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'na596-')));
-    const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const CHECK = '#launch-step-agent .launch-where-check';
     const STATIC = `(window.__coralStatic || '/static/')`;
     // What step 1 shows: the check's lines, its sentence, its fix buttons, whether Next is off; and the type the form (step 3) holds.
-    const step1 = () => ev(`(() => { const c = document.querySelector('${CHECK}'), n = document.getElementById('launch-agent-next');
+    const STEP1 = `(() => { const c = document.querySelector('${CHECK}'), n = document.getElementById('launch-agent-next');
         return { lines: c ? [...c.querySelectorAll('.launch-where-item-title')].map(e => e.textContent.trim()) : [], why: c?.querySelector('.launch-where-why')?.hidden === false ? c.querySelector('.launch-where-why').textContent : '',
             fixes: c ? [...c.querySelectorAll('.launch-where-fix')].map(b => b.textContent.trim()) : [], nextOff: !!n && (n.disabled || n.getAttribute('aria-disabled') === 'true'),
-            type: document.querySelector('#launch-agent-acf .acf-agent-type')?.value || '' }; })()`);
+            type: document.querySelector('#launch-agent-acf .acf-agent-type')?.value || '' }; })()`;
+    const step1 = () => ev(STEP1);
     const cliLine = s => s.lines.find(l => /installed|sign-in|not offered/.test(l)) || '';
     // A fresh page with these agents installed, then the scenario's own state (a setting, live agents), then New agent with a folder typed.
     const open = async (have, setup = '') => {
@@ -38,8 +39,9 @@ const only = (...have) => ALL.filter(t => !have.includes(t)); // stubCliChecks t
         await ev(`(() => { const i = document.getElementById('launch-dir'); i.value = ${JSON.stringify(work)}; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await waitFor(`!!document.querySelector('${CHECK}') && !!document.querySelector('#launch-agent-pick')?.dataset.probed`, 'the setup check and the provider answers', 10000);
     };
-    // The check once it names `name`'s CLI (the provider cards may move the type a moment after the dialog opens, and the check follows them).
-    const settled = async name => { await waitFor(`[...document.querySelectorAll('${CHECK} .launch-where-item-title')].some(e => e.textContent.startsWith(${JSON.stringify(name)}))`, `the check for ${name}`, 10000).catch(() => {}); await sleep(300); return step1(); };
+    // The check once it names `name`'s CLI and has stopped changing (the provider cards may move the type a moment after the dialog opens, and the check follows them).
+    // A check that never gets there is read as it is, so the failing line shows what it said.
+    const settled = name => waitStable(ev, STEP1, `the check for ${name}`, 300, { timeout: 10000, accept: s => s.lines.some(l => l.startsWith(name)) }).catch(() => step1());
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
