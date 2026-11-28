@@ -8,12 +8,13 @@ import { markHidden } from './visible_marks.js';
 import { whenText } from './when_text.js';
 import { pollEvery } from './overload.js';
 import { onArtifactsRev } from './artifacts_feed.js';
+import { isParked } from './goal_words.js';
 const { needsReviewAttention } = await importOnce('./inbox_review_state.js');
 const { el } = await importOnce('./dom_el.js');
 const Tasks = await importOnce('./tasks_view.js');
 const DT = await importOnce('./data_table.js');
 const { avatar, chip } = DT;
-const { isParked } = await importOnce('./goal_words.js');
+
 const { readGoalJSON } = await importOnce('./goal_view.js');
 const { agentLink, liveAgentOf } = await importOnce('./agent_link.js');
 const { readableName, itemKey, managedHex } = await importOnce('./artifact_item.js');
