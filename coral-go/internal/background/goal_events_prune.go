@@ -36,8 +36,12 @@ func (j *GoalEventsPrune) Run(ctx context.Context) error {
 // RunOnce deletes the events past the newest Keep of each board, in short batches with Pause between them (#22013), and reports how many.
 func (j *GoalEventsPrune) RunOnce(ctx context.Context) int64 {
 	var total int64
+	tune := newBatchTuner(j.BatchSize, j.Pause)
 	for ctx.Err() == nil {
-		n, err := j.bs.PruneGoalEventsBatch(ctx, j.Keep, j.BatchSize)
+		batch := tune.Size()
+		t0 := time.Now()
+		n, err := j.bs.PruneGoalEventsBatch(ctx, j.Keep, batch)
+		pause := tune.Took(time.Since(t0))
 		if err != nil {
 			if ctx.Err() == nil {
 				j.logger.Warn("goal events: could not prune", "error", err)
@@ -45,12 +49,12 @@ func (j *GoalEventsPrune) RunOnce(ctx context.Context) int64 {
 			break
 		}
 		total += n
-		if n < int64(j.BatchSize) {
+		if n < int64(batch) {
 			break
 		}
 		select {
 		case <-ctx.Done():
-		case <-time.After(j.Pause):
+		case <-time.After(pause):
 		}
 	}
 	if total > 0 {

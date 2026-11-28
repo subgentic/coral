@@ -58,8 +58,9 @@ func (j *CallMetricsRetention) RunOnce(ctx context.Context) int64 {
 	started := j.now()
 	var total int64
 	capped := false
+	tune := newBatchTuner(j.BatchSize, j.Pause)
 	for ctx.Err() == nil {
-		batch := j.BatchSize
+		batch := tune.Size()
 		if left := j.RunCap - total; left < int64(batch) {
 			batch = int(left)
 		}
@@ -67,7 +68,9 @@ func (j *CallMetricsRetention) RunOnce(ctx context.Context) int64 {
 			capped = true
 			break
 		}
+		t0 := time.Now()
 		n, err := j.db.PruneCallMetrics(ctx, cutoff, batch)
+		pause := tune.Took(time.Since(t0))
 		if err != nil {
 			if ctx.Err() == nil {
 				j.logger.Warn("call metrics retention: delete failed", "error", err)
@@ -80,7 +83,7 @@ func (j *CallMetricsRetention) RunOnce(ctx context.Context) int64 {
 		}
 		select {
 		case <-ctx.Done():
-		case <-time.After(j.Pause):
+		case <-time.After(pause):
 		}
 	}
 	// Rows past the window are deleted, never rolled up: while the prune is capped some are
@@ -101,8 +104,12 @@ func (j *CallMetricsRetention) RunOnce(ctx context.Context) int64 {
 
 // pruneHourly deletes the hourly rows past the window in short batches with Pause between them, as the raw prune does: one long delete would hold the database's one writer (#22013).
 func (j *CallMetricsRetention) pruneHourly(ctx context.Context, cutoff time.Time) (total int64) {
+	tune := newBatchTuner(j.BatchSize, j.Pause)
 	for ctx.Err() == nil {
-		n, err := j.db.PruneCallMetricsHourlyBatch(ctx, cutoff, j.BatchSize)
+		batch := tune.Size()
+		t0 := time.Now()
+		n, err := j.db.PruneCallMetricsHourlyBatch(ctx, cutoff, batch)
+		pause := tune.Took(time.Since(t0))
 		if err != nil {
 			if ctx.Err() == nil {
 				j.logger.Warn("call metrics retention: deleting old hourly rows failed", "error", err)
@@ -110,12 +117,12 @@ func (j *CallMetricsRetention) pruneHourly(ctx context.Context, cutoff time.Time
 			break
 		}
 		total += n
-		if n < int64(j.BatchSize) {
+		if n < int64(batch) {
 			break
 		}
 		select {
 		case <-ctx.Done():
-		case <-time.After(j.Pause):
+		case <-time.After(pause):
 		}
 	}
 	return total
